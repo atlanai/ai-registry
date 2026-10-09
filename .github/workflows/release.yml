@@ -1,10 +1,11 @@
 # Releases the cli/package.json version of aireg to the stable channel and GitHub Releases.
 # Repository variables, public because every binary embeds them: RELEASE_ORIGIN_PROD,
 # RELEASE_TRUSTED_KEYS_PROD, optional RELEASE_PREFIX (the origin's path; default: bucket root).
-# More repository variables, identifiers rather than secrets: RELEASE_AWS_REGION, RELEASE_ROLE_ARN,
-# RELEASE_BUCKET, RELEASE_SIGNING_KEY_SECRET (the Secrets Manager id; the key is read from AWS).
-# No GitHub secrets. Approval is the release-gate environment on the publish job, and the publisher
-# role trusts only OIDC tokens for release-gate from this workflow on main; it runs no pnpm install.
+# Also RELEASE_AWS_REGION, RELEASE_ROLE_ARN and RELEASE_CONFIG_SECRET. No GitHub secrets: the bucket
+# and signing-key secret id come from that AWS Secrets Manager JSON secret (keys `bucket`,
+# `signing_key_secret`; a later macOS signing job may add `macos_signing_secret`). Only the role ARN
+# and region print in the publish job's logs; the account id is masked after login.
+# Approval is the release-gate environment on the publish job, the only environment AWS trusts.
 name: Release
 
 on:
@@ -199,13 +200,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # Later step headers print these identifiers in clear; they are not secrets.
+      # Prints only true or false; the role ARN and region later print in clear and are not secrets.
       - name: Check the release variables
         env:
-          VARS_SET: ${{ vars.RELEASE_AWS_REGION != '' && vars.RELEASE_ROLE_ARN != '' && vars.RELEASE_BUCKET != '' && vars.RELEASE_SIGNING_KEY_SECRET != '' }}
+          VARS_SET: ${{ vars.RELEASE_AWS_REGION != '' && vars.RELEASE_ROLE_ARN != '' && vars.RELEASE_CONFIG_SECRET != '' }}
         run: |
           if [ "$VARS_SET" != true ]; then
-            echo "::error::set RELEASE_AWS_REGION, RELEASE_ROLE_ARN, RELEASE_BUCKET and RELEASE_SIGNING_KEY_SECRET as repository variables"
+            echo "::error::set RELEASE_AWS_REGION, RELEASE_ROLE_ARN and RELEASE_CONFIG_SECRET as repository variables"
             exit 1
           fi
 
@@ -241,6 +242,23 @@ jobs:
           role-duration-seconds: 900
           mask-aws-account-id: true
 
+      # Masked step outputs pass within this job only; GitHub drops masked values from job outputs.
+      - id: config
+        name: Read the release config
+        env:
+          SECRET_ID: ${{ vars.RELEASE_CONFIG_SECRET }}
+        run: |
+          set -euo pipefail
+          config="$(aws secretsmanager get-secret-value --secret-id "$SECRET_ID" --query SecretString --output text)"
+          for field in bucket signing_key_secret; do
+            if ! value="$(jq -er --arg f "$field" '.[$f] | select(type == "string" and test("^[^\\r\\n]+$"))' <<< "$config" 2>/dev/null)"; then
+              echo "::error::the release config secret must be JSON with a non-empty, single-line string '$field'"
+              exit 1
+            fi
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$field" "$value" >> "$GITHUB_OUTPUT"
+          done
+
       - uses: ./.github/actions/aireg-publish
         with:
           dir: ${{ github.workspace }}/release
@@ -249,9 +267,9 @@ jobs:
           minimum-version: ${{ inputs.minimum_version }}
           key-id: ${{ needs.plan.outputs.key_id }}
           origin: ${{ env.RELEASE_ORIGIN }}
-          bucket: ${{ vars.RELEASE_BUCKET }}
+          bucket: ${{ steps.config.outputs.bucket }}
           prefix: ${{ env.RELEASE_PREFIX }}
-          signing-key-secret: ${{ vars.RELEASE_SIGNING_KEY_SECRET }}
+          signing-key-secret: ${{ steps.config.outputs.signing_key_secret }}
           trusted-keys: ${{ env.RELEASE_TRUSTED_KEYS }}
 
   # Last, so the tag only ever names a release whose channel is already live.
