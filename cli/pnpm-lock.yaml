@@ -16,10 +16,10 @@ importers:
     dependencies:
       ink:
         specifier: 6.3.1
-        version: 6.3.1(@types/react@19.2.2)(react@19.2.0)
+        version: 6.3.1(@types/react@19.3.0)(react@19.3.0)
       react:
-        specifier: 19.2.0
-        version: 19.2.0
+        specifier: 19.3.0
+        version: 19.3.0
       string-width:
         specifier: 8.3.0
         version: 8.3.0
@@ -37,8 +37,8 @@ importers:
         specifier: 26.6.4
         version: 26.6.4
       '@types/react':
-        specifier: 19.2.2
-        version: 19.2.2
+        specifier: 19.3.0
+        version: 19.3.0
       '@vitest/coverage-v8':
         specifier: 4.1.11
         version: 4.1.11(vitest@4.1.11)
@@ -830,8 +830,8 @@ packages:
   '@types/node@26.6.4':
     resolution: {integrity: sha512-ldVPDCzj7fsaGZrLB0NuHuTvJcsNasysBAqMolr/cgxrLd1xbqxIr3XJiPnHHJUCxj5sNF1vnRj9aWnrVh5Jcg==}
 
-  '@types/react@19.2.2':
-    resolution: {integrity: sha512-6mDvHUFSjyT2B2yeNx2nUgMxh9LtOWvkhIU3uePn2I2oyNymUAX1NIsdgviM4CH+JSrp2D2hsMvJOkxY+0wNRA==}
+  '@types/react@19.3.0':
+    resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
@@ -1422,8 +1422,8 @@ packages:
     peerDependencies:
       react: ^19.1.0
 
-  react@19.2.0:
-    resolution: {integrity: sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==}
+  react@19.3.0:
+    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
     engines: {node: '>=0.10.0'}
 
   readdirp@4.1.2:
@@ -2174,7 +2174,7 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
-  '@types/react@19.2.2':
+  '@types/react@19.3.0':
     dependencies:
       csstype: 3.2.3
 
@@ -2455,7 +2455,7 @@ snapshots:
 
   indent-string@5.0.0: {}
 
-  ink@6.3.1(@types/react@19.2.2)(react@19.2.0):
+  ink@6.3.1(@types/react@19.3.0)(react@19.3.0):
     dependencies:
       '@alcalzone/ansi-tokenize': 0.2.5
       ansi-escapes: 7.3.0
@@ -2470,9 +2470,9 @@ snapshots:
       indent-string: 5.0.0
       is-in-ci: 2.0.0
       patch-console: 2.0.0
-      react: 19.2.0
+      react: 19.3.0
       react-devtools-core: link:packaging/stubs/react-devtools-core
-      react-reconciler: 0.32.0(react@19.2.0)
+      react-reconciler: 0.32.0(react@19.3.0)
       signal-exit: 3.0.7
       slice-ansi: 7.1.2
       stack-utils: 2.0.6
@@ -2483,7 +2483,7 @@ snapshots:
       ws: 8.21.3
       yoga-layout: 3.2.1
     optionalDependencies:
-      '@types/react': 19.2.2
+      '@types/react': 19.3.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -2716,12 +2716,12 @@ snapshots:
       picocolors: 1.1.1
       sade: 1.8.1
 
-  react-reconciler@0.32.0(react@19.2.0):
+  react-reconciler@0.32.0(react@19.3.0):
     dependencies:
-      react: 19.2.0
+      react: 19.3.0
       scheduler: 0.26.0
 
-  react@19.2.0: {}
+  react@19.3.0: {}
 
   readdirp@4.1.2: {}
 
