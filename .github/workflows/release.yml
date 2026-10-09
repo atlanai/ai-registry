@@ -214,7 +214,10 @@ jobs:
           test "$(HOME="$RUNNER_TEMP" AIREG_DISABLE_UPDATE_CHECK=1 ./aireg-darwin-arm64 --version)" = "$VERSION"
 
           field APPLE_API_KEY_BASE64 | base64 --decode > "$RUNNER_TEMP/notary.p8"
-          ditto -c -k --sequesterRsrc aireg-darwin-arm64 aireg-darwin-amd64 "$RUNNER_TEMP/notarize.zip"
+          # ditto zips only one source, so both binaries go in one folder first.
+          mkdir "$RUNNER_TEMP/notarize"
+          cp aireg-darwin-arm64 aireg-darwin-amd64 "$RUNNER_TEMP/notarize/"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/notarize" "$RUNNER_TEMP/notarize.zip"
           xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --key "$RUNNER_TEMP/notary.p8" \
             --key-id "$(field APPLE_API_KEY)" --issuer "$(field APPLE_API_ISSUER)" \
             --wait --timeout 30m --output-format json > "$RUNNER_TEMP/notary.json"
@@ -233,6 +236,7 @@ jobs:
           security delete-keychain "$RUNNER_TEMP/aireg-signing.keychain-db" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/apple.json" "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notary.p8" \
             "$RUNNER_TEMP/notary.json" "$RUNNER_TEMP/notarize.zip"
+          rm -rf "$RUNNER_TEMP/notarize"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
