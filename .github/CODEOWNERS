@@ -1,7 +1,3 @@
 # Code owners review pull requests that change their paths.
-/spec/ @firecast
-/cli/ @UdaySagar-Git
-/docs/ @benhuds
-/examples/ @firecast
-/tools/ @firecast
-/.github/ @firecast
+# Any one of these maintainers can review any file.
+* @UdaySagar-Git @firecast @goelrohan6 @benhuds
