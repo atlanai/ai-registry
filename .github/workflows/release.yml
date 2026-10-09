@@ -1,11 +1,9 @@
 # Releases the cli/package.json version of aireg to the stable channel and GitHub Releases.
-# Repository variables, public because every binary embeds them: RELEASE_ORIGIN_PROD,
-# RELEASE_TRUSTED_KEYS_PROD, optional RELEASE_PREFIX (the origin's path; default: bucket root).
-# Also RELEASE_AWS_REGION, RELEASE_ROLE_ARN and RELEASE_CONFIG_SECRET. No GitHub secrets: the bucket
-# and signing-key secret id come from that AWS Secrets Manager JSON secret (keys `bucket`,
-# `signing_key_secret`; a later macOS signing job may add `macos_signing_secret`). Only the role ARN
-# and region print in the publish job's logs; the account id is masked after login.
-# Approval is the release-gate environment on the publish job, the only environment AWS trusts.
+# Variables (public): RELEASE_ORIGIN_PROD, RELEASE_TRUSTED_KEYS_PROD, RELEASE_MACOS_CODESIGN_IDENTIFIER,
+# optional RELEASE_PREFIX; and, to log in, RELEASE_AWS_REGION, RELEASE_ROLE_ARN, RELEASE_MACOS_ROLE_ARN,
+# RELEASE_CONFIG_SECRET. No GitHub secrets: everything else comes from that AWS Secrets Manager JSON
+# secret (keys `bucket`, `signing_key_secret`, `macos_signing_secret`), masked once read.
+# Approval is the release-gate environment on the jobs that log in to AWS, the only environment AWS trusts.
 name: Release
 
 on:
@@ -31,6 +29,7 @@ env:
   RELEASE_PREFIX: ${{ vars.RELEASE_PREFIX || '' }}
   RELEASE_ORIGIN: ${{ vars.RELEASE_ORIGIN_PROD }}
   RELEASE_TRUSTED_KEYS: ${{ vars.RELEASE_TRUSTED_KEYS_PROD }}
+  RELEASE_MACOS_CODESIGN_IDENTIFIER: ${{ vars.RELEASE_MACOS_CODESIGN_IDENTIFIER }}
 
 jobs:
   plan:
@@ -72,10 +71,10 @@ jobs:
           fi
           passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success" --jq .total_count)
           [ "$passed" -gt 0 ] || fail "CI has not passed on $GITHUB_SHA"
-          for name in RELEASE_ORIGIN RELEASE_TRUSTED_KEYS; do
+          for name in RELEASE_ORIGIN RELEASE_TRUSTED_KEYS RELEASE_MACOS_CODESIGN_IDENTIFIER; do
             [ -n "${!name}" ] || fail "$name is not set"
           done
-          echo "::warning::darwin binaries are not notarized; browser downloads will be blocked"
+          [[ "$RELEASE_MACOS_CODESIGN_IDENTIFIER" =~ ^[a-z0-9-]+(\.[a-z0-9-]+)+$ ]] || fail "RELEASE_MACOS_CODESIGN_IDENTIFIER '$RELEASE_MACOS_CODESIGN_IDENTIFIER' must be lowercase reverse-DNS, such as com.example.tool"
           [[ "$RELEASE_ORIGIN" == https://* ]] || fail "the release origin must be https"
           # Slash-separated plain segments, no leading or trailing slash; empty means the bucket root.
           [[ "$RELEASE_PREFIX" =~ ^([A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*)?$ ]] || fail "RELEASE_PREFIX '$RELEASE_PREFIX' must be empty or a/b/c with no leading or trailing slash"
@@ -118,12 +117,143 @@ jobs:
           path: cli/dist-standalone/bin/
           if-no-files-found: error
 
+  # Signs and notarizes the darwin binaries, with no checkout and no installed packages.
+  sign-macos:
+    name: Sign and notarize the macOS binaries
+    needs: [plan, build]
+    # Dry runs stage unsigned binaries, so they never wait for approval.
+    if: ${{ !cancelled() && !inputs.dry_run && needs.build.result == 'success' }}
+    environment: release-gate
+    permissions:
+      id-token: write
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Check the release variables
+        env:
+          # A boolean, so this log shows only true/false, never the values.
+          VARS_SET: ${{ vars.RELEASE_AWS_REGION != '' && vars.RELEASE_MACOS_ROLE_ARN != '' && vars.RELEASE_CONFIG_SECRET != '' }}
+        run: |
+          if [ "$VARS_SET" != true ]; then
+            echo "::error::set the RELEASE_AWS_REGION, RELEASE_MACOS_ROLE_ARN and RELEASE_CONFIG_SECRET repository variables"
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: aireg-binary-darwin-*
+          path: bin
+          merge-multiple: true
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.RELEASE_MACOS_ROLE_ARN }}
+          aws-region: ${{ vars.RELEASE_AWS_REGION }}
+          role-duration-seconds: 900
+          mask-aws-account-id: true
+
+      # A bare Mach-O can't be stapled, so Gatekeeper checks the notarization online.
+      - name: Sign and notarize
+        working-directory: bin
+        env:
+          CONFIG_SECRET: ${{ vars.RELEASE_CONFIG_SECRET }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          umask 077
+          secret="$RUNNER_TEMP/apple.json"
+          SIGNING_SECRET=$(aws secretsmanager get-secret-value --secret-id "$CONFIG_SECRET" \
+            --query SecretString --output text | jq -er '.macos_signing_secret | select(type == "string" and length > 0)')
+          echo "::add-mask::$SIGNING_SECRET"
+          aws secretsmanager get-secret-value --secret-id "$SIGNING_SECRET" \
+            --query SecretString --output text > "$secret"
+          field() { jq -er --arg k "$1" '.[$k] | select(type == "string" and length > 0)' "$secret"; }
+          for key in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+            APPLE_API_KEY APPLE_API_KEY_BASE64 APPLE_API_ISSUER; do
+            field "$key" > /dev/null || { echo "::error::the signing secret has no $key"; exit 1; }
+          done
+          identity=$(field APPLE_SIGNING_IDENTITY)
+
+          # Throwaway keychain, deleted by the cleanup step.
+          keychain="$RUNNER_TEMP/aireg-signing.keychain-db"
+          password=$(openssl rand -hex 24)
+          field APPLE_CERTIFICATE | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$(field APPLE_CERTIFICATE_PASSWORD)" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          searched=("$keychain")
+          while IFS= read -r line; do searched+=("$(tr -d ' "' <<< "$line")"); done < <(security list-keychains -d user)
+          security list-keychains -d user -s "${searched[@]}"
+          rm -f "$RUNNER_TEMP/certificate.p12"
+
+          # JIT entitlements for the bundled JavaScript runtime.
+          cat > "$RUNNER_TEMP/entitlements.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>com.apple.security.cs.allow-jit</key>
+            <true/>
+            <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+          for binary in aireg-darwin-arm64 aireg-darwin-amd64; do
+            codesign --force --options runtime --timestamp \
+              --identifier "$RELEASE_MACOS_CODESIGN_IDENTIFIER" \
+              --entitlements "$RUNNER_TEMP/entitlements.plist" \
+              --keychain "$keychain" --sign "$identity" "$binary"
+            codesign --verify --strict --verbose=2 "$binary"
+            codesign --display --verbose=2 "$binary" 2>&1 | grep -qx "Identifier=$RELEASE_MACOS_CODESIGN_IDENTIFIER"
+          done
+          chmod +x aireg-darwin-arm64
+          test "$(HOME="$RUNNER_TEMP" AIREG_DISABLE_UPDATE_CHECK=1 ./aireg-darwin-arm64 --version)" = "$VERSION"
+
+          field APPLE_API_KEY_BASE64 | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          ditto -c -k --sequesterRsrc aireg-darwin-arm64 aireg-darwin-amd64 "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --key "$RUNNER_TEMP/notary.p8" \
+            --key-id "$(field APPLE_API_KEY)" --issuer "$(field APPLE_API_ISSUER)" \
+            --wait --timeout 30m --output-format json > "$RUNNER_TEMP/notary.json"
+          status=$(jq -r .status "$RUNNER_TEMP/notary.json")
+          if [ "$status" != Accepted ]; then
+            id=$(jq -r .id "$RUNNER_TEMP/notary.json")
+            xcrun notarytool log "$id" --key "$RUNNER_TEMP/notary.p8" \
+              --key-id "$(field APPLE_API_KEY)" --issuer "$(field APPLE_API_ISSUER)" || true
+            echo "::error::notarization finished as $status"
+            exit 1
+          fi
+
+      - name: Remove the signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/aireg-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/apple.json" "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notary.p8" \
+            "$RUNNER_TEMP/notary.json" "$RUNNER_TEMP/notarize.zip"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aireg-binary-darwin-arm64
+          path: bin/aireg-darwin-arm64
+          if-no-files-found: error
+          overwrite: true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aireg-binary-darwin-amd64
+          path: bin/aireg-darwin-amd64
+          if-no-files-found: error
+          overwrite: true
+
   # Assembles every release file and attests it, with no cloud credentials and no installed
   # packages. Its digests output is what the later jobs check their download against.
   stage:
     name: Stage release files
-    needs: [plan, build]
-    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    needs: [plan, build, sign-macos]
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.sign-macos.result == 'success' || (inputs.dry_run && needs.sign-macos.result == 'skipped')) }}
     permissions:
       contents: read
       id-token: write
