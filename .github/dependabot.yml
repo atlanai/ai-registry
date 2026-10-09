@@ -9,6 +9,11 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    # One pull request for minor and patch updates; each major version gets its own.
+    groups:
+      cli:
+        patterns: ["*"]
+        update-types: [minor, patch]
 
   # The hash-locked docs and schema-check toolchains.
   - package-ecosystem: pip
@@ -18,3 +23,7 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      python:
+        patterns: ["*"]
+        update-types: [minor, patch]

@@ -46,7 +46,7 @@ aireg links them into the folders your coding agents read, and records each exac
 When it runs in a terminal, the installer offers the aireg skills, from the release it installs. They let your coding agent set up, install from and publish to registries for you. To add them later:
 
 ```sh
-aireg registry add github.com/atlanai/ai-registry --path examples/aireg --ref "aireg-v$(aireg --version)" --as ai-registry -g
+aireg registry add github.com/atlanai/ai-registry --path examples/aireg -g
 aireg add ai-registry/aireg -g
 ```
 

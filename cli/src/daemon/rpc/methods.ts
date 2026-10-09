@@ -166,7 +166,8 @@ export interface DaemonMethods {
   "run.start": RpcMethod<
     /** `refs` scopes one run to chosen artifacts without editing the manifest. */
     { jobId: string; mode: RunMode; refs?: string[] },
-    { run: RunRecord }>;
+    { run: RunRecord }
+  >;
   "run.retry": RpcMethod<{ runId: string }, { run: RunRecord }>;
   "run.cancel": RpcMethod<{ runId: string }, { run: RunRecord }>;
   "run.list": RpcMethod<

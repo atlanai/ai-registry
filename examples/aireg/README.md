@@ -18,7 +18,7 @@ Claude Code they appear as `/aireg:new`, `/aireg:add` and `/aireg:publish`. `air
 says whether they are installed.
 
 ```sh
-aireg registry add github.com/atlanai/ai-registry --path examples/aireg --ref "aireg-v$(aireg --version)" --as ai-registry -g
+aireg registry add github.com/atlanai/ai-registry --path examples/aireg -g
 aireg add ai-registry/aireg -g
 ```
 
