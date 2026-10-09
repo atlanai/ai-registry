@@ -7,7 +7,7 @@ Cursor and `.agents` in one step. A registry is a folder or a git repository tha
 
 ```sh
 curl -fsSL https://aireg.sh/install | sh
-aireg registry add github.com/atlanai/ai-registry --path examples/aireg --ref "aireg-v$(aireg --version)" --as ai-registry -g
+aireg registry add github.com/atlanai/ai-registry --path examples/aireg -g
 aireg add ai-registry/aireg -g   # your agents can now set up, install from and publish to registries
 ```
 
