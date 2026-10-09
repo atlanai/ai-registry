@@ -83,7 +83,7 @@ body:
         - Codex
         - Cursor
         - Another agent that reads .agents
-        - None
+        - No coding agent
 
   - type: textarea
     id: diagnostics

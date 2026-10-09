@@ -90,7 +90,7 @@ Both machines now have every skill and agent in your registry, and each new vers
 Give your coding agent aireg's skills, then ask it to do any of the steps above.
 
 ```bash
-aireg registry add github.com/atlanai/ai-registry --path examples/aireg --ref "aireg-v$(aireg --version)" --as ai-registry -g
+aireg registry add github.com/atlanai/ai-registry --path examples/aireg -g
 aireg add ai-registry/aireg -g
 ```
 

@@ -226,7 +226,7 @@ These skills respectively set up a registry of skills and agents for a person or
 To give your coding agent the registry skills, run:
 
 ```bash
-aireg registry add github.com/atlanai/ai-registry --path examples/aireg --ref "aireg-v$(aireg --version)" --as ai-registry -g
+aireg registry add github.com/atlanai/ai-registry --path examples/aireg -g
 aireg add ai-registry/aireg -g
 ```
 
