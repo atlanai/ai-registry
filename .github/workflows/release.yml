@@ -1,8 +1,8 @@
 # Releases the cli/package.json version of aireg to the stable channel and GitHub Releases.
 # Variables (public): RELEASE_ORIGIN_PROD, RELEASE_TRUSTED_KEYS_PROD, RELEASE_MACOS_CODESIGN_IDENTIFIER,
-# optional RELEASE_PREFIX; and, to log in, RELEASE_AWS_REGION, RELEASE_ROLE_ARN, RELEASE_MACOS_ROLE_ARN,
-# RELEASE_CONFIG_SECRET. No GitHub secrets: everything else comes from that AWS Secrets Manager JSON
-# secret (keys `bucket`, `signing_key_secret`, `macos_signing_secret`), masked once read.
+# optional RELEASE_PREFIX. Secrets: only AWS_PUBLISH_ROLE and AWS_SIGN_ROLE, the role ARNs needed to log in,
+# kept as secrets so logs mask them. Everything else comes from the AWS Secrets Manager JSON secret
+# AIREG_CONFIG_SECRET (keys `bucket`, `signing_key_secret`, `macos_signing_secret`), masked once read.
 # Approval is the release-gate environment on the jobs that log in to AWS, the only environment AWS trusts.
 name: Release
 
@@ -30,6 +30,8 @@ env:
   RELEASE_ORIGIN: ${{ vars.RELEASE_ORIGIN_PROD }}
   RELEASE_TRUSTED_KEYS: ${{ vars.RELEASE_TRUSTED_KEYS_PROD }}
   RELEASE_MACOS_CODESIGN_IDENTIFIER: ${{ vars.RELEASE_MACOS_CODESIGN_IDENTIFIER }}
+  AWS_REGION: us-east-1
+  AIREG_CONFIG_SECRET: aireg/release-config
 
 jobs:
   plan:
@@ -129,13 +131,13 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 60
     steps:
-      - name: Check the release variables
+      - name: Check the signing role
         env:
-          # A boolean, so this log shows only true/false, never the values.
-          VARS_SET: ${{ vars.RELEASE_AWS_REGION != '' && vars.RELEASE_MACOS_ROLE_ARN != '' && vars.RELEASE_CONFIG_SECRET != '' }}
+          # A boolean, so this log shows only true/false.
+          ROLE_SET: ${{ secrets.AWS_SIGN_ROLE != '' }}
         run: |
-          if [ "$VARS_SET" != true ]; then
-            echo "::error::set the RELEASE_AWS_REGION, RELEASE_MACOS_ROLE_ARN and RELEASE_CONFIG_SECRET repository variables"
+          if [ "$ROLE_SET" != true ]; then
+            echo "::error::set the AWS_SIGN_ROLE repository secret"
             exit 1
           fi
 
@@ -147,8 +149,8 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ vars.RELEASE_MACOS_ROLE_ARN }}
-          aws-region: ${{ vars.RELEASE_AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_SIGN_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 900
           mask-aws-account-id: true
 
@@ -156,7 +158,7 @@ jobs:
       - name: Sign and notarize
         working-directory: bin
         env:
-          CONFIG_SECRET: ${{ vars.RELEASE_CONFIG_SECRET }}
+          CONFIG_SECRET: ${{ env.AIREG_CONFIG_SECRET }}
           VERSION: ${{ needs.plan.outputs.version }}
         run: |
           set -euo pipefail
@@ -330,13 +332,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # Prints only true or false; the role ARN and region later print in clear and are not secrets.
-      - name: Check the release variables
+      - name: Check the publish role
         env:
-          VARS_SET: ${{ vars.RELEASE_AWS_REGION != '' && vars.RELEASE_ROLE_ARN != '' && vars.RELEASE_CONFIG_SECRET != '' }}
+          # A boolean, so this log shows only true/false.
+          ROLE_SET: ${{ secrets.AWS_PUBLISH_ROLE != '' }}
         run: |
-          if [ "$VARS_SET" != true ]; then
-            echo "::error::set RELEASE_AWS_REGION, RELEASE_ROLE_ARN and RELEASE_CONFIG_SECRET as repository variables"
+          if [ "$ROLE_SET" != true ]; then
+            echo "::error::set the AWS_PUBLISH_ROLE repository secret"
             exit 1
           fi
 
@@ -367,8 +369,8 @@ jobs:
       # Credentials come last: every later step runs only this repository's code and the AWS CLI.
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ vars.RELEASE_ROLE_ARN }}
-          aws-region: ${{ vars.RELEASE_AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_PUBLISH_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 900
           mask-aws-account-id: true
 
@@ -376,7 +378,7 @@ jobs:
       - id: config
         name: Read the release config
         env:
-          SECRET_ID: ${{ vars.RELEASE_CONFIG_SECRET }}
+          SECRET_ID: ${{ env.AIREG_CONFIG_SECRET }}
         run: |
           set -euo pipefail
           config="$(aws secretsmanager get-secret-value --secret-id "$SECRET_ID" --query SecretString --output text)"
