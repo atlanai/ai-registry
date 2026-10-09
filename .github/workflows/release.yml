@@ -1,10 +1,10 @@
 # Releases the cli/package.json version of aireg to the stable channel and GitHub Releases.
 # Repository variables, public because every binary embeds them: RELEASE_ORIGIN_PROD,
 # RELEASE_TRUSTED_KEYS_PROD, optional RELEASE_PREFIX (the origin's path; default: bucket root).
-# Secrets of the `release` environment, so logs only ever show ***: RELEASE_AWS_REGION,
-# RELEASE_ROLE_ARN, RELEASE_BUCKET, RELEASE_SIGNING_KEY_SECRET (the Secrets Manager id of the key).
-# Approval is the release-gate environment. The publisher role trusts only OIDC tokens for the
-# `release` environment, which only the publish job uses, and that job runs no pnpm install.
+# More repository variables, identifiers rather than secrets: RELEASE_AWS_REGION, RELEASE_ROLE_ARN,
+# RELEASE_BUCKET, RELEASE_SIGNING_KEY_SECRET (the Secrets Manager id; the key is read from AWS).
+# No GitHub secrets. Approval is the release-gate environment on the publish job, and the publisher
+# role trusts only OIDC tokens for release-gate from this workflow on main; it runs no pnpm install.
 name: Release
 
 on:
@@ -82,24 +82,9 @@ jobs:
           previous=$(git tag -l 'aireg-v*' --sort=-v:refname | grep -E '^aireg-v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vxF "aireg-v$version" | head -1 || true)
           printf 'version=%s\nprevious=%s\nkey_id=%s\n' "$version" "$previous" "$key_id" >> "$GITHUB_OUTPUT"
 
-  # The only approval: required reviewers on release-gate hold every later job.
-  approve:
-    name: Approve stable release
-    needs: plan
-    if: ${{ !inputs.dry_run }}
-    environment: release-gate
-    permissions: {}
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - env:
-          VERSION: ${{ needs.plan.outputs.version }}
-        run: echo "aireg $VERSION approved"
-
   build:
     name: Release binary (${{ matrix.os }}-${{ matrix.arch }})
-    needs: [plan, approve]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.approve.result == 'success' || (inputs.dry_run && needs.approve.result == 'skipped')) }}
+    needs: plan
     permissions:
       contents: read
     runs-on: ${{ matrix.runner }}
@@ -206,20 +191,21 @@ jobs:
     name: Publish stable release
     needs: [plan, stage]
     if: ${{ !cancelled() && !inputs.dry_run && needs.stage.result == 'success' }}
-    environment: release
+    # The only approval: release-gate reviewers hold this job; AWS trusts no other environment.
+    environment: release-gate
     permissions:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check the release environment
+      # Later step headers print these identifiers in clear; they are not secrets.
+      - name: Check the release variables
         env:
-          # A boolean, so this log shows only true/false, never the values.
-          SECRETS_SET: ${{ secrets.RELEASE_AWS_REGION != '' && secrets.RELEASE_ROLE_ARN != '' && secrets.RELEASE_BUCKET != '' && secrets.RELEASE_SIGNING_KEY_SECRET != '' }}
+          VARS_SET: ${{ vars.RELEASE_AWS_REGION != '' && vars.RELEASE_ROLE_ARN != '' && vars.RELEASE_BUCKET != '' && vars.RELEASE_SIGNING_KEY_SECRET != '' }}
         run: |
-          if [ "$SECRETS_SET" != true ]; then
-            echo "::error::set RELEASE_AWS_REGION, RELEASE_ROLE_ARN, RELEASE_BUCKET and RELEASE_SIGNING_KEY_SECRET as secrets of the release environment"
+          if [ "$VARS_SET" != true ]; then
+            echo "::error::set RELEASE_AWS_REGION, RELEASE_ROLE_ARN, RELEASE_BUCKET and RELEASE_SIGNING_KEY_SECRET as repository variables"
             exit 1
           fi
 
@@ -250,8 +236,8 @@ jobs:
       # Credentials come last: every later step runs only this repository's code and the AWS CLI.
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ secrets.RELEASE_ROLE_ARN }}
-          aws-region: ${{ secrets.RELEASE_AWS_REGION }}
+          role-to-assume: ${{ vars.RELEASE_ROLE_ARN }}
+          aws-region: ${{ vars.RELEASE_AWS_REGION }}
           role-duration-seconds: 900
           mask-aws-account-id: true
 
@@ -263,9 +249,9 @@ jobs:
           minimum-version: ${{ inputs.minimum_version }}
           key-id: ${{ needs.plan.outputs.key_id }}
           origin: ${{ env.RELEASE_ORIGIN }}
-          bucket: ${{ secrets.RELEASE_BUCKET }}
+          bucket: ${{ vars.RELEASE_BUCKET }}
           prefix: ${{ env.RELEASE_PREFIX }}
-          signing-key-secret: ${{ secrets.RELEASE_SIGNING_KEY_SECRET }}
+          signing-key-secret: ${{ vars.RELEASE_SIGNING_KEY_SECRET }}
           trusted-keys: ${{ env.RELEASE_TRUSTED_KEYS }}
 
   # Last, so the tag only ever names a release whose channel is already live.
