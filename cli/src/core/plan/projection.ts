@@ -1,4 +1,4 @@
-import { join, posix, resolve } from "node:path";
+import { dirname, join, posix, resolve } from "node:path";
 import { sanitizeName } from "#adapter/text.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import {
@@ -6,6 +6,7 @@ import {
   placementFor,
   pluginProjection,
   projectionPath,
+  readsFor,
   takesPlugin,
 } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
@@ -13,7 +14,7 @@ import type { Lock } from "#core/lock.ts";
 import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
 import type { Selected } from "./model.ts";
 
-interface ProjectionOptions {
+export interface ProjectionOptions {
   roots: {
     base: string;
     cwd: string;
@@ -309,4 +310,27 @@ export function claim(
     kept.push(link);
   }
   return kept;
+}
+
+/**
+ * The folders a harness would load these items from, were it picked beside `chosen`:
+ * the plugin directory it takes them in, else the first folder it reads each kind from.
+ */
+export function loadsFrom(
+  harness: string,
+  chosen: readonly string[],
+  items: readonly Selected[],
+  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+): string[] {
+  const targets = [...new Set([...chosen, harness])];
+  const folders = items.flatMap((item) => {
+    const links = linksFor(item, "", { ...options, targets });
+    const own = links.find((link) => link.harness === harness);
+    if (own !== undefined) return [own.shared === true ? own.absolute : dirname(own.absolute)];
+    const read = readsFor(options.harnesses, harness, item.kind)
+      .map((folder) => links.find((link) => link.harness === folder && link.shared !== true))
+      .find((link) => link !== undefined);
+    return read === undefined ? [] : [dirname(read.absolute)];
+  });
+  return [...new Set(folders)];
 }

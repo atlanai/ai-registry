@@ -12,7 +12,7 @@ aireg harnesses
 
 `aireg harnesses` lists every harness name [`--for`](options.md#harnesses) accepts, and whether aireg found that coding agent on this machine. It finds one by its environment variables, its program on your `PATH`, or its folder in the project or your home folder.
 
-Each row names a coding agent and the id that `--for` and the manifest take. The shared `.agents` folder is not a coding agent, so it has no row: a line under the table says which coding agents read it, and installing for one of them writes there. `--for agents` still installs into it alone.
+Each row names a coding agent and the id `--for` takes. A line under the table names the agents that read the shared `.agents` folder.
 
 `harnesses` doesn't need a project.
 
@@ -26,7 +26,7 @@ Each row names a coding agent and the id that `--for` and the manifest take. The
 {"ok": true, "data": {"harnesses": [{"name": "claude", "displayName": "Claude Code", "shared": false, "detected": true, "by": "binary"}]}}
 ```
 
-The coding agents are in the order the text lists them, followed by the shared `.agents` folder, which the text leaves out. `shared` is true for that folder, which is never detected. `by` is `env`, `binary`, `project` or `user`, and is left out when the harness wasn't found.
+The harnesses are in the order the text lists them, plus the shared `.agents` folder, which the table leaves out; `shared` is true for it. `by` is `env`, `binary`, `project` or `user`, and is left out when the harness wasn't found.
 
 ## Exit status
 

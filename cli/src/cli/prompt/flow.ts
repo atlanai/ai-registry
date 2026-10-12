@@ -1,6 +1,6 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
-import { foundBy } from "#cli/render/found.ts";
+import { underHome } from "#cli/render/home.ts";
 import { loadedBy, skipLine, toolName, unhandled } from "#cli/render/tools.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import {
@@ -14,14 +14,14 @@ import {
 import { type ArtifactKind, KINDS, kindDir } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
-import type { Plan } from "#core/plan/model.ts";
+import type { Plan, Selected } from "#core/plan/model.ts";
+import { loadsFrom, type ProjectionOptions } from "#core/plan/projection.ts";
 import { NAME } from "#core/product.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { tableLines } from "#core/term/table.ts";
 import { blocker, explain } from "./caller.ts";
 import { type Choice, multiselect } from "./multiselect.ts";
 import { type Canceled, canceled, type PromptIo, prepare } from "./prompt.ts";
-import { note } from "./report.ts";
 import { confirm, select } from "./select.ts";
 
 /** Shared prompt state for commands that gather missing choices. */
@@ -170,39 +170,33 @@ const SELECT_ALL_LIMIT = 50;
 export async function chooseTargets(
   step: Interaction,
   harnesses: Harnesses,
-  scope: Scope,
-  cwd: string,
+  roots: ProjectionOptions["roots"],
   preselected: readonly string[],
+  /** What is being installed, so each harness can show where it would load it from. */
+  items: readonly Selected[],
 ): Promise<string[] | Canceled> {
   // A shared folder is where tools read from, not a tool to pick: choosing a
   // tool reaches it. One a manifest already names is kept as it was.
-  const all = detectAll(harnesses, cwd).filter((item) => !item.target.shared);
+  const all = detectAll(harnesses, roots.cwd).filter((item) => !item.target.shared);
   const kept = preselected.filter((name) => harnesses[name]?.shared === true);
-
-  const where = (target: Target): string => {
-    const root = targetRoot(target, scope, cwd);
-    return scope === "user" ? root : relative(cwd, root) || root;
-  };
+  const show = (path: string): string =>
+    roots.scope === "user" ? underHome(path) : relative(roots.cwd, path) || path;
+  const folders = (name: string, chosen: readonly string[]): string[] =>
+    loadsFrom(name, chosen, items, { roots, harnesses });
 
   const choices: Choice<string>[] = all.map((item) => ({
     value: item.target.name,
     label: item.target.displayName,
-    hint: where(item.target),
-    detail: [
-      item.detected ? `Found ${foundBy(item.by)}.` : "Not found on this machine.",
-      `Takes ${kinds(item.target)}.`,
-      ...borrowed(harnesses, item.target).map(
-        ([kind, read]) => `Reads ${kind}s from ${where(read)}.`,
-      ),
-    ].join(" "),
   }));
 
   // The scope's own harnesses, or the defaults every scope starts with, so the
   // answer a person accepts is the one a command without --for would take.
   const selectable = new Set(all.map((item) => item.target.name));
   const remembered = preselected.filter((name) => selectable.has(name));
-  const initial =
+  const wanted =
     remembered.length > 0 ? remembered : DEFAULT_TARGETS.filter((name) => selectable.has(name));
+  // A harness that would load none of it is left for a person to pick on purpose.
+  const initial = wanted.filter((name) => folders(name, wanted).length > 0);
 
   const picked = await multiselect(
     {
@@ -210,19 +204,14 @@ export async function chooseTargets(
       choices,
       style: step.printer.errStyle,
       initial,
-      detail: true,
+      focusHint: (name, chosen) => {
+        const found = folders(name, [...chosen]);
+        return found.length === 0 ? "-" : found.map(show).join(", ");
+      },
     },
     step.io,
   );
   return canceled(picked) ? picked : [...picked, ...kept.filter((name) => !picked.includes(name))];
-}
-
-/** The kinds a tool reads first from another harness's folder, with that folder. */
-function borrowed(harnesses: Harnesses, target: Target): [ArtifactKind, Target][] {
-  return Object.entries(target.reads).flatMap(([kind, reads]) => {
-    const read = reads?.[0] === undefined ? undefined : harnesses[reads[0]];
-    return read === undefined || read.name === target.name ? [] : [[kind as ArtifactKind, read]];
-  });
 }
 
 /** Group removal choices by their registry. */
@@ -253,15 +242,6 @@ export async function chooseRemovals(
     },
     step.io,
   );
-}
-
-/** What a harness takes, in a person's words: a plugin is how a namespace arrives, not a kind to pick. */
-function kinds(target: Target): string {
-  const taken = Object.keys(target.kinds)
-    .filter((kind) => kind !== "plugin")
-    .sort()
-    .map((kind) => `${kind}s`);
-  return taken.length === 0 ? "nothing" : list(taken);
 }
 
 export async function chooseScope(step: Interaction, initial: Scope): Promise<Scope | Canceled> {
@@ -310,20 +290,12 @@ export async function chooseMethod(
 ): Promise<boolean | Canceled> {
   return await select<boolean>(
     {
-      message: "How should harnesses reference the artifacts?",
+      message: "How should they be installed?",
       style: step.printer.errStyle,
       initial,
       options: [
-        {
-          value: false,
-          label: "Symlink",
-          hint: "one writable copy, edits reach every harness at once",
-        },
-        {
-          value: true,
-          label: "Copy",
-          hint: "an independent copy per harness",
-        },
+        { value: false, label: "Symlink (recommended)" },
+        { value: true, label: "Copy" },
       ],
     },
     step.io,
@@ -345,6 +317,8 @@ export async function confirmIfDestructive(
 }
 
 export interface PlanContext {
+  /** What confirming does, which titles the question: `Install 2 artifacts?`. */
+  verb?: "Install" | "Remove" | "Update" | undefined;
   /** Harnesses this run was asked to write to. */
   targets?: readonly string[] | undefined;
   /** Kinds being installed, used to explain a harness that gets nothing. */
@@ -359,14 +333,38 @@ export async function confirmPlan(
   context: PlanContext = {},
 ): Promise<boolean> {
   if (!interactive(step)) return true;
-  note(step.io, step.printer.errStyle, "Plan", planLines(step, plan, context));
+  // Nothing on disk would change, so there is nothing to agree to.
+  if (plan.actions.every((action) => action.kind === "record")) return true;
   // Deleting edits is the one answer that cannot be undone, so it is never the default.
   const loses = plan.actions.some((action) => action.kind === "unlink" && action.edited === true);
   const proceed = await confirm(
-    { message: "Proceed?", style: step.printer.errStyle, initial: !loses },
+    {
+      message: planQuestion(plan, context.verb ?? "Install"),
+      style: step.printer.errStyle,
+      initial: !loses,
+      body: planLines(step, plan, context),
+    },
     step.io,
   );
   return !canceled(proceed) && proceed;
+}
+
+/** The question a plan asks, named by what it does and to how many: `Remove 1 artifact?`. */
+function planQuestion(plan: Plan, verb: "Install" | "Remove" | "Update"): string {
+  const placed = new Set<string>();
+  const removed = new Set<string>();
+  for (const action of plan.actions) {
+    if (action.kind === "stage" || action.kind === "link") placed.add(action.name);
+    else if (action.kind === "unlink") removed.add(action.name);
+  }
+  // A plan that only removes says so, whatever the command; an update counts both.
+  const [said, count] =
+    verb === "Update"
+      ? [verb, new Set([...placed, ...removed]).size]
+      : verb === "Remove" || placed.size === 0
+        ? (["Remove", removed.size] as const)
+        : ([verb, placed.size] as const);
+  return `${said} ${plural(count, "artifact")}?`;
 }
 
 /** Chosen harnesses the plan places nothing in, so the review can warn before it applies. */
