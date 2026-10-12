@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account } from "#core/config/model.ts";
+import type { Account, Job } from "#core/config/model.ts";
+import type { StepContribution } from "#core/host/extend.ts";
+import { createLogger } from "#core/log/index.ts";
+import { ManifestError } from "#core/manifest.ts";
 import { jobOfWork, type ScopeWork } from "#engine/work.ts";
+import { memorySink } from "#test/kit/memory-sink.ts";
 import { SqliteRunStore } from "./run-store.ts";
 import { SyncRunner } from "./runner.ts";
 
@@ -11,6 +15,25 @@ const sync = vi.hoisted(() => ({
   release() {
     for (const resolve of this.waiting.splice(0)) resolve();
   },
+}));
+
+/** What the account's registry resolves to, and which adapters registered which step kinds. */
+const adapters = vi.hoisted(() => ({
+  resolve: undefined as (() => Promise<unknown>) | undefined,
+  own: undefined as unknown,
+  contributed: undefined as unknown,
+}));
+
+vi.mock("#accounts/service.ts", () => ({
+  AccountService: class {
+    resolve() {
+      return adapters.resolve?.() ?? Promise.resolve({ adapter: {} });
+    }
+  },
+}));
+vi.mock("#core/host/load.ts", () => ({
+  stepOn: () => adapters.own,
+  stepContribution: async () => adapters.contributed,
 }));
 
 vi.mock("#core/config/repository.ts", () => ({
@@ -49,6 +72,9 @@ beforeEach(async () => {
   store = await SqliteRunStore.open(":memory:");
   runner = new SyncRunner(store, () => {});
   sync.calls = 0;
+  adapters.resolve = undefined;
+  adapters.own = undefined;
+  adapters.contributed = undefined;
 });
 
 afterEach(async () => {
@@ -119,5 +145,99 @@ describe("a run whose work ignores its abort", () => {
     await vi.advanceTimersByTimeAsync(1_000);
     await stopping;
     expect(stopped).toBe(true);
+  });
+});
+
+describe("an adapter step whose account registry does not resolve", () => {
+  const SUCCEEDED = {
+    state: "succeeded",
+    counts: { examined: 1, changed: 0, skipped: 0, attention: 0, failed: 0 },
+  };
+  const step = (run = vi.fn(async () => SUCCEEDED)) =>
+    ({ kind: "mcp-scan", run }) as unknown as StepContribution & { run: typeof run };
+  const target = (names = ["mcp"]): { id: string; target: { job: Job; account: Account } } => {
+    const job = {
+      id: "job_adapter",
+      account: account.id,
+      schedule: { every: 900, enabled: false },
+      steps: names.map((name) => ({
+        name,
+        kind: "mcp-scan",
+        needs: [],
+        select: [],
+        policy: "apply",
+        extra: {},
+      })),
+    } as unknown as Job;
+    return { id: job.id, target: { job, account } };
+  };
+  let sink: ReturnType<typeof memorySink>;
+  const start = async (adapterRunner: SyncRunner, names?: string[]) => {
+    const { id, target: t } = target(names);
+    const run = await adapterRunner.start(id, "sync", "manual", { ephemeral: t });
+    await vi.waitFor(() => expect(store.get(run.id)?.state).not.toBe("running"));
+    return store.get(run.id);
+  };
+  const undeclared = new ManifestError('registry "shop" is not declared');
+
+  let adapterRunner: SyncRunner;
+  beforeEach(() => {
+    sink = memorySink();
+    const log = createLogger({ sink, level: "trace" });
+    adapterRunner = new SyncRunner(store, () => {}, "0.0.0-test", log);
+  });
+  afterEach(() => adapterRunner.stop());
+
+  it("runs the step through an installed adapter that registered the kind, and says why", async () => {
+    adapters.resolve = () => Promise.reject(undeclared);
+    const contributed = step();
+    adapters.contributed = contributed;
+    expect(await start(adapterRunner)).toMatchObject({ state: "succeeded" });
+    expect(contributed.run).toHaveBeenCalledOnce();
+    const warned = sink.records.filter((r) => r.severity_text === "warn");
+    expect(warned).toHaveLength(1);
+    expect(warned[0]?.error?.message).toBe(undeclared.message);
+  });
+
+  it("still prefers the account's own adapter when the registry resolves", async () => {
+    const own = step();
+    const contributed = step();
+    adapters.own = own;
+    adapters.contributed = contributed;
+    expect(await start(adapterRunner)).toMatchObject({ state: "succeeded" });
+    expect(own.run).toHaveBeenCalledOnce();
+    expect(contributed.run).not.toHaveBeenCalled();
+    expect(sink.records.filter((r) => r.severity_text === "warn")).toEqual([]);
+  });
+
+  it("falls back to a contributed step when the account's adapter does not run the kind", async () => {
+    const contributed = step();
+    adapters.contributed = contributed;
+    expect(await start(adapterRunner)).toMatchObject({ state: "succeeded" });
+    expect(contributed.run).toHaveBeenCalledOnce();
+  });
+
+  it("fails with the resolve error, not 'no adapter', when nothing runs the kind", async () => {
+    adapters.resolve = () => Promise.reject(undeclared);
+    expect(await start(adapterRunner)).toMatchObject({ state: "failed" });
+    const failure = sink.records.find((r) => r.body === "run failed");
+    expect(failure?.error?.message).toBe(undeclared.message);
+  });
+
+  it("still fails with 'no adapter' when the registry resolves but nothing runs the kind", async () => {
+    expect(await start(adapterRunner)).toMatchObject({ state: "failed" });
+    const failure = sink.records.find((r) => r.body === "run failed");
+    expect(failure?.error?.message).toContain('No installed adapter runs "mcp-scan" steps');
+  });
+
+  it("resolves the registry once per run and warns once, however many steps fall back", async () => {
+    const resolve = vi.fn(() => Promise.reject(undeclared));
+    adapters.resolve = resolve;
+    const contributed = step();
+    adapters.contributed = contributed;
+    expect(await start(adapterRunner, ["scan", "report"])).toMatchObject({ state: "succeeded" });
+    expect(contributed.run).toHaveBeenCalledTimes(2);
+    expect(resolve).toHaveBeenCalledOnce();
+    expect(sink.records.filter((r) => r.severity_text === "warn")).toHaveLength(1);
   });
 });

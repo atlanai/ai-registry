@@ -362,12 +362,33 @@ export class SyncRunner {
       retryable = result.retryable;
     }
 
+    // An unresolvable registry still lets steps run through any installed adapter that registered
+    // their kind, as job creation allows; its error surfaces only when none did.
+    let resolveError: unknown;
+    const own =
+      adapters.length === 0
+        ? undefined
+        : await new AccountService().resolve(account, scope, root).then(
+            (resolved) => resolved.adapter,
+            (error: unknown) => {
+              resolveError = error;
+              return undefined;
+            },
+          );
+    if (resolveError !== undefined) {
+      this.#log.warn("account registry did not resolve; steps fall back to installed adapters", {
+        jobId: job.id,
+        error: resolveError,
+      });
+    }
+
     for (const step of adapters) {
       if (controller.signal.aborted) break;
-      const accounts = new AccountService();
-      const resolved = await accounts.resolve(account, scope, root);
-      const handler = stepOn(resolved.adapter, step.kind) ?? (await stepContribution(step.kind));
+      const handler =
+        (own === undefined ? undefined : stepOn(own, step.kind)) ??
+        (await stepContribution(step.kind));
       if (handler === undefined) {
+        if (resolveError !== undefined) throw resolveError;
         throw new Error(
           `No installed adapter runs ${quoted(step.kind)} steps. Install one with \`aireg adapter install\`.`,
         );
