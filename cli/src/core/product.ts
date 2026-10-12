@@ -21,7 +21,8 @@ export const LOG_FILE = `${NAME}.log`;
 export function releaseBinary(platform: string): string {
   return `${NAME}-${platform}`;
 }
-export const RELEASE_ADAPTER_FILE = `${NAME}-adapter.mjs`;
+/** An adapter's file on the release server; the path already says it is aireg's, so no prefix. */
+export const RELEASE_ADAPTER_FILE = "adapter.mjs";
 /** What an installed adapter is saved as, under `adapters/<id>/<version>/`. */
 export const ADAPTER_MODULE_FILE = "adapter.mjs";
 
