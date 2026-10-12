@@ -5,12 +5,13 @@ import { test } from "#test/kit/fixtures.ts";
 import { foundSummary, run } from "./harnesses.ts";
 import type { CommandContext } from "./index.ts";
 
-function context(cwd: string, writes: string[]): CommandContext {
+function context(cwd: string, writes: string[], format: "json" | "text" = "json"): CommandContext {
   return {
     argv: [],
     cwd,
     printer: new Printer({
-      format: "json",
+      format,
+      color: "never",
       out: { write: (chunk: string) => writes.push(chunk), isTTY: false },
     }),
     host: {
@@ -53,6 +54,17 @@ describe("harnesses", () => {
       { name: "cursor", displayName: "Cursor", shared: false, detected: false },
       { name: "agents", displayName: "Shared .agents folder", shared: true, detected: false },
     ]);
+  });
+
+  test("names each coding agent with its id, and says who reads the shared folder", async () => {
+    const writes: string[] = [];
+    await run(context(cwd, writes, "text"));
+    const lines = writes.join("").split("\n");
+    expect(lines).toContain("  harness      id      status     where");
+    expect(lines).toContain("  Claude Code  claude  found      from its environment variables");
+    expect(lines.some((line) => /^ +(agents|Shared)/.test(line))).toBe(false);
+    expect(lines).toContain("Codex and Cursor read skills from the shared .agents folder.");
+    expect(lines).toContain("Found 1 of 3 supported harnesses on this machine.");
   });
 
   test("sums up how many of the supported harnesses this machine has", () => {
