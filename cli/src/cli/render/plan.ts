@@ -227,14 +227,18 @@ function changeLines(
       );
     (from !== undefined && puts ? restored : updated).push(name);
   }
-  // Only the links put back, not every harness the artifact is in.
-  const relinked = tools(restored, (name) => [
-    ...new Set(
-      shown.flatMap((action) =>
-        action.kind === "link" && action.name === name ? [action.harness] : [],
-      ),
-    ),
-  ]);
+  // The links put back, not every harness the artifact is in; content fetched
+  // again with its links intact is restored for every harness it is linked in.
+  const relinked = tools(restored, (name) => {
+    const put = shown.flatMap((action) =>
+      action.kind === "link" && action.name === name ? [action.harness] : [],
+    );
+    const links = after?.[name]?.links ?? [];
+    const held = (links.length > 0 ? links : (before.artifacts[name]?.links ?? [])).map(
+      (link) => link.harness,
+    );
+    return [...new Set(put.length > 0 ? put : held)];
+  });
   return [
     moved.length > 0
       ? `Updated ${moved.length <= 3 ? list(moved) : plural(moved.length, "artifact")}.`

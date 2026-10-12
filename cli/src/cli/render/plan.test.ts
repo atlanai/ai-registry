@@ -132,7 +132,7 @@ describe("summarize", () => {
     const lock = { artifacts: { lint: { version: "0.1.0", links: [] } } };
     const applied = { performed: { stage: 1, clone: 1 } as never, lock: lock as never };
     const before = { lint: { version: "0.1.0", links: [{ harness: "claude" }] } };
-    expect(printed(actions, applied, before)).toEqual(["✓ Restored lint."]);
+    expect(printed(actions, applied, before)).toEqual(["✓ Restored lint for Claude Code."]);
   });
 
   it("names a row of yours whose harness links went as removed, though the row stays", () => {
