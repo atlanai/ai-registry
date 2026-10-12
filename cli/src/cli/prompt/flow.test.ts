@@ -1,6 +1,7 @@
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { resolveHarnesses } from "#core/harness/index.ts";
+import { emptyLock, type LockArtifact } from "#core/lock.ts";
 import { Printer } from "#core/output.ts";
 import { emptyPlan, type Plan } from "#core/plan/model.ts";
 import { KEY, terminal } from "#test/kit/fake-terminal.ts";
@@ -11,6 +12,7 @@ import {
   equivalent,
   linkedTargets,
   methodIsMeaningful,
+  type PlanContext,
   unhandled,
   unreached,
 } from "./flow.ts";
@@ -168,7 +170,11 @@ describe("confirmPlan", () => {
     actions: [{ kind: "unlink", name: "a", to: "/t", edited: true }],
   };
 
-  async function answer(plan: Plan, keys: string[]): Promise<{ proceed: boolean; shown: string }> {
+  async function answer(
+    plan: Plan,
+    keys: string[],
+    context: PlanContext = {},
+  ): Promise<{ proceed: boolean; shown: string }> {
     const input = new FakeInput();
     const frames: string[] = [];
     const io = {
@@ -176,7 +182,7 @@ describe("confirmPlan", () => {
       output: { write: (chunk: string) => frames.push(chunk), columns: 80, rows: 40 },
     };
     const printer = new Printer({ err: { write: () => true, isTTY: false }, env: {} });
-    const run = confirmPlan({ io, printer, blocked: undefined }, plan);
+    const run = confirmPlan({ io, printer, blocked: undefined }, plan, context);
     for (const key of keys) {
       // Keys have to arrive after the prompt has subscribed to them.
       await new Promise((resolve) => setImmediate(resolve));
@@ -184,6 +190,33 @@ describe("confirmPlan", () => {
     }
     return { proceed: await run, shown: frames.join("") };
   }
+
+  it("names the tools each artifact reaches, and what a tool skips", async () => {
+    const row = (kind: "skill" | "agent") =>
+      ({ kind, version: "0.1.0", links: [] }) as unknown as LockArtifact;
+    const plan: Plan = {
+      ...emptyPlan(),
+      actions: [
+        { kind: "stage", name: "pr-review", source: "acme", path: "p", to: "/s1" },
+        { kind: "stage", name: "reviewer", source: "acme", path: "r", to: "/s2" },
+        { kind: "link", name: "pr-review", harness: "agents", from: "/f", to: "/t1", copy: false },
+        { kind: "link", name: "pr-review", harness: "claude", from: "/f", to: "/t2", copy: false },
+        { kind: "link", name: "reviewer", harness: "claude", from: "/f", to: "/t3", copy: false },
+        {
+          kind: "record",
+          lock: {
+            ...emptyLock(),
+            artifacts: { "pr-review": row("skill"), reviewer: row("agent") },
+          },
+        },
+      ],
+    };
+    const { shown } = await answer(plan, [ENTER], { targets: ["claude", "codex"], harnesses });
+    expect(shown).toMatch(/pr-review +0\.1\.0 +Claude Code, Codex/);
+    expect(shown).toMatch(/reviewer +0\.1\.0 +Claude Code\n/);
+    expect(shown).not.toContain("agents, claude");
+    expect(shown).toContain("Codex skips reviewer: it does not load agents.");
+  });
 
   it("starts on No when the plan deletes local edits", async () => {
     const { proceed, shown } = await answer(edited, [ENTER]);
