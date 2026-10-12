@@ -1,5 +1,6 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
+import type { ArtifactKind } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
 import type { ApplyResult } from "#core/plan/apply.ts";
@@ -9,9 +10,9 @@ import { olderThan } from "#core/semver.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { GLYPH } from "#core/term/theme.ts";
-import type { PlanReport, RunResult } from "#engine/pipeline.ts";
+import type { Chosen, PlanReport, RunResult } from "#engine/pipeline.ts";
 import { underHome } from "./home.ts";
-import { loadedBy, toolName } from "./tools.ts";
+import { linkLoadedBy, loadedBy, toolName } from "./tools.ts";
 
 type Shown = Exclude<Action, { kind: "record" }>;
 
@@ -23,15 +24,30 @@ const VERB: Record<Shown["kind"], string> = {
   unlink: "uninstall",
 };
 
-/** One line per action as it happens, naming the harness so four links read apart. */
-function describeAction(action: Shown): string {
-  if (action.kind === "link") return `install ${action.name} into ${action.harness}`;
+/** The kind the plan records for an artifact, which says which harnesses load it. */
+function kindIn(plan: Plan, name: string): ArtifactKind | undefined {
+  const record = plan.actions.find((action) => action.kind === "record");
+  return record?.kind === "record" ? record.lock.artifacts[name]?.kind : undefined;
+}
+
+/** One line per action as it happens, naming the harnesses so four links read apart. */
+function describeAction(action: Shown, plan: Plan, chosen: Chosen): string {
+  if (action.kind === "link") {
+    const kind = kindIn(plan, action.name);
+    return `install ${action.name} for ${linkLoadedBy(chosen.harnesses, chosen.targets, kind, action.harness)}`;
+  }
   if (action.kind === "clone") return `copy ${action.name} into this project`;
   return `${VERB[action.kind]} ${action.name}`;
 }
 
 /** The same value a real run executes, printed instead of performed. */
-function renderPlan(printer: Printer, plan: Plan, roots: Roots, aside: ReadonlySet<string>): void {
+function renderPlan(
+  printer: Printer,
+  plan: Plan,
+  roots: Roots,
+  aside: ReadonlySet<string>,
+  chosen: Chosen,
+): void {
   const shown = plan.actions.filter((action): action is Shown => action.kind !== "record");
   // Your user scope is your home folder, so its paths read from there.
   const shownPath = (path: string): string =>
@@ -68,8 +84,16 @@ function renderPlan(printer: Printer, plan: Plan, roots: Roots, aside: ReadonlyS
       },
       { header: "artifact", value: (action: Shown) => action.name },
       {
-        header: "harness",
-        value: (action: Shown) => (action.kind === "link" ? action.harness : ""),
+        header: "harnesses",
+        value: (action: Shown) =>
+          action.kind === "link"
+            ? linkLoadedBy(
+                chosen.harnesses,
+                chosen.targets,
+                kindIn(plan, action.name),
+                action.harness,
+              )
+            : "",
         optional: true,
       },
       {
@@ -274,9 +298,9 @@ export function outcome({ plan, applied }: RunResult, dryRun: boolean) {
 /** How an installing command shows a run: each step as it happens, or the whole plan for a dry run. */
 export function planReport(printer: Printer): PlanReport {
   return {
-    plan: (plan, roots, aside) => renderPlan(printer, plan, roots, aside),
-    step: (action) => {
-      if (action.kind !== "record") printer.step(describeAction(action));
+    plan: (plan, roots, aside, chosen) => renderPlan(printer, plan, roots, aside, chosen),
+    step: (action, plan, chosen) => {
+      if (action.kind !== "record") printer.step(describeAction(action, plan, chosen));
     },
   };
 }

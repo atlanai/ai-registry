@@ -12,7 +12,7 @@ aireg harnesses
 
 `aireg harnesses` lists every harness name [`--for`](options.md#harnesses) accepts, and whether aireg found that coding agent on this machine. It finds one by its environment variables, its program on your `PATH`, or its folder in the project or your home folder.
 
-The shared `.agents` folder is read by several coding agents, so it is never detected; it is listed last, as `always used`.
+Each row names a coding agent and the id that `--for` and the manifest take. The shared `.agents` folder is not a coding agent, so it has no row: a line under the table says which coding agents read it, and installing for one of them writes there. `--for agents` still installs into it alone.
 
 `harnesses` doesn't need a project.
 
@@ -26,7 +26,7 @@ The shared `.agents` folder is read by several coding agents, so it is never det
 {"ok": true, "data": {"harnesses": [{"name": "claude", "displayName": "Claude Code", "shared": false, "detected": true, "by": "binary"}]}}
 ```
 
-The harnesses are in the order the text lists them. `shared` is true for the shared `.agents` folder, which is always used and never detected. `by` is `env`, `binary`, `project` or `user`, and is left out when the harness wasn't found.
+The coding agents are in the order the text lists them, followed by the shared `.agents` folder, which the text leaves out. `shared` is true for that folder, which is never detected. `by` is `env`, `binary`, `project` or `user`, and is left out when the harness wasn't found.
 
 ## Exit status
 
@@ -42,12 +42,12 @@ aireg harnesses
 ```
 
 ```text
-  harness  status       where
-  claude   found        on your PATH
-  codex    not found
-  cursor   not found
-  agents   always used  the shared .agents folder
+  harness      id      status     where
+  Claude Code  claude  found      on your PATH
+  Codex        codex   not found
+  Cursor       cursor  not found
 
+Codex and Cursor read skills from the shared .agents folder.
 Found 1 of 3 supported harnesses on this machine.
 ```
 
