@@ -89,12 +89,14 @@ export interface KindTargets {
 /**
  * The fewest folders that reach every selected harness able to read this kind,
  * so a folder several of them share is written once and nothing lists twice.
+ * `wrapped` items sit in plugin folders, which another tool cannot read through.
  */
 export function placementFor(
   kind: ArtifactKind,
   selected: readonly string[],
   harnesses: Harnesses,
   scope: Scope,
+  wrapped = false,
 ): KindTargets {
   const needs: string[][] = [];
   const unreadable: string[] = [];
@@ -104,7 +106,7 @@ export function placementFor(
     const reads = readsFor(harnesses, name, kind).filter(
       (read) =>
         placeable(harnesses[read], kind, scope) &&
-        (read === name || !takesPlugin(harnesses[read] as Target, scope)),
+        (read === name || !wrapped || !takesPlugin(harnesses[read] as Target, scope)),
     );
     if (reads.length === 0) unreadable.push(name);
     else needs.push(reads);

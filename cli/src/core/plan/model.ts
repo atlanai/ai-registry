@@ -44,6 +44,8 @@ export interface Acquired {
   /** Keyed by catalog entry path. */
   placements: Map<string, Placement>;
   catalog: Catalog;
+  /** Its adapter declares each namespace a plugin. Absent is off. */
+  namespacePlugins?: boolean;
   /** An entry's content on disk, and the identity the store keyed it by. */
   content: (entryPath: string) => Promise<Staged>;
   /** Releases whatever the adapter opened. */

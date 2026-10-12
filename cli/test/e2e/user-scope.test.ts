@@ -15,7 +15,7 @@ test("reads its own lock back when the user scope and a harness home are outside
   const claude = join(tmp, "claudehome");
   const env = { AIREG_USER_SCOPE: join(tmp, "elsewhere", "scope"), CLAUDE_CONFIG_DIR: claude };
   const at = { cwd: tmp, env };
-  const skill = join(claude, "skills", "eng", "skills", "lint", "SKILL.md");
+  const skill = join(claude, "skills", "lint", "SKILL.md");
 
   const added = await aireg(["add", "-g", market, "--all", "--yes", "--for", "claude"], at);
   expect(added.code, added.stderr).toBe(0);

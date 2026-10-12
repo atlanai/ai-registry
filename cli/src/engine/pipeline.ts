@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import { isAdapterError, type Want } from "#adapter/index.ts";
 import { list, quoted, sanitizeText } from "#adapter/text.ts";
+import { loadAdapter } from "#core/adapter/registry.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
@@ -21,6 +22,7 @@ import { build, clashMessage } from "#core/plan/build.ts";
 import { formatNeed, type Unresolved, wantOf } from "#core/plan/depends.ts";
 import type { Acquired, Action, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
+import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
 import { survey } from "#core/plan/survey.ts";
 import { blockedTargets } from "#core/plan/writable.ts";
 import { unmetEngine } from "#core/semver.ts";
@@ -386,7 +388,14 @@ async function plan(
   for (const alias of hooks.aliases ?? aliases) {
     if (view.rows(alias).some(([name]) => moving.has(name))) continue;
     const source = view.source(alias);
-    if (source !== undefined && answers(manifest, source, hooks.held)) settled.set(alias, source);
+    if (source === undefined || !answers(manifest, source, hooks.held)) continue;
+    // Only user scope wraps; an adapter that will not load leaves its rows as the lock has them.
+    const namespacePlugins =
+      roots.scope === "user" &&
+      (await loadAdapter(source.origin.adapter).then(wrapsNamespaces, () =>
+        wrappedInLock(view.rows(alias), { roots, harnesses }),
+      ));
+    settled.set(alias, { ...source, namespacePlugins });
   }
   // Only a registry being opened needs its account, which may refresh a token.
   const open = async (only: readonly string[]) =>

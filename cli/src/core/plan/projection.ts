@@ -13,7 +13,7 @@ import type { Lock } from "#core/lock.ts";
 import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
 import type { Selected } from "./model.ts";
 
-interface ProjectionOptions {
+export interface ProjectionOptions {
   roots: {
     base: string;
     cwd: string;
@@ -50,7 +50,7 @@ function plannedLink(
 }
 
 /**
- * A plugin artifact is its own; anything else joins the plugin its namespace
+ * A plugin artifact is its own; anything else wrapped joins the plugin its namespace
  * becomes, or the registry's when it publishes no namespaces.
  */
 export function namespaceOf(item: Pick<Selected, "kind" | "name" | "group" | "source">): string {
@@ -124,7 +124,7 @@ export function movedPluginLinks(
   options: Pick<ProjectionOptions, "roots" | "harnesses">,
   opened?: ReadonlySet<string>,
 ): Set<string> {
-  const { scope, cwd, base } = options.roots;
+  const { base } = options.roots;
   const rows = Object.entries(lock.artifacts).map(([name, entry]) => ({
     name,
     entry,
@@ -149,26 +149,39 @@ export function movedPluginLinks(
   for (const { name, entry, namespace } of rows) {
     if (opened !== undefined && !opened.has(entry.registry)) continue;
     for (const link of entry.links) {
-      const target = options.harnesses[link.harness];
-      if (target === undefined || !takesPlugin(target, scope)) continue;
-      const source = entry.registry;
-      const bare = pluginProjection(target, namespace, scope, cwd, process.env, source);
-      const qualified = pluginProjection(
-        target,
-        qualifiedName(source, namespace),
-        scope,
-        cwd,
-        process.env,
-        source,
-      );
-      if (bare === undefined || qualified === undefined) continue;
-      const at = resolve(base, link.path);
+      const at = pluginLinkAt(link, namespace, entry.registry, options);
       // Only the namespace's own plugin link can move; any other link stays put.
-      if (at !== bare && at !== qualified) continue;
-      if (at !== (crowded.has(bare) ? qualified : bare)) moved.add(name);
+      if (at === undefined) continue;
+      if (resolve(base, link.path) !== (crowded.has(at.bare) ? at.qualified : at.bare)) {
+        moved.add(name);
+      }
     }
   }
   return moved;
+}
+
+/** Where a recorded link sits, when it is a namespace's plugin directory under either name. */
+export function pluginLinkAt(
+  link: { harness: string; path: string },
+  namespace: string,
+  source: string,
+  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+): { bare: string; qualified: string } | undefined {
+  const { scope, cwd, base } = options.roots;
+  const target = options.harnesses[link.harness];
+  if (target === undefined || !takesPlugin(target, scope)) return undefined;
+  const bare = pluginProjection(target, namespace, scope, cwd, process.env, source);
+  const qualified = pluginProjection(
+    target,
+    qualifiedName(source, namespace),
+    scope,
+    cwd,
+    process.env,
+    source,
+  );
+  if (bare === undefined || qualified === undefined) return undefined;
+  const at = resolve(base, link.path);
+  return at === bare || at === qualified ? { bare, qualified } : undefined;
 }
 
 type Unreadable = (harness: string, kind: ArtifactKind) => void;
@@ -231,7 +244,7 @@ function pluginLinks(
     if (link !== undefined) links.push(link);
   }
   for (const kind of new Set(item.contents.map((leaf) => leaf.kind))) {
-    const placed = placementFor(kind, rest, options.harnesses, scope);
+    const placed = placementFor(kind, rest, options.harnesses, scope, true);
     for (const harness of placed.unreadable) onUnreadable(harness, kind);
     for (const name of placed.targets) {
       const target = options.harnesses[name] as Harnesses[string];
@@ -246,13 +259,14 @@ function pluginLinks(
 }
 
 /**
- * A harness that loads plugins gets the item's namespace as one; the rest get
- * links in the fewest folders that reach every one able to read this kind.
+ * A plugin installs as one, and so does a namespace whose source wraps it; anything else
+ * is placed as itself, in the fewest folders that reach every harness able to read its kind.
  */
 export function linksFor(
   item: Selected,
   copy: string,
   options: ProjectionOptions,
+  wrapped = false,
   crowded: ReadonlySet<string> = new Set(),
   onUnreadable: Unreadable = () => undefined,
 ): PlannedLink[] {
@@ -268,14 +282,14 @@ export function linksFor(
     const target = options.harnesses[name];
     if (target === undefined) continue;
     // Its plugins carry only the kinds it maps; any other kind is placed flat or not at all.
-    if (!takesPlugin(target, scope) || target.kinds[item.kind] === undefined) {
+    if (!wrapped || !takesPlugin(target, scope) || target.kinds[item.kind] === undefined) {
       rest.push(name);
       continue;
     }
     const link = pluginLink(item, name, target, options, crowded);
     if (link !== undefined) links.push(link);
   }
-  const placed = placementFor(item.kind, rest, options.harnesses, scope);
+  const placed = placementFor(item.kind, rest, options.harnesses, scope, wrapped);
   for (const harness of placed.unreadable) onUnreadable(harness, item.kind);
   for (const name of placed.targets) {
     const target = options.harnesses[name] as Harnesses[string];

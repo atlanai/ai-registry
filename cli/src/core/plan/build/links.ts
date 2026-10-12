@@ -24,7 +24,8 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const blocked: Blocked[] = [];
   const address = addressOf({ ...item, name: item.upstreamName }, item.source);
   build.addresses.set(item.name, address);
-  const planned = linksFor(item, copy, build.options, build.crowded, (harness) => {
+  const wrapped = build.wrapping.has(item.source);
+  const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (harness) => {
     skipped.add(build.options.harnesses[harness]?.displayName ?? harness);
   });
   const links = claim(planned, item.name, build.claimed, (owner, link) => {
