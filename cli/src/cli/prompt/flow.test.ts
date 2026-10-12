@@ -218,6 +218,38 @@ describe("confirmPlan", () => {
     expect(shown).toContain("Codex skips reviewer: it does not load agents.");
   });
 
+  it("places a plugin's members where the lock records them", async () => {
+    const row = (kind: "skill" | "agent", harnesses: string[]) =>
+      ({
+        kind,
+        version: "0.1.0",
+        links: harnesses.map((harness) => ({ harness, path: "p", mode: "symlink" })),
+      }) as unknown as LockArtifact;
+    // One link per plugin, named for its first member.
+    const plan: Plan = {
+      ...emptyPlan(),
+      actions: [
+        { kind: "stage", name: "pr-review", source: "acme", path: "p", to: "/s1" },
+        { kind: "stage", name: "reviewer", source: "acme", path: "r", to: "/s2" },
+        { kind: "link", name: "pr-review", harness: "claude", from: "/f", to: "/t1", copy: false },
+        { kind: "link", name: "pr-review", harness: "codex", from: "/f", to: "/t2", copy: false },
+        {
+          kind: "record",
+          lock: {
+            ...emptyLock(),
+            artifacts: {
+              "pr-review": row("skill", ["claude", "codex"]),
+              reviewer: row("agent", ["claude"]),
+            },
+          },
+        },
+      ],
+    };
+    const { shown } = await answer(plan, [ENTER], { targets: ["claude", "codex"], harnesses });
+    expect(shown).toMatch(/reviewer +0\.1\.0 +Claude Code\n/);
+    expect(shown).toContain("Codex skips reviewer: it does not load agents.");
+  });
+
   it("starts on No when the plan deletes local edits", async () => {
     const { proceed, shown } = await answer(edited, [ENTER]);
     expect(proceed).toBe(false);

@@ -427,6 +427,13 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
   const linked = linkedTargets(plan);
 
   const names = [...new Set([...staged.keys(), ...linked.keys()])].sort();
+  // A namespace installs as one plugin link, so the lock says where each member went.
+  const folders = (name: string): string[] => [
+    ...new Set([
+      ...(linked.get(name) ?? []),
+      ...(recorded?.artifacts[name]?.links.map((link) => link.harness) ?? []),
+    ]),
+  ];
   const chosen = context.targets ?? [];
   // The tools a person picked, not the folders written for them: one folder can
   // serve several tools, and a tool can read from another's folder.
@@ -438,7 +445,7 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
             context.harnesses as Harnesses,
             tool,
             recorded?.artifacts[name]?.kind,
-            linked.get(name) ?? [],
+            folders(name),
           ),
         );
 
@@ -462,7 +469,7 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
               value: (name: string) => {
                 const tools = loading(name);
                 return tools === undefined
-                  ? [...(linked.get(name) ?? [])].sort().join(", ")
+                  ? folders(name).sort().join(", ")
                   : tools.map((tool) => label(context.harnesses, tool)).join(", ");
               },
               optional: true,
@@ -492,7 +499,7 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
   }
 
   const missed = unreached(plan, context.targets ?? [], context.harnesses);
-  const skips = skipped(names, chosen, missed, loading, linked);
+  const skips = skipped(names, chosen, missed, loading, folders);
   if ((missed.length > 0 || skips.size > 0) && names.length > 0) {
     lines.push("");
     if (missed.length > 0) {
@@ -531,11 +538,11 @@ function skipped(
   chosen: readonly string[],
   missed: readonly string[],
   loading: (name: string) => string[] | undefined,
-  linked: ReadonlyMap<string, string[]>,
+  folders: (name: string) => string[],
 ): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const name of names) {
-    if (!linked.has(name)) continue;
+    if (folders(name).length === 0) continue;
     const tools = loading(name);
     if (tools === undefined) continue;
     for (const tool of chosen) {
