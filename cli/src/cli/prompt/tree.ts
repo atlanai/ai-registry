@@ -127,8 +127,8 @@ export class Selection<T> {
 
   /** A section reads its own leaves only; a group picked whole is full. */
   fill(node: Node<T>): Fill {
+    if (this.whole(node)) return "all";
     if (node.kind === "leaf") return this.picked.has(node.choice.value) ? "all" : "none";
-    if (node.kind === "group" && this.whole(node)) return "all";
     const taken = node.leaves.filter((choice) => this.picked.has(choice.value)).length;
     return taken === 0 ? "none" : taken === node.leaves.length ? "all" : "some";
   }
@@ -147,14 +147,17 @@ export class Selection<T> {
       else this.take(node);
       return;
     }
+    // Leaving part of a whole group out picks the rest by name, so what it adds later stays out.
+    if (group?.value !== undefined && this.whole(node)) {
+      this.picked.delete(group.value);
+      const left = node.kind === "leaf" ? [node.choice] : node.leaves;
+      for (const choice of group.leaves) if (!left.includes(choice)) this.picked.add(choice.value);
+      return;
+    }
     if (node.kind === "leaf") {
       const value = node.choice.value;
       if (this.picked.has(value)) this.picked.delete(value);
-      else {
-        // The part supersedes the whole it was picked out of.
-        if (group?.value !== undefined) this.picked.delete(group.value);
-        this.picked.add(value);
-      }
+      else this.picked.add(value);
       return;
     }
     if (this.fill(node) === "all") this.drop(node);

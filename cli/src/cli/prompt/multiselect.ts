@@ -289,6 +289,10 @@ class Picking<T> implements Machine<T[]> {
     if (node.kind === "section") {
       return `Every ${node.label} artifact in ${node.group}: ${count} in all.`;
     }
+    if (this.selection.fill(node) === "some") {
+      const taken = node.leaves.filter((choice) => this.selection.picked.has(choice.value)).length;
+      return `${taken} of ${count} in ${node.label}. New ones won't be added.`;
+    }
     return (
       this.options.groupDetails?.get(node.label) ??
       `Everything in ${node.label}: ${plural(count, "artifact")}.`
