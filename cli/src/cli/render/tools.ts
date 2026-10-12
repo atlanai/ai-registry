@@ -1,3 +1,4 @@
+import { list } from "#adapter/text.ts";
 import { type Harnesses, readsFor } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 
@@ -42,4 +43,34 @@ export function loadedBy(
       !picked.some((tool) => tool === folder || loads(harnesses, tool, kind, [folder])),
   );
   return [...picked, ...others, ...unread];
+}
+
+/** The harnesses that load what one link places, by name, for a table cell or a step line. */
+export function linkLoadedBy(
+  harnesses: Harnesses,
+  chosen: readonly string[],
+  kind: ArtifactKind | undefined,
+  folder: string,
+): string {
+  return loadedBy(harnesses, chosen, kind, [folder])
+    .map((name) => toolName(harnesses, name))
+    .join(", ");
+}
+
+/** One line per shared folder and kind: which tools read that kind from it. */
+export function sharedReads(harnesses: Harnesses): string[] {
+  const shared = Object.values(harnesses).filter((target) => target.shared);
+  const tools = Object.values(harnesses).filter((target) => !target.shared);
+  return shared.flatMap((folder) =>
+    [...new Set(tools.flatMap((tool) => Object.keys(tool.reads)))].sort().flatMap((kind) => {
+      const readers = tools.filter((tool) =>
+        tool.reads[kind as ArtifactKind]?.includes(folder.name),
+      );
+      return readers.length === 0
+        ? []
+        : [
+            `${list(readers.map((tool) => tool.displayName))} read ${kind}s from the shared ${folder.projectRoot} folder.`,
+          ];
+    }),
+  );
 }

@@ -212,6 +212,7 @@ describe("confirmPlan", () => {
       ],
     };
     const { shown } = await answer(plan, [ENTER], { targets: ["claude", "codex"], harnesses });
+    expect(shown).toMatch(/artifact +version +harnesses\n/);
     expect(shown).toMatch(/pr-review +0\.1\.0 +Claude Code, Codex/);
     expect(shown).toMatch(/reviewer +0\.1\.0 +Claude Code\n/);
     expect(shown).not.toContain("agents, claude");

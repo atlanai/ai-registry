@@ -186,12 +186,18 @@ export interface RunHooks {
   adding?: ReadonlySet<string>;
 }
 
+/** The harnesses a run installs for, so a report can name them as they were chosen. */
+export interface Chosen {
+  targets: readonly string[];
+  harnesses: Harnesses;
+}
+
 /** How a run is shown, which the caller decides: the engine only says what happens. */
 export interface PlanReport {
   /** The whole plan, for a dry run, and the paths a real run would move to backups. */
-  plan(plan: Plan, roots: Roots, aside: ReadonlySet<string>): void;
+  plan(plan: Plan, roots: Roots, aside: ReadonlySet<string>, chosen: Chosen): void;
   /** Each action as apply reaches it. */
-  step(action: Action): void;
+  step(action: Action, plan: Plan, chosen: Chosen): void;
 }
 
 /** The single install path: `add`, `update` and `remove` differ only in `edit`. */
@@ -569,7 +575,7 @@ async function write(
       const aside = new Set(
         [...guards].flatMap(([path, guard]) => (guard === "backup" ? [path] : [])),
       );
-      report.plan(planned, roots, aside);
+      report.plan(planned, roots, aside, { targets, harnesses });
       return { plan: planned, applied: undefined, before: lock, targets, harnesses };
     }
 
@@ -588,7 +594,7 @@ async function write(
       planned,
       acquired,
       targets,
-      (action) => report.step(action),
+      (action) => report.step(action, planned, { targets, harnesses }),
       async () => {
         // Nothing was recorded, so the manifest must not ask for it.
         if (edited && (await unrecorded(roots, lock)))

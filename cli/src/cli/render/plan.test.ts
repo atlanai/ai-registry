@@ -4,7 +4,7 @@ import type { Lock } from "#core/lock.ts";
 import { Printer } from "#core/output.ts";
 import type { ApplyResult } from "#core/plan/apply.ts";
 import { type Action, emptyPlan } from "#core/plan/model.ts";
-import { summarize } from "./plan.ts";
+import { planReport, summarize } from "./plan.ts";
 
 function printed(
   actions: Action[],
@@ -146,5 +146,46 @@ describe("summarize", () => {
     const gone = ["a", "b", "c", "d"].map((name) => ({ kind: "unlink", name, to: "x" }) as Action);
     const applied = { performed: { unlink: 4 } as never, removed: ["a", "b", "c", "d"] };
     expect(printed(gone, applied)).toEqual(["✓ Removed 4 artifacts."]);
+  });
+});
+
+describe("planReport", () => {
+  const harnesses = resolveHarnesses({ HOME: "/home/dev" });
+  const chosen = { targets: ["claude", "codex"], harnesses };
+  const plan = {
+    ...emptyPlan(),
+    actions: [
+      link("pr-review", "agents"),
+      link("pr-review", "claude"),
+      link("reviewer", "claude"),
+      {
+        kind: "record",
+        lock: {
+          artifacts: { "pr-review": { kind: "skill" }, reviewer: { kind: "agent" } },
+          registries: {},
+        },
+      } as unknown as Action,
+    ],
+  };
+
+  function report(verbose: boolean): string[] {
+    const lines: string[] = [];
+    const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
+    const printer = new Printer({ out: sink, err: sink, color: "never", verbose });
+    const shown = planReport(printer);
+    shown.plan(plan, { scope: "project", base: process.cwd() } as never, new Set(), chosen);
+    for (const action of plan.actions) shown.step(action, plan, chosen);
+    return lines.join("\n").split("\n");
+  }
+
+  it("names the harnesses each link is for, not the folder it is in", () => {
+    const lines = report(false);
+    expect(lines).toContain("  action   artifact   harnesses    path");
+    expect(lines).toContain("  install  pr-review  Codex        t/agents/pr-review");
+    expect(lines).toContain("  install  pr-review  Claude Code  t/claude/pr-review");
+  });
+
+  it("names them in each step a verbose run prints", () => {
+    expect(report(true)).toContain("· install pr-review for Codex");
   });
 });

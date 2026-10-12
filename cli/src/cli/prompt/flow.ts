@@ -460,7 +460,7 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
                 ),
             },
             {
-              header: "for",
+              header: "harnesses",
               value: (name: string) => {
                 const tools = loading(name);
                 return tools === undefined
