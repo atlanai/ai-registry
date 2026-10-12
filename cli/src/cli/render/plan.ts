@@ -199,11 +199,12 @@ function changeLines(
       );
       continue;
     }
-    // Only what the lockfile already held was put back: a copy made again, or a link it records.
+    // Only what the lockfile already held was put back: its content fetched again, or a link it records.
     const puts = shown
       .filter((action) => action.name === name)
       .every(
         (action) =>
+          action.kind === "stage" ||
           action.kind === "clone" ||
           (action.kind === "link" && from?.links.some((link) => link.harness === action.harness)),
       );
