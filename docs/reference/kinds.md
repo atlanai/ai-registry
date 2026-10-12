@@ -18,10 +18,10 @@ aireg has one command for each kind of artifact. `skill` and `agent` are always 
 
 ### new
 
-`new` creates an artifact with every field its kind requires. Fields aireg can't fill in are set to `TODO`, and `new` lists them, so you know what to write.
+`new` creates an artifact with every field its kind requires. On a terminal, aireg asks for the fields it can't fill in, such as the description. A field left empty, or not asked for, is set to `TODO`, and `new` lists it, so you know what to write.
 
-- **In a registry**, it creates version `0.1.0` in `artifacts/<namespace>/<kind>/<name>/0.1.0/`. The namespace is `--namespace`, or the `artifacts/<namespace>/` folder you're in, or on a terminal aireg asks.
-- **Outside a registry**, it creates `./<name>/`, ready to publish with [`aireg publish`](publish.md). Publish a skill by its folder, and an agent by the path to its `AGENT.md`, since `publish` takes an agent as a single file.
+- **In a registry**, it creates version `0.1.0` in `artifacts/<namespace>/<kind>/<name>/0.1.0/`. The namespace is `--namespace`, or the `artifacts/<namespace>/` folder you're in, or on a terminal aireg asks. Without `<name>`, aireg asks for it on a terminal.
+- **Outside a registry**, it creates `./<name>/`, or without `<name>` fills the current folder and names the artifact after it, ready to publish with [`aireg publish`](publish.md). Publish a skill by its folder, and an agent by the path to its `AGENT.md`, since `publish` takes an agent as a single file.
 
 A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. A card's `name`, `description` and `runtime` are what `registry index` checks, so a card aireg writes indexes as it is.
 
@@ -54,7 +54,7 @@ An artifact names what has to be installed with it as `depends_on` relationships
 | `--file <file>` | For a kind that offers more than one layout, the file to create, such as `agent-card.json` for an agent. |
 | `--from <path>` | An existing skill folder or agent file to copy in. Repeat it, or list more paths after it. |
 | `--name <name>` | With `--from`, the name to give the one artifact copied in. |
-| `-y`, `--yes` | Don't ask for the namespace. |
+| `-y`, `--yes` | Don't ask for the namespace, the name or the fields. |
 
 ## JSON output
 
@@ -68,7 +68,7 @@ An artifact names what has to be installed with it as `depends_on` relationships
 
 - `0`: created or copied, or canceled at a question.
 - `1`: the artifact or version already exists, a path is missing or isn't a valid skill or agent, or there is no version to start from.
-- `2`: the action, namespace, name or version isn't valid, no namespace was given and aireg can't ask, or `--from` or `bump` is run outside a registry.
+- `2`: the action, namespace, name or version isn't valid, no namespace, or no name in a registry, was given and aireg can't ask, or `--from` or `bump` is run outside a registry.
 
 ## Examples
 

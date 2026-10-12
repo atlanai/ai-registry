@@ -15,8 +15,8 @@ import { isWithin } from "#adapter/paths.ts";
 import { bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { list, plural, quoted, sanitizeName } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
-import { cancel, interaction, interactive } from "#cli/prompt/flow.ts";
-import { canceled, defaultIo, select } from "#cli/prompt/index.ts";
+import { cancel, type Interaction, interaction, interactive } from "#cli/prompt/flow.ts";
+import { canceled, defaultIo, select, text } from "#cli/prompt/index.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isRecord, RESERVED_KEYS } from "#core/fields.ts";
 import { inBlobStore } from "#core/filespec/write/indexer.ts";
@@ -192,22 +192,94 @@ function scaffold(
     return out;
   }
   const fields = fill(schema, []);
-  for (const [path, value] of sets) {
-    let node: Record<string, unknown> = fields;
-    for (const key of path.slice(0, -1)) {
-      node[key] = typeof node[key] === "object" && node[key] !== null ? node[key] : {};
-      node = node[key] as Record<string, unknown>;
-    }
-    node[path.at(-1) as string] = value;
-    const index = todo.indexOf(path.join("."));
-    if (index !== -1) todo.splice(index, 1);
-  }
+  for (const [path, value] of sets) assign(fields, todo, path, value);
   return { fields, todo };
+}
+
+function assign(fields: Record<string, unknown>, todo: string[], path: string[], value: string) {
+  let node = fields;
+  for (const key of path.slice(0, -1)) {
+    node[key] = typeof node[key] === "object" && node[key] !== null ? node[key] : {};
+    node = node[key] as Record<string, unknown>;
+  }
+  node[path.at(-1) as string] = value;
+  const index = todo.indexOf(path.join("."));
+  if (index !== -1) todo.splice(index, 1);
+}
+
+/** Asked on a terminal; an empty answer leaves the field to fill in later. */
+async function askFields(step: Interaction, fields: Record<string, unknown>, todo: string[]) {
+  for (const path of [...todo]) {
+    const label = path.replaceAll(".", " ");
+    const message = label.charAt(0).toUpperCase() + label.slice(1);
+    const answer = await text({ message, style: step.printer.errStyle }, step.io);
+    if (canceled(answer)) return false;
+    if (answer !== "") assign(fields, todo, path.split("."), answer);
+  }
+  return true;
+}
+
+/** A registry folder's name is never the artifact's, so there the name is asked for. */
+async function askName(kind: string, step: Interaction): Promise<string | undefined> {
+  if (!interactive(step))
+    throw new AiregError(`\`aireg ${kind} new\` needs a name in a registry.`, {
+      code: ErrorCode.Usage,
+      hint: `Run \`aireg ${kind} new <name>\`.`,
+    });
+  const answer = await text({ message: "Name", style: step.printer.errStyle }, step.io);
+  return canceled(answer) ? undefined : nameOf(answer, answer);
 }
 
 function render(path: string, fields: Record<string, unknown>): string {
   if (path.endsWith(".json")) return `${JSON.stringify(fields, undefined, 2)}\n`;
   return `---\n${stringify(fields, { lineWidth: 0 })}---\n`;
+}
+
+/** `artifacts/<namespace>/<kind>/<name>/0.1.0`, with the namespace and name asked for when missing. */
+async function registryPlace(
+  kind: string,
+  root: string,
+  context: CommandContext,
+  own: Own,
+  yes: boolean,
+  given: string | undefined,
+  step: Interaction,
+): Promise<{ name: string; at: string } | undefined> {
+  const namespace = await namespaceFor(root, context.cwd, own, context, yes);
+  if (namespace === undefined) return undefined;
+  const name = given ?? (await askName(kind, step));
+  if (name === undefined) {
+    cancel(step);
+    return undefined;
+  }
+  const home = join(root, "artifacts", namespace, kind, name);
+  if (existsSync(home)) {
+    throw new AiregError(`${namespace}/${kind}/${name} already exists.`, {
+      code: ErrorCode.Conflict,
+      hint: `Start its next version with \`aireg ${kind} bump ${name}\`.`,
+    });
+  }
+  return { name, at: join(home, "0.1.0") };
+}
+
+/** `./<name>`, or this folder named after itself when no name is given. */
+function outsidePlace(
+  kind: string,
+  files: readonly string[],
+  context: CommandContext,
+  given: string | undefined,
+): { name: string; at: string } {
+  const name = given ?? nameOf(undefined, sanitizeName(basename(context.cwd)));
+  const at = given === undefined ? context.cwd : join(context.cwd, name);
+  const shown = relative(context.cwd, at) || ".";
+  for (const file of files) {
+    if (existsSync(join(at, file)))
+      throw new AiregError(`${join(shown, file)} already exists.`, {
+        code: ErrorCode.Conflict,
+        hint: `Run it in an empty folder, or name a new one: \`aireg ${kind} new <name>\`.`,
+      });
+  }
+  return { name, at };
 }
 
 async function init(
@@ -220,40 +292,25 @@ async function init(
 ): Promise<void> {
   const root = findRegistry(context.cwd);
   const inRegistry = root !== undefined;
-  const name = nameOf(input, sanitizeName(basename(context.cwd)));
+  const given = input === undefined ? undefined : nameOf(input, input);
   const files = primaryFiles(manifest, own.file);
   if (files.length === 0)
     throw new AiregError(`The ${kind} kind names no files to create.`, {
       code: ErrorCode.Invalid,
       hint: `List the ${kind} kind's files in the registry's \`kinds/\`, then run it again.`,
     });
-  const { fields, todo } = scaffold(manifest, name, settings(own.set));
+  const sets = settings(own.set);
+  const step = interaction(context.printer, defaultIo(), yes);
 
-  let at: string;
-  let shown: string;
-  if (inRegistry) {
-    const namespace = await namespaceFor(root, context.cwd, own, context, yes);
-    if (namespace === undefined) return;
-    const home = join(root, "artifacts", namespace, kind, name);
-    if (existsSync(home)) {
-      throw new AiregError(`${namespace}/${kind}/${name} already exists.`, {
-        code: ErrorCode.Conflict,
-        hint: `Start its next version with \`aireg ${kind} bump ${name}\`.`,
-      });
-    }
-    at = join(home, "0.1.0");
-    shown = relative(context.cwd, at) || ".";
-  } else {
-    at = input === undefined ? context.cwd : join(context.cwd, name);
-    shown = relative(context.cwd, at) || ".";
-    for (const file of files) {
-      if (existsSync(join(at, file)))
-        throw new AiregError(`${join(shown, file)} already exists.`, {
-          code: ErrorCode.Conflict,
-          hint: `Run it in an empty folder, or name a new one: \`aireg ${kind} new <name>\`.`,
-        });
-    }
-  }
+  const place = inRegistry
+    ? await registryPlace(kind, root, context, own, yes, given, step)
+    : outsidePlace(kind, files, context, given);
+  if (place === undefined) return;
+  const { name, at } = place;
+  const shown = relative(context.cwd, at) || ".";
+
+  const { fields, todo } = scaffold(manifest, name, sets);
+  if (interactive(step) && !(await askFields(step, fields, todo))) return cancel(step);
 
   await mkdir(at, { recursive: true });
   for (const file of files) await writeFile(join(at, file), render(file, fields), "utf8");
