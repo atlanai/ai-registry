@@ -227,8 +227,12 @@ class Picking<T> implements Machine<T[]> {
   }
 
   private allBody(on: boolean): string {
-    const full = this.top.filter((node) => this.selection.fill(node) === "all").length;
-    const fill: Fill = full === 0 ? "none" : full === this.top.length ? "all" : "some";
+    const fills = this.top.map((node) => this.selection.fill(node));
+    const fill: Fill = fills.every((each) => each === "all")
+      ? "all"
+      : fills.some((each) => each !== "none")
+        ? "some"
+        : "none";
     // The title already counts what is selected, in the same units the tree picks.
     const label = "Select all";
     return `${this.radio(fill)} ${on ? this.options.style.cyan(label) : label}`;

@@ -51,6 +51,19 @@ describe("select", () => {
     expect((await pick(scope, [down, enter])).screen).toEqual(["◇  Installation scope  User"]);
   });
 
+  it("collapses to an option's shorter answer when it has one", async () => {
+    const method = {
+      message: "How should they be installed?",
+      options: [
+        { value: "link", label: "Symlink (recommended)", answer: "Symlink" },
+        { value: "copy", label: "Copy" },
+      ],
+    };
+    expect((await pick(method, [enter])).screen).toEqual([
+      "◇  How should they be installed?  Symlink",
+    ]);
+  });
+
   it("starts on the initial value, or the first when it matches nothing", async () => {
     expect((await pick({ ...scope, initial: "user" }, [enter])).value).toBe("user");
     expect((await pick({ ...scope, initial: "nowhere" }, [enter])).value).toBe("project");

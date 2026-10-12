@@ -16,6 +16,8 @@ interface Option<T> {
   label: string;
   /** Why someone would pick this one. Shown beside the label. */
   hint?: string | undefined;
+  /** Shown as the answer once chosen, when the label carries more, such as "(recommended)". */
+  answer?: string | undefined;
   /** A letter that moves to this option, so `n` then enter answers No. */
   key?: string | undefined;
 }
@@ -73,7 +75,7 @@ class Choosing<T> implements Machine<T> {
     const body = (this.options.body ?? []).map((line) => railLine(style, line));
     if (this.ended === "submit") {
       return [
-        titleLine(style, "submit", message, style.dim(options[this.cursor]?.label ?? "")),
+        titleLine(style, "submit", message, style.dim(answerOf(options[this.cursor]))),
         ...body,
       ];
     }
@@ -99,6 +101,10 @@ class Choosing<T> implements Machine<T> {
       ...footerLines(style, keys),
     ];
   }
+}
+
+function answerOf<T>(option: Option<T> | undefined): string {
+  return option?.answer ?? option?.label ?? "";
 }
 
 export async function select<T>(options: SelectOptions<T>, io: PromptIo): Promise<T | Canceled> {
