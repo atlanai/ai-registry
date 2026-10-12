@@ -31,7 +31,7 @@ import { gitIn } from "#core/git.ts";
 import { type LockArtifact, writeLock } from "#core/lock.ts";
 import { pinOf, type RegistrySource, unknownRegistry } from "#core/manifest.ts";
 import type { Printer } from "#core/output.ts";
-import { listedAt } from "#core/plan/model.ts";
+import { listedAt, type Placement } from "#core/plan/model.ts";
 import { applyLocal } from "#engine/local.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { type Loaded, load, withScope } from "#engine/pipeline.ts";
@@ -478,16 +478,23 @@ async function follow(
           .filter(([row, version]) => moved(found, fresh.lock.artifacts[row], version))
           .map(([row]) => row),
       );
-      for (const row of rows.keys()) {
+      for (const [row, version] of rows) {
         const entry = fresh.lock.artifacts[row];
         if (served.has(row) || entry === undefined) continue;
         // What was sent is what is on disk, so the copy stops reading as an edit.
         entry.digest = await digest(resolve(fresh.roots.base, entry.path));
-        context.printer.hint(
-          `The registry does not serve ${row} yet, so the copy here was left as it is. Run ${
-            entry.origin === undefined ? "`aireg update`" : "`aireg sync`"
-          } once it does.`,
-        );
+        const next = entry.origin === undefined ? "`aireg update`" : "`aireg sync`";
+        // Moved past the lock but not to what was sent, as after `--force` into a clone.
+        const other = moved(found, entry) ? head(found, entry)?.version : undefined;
+        if (other === undefined) {
+          context.printer.hint(
+            `The registry does not serve ${row} yet, so the copy here was left as it is. Run ${next} once it does.`,
+          );
+        } else {
+          context.printer.warning(
+            `The registry serves ${row} ${other}, not the ${version} you published, so the copy here was left as it is. Run ${next} only once it serves ${version}: until then it would put ${other} in place of your copy.`,
+          );
+        }
       }
       if (served.size > 0) await applyLocal(fresh, common, found, served, served, true, () => {});
       else await writeLock(fresh.roots, fresh.lock);
@@ -507,15 +514,20 @@ export function moved(
   /** The version just sent: a head older than it is not what was sent, as after `--force` into a clone. */
   sent?: string,
 ): boolean {
-  if (entry === undefined) return false;
-  const acquired = found.acquired.find((item) => item.alias === entry.registry);
-  const at = acquired === undefined ? undefined : listedAt(entry, acquired.catalog.entries);
-  const now = at === undefined ? undefined : acquired?.placements.get(at);
+  const now = entry === undefined ? undefined : head(found, entry);
   return (
+    entry !== undefined &&
     now !== undefined &&
     (now.contentId !== entry.content || now.version !== entry.version) &&
     !older(now.version, sent)
   );
+}
+
+/** What the registry serves at the row's address now. */
+function head(found: Scan, entry: LockArtifact): Placement | undefined {
+  const acquired = found.acquired.find((item) => item.alias === entry.registry);
+  const at = acquired === undefined ? undefined : listedAt(entry, acquired.catalog.entries);
+  return at === undefined ? undefined : acquired?.placements.get(at);
 }
 
 function older(served: string | undefined, sent: string | undefined): boolean {
