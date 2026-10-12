@@ -1,6 +1,7 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
 import { foundBy } from "#cli/render/found.ts";
+import { loadedBy, toolName } from "#cli/render/tools.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import {
   DEFAULT_TARGETS,
@@ -227,6 +228,7 @@ function borrowed(harnesses: Harnesses, target: Target): [ArtifactKind, Target][
 /** Group removal choices by their registry. */
 export async function chooseRemovals(
   step: Interaction,
+  /** `targets` are the harnesses that load each one, by name. */
   installed: readonly { name: string; kind: string; source: string; targets: string[] }[],
 ): Promise<string[] | Canceled> {
   return await multiselect(
@@ -239,7 +241,7 @@ export async function chooseRemovals(
         group: entry.source,
         detail:
           entry.targets.length > 0
-            ? `Installed into ${entry.targets.join(", ")}.`
+            ? `Installed for ${list(entry.targets)}.`
             : "Fetched, but installed into no harness.",
       })),
       style: step.printer.errStyle,
@@ -440,14 +442,7 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
   const loading = (name: string): string[] | undefined =>
     context.harnesses === undefined || chosen.length === 0
       ? undefined
-      : chosen.filter((tool) =>
-          loads(
-            context.harnesses as Harnesses,
-            tool,
-            recorded?.artifacts[name]?.kind,
-            folders(name),
-          ),
-        );
+      : loadedBy(context.harnesses, chosen, recorded?.artifacts[name]?.kind, folders(name));
 
   // What a person decides on: which version, into which harnesses. Store paths are ours.
   const lines =
@@ -470,7 +465,7 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
                 const tools = loading(name);
                 return tools === undefined
                   ? folders(name).sort().join(", ")
-                  : tools.map((tool) => label(context.harnesses, tool)).join(", ");
+                  : tools.map((tool) => toolName(context.harnesses, tool)).join(", ");
               },
               optional: true,
             },
@@ -498,38 +493,15 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
     lines.push(style.dim(`${plan.unchanged.length} already up to date`));
   }
 
-  const missed = unreached(plan, context.targets ?? [], context.harnesses);
-  const skips = skipped(names, chosen, missed, loading, folders);
-  if ((missed.length > 0 || skips.size > 0) && names.length > 0) {
-    lines.push("");
-    if (missed.length > 0) {
-      for (const line of explainMissed(missed, context)) lines.push(style.yellow(line));
-    }
-    for (const line of explainSkipped(skips, recorded, context)) {
-      lines.push(style.yellow(line));
-    }
+  if (names.length > 0) {
+    const missed = unreached(plan, chosen, context.harnesses);
+    const notes = [
+      ...explainMissed(missed, context),
+      ...explainSkipped(skipped(names, chosen, missed, loading, folders), recorded, context),
+    ];
+    if (notes.length > 0) lines.push("", ...notes.map((line) => style.yellow(line)));
   }
   return lines.length === 0 ? [style.dim("Nothing to do.")] : lines;
-}
-
-/** Whether a tool loads an artifact placed in these folders, its own or one it reads the kind from. */
-function loads(
-  harnesses: Harnesses,
-  tool: string,
-  kind: ArtifactKind | undefined,
-  folders: readonly string[],
-): boolean {
-  if (folders.includes(tool)) return true;
-  return (
-    kind !== undefined && readsFor(harnesses, tool, kind).some((read) => folders.includes(read))
-  );
-}
-
-/** A chosen harness by the name a person picked it by. */
-function label(harnesses: Harnesses | undefined, name: string): string {
-  const target = harnesses?.[name];
-  if (target === undefined) return name;
-  return target.shared ? target.projectRoot : target.displayName;
 }
 
 /** The artifacts each chosen tool is left without, for tools that receive something else. */
@@ -573,14 +545,15 @@ function explainSkipped(
     const reason = unhandled(harnesses, tool, kinds);
     const because =
       reason.length === 0 ? "" : `: it does not load ${list(reason.map((kind) => `${kind}s`))}`;
-    return `${label(harnesses, tool)} skips ${list(names)}${because}.`;
+    return `${toolName(harnesses, tool)} skips ${list(names)}${because}.`;
   });
 }
 
 /** Group unreached harnesses by unsupported kinds for concise reporting. */
 function explainMissed(missed: readonly string[], context: PlanContext): string[] {
+  if (missed.length === 0) return [];
   const { harnesses, kinds } = context;
-  const named = (targets: readonly string[]) => list(targets.map((t) => label(harnesses, t)));
+  const named = (targets: readonly string[]) => list(targets.map((t) => toolName(harnesses, t)));
   const receive = (targets: readonly string[]) => (targets.length === 1 ? "receives" : "receive");
   const vague = (targets: readonly string[]): string =>
     `${named(targets)} ${receive(targets)} nothing from this selection.`;

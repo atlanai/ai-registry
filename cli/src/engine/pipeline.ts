@@ -161,6 +161,9 @@ export interface RunResult {
   applied: ApplyResult | undefined;
   /** The lockfile as the run found it, so a report can say what moved. */
   before: Lock;
+  /** The harnesses this run installed for, so a report names them as they were chosen. */
+  targets: readonly string[];
+  harnesses: Harnesses;
 }
 
 export interface RunHooks {
@@ -567,13 +570,13 @@ async function write(
         [...guards].flatMap(([path, guard]) => (guard === "backup" ? [path] : [])),
       );
       report.plan(planned, roots, aside);
-      return { plan: planned, applied: undefined, before: lock };
+      return { plan: planned, applied: undefined, before: lock, targets, harnesses };
     }
 
     await refuseBlocked(planned);
 
     if (hooks.approve !== undefined && !(await hooks.approve(planned, targets))) {
-      return { plan: planned, applied: undefined, before: lock };
+      return { plan: planned, applied: undefined, before: lock, targets, harnesses };
     }
 
     const edited = formatManifest(manifest) !== loaded.manifestAsRead;
@@ -600,7 +603,7 @@ async function write(
     if (edited && !landed && applied.unstaged.length > 0)
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
-    return { plan: planned, applied, before: lock };
+    return { plan: planned, applied, before: lock, targets, harnesses };
   } finally {
     await closeAll(acquired);
   }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolveHarnesses } from "#core/harness/index.ts";
 import type { Lock } from "#core/lock.ts";
 import { Printer } from "#core/output.ts";
 import type { ApplyResult } from "#core/plan/apply.ts";
@@ -9,6 +10,7 @@ function printed(
   actions: Action[],
   applied: Partial<ApplyResult>,
   before: Record<string, unknown> = {},
+  targets: string[] = ["claude", "codex"],
 ): string[] {
   const lines: string[] = [];
   const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
@@ -26,6 +28,8 @@ function printed(
     plan: { ...emptyPlan(), actions },
     applied: result,
     before: { artifacts: before, registries: {} } as unknown as Lock,
+    targets,
+    harnesses: resolveHarnesses({ HOME: "/home/dev" }),
   });
   return lines;
 }
@@ -33,11 +37,32 @@ function printed(
 const link = (name: string, harness: string) =>
   ({ kind: "link", name, harness, from: "f", to: `t/${harness}/${name}`, copy: false }) as Action;
 
+const at = (harness: string) => ({ harness, path: "p", mode: "symlink" });
+
 describe("summarize", () => {
-  it("names what was installed and where, not how many steps ran", () => {
+  it("names the tools that load what was installed, not the folders or the steps", () => {
     const actions = [link("lint", "claude"), link("lint", "agents")];
-    const applied = { performed: { link: 2 } as never, installed: ["lint"], added: ["lint"] };
-    expect(printed(actions, applied)).toEqual(["✓ Installed lint into claude and agents."]);
+    const lock = { artifacts: { lint: { kind: "skill", links: [at("claude"), at("agents")] } } };
+    const applied = {
+      performed: { link: 2 } as never,
+      installed: ["lint"],
+      added: ["lint"],
+      lock: lock as never,
+    };
+    // Codex reads skills from `.agents`.
+    expect(printed(actions, applied)).toEqual(["✓ Installed lint for Claude Code and Codex."]);
+  });
+
+  it("names a shared folder by its path when no chosen tool reads it", () => {
+    const actions = [link("lint", "agents")];
+    const lock = { artifacts: { lint: { kind: "skill", links: [at("agents")] } } };
+    const applied = {
+      performed: { link: 1 } as never,
+      installed: ["lint"],
+      added: ["lint"],
+      lock: lock as never,
+    };
+    expect(printed(actions, applied, {}, ["agents"])).toEqual(["✓ Installed lint for .agents."]);
   });
 
   it("names every member of a new namespace as installed, though one link carries them", () => {
@@ -51,7 +76,9 @@ describe("summarize", () => {
       added: ["add", "new", "publish"],
       lock: lock as never,
     };
-    expect(printed(actions, applied)).toEqual(["✓ Installed add, new and publish into claude."]);
+    expect(printed(actions, applied, {}, ["claude"])).toEqual([
+      "✓ Installed add, new and publish for Claude Code.",
+    ]);
   });
 
   it("says which harnesses start a plugin's hooks and MCP servers", () => {
@@ -63,8 +90,8 @@ describe("summarize", () => {
       carried: [{ name: "tools", carries: ["hooks", "mcpServers"] }] as ApplyResult["carried"],
     };
     expect(printed(actions, applied)).toEqual([
-      "✓ Installed tools into claude and codex.",
-      "  runs   hooks and MCP servers from tools, in claude and codex",
+      "✓ Installed tools for Claude Code and Codex.",
+      "  runs   hooks and MCP servers from tools, in Claude Code and Codex",
     ]);
   });
 
@@ -93,7 +120,7 @@ describe("summarize", () => {
     const applied = { performed: { link: 1 } as never, lock: lock as never };
     const before = { lint: { version: "0.1.0", links: [{ harness: "claude" }] } };
     expect(printed([link("lint", "claude")], applied, before)).toEqual([
-      "✓ Restored lint in claude.",
+      "✓ Restored lint for Claude Code.",
     ]);
   });
 

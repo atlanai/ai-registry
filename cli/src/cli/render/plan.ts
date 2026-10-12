@@ -11,6 +11,7 @@ import { table } from "#core/term/table.ts";
 import { GLYPH } from "#core/term/theme.ts";
 import type { PlanReport, RunResult } from "#engine/pipeline.ts";
 import { underHome } from "./home.ts";
+import { loadedBy, toolName } from "./tools.ts";
 
 type Shown = Exclude<Action, { kind: "record" }>;
 
@@ -119,8 +120,13 @@ function unchanged(printer: Printer, plan: Plan): void {
   );
 }
 
+/** The harnesses some artifacts went to, named as chosen; `folders` narrows where each went. */
+type Tools = (names: readonly string[], folders?: (name: string) => string[]) => string;
+
 /** An applied run: the plan, what apply did, and the lockfile it started from. */
-export type Ran = Pick<RunResult, "plan" | "before"> & { applied: ApplyResult };
+export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses"> & {
+  applied: ApplyResult;
+};
 
 /**
  * Names what apply did, not what was planned: a link kept for a file of yours is not one.
@@ -128,7 +134,7 @@ export type Ran = Pick<RunResult, "plan" | "before"> & { applied: ApplyResult };
  */
 export function summarize(
   printer: Printer,
-  { plan, applied, before }: Ran,
+  { plan, applied, before, targets, harnesses }: Ran,
   told: ReadonlySet<string> = new Set(),
 ): void {
   const shown = plan.actions.filter(
@@ -143,6 +149,17 @@ export function summarize(
     shown.flatMap((action) =>
       action.kind === "link" && action.name === name ? [action.harness] : [],
     );
+  // Named as they were chosen: one folder can serve several tools.
+  const toolsOf = (name: string, folders = harnessesOf(name)): string[] => {
+    const kind = held?.[name]?.kind ?? before.artifacts[name]?.kind;
+    return loadedBy(harnesses, targets, kind, folders);
+  };
+  const tools: Tools = (names, folders) =>
+    list(
+      [...new Set(names.flatMap((name) => toolsOf(name, folders?.(name))))].map((tool) =>
+        toolName(harnesses, tool),
+      ),
+    );
   const installed = applied.added.filter((name) => harnessesOf(name).length > 0);
   const changed = [...touched("clone", "link", "unlink")].filter(
     (name) => !applied.added.includes(name) && !applied.removed.includes(name),
@@ -150,9 +167,9 @@ export function summarize(
   const lines = Object.values(applied.performed).some((count) => count > 0)
     ? [
         installed.length > 0
-          ? `Installed ${named(installed)} into ${list([...new Set(installed.flatMap(harnessesOf))])}.`
+          ? `Installed ${named(installed)}${tools(installed) === "" ? "" : ` for ${tools(installed)}`}.`
           : "",
-        ...changeLines(changed, shown, before, held),
+        ...changeLines(changed, shown, before, held, tools),
         applied.removed.length > 0 ? `Removed ${named(applied.removed)}.` : "",
       ].filter((line) => line !== "")
     : [];
@@ -170,9 +187,8 @@ export function summarize(
   }
   // Instructions wait for an agent to read them; these run as you once a harness loads them.
   for (const { name, carries } of applied.carried) {
-    const where = harnessesOf(name);
-    if (told.has(name) || where.length === 0) continue;
-    printer.note("runs", `${describeCarried(carries)} from ${name}, in ${list(where)}`);
+    if (told.has(name) || harnessesOf(name).length === 0) continue;
+    printer.note("runs", `${describeCarried(carries)} from ${name}, in ${tools([name])}`);
   }
 }
 
@@ -185,6 +201,7 @@ function changeLines(
   shown: readonly Shown[],
   before: Lock,
   after: Lock["artifacts"] | undefined,
+  tools: Tools,
 ): string[] {
   const moved: string[] = [];
   const back: string[] = [];
@@ -210,13 +227,14 @@ function changeLines(
       );
     (from !== undefined && puts ? restored : updated).push(name);
   }
-  const relinked = [
+  // Only the links put back, not every harness the artifact is in.
+  const relinked = tools(restored, (name) => [
     ...new Set(
       shown.flatMap((action) =>
-        action.kind === "link" && restored.includes(action.name) ? [action.harness] : [],
+        action.kind === "link" && action.name === name ? [action.harness] : [],
       ),
     ),
-  ];
+  ]);
   return [
     moved.length > 0
       ? `Updated ${moved.length <= 3 ? list(moved) : plural(moved.length, "artifact")}.`
@@ -226,7 +244,7 @@ function changeLines(
       : "",
     updated.length > 0 ? `Updated ${named(updated)}.` : "",
     restored.length > 0
-      ? `Restored ${named(restored)}${relinked.length === 0 ? "" : ` in ${list(relinked)}`}.`
+      ? `Restored ${named(restored)}${relinked === "" ? "" : ` for ${relinked}`}.`
       : "",
   ];
 }
