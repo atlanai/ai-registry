@@ -133,8 +133,7 @@ runs:
           test "$(aws s3 cp --only-show-errors "s3://$BUCKET/$(key "$2")" - | sha256sum)" = "$(sha256sum < "$1")"
         }
         put "$RUNNER_TEMP/aireg-manifest.json" "channels/$CHANNEL/manifest.json" application/json
+        # Served as <origin>/install only; the versioned copy under artifacts/ keeps its .sh name.
         if [ "$CHANNEL" = stable ]; then
-          put install.sh install.sh text/x-shellscript
-          # Same bytes, so `curl -fsSL <origin>/install | sh` works.
           put install.sh install text/x-shellscript
         fi
