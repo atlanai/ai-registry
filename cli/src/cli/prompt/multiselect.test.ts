@@ -115,6 +115,12 @@ describe("multiselect keys", () => {
     expect(await run).toEqual(tree.map((choice) => choice.value));
   });
 
+  it("marks Select all partial when only part of one heading is picked", async () => {
+    const options = { choices: tree, groups: true, selectAll: true };
+    const frame = await frameAfter(options, [down, space]);
+    expect(frame[2]).toBe("│   ◐ Select all");
+  });
+
   it("ignores other letters, and a where select-all is off", async () => {
     expect((await answer({ choices }, ["d", "a", space, enter])).value).toEqual(["api-design"]);
   });
