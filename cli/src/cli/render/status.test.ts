@@ -58,4 +58,25 @@ describe("renderStatus", () => {
     expect(lines).toContain("  pr-review  skill  0.1.0    acme  ✓            ✓      ok");
     expect(lines).toContain("  reviewer   agent  0.1.0    acme  missing      -      missing");
   });
+
+  it("says replaced, drops the folder from a detail, and explains each dash and ok", () => {
+    const lines = rendered(
+      [
+        {
+          name: "pr-review",
+          state: "dangling",
+          detail: "claude: replaced by something of yours",
+          harnesses: { agents: "linked", claude: "replaced" },
+        },
+        { name: "reviewer", state: "ok", detail: undefined, harnesses: { claude: "linked" } },
+      ],
+      [row("pr-review", "skill"), row("reviewer", "agent")],
+    );
+    expect(lines).toContain(
+      "  pr-review  skill  0.1.0    acme  replaced     ✓      replaced  replaced by something of yours",
+    );
+    expect(lines).toContain("Codex skips reviewer: it does not load agents.");
+    expect(lines).toContain("ok  matches the lockfile, links intact");
+    expect(lines).toContain("1 artifact needs attention.");
+  });
 });

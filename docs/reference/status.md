@@ -16,12 +16,14 @@ aireg status [-g]
 |---|---|
 | `ok` | Installed as the lockfile records it. |
 | `missing` | The stored copy, or a link in a harness folder, is missing, or something else holds the path the link needs. |
-| `dangling` | A harness link was replaced by a file or folder of yours, or points outside the scope. |
+| `replaced` | A harness link was replaced by a file or folder of yours, or points outside the scope. `--json` calls this state `dangling`. |
 | `edited` | The installed copy was edited after it was installed. With `--copy`, that includes the copy in the harness folder. |
 
-The table shows each artifact's kind, version and registry, then a column per harness it was installed for: `✓` when linked where that harness reads it, `missing`, `replaced`, `foreign` when its link points outside the scope, or `-` when it isn't installed there. Codex reads a project's skills from `.agents/skills/`, so its column shows the link there. A version marked `pinned` is held by the manifest.
+The table shows each artifact's kind, version and registry, then a column per harness it was installed for: `✓` when linked where that harness reads it, `missing`, `replaced`, `foreign` when its link points outside the scope, or `-` when it isn't installed there. Codex reads a project's skills from `.agents/skills/`, so its column shows the link there. A version marked `pinned` is held by the manifest. The detail says why an artifact is not `ok`; the column it is under names the harness.
 
-`status` ends with what to run next. Run [`aireg install`](install.md) to restore missing or dangling artifacts, which first moves a file or folder of yours that replaced a link to `.registry/backups/`, and [`aireg sync`](sync.md) to compare an edit with the registry.
+Under the table, a line explains each `-`, such as `Codex skips reviewer: it does not load agents.`, and when some artifacts need attention, a line says what `ok` means.
+
+`status` ends with what to run next. Run [`aireg install`](install.md) to restore missing or replaced artifacts, which first moves a file or folder of yours that replaced a link to `.registry/backups/`, and [`aireg sync`](sync.md) to compare an edit with the registry.
 
 A link aireg did not make is `missing` too, with the reason: a folder of yours already at the path, or another artifact of the same name installed there. `install` leaves your folder alone, so move it, or give one artifact another name with `as:` in the manifest, then run `aireg install`.
 
@@ -44,13 +46,13 @@ In a project, `status` also warns about an artifact installed in both the projec
 }}
 ```
 
-In JSON, `harnesses` is keyed by the folder each link is in, which is not always the harness that reads it: Codex reads skills from `agents`. A value is `linked`, `missing`, `replaced` or `foreign`. An artifact that isn't `ok` also has a `detail` saying why. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`.
+In JSON, `harnesses` is keyed by the folder each link is in, which is not always the harness that reads it: Codex reads skills from `agents`. A value is `linked`, `missing`, `replaced` or `foreign`. `state` is `ok`, `missing`, `dangling` (shown as `replaced` in the table) or `edited`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder it is about, such as `claude: not installed`. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`.
 
 ## Exit status
 
 - `0`: every artifact is `ok`, or nothing is installed. Unmanaged artifacts don't change the exit status.
 - `2`: an argument was given.
-- `3`: at least one artifact is `missing`, `dangling` or `edited`.
+- `3`: at least one artifact is `missing`, `replaced` or `edited`.
 
 ## Examples
 
@@ -61,11 +63,15 @@ aireg status
 ```
 
 ```text
-1 installed in this project
-  artifact   kind   version  from  Claude Code  Codex  state
-  pr-review  skill  0.1.0    acme  ✓            ✓      ok
+2 installed in this project
+  artifact   kind   version  from  Claude Code  Codex  state     detail
+  pr-review  skill  0.1.0    acme  replaced     ✓      replaced  replaced by something of yours
+  reviewer   agent  0.1.0    acme  ✓            -      ok
 
-✓ Everything matches the lockfile.
+Codex skips reviewer: it does not load agents.
+ok  matches the lockfile, links intact
+1 artifact needs attention.
+hint: Run `aireg install` to restore what is missing.
 ```
 
 Check your user scope:

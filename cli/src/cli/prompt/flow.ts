@@ -1,7 +1,7 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
 import { foundBy } from "#cli/render/found.ts";
-import { loadedBy, toolName } from "#cli/render/tools.ts";
+import { loadedBy, skipLine, toolName, unhandled } from "#cli/render/tools.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import {
   DEFAULT_TARGETS,
@@ -383,17 +383,6 @@ export function unreached(plan: Plan, targets: readonly string[], harnesses?: Ha
   return targets.filter((name) => !reads(name).some((read) => reached.has(read))).sort();
 }
 
-/** The kinds a harness cannot load, which explain why it was left out. */
-export function unhandled(
-  harnesses: Harnesses,
-  target: string,
-  kinds: readonly ArtifactKind[],
-): ArtifactKind[] {
-  const harness = harnesses[target];
-  if (harness === undefined) return [];
-  return kinds.filter((kind) => harness.kinds[kind] === undefined);
-}
-
 /**
  * A plugin is one plan entry but one link per member per harness, so a harness
  * is named once however many members point there.
@@ -542,10 +531,7 @@ function explainSkipped(
         }),
       ),
     ];
-    const reason = unhandled(harnesses, tool, kinds);
-    const because =
-      reason.length === 0 ? "" : `: it does not load ${list(reason.map((kind) => `${kind}s`))}`;
-    return `${toolName(harnesses, tool)} skips ${list(names)}${because}.`;
+    return skipLine(harnesses, tool, names, kinds);
   });
 }
 

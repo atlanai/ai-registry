@@ -1,13 +1,16 @@
-import { plural } from "#adapter/text.ts";
-import { stateTone } from "#core/console/state-style.ts";
+import { list, plural } from "#adapter/text.ts";
+import { STATE_MEANING, stateTone } from "#core/console/state-style.ts";
 import type { Harnesses } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { Printer } from "#core/output.ts";
-import type { ArtifactStatus, LinkState } from "#core/plan/status.ts";
+import type { ArtifactStatus, LinkState, State } from "#core/plan/status.ts";
 import { type Scope, scopeName } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { heading, type Installed, identity } from "./installed.ts";
-import { loadedBy, stateFor, toolName } from "./tools.ts";
+import { loadedBy, skipLine, stateFor, toolName } from "./tools.ts";
+
+/** A state as a person reads it; `--json` keeps the name the state has in the lockfile check. */
+const SHOWN_STATE: Partial<Record<State, string>> = { dangling: "replaced" };
 
 function cell(printer: Printer, seen: LinkState | undefined): string {
   const { style } = printer;
@@ -67,6 +70,17 @@ export function renderStatus(
       targets: [],
     };
 
+  // A detail names the folder its link is in; the column already names the harness.
+  const detailFor = (item: ArtifactStatus, detail: string): string => {
+    const at = detail.indexOf(": ");
+    const folder = at === -1 ? "" : detail.slice(0, at);
+    if (chosen.harnesses[folder] === undefined) return detail;
+    const tools = toolsOf(item, [folder]);
+    return tools.length === 1
+      ? detail.slice(at + 2)
+      : `${list(tools.map((tool) => toolName(chosen.harnesses, tool)))}: ${detail.slice(at + 2)}`;
+  };
+
   heading(printer, statuses.length, scope);
   table(
     printer,
@@ -85,12 +99,15 @@ export function renderStatus(
       })),
       {
         header: "state",
-        value: (item: ArtifactStatus) => printer.style[stateTone(item.state)](item.state),
+        value: (item: ArtifactStatus) =>
+          printer.style[stateTone(item.state)](SHOWN_STATE[item.state] ?? item.state),
       },
       {
         header: "detail",
         value: (item: ArtifactStatus) =>
-          item.state === "ok" || item.detail === undefined ? "" : printer.style.dim(item.detail),
+          item.state === "ok" || item.detail === undefined
+            ? ""
+            : printer.style.dim(detailFor(item, item.detail)),
         optional: true,
       },
     ],
@@ -99,10 +116,35 @@ export function renderStatus(
 
   const attention = statuses.filter((item) => item.state !== "ok").length;
   printer.info();
+  // Each `-` said in words, as the install plan says it.
+  const skipped = new Map<string, Installed[]>();
+  for (const item of statuses) {
+    for (const tool of tools) {
+      if (
+        !toolsOf(item, Object.keys(item.harnesses)).includes(tool) &&
+        !watchedBy(item).includes(tool)
+      )
+        skipped.set(tool, [...(skipped.get(tool) ?? []), of(item)]);
+    }
+  }
+  for (const [tool, missed] of skipped) {
+    const kinds = [...new Set(missed.map((row) => row.kind as ArtifactKind))];
+    printer.info(
+      printer.style.dim(
+        skipLine(
+          chosen.harnesses,
+          tool,
+          missed.map((row) => row.shown),
+          kinds,
+        ),
+      ),
+    );
+  }
   if (attention === 0) {
     printer.success("Everything matches the lockfile.");
     return;
   }
+  if (attention < statuses.length) printer.info(printer.style.dim(`ok  ${STATE_MEANING.ok}`));
   printer.info(`${plural(attention, "artifact")} need${attention === 1 ? "s" : ""} attention.`);
 
   // An edit is the one state `install` will not repair: it refuses to overwrite

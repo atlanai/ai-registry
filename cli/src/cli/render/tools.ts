@@ -112,3 +112,27 @@ export function sharedReads(harnesses: Harnesses): string[] {
     }),
   );
 }
+
+/** The kinds a harness cannot load, which explain why it was left out. */
+export function unhandled(
+  harnesses: Harnesses,
+  target: string,
+  kinds: readonly ArtifactKind[],
+): ArtifactKind[] {
+  const harness = harnesses[target];
+  if (harness === undefined) return [];
+  return kinds.filter((kind) => harness.kinds[kind] === undefined);
+}
+
+/** `Codex skips reviewer: it does not load agents.`, said the same by the plan and by status. */
+export function skipLine(
+  harnesses: Harnesses,
+  tool: string,
+  names: readonly string[],
+  kinds: readonly ArtifactKind[],
+): string {
+  const reason = unhandled(harnesses, tool, kinds);
+  const because =
+    reason.length === 0 ? "" : `: it does not load ${list(reason.map((kind) => `${kind}s`))}`;
+  return `${toolName(harnesses, tool)} skips ${list(names)}${because}.`;
+}

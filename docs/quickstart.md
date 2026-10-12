@@ -149,9 +149,9 @@ aireg status -g
 Nothing is installed in your user scope.
 
 2 unmanaged
-  artifact   kind   harness  path
-  lint       skill  claude   ~/.claude/skills/lint
-  pr-review  skill  claude   ~/.claude/skills/pr-review
+  artifact   kind   harness      path
+  lint       skill  Claude Code  ~/.claude/skills/lint
+  pr-review  skill  Claude Code  ~/.claude/skills/pr-review
   next   aireg publish <path> --to <registry>/<namespace>
 ```
 
