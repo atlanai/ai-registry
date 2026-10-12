@@ -1,10 +1,13 @@
 import { plural } from "#adapter/text.ts";
 import { stateTone } from "#core/console/state-style.ts";
+import type { Harnesses } from "#core/harness/index.ts";
+import type { ArtifactKind } from "#core/kinds.ts";
 import type { Printer } from "#core/output.ts";
 import type { ArtifactStatus, LinkState } from "#core/plan/status.ts";
 import { type Scope, scopeName } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { heading, type Installed, identity } from "./installed.ts";
+import { loadedBy, stateFor, toolName } from "./tools.ts";
 
 function cell(printer: Printer, seen: LinkState | undefined): string {
   const { style } = printer;
@@ -13,11 +16,18 @@ function cell(printer: Printer, seen: LinkState | undefined): string {
   return seen === "missing" ? style.red(seen) : style.yellow(seen);
 }
 
+/** Which harnesses each artifact was chosen for, so columns name harnesses rather than folders. */
+export interface Chosen {
+  harnesses: Harnesses;
+  for: (name: string) => readonly string[];
+}
+
 export function renderStatus(
   printer: Printer,
   statuses: readonly ArtifactStatus[],
   rows: readonly Installed[],
   scope: Scope,
+  chosen: Chosen,
 ): void {
   if (statuses.length === 0) {
     printer.info(`Nothing is installed in ${scopeName(scope)}.`);
@@ -28,15 +38,23 @@ export function renderStatus(
   // A watched artifact is its harness's own folder, which aireg reads and never links.
   const watching = (item: ArtifactStatus): string | undefined =>
     byName.get(item.name)?.watched?.harness;
-  const harnesses = [
+  const kindOf = (item: ArtifactStatus) => byName.get(item.name)?.kind as ArtifactKind | undefined;
+  const toolsOf = (item: ArtifactStatus, folders: readonly string[]): string[] =>
+    loadedBy(chosen.harnesses, chosen.for(item.name), kindOf(item), folders);
+  const watchedBy = (item: ArtifactStatus): string[] => {
+    const watched = watching(item);
+    return watched === undefined ? [] : toolsOf(item, [watched]);
+  };
+  // One column per harness, in the order aireg lists them.
+  const order = Object.keys(chosen.harnesses);
+  const tools = [
     ...new Set(
-      statuses.flatMap((item) => {
-        const linked = Object.keys(item.harnesses);
-        const watched = watching(item);
-        return watched === undefined ? linked : [...linked, watched];
-      }),
+      statuses.flatMap((item) => [
+        ...toolsOf(item, Object.keys(item.harnesses)),
+        ...watchedBy(item),
+      ]),
     ),
-  ].sort();
+  ].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   const of = (item: ArtifactStatus): Installed =>
     byName.get(item.name) ?? {
       name: item.name,
@@ -54,12 +72,16 @@ export function renderStatus(
     printer,
     [
       ...identity(printer, of),
-      ...harnesses.map((harness) => ({
-        header: harness,
-        value: (item: ArtifactStatus) =>
-          item.harnesses[harness] === undefined && watching(item) === harness
+      ...tools.map((tool) => ({
+        header: toolName(chosen.harnesses, tool),
+        value: (item: ArtifactStatus) => {
+          const seen = toolsOf(item, Object.keys(item.harnesses)).includes(tool)
+            ? stateFor(chosen.harnesses, tool, kindOf(item), item.harnesses)
+            : undefined;
+          return seen === undefined && watchedBy(item).includes(tool)
             ? printer.style.dim("watched")
-            : cell(printer, item.harnesses[harness]),
+            : cell(printer, seen);
+        },
       })),
       {
         header: "state",

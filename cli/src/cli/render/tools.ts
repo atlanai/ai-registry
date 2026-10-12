@@ -1,5 +1,7 @@
-import { type Harnesses, readsFor } from "#core/harness/index.ts";
+import { DEFAULT_TARGETS, type Harnesses, names, readsFor } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
+import { askingFor, type Manifest, type Pinnable } from "#core/manifest.ts";
+import type { LinkState } from "#core/plan/status.ts";
 
 /** A harness by the name a person picks it by: a tool's own name, or a shared folder's path. */
 export function toolName(harnesses: Harnesses | undefined, name: string): string {
@@ -42,4 +44,40 @@ export function loadedBy(
       !picked.some((tool) => tool === folder || loads(harnesses, tool, kind, [folder])),
   );
   return [...picked, ...others, ...unread];
+}
+
+/** The harnesses a scope installs for, read without refusing a name this aireg does not know. */
+export function scopeTargets(manifest: Manifest, harnesses: Harnesses): string[] {
+  const wanted = manifest.targets.length > 0 ? manifest.targets : DEFAULT_TARGETS;
+  return wanted.includes("*") ? names(harnesses) : [...wanted];
+}
+
+/**
+ * The harnesses a scope installs a row for: those of each manifest entry that
+ * asks for it, the scope's own for an entry that names none or for a row only
+ * something else needs.
+ */
+export function chosenFor(manifest: Manifest, scope: readonly string[], row: Pinnable): string[] {
+  const asking = askingFor(manifest, row);
+  if (asking.length === 0) return [...scope];
+  return [...new Set(asking.flatMap((ref) => ref.targets ?? scope))];
+}
+
+/**
+ * How a harness has an artifact, from the state of each folder it was linked in:
+ * the harness's own folder first, then the first folder it reads this kind from.
+ */
+export function stateFor(
+  harnesses: Harnesses,
+  tool: string,
+  kind: ArtifactKind | undefined,
+  states: Readonly<Record<string, LinkState>>,
+): LinkState | undefined {
+  const own = states[tool];
+  if (own !== undefined) return own;
+  const read =
+    kind === undefined
+      ? undefined
+      : readsFor(harnesses, tool, kind).find((folder) => states[folder] !== undefined);
+  return read === undefined ? undefined : states[read];
 }

@@ -24,8 +24,8 @@ describe("aireg status, for what nothing manages", () => {
   test("names each unmanaged artifact, of every kind, and where it is", async ({ status }) => {
     const out = await status([]);
     expect(out).toContain("2 unmanaged");
-    expect(out).toMatch(/notes\s+skill\s+claude\s+~\/\.claude\/skills\/notes/);
-    expect(out).toMatch(/triage\s+agent\s+claude\s+~\/\.claude\/agents\/triage\.md/);
+    expect(out).toMatch(/notes\s+skill\s+Claude Code\s+~\/\.claude\/skills\/notes/);
+    expect(out).toMatch(/triage\s+agent\s+Claude Code\s+~\/\.claude\/agents\/triage\.md/);
   });
 
   test("answers the same in JSON", async ({ status }) => {
