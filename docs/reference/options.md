@@ -52,7 +52,7 @@ A harness is a coding agent that aireg installs into. aireg knows four:
 | `claude` | Claude Code |
 | `codex` | Codex |
 | `cursor` | Cursor |
-| `agents` | The shared `.agents` folder, which several coding agents read. `--for` takes it, but `add` does not offer it when it asks: choosing a harness that reads it writes there. |
+| `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
 
 aireg links each artifact into the folder its harness reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`, and doesn't take agents.
 

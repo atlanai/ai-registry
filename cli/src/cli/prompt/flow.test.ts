@@ -1,10 +1,12 @@
+import { homedir } from "node:os";
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { unhandled } from "#cli/render/tools.ts";
 import { resolveHarnesses } from "#core/harness/index.ts";
 import { emptyLock, type LockArtifact } from "#core/lock.ts";
 import { Printer } from "#core/output.ts";
-import { emptyPlan, type Plan } from "#core/plan/model.ts";
+import { emptyPlan, type Plan, type Selected } from "#core/plan/model.ts";
+import { roots, type Scope } from "#core/store/paths.ts";
 import { KEY, terminal } from "#test/kit/fake-terminal.ts";
 import {
   chooseTargets,
@@ -217,6 +219,8 @@ describe("confirmPlan", () => {
     expect(shown).toMatch(/reviewer +0\.1\.0 +Claude Code\n/);
     expect(shown).not.toContain("agents, claude");
     expect(shown).toContain("Codex skips reviewer: it does not load agents.");
+    expect(shown).toContain("Install 2 artifacts?");
+    expect(shown).not.toContain("Proceed?");
   });
 
   it("places a plugin's members where the lock records them", async () => {
@@ -255,19 +259,52 @@ describe("confirmPlan", () => {
     const { proceed, shown } = await answer(edited, [ENTER]);
     expect(proceed).toBe(false);
     expect(shown).toContain("has local edits");
+    expect(shown).toContain("Remove 1 artifact?");
+  });
+
+  it("asks nothing when nothing on disk would change", async () => {
+    const plan: Plan = { ...emptyPlan(), actions: [{ kind: "record", lock: emptyLock() }] };
+    const { proceed, shown } = await answer(plan, []);
+    expect(proceed).toBe(true);
+    expect(shown).toBe("");
+  });
+
+  it("asks an update by everything it changes", async () => {
+    const { shown } = await answer(edited, [ENTER], { verb: "Update" });
+    expect(shown).toContain("Update 1 artifact?");
   });
 });
 
 describe("chooseTargets", () => {
-  async function pick(preselected: string[], keys: string[]) {
+  const item = (kind: "skill" | "agent", name: string): Selected => ({
+    name,
+    kind,
+    source: "acme",
+    path: `engineering/${kind}s/${name}`,
+    id: name,
+    upstreamName: name,
+    contentId: undefined,
+    version: undefined,
+    contents: [],
+    group: "engineering",
+  });
+  const BOTH = [item("skill", "pr-review"), item("agent", "reviewer")];
+
+  async function pick(
+    preselected: string[],
+    keys: string[],
+    items: Selected[] = BOTH,
+    scope: Scope = "project",
+    tools = harnesses,
+  ) {
     const term = terminal(40, 100);
     const printer = new Printer({ err: { write: () => true, isTTY: false }, env: {} });
     const run = chooseTargets(
       { io: term.io, printer, blocked: undefined },
-      harnesses,
-      "project",
-      "/w",
+      tools,
+      roots(scope, "/w"),
       preselected,
+      items,
     );
     await term.press(...keys);
     const shown = term.screen().join("\n");
@@ -282,9 +319,31 @@ describe("chooseTargets", () => {
     expect(picked).toEqual(["claude", "codex"]);
   });
 
-  it("says where a tool reads a kind from another folder", async () => {
-    const { shown } = await pick([], [KEY.down]);
-    expect(shown).toContain("Reads skills from .agents.");
+  it("shows where the highlighted tool loads what was picked, and nothing on other rows", async () => {
+    const { shown } = await pick([], []);
+    expect(shown).toMatch(/Claude Code\s+\.claude\/skills, \.claude\/agents/);
+    expect(shown).not.toMatch(/Codex\s+\.agents/);
+    expect(shown).not.toContain("Found");
+  });
+
+  it("follows the cursor: Codex reads skills from .agents, Cursor from .agents and .claude", async () => {
+    expect((await pick([], [KEY.down])).shown).toMatch(/Codex\s+\.agents\/skills$/m);
+    expect((await pick([], [KEY.down, KEY.down])).shown).toMatch(
+      /Cursor\s+\.agents\/skills, \.claude\/agents$/m,
+    );
+  });
+
+  it("leaves a tool that loads none of it unpicked, with a dash", async () => {
+    const { picked, shown } = await pick([], [KEY.down], [item("agent", "reviewer")]);
+    expect(shown).toMatch(/Codex\s+-$/m);
+    expect(picked).toEqual(["claude"]);
+  });
+
+  it("shows a user scope's folders under ~, never as absolute paths", async () => {
+    const tools = resolveHarnesses({ HOME: homedir() });
+    const { shown } = await pick([], [], BOTH, "user", tools);
+    expect(shown).toContain("~/.claude/skills/engineering");
+    expect(shown).not.toContain(homedir());
   });
 
   it("keeps a shared folder the manifest already names", async () => {
