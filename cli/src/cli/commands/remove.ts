@@ -164,7 +164,11 @@ export async function run(context: CommandContext): Promise<void> {
         held: true,
         discard: new Set(edited),
         approve: async (plan, targets) => {
-          approved = await confirmPlan(step, plan, { targets, harnesses: fresh.harnesses });
+          approved = await confirmPlan(step, plan, {
+            verb: "Remove",
+            targets,
+            harnesses: fresh.harnesses,
+          });
           return approved;
         },
       };

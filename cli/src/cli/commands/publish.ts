@@ -230,23 +230,41 @@ async function review(
   asks: (alias: string) => Promise<boolean>,
 ): Promise<Sending | undefined> {
   const printer = context.printer;
+  const lines: string[] = [];
   for (const alias of new Set(planned.map((entry) => entry.alias))) {
     const { location } = await open(alias);
-    printer.info(location === alias ? alias : `${alias}  ${printer.style.dim(location)}`);
+    lines.push(location === alias ? alias : `${alias}  ${printer.style.dim(location)}`);
     for (const { item } of planned.filter((entry) => entry.alias === alias))
-      printer.info(describe(item));
+      lines.push(describe(item));
   }
+  const print = () => {
+    for (const line of lines) printer.info(line);
+  };
   const sending = planned.filter(({ item }) => !item.same);
   if (sending.length === 0) {
+    print();
     printer.info(printer.style.dim("Nothing new to publish."));
     return undefined;
   }
-  if (dryRun) return undefined;
-  if (!interactive(step)) return sending;
+  if (dryRun || !interactive(step)) {
+    print();
+    return dryRun ? undefined : sending;
+  }
   // A source that asks why the change was made asks that instead; canceling it still sends nothing.
   const asking = await Promise.all([...new Set(sending.map((entry) => entry.alias))].map(asks));
-  if (asking.every(Boolean)) return sending;
-  const proceed = await confirm({ message: "Publish?", style: printer.errStyle }, step.io);
+  if (asking.every(Boolean)) {
+    print();
+    return sending;
+  }
+  // The plan is the question's body, so it reads as one step, as `add` and `remove` do.
+  const proceed = await confirm(
+    {
+      message: `Publish ${plural(sending.length, "artifact")}?`,
+      style: printer.errStyle,
+      body: lines.map((line) => line.trimStart()),
+    },
+    step.io,
+  );
   if (!canceled(proceed) && proceed) return sending;
   printer.info("Canceled. Nothing was published.");
   return undefined;

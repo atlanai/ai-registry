@@ -344,3 +344,23 @@ describe("sequential prompts", () => {
     expect(term.input.raw).toBe(false);
   });
 });
+
+describe("multiselect focus hint", () => {
+  const tools: Choice<string>[] = [
+    { value: "claude", label: "Claude Code" },
+    { value: "codex", label: "Codex" },
+  ];
+  const focusHint = (value: string, picked: ReadonlySet<string>) =>
+    `${value} with ${[...picked].join("+") || "none"}`;
+
+  it("shows on the highlighted row alone, lined up after the longest name", async () => {
+    const frame = await frameAfter({ choices: tools, focusHint }, [down]);
+    expect(frame).toContain("│   ○ Claude Code");
+    expect(frame).toContain("│ ❯ ○ Codex        codex with none");
+  });
+
+  it("follows what is picked so far", async () => {
+    const frame = await frameAfter({ choices: tools, focusHint }, [space, down]);
+    expect(frame.join("\n")).toContain("codex with claude");
+  });
+});
