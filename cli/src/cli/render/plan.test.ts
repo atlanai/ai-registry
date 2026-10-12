@@ -97,6 +97,17 @@ describe("summarize", () => {
     ]);
   });
 
+  it("calls content fetched and copied again at the same version a restore, not an update", () => {
+    const actions = [
+      { kind: "stage", name: "lint", source: "s", path: "p", to: "m" } as Action,
+      { kind: "clone", name: "lint", from: "m", to: "c" } as Action,
+    ];
+    const lock = { artifacts: { lint: { version: "0.1.0", links: [] } } };
+    const applied = { performed: { stage: 1, clone: 1 } as never, lock: lock as never };
+    const before = { lint: { version: "0.1.0", links: [{ harness: "claude" }] } };
+    expect(printed(actions, applied, before)).toEqual(["✓ Restored lint."]);
+  });
+
   it("names a row of yours whose harness links went as removed, though the row stays", () => {
     const gone = [{ kind: "unlink", name: "lint", to: "x" } as Action];
     const lock = { artifacts: { lint: { links: [] } } };
