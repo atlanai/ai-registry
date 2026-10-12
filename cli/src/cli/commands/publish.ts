@@ -18,6 +18,7 @@ import {
   plan,
   readPublished,
   releaseSubject,
+  writableRegistries,
 } from "#cli/publish/target.ts";
 import { changedSince, edited, fromArgs, type Work } from "#cli/publish/work.ts";
 import { chooseRegistry, knownIn, knownRegistries } from "#cli/registries.ts";
@@ -350,6 +351,7 @@ export async function run(context: CommandContext): Promise<void> {
       knownIn(loaded.roots.scope),
     );
   }
+  const targets = to === undefined ? await writableRegistries(known, context.cwd) : known;
 
   const since = own["changed-since"];
   const keep = async (found: Work[]) =>
@@ -395,7 +397,7 @@ export async function run(context: CommandContext): Promise<void> {
     const fallback = declared === undefined ? undefined : parseTo(declared);
     const saved =
       fallback !== undefined && known[fallback.registry] !== undefined ? fallback : undefined;
-    const where = await destinationOf(step, works, known, to, open, saved);
+    const where = await destinationOf(step, works, targets, to, open, saved);
     if (where === undefined) return printer.info("Canceled. Nothing was published.");
 
     const planned = await planAll(

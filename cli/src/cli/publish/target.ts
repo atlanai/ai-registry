@@ -4,9 +4,10 @@ import { credentialFor } from "#accounts/credentials.ts";
 import { isArtifactName, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import type { Artifact, PublishInput, SourceAdapter } from "#adapter/index.ts";
 import { type Bump, bumpVersion, parseVersion } from "#adapter/semver.ts";
-import { quoted, sanitizeName } from "#adapter/text.ts";
+import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { ID as LOCAL } from "#adapters/local/api.ts";
 import { expandLocation } from "#core/adapter/location.ts";
+import { adapterFor } from "#core/adapter/registry.ts";
 import { type ConnectedSource, connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { kindsOf } from "#core/filespec/write/kinds.ts";
@@ -68,6 +69,41 @@ export function cannotPublish(adapter: SourceAdapter, alias: string, how?: strin
     return readOnly(alias, adapter.displayName);
   }
   return new AiregError(adapter.readOnly.message.replace("{registry}", alias), {
+    code: ErrorCode.Usage,
+    hint: `${instead.charAt(0).toUpperCase()}${instead.slice(1)}.`,
+  });
+}
+
+/**
+ * The declared registries a publish can write to. When there are none, it refuses before
+ * anything is asked, rather than after the work and a registry are picked.
+ */
+export async function writableRegistries(
+  known: Readonly<Record<string, RegistrySource>>,
+  cwd: string,
+): Promise<Record<string, RegistrySource>> {
+  const writable: Record<string, RegistrySource> = {};
+  const refused: { alias: string; adapter: SourceAdapter }[] = [];
+  for (const alias of Object.keys(known).sort()) {
+    const declared = known[alias] as RegistrySource;
+    // An adapter that fails to load is reported when the publish opens it.
+    const adapter = await adapterFor(
+      expandLocation(declared.location, cwd),
+      declared.adapter,
+    ).catch(() => undefined);
+    if (adapter === undefined || adapter.capabilities.publish) writable[alias] = declared;
+    else refused.push({ alias, adapter });
+  }
+  const [first] = refused;
+  if (Object.keys(writable).length > 0 || first === undefined) return writable;
+  if (refused.length === 1) throw cannotPublish(first.adapter, first.alias);
+  const instead =
+    publishInstead(first.adapter) ?? "publish with `aireg publish --to <folder>/<namespace>`";
+  const aliases = list(
+    refused.map((each) => each.alias),
+    "or",
+  );
+  throw new AiregError(`None of ${aliases} takes a publish.`, {
     code: ErrorCode.Usage,
     hint: `${instead.charAt(0).toUpperCase()}${instead.slice(1)}.`,
   });
