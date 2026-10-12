@@ -566,6 +566,13 @@ async function write(
   warn(printer, recoveredNotices(roots, await prepareWrite(loaded)));
 
   const targets = resolveTargets(manifest, harnesses, common);
+  // Reports name every tool picked, including those an entry's own `harnesses:` adds.
+  const named = [
+    ...new Set([
+      ...targets,
+      ...manifest.artifacts.flatMap((ref) => ref.targets ?? []).filter((name) => name in harnesses),
+    ]),
+  ];
   const { planned, acquired } = await plan(loaded, common, printer, cwd, hooks, targets);
   try {
     refuseClash(planned, hooks.adding);
@@ -584,14 +591,14 @@ async function write(
       const aside = new Set(
         [...guards].flatMap(([path, guard]) => (guard === "backup" ? [path] : [])),
       );
-      report.plan(planned, roots, aside, { targets, harnesses });
-      return { plan: planned, applied: undefined, before: lock, targets, harnesses };
+      report.plan(planned, roots, aside, { targets: named, harnesses });
+      return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
     }
 
     await refuseBlocked(planned);
 
-    if (hooks.approve !== undefined && !(await hooks.approve(planned, targets))) {
-      return { plan: planned, applied: undefined, before: lock, targets, harnesses };
+    if (hooks.approve !== undefined && !(await hooks.approve(planned, named))) {
+      return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
     }
 
     const edited = formatManifest(manifest) !== loaded.manifestAsRead;
@@ -603,7 +610,7 @@ async function write(
       planned,
       acquired,
       targets,
-      (action) => report.step(action, planned, { targets, harnesses }),
+      (action) => report.step(action, planned, { targets: named, harnesses }),
       async () => {
         // Nothing was recorded, so the manifest must not ask for it.
         if (edited && (await unrecorded(roots, lock)))
@@ -618,7 +625,7 @@ async function write(
     if (edited && !landed && applied.unstaged.length > 0)
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
-    return { plan: planned, applied, before: lock, targets, harnesses };
+    return { plan: planned, applied, before: lock, targets: named, harnesses };
   } finally {
     await closeAll(acquired);
   }
