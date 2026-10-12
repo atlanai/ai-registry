@@ -22,6 +22,7 @@ const adapters = vi.hoisted(() => ({
   resolve: undefined as (() => Promise<unknown>) | undefined,
   own: undefined as unknown,
   contributed: undefined as unknown,
+  byKind: {} as Record<string, unknown>,
 }));
 
 vi.mock("#accounts/service.ts", () => ({
@@ -33,7 +34,8 @@ vi.mock("#accounts/service.ts", () => ({
 }));
 vi.mock("#core/host/load.ts", () => ({
   stepOn: () => adapters.own,
-  stepContribution: async () => adapters.contributed,
+  stepContribution: async (kind: string) =>
+    kind in adapters.byKind ? adapters.byKind[kind] : adapters.contributed,
 }));
 
 vi.mock("#core/config/repository.ts", () => ({
@@ -75,6 +77,7 @@ beforeEach(async () => {
   adapters.resolve = undefined;
   adapters.own = undefined;
   adapters.contributed = undefined;
+  adapters.byKind = {};
 });
 
 afterEach(async () => {
@@ -155,14 +158,17 @@ describe("an adapter step whose account registry does not resolve", () => {
   };
   const step = (run = vi.fn(async () => SUCCEEDED)) =>
     ({ kind: "mcp-scan", run }) as unknown as StepContribution & { run: typeof run };
-  const target = (names = ["mcp"]): { id: string; target: { job: Job; account: Account } } => {
+  const target = (
+    names = ["mcp"],
+    kinds: string[] = [],
+  ): { id: string; target: { job: Job; account: Account } } => {
     const job = {
       id: "job_adapter",
       account: account.id,
       schedule: { every: 900, enabled: false },
-      steps: names.map((name) => ({
+      steps: names.map((name, i) => ({
         name,
-        kind: "mcp-scan",
+        kind: kinds[i] ?? "mcp-scan",
         needs: [],
         select: [],
         policy: "apply",
@@ -172,8 +178,8 @@ describe("an adapter step whose account registry does not resolve", () => {
     return { id: job.id, target: { job, account } };
   };
   let sink: ReturnType<typeof memorySink>;
-  const start = async (adapterRunner: SyncRunner, names?: string[]) => {
-    const { id, target: t } = target(names);
+  const start = async (adapterRunner: SyncRunner, names?: string[], kinds?: string[]) => {
+    const { id, target: t } = target(names, kinds);
     const run = await adapterRunner.start(id, "sync", "manual", { ephemeral: t });
     await vi.waitFor(() => expect(store.get(run.id)?.state).not.toBe("running"));
     return store.get(run.id);
@@ -239,5 +245,24 @@ describe("an adapter step whose account registry does not resolve", () => {
     expect(contributed.run).toHaveBeenCalledTimes(2);
     expect(resolve).toHaveBeenCalledOnce();
     expect(sink.records.filter((r) => r.severity_text === "warn")).toHaveLength(1);
+  });
+
+  it("fails with the resolve error after a fallen-back step, when a later step has no adapter", async () => {
+    adapters.resolve = () => Promise.reject(undeclared);
+    const contributed = step();
+    adapters.byKind = { "mcp-scan": contributed, "mcp-report": undefined };
+    const result = await start(adapterRunner, ["scan", "report"], ["mcp-scan", "mcp-report"]);
+    expect(result).toMatchObject({ state: "failed" });
+    expect(contributed.run).toHaveBeenCalledOnce();
+    const failure = sink.records.find((r) => r.body === "run failed");
+    expect(failure?.error?.message).toBe(undeclared.message);
+  });
+
+  it("names the run in its one fallback warning", async () => {
+    adapters.resolve = () => Promise.reject(undeclared);
+    adapters.contributed = step();
+    const run = await start(adapterRunner);
+    const warned = sink.records.filter((r) => r.severity_text === "warn");
+    expect(warned[0]?.attributes).toMatchObject({ runId: run?.id, jobId: "job_adapter" });
   });
 });
