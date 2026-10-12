@@ -19,9 +19,9 @@ aireg status [-g]
 | `replaced` | A harness link was replaced by a file or folder of yours, or points outside the scope. `--json` calls this state `dangling`. |
 | `edited` | The installed copy was edited after it was installed. With `--copy`, that includes the copy in the harness folder. |
 
-The table shows each artifact's kind, version and registry, then a column per harness it was installed for: `✓` when linked where that harness reads it, `missing`, `replaced`, `foreign` when its link points outside the scope, or `-` when it isn't installed there. Codex reads a project's skills from `.agents/skills/`, so its column shows the link there. A version marked `pinned` is held by the manifest. The detail says why an artifact is not `ok`; the column it is under names the harness.
+The table shows each artifact's kind, version and registry, then a column per harness it was installed for: `✓` when linked where that harness reads it, `missing`, `replaced`, `foreign` when its link points outside the scope, or `-` when it isn't installed there. A version marked `pinned` is held by the manifest.
 
-Under the table, a line explains each `-`, such as `Codex skips reviewer: it does not load agents.`, and when some artifacts need attention, a line says what `ok` means.
+Lines under the table explain each `-` and, when something needs attention, what `ok` means.
 
 `status` ends with what to run next. Run [`aireg install`](install.md) to restore missing or replaced artifacts, which first moves a file or folder of yours that replaced a link to `.registry/backups/`, and [`aireg sync`](sync.md) to compare an edit with the registry.
 
@@ -46,7 +46,7 @@ In a project, `status` also warns about an artifact installed in both the projec
 }}
 ```
 
-In JSON, `harnesses` is keyed by the folder each link is in, which is not always the harness that reads it: Codex reads skills from `agents`. A value is `linked`, `missing`, `replaced` or `foreign`. `state` is `ok`, `missing`, `dangling` (shown as `replaced` in the table) or `edited`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder it is about, such as `claude: not installed`. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`.
+In JSON, `harnesses` is keyed by folder, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`.
 
 ## Exit status
 
@@ -63,15 +63,11 @@ aireg status
 ```
 
 ```text
-2 installed in this project
-  artifact   kind   version  from  Claude Code  Codex  state     detail
-  pr-review  skill  0.1.0    acme  replaced     ✓      replaced  replaced by something of yours
-  reviewer   agent  0.1.0    acme  ✓            -      ok
+1 installed in this project
+  artifact   kind   version  from  Claude Code  Codex  state
+  pr-review  skill  0.1.0    acme  ✓            ✓      ok
 
-Codex skips reviewer: it does not load agents.
-ok  matches the lockfile, links intact
-1 artifact needs attention.
-hint: Run `aireg install` to restore what is missing.
+✓ Everything matches the lockfile.
 ```
 
 Check your user scope:
