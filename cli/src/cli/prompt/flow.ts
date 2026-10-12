@@ -294,7 +294,7 @@ export async function chooseMethod(
       style: step.printer.errStyle,
       initial,
       options: [
-        { value: false, label: "Symlink (recommended)" },
+        { value: false, label: "Symlink (recommended)", answer: "Symlink" },
         { value: true, label: "Copy" },
       ],
     },

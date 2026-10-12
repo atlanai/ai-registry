@@ -22,6 +22,7 @@ import {
 } from "#cli/publish/target.ts";
 import { changedSince, edited, fromArgs, type Work } from "#cli/publish/work.ts";
 import { chooseRegistry, knownIn, knownRegistries } from "#cli/registries.ts";
+import { underHome } from "#cli/render/home.ts";
 import { noteUserScope } from "#cli/render/where.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
@@ -233,7 +234,9 @@ async function review(
   const lines: string[] = [];
   for (const alias of new Set(planned.map((entry) => entry.alias))) {
     const { location } = await open(alias);
-    lines.push(location === alias ? alias : `${alias}  ${printer.style.dim(location)}`);
+    lines.push(
+      location === alias ? underHome(alias) : `${alias}  ${printer.style.dim(underHome(location))}`,
+    );
     for (const { item } of planned.filter((entry) => entry.alias === alias))
       lines.push(describe(item));
   }
