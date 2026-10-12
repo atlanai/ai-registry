@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { resolveHarnesses } from "#core/harness/index.ts";
 import { Printer } from "#core/output.ts";
 import { emptyPlan, type Plan } from "#core/plan/model.ts";
+import { KEY, terminal } from "#test/kit/fake-terminal.ts";
 import {
+  chooseTargets,
   confirmPlan,
   destroys,
   equivalent,
@@ -187,5 +189,40 @@ describe("confirmPlan", () => {
     const { proceed, shown } = await answer(edited, [ENTER]);
     expect(proceed).toBe(false);
     expect(shown).toContain("has local edits");
+  });
+});
+
+describe("chooseTargets", () => {
+  async function pick(preselected: string[], keys: string[]) {
+    const term = terminal(40, 100);
+    const printer = new Printer({ err: { write: () => true, isTTY: false }, env: {} });
+    const run = chooseTargets(
+      { io: term.io, printer, blocked: undefined },
+      harnesses,
+      "project",
+      "/w",
+      preselected,
+    );
+    await term.press(...keys);
+    const shown = term.screen().join("\n");
+    await term.press(KEY.enter);
+    return { picked: await run, shown };
+  }
+
+  it("offers the tools, not the folder they share", async () => {
+    const { picked, shown } = await pick([], []);
+    expect(shown).toContain("Codex");
+    expect(shown).not.toContain(".agents folder");
+    expect(picked).toEqual(["claude", "codex"]);
+  });
+
+  it("says where a tool reads a kind from another folder", async () => {
+    const { shown } = await pick([], [KEY.down]);
+    expect(shown).toContain("Reads skills from .agents.");
+  });
+
+  it("keeps a shared folder the manifest already names", async () => {
+    const { picked } = await pick(["agents", "claude"], []);
+    expect(picked).toEqual(["claude", "agents"]);
   });
 });

@@ -173,7 +173,10 @@ export async function chooseTargets(
   cwd: string,
   preselected: readonly string[],
 ): Promise<string[] | Canceled> {
-  const all = detectAll(harnesses, cwd);
+  // A shared folder is where tools read from, not a tool to pick: choosing a
+  // tool reaches it. One a manifest already names is kept as it was.
+  const all = detectAll(harnesses, cwd).filter((item) => !item.target.shared);
+  const kept = preselected.filter((name) => harnesses[name]?.shared === true);
 
   const where = (target: Target): string => {
     const root = targetRoot(target, scope, cwd);
@@ -184,7 +187,13 @@ export async function chooseTargets(
     value: item.target.name,
     label: item.target.displayName,
     hint: where(item.target),
-    detail: `${item.target.shared ? "Read by several coding agents" : item.detected ? `Found ${foundBy(item.by)}` : "Not found on this machine"}. Takes ${kinds(item.target)}.`,
+    detail: [
+      item.detected ? `Found ${foundBy(item.by)}.` : "Not found on this machine.",
+      `Takes ${kinds(item.target)}.`,
+      ...borrowed(harnesses, item.target).map(
+        ([kind, read]) => `Reads ${kind}s from ${where(read)}.`,
+      ),
+    ].join(" "),
   }));
 
   // The scope's own harnesses, or the defaults every scope starts with, so the
@@ -194,7 +203,7 @@ export async function chooseTargets(
   const initial =
     remembered.length > 0 ? remembered : DEFAULT_TARGETS.filter((name) => selectable.has(name));
 
-  return await multiselect(
+  const picked = await multiselect(
     {
       message: "Which harnesses should they install into?",
       choices,
@@ -204,6 +213,15 @@ export async function chooseTargets(
     },
     step.io,
   );
+  return canceled(picked) ? picked : [...picked, ...kept.filter((name) => !picked.includes(name))];
+}
+
+/** The kinds a tool reads first from another harness's folder, with that folder. */
+function borrowed(harnesses: Harnesses, target: Target): [ArtifactKind, Target][] {
+  return Object.entries(target.reads).flatMap(([kind, reads]) => {
+    const read = reads?.[0] === undefined ? undefined : harnesses[reads[0]];
+    return read === undefined || read.name === target.name ? [] : [[kind as ArtifactKind, read]];
+  });
 }
 
 /** Group removal choices by their registry. */
