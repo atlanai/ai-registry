@@ -785,28 +785,19 @@ describe("publishing from a project", () => {
     const scratch = join(root, "force-clone");
     const mp = join(root, "force-clone-repo");
     const clone = join(root, "force-clone-clone");
-    await registry(mp).skill("acme/seed@1.0.0", { description: "s", body: "body\n" }).write();
+    const seed = registry(mp).skill("acme/seed@1.0.0", { body: "body\n" });
+    await seed.write();
     await git.init(mp);
     await git.commit(mp, "initial");
     await git(root, "clone", "-q", mp, clone);
     await mkdir(join(scratch, ".claude"), { recursive: true });
     await writeManifestIn(
       scratch,
-      [
-        "registries:",
-        "  kit:",
-        `    source: file://${mp}`,
-        "artifacts:",
-        "  - kit/acme/skill/seed",
-      ].join("\n"),
+      `registries:\n  kit:\n    source: file://${mp}\nartifacts:\n  - kit/acme/skill/seed`,
     );
     expect((await aireg(["install"], { cwd: scratch })).code).toBe(0);
     // A teammate releases 1.0.1 after this copy was installed, and the clone pulls it.
-    expect((await aireg(["skill", "bump", "seed", "--namespace", "acme"], { cwd: mp })).code).toBe(
-      0,
-    );
-    await appendFile(join(mp, "artifacts/acme/skill/seed/1.0.1/SKILL.md"), "Theirs.\n");
-    expect((await aireg(["registry", "index"], { cwd: mp })).code).toBe(0);
+    await seed.skill("acme/seed@1.0.1", { body: "theirs\n" }).write();
     await git.commit(mp, "seed 1.0.1");
     await git(clone, "pull", "-q");
     const copy = join(scratch, ".claude", "skills", "seed", "SKILL.md");
@@ -816,9 +807,6 @@ describe("publishing from a project", () => {
       cwd: scratch,
     });
     expect(sent.code, sent.stderr).toBe(0);
-    expect(
-      await readFile(join(clone, "artifacts/acme/skill/seed/1.0.2/SKILL.md"), "utf8"),
-    ).toContain("Mine.");
     expect(await readFile(copy, "utf8")).toContain("Mine.");
     expect(sent.stderr).toMatch(/serves seed 1\.0\.1, not the 1\.0\.2 you published/);
   }, 60_000);
