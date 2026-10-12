@@ -43,6 +43,13 @@ describe("moved", () => {
     expect(moved(serving([at("sha256:after", "4")]), undefined)).toBe(false);
   });
 
+  // Published with `--force` into a clone: upstream moved, but to a teammate's head, not ours.
+  it("is false while upstream serves a version older than the one just sent", () => {
+    const stale = { ...row, version: "0.1.0" };
+    expect(moved(serving([at("sha256:after", "0.1.1")]), stale, "0.1.2")).toBe(false);
+    expect(moved(serving([at("sha256:after", "0.1.2")]), stale, "0.1.2")).toBe(true);
+  });
+
   it("finds a row of yours with no address yet where its publish put it", () => {
     const yours = {
       ...row,

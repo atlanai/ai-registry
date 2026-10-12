@@ -2,7 +2,7 @@ import { relative, resolve } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import type { PublishResult } from "#adapter/index.ts";
 import { isLocalPath } from "#adapter/paths.ts";
-import { BUMPS, type Bump } from "#adapter/semver.ts";
+import { BUMPS, type Bump, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { list, plural, quoted } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import { type Interaction, interaction, interactive } from "#cli/prompt/flow.ts";
@@ -454,13 +454,14 @@ async function follow(
   common: CommonOptions,
   sent: readonly Planned[],
 ) {
-  const rows = new Set<string>();
+  // Each row with the version it sent.
+  const rows = new Map<string, string>();
   for (const item of sent) {
     const row = item.work.row;
     const entry = row === undefined ? undefined : loaded.lock.artifacts[row];
     if (row === undefined || entry === undefined) continue;
     const pinned = pinOf(loaded.manifest, entry);
-    if (pinned === undefined) rows.add(row);
+    if (pinned === undefined) rows.set(row, item.version);
     else
       context.printer.hint(
         `${row} stays at ${pinned} here because the manifest pins it. Change the pin to ${item.version} to install what you published.`,
@@ -472,8 +473,12 @@ async function follow(
       credentials: await credentialsForManifest(fresh.manifest.registries, context.cwd),
     });
     try {
-      const served = new Set([...rows].filter((row) => moved(found, fresh.lock.artifacts[row])));
-      for (const row of rows) {
+      const served = new Set(
+        [...rows]
+          .filter(([row, version]) => moved(found, fresh.lock.artifacts[row], version))
+          .map(([row]) => row),
+      );
+      for (const row of rows.keys()) {
         const entry = fresh.lock.artifacts[row];
         if (served.has(row) || entry === undefined) continue;
         // What was sent is what is on disk, so the copy stops reading as an edit.
@@ -496,10 +501,25 @@ async function follow(
  * A backend may hold an upload for review. Until upstream serves something else, restating
  * the row from it would overwrite the copy just sent, or delete it when nothing is served.
  */
-export function moved(found: Scan, entry: LockArtifact | undefined): boolean {
+export function moved(
+  found: Scan,
+  entry: LockArtifact | undefined,
+  /** The version just sent: a head older than it is not what was sent, as after `--force` into a clone. */
+  sent?: string,
+): boolean {
   if (entry === undefined) return false;
   const acquired = found.acquired.find((item) => item.alias === entry.registry);
   const at = acquired === undefined ? undefined : listedAt(entry, acquired.catalog.entries);
   const now = at === undefined ? undefined : acquired?.placements.get(at);
-  return now !== undefined && (now.contentId !== entry.content || now.version !== entry.version);
+  return (
+    now !== undefined &&
+    (now.contentId !== entry.content || now.version !== entry.version) &&
+    !older(now.version, sent)
+  );
+}
+
+function older(served: string | undefined, sent: string | undefined): boolean {
+  const left = served === undefined ? undefined : parseVersion(served);
+  const right = sent === undefined ? undefined : parseVersion(sent);
+  return left !== undefined && right !== undefined && compareVersion(left, right) < 0;
 }
