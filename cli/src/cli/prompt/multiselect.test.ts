@@ -94,7 +94,7 @@ describe("multiselect keys", () => {
     expect(value).toEqual(["api-design"]);
   });
 
-  it("lists Select all and a divider above the tree, group hints in a column, and space on it takes all", async () => {
+  it("lists Select all, with no count of its own, and a divider above the tree, group hints in a column, and space on it takes all", async () => {
     const groupHints = new Map([
       ["engineering", "2 skills, 1 agent"],
       ["frontend", "1 skill"],
@@ -102,7 +102,7 @@ describe("multiselect keys", () => {
     const options = { choices: tree, groups: true, collapsed: true, selectAll: true, groupHints };
     const opened = await frameAfter(options, []);
     expect(opened.slice(2, 6)).toEqual([
-      "│   ○ Select all (0/2)",
+      "│   ○ Select all",
       "│   ────────────────────────",
       "│ ❯ ▸ ○ engineering  2 skills, 1 agent",
       "│   ▸ ○ frontend     1 skill",
@@ -110,7 +110,7 @@ describe("multiselect keys", () => {
     const term = terminal(40, 80);
     const run = multiselect({ message: "Pick", style, ...options }, term.io);
     await term.press(space, up);
-    expect(term.screen()[2]).toBe("│ ❯ ◐ Select all (1/2)");
+    expect(term.screen()[2]).toBe("│ ❯ ◐ Select all");
     await term.press(space, enter);
     expect(await run).toEqual(tree.map((choice) => choice.value));
   });
