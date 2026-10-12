@@ -88,6 +88,12 @@ function sealed(
   return { envelope, digest };
 }
 
+function descriptorsOf(change: PublishInput): FileDescriptor[] {
+  return change.files.map((file) =>
+    describeFile(file.path, sha256(file.content), file.content.byteLength),
+  );
+}
+
 function under(root: string, path: string): string {
   return join(root, ...path.split(posix.sep));
 }
@@ -135,14 +141,18 @@ async function writeOfferNow(
   const latest = new Map<string, OfferedVersion>();
   let unchanged = true;
 
+  // Every change is checked before any is written: a refusal partway through
+  // would leave an earlier artifact's versions.json ahead of the index.
+  for (const change of changes) {
+    destination(change);
+    sealed(change, descriptorsOf(change));
+  }
+
   for (const requested of changes) {
     let change = requested;
     let { namespace, version, at } = destination(change);
 
-    const descriptors = change.files.map((file) =>
-      describeFile(file.path, sha256(file.content), file.content.byteLength),
-    );
-    // Built before anything is written, so a bad file list refuses cleanly.
+    const descriptors = descriptorsOf(change);
     let { envelope, digest } = sealed(change, descriptors);
     const existing = await existingDigest(read, at);
     if (existing !== digest) unchanged = false;
