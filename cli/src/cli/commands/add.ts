@@ -145,6 +145,7 @@ export async function run(context: CommandContext): Promise<void> {
     entries,
     partial,
     catalogAlias,
+    source.namespacePlugins,
   );
   if (gathered === undefined) {
     cancel(step);
@@ -585,6 +586,8 @@ async function gather(
   all: readonly Entry[],
   partial: boolean,
   alias: string,
+  /** Its source installs each namespace as a plugin in the user scope. */
+  wrapped: boolean,
 ): Promise<Gathered | undefined> {
   const picked = await pickArtifacts(step, common, shown, all, partial, alias);
   if (picked === undefined) return undefined;
@@ -608,7 +611,14 @@ async function gather(
   let targets = common.targets;
   if (targets === undefined && interactive(step)) {
     const items = chosen.map((entry) => asSelected(entry, alias));
-    const picked = await chooseTargets(step, harnesses, loaded.roots, manifest.targets, items);
+    const picked = await chooseTargets(
+      step,
+      harnesses,
+      loaded.roots,
+      manifest.targets,
+      items,
+      wrapped,
+    );
     if (canceled(picked)) return undefined;
     targets = picked;
   }

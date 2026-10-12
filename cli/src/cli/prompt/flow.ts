@@ -174,6 +174,8 @@ export async function chooseTargets(
   preselected: readonly string[],
   /** What is being installed, so each harness can show where it would load it from. */
   items: readonly Selected[],
+  /** Its source installs each namespace as a plugin in the user scope. */
+  wrapped = false,
 ): Promise<string[] | Canceled> {
   // A shared folder is where tools read from, not a tool to pick: choosing a
   // tool reaches it. One a manifest already names is kept as it was.
@@ -182,7 +184,7 @@ export async function chooseTargets(
   const show = (path: string): string =>
     roots.scope === "user" ? underHome(path) : relative(roots.cwd, path) || path;
   const folders = (name: string, chosen: readonly string[]): string[] =>
-    loadsFrom(name, chosen, items, { roots, harnesses });
+    loadsFrom(name, chosen, items, { roots, harnesses }, wrapped);
 
   const choices: Choice<string>[] = all.map((item) => ({
     value: item.target.name,

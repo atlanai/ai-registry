@@ -335,10 +335,11 @@ export function loadsFrom(
   chosen: readonly string[],
   items: readonly Selected[],
   options: Pick<ProjectionOptions, "roots" | "harnesses">,
+  wrapped = false,
 ): string[] {
   const targets = [...new Set([...chosen, harness])];
   const folders = items.flatMap((item) => {
-    const links = linksFor(item, "", { ...options, targets });
+    const links = linksFor(item, "", { ...options, targets }, wrapped);
     const own = links.find((link) => link.harness === harness);
     if (own !== undefined) return [own.shared === true ? own.absolute : dirname(own.absolute)];
     const read = readsFor(options.harnesses, harness, item.kind)

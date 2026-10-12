@@ -296,6 +296,7 @@ describe("chooseTargets", () => {
     items: Selected[] = BOTH,
     scope: Scope = "project",
     tools = harnesses,
+    wrapped = false,
   ) {
     const term = terminal(40, 100);
     const printer = new Printer({ err: { write: () => true, isTTY: false }, env: {} });
@@ -305,6 +306,7 @@ describe("chooseTargets", () => {
       roots(scope, "/w"),
       preselected,
       items,
+      wrapped,
     );
     await term.press(...keys);
     const shown = term.screen().join("\n");
@@ -342,8 +344,14 @@ describe("chooseTargets", () => {
   it("shows a user scope's folders under ~, never as absolute paths", async () => {
     const tools = resolveHarnesses({ HOME: homedir() });
     const { shown } = await pick([], [], BOTH, "user", tools);
-    expect(shown).toContain("~/.claude/skills/engineering");
+    expect(shown).toContain("~/.claude/skills, ~/.claude/agents");
     expect(shown).not.toContain(homedir());
+  });
+
+  it("shows the plugin folder for a source that installs its namespaces as plugins", async () => {
+    const tools = resolveHarnesses({ HOME: homedir() });
+    const { shown } = await pick([], [], BOTH, "user", tools, true);
+    expect(shown).toContain("~/.claude/skills/engineering");
   });
 
   it("keeps a shared folder the manifest already names", async () => {
