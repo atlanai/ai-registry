@@ -30,8 +30,8 @@ folder to the PATH of new shells only, so in this session run `~/.aireg/bin/aire
 
 ## 2. Install the aireg skills
 
-The aireg skills cover the rest: `new` sets up a registry, `add` installs from one, and
-`publish` publishes to one. Run `aireg doctor`. When the skills are missing, it prints the
+The aireg skills cover the rest: `aireg-new` sets up a registry, `aireg-add` installs from one,
+and `aireg-publish` publishes to one. Run `aireg doctor`. When the skills are missing, it prints the
 command that installs them, pinned to the user's aireg release. Tell the user what the
 command does and ask, then run it as printed:
 
@@ -70,8 +70,8 @@ offer the use cases in [references/use-cases.md](references/use-cases.md) that f
 to 3 for one person's coding agents, 4 and 5 for sharing a registry, 6 to 9 for a team.
 Each one gives its steps.
 
-For anything else, follow the `new` skill to set up a registry, the `add` skill to install
-from one, or the `publish` skill to publish to one. For one person, one namespace such as
+For anything else, follow the `aireg-new` skill to set up a registry, the `aireg-add` skill
+to install from one, or the `aireg-publish` skill to publish to one. For one person, one namespace such as
 `personal` is enough, and the pull request check is optional.
 
 When the user brings skills in from their own harness folders, such as `~/.claude/skills`,

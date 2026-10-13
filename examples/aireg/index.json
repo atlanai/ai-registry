@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": "2026-10-09T07:01:38.464Z",
+  "generated_at": "2026-10-13T10:09:56.459Z",
   "entries": [
     {
       "namespace": "aireg",
@@ -8,7 +8,7 @@
       "name": "add",
       "latest": "0.1.0",
       "digest": "sha256:20d2e58e905748842ca801986c7e83f63437205e9174dfc02506bc7fc92f919b",
-      "status": "active",
+      "status": "archived",
       "description": "Find, read, install and update skills and agents from a registry, in this project or for the user. Use when asked to add or connect a registry, install or read a skill or agent, see what a registry offers, check that installed skills are current, or keep them checked in CI."
     },
     {
@@ -17,7 +17,7 @@
       "name": "new",
       "latest": "0.1.0",
       "digest": "sha256:818534a0c47cecf7af1e6723798e80c70a48f59b749cee95e78faf441bec7569",
-      "status": "active",
+      "status": "archived",
       "description": "Set up a registry of skills and agents for a person or a team, from nothing to installed. Use when asked to create, start or set up a registry, share skills with a team, or turn a folder of existing skills into a registry."
     },
     {
@@ -26,6 +26,33 @@
       "name": "publish",
       "latest": "0.1.0",
       "digest": "sha256:9067557c4a907073d8f53fa6a97710442cf5bbab38ce1099c7a83d760ac3da6f",
+      "status": "archived",
+      "description": "Publish a skill or agent to a registry, or release a new version of one. Use when asked to publish, share, contribute or release a skill or agent, update one that is already in a registry, publish a project's skills from CI, or fix what registry validation reports."
+    },
+    {
+      "namespace": "aireg",
+      "kind": "skill",
+      "name": "aireg-add",
+      "latest": "0.1.0",
+      "digest": "sha256:bda07a8b926fe789180e77898a14cfa541395bd3ec9e1d23c28b1b3ab01ad1d5",
+      "status": "active",
+      "description": "Find, read, install and update skills and agents from a registry, in this project or for the user. Use when asked to add or connect a registry, install or read a skill or agent, see what a registry offers, check that installed skills are current, or keep them checked in CI."
+    },
+    {
+      "namespace": "aireg",
+      "kind": "skill",
+      "name": "aireg-new",
+      "latest": "0.1.0",
+      "digest": "sha256:cee403d04f6d27f2bdc2cdecce205d8d17eb123c82dd26c20b022822f4d170fb",
+      "status": "active",
+      "description": "Set up a registry of skills and agents for a person or a team, from nothing to installed. Use when asked to create, start or set up a registry, share skills with a team, or turn a folder of existing skills into a registry."
+    },
+    {
+      "namespace": "aireg",
+      "kind": "skill",
+      "name": "aireg-publish",
+      "latest": "0.1.0",
+      "digest": "sha256:a63c168148177f61850379ba0d73baa9bc66f68b665515c25fc54a38c0ce3673",
       "status": "active",
       "description": "Publish a skill or agent to a registry, or release a new version of one. Use when asked to publish, share, contribute or release a skill or agent, update one that is already in a registry, publish a project's skills from CI, or fix what registry validation reports."
     }

@@ -8,7 +8,7 @@ export const OWN_SKILLS_SOURCE = REPOSITORY;
 /** The folder in that repository that is the registry. */
 export const OWN_SKILLS_PATH = `examples/${NAME}`;
 
-/** Its alias once added, and the namespace that shows as `/aireg:*` in a harness. */
+/** Its alias once added, and the namespace that holds the skills. */
 export const OWN_SKILLS_ALIAS = REPOSITORY_NAME;
 export const OWN_SKILLS_NAMESPACE = NAME;
 
@@ -17,7 +17,7 @@ export function ownSkillsRef(version = VERSION): string | undefined {
   return /^\d+\.\d+\.\d+$/.test(version) ? releaseTag(version) : undefined;
 }
 
-/** What gives your agents the `/aireg` skills: the same two steps as any registry. */
+/** What gives your agents the aireg skills: the same two steps as any registry. */
 export function ownSkillsCommand(aireg = "aireg", version = VERSION): string {
   const ref = ownSkillsRef(version);
   const pinned = ref === undefined ? "" : ` --ref ${ref}`;

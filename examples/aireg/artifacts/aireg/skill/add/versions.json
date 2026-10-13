@@ -8,8 +8,9 @@
       "version": "0.1.0",
       "digest": "sha256:20d2e58e905748842ca801986c7e83f63437205e9174dfc02506bc7fc92f919b",
       "published_at": "2026-10-09T07:01:38.464Z",
-      "status": "active",
-      "yanked": false
+      "status": "archived",
+      "yanked": false,
+      "reason": "Renamed to aireg-add."
     }
   ]
 }

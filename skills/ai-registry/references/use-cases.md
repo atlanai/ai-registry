@@ -3,7 +3,7 @@
 What people ask for once aireg and the aireg skills are installed, in order: first one
 person's coding agents, then sharing a registry, then a team. Each use
 case starts with a prompt a person can paste into a coding agent, then gives the steps for
-the agent. The `new`, `add` and `publish` skills have the detail behind each step.
+the agent. The `aireg-new`, `aireg-add` and `aireg-publish` skills have the detail behind each step.
 
 To start from nothing, put `https://github.com/atlanai/ai-registry` on the line before a
 prompt. The agent then sets up aireg first, as the setup skill describes.
@@ -20,7 +20,7 @@ I've written a few skills for Claude Code. Put them in a private registry in a n
 
 1. `aireg status -g` lists the skills nothing manages, with their paths. Ask which to bring
    in.
-2. Create the registry as the `new` skill describes, with one namespace:
+2. Create the registry as the `aireg-new` skill describes, with one namespace:
    `gh repo create <owner>/my-skills --private --clone`, then in it
    `aireg registry init --name my-skills --namespace personal -y`,
    `aireg skill new --from <path> --namespace personal` for each skill,
@@ -97,7 +97,7 @@ A friend shared their registry at github.com/<friend>/skills. Read every skill i
 Set up an agent registry for our platform and data teams in a new private repo, <org>/ai-registry. Bring in the skills from this repo's .claude/skills, add the check that validates every pull request, and give me the commands my team runs to install it.
 ```
 
-Follow the `new` skill. It creates the repository and the namespaces, releases the first
+Follow the `aireg-new` skill. It creates the repository and the namespaces, releases the first
 skills, adds the validation workflow, and ends with the two commands the team runs.
 
 ### 7. Publish from application repositories on merge
@@ -106,7 +106,7 @@ skills, adds the validation workflow, and ends with the two commands the team ru
 This service keeps its skills in .claude/skills. Set up CI so that every merge to main publishes the changed skills to <org>/ai-registry, in the platform namespace, as a pull request there.
 ```
 
-Follow "Publish a project's skills from CI" in the `publish` skill. Tell the user how to
+Follow "Publish a project's skills from CI" in the `aireg-publish` skill. Tell the user how to
 create the token secret, and never ask for its value.
 
 ### 8. Pin versions and catch drift in CI
@@ -117,7 +117,7 @@ Install our pr-review skill from <org>/ai-registry into this repo at its current
 
 1. In the project: `aireg add <registry>/<namespace>/pr-review@<version>`, then commit
    `.registry/` and the harness folders it links into, such as `.claude/` and `.agents/`.
-2. Add the workflow from "In CI" in the `add` skill. It runs
+2. Add the workflow from "In CI" in the `aireg-add` skill. It runs
    `aireg install --frozen && aireg status`, and `aireg status` exits 3 when an installed copy
    was edited.
 

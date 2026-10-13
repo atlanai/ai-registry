@@ -8,8 +8,9 @@
       "version": "0.1.0",
       "digest": "sha256:9067557c4a907073d8f53fa6a97710442cf5bbab38ce1099c7a83d760ac3da6f",
       "published_at": "2026-10-09T07:01:38.464Z",
-      "status": "active",
-      "yanked": false
+      "status": "archived",
+      "yanked": false,
+      "reason": "Renamed to aireg-publish."
     }
   ]
 }

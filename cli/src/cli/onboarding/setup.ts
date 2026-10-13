@@ -89,7 +89,7 @@ async function offerSkills(
       `No ${list(
         known.map((target) => target.displayName),
         "or",
-      )} found, so the /aireg skills were not installed.`,
+      )} found, so the aireg skills were not installed.`,
     );
     return;
   }
@@ -97,7 +97,7 @@ async function offerSkills(
   const ref = ownSkillsRef();
   if (ref === undefined) {
     printer.info(
-      "Did not install the /aireg skills, because this development build has no release.",
+      "Did not install the aireg skills, because this development build has no release.",
     );
     printer.info(`Run \`${ownSkillsCommand(aireg)}\` to install them from the default branch.`);
     return;
@@ -106,13 +106,13 @@ async function offerSkills(
   const prompt = blocker({ json: false, yes, isTTY: process.stdin.isTTY === true, env });
   if (prompt === undefined) {
     if (
-      !ask(`Found ${names}. Install the /aireg skills for ${found.length === 1 ? "it" : "them"}?`)
+      !ask(`Found ${names}. Install the aireg skills for ${found.length === 1 ? "it" : "them"}?`)
     ) {
-      printer.info(`Run \`${ownSkillsCommand(aireg)}\` to install the /aireg skills later.`);
+      printer.info(`Run \`${ownSkillsCommand(aireg)}\` to install the aireg skills later.`);
       return;
     }
   } else if (prompt.kind !== "yes") {
-    printer.info(`Did not install the /aireg skills, because ${explain(prompt)}.`);
+    printer.info(`Did not install the aireg skills, because ${explain(prompt)}.`);
     printer.info(`Run \`${ownSkillsCommand(aireg)}\` to install them.`);
     return;
   }
@@ -127,7 +127,7 @@ async function offerSkills(
     }),
   };
   const spin = canAnimate(process.stderr) ? spinner(defaultIo(), printer.errStyle) : undefined;
-  spin?.update(`Installing the /aireg skills for ${names}`);
+  spin?.update(`Installing the aireg skills for ${names}`);
   // A user scope with no harnesses yet takes the ones found here, so later -g installs reach
   // them too; one someone already set is left, and only this entry names the harnesses.
   const wanted = found.map((item) => item.target.name);
@@ -174,12 +174,12 @@ async function offerSkills(
         .catch(() => undefined);
     }
     spin?.stop();
-    printer.warning(`The /aireg skills were not installed: ${(error as Error).message}`);
+    printer.warning(`The aireg skills were not installed: ${(error as Error).message}`);
     printer.hint(`Run \`${ownSkillsCommand(aireg)}\` to install them later.`);
     return;
   }
   spin?.stop();
-  printer.success(`Installed the /aireg skills for ${names}.`);
+  printer.success(`Installed the aireg skills for ${names}.`);
   for (const chunk of held) process.stderr.write(chunk);
 }
 
@@ -296,7 +296,7 @@ export async function install(
     // Until a new shell picks up PATH, only the full path runs.
     const aireg = ready ? "aireg" : underHome(shimPath(env));
     await offerSkills(context, env, aireg, yes).catch((error: Error) => {
-      printer.warning(`The /aireg skills were not installed: ${error.message}`);
+      printer.warning(`The aireg skills were not installed: ${error.message}`);
       printer.hint(`Run \`${ownSkillsCommand(aireg)}\` to install them later.`);
     });
   }

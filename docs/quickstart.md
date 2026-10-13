@@ -155,7 +155,7 @@ Nothing is installed in your user scope.
   next   aireg publish <path> --to <registry>/<namespace>
 ```
 
-`-g` looks at your user scope: the harness folders in your home folder, such as `~/.claude/skills`. Without it, `aireg status` checks the project's own harness folders. If you accepted the installer's offer of the aireg skills, `add`, `new` and `publish` are also listed, as installed from `ai-registry`.
+`-g` looks at your user scope: the harness folders in your home folder, such as `~/.claude/skills`. Without it, `aireg status` checks the project's own harness folders. If you accepted the installer's offer of the aireg skills, `aireg-add`, `aireg-new` and `aireg-publish` are also listed, as installed from `ai-registry`.
 
 Then bring each one in, release them, and install them into the project. Replace `pr-review` and `lint` with the names `aireg status -g` lists:
 
@@ -230,7 +230,7 @@ aireg registry add github.com/atlanai/ai-registry --path examples/aireg -g
 aireg add ai-registry/aireg -g
 ```
 
-This connects the registry that holds the skills and installs them into your user scope for Claude Code and Codex, so they're available in every project. It also adds a job that keeps them up to date, so the daemon starts again. In Claude Code they appear as `/aireg:new`, `/aireg:add`, and `/aireg:publish` in a new session. When the installer runs in a terminal, it offers to install them for you, from the release that matches your aireg; without a terminal it leaves them out. `aireg doctor` tells you whether they are installed, and prints the command, pinned to that release, when they are not.
+This connects the registry that holds the skills and installs them into your user scope for Claude Code and Codex, so they're available in every project. It also adds a job that keeps them up to date, so the daemon starts again. In Claude Code they appear as `/aireg-new`, `/aireg-add`, and `/aireg-publish` in a new session. When the installer runs in a terminal, it offers to install them for you, from the release that matches your aireg; without a terminal it leaves them out. `aireg doctor` tells you whether they are installed, and prints the command, pinned to that release, when they are not.
 
 Once installed, you can use your preferred harness to manage registries. For example, "set up a registry for my team's skills" or "publish the skills in `~/.claude/skills` to the acme registry".
 

@@ -8,14 +8,15 @@ registry of their own. It was made with the CLI it documents, the way any regist
 ```
 registry.json                                      slug ai-registry
 index.json
-artifacts/aireg/skill/new/0.1.0/SKILL.md           set up a registry: create it, add skills, release, gate pull requests, hand it over
-artifacts/aireg/skill/add/0.1.0/SKILL.md           find, read, install and update from a registry, and check installs in CI
-artifacts/aireg/skill/publish/0.1.0/SKILL.md       publish a skill, release its next version, or publish a project's skills from CI
+artifacts/aireg/skill/aireg-new/0.1.0/SKILL.md     set up a registry: create it, add skills, release, gate pull requests, hand it over
+artifacts/aireg/skill/aireg-add/0.1.0/SKILL.md     find, read, install and update from a registry, and check installs in CI
+artifacts/aireg/skill/aireg-publish/0.1.0/SKILL.md publish a skill, release its next version, or publish a project's skills from CI
 ```
 
 Give an agent the skills in your user scope, so every harness on your machine has them. In
-Claude Code they appear as `/aireg:new`, `/aireg:add` and `/aireg:publish`. `aireg doctor`
-says whether they are installed.
+Claude Code they appear as `/aireg-new`, `/aireg-add` and `/aireg-publish`, and in Codex as
+`$aireg-new` and so on. `aireg doctor` says whether they are installed. The `new`, `add` and
+`publish` they replace are archived.
 
 ```sh
 aireg registry add github.com/atlanai/ai-registry --path examples/aireg -g

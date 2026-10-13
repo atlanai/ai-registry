@@ -132,11 +132,11 @@ function userScope(): Check {
 async function ownSkills(cwd: string): Promise<Check> {
   const installed = await ownSkillsInstalled(cwd).catch((error: Error) => error);
   if (installed instanceof Error) {
-    return { name: "/aireg skills", ok: true, detail: `unknown: ${installed.message}` };
+    return { name: "aireg skills", ok: true, detail: `unknown: ${installed.message}` };
   }
-  if (installed) return { name: "/aireg skills", ok: true, detail: "installed" };
+  if (installed) return { name: "aireg skills", ok: true, detail: "installed" };
   return {
-    name: "/aireg skills",
+    name: "aireg skills",
     ok: true,
     detail: "not installed",
     fix: ownSkillsCommand(),
