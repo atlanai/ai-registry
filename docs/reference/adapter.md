@@ -83,7 +83,7 @@ Everything `@atlanai/aireg` exports is the contract, and every export carries it
 | `protocol` | The contract version, `ADAPTER_PROTOCOL`. `defineAdapter` fills it in. |
 | `artifactKinds`, `publishKinds` | The kinds it serves, and the narrower set it publishes, if any. |
 | `dispatch` | The URL schemes, hosts and local paths whose addresses aireg sends to it. |
-| `capabilities` | `pinsSource`, `publish`, `auth`, `messages` and `fileSpec`. Anything left out is off. |
+| `capabilities` | `pinsSource`, `publish`, `auth`, `messages`, `fileSpec` and `namespacePlugins`. Anything left out is off. With `namespacePlugins`, each namespace the source lists installs as one plugin in your user scope, named after it, while each artifact keeps a lockfile row of its own. |
 | `configSchema` | The keys a registry's `config:` may carry for it. |
 | `auth` | `login`, and optionally `refresh` and `revoke`. `login` returns a `Credential` and, when the registry says who signed in, an `Identity`: a `name` and an optional `account`. |
 | `credentialsHint`, `readOnly` | What aireg says when a person needs to set up credentials, or publishes to a registry the adapter only reads. |

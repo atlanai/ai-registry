@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { canonical } from "#core/fs/canonical.ts";
@@ -22,6 +23,8 @@ export async function guardLink(
   to: string,
   recorded: LinkMode | undefined,
   roots: RemovableRoots,
+  /** What a rendered placement would write, when that is known. */
+  rendered?: string,
 ): Promise<LinkGuard> {
   const state = await inspect(to);
   if (!state.exists) return "replace";
@@ -31,7 +34,13 @@ export async function guardLink(
       ? isWithin(canonical(dirname(roots.artifacts)), canonical(state.target))
       : recorded === "copy";
   if (ours) return "replace";
+  // A file already holding what would be written is ours to take on.
+  if (rendered !== undefined && !state.isLink && (await sameText(to, rendered))) return "replace";
   return recorded === undefined ? "keep" : "backup";
+}
+
+async function sameText(path: string, text: string): Promise<boolean> {
+  return (await readFile(path, "utf8").catch(() => undefined)) === text;
 }
 
 /** Filed by harness and the directory it sat in, the layout a claimed folder uses too. */

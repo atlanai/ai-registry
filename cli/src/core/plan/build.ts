@@ -62,6 +62,9 @@ export function build(
     rewritten: [],
     claimed: new Map(),
     linked: new Set(),
+    wrapping: new Set(
+      acquired.filter((source) => source.namespacePlugins).map((source) => source.alias),
+    ),
     crowded: new Set(),
     unlinks: [],
     neededBy: dependentsByName(needs, selected, lock),

@@ -46,6 +46,7 @@ export const GLYPH = {
   pipe: "│",
   arrow: "→",
   upDown: "↑↓",
+  caret: "▌",
   leftRight: "←→",
   aside: "↳",
   sep: "·",

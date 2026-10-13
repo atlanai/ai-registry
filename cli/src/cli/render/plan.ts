@@ -1,5 +1,6 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
+import type { ArtifactKind } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
 import type { ApplyResult } from "#core/plan/apply.ts";
@@ -9,8 +10,9 @@ import { olderThan } from "#core/semver.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { GLYPH } from "#core/term/theme.ts";
-import type { PlanReport, RunResult } from "#engine/pipeline.ts";
+import type { Chosen, PlanReport, RunResult } from "#engine/pipeline.ts";
 import { underHome } from "./home.ts";
+import { linkLoadedBy, loadedBy, toolName } from "./tools.ts";
 
 type Shown = Exclude<Action, { kind: "record" }>;
 
@@ -22,15 +24,30 @@ const VERB: Record<Shown["kind"], string> = {
   unlink: "uninstall",
 };
 
-/** One line per action as it happens, naming the harness so four links read apart. */
-function describeAction(action: Shown): string {
-  if (action.kind === "link") return `install ${action.name} into ${action.harness}`;
+/** The kind the plan records for an artifact, which says which harnesses load it. */
+function kindIn(plan: Plan, name: string): ArtifactKind | undefined {
+  const record = plan.actions.find((action) => action.kind === "record");
+  return record?.kind === "record" ? record.lock.artifacts[name]?.kind : undefined;
+}
+
+/** One line per action as it happens, naming the harnesses so four links read apart. */
+function describeAction(action: Shown, plan: Plan, chosen: Chosen): string {
+  if (action.kind === "link") {
+    const kind = kindIn(plan, action.name);
+    return `install ${action.name} for ${linkLoadedBy(chosen.harnesses, chosen.targets, kind, action.harness)}`;
+  }
   if (action.kind === "clone") return `copy ${action.name} into this project`;
   return `${VERB[action.kind]} ${action.name}`;
 }
 
 /** The same value a real run executes, printed instead of performed. */
-function renderPlan(printer: Printer, plan: Plan, roots: Roots, aside: ReadonlySet<string>): void {
+function renderPlan(
+  printer: Printer,
+  plan: Plan,
+  roots: Roots,
+  aside: ReadonlySet<string>,
+  chosen: Chosen,
+): void {
   const shown = plan.actions.filter((action): action is Shown => action.kind !== "record");
   // Your user scope is your home folder, so its paths read from there.
   const shownPath = (path: string): string =>
@@ -67,8 +84,16 @@ function renderPlan(printer: Printer, plan: Plan, roots: Roots, aside: ReadonlyS
       },
       { header: "artifact", value: (action: Shown) => action.name },
       {
-        header: "harness",
-        value: (action: Shown) => (action.kind === "link" ? action.harness : ""),
+        header: "harnesses",
+        value: (action: Shown) =>
+          action.kind === "link"
+            ? linkLoadedBy(
+                chosen.harnesses,
+                chosen.targets,
+                kindIn(plan, action.name),
+                action.harness,
+              )
+            : "",
         optional: true,
       },
       {
@@ -119,8 +144,13 @@ function unchanged(printer: Printer, plan: Plan): void {
   );
 }
 
+/** The harnesses some artifacts went to, named as chosen; `folders` narrows where each went. */
+type Tools = (names: readonly string[], folders?: (name: string) => string[]) => string;
+
 /** An applied run: the plan, what apply did, and the lockfile it started from. */
-export type Ran = Pick<RunResult, "plan" | "before"> & { applied: ApplyResult };
+export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses"> & {
+  applied: ApplyResult;
+};
 
 /**
  * Names what apply did, not what was planned: a link kept for a file of yours is not one.
@@ -128,7 +158,7 @@ export type Ran = Pick<RunResult, "plan" | "before"> & { applied: ApplyResult };
  */
 export function summarize(
   printer: Printer,
-  { plan, applied, before }: Ran,
+  { plan, applied, before, targets, harnesses }: Ran,
   told: ReadonlySet<string> = new Set(),
 ): void {
   const shown = plan.actions.filter(
@@ -143,6 +173,17 @@ export function summarize(
     shown.flatMap((action) =>
       action.kind === "link" && action.name === name ? [action.harness] : [],
     );
+  // Named as they were chosen: one folder can serve several tools.
+  const toolsOf = (name: string, folders = harnessesOf(name)): string[] => {
+    const kind = held?.[name]?.kind ?? before.artifacts[name]?.kind;
+    return loadedBy(harnesses, targets, kind, folders);
+  };
+  const tools: Tools = (names, folders) =>
+    list(
+      [...new Set(names.flatMap((name) => toolsOf(name, folders?.(name))))].map((tool) =>
+        toolName(harnesses, tool),
+      ),
+    );
   const installed = applied.added.filter((name) => harnessesOf(name).length > 0);
   const changed = [...touched("clone", "link", "unlink")].filter(
     (name) => !applied.added.includes(name) && !applied.removed.includes(name),
@@ -150,9 +191,9 @@ export function summarize(
   const lines = Object.values(applied.performed).some((count) => count > 0)
     ? [
         installed.length > 0
-          ? `Installed ${named(installed)} into ${list([...new Set(installed.flatMap(harnessesOf))])}.`
+          ? `Installed ${named(installed)}${tools(installed) === "" ? "" : ` for ${tools(installed)}`}.`
           : "",
-        ...changeLines(changed, shown, before, held),
+        ...changeLines(changed, shown, before, held, tools),
         applied.removed.length > 0 ? `Removed ${named(applied.removed)}.` : "",
       ].filter((line) => line !== "")
     : [];
@@ -170,9 +211,8 @@ export function summarize(
   }
   // Instructions wait for an agent to read them; these run as you once a harness loads them.
   for (const { name, carries } of applied.carried) {
-    const where = harnessesOf(name);
-    if (told.has(name) || where.length === 0) continue;
-    printer.note("runs", `${describeCarried(carries)} from ${name}, in ${list(where)}`);
+    if (told.has(name) || harnessesOf(name).length === 0) continue;
+    printer.note("runs", `${describeCarried(carries)} from ${name}, in ${tools([name])}`);
   }
 }
 
@@ -185,6 +225,7 @@ function changeLines(
   shown: readonly Shown[],
   before: Lock,
   after: Lock["artifacts"] | undefined,
+  tools: Tools,
 ): string[] {
   const moved: string[] = [];
   const back: string[] = [];
@@ -199,23 +240,29 @@ function changeLines(
       );
       continue;
     }
-    // Only what the lockfile already held was put back: a copy made again, or a link it records.
+    // Only what the lockfile already held was put back: its content fetched again, or a link it records.
     const puts = shown
       .filter((action) => action.name === name)
       .every(
         (action) =>
+          action.kind === "stage" ||
           action.kind === "clone" ||
           (action.kind === "link" && from?.links.some((link) => link.harness === action.harness)),
       );
     (from !== undefined && puts ? restored : updated).push(name);
   }
-  const relinked = [
-    ...new Set(
-      shown.flatMap((action) =>
-        action.kind === "link" && restored.includes(action.name) ? [action.harness] : [],
-      ),
-    ),
-  ];
+  // The links put back, not every harness the artifact is in; content fetched
+  // again with its links intact is restored for every harness it is linked in.
+  const relinked = tools(restored, (name) => {
+    const put = shown.flatMap((action) =>
+      action.kind === "link" && action.name === name ? [action.harness] : [],
+    );
+    const links = after?.[name]?.links ?? [];
+    const held = (links.length > 0 ? links : (before.artifacts[name]?.links ?? [])).map(
+      (link) => link.harness,
+    );
+    return [...new Set(put.length > 0 ? put : held)];
+  });
   return [
     moved.length > 0
       ? `Updated ${moved.length <= 3 ? list(moved) : plural(moved.length, "artifact")}.`
@@ -225,7 +272,7 @@ function changeLines(
       : "",
     updated.length > 0 ? `Updated ${named(updated)}.` : "",
     restored.length > 0
-      ? `Restored ${named(restored)}${relinked.length === 0 ? "" : ` in ${list(relinked)}`}.`
+      ? `Restored ${named(restored)}${relinked === "" ? "" : ` for ${relinked}`}.`
       : "",
   ];
 }
@@ -251,9 +298,9 @@ export function outcome({ plan, applied }: RunResult, dryRun: boolean) {
 /** How an installing command shows a run: each step as it happens, or the whole plan for a dry run. */
 export function planReport(printer: Printer): PlanReport {
   return {
-    plan: (plan, roots, aside) => renderPlan(printer, plan, roots, aside),
-    step: (action) => {
-      if (action.kind !== "record") printer.step(describeAction(action));
+    plan: (plan, roots, aside, chosen) => renderPlan(printer, plan, roots, aside, chosen),
+    step: (action, plan, chosen) => {
+      if (action.kind !== "record") printer.step(describeAction(action, plan, chosen));
     },
   };
 }

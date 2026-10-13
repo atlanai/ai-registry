@@ -27,6 +27,7 @@ import { findRegistry } from "#core/filespec/write/init.ts";
 import { dotRelative, posixRelative } from "#core/fs/path.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { RegistrySource } from "#core/manifest.ts";
+import { wrapsNamespaces } from "#core/plan/namespaces.ts";
 import { unmatched } from "#core/plan/select.ts";
 import { parseRef, type Ref } from "#core/ref.ts";
 import { ensureHome, stagingPath } from "#core/store/paths.ts";
@@ -51,6 +52,8 @@ export interface Probed {
   catalog: Catalog;
   /** Set only when the source reports one revision covering everything. */
   revision: string | undefined;
+  /** Its adapter declares each namespace a plugin, which the user scope installs as one. */
+  namespacePlugins: boolean;
   /** The version the source serves an entry at, which `@<version>` can pin. */
   versionOf: (entry: Entry) => string | undefined;
   /** The spec's indexable string pairs on an entry, which a search reads as tags. */
@@ -444,6 +447,7 @@ export async function probe(
     declared: { location, adapter, config },
     catalog: listing.catalog,
     revision: listing.sourceRevision,
+    namespacePlugins: wrapsNamespaces(open.adapter),
     versionOf: (entry) => listedAt(entry)?.artifact.envelope.metadata.version,
     labelsOf: (entry) => listedAt(entry)?.artifact.envelope.metadata.labels,
     content: async (entry) => {

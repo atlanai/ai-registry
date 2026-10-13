@@ -8,6 +8,7 @@ import {
   installed,
   watchedFrom,
 } from "#cli/render/installed.ts";
+import { chosenFor, loadedBy, scopeTargets, toolName } from "#cli/render/tools.ts";
 import type { LockArtifact, readLock } from "#core/lock.ts";
 import { artifactPath, copyLeaf, scopeName } from "#core/store/paths.ts";
 import { fields, table } from "#core/term/table.ts";
@@ -16,7 +17,7 @@ import { builtin, type CommandContext } from "./index.ts";
 
 export async function run(context: CommandContext): Promise<void> {
   const { common, positionals } = parse(context.argv, builtin("list"));
-  const { roots, manifest, lock } = await load(common, context.cwd, "user");
+  const { roots, manifest, harnesses, lock } = await load(common, context.cwd, "user");
 
   // Naming one asks where it came from, which is the only question left once
   // you can already see it in the list.
@@ -35,6 +36,16 @@ export async function run(context: CommandContext): Promise<void> {
     return;
   }
 
+  // Named as they were chosen, not by the folders that serve them: JSON keeps the folders.
+  const scope = scopeTargets(manifest, harnesses);
+  const tools = (row: Installed): string => {
+    const entry = lock.artifacts[row.name];
+    if (entry === undefined) return row.targets.join(", ");
+    return loadedBy(harnesses, chosenFor(manifest, scope, entry), entry.kind, row.targets)
+      .map((name) => toolName(harnesses, name))
+      .join(", ");
+  };
+
   heading(context.printer, rows.length, roots.scope);
   table(
     context.printer,
@@ -45,9 +56,9 @@ export async function run(context: CommandContext): Promise<void> {
         value: (row: Installed) =>
           context.printer.style.dim(
             row.targets.length > 0
-              ? row.targets.join(", ")
+              ? tools(row)
               : row.watched !== undefined
-                ? `${row.watched.harness} (watched)`
+                ? `${toolName(harnesses, row.watched.harness)} (watched)`
                 : "in no harness",
           ),
       },

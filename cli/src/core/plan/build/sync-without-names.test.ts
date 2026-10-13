@@ -7,7 +7,14 @@ import type { Manifest } from "#core/manifest.ts";
 import { type BuildOptions, build } from "#core/plan/build.ts";
 import type { Acquired, Action } from "#core/plan/model.ts";
 import { roots } from "#core/store/paths.ts";
-import { acquired, entry, kitManifest, linksTo, PLAN_OPTIONS } from "#test/kit/builders/plan.ts";
+import {
+  acquired,
+  entry,
+  kitManifest,
+  linksTo,
+  PLAN_OPTIONS,
+  wrapping,
+} from "#test/kit/builders/plan.ts";
 
 describe("a sync that reads one registry and names none", () => {
   // The daemon's path: it reads the job's registry and passes no `opened`.
@@ -16,9 +23,9 @@ describe("a sync that reads one registry and names none", () => {
   const options: BuildOptions = { ...PLAN_OPTIONS, roots: USER, targets: ["claude"] };
   const claudeSkills = (name: string) => join(home, ".claude", "skills", name);
   function engineeringSource(alias: string, skill: string): Acquired {
-    const [base] = acquired([
-      entry({ name: skill, path: `engineering/skills/${skill}`, group: "engineering" }),
-    ]);
+    const [base] = wrapping(
+      acquired([entry({ name: skill, path: `engineering/skills/${skill}`, group: "engineering" })]),
+    );
     if (base === undefined) throw new Error("no source");
     return { ...base, alias };
   }

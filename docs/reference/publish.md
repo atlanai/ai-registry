@@ -28,7 +28,7 @@ For each artifact, `publish` uses the first of these that applies:
 1. `--to`
 2. The registry and namespace an installed artifact came from
 3. The default set with `aireg config set defaults.namespace <registry>/<namespace>`, if this scope declares that registry
-4. On a terminal, it asks
+4. On a terminal, it asks, offering only the registries that accept a publish
 
 The registry must be declared in the project or your user scope. See [`aireg registry add`](registry.md#aireg-registry-add). A path names a registry folder instead, such as `--to ../acme-registry/engineering`, and needs no declaration.
 
@@ -46,7 +46,7 @@ Everything in the artifact's folder is published, except version-control folders
 
 ### Git registries
 
-aireg doesn't publish to a registry in a git repository. Publish into your clone of it, then commit and push with git:
+aireg doesn't publish to a registry in a git repository. Without `--to`, when every declared registry is a git one, `publish` says so before asking anything. Publish into your clone of it, then commit and push with git:
 
 ```bash
 aireg publish .claude/skills/triage --to ../acme-registry/engineering

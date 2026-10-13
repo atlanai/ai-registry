@@ -1,6 +1,7 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
-import { foundBy } from "#cli/render/found.ts";
+import { underHome } from "#cli/render/home.ts";
+import { loadedBy, skipLine, toolName, unhandled } from "#cli/render/tools.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import {
   DEFAULT_TARGETS,
@@ -13,14 +14,14 @@ import {
 import { type ArtifactKind, KINDS, kindDir } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
-import type { Plan } from "#core/plan/model.ts";
+import type { Plan, Selected } from "#core/plan/model.ts";
+import { loadsFrom, type ProjectionOptions } from "#core/plan/projection.ts";
 import { NAME } from "#core/product.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { tableLines } from "#core/term/table.ts";
 import { blocker, explain } from "./caller.ts";
 import { type Choice, multiselect } from "./multiselect.ts";
 import { type Canceled, canceled, type PromptIo, prepare } from "./prompt.ts";
-import { note } from "./report.ts";
 import { confirm, select } from "./select.ts";
 
 /** Shared prompt state for commands that gather missing choices. */
@@ -169,46 +170,56 @@ const SELECT_ALL_LIMIT = 50;
 export async function chooseTargets(
   step: Interaction,
   harnesses: Harnesses,
-  scope: Scope,
-  cwd: string,
+  roots: ProjectionOptions["roots"],
   preselected: readonly string[],
+  /** What is being installed, so each harness can show where it would load it from. */
+  items: readonly Selected[],
+  /** Its source installs each namespace as a plugin in the user scope. */
+  wrapped = false,
 ): Promise<string[] | Canceled> {
-  const all = detectAll(harnesses, cwd);
-
-  const where = (target: Target): string => {
-    const root = targetRoot(target, scope, cwd);
-    return scope === "user" ? root : relative(cwd, root) || root;
-  };
+  // A shared folder is where tools read from, not a tool to pick: choosing a
+  // tool reaches it. One a manifest already names is kept as it was.
+  const all = detectAll(harnesses, roots.cwd).filter((item) => !item.target.shared);
+  const kept = preselected.filter((name) => harnesses[name]?.shared === true);
+  const show = (path: string): string =>
+    roots.scope === "user" ? underHome(path) : relative(roots.cwd, path) || path;
+  const folders = (name: string, chosen: readonly string[]): string[] =>
+    loadsFrom(name, chosen, items, { roots, harnesses }, wrapped);
 
   const choices: Choice<string>[] = all.map((item) => ({
     value: item.target.name,
     label: item.target.displayName,
-    hint: where(item.target),
-    detail: `${item.target.shared ? "Read by several coding agents" : item.detected ? `Found ${foundBy(item.by)}` : "Not found on this machine"}. Takes ${kinds(item.target)}.`,
   }));
 
   // The scope's own harnesses, or the defaults every scope starts with, so the
   // answer a person accepts is the one a command without --for would take.
   const selectable = new Set(all.map((item) => item.target.name));
   const remembered = preselected.filter((name) => selectable.has(name));
-  const initial =
+  const wanted =
     remembered.length > 0 ? remembered : DEFAULT_TARGETS.filter((name) => selectable.has(name));
+  // A harness that would load none of it is left for a person to pick on purpose.
+  const initial = wanted.filter((name) => folders(name, wanted).length > 0);
 
-  return await multiselect(
+  const picked = await multiselect(
     {
       message: "Which harnesses should they install into?",
       choices,
       style: step.printer.errStyle,
       initial,
-      detail: true,
+      focusHint: (name, chosen) => {
+        const found = folders(name, [...chosen]);
+        return found.length === 0 ? "-" : found.map(show).join(", ");
+      },
     },
     step.io,
   );
+  return canceled(picked) ? picked : [...picked, ...kept.filter((name) => !picked.includes(name))];
 }
 
 /** Group removal choices by their registry. */
 export async function chooseRemovals(
   step: Interaction,
+  /** `targets` are the harnesses that load each one, by name. */
   installed: readonly { name: string; kind: string; source: string; targets: string[] }[],
 ): Promise<string[] | Canceled> {
   return await multiselect(
@@ -221,7 +232,7 @@ export async function chooseRemovals(
         group: entry.source,
         detail:
           entry.targets.length > 0
-            ? `Installed into ${entry.targets.join(", ")}.`
+            ? `Installed for ${list(entry.targets)}.`
             : "Fetched, but installed into no harness.",
       })),
       style: step.printer.errStyle,
@@ -233,15 +244,6 @@ export async function chooseRemovals(
     },
     step.io,
   );
-}
-
-/** What a harness takes, in a person's words: a plugin is how a namespace arrives, not a kind to pick. */
-function kinds(target: Target): string {
-  const taken = Object.keys(target.kinds)
-    .filter((kind) => kind !== "plugin")
-    .sort()
-    .map((kind) => `${kind}s`);
-  return taken.length === 0 ? "nothing" : list(taken);
 }
 
 export async function chooseScope(step: Interaction, initial: Scope): Promise<Scope | Canceled> {
@@ -290,20 +292,12 @@ export async function chooseMethod(
 ): Promise<boolean | Canceled> {
   return await select<boolean>(
     {
-      message: "How should harnesses reference the artifacts?",
+      message: "How should they be installed?",
       style: step.printer.errStyle,
       initial,
       options: [
-        {
-          value: false,
-          label: "Symlink",
-          hint: "one writable copy, edits reach every harness at once",
-        },
-        {
-          value: true,
-          label: "Copy",
-          hint: "an independent copy per harness",
-        },
+        { value: false, label: "Symlink (recommended)", answer: "Symlink" },
+        { value: true, label: "Copy" },
       ],
     },
     step.io,
@@ -325,6 +319,8 @@ export async function confirmIfDestructive(
 }
 
 export interface PlanContext {
+  /** What confirming does, which titles the question: `Install 2 artifacts?`. */
+  verb?: "Install" | "Remove" | "Update" | undefined;
   /** Harnesses this run was asked to write to. */
   targets?: readonly string[] | undefined;
   /** Kinds being installed, used to explain a harness that gets nothing. */
@@ -339,14 +335,38 @@ export async function confirmPlan(
   context: PlanContext = {},
 ): Promise<boolean> {
   if (!interactive(step)) return true;
-  note(step.io, step.printer.errStyle, "Plan", planLines(step, plan, context));
+  // Nothing on disk would change, so there is nothing to agree to.
+  if (plan.actions.every((action) => action.kind === "record")) return true;
   // Deleting edits is the one answer that cannot be undone, so it is never the default.
   const loses = plan.actions.some((action) => action.kind === "unlink" && action.edited === true);
   const proceed = await confirm(
-    { message: "Proceed?", style: step.printer.errStyle, initial: !loses },
+    {
+      message: planQuestion(plan, context.verb ?? "Install"),
+      style: step.printer.errStyle,
+      initial: !loses,
+      body: planLines(step, plan, context),
+    },
     step.io,
   );
   return !canceled(proceed) && proceed;
+}
+
+/** The question a plan asks, named by what it does and to how many: `Remove 1 artifact?`. */
+function planQuestion(plan: Plan, verb: "Install" | "Remove" | "Update"): string {
+  const placed = new Set<string>();
+  const removed = new Set<string>();
+  for (const action of plan.actions) {
+    if (action.kind === "stage" || action.kind === "link") placed.add(action.name);
+    else if (action.kind === "unlink") removed.add(action.name);
+  }
+  // A plan that only removes says so, whatever the command; an update counts both.
+  const [said, count] =
+    verb === "Update"
+      ? [verb, new Set([...placed, ...removed]).size]
+      : verb === "Remove" || placed.size === 0
+        ? (["Remove", removed.size] as const)
+        : ([verb, placed.size] as const);
+  return `${said} ${plural(count, "artifact")}?`;
 }
 
 /** Chosen harnesses the plan places nothing in, so the review can warn before it applies. */
@@ -361,17 +381,6 @@ export function unreached(plan: Plan, targets: readonly string[], harnesses?: Ha
       ? [name]
       : [name, ...KINDS.flatMap((kind) => readsFor(harnesses, name, kind))];
   return targets.filter((name) => !reads(name).some((read) => reached.has(read))).sort();
-}
-
-/** The kinds a harness cannot load, which explain why it was left out. */
-export function unhandled(
-  harnesses: Harnesses,
-  target: string,
-  kinds: readonly ArtifactKind[],
-): ArtifactKind[] {
-  const harness = harnesses[target];
-  if (harness === undefined) return [];
-  return kinds.filter((kind) => harness.kinds[kind] === undefined);
 }
 
 /**
@@ -409,6 +418,20 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
   const linked = linkedTargets(plan);
 
   const names = [...new Set([...staged.keys(), ...linked.keys()])].sort();
+  // A namespace installs as one plugin link, so the lock says where each member went.
+  const folders = (name: string): string[] => [
+    ...new Set([
+      ...(linked.get(name) ?? []),
+      ...(recorded?.artifacts[name]?.links.map((link) => link.harness) ?? []),
+    ]),
+  ];
+  const chosen = context.targets ?? [];
+  // The tools a person picked, not the folders written for them: one folder can
+  // serve several tools, and a tool can read from another's folder.
+  const loading = (name: string): string[] | undefined =>
+    context.harnesses === undefined || chosen.length === 0
+      ? undefined
+      : loadedBy(context.harnesses, chosen, recorded?.artifacts[name]?.kind, folders(name));
 
   // What a person decides on: which version, into which harnesses. Store paths are ours.
   const lines =
@@ -426,8 +449,13 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
                 ),
             },
             {
-              header: "into",
-              value: (name: string) => [...(linked.get(name) ?? [])].sort().join(", "),
+              header: "harnesses",
+              value: (name: string) => {
+                const tools = loading(name);
+                return tools === undefined
+                  ? folders(name).sort().join(", ")
+                  : tools.map((tool) => toolName(context.harnesses, tool)).join(", ");
+              },
               optional: true,
             },
             {
@@ -454,20 +482,67 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
     lines.push(style.dim(`${plan.unchanged.length} already up to date`));
   }
 
-  const missed = unreached(plan, context.targets ?? [], context.harnesses);
-  if (missed.length > 0 && names.length > 0) {
-    lines.push("");
-    for (const line of explainMissed(missed, context)) lines.push(style.yellow(line));
+  if (names.length > 0) {
+    const missed = unreached(plan, chosen, context.harnesses);
+    const notes = [
+      ...explainMissed(missed, context),
+      ...explainSkipped(skipped(names, chosen, missed, loading, folders), recorded, context),
+    ];
+    if (notes.length > 0) lines.push("", ...notes.map((line) => style.yellow(line)));
   }
   return lines.length === 0 ? [style.dim("Nothing to do.")] : lines;
 }
 
+/** The artifacts each chosen tool is left without, for tools that receive something else. */
+function skipped(
+  names: readonly string[],
+  chosen: readonly string[],
+  missed: readonly string[],
+  loading: (name: string) => string[] | undefined,
+  folders: (name: string) => string[],
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const name of names) {
+    if (folders(name).length === 0) continue;
+    const tools = loading(name);
+    if (tools === undefined) continue;
+    for (const tool of chosen) {
+      if (missed.includes(tool) || tools.includes(tool)) continue;
+      out.set(tool, [...(out.get(tool) ?? []), name]);
+    }
+  }
+  return out;
+}
+
+/** One line per tool: what it skips, and the kind it cannot load when that is why. */
+function explainSkipped(
+  skips: ReadonlyMap<string, string[]>,
+  recorded: Lock | undefined,
+  context: PlanContext,
+): string[] {
+  const { harnesses } = context;
+  if (harnesses === undefined) return [];
+  return [...skips.entries()].map(([tool, names]) => {
+    const kinds = [
+      ...new Set(
+        names.flatMap((name) => {
+          const kind = recorded?.artifacts[name]?.kind;
+          return kind === undefined ? [] : [kind];
+        }),
+      ),
+    ];
+    return skipLine(harnesses, tool, names, kinds);
+  });
+}
+
 /** Group unreached harnesses by unsupported kinds for concise reporting. */
 function explainMissed(missed: readonly string[], context: PlanContext): string[] {
+  if (missed.length === 0) return [];
   const { harnesses, kinds } = context;
+  const named = (targets: readonly string[]) => list(targets.map((t) => toolName(harnesses, t)));
   const receive = (targets: readonly string[]) => (targets.length === 1 ? "receives" : "receive");
   const vague = (targets: readonly string[]): string =>
-    `${list(targets)} ${receive(targets)} nothing from this selection.`;
+    `${named(targets)} ${receive(targets)} nothing from this selection.`;
   if (harnesses === undefined || kinds === undefined || kinds.length === 0) {
     return [vague(missed)];
   }
@@ -481,7 +556,7 @@ function explainMissed(missed: readonly string[], context: PlanContext): string[
   return [...byReason.entries()].map(([reason, targets]) =>
     reason === ""
       ? vague(targets)
-      : `${list(targets)} ${receive(targets)} nothing: ${targets.length === 1 ? "it does not" : "they do not"} load ${list(
+      : `${named(targets)} ${receive(targets)} nothing: ${targets.length === 1 ? "it does not" : "they do not"} load ${list(
           reason.split(",").map((kind) => `${kind}s`),
         )}.`,
   );

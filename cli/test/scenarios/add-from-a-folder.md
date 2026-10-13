@@ -18,7 +18,7 @@ $ aireg add ../kit/artifacts/kit/skill/lint/1.0.0 -y
 $ aireg list
 1 installed in this project
   artifact  kind   version       from  harnesses
-  lint      skill  1.0.0 pinned  kit   agents, claude
+  lint      skill  1.0.0 pinned  kit   Claude Code, Codex
 ```
 
 The manifest records the registry as typed, relative to the project, and the pin.
@@ -40,8 +40,8 @@ $ aireg add [ROOT]/kit/artifacts/kit/skill/deploy -y
 $ aireg list
 2 installed in this project
   artifact  kind   version       from  harnesses
-  deploy    skill  1.0.0         kit   agents, claude
-  lint      skill  1.0.0 pinned  kit   agents, claude
+  deploy    skill  1.0.0         kit   Claude Code, Codex
+  lint      skill  1.0.0 pinned  kit   Claude Code, Codex
 ```
 
 A folder no registry holds, or one that names no artifact, is refused.

@@ -732,6 +732,14 @@ describe("publishing from a project", () => {
     });
     expect(refused.code).toBe(2);
     expect(refused.stderr).toMatch(/kit is a git registry, and aireg does not publish to git/);
+    // With nowhere named and only kit declared, it says so before asking anything. An empty
+    // user scope keeps the folder registries earlier tests declared out of the choice.
+    const unnamed = await aireg(["publish", hotfix, "--yes"], {
+      cwd: scratch,
+      env: { AIREG_USER_SCOPE: join(root, "push-new-scope") },
+    });
+    expect(unnamed.code).toBe(2);
+    expect(unnamed.stderr).toMatch(/kit is a git registry, and aireg does not publish to git/);
 
     const published = await aireg(["publish", hotfix, "--to", join(clone, "mine"), "--yes"], {
       cwd: scratch,

@@ -44,7 +44,7 @@ A version goes only on a single artifact's full name. Adding an artifact that is
 
 ### Questions
 
-On a terminal, `add` asks what to install, which scope to install into when the folder has no `.registry/manifest.yml`, which harnesses to install into, and whether to link or copy, then shows the plan before changing anything. It asks nothing when you name a namespace or an artifact, pass `--select`, or pass `--yes`. See [When aireg asks questions](options.md#when-aireg-asks-questions).
+On a terminal, `add` asks what to install, which scope to install into when the folder has no `.registry/manifest.yml`, which harnesses to install into, and whether to link or copy, then asks you to confirm the install, with each artifact and the harnesses that load it. It asks nothing when you name a namespace or an artifact, pass `--select`, or pass `--yes`. See [When aireg asks questions](options.md#when-aireg-asks-questions).
 
 Without a terminal, `add` installs everything you named, but refuses to install more than 10 artifacts unless you pass `--select` or `--all`. For a namespace, only its own artifacts count.
 

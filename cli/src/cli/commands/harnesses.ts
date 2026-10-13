@@ -1,5 +1,6 @@
 import { noArguments, parse } from "#cli/options.ts";
 import { foundBy } from "#cli/render/found.ts";
+import { sharedReads } from "#cli/render/tools.ts";
 import { detectAll, resolveHarnesses } from "#core/harness/index.ts";
 import { table } from "#core/term/table.ts";
 import { builtin, type CommandContext } from "./index.ts";
@@ -9,7 +10,8 @@ export async function run(context: CommandContext): Promise<void> {
   const { positionals } = parse(context.argv, builtin("harnesses"));
   noArguments(positionals, "harnesses");
   // Every name `--for` takes; a shared folder such as `.agents` is never detected.
-  const rows = detectAll(resolveHarnesses(), context.cwd);
+  const harnesses = resolveHarnesses();
+  const rows = detectAll(harnesses, context.cwd);
   const tools = rows.filter((item) => !item.target.shared);
   // The shared folder last: it is not a coding agent, and is always installed into when asked.
   const ordered = [...tools, ...rows.filter((item) => item.target.shared)];
@@ -31,34 +33,26 @@ export async function run(context: CommandContext): Promise<void> {
   }
 
   const { style } = context.printer;
+  // The shared folder is not a tool: a person picks the tools, and the note says who reads it.
   table(
     context.printer,
     [
-      { header: "harness", value: (item: (typeof rows)[number]) => item.target.name },
+      { header: "harness", value: (item: (typeof rows)[number]) => item.target.displayName },
+      { header: "id", value: (item: (typeof rows)[number]) => style.dim(item.target.name) },
       {
         header: "status",
         value: (item: (typeof rows)[number]) =>
-          item.target.shared
-            ? style.dim("always used")
-            : item.detected
-              ? style.green("found")
-              : style.dim("not found"),
+          item.detected ? style.green("found") : style.dim("not found"),
       },
       {
         header: "where",
-        value: (item: (typeof rows)[number]) =>
-          style.dim(
-            item.target.shared
-              ? `the shared ${item.target.projectRoot} folder`
-              : item.detected
-                ? foundBy(item.by)
-                : "",
-          ),
+        value: (item: (typeof rows)[number]) => style.dim(item.detected ? foundBy(item.by) : ""),
       },
     ],
-    ordered,
+    tools,
   );
   context.printer.info();
+  for (const line of sharedReads(harnesses)) context.printer.info(line);
   context.printer.info(foundSummary(tools.filter((item) => item.detected).length, tools.length));
 }
 

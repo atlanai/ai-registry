@@ -3,7 +3,7 @@ import { emptyLock } from "#core/lock.ts";
 import { build } from "#core/plan/build.ts";
 import type { Action } from "#core/plan/model.ts";
 import { artifactPath, projectionDir, roots, stagingPath } from "#core/store/paths.ts";
-import { acquired, entry, kitManifest, PLAN_OPTIONS } from "#test/kit/builders/plan.ts";
+import { acquired, entry, kitManifest, PLAN_OPTIONS, wrapping } from "#test/kit/builders/plan.ts";
 
 const OPTIONS = { ...PLAN_OPTIONS, targets: ["claude", "codex"] };
 const ENTRIES = [
@@ -12,11 +12,12 @@ const ENTRIES = [
 ];
 const CONTENTS = new Map(ENTRIES.map((each) => [each.path, "sha256:lint"]));
 
-function planned(entries = ENTRIES, options = OPTIONS) {
+function planned(entries = ENTRIES, options = OPTIONS, wraps = false) {
+  const sources = acquired(entries, "c1", CONTENTS);
   return build(
     kitManifest(["kit"]),
     emptyLock(),
-    acquired(entries, "c1", CONTENTS),
+    wraps ? wrapping(sources) : sources,
     { artifacts: {} },
     options,
   );
@@ -50,9 +51,9 @@ describe("a namespaced skill, projected", () => {
   });
 
   // At user scope, where Claude and Codex read plugins from.
-  it("points Claude and Codex at the namespace's plugin directory", () => {
+  it("points Claude and Codex at the namespace's plugin directory, when its source says so", () => {
     const at = { ...OPTIONS, roots: roots("user", "/work") };
-    const links = linksOf(planned(ENTRIES, at).actions);
+    const links = linksOf(planned(ENTRIES, at, true).actions);
     const froms = links
       .filter((link) => link.harness === "claude")
       .map((link) => link.from)
@@ -73,6 +74,29 @@ describe("a namespaced skill, projected", () => {
     expect(links.some((link) => link.harness === "agents")).toBe(false);
   });
 
+  // A namespace is where a skill comes from, not a plugin, unless its source declares it one.
+  it("places a skill as itself at user scope, where Claude and Codex read it", () => {
+    const at = { ...OPTIONS, roots: roots("user", "/work") };
+    const links = linksOf(planned(ENTRIES.slice(0, 1), at).actions);
+    expect(links.map((link) => [link.harness, link.to.split("/").slice(-3).join("/")])).toEqual([
+      ["agents", ".agents/skills/lint"],
+      ["claude", ".claude/skills/lint"],
+    ]);
+    expect(links.every((link) => link.plugin === false && link.fan === undefined)).toBe(true);
+    expect(links.some((link) => link.from.includes(".projections"))).toBe(false);
+  });
+
+  it("refuses two namespaces' skills of one name at user scope, as in a project", () => {
+    const at = { ...OPTIONS, roots: roots("user", "/work") };
+    const plan = planned(ENTRIES, at);
+    // The first keeps the folders; the second is reported rather than overwriting it.
+    expect(linksOf(plan.actions).map((link) => link.name)).toEqual([
+      "engineering/lint",
+      "engineering/lint",
+    ]);
+    expect(plan.clashes.map((clash) => clash.name)).toEqual(["sales/lint"]);
+  });
+
   it("keeps a project's Codex skills flat, where Codex reads them", () => {
     const links = linksOf(planned(ENTRIES.slice(0, 1)).actions);
     const flat = links.filter((link) => link.harness === "agents");
@@ -82,11 +106,17 @@ describe("a namespaced skill, projected", () => {
 
   it("gives Cursor a folder it reads when Claude's holds plugins", () => {
     const at = { ...OPTIONS, roots: roots("user", "/work"), targets: ["claude", "cursor"] };
-    const flat = linksOf(planned(ENTRIES.slice(0, 1), at).actions).filter(
+    const flat = linksOf(planned(ENTRIES.slice(0, 1), at, true).actions).filter(
       (link) => link.harness !== "claude",
     );
     expect(flat.map((link) => [link.harness, link.to.endsWith("/.agents/skills/lint")])).toEqual([
       ["agents", true],
     ]);
+  });
+
+  it("lets Cursor read Claude's folder when it holds the skill as itself", () => {
+    const at = { ...OPTIONS, roots: roots("user", "/work"), targets: ["claude", "cursor"] };
+    const links = linksOf(planned(ENTRIES.slice(0, 1), at).actions);
+    expect(links.map((link) => link.harness)).toEqual(["claude"]);
   });
 });

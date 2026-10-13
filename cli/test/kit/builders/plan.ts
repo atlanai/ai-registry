@@ -142,6 +142,11 @@ export function linksTo(actions: readonly Action[], target: string): string[] {
     .sort();
 }
 
+/** The same sources, read through an adapter that declares each namespace a plugin. */
+export function wrapping(sources: readonly Acquired[]): Acquired[] {
+  return sources.map((source) => ({ ...source, namespacePlugins: true }));
+}
+
 /** A plugin and the two artifacts it holds, as a registry publishes them. */
 export function pluginCatalog(name = "toolkit"): Entry[] {
   return [

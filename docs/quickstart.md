@@ -78,7 +78,7 @@ The above:
 ```text
 1 installed in this project
   artifact        kind   version  from  harnesses
-  hello-registry  skill  0.1.0    acme  agents, claude
+  hello-registry  skill  0.1.0    acme  Claude Code, Codex
 ```
 
 The CLI writes the skill's files into the project's `.registry/` folder and links `.claude/skills/` and `.agents/skills/` to them: Claude Code reads the first, Codex the second. It records the registry and the skill in `.registry/manifest.yml` and the exact version and digests in `.registry/manifest.lock.yml`; commit `.registry/`, `.claude/` and `.agents/` so teammates get the same skill. Open Claude Code or Codex in `my-project` and ask it to say hello from the registry: it answers with 0.1.0.
@@ -149,9 +149,9 @@ aireg status -g
 Nothing is installed in your user scope.
 
 2 unmanaged
-  artifact   kind   harness  path
-  lint       skill  claude   ~/.claude/skills/lint
-  pr-review  skill  claude   ~/.claude/skills/pr-review
+  artifact   kind   harness      path
+  lint       skill  Claude Code  ~/.claude/skills/lint
+  pr-review  skill  Claude Code  ~/.claude/skills/pr-review
   next   aireg publish <path> --to <registry>/<namespace>
 ```
 

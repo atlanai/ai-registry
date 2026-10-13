@@ -23,6 +23,7 @@ import { formatAddress, type Ref } from "#core/ref.ts";
 import { ensureHome, stagingPath, toolHome } from "#core/store/paths.ts";
 import { type Need, needsOf } from "./depends.ts";
 import type { Acquired, Placement, Staged } from "./model.ts";
+import { wrapsNamespaces } from "./namespaces.ts";
 import { candidates } from "./select.ts";
 
 export interface AcquireOptions {
@@ -384,6 +385,7 @@ async function acquireOne(
     },
     placements,
     catalog: listing.catalog,
+    namespacePlugins: wrapsNamespaces(open.adapter),
     content: (entryPath) => {
       const already = placed.get(entryPath);
       if (already !== undefined) return already;

@@ -24,7 +24,8 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const blocked: Blocked[] = [];
   const address = addressOf({ ...item, name: item.upstreamName }, item.source);
   build.addresses.set(item.name, address);
-  const planned = linksFor(item, copy, build.options, build.crowded, (harness) => {
+  const wrapped = build.wrapping.has(item.source);
+  const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (harness) => {
     skipped.add(build.options.harnesses[harness]?.displayName ?? harness);
   });
   const links = claim(planned, item.name, build.claimed, (owner, link) => {
@@ -97,7 +98,7 @@ export function updateLinks(
 ): boolean {
   let touched = restage;
   for (const link of links) {
-    const copying = build.options.copy || item.copy === true;
+    const copying = link.render !== undefined || build.options.copy || item.copy === true;
     const correct = inPlace(state?.links[link.relative], copying, link.from);
     const prior = previous?.links.find((old) => old.path === link.relative);
     if (keepsEditedCopy(prior, state, build)) continue;
@@ -114,6 +115,7 @@ export function updateLinks(
         plugin: link.shared === true,
         ...(link.content === undefined ? {} : { content: link.content }),
         ...(link.fan === true ? { fan: true } : {}),
+        ...(link.render === undefined ? {} : { render: link.render }),
         ...(recorded === undefined ? {} : { recorded }),
       });
       touched = true;

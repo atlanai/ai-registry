@@ -94,7 +94,7 @@ describe("multiselect keys", () => {
     expect(value).toEqual(["api-design"]);
   });
 
-  it("lists Select all and a divider above the tree, group hints in a column, and space on it takes all", async () => {
+  it("lists Select all, with no count of its own, and a divider above the tree, group hints in a column, and space on it takes all", async () => {
     const groupHints = new Map([
       ["engineering", "2 skills, 1 agent"],
       ["frontend", "1 skill"],
@@ -102,7 +102,7 @@ describe("multiselect keys", () => {
     const options = { choices: tree, groups: true, collapsed: true, selectAll: true, groupHints };
     const opened = await frameAfter(options, []);
     expect(opened.slice(2, 6)).toEqual([
-      "│   ○ Select all (0/2)",
+      "│   ○ Select all",
       "│   ────────────────────────",
       "│ ❯ ▸ ○ engineering  2 skills, 1 agent",
       "│   ▸ ○ frontend     1 skill",
@@ -110,9 +110,15 @@ describe("multiselect keys", () => {
     const term = terminal(40, 80);
     const run = multiselect({ message: "Pick", style, ...options }, term.io);
     await term.press(space, up);
-    expect(term.screen()[2]).toBe("│ ❯ ◐ Select all (1/2)");
+    expect(term.screen()[2]).toBe("│ ❯ ◐ Select all");
     await term.press(space, enter);
     expect(await run).toEqual(tree.map((choice) => choice.value));
+  });
+
+  it("marks Select all partial when only part of one heading is picked", async () => {
+    const options = { choices: tree, groups: true, selectAll: true };
+    const frame = await frameAfter(options, [down, space]);
+    expect(frame[2]).toBe("│   ◐ Select all");
   });
 
   it("ignores other letters, and a where select-all is off", async () => {
@@ -163,17 +169,30 @@ describe("multiselect groups that stand for a plugin", () => {
     expect(value).toEqual(["acme-api"]);
   });
 
-  it("drops the plugin when a leaf inside it is picked instead", async () => {
+  it("leaves a leaf out of a whole plugin by picking the rest by name", async () => {
     const { value } = await answer({ choices, groups: true, groupValues: values }, [
       space,
       down,
       space,
       enter,
     ]);
-    expect(value).toEqual(["api-design"]);
+    expect(value).toEqual(["api-review"]);
   });
 
-  it("takes every kind from a section heading, dropping the plugin", async () => {
+  it("shows a whole plugin's leaves as picked, and a partial one as some", async () => {
+    const whole = await frameAfter({ choices, groups: true, groupValues: values }, [space]);
+    expect(whole.join("\n")).toMatch(/● api-design/);
+    const part = await frameAfter({ choices, groups: true, groupValues: values, detail: true }, [
+      space,
+      down,
+      space,
+      up,
+    ]);
+    expect(part.join("\n")).toMatch(/◐ acme-api/);
+    expect(part.join("\n")).toContain("1 of 2 in acme-api. New ones won't be added.");
+  });
+
+  it("leaves a whole section out of a whole plugin, picking the other kinds by name", async () => {
     const core = new Map([["acme-core", "acme-core"]]);
     const { value } = await answer({ choices: nested, groups: true, groupValues: core }, [
       space,
@@ -181,7 +200,7 @@ describe("multiselect groups that stand for a plugin", () => {
       space,
       enter,
     ]);
-    expect(value).toEqual(["debug", "ship"]);
+    expect(value).toEqual(["adr"]);
   });
 
   it("clears a section that is already full", async () => {
@@ -342,5 +361,25 @@ describe("sequential prompts", () => {
     expect(await second).toEqual(["api-review"]);
     expect(term.screen()).toEqual(["◇  One  api-design", "◇  Two  api-review"]);
     expect(term.input.raw).toBe(false);
+  });
+});
+
+describe("multiselect focus hint", () => {
+  const tools: Choice<string>[] = [
+    { value: "claude", label: "Claude Code" },
+    { value: "codex", label: "Codex" },
+  ];
+  const focusHint = (value: string, picked: ReadonlySet<string>) =>
+    `${value} with ${[...picked].join("+") || "none"}`;
+
+  it("shows on the highlighted row alone, lined up after the longest name", async () => {
+    const frame = await frameAfter({ choices: tools, focusHint }, [down]);
+    expect(frame).toContain("│   ○ Claude Code");
+    expect(frame).toContain("│ ❯ ○ Codex        codex with none");
+  });
+
+  it("follows what is picked so far", async () => {
+    const frame = await frameAfter({ choices: tools, focusHint }, [space, down]);
+    expect(frame.join("\n")).toContain("codex with claude");
   });
 });

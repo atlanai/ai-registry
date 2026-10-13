@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import { isAdapterError, type Want } from "#adapter/index.ts";
 import { list, quoted, sanitizeText } from "#adapter/text.ts";
+import { loadAdapter } from "#core/adapter/registry.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
@@ -21,6 +22,7 @@ import { build, clashMessage } from "#core/plan/build.ts";
 import { formatNeed, type Unresolved, wantOf } from "#core/plan/depends.ts";
 import type { Acquired, Action, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
+import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
 import { survey } from "#core/plan/survey.ts";
 import { blockedTargets } from "#core/plan/writable.ts";
 import { unmetEngine } from "#core/semver.ts";
@@ -161,6 +163,9 @@ export interface RunResult {
   applied: ApplyResult | undefined;
   /** The lockfile as the run found it, so a report can say what moved. */
   before: Lock;
+  /** The harnesses this run installed for, so a report names them as they were chosen. */
+  targets: readonly string[];
+  harnesses: Harnesses;
 }
 
 export interface RunHooks {
@@ -183,12 +188,18 @@ export interface RunHooks {
   adding?: ReadonlySet<string>;
 }
 
+/** The harnesses a run installs for, so a report can name them as they were chosen. */
+export interface Chosen {
+  targets: readonly string[];
+  harnesses: Harnesses;
+}
+
 /** How a run is shown, which the caller decides: the engine only says what happens. */
 export interface PlanReport {
   /** The whole plan, for a dry run, and the paths a real run would move to backups. */
-  plan(plan: Plan, roots: Roots, aside: ReadonlySet<string>): void;
+  plan(plan: Plan, roots: Roots, aside: ReadonlySet<string>, chosen: Chosen): void;
   /** Each action as apply reaches it. */
-  step(action: Action): void;
+  step(action: Action, plan: Plan, chosen: Chosen): void;
 }
 
 /** The single install path: `add`, `update` and `remove` differ only in `edit`. */
@@ -377,7 +388,14 @@ async function plan(
   for (const alias of hooks.aliases ?? aliases) {
     if (view.rows(alias).some(([name]) => moving.has(name))) continue;
     const source = view.source(alias);
-    if (source !== undefined && answers(manifest, source, hooks.held)) settled.set(alias, source);
+    if (source === undefined || !answers(manifest, source, hooks.held)) continue;
+    // Only user scope wraps; an adapter that will not load leaves its rows as the lock has them.
+    const namespacePlugins =
+      roots.scope === "user" &&
+      (await loadAdapter(source.origin.adapter).then(wrapsNamespaces, () =>
+        wrappedInLock(view.rows(alias), { roots, harnesses }),
+      ));
+    settled.set(alias, { ...source, namespacePlugins });
   }
   // Only a registry being opened needs its account, which may refresh a token.
   const open = async (only: readonly string[]) =>
@@ -455,7 +473,11 @@ export function recoveredNotices(roots: Roots, recovered: Recovered): ApplyNotic
   }));
 }
 
-export function appliedNotices(roots: Roots, applied: ApplyResult): ApplyNotice[] {
+export function appliedNotices(
+  roots: Roots,
+  applied: ApplyResult,
+  harnesses: Harnesses,
+): ApplyNotice[] {
   const notices: ApplyNotice[] = applied.backedUp.map((moved) => ({
     message: `Moved your ${moved.what} ${displayPath(roots, moved.path)} to ${displayPath(roots, moved.to)}.`,
   }));
@@ -473,7 +495,16 @@ export function appliedNotices(roots: Roots, applied: ApplyResult): ApplyNotice[
           : `Did not install ${name} at ${displayPath(roots, path)}: ${sanitizeText(reason)}.`,
     });
   }
+  for (const { name, harness, reason } of applied.unrendered) {
+    notices.push({
+      message: `Did not install ${name} for ${displayName(harnesses, harness)}: ${reason}.`,
+    });
+  }
   return notices;
+}
+
+function displayName(harnesses: Harnesses, harness: string): string {
+  return harnesses[harness]?.displayName ?? harness;
 }
 
 export function unstagedNotices(unstaged: Readonly<ApplyResult["unstaged"]>): ApplyNotice[] {
@@ -548,6 +579,13 @@ async function write(
   warn(printer, recoveredNotices(roots, await prepareWrite(loaded)));
 
   const targets = resolveTargets(manifest, harnesses, common);
+  // Reports name every tool picked, including those an entry's own `harnesses:` adds.
+  const named = [
+    ...new Set([
+      ...targets,
+      ...manifest.artifacts.flatMap((ref) => ref.targets ?? []).filter((name) => name in harnesses),
+    ]),
+  ];
   const { planned, acquired } = await plan(loaded, common, printer, cwd, hooks, targets);
   try {
     refuseClash(planned, hooks.adding);
@@ -566,14 +604,14 @@ async function write(
       const aside = new Set(
         [...guards].flatMap(([path, guard]) => (guard === "backup" ? [path] : [])),
       );
-      report.plan(planned, roots, aside);
-      return { plan: planned, applied: undefined, before: lock };
+      report.plan(planned, roots, aside, { targets: named, harnesses });
+      return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
     }
 
     await refuseBlocked(planned);
 
-    if (hooks.approve !== undefined && !(await hooks.approve(planned, targets))) {
-      return { plan: planned, applied: undefined, before: lock };
+    if (hooks.approve !== undefined && !(await hooks.approve(planned, named))) {
+      return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
     }
 
     const edited = formatManifest(manifest) !== loaded.manifestAsRead;
@@ -585,7 +623,7 @@ async function write(
       planned,
       acquired,
       targets,
-      (action) => report.step(action),
+      (action) => report.step(action, planned, { targets: named, harnesses }),
       async () => {
         // Nothing was recorded, so the manifest must not ask for it.
         if (edited && (await unrecorded(roots, lock)))
@@ -593,14 +631,14 @@ async function write(
       },
     );
 
-    warn(printer, appliedNotices(roots, applied));
+    warn(printer, appliedNotices(roots, applied, harnesses));
 
     const landed = applied.installed.length > 0;
     // An edit none of whose artifacts landed must not leave the manifest asking for them.
     if (edited && !landed && applied.unstaged.length > 0)
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
-    return { plan: planned, applied, before: lock };
+    return { plan: planned, applied, before: lock, targets: named, harnesses };
   } finally {
     await closeAll(acquired);
   }

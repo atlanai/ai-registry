@@ -3,7 +3,7 @@ import type { LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
 import type { Closure } from "#core/plan/depends.ts";
 import type { Acquired, Selected } from "#core/plan/model.ts";
-import { type NamespaceWant, namespaceOf } from "#core/plan/projection.ts";
+import { type NamespaceWant, namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
 import { addressOf } from "#core/plan/select.ts";
 import type { BuildState } from "./state.ts";
 
@@ -69,6 +69,7 @@ export function namespaceWants(
   const wants: NamespaceWant[] = [];
   for (const item of selected) {
     if (carried.has(item.name)) continue;
+    if (item.kind !== "plugin" && !build.wrapping.has(item.source)) continue;
     const namespace = namespaceOf(item);
     for (const harness of item.targets ?? build.options.targets) {
       wants.push({ harness, namespace, source: item.source });
@@ -81,7 +82,13 @@ export function namespaceWants(
       group: entry.namespace,
       source: entry.registry,
     });
-    for (const harness of new Set(entry.links.map((link) => link.harness))) {
+    // An unread registry's adapter is not loaded: where its rows' links sit says whether it wraps.
+    const holding = entry.links.filter(
+      (link) =>
+        entry.kind === "plugin" ||
+        pluginLinkAt(link, namespace, entry.registry, build.options) !== undefined,
+    );
+    for (const harness of new Set(holding.map((link) => link.harness))) {
       wants.push({ harness, namespace, source: entry.registry });
     }
   }

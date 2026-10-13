@@ -7,8 +7,16 @@ import type { Manifest } from "#core/manifest.ts";
 import { type BuildOptions, build } from "#core/plan/build.ts";
 import type { Acquired, Action } from "#core/plan/model.ts";
 import { projectionDir, roots } from "#core/store/paths.ts";
-import { acquired, entry, kitManifest, linksTo, PLAN_OPTIONS } from "#test/kit/builders/plan.ts";
+import {
+  acquired,
+  entry,
+  kitManifest,
+  linksTo,
+  PLAN_OPTIONS,
+  wrapping,
+} from "#test/kit/builders/plan.ts";
 
+// Both sources declare each namespace a plugin, which is what makes two of them share a directory.
 describe("two registries with a namespace of the same name", () => {
   const USER = roots("user", "/work");
   const home = homedir();
@@ -16,9 +24,9 @@ describe("two registries with a namespace of the same name", () => {
   const claudeSkills = (name: string) => join(home, ".claude", "skills", name);
 
   function source(alias: "kit" | "far", skill: string): Acquired {
-    const [base] = acquired([
-      entry({ name: skill, path: `engineering/skills/${skill}`, group: "engineering" }),
-    ]);
+    const [base] = wrapping(
+      acquired([entry({ name: skill, path: `engineering/skills/${skill}`, group: "engineering" })]),
+    );
     if (base === undefined) throw new Error("no source");
     const location = `https://github.com/acme/${alias}.git`;
     return {

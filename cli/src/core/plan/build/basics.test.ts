@@ -19,6 +19,7 @@ import {
   SYNCED,
 } from "#test/kit/builders/plan.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { withoutKind } from "#test/kit/harness.ts";
 
 describe("build", () => {
   test("stages and links on a fresh install", () => {
@@ -525,8 +526,11 @@ describe("build", () => {
       emptyLock(),
       acquired([entry({ kind: "agent" })]),
       { artifacts: {} },
-      // Codex reads agents written in its own format, so a markdown agent has nowhere to go.
-      { ...PLAN_OPTIONS, targets: ["codex"] },
+      {
+        ...PLAN_OPTIONS,
+        targets: ["codex"],
+        harnesses: withoutKind(PLAN_OPTIONS.harnesses, "codex", "agent"),
+      },
     );
     expect(plan.actions.filter((a) => a.kind === "link")).toHaveLength(0);
     expect(plan.warnings.some((w) => /Codex cannot load agents/.test(w.message))).toBe(true);

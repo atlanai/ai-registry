@@ -23,10 +23,10 @@ describe("placementFor", () => {
     expect(place("skill", selected)).toEqual({ targets, unreadable: [] });
   });
 
-  it("skips a tool that cannot read a kind, and still places it for the rest", () => {
+  it("places an agent in each tool's own folder", () => {
     expect(place("agent", ["claude", "codex"])).toEqual({
-      targets: ["claude"],
-      unreadable: ["codex"],
+      targets: ["claude", "codex"],
+      unreadable: [],
     });
   });
 
@@ -50,6 +50,6 @@ describe("built-in reads", () => {
   it("defaults a tool with no reads to its own folder", () => {
     const table = resolveHarnesses();
     expect(readsFor(table, "claude", "skill")).toEqual(["claude"]);
-    expect(readsFor(table, "codex", "agent")).toEqual([]);
+    expect(readsFor(table, "codex", "agent")).toEqual(["codex"]);
   });
 });

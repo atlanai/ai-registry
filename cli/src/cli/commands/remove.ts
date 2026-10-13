@@ -12,6 +12,7 @@ import {
 } from "#cli/prompt/flow.ts";
 import { canceled, defaultIo } from "#cli/prompt/index.ts";
 import { planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
+import { loadedBy, toolName } from "#cli/render/tools.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import type { Lock } from "#core/lock.ts";
@@ -20,7 +21,7 @@ import { editedAnywhere } from "#core/plan/model.ts";
 import { survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
-import { load, run as runPipeline } from "#engine/pipeline.ts";
+import { load, resolveTargets, run as runPipeline } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
 /**
@@ -110,7 +111,12 @@ export async function run(context: CommandContext): Promise<void> {
           name,
           kind: entry?.kind ?? "",
           source: entry?.registry ?? "",
-          targets: (entry?.links ?? []).map((linked) => linked.harness).sort(),
+          targets: loadedBy(
+            loaded.harnesses,
+            resolveTargets(loaded.manifest, loaded.harnesses, common),
+            entry?.kind,
+            (entry?.links ?? []).map((linked) => linked.harness),
+          ).map((name) => toolName(loaded.harnesses, name)),
         };
       }),
     );
@@ -158,7 +164,11 @@ export async function run(context: CommandContext): Promise<void> {
         held: true,
         discard: new Set(edited),
         approve: async (plan, targets) => {
-          approved = await confirmPlan(step, plan, { targets, harnesses: fresh.harnesses });
+          approved = await confirmPlan(step, plan, {
+            verb: "Remove",
+            targets,
+            harnesses: fresh.harnesses,
+          });
           return approved;
         },
       };

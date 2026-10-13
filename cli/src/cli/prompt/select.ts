@@ -16,6 +16,8 @@ interface Option<T> {
   label: string;
   /** Why someone would pick this one. Shown beside the label. */
   hint?: string | undefined;
+  /** Shown as the answer once chosen, when the label carries more, such as "(recommended)". */
+  answer?: string | undefined;
   /** A letter that moves to this option, so `n` then enter answers No. */
   key?: string | undefined;
 }
@@ -26,6 +28,8 @@ export interface SelectOptions<T> {
   style: Styler;
   /** Pre-selected value; the first option when it matches nothing. */
   initial?: T | undefined;
+  /** What the question is about, under its title; kept under the answer once given. */
+  body?: readonly string[] | undefined;
 }
 
 /** One answer from a short list; the cursor is the answer, so it wraps at either end. */
@@ -68,8 +72,12 @@ class Choosing<T> implements Machine<T> {
     const { style, message, options } = this.options;
     if (this.ended === "cancel")
       return [titleLine(style, "cancel", message, style.dim("canceled"))];
+    const body = (this.options.body ?? []).map((line) => railLine(style, line));
     if (this.ended === "submit") {
-      return [titleLine(style, "submit", message, style.dim(options[this.cursor]?.label ?? ""))];
+      return [
+        titleLine(style, "submit", message, style.dim(answerOf(options[this.cursor]))),
+        ...body,
+      ];
     }
     const letters = options.flatMap((option) => (option.key === undefined ? [] : [option.key]));
     const keys =
@@ -80,7 +88,7 @@ class Choosing<T> implements Machine<T> {
     const widest = Math.max(...options.map((option) => displayWidth(option.label)));
     return [
       titleLine(style, "active", message),
-      railLine(style),
+      ...(body.length > 0 ? [...body, railLine(style)] : [railLine(style)]),
       ...options.map((option, index) => {
         const on = index === this.cursor;
         const radio = on ? style.green(GLYPH.bullet) : style.dim(GLYPH.hollow);
@@ -95,6 +103,10 @@ class Choosing<T> implements Machine<T> {
   }
 }
 
+function answerOf<T>(option: Option<T> | undefined): string {
+  return option?.answer ?? option?.label ?? "";
+}
+
 export async function select<T>(options: SelectOptions<T>, io: PromptIo): Promise<T | Canceled> {
   return await ask(io, new Choosing(options));
 }
@@ -103,6 +115,7 @@ export interface ConfirmOptions {
   message: string;
   style: Styler;
   initial?: boolean | undefined;
+  body?: readonly string[] | undefined;
 }
 
 /** Yes/no as a two-option select, so it looks and steers like every other prompt. */
@@ -112,6 +125,7 @@ export async function confirm(options: ConfirmOptions, io: PromptIo): Promise<bo
       message: options.message,
       style: options.style,
       initial: options.initial ?? true,
+      body: options.body,
       options: [
         { value: true, label: "Yes", key: "y" },
         { value: false, label: "No", key: "n" },

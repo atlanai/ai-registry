@@ -18,9 +18,11 @@ import {
   plan,
   readPublished,
   releaseSubject,
+  writableRegistries,
 } from "#cli/publish/target.ts";
 import { changedSince, edited, fromArgs, type Work } from "#cli/publish/work.ts";
 import { chooseRegistry, knownIn, knownRegistries } from "#cli/registries.ts";
+import { underHome } from "#cli/render/home.ts";
 import { noteUserScope } from "#cli/render/where.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
@@ -229,23 +231,43 @@ async function review(
   asks: (alias: string) => Promise<boolean>,
 ): Promise<Sending | undefined> {
   const printer = context.printer;
+  const lines: string[] = [];
   for (const alias of new Set(planned.map((entry) => entry.alias))) {
     const { location } = await open(alias);
-    printer.info(location === alias ? alias : `${alias}  ${printer.style.dim(location)}`);
+    lines.push(
+      location === alias ? underHome(alias) : `${alias}  ${printer.style.dim(underHome(location))}`,
+    );
     for (const { item } of planned.filter((entry) => entry.alias === alias))
-      printer.info(describe(item));
+      lines.push(describe(item));
   }
+  const print = () => {
+    for (const line of lines) printer.info(line);
+  };
   const sending = planned.filter(({ item }) => !item.same);
   if (sending.length === 0) {
+    print();
     printer.info(printer.style.dim("Nothing new to publish."));
     return undefined;
   }
-  if (dryRun) return undefined;
-  if (!interactive(step)) return sending;
+  if (dryRun || !interactive(step)) {
+    print();
+    return dryRun ? undefined : sending;
+  }
   // A source that asks why the change was made asks that instead; canceling it still sends nothing.
   const asking = await Promise.all([...new Set(sending.map((entry) => entry.alias))].map(asks));
-  if (asking.every(Boolean)) return sending;
-  const proceed = await confirm({ message: "Publish?", style: printer.errStyle }, step.io);
+  if (asking.every(Boolean)) {
+    print();
+    return sending;
+  }
+  // The plan is the question's body, so it reads as one step, as `add` and `remove` do.
+  const proceed = await confirm(
+    {
+      message: `Publish ${plural(sending.length, "artifact")}?`,
+      style: printer.errStyle,
+      body: lines.map((line) => line.trimStart()),
+    },
+    step.io,
+  );
   if (!canceled(proceed) && proceed) return sending;
   printer.info("Canceled. Nothing was published.");
   return undefined;
@@ -310,7 +332,12 @@ async function sendTo(
   let message = options.message ?? subjectOf(items);
   if (options.asked) {
     const typed = await text(
-      { message: "What changed?", style: printer.errStyle, initial: message },
+      {
+        message: "What changed?",
+        style: printer.errStyle,
+        initial: message,
+        hint: "Type what changed, or press Enter to use this message.",
+      },
       step.io,
     );
     if (canceled(typed)) return "canceled";
@@ -350,6 +377,7 @@ export async function run(context: CommandContext): Promise<void> {
       knownIn(loaded.roots.scope),
     );
   }
+  const targets = to === undefined ? await writableRegistries(known, context.cwd) : known;
 
   const since = own["changed-since"];
   const keep = async (found: Work[]) =>
@@ -395,7 +423,7 @@ export async function run(context: CommandContext): Promise<void> {
     const fallback = declared === undefined ? undefined : parseTo(declared);
     const saved =
       fallback !== undefined && known[fallback.registry] !== undefined ? fallback : undefined;
-    const where = await destinationOf(step, works, known, to, open, saved);
+    const where = await destinationOf(step, works, targets, to, open, saved);
     if (where === undefined) return printer.info("Canceled. Nothing was published.");
 
     const planned = await planAll(

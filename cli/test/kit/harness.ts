@@ -1,12 +1,21 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { KIND_SPECS } from "#core/kinds.ts";
+import type { Harnesses } from "#core/harness/index.ts";
+import { type ArtifactKind, KIND_SPECS } from "#core/kinds.ts";
 import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
 
 /** Which harnesses a machine has varies, so every root the CLI may write is searched. */
 export const HARNESS_ROOTS: readonly string[] = BUILTIN_HARNESSES.map(
   (harness) => harness.roots.project,
 );
+
+/** The table with one harness given no place for a kind, as a harness without that kind is. */
+export function withoutKind(harnesses: Harnesses, name: string, kind: ArtifactKind): Harnesses {
+  const target = harnesses[name];
+  if (target === undefined) return harnesses;
+  const { [kind]: _dropped, ...kinds } = target.kinds;
+  return { ...harnesses, [name]: { ...target, kinds } };
+}
 
 /**
  * Where a skill is projected under `root`: inside the plugin its namespace

@@ -132,8 +132,7 @@ describe("the git route, end to end", () => {
             .map((entry) => join(entry.parentPath, entry.name).slice(home.length + 1))
         : [],
     );
-    expect(left).toEqual([join(".codex", "config.toml")]);
-    expect(await readFile(join(home, ".codex", "config.toml"), "utf8")).toBe("");
+    expect(left).toEqual([]);
   }, 60_000);
 
   test("sync reports a conflict, and never merges it", async ({ aireg, git, tmp }) => {

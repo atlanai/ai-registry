@@ -574,13 +574,18 @@ export function coveredByWhole(ref: Ref, artifacts: readonly Ref[]): boolean {
   );
 }
 
-/** Whether the manifest asks for this row itself, rather than for something that needs it. */
-export function asksFor(manifest: Manifest, row: Pinnable): boolean {
-  return manifest.artifacts.some(
+/** The manifest entries that ask for this row, leaving out any that exclude it. */
+export function askingFor(manifest: Manifest, row: Pinnable): Ref[] {
+  return manifest.artifacts.filter(
     (ref) =>
       reaches(ref, row) &&
       !(ref.exclude ?? []).includes(
         relativeTo(ref, { namespace: row.namespace, kind: row.kind, name: sanitizeName(row.name) }),
       ),
   );
+}
+
+/** Whether the manifest asks for this row itself, rather than for something that needs it. */
+export function asksFor(manifest: Manifest, row: Pinnable): boolean {
+  return askingFor(manifest, row).length > 0;
 }

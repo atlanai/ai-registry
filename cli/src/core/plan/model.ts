@@ -3,6 +3,7 @@ import { quoted } from "#adapter/text.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import type { Render } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
@@ -44,6 +45,8 @@ export interface Acquired {
   /** Keyed by catalog entry path. */
   placements: Map<string, Placement>;
   catalog: Catalog;
+  /** Its adapter declares each namespace a plugin. Absent is off. */
+  namespacePlugins?: boolean;
   /** An entry's content on disk, and the identity the store keyed it by. */
   content: (entryPath: string) => Promise<Staged>;
   /** Releases whatever the adapter opened. */
@@ -126,6 +129,8 @@ export type Action =
       recorded?: LinkMode;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
+      /** Written in the harness's own format. */
+      render?: Render;
     }
   | {
       kind: "unlink";

@@ -14,7 +14,7 @@ const fake = vi.hoisted(() => ({
 
 vi.mock("#core/adapter/source.ts", () => ({
   connectSource: async ({ alias }: { alias: string }) => ({
-    adapter: { id: "fake" },
+    adapter: { id: "fake", capabilities: {} },
     handle: { alias, close: async () => void fake.closed.add(alias) },
     key: alias,
   }),

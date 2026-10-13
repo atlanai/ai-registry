@@ -52,11 +52,13 @@ A harness is a coding agent that aireg installs into. aireg knows four:
 | `claude` | Claude Code |
 | `codex` | Codex |
 | `cursor` | Cursor |
-| `agents` | The shared `.agents` folder, which several coding agents read |
+| `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
 
-In a project, aireg links each artifact into the folder its harness reads, such as `.claude/skills/`. Codex reads a project's skills from `.agents/skills/`.
+aireg links each artifact into the folder its harness reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`.
 
-In your user scope, Claude Code and Codex each get a namespace as one plugin: Claude Code in `~/.claude/skills/<namespace>/`, and Codex in `~/.codex/plugins/cache/<registry>/<namespace>/local`, which aireg turns on in `~/.codex/config.toml`. Cursor and the shared `.agents` folder get a link for each artifact in a folder they read. Codex doesn't take agents.
+Codex reads agents only as TOML, so aireg writes each one as a file, never a link: `.codex/agents/<name>.toml`, or `$CODEX_HOME/agents/` (default `~/.codex/agents/`) in your user scope. It holds the agent's `name`, `description` and body, as `developer_instructions`; other front matter is left out. Codex loads a project's agents only in a project it trusts.
+
+A plugin installs as one plugin in your user scope: Claude Code in `~/.claude/skills/<plugin>/`, and Codex in `~/.codex/plugins/cache/<registry>/<plugin>/local`, which aireg turns on in `~/.codex/config.toml`. The same goes for each namespace of a registry whose adapter declares its namespaces plugins (`namespacePlugins` in the [adapter contract](adapter.md#the-adapter-contract)). Cursor and the shared `.agents` folder get a link for each artifact in a folder they read.
 
 aireg installs into the harnesses named by `--for`. Without it, aireg uses the `harnesses:` list in the scope's manifest, and without that, `claude` and `codex`. Run [`aireg harnesses`](harnesses.md) to see which ones this machine has.
 

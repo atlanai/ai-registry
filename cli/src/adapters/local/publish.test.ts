@@ -165,6 +165,17 @@ describe("writeOffer", () => {
     );
   });
 
+  test("refuses the whole offer, writing nothing, when one change has no place", async () => {
+    const placeless = offer({ name: "fresh", namespace: undefined });
+    await expect(writeOffer(root, [offer(), placeless], "x", alone)).rejects.toThrow(
+      /fresh has no namespace or version/,
+    );
+    await expect(
+      readFile(join(root, "artifacts/house/skill/lint/versions.json")),
+    ).rejects.toThrow();
+    await expect(readFile(join(root, "index.json"))).rejects.toThrow();
+  });
+
   test("refuses a segment Windows reserves for a device", async () => {
     for (const change of [{ name: "con" }, { namespace: "aux" }, { name: "lpt9" }]) {
       await expect(writeOffer(root, [offer(change)], "x", alone)).rejects.toThrow(

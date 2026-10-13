@@ -50,6 +50,6 @@ $ aireg add kit --all -y
 $ aireg list
 2 installed in this project
   artifact  kind   version  from  harnesses
-  deploy    skill  1.0.0    kit   agents, claude
-  lint      skill  1.0.0    kit   agents, claude
+  deploy    skill  1.0.0    kit   Claude Code, Codex
+  lint      skill  1.0.0    kit   Claude Code, Codex
 ```

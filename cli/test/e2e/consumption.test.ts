@@ -225,7 +225,11 @@ describe("a folder of yours where a link would go", () => {
     expect(added.stderr).toMatch(/already holds something of yours/);
     const seen = await run(["status"]);
     expect(seen.code).toBe(3);
-    expect(seen.stdout).toMatch(/claude: something of yours is at \.claude\/skills\/lint/);
+    expect(seen.stdout).toMatch(/missing +something of yours is at \.claude\/skills\/lint/);
+    const json = JSON.parse((await run(["status", "--json"])).stdout);
+    expect(json.data.artifacts[0].detail).toBe(
+      "claude: something of yours is at .claude/skills/lint",
+    );
     expect(await readFile(join(blocked(), ".claude", "skills", "lint", "SKILL.md"), "utf8")).toBe(
       "mine\n",
     );

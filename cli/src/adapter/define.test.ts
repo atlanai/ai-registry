@@ -23,6 +23,7 @@ describe("defineAdapter", () => {
       auth: false,
       messages: false,
       fileSpec: false,
+      namespacePlugins: false,
     });
   });
 

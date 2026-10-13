@@ -69,6 +69,10 @@ function mappingProblems(kind: string, mapping: KindMapping, report: (problem: s
   for (const entry of mapping.register ?? []) {
     registerProblems(kind, entry, usable, report);
   }
+  // Written unquoted, so each key must be a bare one.
+  for (const key of [...(mapping.render?.fields ?? []), mapping.render?.body ?? "body"]) {
+    if (!/^[A-Za-z0-9_-]+$/.test(key)) report(`${kind} renders ${key}, which is not a bare key.`);
+  }
 }
 
 function registerProblems(

@@ -4,6 +4,7 @@ import { noArguments, parse } from "#cli/options.ts";
 import { underHome } from "#cli/render/home.ts";
 import { installed } from "#cli/render/installed.ts";
 import { renderStatus } from "#cli/render/status.ts";
+import { chosenFor, scopeTargets, toolName } from "#cli/render/tools.ts";
 import { ExitCode } from "#core/errors.ts";
 import { names } from "#core/harness/index.ts";
 import { type Lock, readLock } from "#core/lock.ts";
@@ -83,7 +84,14 @@ export async function run(context: CommandContext): Promise<void> {
       },
     });
   } else {
-    renderStatus(context.printer, statuses, rows, roots.scope);
+    const scope = scopeTargets(manifest, harnesses);
+    renderStatus(context.printer, statuses, rows, roots.scope, {
+      harnesses,
+      for: (name) => {
+        const entry = lock.artifacts[name];
+        return entry === undefined ? scope : chosenFor(manifest, scope, entry);
+      },
+    });
     for (const name of clashes) {
       context.printer.warning(
         `${name} is also installed in your user scope, and your harness decides which one it loads.`,
@@ -97,7 +105,11 @@ export async function run(context: CommandContext): Promise<void> {
         [
           { header: "artifact", value: (item: Unmanaged) => item.name },
           { header: "kind", value: (item: Unmanaged) => item.kind },
-          { header: "harness", value: (item: Unmanaged) => item.harnesses.join(", ") },
+          {
+            header: "harness",
+            value: (item: Unmanaged) =>
+              item.harnesses.map((name) => toolName(harnesses, name)).join(", "),
+          },
           { header: "path", value: (item: Unmanaged) => shown(roots, item.path) },
         ],
         loose,

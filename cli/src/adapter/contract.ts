@@ -105,6 +105,11 @@ export interface Capabilities {
   messages?: boolean;
   /** `publish` writes the file spec's own layout, so an agent travels as its folder's `AGENT.md`. */
   fileSpec?: boolean;
+  /**
+   * Each namespace the source lists is one plugin: at user scope, a harness that loads plugins
+   * gets the namespace as one, named after it, rather than each artifact on its own.
+   */
+  namespacePlugins?: boolean;
 }
 
 /** Whether an adapter has a sign-in: its `auth.login`, which `capabilities.auth` must declare. */
@@ -122,6 +127,7 @@ export function advertisedCapabilities(
     auth: capabilities?.auth === true,
     messages: capabilities?.messages === true,
     fileSpec: capabilities?.fileSpec === true,
+    namespacePlugins: capabilities?.namespacePlugins === true,
   };
 }
 

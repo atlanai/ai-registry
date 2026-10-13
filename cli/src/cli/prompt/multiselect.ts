@@ -39,6 +39,8 @@ export interface MultiselectOptions<T> {
   /** Shown dim beside a group's name, such as what kinds it holds. */
   groupHints?: ReadonlyMap<string, string> | undefined;
   collapsed?: boolean | undefined;
+  /** Shown dim beside the highlighted row alone, from what is picked so far; no other row has one. */
+  focusHint?: ((value: T, picked: ReadonlySet<T>) => string) | undefined;
   detail?: boolean | undefined;
   detailLines?: number | undefined;
   maxVisible?: number | undefined;
@@ -217,10 +219,22 @@ class Picking<T> implements Machine<T[]> {
     );
   }
 
+  private leafWidth(): number {
+    return Math.max(
+      0,
+      ...this.top.map((node) => (node.kind === "leaf" ? displayWidth(node.choice.label) : 0)),
+    );
+  }
+
   private allBody(on: boolean): string {
-    const full = this.top.filter((node) => this.selection.fill(node) === "all").length;
-    const fill: Fill = full === 0 ? "none" : full === this.top.length ? "all" : "some";
-    const label = `Select all (${full}/${this.top.length})`;
+    const fills = this.top.map((node) => this.selection.fill(node));
+    const fill: Fill = fills.every((each) => each === "all")
+      ? "all"
+      : fills.some((each) => each !== "none")
+        ? "some"
+        : "none";
+    // The title already counts what is selected, in the same units the tree picks.
+    const label = "Select all";
     return `${this.radio(fill)} ${on ? this.options.style.cyan(label) : label}`;
   }
 
@@ -241,12 +255,19 @@ class Picking<T> implements Machine<T[]> {
     }
     const { choice, depth } = node;
     const twig = depth === 0 ? "" : style.dim(node.last ? GLYPH.twigLast : GLYPH.twig);
+    const label = on ? style.cyan(choice.label) : choice.label;
+    const { focusHint } = this.options;
+    if (focusHint !== undefined) {
+      const text = on ? focusHint(choice.value, this.selection.picked) : "";
+      // Lined up after the longest name, so the highlighted row's hint never jumps sideways.
+      const pad = " ".repeat(this.leafWidth() - displayWidth(choice.label) + 2);
+      return `${" ".repeat(depth * 2)}${twig}${radio} ${label}${text === "" ? "" : `${pad}${style.dim(text)}`}`;
+    }
     // Under a section the kind is the heading, so a hint would repeat it.
     const hint =
       choice.hint !== undefined && choice.hint !== "" && node.parent?.kind !== "section"
         ? style.dim(` ${choice.hint}`)
         : "";
-    const label = on ? style.cyan(choice.label) : choice.label;
     return `${" ".repeat(depth * 2)}${twig}${radio} ${label}${hint}`;
   }
 
@@ -271,6 +292,10 @@ class Picking<T> implements Machine<T[]> {
     const count = node.leaves.length;
     if (node.kind === "section") {
       return `Every ${node.label} artifact in ${node.group}: ${count} in all.`;
+    }
+    if (this.selection.fill(node) === "some") {
+      const taken = node.leaves.filter((choice) => this.selection.picked.has(choice.value)).length;
+      return `${taken} of ${count} in ${node.label}. New ones won't be added.`;
     }
     return (
       this.options.groupDetails?.get(node.label) ??

@@ -58,7 +58,9 @@ describe("init", () => {
       err: { write: () => true, isTTY: false },
     });
     await run({ ...context(cwd, ["--for", "claude,codex"], writes), printer });
-    expect(writes.join("")).toContain("Installs for claude and codex, into .agents and .claude.");
+    expect(writes.join("")).toContain(
+      "Installs for claude and codex, into .agents, .claude and .codex.",
+    );
   });
 
   test("writes the manifest with the harnesses it chose and nothing else", async () => {

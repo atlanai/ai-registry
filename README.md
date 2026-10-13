@@ -24,6 +24,14 @@ An agent registry stores your organization's AI artifacts and manages their life
 
 The easiest way to get started is to follow the [Quickstart](https://atlanai.github.io/ai-registry/quickstart/).
 
+To have your coding agent set up ai-registry for you, paste this prompt into Claude Code, Codex or Cursor:
+
+```text
+Set me up with ai-registry: https://github.com/atlanai/ai-registry
+```
+
+The agent follows the setup skill in this repository, [`skills/ai-registry/SKILL.md`](skills/ai-registry/SKILL.md). It asks before it installs aireg and the aireg skills, offers to try the example registry, then helps you set up a registry for yourself or your team. [The use cases](skills/ai-registry/references/use-cases.md) have more prompts to try, from your own coding agents to a whole team.
+
 Install the aireg CLI on macOS or Linux:
 
 ```sh

@@ -1,3 +1,4 @@
+import { chosenFor, loadedBy, scopeTargets, toolName } from "#cli/render/tools.ts";
 import type { RegistryConfig } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { groupArtifacts, summarize } from "#core/console/artifacts.ts";
@@ -133,6 +134,19 @@ export async function collect(
       defaultNamespace: account?.defaultNamespace,
       local: await localWork(roots, harnesses, mine, declaredNames(resolved), carried),
     });
+
+    // Named as they were chosen, by the module every listing uses.
+    const scope = scopeTargets(resolved, harnesses);
+    for (const row of groups.flatMap((group) => group.rows)) {
+      const entry = mine.artifacts[row.key];
+      if (entry === undefined) continue;
+      row.targets = loadedBy(
+        harnesses,
+        chosenFor(resolved, scope, entry),
+        entry.kind,
+        row.targets,
+      ).map((name) => toolName(harnesses, name));
+    }
 
     // A panel that throws is reported, not fatal.
     const panels: Record<string, unknown> = {};

@@ -18,9 +18,9 @@ const test = fileTest.extend("market", { scope: "file" }, async ({ tmp }) => ({
 describe("an add or remove opens only the registry it changes", () => {
   // Run outside any project, so every add and remove goes to the user scope.
   const outside = (tmp: string) => ({ cwd: tmp });
-  // A namespaced skill reaches Claude through its namespace's plugin directory.
-  const skillFile = (home: string, namespace: string, name: string) =>
-    join(home, ".claude", "skills", namespace, "skills", name, "SKILL.md");
+  // A namespaced skill reaches Claude as itself: its namespace is where it came from.
+  const skillFile = (home: string, name: string) =>
+    join(home, ".claude", "skills", name, "SKILL.md");
 
   test("installs from two registries", async ({ aireg, tmp, market }) => {
     const at = outside(tmp);
@@ -41,8 +41,8 @@ describe("an add or remove opens only the registry it changes", () => {
     await rename(market.far, `${market.far}.gone`);
     const added = await aireg(["add", "-g", "near/team/skill/review", "-y"], outside(tmp));
     expect(added.code, added.stderr).toBe(0);
-    expect(existsSync(skillFile(home.dir, "team", "review"))).toBe(true);
-    expect(existsSync(skillFile(home.dir, "ops", "deploy"))).toBe(true);
+    expect(existsSync(skillFile(home.dir, "review"))).toBe(true);
+    expect(existsSync(skillFile(home.dir, "deploy"))).toBe(true);
     const listed = await aireg(["list", "-g"], outside(tmp));
     expect(listed.stdout).toMatch(/deploy\s+skill\s+1\.0\.0\s+far/);
     expect(listed.stdout).toMatch(/review\s+skill\s+1\.0\.0\s+near/);
@@ -51,8 +51,8 @@ describe("an add or remove opens only the registry it changes", () => {
   test("removes from one while the other cannot be read", async ({ aireg, home, tmp }) => {
     const removed = await aireg(["remove", "-g", "near/team/skill/lint", "-y"], outside(tmp));
     expect(removed.code, removed.stderr).toBe(0);
-    expect(existsSync(skillFile(home.dir, "team", "lint"))).toBe(false);
-    expect(existsSync(skillFile(home.dir, "team", "review"))).toBe(true);
-    expect(existsSync(skillFile(home.dir, "ops", "deploy"))).toBe(true);
+    expect(existsSync(skillFile(home.dir, "lint"))).toBe(false);
+    expect(existsSync(skillFile(home.dir, "review"))).toBe(true);
+    expect(existsSync(skillFile(home.dir, "deploy"))).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ interface ContentsMapping {
   place?: undefined;
   manifest?: undefined;
   register?: undefined;
+  render?: undefined;
 }
 
 /** A folder per artifact, under `subdir`; strings take `{name}` and `{source}`. */
@@ -24,6 +25,7 @@ interface DirectoryMapping {
   manifest?: ManifestEntry[] | undefined;
   /** Edits to the harness's own config that make it load what was placed, applied in order. */
   register?: RegisterEntry[] | undefined;
+  render?: undefined;
 }
 
 /** One file per artifact, `<subdir>/<name><extension>`. */
@@ -35,6 +37,15 @@ interface FileMapping {
   place?: undefined;
   manifest?: undefined;
   register?: undefined;
+  /** Written as a real file in the harness's own format. */
+  render?: Render | undefined;
+}
+
+/** The front-matter `fields`, each required, and the Markdown body under `body`; nothing else. */
+export interface Render {
+  format: "toml";
+  fields: string[];
+  body: string;
 }
 
 /** Where one artifact kind lands inside a harness root. */

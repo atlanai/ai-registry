@@ -13,7 +13,7 @@ aireg list <name> [-g]
 
 ## Description
 
-`aireg list` lists the artifacts installed in the current project, or with `-g` or outside a project in your user scope, from the lockfile. It doesn't contact any registry. The table shows each artifact's kind, version and registry, and the harnesses it is installed into. A version marked `pinned` is held by the manifest. An artifact installed only because others depend on it names them under `needed by`. A skill or agent from a watched folder shows the harness that reads it, such as `cursor (watched)`.
+`aireg list` lists the artifacts installed in the current project, or with `-g` or outside a project in your user scope, from the lockfile. It doesn't contact any registry. The table shows each artifact's kind, version and registry, and the harnesses that load it. A version marked `pinned` is held by the manifest. An artifact installed only because others depend on it names them under `needed by`. A skill or agent from a watched folder shows the harness that reads it, such as `Cursor (watched)`.
 
 The table names each artifact by the shortest name no other installed artifact shares, such as `pr-review`. Wherever aireg asks for an installed artifact's name, a longer form works too, such as `engineering/pr-review` or `acme/engineering/skill/pr-review`.
 
@@ -29,7 +29,7 @@ With a name, `list` shows where one installed artifact came from: its registry, 
 {"ok": true, "data": {"scope": "project", "artifacts": [{"name": "engineering/pr-review", "shown": "pr-review", "kind": "skill", "registry": "acme", "address": "github.com/acme/ai-registry", "ref": "0.1.0", "pinned": false, "targets": ["agents", "claude"]}]}}
 ```
 
-`name` is the artifact's name in the lockfile, and `shown` the name the table prints. `address` is where its registry lives. `ref` is the version; an artifact with no version has its registry's short commit instead, or nothing when it comes from a watched folder. `watched` names the harness and folder of an artifact from a watched folder, and `neededBy` the artifacts that need one installed only for them.
+`name` is the artifact's name in the lockfile, and `shown` the name the table prints. `address` is where its registry lives. `targets` are the folders it is linked in, such as `agents`. `ref` is the version; an artifact with no version has its registry's short commit instead, or nothing when it comes from a watched folder. `watched` names the harness and folder of an artifact from a watched folder, and `neededBy` the artifacts that need one installed only for them.
 
 With a name, `data` is that one artifact instead: where it came from, its `version` and `content` digest, the stored `copy` you edit, and its `links` into each harness folder.
 
@@ -53,7 +53,7 @@ aireg list
 ```text
 1 installed in this project
   artifact   kind   version  from  harnesses
-  pr-review  skill  0.1.0    acme  agents, claude
+  pr-review  skill  0.1.0    acme  Claude Code, Codex
 ```
 
 See where an installed skill came from:

@@ -144,7 +144,8 @@ export async function candidates(
     // one folder, so walking both would report every skill twice.
     for (const kind of SCANNED_KINDS) {
       const mapping = target.kinds[kind];
-      if (mapping?.subdir === undefined) continue;
+      // A rendered file is aireg's own output, not an artifact to read back.
+      if (mapping?.subdir === undefined || mapping.render !== undefined) continue;
 
       const items = await collectKindCandidates(
         roots,

@@ -50,6 +50,7 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import { coveredByWhole, type RegistrySource } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
 import { reached } from "#core/plan/acquire.ts";
+import type { Selected } from "#core/plan/model.ts";
 import {
   formatAddress,
   formatRef,
@@ -144,6 +145,7 @@ export async function run(context: CommandContext): Promise<void> {
     entries,
     partial,
     catalogAlias,
+    source.namespacePlugins,
   );
   if (gathered === undefined) {
     cancel(step);
@@ -238,7 +240,9 @@ export async function run(context: CommandContext): Promise<void> {
         ),
         approve: async (plan, targets) => {
           approved = await confirmPlan(asking, plan, {
-            targets,
+            verb: "Install",
+            // The harnesses picked for this add, which an entry may narrow from the scope's.
+            targets: choices.targets ?? targets,
             kinds: choices.kinds,
             harnesses: fresh.harnesses,
           });
@@ -582,6 +586,8 @@ async function gather(
   all: readonly Entry[],
   partial: boolean,
   alias: string,
+  /** Its source installs each namespace as a plugin in the user scope. */
+  wrapped: boolean,
 ): Promise<Gathered | undefined> {
   const picked = await pickArtifacts(step, common, shown, all, partial, alias);
   if (picked === undefined) return undefined;
@@ -601,14 +607,23 @@ async function gather(
   // Loaded under the chosen scope, so the paths shown in the prompt are real.
   const loaded = await load({ ...common, scope }, cwd);
   const { manifest, harnesses } = loaded;
+  const chosen = chosenEntries(picked.addresses, all);
   let targets = common.targets;
   if (targets === undefined && interactive(step)) {
-    const picked = await chooseTargets(step, harnesses, scope, cwd, manifest.targets);
+    const items = chosen.map((entry) => asSelected(entry, alias));
+    const picked = await chooseTargets(
+      step,
+      harnesses,
+      loaded.roots,
+      manifest.targets,
+      items,
+      wrapped,
+    );
     if (canceled(picked)) return undefined;
     targets = picked;
   }
 
-  const kinds = kindsOf(picked.addresses, all);
+  const kinds = [...new Set(chosen.map((entry) => entry.kind))];
   let copy = common.copy;
   if (
     !copy &&
@@ -663,21 +678,34 @@ interface Picked {
 }
 
 /** The kinds a selection covers; every kind when the whole registry is taken. */
-function kindsOf(addresses: readonly string[] | undefined, all: readonly Entry[]): ArtifactKind[] {
+function chosenEntries(addresses: readonly string[] | undefined, all: readonly Entry[]): Entry[] {
   const leaf = (address: string): string =>
     sanitizeName((address.split("@")[0] as string).split("/").at(-1) as string);
   const wanted = addresses === undefined ? undefined : new Set(addresses.map(leaf));
   // A bare namespace is every member of it.
   const namespaces = new Set((addresses ?? []).filter((address) => !address.includes("/")));
-  const kinds = all
-    .filter(
-      (entry) =>
-        wanted === undefined ||
-        wanted.has(entry.name) ||
-        (entry.group !== undefined && namespaces.has(entry.group)),
-    )
-    .map((entry) => entry.kind);
-  return [...new Set(kinds)];
+  return all.filter(
+    (entry) =>
+      wanted === undefined ||
+      wanted.has(entry.name) ||
+      (entry.group !== undefined && namespaces.has(entry.group)),
+  );
+}
+
+/** A catalog entry as the plan would place it, for showing where each harness loads it from. */
+function asSelected(entry: Entry, alias: string): Selected {
+  return {
+    name: entry.name,
+    kind: entry.kind,
+    source: alias,
+    path: entry.path,
+    id: entry.path,
+    upstreamName: entry.name,
+    contentId: undefined,
+    version: undefined,
+    contents: [],
+    group: entry.group,
+  };
 }
 
 /**

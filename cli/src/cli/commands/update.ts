@@ -72,6 +72,7 @@ export async function run(context: CommandContext): Promise<void> {
       ),
       approve: async (plan, targets) => {
         approved = await confirmIfDestructive(step, plan, {
+          verb: "Update",
           targets,
           harnesses: fresh.harnesses,
         });

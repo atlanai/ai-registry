@@ -53,7 +53,7 @@ aireg list
 ```text
 1 installed in this project
   artifact       kind   version  from  harnesses
-  run-benchmark  skill  0.1.0    acme  agents, claude
+  run-benchmark  skill  0.1.0    acme  Claude Code, Codex
 ```
 
 The CLI writes the skill's files into the project's `.registry/` folder, links `.claude/skills/` and `.agents/skills/` to them (Codex reads `.agents/skills/`), and records the version and digests in `.registry/manifest.lock.yml`. To install it into your user scope instead, for every project on this machine, connect the registry with `aireg registry add ../acme-registry -g` and run `aireg add -g acme/engineering/skill/run-benchmark`. The CLI then keeps it current in the background.

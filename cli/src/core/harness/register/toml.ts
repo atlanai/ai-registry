@@ -17,19 +17,33 @@ function checked(text: string): void {
   }
 }
 
-/** A basic string: the quote, the backslash and every control character escaped. */
-function quote(value: string): string {
+/** The backslash and every control character escaped, except those in `kept`. */
+function escaped(value: string, kept = ""): string {
   let out = "";
   for (const char of value) {
     const code = char.charCodeAt(0);
-    if (char === "\\" || char === '"') out += `\\${char}`;
+    if (kept.includes(char)) out += char;
+    else if (char === "\\") out += "\\\\";
     else if (char === "\n") out += "\\n";
     else if (char === "\t") out += "\\t";
     else if (char === "\r") out += "\\r";
     else if (code < 0x20 || code === 0x7f) out += `\\u${code.toString(16).padStart(4, "0")}`;
     else out += char;
   }
-  return `"${out}"`;
+  return out;
+}
+
+/** A basic string: the quote, the backslash and every control character escaped. */
+export function quote(value: string): string {
+  return `"${escaped(value).replaceAll('"', '\\"')}"`;
+}
+
+/** A multi-line basic string; a quote is escaped only where it would end the string early. */
+export function multilineQuote(value: string): string {
+  const text = escaped(value, "\n\t")
+    .replace(/"+$/, (run) => run.replaceAll('"', '\\"'))
+    .replace(/"{3,}/g, (run) => run.replaceAll('"""', '""\\"'));
+  return `"""\n${text}"""`;
 }
 
 function renderKey(key: string): string {

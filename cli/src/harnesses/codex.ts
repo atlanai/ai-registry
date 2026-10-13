@@ -5,7 +5,6 @@ const PLUGIN_BODY = {
   skills: "./skills/",
 };
 
-// Its agents are TOML, so a markdown agent has nowhere it would load.
 export const codex = defineHarness({
   id: "codex",
   displayName: "Codex",
@@ -69,5 +68,12 @@ export const codex = defineHarness({
     },
     // What its plugins carry; outside a plugin Codex reads skills from `.agents/skills`.
     skill: { shape: "directory", subdir: "skills" },
+    // Codex reads an agent only as TOML, and refuses to run a linked one.
+    agent: {
+      shape: "file",
+      subdir: "agents",
+      extension: ".toml",
+      render: { format: "toml", fields: ["name", "description"], body: "developer_instructions" },
+    },
   },
 });

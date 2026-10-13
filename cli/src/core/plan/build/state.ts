@@ -44,6 +44,8 @@ export interface BuildState {
   claimed: Map<string, string>;
   /** One link action per destination: a plugin is shared by its whole namespace. */
   linked: Set<string>;
+  /** Registries read this run whose adapter declares each namespace a plugin. */
+  wrapping: ReadonlySet<string>;
   /** Plugin directories two registries' namespaces would share. */
   crowded: ReadonlySet<string>;
   /**

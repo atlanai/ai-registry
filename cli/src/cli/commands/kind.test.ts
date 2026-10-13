@@ -1,3 +1,5 @@
+import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { ErrorCode } from "#core/errors.ts";
 import { Printer } from "#core/output.ts";
@@ -32,4 +34,19 @@ describe("skill new --set", () => {
       expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     },
   );
+});
+
+describe("skill new without a name", () => {
+  test("refuses in a registry when it can't ask, instead of naming it after the folder", async ({
+    tmp,
+  }) => {
+    await writeFile(join(tmp, "registry.json"), "{}\n");
+    const namespace = join(tmp, "artifacts", "engineering");
+    await mkdir(namespace, { recursive: true });
+    const { run } = await ((await lookup("skill", tmp))?.load() ?? Promise.reject());
+    await expect(run(context(namespace, ["new"]))).rejects.toMatchObject({
+      code: ErrorCode.Usage,
+    });
+    expect(await readdir(namespace)).toEqual([]);
+  });
 });
