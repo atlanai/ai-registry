@@ -18,6 +18,10 @@
     "card": {
       "type": "object",
       "description": "The A2A agent card, verbatim, when the agent ships agent-card.json. Opaque to this manifest."
+    },
+    "runtime": {
+      "type": "object",
+      "description": "Deprecated and ignored. Accepted only so agents released with it stay valid; new agents leave it out."
     }
   },
   "required": [

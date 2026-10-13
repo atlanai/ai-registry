@@ -18,13 +18,13 @@
     },
     "created_at": "2026-09-03T08:00:00Z",
     "created_by": "acme-ci",
-    "digest": "sha256:07db2ce53967bc170c8b6feff2a5e49920ade2528a1b13bdc7ccd9e196837d7e"
+    "digest": "sha256:924fe67a225ad01100bdf9f91d206b3102179df9ce89242c91e54f08a976b7f6"
   },
   "files": [
     {
       "path": "AGENT.md",
-      "digest": "sha256:ef55b1fac79af3efec652f16b44a518823938c7d9d7d6f3eaf4291b18b953f21",
-      "size": 305,
+      "digest": "sha256:6b712d02a4f143c24613af851fe1995d588d04913d269c2c4a2181b4c6134cbf",
+      "size": 337,
       "media_type": "text/markdown",
       "urls": [
         "AGENT.md"
@@ -33,7 +33,11 @@
   ],
   "spec": {
     "name": "reviewer",
-    "description": "Reviews pull requests on request and posts ranked findings as a review comment."
+    "description": "Reviews pull requests on request and posts ranked findings as a review comment.",
+    "runtime": {
+      "harness": "claude-code",
+      "environment": {}
+    }
   },
   "relationships": [
     {
