@@ -210,11 +210,30 @@ async function init(
   }
 
   const step = interaction(context.printer, defaultIo(), common.yes);
-  const name = flags.name ?? (await ask(step, "Name", (await remoteOwner(root)) ?? basename(root)));
+  const suggested = (await remoteOwner(root)) ?? basename(root);
+  const name =
+    flags.name ??
+    (await ask(step, "Name", suggested, `Press Enter to use ${suggested}, or type another name.`));
   if (name === undefined) return cancel(step);
-  const description = flags.description ?? (await ask(step, "Description", ""));
+  const description =
+    flags.description ??
+    (await ask(
+      step,
+      "Description",
+      "",
+      "Optional, such as Skills our team shares. Press Enter to skip.",
+    ));
   if (description === undefined) return cancel(step);
-  const listed = flags.namespace ?? splitList(await ask(step, "Namespaces", ""));
+  const listed =
+    flags.namespace ??
+    splitList(
+      await ask(
+        step,
+        "Namespaces",
+        "",
+        "Optional. Separate several with commas or spaces: engineering, data.",
+      ),
+    );
   if (listed === undefined) return cancel(step);
   const namespaces = namespacesOf(listed);
 
@@ -438,9 +457,10 @@ async function ask(
   step: Interaction,
   message: string,
   initial: string,
+  hint: string,
 ): Promise<string | undefined> {
   if (!interactive(step)) return initial;
-  const answer = await text({ message, style: step.printer.errStyle, initial }, step.io);
+  const answer = await text({ message, style: step.printer.errStyle, initial, hint }, step.io);
   return canceled(answer) ? undefined : answer;
 }
 

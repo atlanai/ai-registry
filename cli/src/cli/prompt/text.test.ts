@@ -7,9 +7,9 @@ import { text } from "./text.ts";
 const { up, enter, escape: esc, ctrlC, backspace } = KEY;
 const style = new Styler({ isTTY: false }, {});
 
-async function type(initial: string | undefined, keys: string[]) {
+async function type(initial: string | undefined, keys: string[], hint?: string) {
   const term = terminal();
-  const run = text({ message: "Name", style, initial }, term.io);
+  const run = text({ message: "Name", style, initial, hint }, term.io);
   await term.press();
   const first = term.screen();
   await term.press(...keys.slice(0, -1));
@@ -23,6 +23,12 @@ describe("text", () => {
     const { value, first, screen } = await type("newreg", [enter]);
     expect(first).toEqual(["◆  Name  newreg"]);
     expect(value).toBe("newreg");
+    expect(screen).toEqual(["◇  Name  newreg"]);
+  });
+
+  it("shows the hint under the question until it is answered", async () => {
+    const { first, screen } = await type("newreg", [enter], "Press Enter to use newreg.");
+    expect(first).toEqual(["◆  Name  newreg", "│  Press Enter to use newreg."]);
     expect(screen).toEqual(["◇  Name  newreg"]);
   });
 

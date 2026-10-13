@@ -1,6 +1,6 @@
 import type { Styler } from "#core/output.ts";
 import { cells } from "#core/term/format.ts";
-import { type Mark, titleLine } from "./layout.ts";
+import { type Mark, railLine, titleLine } from "./layout.ts";
 import {
   ask,
   CANCEL,
@@ -15,6 +15,8 @@ export interface TextOptions {
   style: Styler;
   /** Taken when the answer is left empty, and shown until something is typed. */
   initial?: string | undefined;
+  /** How to answer, shown under the question while it waits. */
+  hint?: string | undefined;
 }
 
 const CONTROL = /\p{Cc}/gu;
@@ -48,7 +50,7 @@ class Typing implements Machine<string> {
   }
 
   lines(): string[] {
-    const { style, message, initial = "" } = this.options;
+    const { style, message, initial = "", hint } = this.options;
     if (this.ended === "cancel")
       return [titleLine(style, "cancel", message, style.dim("canceled"))];
     if (this.ended === "submit") {
@@ -56,6 +58,7 @@ class Typing implements Machine<string> {
     }
     return [
       titleLine(style, "active", message, this.value === "" ? style.dim(initial) : this.value),
+      ...(hint === undefined ? [] : [railLine(style, style.dim(hint))]),
     ];
   }
 }

@@ -332,7 +332,12 @@ async function sendTo(
   let message = options.message ?? subjectOf(items);
   if (options.asked) {
     const typed = await text(
-      { message: "What changed?", style: printer.errStyle, initial: message },
+      {
+        message: "What changed?",
+        style: printer.errStyle,
+        initial: message,
+        hint: "Press Enter to use this message, or type another.",
+      },
       step.io,
     );
     if (canceled(typed)) return "canceled";
