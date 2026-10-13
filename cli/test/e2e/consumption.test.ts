@@ -220,6 +220,14 @@ describe("a folder of yours where a link would go", () => {
     expect((await run(["registry", "add", market, "--as", "acme"])).code).toBe(0);
   }, 60_000);
 
+  test("is named by a dry run as a path it will skip", async () => {
+    const planned = await run(["add", "acme/platform/skill/lint", "-y", "--dry-run"]);
+    expect(planned.code, planned.stderr).toBe(0);
+    expect(planned.stderr).toMatch(
+      /Would not install lint, because \.claude\/skills\/lint already holds something of yours\./,
+    );
+  });
+
   test("is left alone, and status says the link is missing until it moves", async () => {
     const added = await run(["add", "acme/platform/skill/lint", "-y"]);
     expect(added.stderr).toMatch(/already holds something of yours/);

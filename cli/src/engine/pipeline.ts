@@ -491,7 +491,7 @@ export function appliedNotices(
     notices.push({
       message:
         reason === undefined
-          ? `Did not install ${name}, because ${displayPath(roots, path)} already holds something of yours.`
+          ? keptMessage(roots, name, path, "Did not")
           : `Did not install ${name} at ${displayPath(roots, path)}: ${sanitizeText(reason)}.`,
     });
   }
@@ -501,6 +501,10 @@ export function appliedNotices(
     });
   }
   return notices;
+}
+
+function keptMessage(roots: Roots, name: string, path: string, verb: string): string {
+  return `${verb} install ${name}, because ${displayPath(roots, path)} already holds something of yours.`;
 }
 
 function displayName(harnesses: Harnesses, harness: string): string {
@@ -604,6 +608,11 @@ async function write(
       const aside = new Set(
         [...guards].flatMap(([path, guard]) => (guard === "backup" ? [path] : [])),
       );
+      // Said before the run, so an agent can move a person's folder out of the way first.
+      for (const action of planned.actions) {
+        if (action.kind === "link" && guards.get(action.to) === "keep")
+          printer.warning(keptMessage(roots, action.name, action.to, "Would not"));
+      }
       report.plan(planned, roots, aside, { targets: named, harnesses });
       return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
     }
