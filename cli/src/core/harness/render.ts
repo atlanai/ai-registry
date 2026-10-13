@@ -5,6 +5,9 @@ import type { Render } from "./contract.ts";
 /** The bytes a rendered placement holds and the front-matter fields left out, or why it has none. */
 export type Rendered = { text: string; dropped: string[] } | { problem: string };
 
+// The registry's own record of what runs an agent, not a setting any harness reads.
+const REGISTRY_ONLY = new Set(["runtime"]);
+
 export function renderPlacement(render: Render, source: string): Rendered {
   const record = frontmatterRecord(source);
   if (record === undefined) return { problem: "it has no front matter" };
@@ -19,6 +22,8 @@ export function renderPlacement(render: Render, source: string): Rendered {
   lines.push(`${render.body} = ${multilineQuote(body)}`);
   return {
     text: `${lines.join("\n")}\n`,
-    dropped: Object.keys(record).filter((field) => !render.fields.includes(field)),
+    dropped: Object.keys(record).filter(
+      (field) => !render.fields.includes(field) && !REGISTRY_ONLY.has(field),
+    ),
   };
 }
