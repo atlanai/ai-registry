@@ -24,7 +24,8 @@ I've written a few skills for Claude Code. Put them in a private registry in a n
    `gh repo create <owner>/my-skills --private --clone`, then in it
    `aireg registry init --name my-skills --namespace personal -y`,
    `aireg skill new --from <path> --namespace personal` for each skill,
-   `aireg registry index` and a commit.
+   `aireg registry index` and a commit. For a registry in a local folder instead, run
+   `git init` in the folder, and later add it by its path, as in `aireg registry add ~/my-skills -g`.
 3. Move the originals out of the harness folders, with the user's yes. aireg doesn't link
    over a folder of theirs.
 4. `aireg registry add github.com/<owner>/my-skills -g`, then `aireg add my-skills/personal -g`.
@@ -54,8 +55,9 @@ My commit-message skill got worse after my last change. Show me what changed bet
 ```
 
 1. The skill's `versions.json` in the registry lists its versions. Read the last two with
-   `aireg show my-skills/personal/commit-message@<version>` and show the user what changed.
-2. `aireg add my-skills/personal/commit-message@<earlier> -g` pins the earlier version.
+   `aireg show my-skills/personal/commit-message@<version>`, and show the user a diff of them.
+2. `aireg add my-skills/personal/commit-message@<earlier> -g` pins the earlier version. The
+   registry's latest version doesn't change.
 3. Tell the user that `aireg add my-skills/personal/commit-message -g` takes the latest again.
 
 ## Share it
