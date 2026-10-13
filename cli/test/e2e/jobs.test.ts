@@ -158,14 +158,8 @@ describe("a watch job over a namespace your user scope installs", () => {
     const notes = join(skills, "notes", "SKILL.md");
     const versions = join(reg, "artifacts", "personal", "skill", "notes", "versions.json");
     const run = async (job: string) => {
-      const id = /run_[0-9a-f-]+/.exec((await aireg(["job", "start", job])).stdout)?.[0];
-      const state = async () => {
-        const runs = JSON.parse((await aireg(["job", "runs", "--json"])).stdout) as {
-          data: { runs: { id: string; state: string }[] };
-        };
-        return runs.data.runs.find((item) => item.id === id)?.state;
-      };
-      await expect.poll(state, { interval: 200, timeout: 30_000 }).toBe("succeeded");
+      const id = /run_[0-9a-f-]+/.exec((await aireg(["job", "start", job])).stdout)?.[0] ?? "";
+      expect((await aireg(["job", "runs", id, "--follow"])).stdout).toMatch(/finished\s+succeeded/);
     };
     try {
       expect((await aireg(["registry", "add", reg, "-g"])).code).toBe(0);
