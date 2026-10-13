@@ -167,7 +167,9 @@ export function mergedIndex(
       moved = true;
       continue;
     }
-    const merged = { ...rows[index], ...row };
+    const merged: Record<string, unknown> = { ...rows[index], ...row };
+    // The entry repeats its latest row's catalog_digest, so an older row's is dropped.
+    if (item.catalogDigest === undefined) merged.catalog_digest = undefined;
     if (JSON.stringify(merged) === JSON.stringify(rows[index])) continue;
     rows[index] = merged;
     moved = true;

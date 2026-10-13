@@ -172,6 +172,17 @@ describe("indexRoot", () => {
     ).toMatchObject({ latest: "1.2.0", catalog_digest: rows[0].catalog_digest });
   });
 
+  test("drops the catalog digest of the version a new one replaces as latest", async () => {
+    await nextVersion([]);
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    const index = JSON.parse(await readFile(join(root, "index.json"), "utf8"));
+    const row = index.entries.find((entry: { name: string }) => entry.name === "pr-review");
+    expect(row.latest).toBe("1.3.0");
+    expect(row).not.toHaveProperty("catalog_digest");
+  });
+
   test("drops the row of an artifact whose folder was deleted", async () => {
     await rm(join(root, "artifacts", "engineering", "agent", "reviewer"), { recursive: true });
 
