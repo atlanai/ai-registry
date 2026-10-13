@@ -63,6 +63,7 @@ describe("an agent installed for Codex", () => {
     const status = await aireg(["status"]);
     expect(status.code).toBe(3);
     expect(status.stdout).toMatch(/reviewer .* edited +its copy was edited after installation/);
+    expect(`${status.stdout}${status.stderr}`).toContain("run `aireg install --force`");
     const updated = await aireg(["update", "-y"]);
     expect(updated.code, updated.stderr).toBe(0);
     expect(updated.stderr).toContain(

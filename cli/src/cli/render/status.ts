@@ -150,9 +150,23 @@ export function renderStatus(
   // An edit is the one state `install` will not repair: it refuses to overwrite
   // an edit, so point at `sync`, which reconciles one.
   const flag = scope === "user" ? " -g" : "";
-  const edited = statuses.some((item) => item.state === "edited");
+  // A file written in a harness's own format holds no edit sync could send back.
+  const writtenFor = (item: ArtifactStatus): string | undefined => {
+    const folder = item.detail?.split(": ")[0] ?? "";
+    const kind = kindOf(item);
+    const mapping = kind === undefined ? undefined : chosen.harnesses[folder]?.kinds[kind];
+    return mapping?.render === undefined ? undefined : folder;
+  };
+  const edits = statuses.filter((item) => item.state === "edited");
+  const written = edits.flatMap((item) => writtenFor(item) ?? []);
+  const edited = edits.length > written.length;
   const absent = statuses.some((item) => item.state === "missing" || item.state === "dangling");
-  if (edited) {
+  if (!edited && written.length > 0) {
+    const tools = [...new Set(written)].map((tool) => toolName(chosen.harnesses, tool));
+    printer.hint(
+      `${list(tools)} read${tools.length === 1 ? "s" : ""} a copy aireg writes from the agent: run \`aireg install${flag} --force\` to write it again, and change the agent in its registry.`,
+    );
+  } else if (edited) {
     printer.hint(
       `Run \`aireg sync${flag}\` to compare the edits with the registry` +
         (absent ? `, and \`aireg install${flag}\` to restore what is missing.` : "."),

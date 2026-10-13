@@ -81,4 +81,21 @@ describe("renderStatus", () => {
     expect(lines).toContain("ok  matches the lockfile, links intact");
     expect(lines).toContain("1 artifact needs attention.");
   });
+  it("points an edit to a file aireg writes for a harness at install --force, not sync", () => {
+    const edited = (name: string, folder: string) => ({
+      name,
+      state: "edited" as const,
+      detail: `${folder}: its copy was edited after installation`,
+      harnesses: { [folder]: "linked" as const },
+    });
+    const only = rendered([edited("reviewer", "codex")], [row("reviewer", "agent")]);
+    expect(only).toContain(
+      "hint: Codex reads a copy aireg writes from the agent: run `aireg install --force` to write it again, and change the agent in its registry.",
+    );
+    const both = rendered(
+      [edited("reviewer", "codex"), edited("lint", "claude")],
+      [row("reviewer", "agent"), row("lint", "skill")],
+    );
+    expect(both.join("\n")).toContain("Run `aireg sync` to compare the edits with the registry.");
+  });
 });
