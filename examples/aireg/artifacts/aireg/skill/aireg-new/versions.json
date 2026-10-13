@@ -2,8 +2,15 @@
   "namespace": "aireg",
   "kind": "skill",
   "name": "aireg-new",
-  "latest": "0.1.1",
+  "latest": "0.2.0",
   "versions": [
+    {
+      "version": "0.2.0",
+      "digest": "sha256:662dde8f568c2ba0c5eec5c131bf75c45cb9cae085dabfca9c50f5c0b720992e",
+      "published_at": "2026-10-13T19:27:09.946Z",
+      "status": "active",
+      "yanked": false
+    },
     {
       "version": "0.1.1",
       "digest": "sha256:de7eb4762448d6799edd4b16df2859ee04e907339563103aa9958a434cfb8037",
