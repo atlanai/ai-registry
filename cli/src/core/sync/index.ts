@@ -50,8 +50,8 @@ async function compare(
 }
 
 /**
- * A row from your own folder is found by address in the catalog of the registry it went to,
- * even when a manifest selects it too: its lock digest is already the edit, never the base.
+ * A row from your own folder is declared by no manifest, so its published copy is
+ * found by address in the catalog of the registry it went to.
  */
 async function compareOrigin(
   previous: LockArtifact,
@@ -131,14 +131,19 @@ export async function reconcile(
       path,
     );
 
+    // A selected row of yours whose registry copy has not moved is still yours: its lock digest
+    // is already the edit, so a three-way compare would read the edit as the base.
+    const yours =
+      previous?.origin !== undefined &&
+      (item === undefined || (item.contentId !== undefined && item.contentId === previous.content));
+
     // One artifact the registry will not serve is reported as that one
     // artifact, rather than ending the run without naming any.
     let digests: Digests;
     try {
-      digests =
-        previous?.origin !== undefined
-          ? await compareOrigin(previous, staged, acquired, content)
-          : await compare(item, previous, staged, content);
+      digests = yours
+        ? await compareOrigin(previous, staged, acquired, content)
+        : await compare(item, previous, staged, content);
     } catch (error) {
       if (!isAdapterError(error)) throw error;
       items.push({
@@ -154,7 +159,7 @@ export async function reconcile(
       continue;
     }
 
-    const classified = previous?.origin === undefined ? classify(digests) : classifyOrigin(digests);
+    const classified = yours ? classifyOrigin(digests) : classify(digests);
     const detail =
       classified.disposition === "unknown" && digests.base === undefined && previous !== undefined
         ? missingBase(lock, previous)
