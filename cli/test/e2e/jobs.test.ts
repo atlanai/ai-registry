@@ -1,5 +1,5 @@
 import { chmod, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect } from "vitest";
 import { gitRegistry, registry } from "#test/kit/builders/registry.ts";
 import { test as base } from "#test/kit/fixtures.ts";
@@ -148,4 +148,41 @@ describe("a job that also declares artifacts with -s", () => {
       await aireg(["daemon", "stop"], { cwd: tmp });
     }
   }, 60_000);
+});
+
+describe("a watch job over a namespace your user scope installs", () => {
+  test("publishes each edit as the next version", async ({ aireg, home, tmp }) => {
+    const reg = join(tmp, "reg");
+    await registry(reg, { name: "demo", slug: "demo" }).skill("personal/hello@0.1.0").write();
+    const skills = join(home.dir, ".claude", "skills");
+    const notes = join(skills, "notes", "SKILL.md");
+    const versions = join(reg, "artifacts", "personal", "skill", "notes", "versions.json");
+    const run = async (job: string) => {
+      const id = /run_[0-9a-f-]+/.exec((await aireg(["job", "start", job])).stdout)?.[0];
+      const state = async () => {
+        const runs = JSON.parse((await aireg(["job", "runs", "--json"])).stdout) as {
+          data: { runs: { id: string; state: string }[] };
+        };
+        return runs.data.runs.find((item) => item.id === id)?.state;
+      };
+      await expect.poll(state, { interval: 200, timeout: 30_000 }).toBe("succeeded");
+    };
+    try {
+      expect((await aireg(["registry", "add", reg, "-g"])).code).toBe(0);
+      expect((await aireg(["add", "-g", "demo/personal", "--yes"])).code).toBe(0);
+      await mkdir(dirname(notes), { recursive: true });
+      await writeFile(notes, "---\nname: notes\ndescription: Takes notes.\n---\nOld.\n");
+      const added = await aireg(["job", "add", "-g", "--watch", skills, "--to", "demo/personal"]);
+      expect(added.code, added.stderr).toBe(0);
+      const job = /Added job (\S+),/.exec(added.stdout)?.[1] ?? "";
+      await run(job);
+      expect(await readFile(versions, "utf8")).toContain('"0.1.0"');
+
+      await writeFile(notes, "---\nname: notes\ndescription: Takes notes.\n---\nNew.\n");
+      await run(job);
+      expect(await readFile(versions, "utf8")).toContain('"0.1.1"');
+    } finally {
+      await aireg(["daemon", "stop"]);
+    }
+  }, 120_000);
 });

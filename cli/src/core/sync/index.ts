@@ -50,8 +50,8 @@ async function compare(
 }
 
 /**
- * A row from your own folder is declared by no manifest, so its published copy is
- * found by address in the catalog of the registry it went to.
+ * A row from your own folder is found by address in the catalog of the registry it went to,
+ * even when a manifest selects it too: its lock digest is already the edit, never the base.
  */
 async function compareOrigin(
   previous: LockArtifact,
@@ -136,7 +136,7 @@ export async function reconcile(
     let digests: Digests;
     try {
       digests =
-        item === undefined && previous?.origin !== undefined
+        previous?.origin !== undefined
           ? await compareOrigin(previous, staged, acquired, content)
           : await compare(item, previous, staged, content);
     } catch (error) {
@@ -154,10 +154,7 @@ export async function reconcile(
       continue;
     }
 
-    const classified =
-      previous?.origin === undefined || item !== undefined
-        ? classify(digests)
-        : classifyOrigin(digests);
+    const classified = previous?.origin === undefined ? classify(digests) : classifyOrigin(digests);
     const detail =
       classified.disposition === "unknown" && digests.base === undefined && previous !== undefined
         ? missingBase(lock, previous)
