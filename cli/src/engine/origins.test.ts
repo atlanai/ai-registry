@@ -3,10 +3,10 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import type { Step } from "#core/config/model.ts";
 import { digest } from "#core/fs/digest.ts";
-import { emptyLock, type Lock } from "#core/lock.ts";
+import { emptyLock, type Lock, writeLock } from "#core/lock.ts";
 import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { applyOrigins, recordServed, surveyOrigins } from "./origins.ts";
+import { applyOrigins, forgetOrigins, recordServed, surveyOrigins } from "./origins.ts";
 import type { Scan } from "./scan.ts";
 
 let home: string;
@@ -158,6 +158,27 @@ describe("an origins step", () => {
       step({ select: [{ from: join(home, ".claude", "skills"), match: "!(draft-*)" }] }),
     ]);
     expect(Object.keys(lock.artifacts)).toEqual(["mine/my-helper"]);
+  });
+});
+
+describe("forgetOrigins", () => {
+  test("unlinks what a pull linked to the copy, and leaves the folder", async () => {
+    await write("One.");
+    const lock = emptyLock();
+    await runOnce(lock);
+    const link = join(home, ".agents", "skills", "my-helper");
+    await mkdir(join(link, ".."), { recursive: true });
+    await symlink(join(copy(), ".."), link);
+    lock.artifacts["mine/my-helper"]?.links.push({
+      harness: "agents",
+      path: ".agents/skills/my-helper",
+      mode: "symlink",
+    });
+    await writeLock(roots, lock);
+
+    await forgetOrigins(roots, "kit", [join(home, ".claude", "skills")]);
+    await expect(lstat(link)).rejects.toThrow();
+    expect(await readFile(origin(), "utf8")).toContain("One.");
   });
 });
 

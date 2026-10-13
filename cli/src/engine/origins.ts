@@ -313,6 +313,11 @@ export async function forgetOrigins(
     if (row.origin === undefined || row.registry !== registry) continue;
     const from = canonical(resolve(roots.base, row.origin.path));
     if (!watched.some((folder) => isWithin(folder, from))) continue;
+    // A pull of the same namespace links the copy into other harnesses, and they would dangle.
+    for (const link of row.links) {
+      const at = resolve(roots.base, link.path);
+      if (canonical(at) !== from) await removeContained(at, roots);
+    }
     await removeContained(resolve(roots.base, row.path), roots);
     delete lock.artifacts[key];
     forgotten.push(key);
