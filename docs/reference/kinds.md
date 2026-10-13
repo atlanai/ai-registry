@@ -23,7 +23,7 @@ aireg has one command for each kind of artifact. `skill` and `agent` are always 
 - **In a registry**, it creates version `0.1.0` in `artifacts/<namespace>/<kind>/<name>/0.1.0/`. The namespace is `--namespace`, or the `artifacts/<namespace>/` folder you're in, or on a terminal aireg asks. Without `<name>`, aireg asks for it on a terminal.
 - **Outside a registry**, it creates `./<name>/`, ready to publish with [`aireg publish`](publish.md). Publish a skill by its folder, and an agent by the path to its `AGENT.md`, since `publish` takes an agent as a single file.
 
-A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. A card's `name` and `description` are what `registry index` checks, so a card aireg writes indexes as it is.
+A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. A card's `name` and `description` are what `registry index` checks, so a card aireg writes indexes as it is. An agent that runs outside a coding agent can say what it runs on in an optional `runtime` block, such as `--set runtime.harness=langgraph`; which coding agents install an agent is up to each project, so aireg never asks for it.
 
 ### new --from
 

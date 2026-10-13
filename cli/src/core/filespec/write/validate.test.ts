@@ -101,6 +101,17 @@ const CASES: Case[] = [
     message: 'is named "other" in its front matter',
   },
   {
+    name: "an agent whose runtime names no harness",
+    edit: (root) =>
+      put(
+        root,
+        "artifacts/eng/agent/helper/1.0.0/AGENT.md",
+        "---\nname: helper\ndescription: d\nruntime:\n  model: m\n---\n",
+      ),
+    path: "artifacts/eng/agent/helper/1.0.0",
+    message: "harness",
+  },
+  {
     name: "a dependency the registry does not hold",
     build: (registry) =>
       registry.agent("eng/helper@1.0.0", {
@@ -182,7 +193,7 @@ describe("validateRoot", () => {
     expect(validated.problems).toEqual([]);
   });
 
-  test("still takes the runtime block of an agent released with one", async ({ root }) => {
+  test("takes an agent that names its runtime", async ({ root }) => {
     const agent =
       "---\nname: reviewer\ndescription: Reviews.\nruntime:\n  harness: claude-code\n---\nReview.\n";
     await registry(root, { name: "team" })
