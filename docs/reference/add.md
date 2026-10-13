@@ -82,7 +82,7 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 {"ok": true, "data": {"registry": "acme", "artifacts": ["acme/engineering"], "dependencies": {}, "dryRun": false, "changed": 4, "installed": ["engineering/pr-review"], "kept": []}}
 ```
 
-`artifacts` holds the full names added to the manifest. `dependencies` maps each artifact installed only because others depend on it to their names. `changed` counts the changes made, `installed` names the artifacts linked into a harness, and `kept` the links not made because something of yours is already there. With `--dry-run`, `changed` and `installed` say what would be done, and `kept` is empty.
+`artifacts` holds the full names added to the manifest. `dependencies` maps each artifact installed only because others depend on it to their names. `changed` counts the changes made, `installed` names the artifacts linked into a harness, and `kept` the links not made because something of yours is already there. With `--dry-run`, `changed` and `installed` say what would be done, and `kept` is empty. `jobId` is the background job that keeps a user-scope install current, when there is one.
 
 ## Exit status
 

@@ -75,6 +75,22 @@ describe("background sync jobs", () => {
       await aireg(["daemon", "stop"], { cwd: tmp });
     }
   }, 120_000);
+
+  test("adds the user scope's job under --json too", async ({ aireg, tmp, repo }) => {
+    try {
+      const added = await aireg(["add", `file://${repo}`, "--as", "kit", "-g", "--json"], {
+        cwd: tmp,
+      });
+      expect(added.code, added.stderr).toBe(0);
+      expect(JSON.parse(added.stdout).data.jobId).toBe("job_skills_kit");
+      const listed = JSON.parse((await aireg(["job", "list", "--json"], { cwd: tmp })).stdout) as {
+        data: { jobs: { id: string }[] };
+      };
+      expect(listed.data.jobs.map((job) => job.id)).toEqual(["job_skills_kit"]);
+    } finally {
+      await aireg(["daemon", "stop"], { cwd: tmp });
+    }
+  }, 60_000);
 });
 
 describe("a job for a registry the project declares by a relative folder", () => {

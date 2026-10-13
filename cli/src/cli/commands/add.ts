@@ -257,21 +257,10 @@ export async function run(context: CommandContext): Promise<void> {
     return;
   }
 
-  if (context.printer.format === "json") {
-    context.printer.json({
-      ok: true,
-      data: {
-        registry: alias,
-        artifacts: refs,
-        dependencies: result.plan.neededBy,
-        ...outcome(result, common.dryRun),
-      },
-    });
-    return;
-  }
-
+  // `--json` changes only what is printed, so the background job is still added.
+  let jobId: string | undefined;
   if (result.applied !== undefined) {
-    await reportAdded(context, {
+    jobId = await reportAdded(context, {
       alias,
       source,
       location,
@@ -286,6 +275,19 @@ export async function run(context: CommandContext): Promise<void> {
       pinned: refs.every((text) => parseRef(text).version !== undefined),
     });
   }
+  if (context.printer.format === "json") {
+    context.printer.json({
+      ok: true,
+      data: {
+        registry: alias,
+        artifacts: refs,
+        dependencies: result.plan.neededBy,
+        ...outcome(result, common.dryRun),
+        ...(jobId === undefined ? {} : { jobId }),
+      },
+    });
+    return;
+  }
   if (choices.scope === "user") noteUserScope(context.printer, common.scope, context.cwd);
   if (interactive(asking) && result.applied !== undefined) {
     context.printer.info(
@@ -296,7 +298,10 @@ export async function run(context: CommandContext): Promise<void> {
   }
 }
 
-/** What an applied add changed: the registry it introduced, then the plan's summary. */
+/**
+ * What an applied add changed: the registry it introduced, then the plan's summary.
+ * Returns the job that keeps a user scope install current, if there is one.
+ */
 async function reportAdded(
   context: CommandContext,
   added: {
@@ -314,7 +319,7 @@ async function reportAdded(
     /** Every artifact named was pinned, so background updates leave it where it is. */
     pinned: boolean;
   },
-): Promise<void> {
+): Promise<string | undefined> {
   const { printer } = context;
   const { alias, source } = added;
   if (added.introduced) {
@@ -335,8 +340,9 @@ async function reportAdded(
   const said = added.repinned.map((item) => item.name).filter((name) => !acted.has(name));
   summarize(printer, added.ran, new Set(said));
   if (added.scope === "user" && added.autoUpdate) {
-    await keepCurrent(context, alias, added.config, added.pinned);
+    return keepCurrent(context, alias, added.config, added.pinned);
   }
+  return undefined;
 }
 
 type AddFlags = SourceFlags & { as?: string; registry?: string; "no-auto-update"?: boolean };
@@ -382,25 +388,26 @@ function entriesFor(
 
 /**
  * One background job per registry keeps the user scope current. It is created
- * once and never rewritten, so a policy someone set stays set.
+ * once and never rewritten, so a policy someone set stays set. Returns its id.
  */
 async function keepCurrent(
   context: CommandContext,
   alias: string,
   config: Readonly<Record<string, string>>,
   pinned: boolean,
-): Promise<void> {
+): Promise<string | undefined> {
+  let jobId: string;
   try {
-    await withDaemon(async (client) => {
-      await withFreshConfig(client, async (state) => {
+    jobId = await withDaemon((client) =>
+      withFreshConfig(client, async (state) => {
         const account = state.accounts.find((item) => item.registry === alias);
-        const watched = state.jobs.some(
+        const watched = state.jobs.find(
           (job) =>
             job.account === account?.id &&
             job.steps.some((step) => step.root !== undefined && scopeFor(step.root) === "user"),
         );
-        if (watched) return;
-        await client.request("job.create", {
+        if (watched !== undefined) return watched.id;
+        const { job } = await client.request("job.create", {
           expectedRevision: state.revision,
           root: userScopeDir(),
           scope: "user",
@@ -408,14 +415,15 @@ async function keepCurrent(
           config,
           declaredOnly: true,
         });
-      });
-    });
+        return job.id;
+      }),
+    );
   } catch (error) {
     context.printer.warning(
       `Installed, but could not turn on background updates: ${(error as Error).message}`,
     );
     context.printer.hint(`Run \`aireg job add -g --registry ${alias}\` to try again.`);
-    return;
+    return undefined;
   }
   context.printer.note(
     "kept",
@@ -427,6 +435,7 @@ async function keepCurrent(
   if (autostart !== undefined && !autostart.registered) {
     context.printer.note("next", "aireg daemon autostart on");
   }
+  return jobId;
 }
 
 /**
