@@ -1,5 +1,6 @@
 import type { Styler } from "#core/output.ts";
 import { cells } from "#core/term/format.ts";
+import { GLYPH } from "#core/term/theme.ts";
 import { type Mark, railLine, titleLine } from "./layout.ts";
 import {
   ask,
@@ -57,7 +58,13 @@ class Typing implements Machine<string> {
       return [titleLine(style, "submit", message, style.dim(this.value || initial))];
     }
     return [
-      titleLine(style, "active", message, this.value === "" ? style.dim(initial) : this.value),
+      // Ink hides the terminal's cursor, so the prompt draws one where typing goes.
+      titleLine(
+        style,
+        "active",
+        message,
+        this.value === "" ? `${GLYPH.caret}${style.dim(initial)}` : `${this.value}${GLYPH.caret}`,
+      ),
       ...(hint === undefined ? [] : [railLine(style, style.dim(hint))]),
     ];
   }

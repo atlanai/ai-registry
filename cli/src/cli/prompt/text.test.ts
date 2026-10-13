@@ -19,29 +19,29 @@ async function type(initial: string | undefined, keys: string[], hint?: string) 
 }
 
 describe("text", () => {
-  it("shows the suggestion until something is typed, and takes it when nothing is", async () => {
+  it("shows the cursor and the suggestion until something is typed, and takes it when nothing is", async () => {
     const { value, first, screen } = await type("newreg", [enter]);
-    expect(first).toEqual(["◆  Name  newreg"]);
+    expect(first).toEqual(["◆  Name  ▌newreg"]);
     expect(value).toBe("newreg");
     expect(screen).toEqual(["◇  Name  newreg"]);
   });
 
   it("shows the hint under the question until it is answered", async () => {
     const { first, screen } = await type("newreg", [enter], "Press Enter to use newreg.");
-    expect(first).toEqual(["◆  Name  newreg", "│  Press Enter to use newreg."]);
+    expect(first).toEqual(["◆  Name  ▌newreg", "│  Press Enter to use newreg."]);
     expect(screen).toEqual(["◇  Name  newreg"]);
   });
 
   it("answers with what was typed, trimmed", async () => {
     const { value, typing, screen } = await type("newreg", [" ab ", "c", backspace, enter]);
-    expect(typing).toEqual(["◆  Name   ab"]);
+    expect(typing).toEqual(["◆  Name   ab ▌"]);
     expect(value).toBe("ab");
     expect(screen).toEqual(["◇  Name   ab"]);
   });
 
   it("goes back to the suggestion when everything typed is erased", async () => {
     const { value, typing } = await type("x", ["a", backspace, backspace, enter]);
-    expect(typing).toEqual(["◆  Name  x"]);
+    expect(typing).toEqual(["◆  Name  ▌x"]);
     expect(value).toBe("x");
   });
 
