@@ -104,7 +104,7 @@ JSON output: `{"ok": true, "data": {"root": "...", "created": true, "slug": "acm
 
 Checks the registry, then indexes every version folder that isn't indexed yet. For each new version it writes `artifact.json`, with the kind's own document as `spec` and a digest for every file but VCS and OS files such as `.git` and `.DS_Store`, and updates the artifact's `versions.json` and the registry's `index.json`. Versions already indexed are never rewritten.
 
-`index` also keeps each artifact's `latest` on its newest active release. A status change is the one edit you make to `versions.json` by hand: after you set a version's `"yanked": true`, or its `status` to `deprecated` or `archived`, run `index` to move `latest` off it. `index` lists a new version above the ones before it. A prerelease such as `1.0.0-rc.1` becomes `latest` only while the artifact has no release.
+`index` also keeps each artifact's `latest` on its newest active release. A status change is the one edit you make to `versions.json` by hand: after you set a version's `"yanked": true`, or its `status` to `deprecated` or `archived`, run `index` to move `latest` off it and update the row's `catalog_digest`, if it has one. `index` lists a new version above the ones before it. A prerelease such as `1.0.0-rc.1` becomes `latest` only while the artifact has no release.
 
 `index` works in the registry that holds `<folder>`, or the current folder. If the registry has problems, it lists them and indexes nothing. In a git repository, it ends with the commit command to release what it indexed. Create artifacts to index with [`aireg skill new`](kinds.md).
 
