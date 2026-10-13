@@ -58,8 +58,7 @@
       "required": [
         "harness"
       ],
-      "additionalProperties": false,
-      "description": "Optional. What the agent runs on, for an agent that runs outside a coding agent; a coding agent's harness is the installing project's choice."
+      "additionalProperties": false
     }
   },
   "required": [
