@@ -336,7 +336,7 @@ async function sendTo(
         message: "What changed?",
         style: printer.errStyle,
         initial: message,
-        hint: "Press Enter to use this message, or type another.",
+        hint: "Type what changed, or press Enter to use this message.",
       },
       step.io,
     );

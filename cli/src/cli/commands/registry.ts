@@ -213,7 +213,7 @@ async function init(
   const suggested = (await remoteOwner(root)) ?? basename(root);
   const name =
     flags.name ??
-    (await ask(step, "Name", suggested, `Press Enter to use ${suggested}, or type another name.`));
+    (await ask(step, "Name", suggested, `Type a name, or press Enter to use ${suggested}.`));
   if (name === undefined) return cancel(step);
   const description =
     flags.description ??
@@ -221,7 +221,7 @@ async function init(
       step,
       "Description",
       "",
-      "Optional, such as Skills our team shares. Press Enter to skip.",
+      "Optional. Type one line, such as Skills our team shares.",
     ));
   if (description === undefined) return cancel(step);
   const listed =
@@ -231,7 +231,7 @@ async function init(
         step,
         "Namespaces",
         "",
-        "Optional. Separate several with commas or spaces: engineering, data.",
+        "Optional. Type names separated by commas or spaces: engineering, data.",
       ),
     );
   if (listed === undefined) return cancel(step);

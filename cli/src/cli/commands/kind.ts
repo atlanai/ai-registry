@@ -213,7 +213,11 @@ async function askFields(step: Interaction, fields: Record<string, unknown>, tod
     const label = path.replaceAll(".", " ");
     const message = label.charAt(0).toUpperCase() + label.slice(1);
     const answer = await text(
-      { message, style: step.printer.errStyle, hint: "Press Enter to leave it as TODO for now." },
+      {
+        message,
+        style: step.printer.errStyle,
+        hint: "Type a value, or press Enter to leave it as TODO for now.",
+      },
       step.io,
     );
     if (canceled(answer)) return false;
@@ -233,7 +237,7 @@ async function askName(kind: string, step: Interaction): Promise<string | undefi
     {
       message: "Name",
       style: step.printer.errStyle,
-      hint: "Lowercase letters, digits and hyphens, such as pr-review.",
+      hint: "Type a name: lowercase letters, digits and hyphens, such as pr-review.",
     },
     step.io,
   );
