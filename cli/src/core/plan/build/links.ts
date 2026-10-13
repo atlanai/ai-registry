@@ -98,7 +98,7 @@ export function updateLinks(
 ): boolean {
   let touched = restage;
   for (const link of links) {
-    const copying = build.options.copy || item.copy === true;
+    const copying = link.render !== undefined || build.options.copy || item.copy === true;
     const correct = inPlace(state?.links[link.relative], copying, link.from);
     const prior = previous?.links.find((old) => old.path === link.relative);
     if (keepsEditedCopy(prior, state, build)) continue;
@@ -115,6 +115,7 @@ export function updateLinks(
         plugin: link.shared === true,
         ...(link.content === undefined ? {} : { content: link.content }),
         ...(link.fan === true ? { fan: true } : {}),
+        ...(link.render === undefined ? {} : { render: link.render }),
         ...(recorded === undefined ? {} : { recorded }),
       });
       touched = true;

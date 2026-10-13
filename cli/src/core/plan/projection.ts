@@ -1,6 +1,7 @@
 import { dirname, join, posix, resolve } from "node:path";
 import { sanitizeName } from "#adapter/text.ts";
 import { posixRelative } from "#core/fs/path.ts";
+import type { Render } from "#core/harness/contract.ts";
 import {
   type Harnesses,
   placementFor,
@@ -39,6 +40,8 @@ export interface PlannedLink {
   fan?: boolean;
   /** The plugin name, when it had to differ from the namespace it holds. */
   renamed?: { namespace: string; name: string };
+  /** Written in the harness's own format rather than linked. */
+  render?: Render;
 }
 
 function plannedLink(
@@ -46,8 +49,16 @@ function plannedLink(
   path: string,
   from: string,
   options: ProjectionOptions,
+  kind?: ArtifactKind,
 ): PlannedLink {
-  return { harness: name, absolute: path, relative: posixRelative(options.roots.base, path), from };
+  const render = kind === undefined ? undefined : options.harnesses[name]?.kinds[kind]?.render;
+  return {
+    harness: name,
+    absolute: path,
+    relative: posixRelative(options.roots.base, path),
+    from,
+    ...(render === undefined ? {} : { render }),
+  };
 }
 
 /**
@@ -252,7 +263,8 @@ function pluginLinks(
       for (const leaf of item.contents.filter((each) => each.kind === kind)) {
         const path = projectionPath(target, leaf.kind, leaf.name, scope, cwd);
         if (path === undefined) continue;
-        links.push(plannedLink(name, path, join(copy, ...leaf.within.split(posix.sep)), options));
+        const from = join(copy, ...leaf.within.split(posix.sep));
+        links.push(plannedLink(name, path, from, options, leaf.kind));
       }
     }
   }
@@ -282,8 +294,9 @@ export function linksFor(
   for (const name of new Set(selected)) {
     const target = options.harnesses[name];
     if (target === undefined) continue;
-    // Its plugins carry only the kinds it maps; any other kind is placed flat or not at all.
-    if (!wrapped || !takesPlugin(target, scope) || target.kinds[item.kind] === undefined) {
+    // Its plugins carry only the kinds it maps as they are; any other kind is placed flat or not at all.
+    const mapping = target.kinds[item.kind];
+    if (!wrapped || !takesPlugin(target, scope) || mapping === undefined || mapping.render) {
       rest.push(name);
       continue;
     }
@@ -295,7 +308,7 @@ export function linksFor(
   for (const name of placed.targets) {
     const target = options.harnesses[name] as Harnesses[string];
     const own = projectionPath(target, item.kind, item.name, scope, cwd);
-    if (own !== undefined) links.push(plannedLink(name, own, copy, options));
+    if (own !== undefined) links.push(plannedLink(name, own, copy, options, item.kind));
   }
   return links;
 }

@@ -8,6 +8,7 @@ import { Printer } from "#core/output.ts";
 import { emptyPlan, type Plan, type Selected } from "#core/plan/model.ts";
 import { roots, type Scope } from "#core/store/paths.ts";
 import { KEY, terminal } from "#test/kit/fake-terminal.ts";
+import { withoutKind } from "#test/kit/harness.ts";
 import {
   chooseTargets,
   confirmPlan,
@@ -20,6 +21,8 @@ import {
 } from "./flow.ts";
 
 const harnesses = resolveHarnesses({ HOME: "/home/dev" });
+/** A table where Codex has nowhere to put an agent, for what is said about a kind left out. */
+const noCodexAgents = withoutKind(harnesses, "codex", "agent");
 
 describe("methodIsMeaningful", () => {
   // Codex places a plugin as its parts; Cursor has nowhere for an agent.
@@ -105,11 +108,13 @@ describe("linkedTargets", () => {
 describe("unhandled", () => {
   it.each([
     ["names the kinds a harness has nowhere to put", "codex", ["skill", "agent"], ["agent"]],
+    ["is empty once the harness maps the kind", "codex", ["agent"], []],
     ["does not count a kind the harness takes as parts", "codex", ["plugin", "skill"], []],
     ["is empty for a harness that handles them all", "claude", ["plugin", "skill", "agent"], []],
     ["is empty for a harness it has never heard of", "nope", ["skill"], []],
-  ] as const)("%s", (_, harness, kinds, expected) => {
-    expect(unhandled(harnesses, harness, kinds)).toEqual(expected);
+  ] as const)("%s", (name, harness, kinds, expected) => {
+    const table = name.startsWith("names") ? noCodexAgents : harnesses;
+    expect(unhandled(table, harness, kinds)).toEqual(expected);
   });
 });
 
@@ -213,7 +218,10 @@ describe("confirmPlan", () => {
         },
       ],
     };
-    const { shown } = await answer(plan, [ENTER], { targets: ["claude", "codex"], harnesses });
+    const { shown } = await answer(plan, [ENTER], {
+      targets: ["claude", "codex"],
+      harnesses: noCodexAgents,
+    });
     expect(shown).toMatch(/artifact +version +harnesses\n/);
     expect(shown).toMatch(/pr-review +0\.1\.0 +Claude Code, Codex/);
     expect(shown).toMatch(/reviewer +0\.1\.0 +Claude Code\n/);
@@ -250,7 +258,10 @@ describe("confirmPlan", () => {
         },
       ],
     };
-    const { shown } = await answer(plan, [ENTER], { targets: ["claude", "codex"], harnesses });
+    const { shown } = await answer(plan, [ENTER], {
+      targets: ["claude", "codex"],
+      harnesses: noCodexAgents,
+    });
     expect(shown).toMatch(/reviewer +0\.1\.0 +Claude Code\n/);
     expect(shown).toContain("Codex skips reviewer: it does not load agents.");
   });
@@ -329,14 +340,17 @@ describe("chooseTargets", () => {
   });
 
   it("follows the cursor: Codex reads skills from .agents, Cursor from .agents and .claude", async () => {
-    expect((await pick([], [KEY.down])).shown).toMatch(/Codex\s+\.agents\/skills$/m);
+    expect((await pick([], [KEY.down])).shown).toMatch(
+      /Codex\s+\.agents\/skills, \.codex\/agents$/m,
+    );
     expect((await pick([], [KEY.down, KEY.down])).shown).toMatch(
       /Cursor\s+\.agents\/skills, \.claude\/agents$/m,
     );
   });
 
   it("leaves a tool that loads none of it unpicked, with a dash", async () => {
-    const { picked, shown } = await pick([], [KEY.down], [item("agent", "reviewer")]);
+    const agent = [item("agent", "reviewer")];
+    const { picked, shown } = await pick([], [KEY.down], agent, "project", noCodexAgents);
     expect(shown).toMatch(/Codex\s+-$/m);
     expect(picked).toEqual(["claude"]);
   });

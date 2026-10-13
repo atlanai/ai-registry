@@ -10,7 +10,7 @@ import { olderThan } from "#core/semver.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { GLYPH } from "#core/term/theme.ts";
-import type { Chosen, PlanReport, RunResult } from "#engine/pipeline.ts";
+import { type Chosen, droppedNotices, type PlanReport, type RunResult } from "#engine/pipeline.ts";
 import { underHome } from "./home.ts";
 import { linkLoadedBy, loadedBy, toolName } from "./tools.ts";
 
@@ -214,6 +214,7 @@ export function summarize(
     if (told.has(name) || harnessesOf(name).length === 0) continue;
     printer.note("runs", `${describeCarried(carries)} from ${name}, in ${tools([name])}`);
   }
+  for (const { message } of droppedNotices(applied, harnesses)) printer.warning(message);
 }
 
 /**

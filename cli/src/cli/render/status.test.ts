@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveHarnesses } from "#core/harness/index.ts";
 import { Printer } from "#core/output.ts";
 import type { ArtifactStatus } from "#core/plan/status.ts";
+import { withoutKind } from "#test/kit/harness.ts";
 import type { Installed } from "./installed.ts";
 import { renderStatus } from "./status.ts";
 
@@ -10,11 +11,11 @@ const chosen = {
   for: () => ["claude", "codex"],
 };
 
-function rendered(statuses: ArtifactStatus[], rows: Installed[]): string[] {
+function rendered(statuses: ArtifactStatus[], rows: Installed[], harnesses = chosen.harnesses) {
   const lines: string[] = [];
   const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
   const printer = new Printer({ out: sink, err: sink, color: "never" });
-  renderStatus(printer, statuses, rows, "project", chosen);
+  renderStatus(printer, statuses, rows, "project", { ...chosen, harnesses });
   return lines;
 }
 
@@ -71,6 +72,7 @@ describe("renderStatus", () => {
         { name: "reviewer", state: "ok", detail: undefined, harnesses: { claude: "linked" } },
       ],
       [row("pr-review", "skill"), row("reviewer", "agent")],
+      withoutKind(chosen.harnesses, "codex", "agent"),
     );
     expect(lines).toContain(
       "  pr-review  skill  0.1.0    acme  replaced     ✓      replaced  replaced by something of yours",
@@ -78,5 +80,21 @@ describe("renderStatus", () => {
     expect(lines).toContain("Codex skips reviewer: it does not load agents.");
     expect(lines).toContain("ok  matches the lockfile, links intact");
     expect(lines).toContain("1 artifact needs attention.");
+  });
+
+  it("shows an agent written for Codex under Codex, with nothing skipped", () => {
+    const lines = rendered(
+      [
+        {
+          name: "reviewer",
+          state: "ok",
+          detail: undefined,
+          harnesses: { claude: "linked", codex: "linked" },
+        },
+      ],
+      [row("reviewer", "agent")],
+    );
+    expect(lines).toContain("  reviewer  agent  0.1.0    acme  ✓            ✓      ok");
+    expect(lines.join("\n")).not.toContain("skips");
   });
 });

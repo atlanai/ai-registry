@@ -54,7 +54,9 @@ A harness is a coding agent that aireg installs into. aireg knows four:
 | `cursor` | Cursor |
 | `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
 
-aireg links each artifact into the folder its harness reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`, and doesn't take agents.
+aireg links each artifact into the folder its harness reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`.
+
+Codex reads agents only as TOML, so aireg writes each agent as a file of its own, never a link: `.codex/agents/<name>.toml`, or `~/.codex/agents/<name>.toml` in your user scope (under `CODEX_HOME` when it's set). The file holds the agent's `name` and `description`, and the body of its Markdown as `developer_instructions`. Codex has no setting for any other front-matter field, such as `model`, so aireg leaves it out and warns. Codex can't limit an agent's tools either: an agent that sets `tools` can use every tool there. Codex loads a project's agents only in a project it trusts. aireg treats the file as any copy it writes: [`aireg status`](status.md) shows it as edited once you change it, and `aireg update` leaves your edit in place.
 
 A plugin installs as one plugin in your user scope: Claude Code in `~/.claude/skills/<plugin>/`, and Codex in `~/.codex/plugins/cache/<registry>/<plugin>/local`, which aireg turns on in `~/.codex/config.toml`. The same goes for each namespace of a registry whose adapter declares its namespaces plugins (`namespacePlugins` in the [adapter contract](adapter.md#the-adapter-contract)). Cursor and the shared `.agents` folder get a link for each artifact in a folder they read.
 

@@ -62,6 +62,13 @@ describe("candidates", () => {
     expect(found.local.map((item) => item.name)).toEqual(["mine"]);
   });
 
+  test("never reads back a file written in a harness's own format", async () => {
+    await write(join(root, ".codex", "agents", "reviewer.toml"), 'name = "reviewer"\n');
+    await write(join(root, ".codex", "skills", "mine", "SKILL.md"), skill("mine"));
+    const found = await candidates(roots, harnesses, ["codex"], emptyLock());
+    expect(found.local.map((item) => `${item.kind}:${item.name}`)).toEqual(["skill:mine"]);
+  });
+
   test("reads its name from front matter, not from the directory", async () => {
     await write(join(root, ".claude", "skills", "dir-name", "SKILL.md"), skill("real-name"));
     const found = await candidates(roots, harnesses, ["claude"], emptyLock());

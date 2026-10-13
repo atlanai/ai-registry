@@ -13,6 +13,7 @@ import {
   type ApplyNotice,
   appliedNotices,
   commit,
+  droppedNotices,
   type Loaded,
   prepareWrite,
   recordOf,
@@ -131,7 +132,11 @@ export async function applyLocal(
   );
   await refuseBlocked(narrowed);
   const result = await commit(loaded, narrowed, scan.acquired, targets, onStep);
-  notices.push(...appliedNotices(loaded.roots, result), ...unstagedNotices(result.unstaged));
+  notices.push(
+    ...appliedNotices(loaded.roots, result, loaded.harnesses),
+    ...unstagedNotices(result.unstaged),
+    ...droppedNotices(result, loaded.harnesses),
+  );
   return {
     changed: Object.values(result.performed).reduce((sum, count) => sum + count, 0),
     notices,

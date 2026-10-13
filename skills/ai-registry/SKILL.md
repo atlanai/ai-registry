@@ -60,8 +60,8 @@ aireg list
 `acme/engineering` holds a `pr-review` skill and a `reviewer` agent that depends on it. Show
 the user what aireg wrote: `.registry/manifest.yml` records what the project asks for,
 `.registry/manifest.lock.yml` the exact version and digest of each, `.registry/artifacts/`
-the installed copies, and `.claude/skills/`, `.claude/agents/` and `.agents/skills/` the
-links each coding agent reads.
+the installed copies, `.claude/skills/`, `.claude/agents/` and `.agents/skills/` the
+links each coding agent reads, and `.codex/agents/reviewer.toml` the agent as Codex reads it.
 
 ## 4. Ask what the user wants next
 

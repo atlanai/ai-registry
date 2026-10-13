@@ -3,6 +3,7 @@ import { quoted } from "#adapter/text.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import type { Render } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
@@ -128,6 +129,8 @@ export type Action =
       recorded?: LinkMode;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
+      /** Written in the harness's own format, always as a real file. */
+      render?: Render;
     }
   | {
       kind: "unlink";

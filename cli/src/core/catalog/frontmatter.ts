@@ -52,6 +52,12 @@ export function frontmatterRecord(text: string): Record<string, unknown> | undef
   }
 }
 
+/** What follows the front matter, or all of the text when it has none. */
+export function markdownBody(text: string): string {
+  const match = FENCE.exec(text);
+  return match === null ? text : text.slice(match[0].length);
+}
+
 /** The fields aireg reads from front matter; each is undefined when absent or not text. */
 export function frontmatter(text: string): Frontmatter {
   const record = frontmatterRecord(text);

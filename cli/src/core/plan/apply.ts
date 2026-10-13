@@ -9,6 +9,7 @@ import { fanOut, link } from "#core/fs/link.ts";
 import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { entries, exists, present, pruneEmptyParent, remove, unseal } from "#core/fs/tree.ts";
+import { type Rendered, renderPlacement } from "#core/harness/render.ts";
 import { assertLeasesHeld } from "#core/lease.ts";
 import { type LinkMode, type Lock, readLock, writeLock } from "#core/lock.ts";
 import { backupStamp } from "#core/store/backups.ts";
@@ -127,6 +128,10 @@ export interface ApplyResult {
   }[];
   /** Plugins this run installed or updated that carry something a harness starts on its own. */
   carried: { name: string; carries: Carried[] }[];
+  /** Front-matter fields a harness's own format had no place for, in each file this run wrote. */
+  dropped: { name: string; harness: string; fields: string[] }[];
+  /** Placements in a harness's own format not written, because the artifact could not fill one. */
+  unrendered: { name: string; harness: string; reason: string }[];
 }
 
 /** What a stage's content is keyed by, written once so both readers agree. */
@@ -219,6 +224,8 @@ interface Run {
   /** The lock as this run found it. */
   before: Lock | undefined;
   projections: ReadonlySet<string> | undefined;
+  dropped: ApplyResult["dropped"];
+  unrendered: ApplyResult["unrendered"];
 }
 
 const linkKey = (name: string, path: string): string => `${name} ${path}`;
@@ -247,7 +254,9 @@ export async function guardsOf(plan: Plan, roots: Roots): Promise<Map<string, Li
   for (const action of plan.actions) {
     if (action.kind === "record" || guards.has(action.to)) continue;
     if (action.kind === "link") {
-      guards.set(action.to, await guardLink(action.to, action.recorded, roots));
+      const rendered = await rendering(action);
+      const text = rendered !== undefined && "text" in rendered ? rendered.text : undefined;
+      guards.set(action.to, await guardLink(action.to, action.recorded, roots, text));
     } else if (action.kind === "unlink" && action.link !== undefined) {
       guards.set(action.to, await guardLink(action.to, action.link.mode, roots));
     }
@@ -329,10 +338,42 @@ async function assemblePlugin(run: Run, action: ActionOf<"link">): Promise<void>
   await assemble(action.from, action.content, found.harnesses);
 }
 
+/** What a placement in a harness's own format holds; undefined for a link, or before its source is copied. */
+async function rendering(action: ActionOf<"link">): Promise<Rendered | undefined> {
+  if (action.render === undefined) return undefined;
+  const source = await readFile(action.from, "utf8").catch(() => undefined);
+  return source === undefined ? undefined : renderPlacement(action.render, source);
+}
+
+/** Written whole and never linked: a harness that reads its own format may refuse a link. */
+async function writeRendered(
+  run: Run,
+  action: ActionOf<"link">,
+  rendered: Rendered | undefined,
+): Promise<LinkMode | undefined> {
+  if (rendered === undefined || "problem" in rendered) {
+    const reason = rendered?.problem ?? "its file could not be read";
+    run.unrendered.push({ name: action.name, harness: action.harness, reason });
+    return undefined;
+  }
+  await remove(action.to);
+  await mkdir(dirname(action.to), { recursive: true });
+  await writeAtomic(action.to, rendered.text);
+  if (rendered.dropped.length > 0) {
+    run.dropped.push({ name: action.name, harness: action.harness, fields: rendered.dropped });
+  }
+  return "copy";
+}
+
 async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   const { roots } = run;
   const key = linkKey(action.name, action.to);
-  const guard = run.guards.get(action.to) ?? "replace";
+  let guard = run.guards.get(action.to) ?? "replace";
+  // Its source may have been copied in by this run, after the guard was taken.
+  const rendered = await rendering(action);
+  if (guard === "keep" && rendered !== undefined && "text" in rendered) {
+    guard = await guardLink(action.to, action.recorded, roots, rendered.text);
+  }
   if (guard === "keep") {
     run.kept.push({ name: action.name, path: action.to });
     run.skipped.add(key);
@@ -360,9 +401,16 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   }
   // A harness that will not load a linked plugin gets a real directory of links instead.
   const fan = action.fan === true && !action.copy;
-  const mode = fan
-    ? await fanOut(action.from, action.to)
-    : await link(action.from, action.to, action.copy);
+  const mode =
+    action.render !== undefined
+      ? await writeRendered(run, action, rendered)
+      : fan
+        ? await fanOut(action.from, action.to)
+        : await link(action.from, action.to, action.copy);
+  if (mode === undefined) {
+    run.skipped.add(key);
+    return;
+  }
   if (fan) run.fanned.set(action.to, action.from);
   run.modes.set(key, mode);
   run.pathModes.set(action.to, mode);
@@ -526,6 +574,8 @@ export async function apply(
     recorded: undefined,
     before,
     projections: undefined,
+    dropped: [],
+    unrendered: [],
   };
 
   let leaseCheckedAt = 0;
@@ -561,5 +611,7 @@ export async function apply(
     kept: run.kept,
     backedUp: run.backedUp,
     carried: await carriedBy(plan, run.recorded, roots),
+    dropped: run.dropped,
+    unrendered: run.unrendered,
   };
 }
