@@ -7,7 +7,7 @@ import { expandUserPath } from "#core/fs/path.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
-import type { HarnessDefinition, Harnesses, Target } from "./contract.ts";
+import type { Harnesses, Target } from "./contract.ts";
 
 export type { Harnesses, KindMapping, Target } from "./contract.ts";
 
@@ -30,15 +30,6 @@ export const CALLER_SIGNALS: readonly { agent: string; env: readonly string[] }[
       ? []
       : [{ agent: harness.id, env: harness.detect.caller }],
   );
-
-function definition(name: string): HarnessDefinition | undefined {
-  return BUILTIN_HARNESSES.find((harness) => harness.id === name);
-}
-
-/** The runtime a registry agent written for this harness names, when it has one. */
-export function agentRuntimeOf(name: string): string | undefined {
-  return definition(name)?.runtime;
-}
 
 /** The built-in harnesses, the only ones aireg knows, as data that crosses the daemon RPC. */
 export function resolveHarnesses(env: NodeJS.ProcessEnv = process.env): Harnesses {

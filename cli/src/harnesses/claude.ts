@@ -3,7 +3,6 @@ import { defineHarness } from "#core/harness/contract.ts";
 export const claude = defineHarness({
   id: "claude",
   displayName: "Claude Code",
-  runtime: "claude-code",
   default: true,
   importable: true,
   roots: { project: ".claude", user: { default: "~/.claude", env: "CLAUDE_CONFIG_DIR" } },

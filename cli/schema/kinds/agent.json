@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "kinds/agent.json",
   "title": "agent",
-  "description": "An agent definition: either an A2A agent card (agent-card.json) or an AGENT.md with front-matter, plus a runtime block naming the harness, framework, provider, and model it runs on. spec wraps the card or the front-matter unchanged and adds runtime.",
+  "description": "An agent definition: an AGENT.md with front-matter, or an A2A agent card (agent-card.json). spec is the parsed front-matter, unchanged, or the card verbatim with its name and description lifted beside it.",
   "type": "object",
   "properties": {
     "name": {
@@ -18,60 +18,17 @@
     "card": {
       "type": "object",
       "description": "The A2A agent card, verbatim, when the agent ships agent-card.json. Opaque to this manifest."
-    },
-    "runtime": {
-      "type": "object",
-      "properties": {
-        "harness": {
-          "type": "string",
-          "description": "What runs the agent, such as claude-code or custom.",
-          "minLength": 1
-        },
-        "framework": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "provider": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "Model provider identifier."
-        },
-        "model": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "Model identifier as the provider names it."
-        },
-        "environment": {
-          "type": "object",
-          "description": "Environment variable NAMES the agent expects, with a description or a non-secret default as the value. Never a secret value.",
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "harness"
-      ],
-      "additionalProperties": false
     }
   },
   "required": [
     "name",
-    "description",
-    "runtime"
+    "description"
   ],
   "additionalProperties": false,
   "x-registry-schema-version": 1,
   "x-registry-searchable": [
     "/name",
-    "/description",
-    "/runtime/harness"
+    "/description"
   ],
   "x-registry-embeddings": [
     "/description"

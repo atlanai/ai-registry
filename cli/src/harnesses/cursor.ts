@@ -3,7 +3,6 @@ import { defineHarness } from "#core/harness/contract.ts";
 export const cursor = defineHarness({
   id: "cursor",
   displayName: "Cursor",
-  runtime: "cursor",
   roots: { project: ".cursor", user: { default: "~/.cursor" } },
   detect: { binary: ["cursor"], caller: ["CURSOR_AGENT", "CURSOR_TRACE_ID"] },
   reads: { skill: ["agents", "cursor", "claude"], agent: ["cursor", "claude"] },

@@ -61,7 +61,7 @@ aireg publish .claude/skills/triage --to ../acme-registry/engineering
 
 The `next` line is the git command that commits the new version in the registry's clone and pushes it. Once the change merges, machines that sync with the registry take the new version within 15 minutes, and projects take it with [`aireg update`](update.md).
 
-Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own file, such as `.claude/agents/reviewer.md`, doesn't say what runs it, so aireg adds `runtime.harness` from the folder it sits in (`claude-code` for `.claude`, `cursor` for `.cursor`), and checks it as `aireg registry validate` would.
+Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own file, such as `.claude/agents/reviewer.md`, goes in as it is, named after the file when its front matter has no `name`, and aireg checks it as `aireg registry validate` would.
 
 ## Options
 

@@ -1,8 +1,6 @@
 ---
 name: reviewer
 description: Reviews pull requests on request and posts ranked findings as a review comment.
-runtime:
-  harness: claude-code
 ---
 
 # Reviewer

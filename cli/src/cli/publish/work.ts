@@ -28,8 +28,6 @@ export interface Work {
   row: string | undefined;
   /** The version an installed copy was edited from, so a newer one is not written over. */
   base: string | undefined;
-  /** The harness a watched folder's file was written for, which its stored copy does not say. */
-  harness?: string | undefined;
 }
 
 const SHAPE_HINT = "Name a skill folder that holds SKILL.md, or an agent's .md file.";
@@ -51,7 +49,6 @@ function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
     home: { registry: entry.registry, namespace: entry.namespace },
     row: key,
     base: entry.version,
-    harness: entry.origin?.harness,
   };
 }
 
