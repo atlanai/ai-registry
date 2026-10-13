@@ -116,8 +116,6 @@ interface Detect {
 export interface HarnessDefinition {
   id: string;
   displayName: string;
-  /** The runtime a registry agent written for this harness names. */
-  runtime?: string | undefined;
   /**
    * Installed into when a manifest names none. Fixed rather than detected, so
    * teammates with different tools still write the same lock.

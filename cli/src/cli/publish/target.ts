@@ -14,7 +14,6 @@ import { kindsOf } from "#core/filespec/write/kinds.ts";
 import { type OfferTarget, offerFrom } from "#core/filespec/write/offer.ts";
 import { versionProblems } from "#core/filespec/write/validate.ts";
 import { posixRelative } from "#core/fs/path.ts";
-import { agentRuntimeOf, DEFAULT_TARGETS } from "#core/harness/index.ts";
 import type { RegistrySource } from "#core/manifest.ts";
 import { parseRef, type Ref, RefParseError } from "#core/ref.ts";
 import { readOnly } from "#engine/remote.ts";
@@ -258,16 +257,9 @@ async function refuseInvalid(
     new Map(texts.map((file) => [file.path, decoder.decode(file.content)])),
   );
   if (problems.length === 0) return;
-  const runtime = agentRuntimeOf(DEFAULT_TARGETS[0] ?? "") ?? "<runtime>";
   throw new AiregError(
     `${namespace}/${work.kind}/${work.name} would not pass \`aireg registry validate\`: ${problems.join("; ")}.`,
-    {
-      code: ErrorCode.Invalid,
-      hint:
-        work.kind === "agent" && problems.some((problem) => problem.includes("`runtime`"))
-          ? `Name what runs it in the front matter of ${work.path}, such as \`runtime: { harness: ${runtime} }\`, then publish again.`
-          : `Fix it in ${work.path}, then publish again.`,
-    },
+    { code: ErrorCode.Invalid, hint: `Fix it in ${work.path}, then publish again.` },
   );
 }
 
@@ -302,7 +294,6 @@ export async function plan(
     id: current?.id,
     description: work.description,
     asAgentDocument: folder,
-    harness: work.harness,
   });
   // The files decide sameness: the digest covers the version, so it always moves.
   const probe = await offerFrom(work.path, target(exact ?? "0.1.0"));

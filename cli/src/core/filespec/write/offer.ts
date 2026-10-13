@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import {
   type ArtifactKind,
   buildEnvelope,
@@ -12,7 +12,6 @@ import { describeFile } from "#adapter/spec/envelope.ts";
 import { frontmatterRecord, ownDescription } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { authored, isDirectory, refusal } from "#core/fs/tree.ts";
-import { agentRuntimeOf } from "#core/harness/index.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { CONCURRENCY, limiter } from "#core/limit.ts";
 import { envelopeSpec } from "./kinds.ts";
@@ -30,30 +29,17 @@ export interface OfferTarget {
   description?: string | undefined;
   /** Send an agent file as the `AGENT.md` a registry folder holds, rather than as `<name>.md`. */
   asAgentDocument?: boolean | undefined;
-  /** The harness an agent file was written for, when its folder does not say. */
-  harness?: string | undefined;
 }
 
-/**
- * A harness's agent file may omit the name and runner a registry agent requires;
- * the artifact's name and the harness it was written for supply them.
- */
-function agentDocument(path: string, content: Buffer, target: OfferTarget): UploadFile {
+/** A harness's agent file may omit the name a registry agent requires; the artifact's name supplies it. */
+function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
   const text = content.toString("utf8");
   const record = frontmatterRecord(text);
   const fence = /^---\r?\n[\s\S]*?\r?\n(?=---\r?(?:\n|$))/.exec(text);
-  if (record === undefined || fence === null)
+  if (record === undefined || fence === null || record.name !== undefined) {
     return { path: AGENT_ENTRY, content, executable: false };
-  const folder = basename(dirname(dirname(path))).replace(/^\./, "");
-  const runtime = agentRuntimeOf(target.harness ?? folder);
-  const added = [
-    ...(record.name === undefined ? [`name: ${target.name}`] : []),
-    ...(record.runtime === undefined && runtime !== undefined
-      ? [`runtime:\n  harness: ${runtime}`]
-      : []),
-  ];
-  const filled =
-    added.length === 0 ? text : `${fence[0]}${added.join("\n")}\n${text.slice(fence[0].length)}`;
+  }
+  const filled = `${fence[0]}name: ${target.name}\n${text.slice(fence[0].length)}`;
   return { path: AGENT_ENTRY, content: Buffer.from(filled, "utf8"), executable: false };
 }
 
@@ -61,7 +47,7 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
   if (!(await isDirectory(path))) {
     const content = await readFile(path);
     if (target.kind === "agent" && target.asAgentDocument === true) {
-      return [agentDocument(path, content, target)];
+      return [agentDocument(content, target)];
     }
     return [{ path: basename(path), content, executable: false }];
   }

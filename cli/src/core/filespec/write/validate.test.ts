@@ -8,8 +8,7 @@ import { validateRoot } from "./validate.ts";
 
 type Builder = ReturnType<typeof registry>;
 
-const AGENT =
-  "---\nname: reviewer\ndescription: Reviews.\nruntime:\n  harness: claude-code\n---\nReview.\n";
+const AGENT = "---\nname: reviewer\ndescription: Reviews.\n---\nReview.\n";
 
 /** A clean registry: a skill, and an agent that depends on it. */
 function clean(root: string): Builder {
@@ -100,6 +99,17 @@ const CASES: Case[] = [
       ),
     path: "artifacts/eng/skill/fmt/1.0.0",
     message: 'is named "other" in its front matter',
+  },
+  {
+    name: "an agent that still names a runtime",
+    edit: (root) =>
+      put(
+        root,
+        "artifacts/eng/agent/helper/1.0.0/AGENT.md",
+        "---\nname: helper\ndescription: d\nruntime:\n  harness: claude-code\n---\n",
+      ),
+    path: "artifacts/eng/agent/helper/1.0.0",
+    message: "`runtime` is not a field this kind takes",
   },
   {
     name: "a dependency the registry does not hold",

@@ -183,7 +183,7 @@ export function specOf(
   // The card stays verbatim; the fields a kind requires are lifted beside it, as `kinds/agent.json` describes.
   const lifted: Record<string, unknown> = {};
   if (isRecord(card)) {
-    for (const field of ["name", "description", "runtime"]) {
+    for (const field of ["name", "description"]) {
       const value = card[field];
       if (value !== undefined) lifted[field] = value;
     }
