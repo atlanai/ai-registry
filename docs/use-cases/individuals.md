@@ -51,7 +51,7 @@ aireg registry index && git add . && git commit -m "release pr-review 0.1.0" && 
 
 ### 3. Install them into every tool on this machine
 
-Connect your registry for this machine and install the whole namespace.
+First move the original you imported in step 2, `~/.claude/skills/pr-review`, out of `~/.claude/skills`. `aireg add -g` doesn't install over a folder of yours, so while the original is there, Claude Code keeps loading it instead of the copy the CLI manages. Then connect your registry for this machine and install the whole namespace.
 
 ```bash
 aireg registry add github.com/<you>/my-skills -g
@@ -59,7 +59,7 @@ aireg add -g my-skills/personal
 aireg daemon autostart on
 ```
 
-`-g` installs into your user scope instead of a project, so every project on this machine gets the skills. Installing `my-skills/personal` takes every skill in the namespace, including ones added later. The CLI's background job checks for new versions every 15 minutes, and `aireg daemon autostart on` starts it when you log in. Then move the original you imported in step 2, `~/.claude/skills/pr-review`, out of `~/.claude/skills`, so Claude Code loads only the copy the CLI manages.
+`-g` installs into your user scope instead of a project, so every project on this machine gets the skills. Installing `my-skills/personal` takes every skill in the namespace, including ones added later. The CLI's background job checks for new versions every 15 minutes, and `aireg daemon autostart on` starts it when you log in.
 
 ### 4. Release an update
 

@@ -129,7 +129,7 @@ aireg install --frozen && aireg status
 
 ### 7. Keep every laptop current
 
-Install a namespace for every project on your machine and let the aireg CLI keep it up to date, so new skills and new versions reach Claude Code and Codex without you running a command.
+Install a namespace for every project on your machine and let the aireg CLI keep it up to date, so new skills and new versions reach Claude Code and Codex without you running a command. If you brought skills in from `~/.claude/skills` in step 2, first move those originals out of the folder. `aireg add -g` doesn't install over a folder of yours, so while an original is there, Claude Code keeps loading it instead of the copy the CLI manages.
 
 ```bash
 aireg registry add github.com/acme/ai-registry -g
@@ -137,7 +137,7 @@ aireg add -g acme/engineering
 aireg daemon autostart on
 ```
 
-`-g` installs into your user scope instead of the current project, so every project on your machine gets the skills. Installing `acme/engineering` takes every skill in the namespace, including ones added later. The CLI's background job checks for new versions every 15 minutes, and `aireg daemon autostart on` starts it when you log in. If you brought skills in from `~/.claude/skills` in step 2, move those originals out of the folder, so Claude Code loads only the copy the CLI manages.
+`-g` installs into your user scope instead of the current project, so every project on your machine gets the skills. Installing `acme/engineering` takes every skill in the namespace, including ones added later. The CLI's background job checks for new versions every 15 minutes, and `aireg daemon autostart on` starts it when you log in.
 
 ## Beyond engineering
 
