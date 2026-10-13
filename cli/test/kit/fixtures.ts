@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test as base, expect, vi } from "vitest";
@@ -100,6 +101,13 @@ function cliIn(home: Home, project: string): Aireg {
     });
 }
 
+/** A daemon an `add -g` started outlives its test, and writes logs while its folder is removed. */
+async function stopDaemon(home: Home): Promise<void> {
+  if (existsSync(join(home.aireg, "logs", "daemon.log"))) {
+    await cliIn(home, home.dir)(["daemon", "stop"]);
+  }
+}
+
 // biome-ignore lint/correctness/noEmptyPattern: vitest reads a fixture's dependencies from this pattern.
 async function makeTmp({}, { onCleanup }: Cleanup): Promise<string> {
   const dir = await tempDir("test-");
@@ -125,8 +133,9 @@ export const test = base
     const home = await makeHome(join(tmp, "home"));
     // In-process code reads the same variables a spawned CLI is given.
     for (const [name, value] of Object.entries(home.env)) vi.stubEnv(name, value);
-    onCleanup(() => {
+    onCleanup(async () => {
       vi.unstubAllEnvs();
+      await stopDaemon(home);
     });
     return home;
   })
@@ -174,7 +183,11 @@ export const homeTest = test.extend("inHome", { auto: true }, async ({ home }) =
  */
 export const fileTest = base
   .extend("tmp", { scope: "file" }, makeTmp)
-  .extend("home", { scope: "file" }, ({ tmp }) => makeHome(join(tmp, "home")))
+  .extend("home", { scope: "file" }, async ({ tmp }, { onCleanup }) => {
+    const home = await makeHome(join(tmp, "home"));
+    onCleanup(() => stopDaemon(home));
+    return home;
+  })
   .extend("project", { scope: "file" }, makeProject)
   .extend("aireg", { scope: "file" }, ({ home, project }) => cliIn(home, project))
   .extend("git", { scope: "file" }, ({ home }) => makeGit(home));
