@@ -47,19 +47,12 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir, home: { dir: homeDir } })
 }, 60_000);
 
 describe("an agent installed for Codex", () => {
-  test("is written as TOML, and each field Codex has no place for is warned about once", async () => {
+  test("is written as TOML holding only what Codex reads", async () => {
     const added = await aireg(["add", "acme/eng/agent/reviewer", "-y"]);
     expect(added.code, added.stderr).toBe(0);
     expect((await lstat(toml())).isFile()).toBe(true);
     expect(await readFile(toml(), "utf8")).toBe(TOML);
-    const said = `${added.stdout}${added.stderr}`;
-    expect(
-      said.match(/Codex cannot limit tools, so reviewer can use every tool there\./g),
-    ).toHaveLength(1);
-    expect(said).toContain(
-      "Codex has no setting for model or color, so they were left out of reviewer.",
-    );
-    expect(said).not.toContain("skips");
+    expect(`${added.stdout}${added.stderr}`).not.toContain("skips");
     const status = await aireg(["status"]);
     expect(status.code, status.stdout).toBe(0);
     expect(status.stdout).toMatch(/reviewer +agent +1\.0\.0 +acme +✓ +✓ +ok/);

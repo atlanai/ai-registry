@@ -503,30 +503,6 @@ export function appliedNotices(
   return notices;
 }
 
-/** Said after the summary: what each agent lost in a harness's own format, once per agent. */
-export function droppedNotices(applied: ApplyResult, harnesses: Harnesses): ApplyNotice[] {
-  const said = new Set<string>();
-  return applied.dropped.flatMap(({ name, harness, fields }) => {
-    const key = `${harness}\0${name}`;
-    if (said.has(key)) return [];
-    said.add(key);
-    const tool = displayName(harnesses, harness);
-    const rest = fields.filter((field) => field !== "tools");
-    return [
-      ...(fields.includes("tools")
-        ? [{ message: `${tool} cannot limit tools, so ${name} can use every tool there.` }]
-        : []),
-      ...(rest.length === 0
-        ? []
-        : [
-            {
-              message: `${tool} has no setting for ${list(rest, "or")}, so ${rest.length === 1 ? "it was" : "they were"} left out of ${name}.`,
-            },
-          ]),
-    ];
-  });
-}
-
 function displayName(harnesses: Harnesses, harness: string): string {
   return harnesses[harness]?.displayName ?? harness;
 }

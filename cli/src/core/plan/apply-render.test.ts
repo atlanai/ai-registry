@@ -70,7 +70,7 @@ function renderPlan(recorded?: LinkMode): Plan {
 }
 
 describe("a rendered placement", () => {
-  test("is written as a real file, recorded as a copy of what was written, with what it left out", async () => {
+  test("is written as a real file, recorded as a copy of what was written", async () => {
     const applied = await apply(renderPlan(), roots, () => Promise.reject(new Error("no fetch")));
     expect((await lstat(target)).isFile()).toBe(true);
     expect(await readFile(target, "utf8")).toBe(TOML);
@@ -81,9 +81,6 @@ describe("a rendered placement", () => {
         mode: "copy",
         digest: await digest(target),
       },
-    ]);
-    expect(applied.dropped).toEqual([
-      { name: "reviewer", harness: "codex", fields: ["tools", "model"] },
     ]);
     expect(applied.installed).toEqual(["reviewer"]);
   });

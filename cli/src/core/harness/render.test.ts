@@ -11,7 +11,7 @@ const AGENT: Render = {
 const agent = (front: string, body: string) => `---\n${front}\n---\n${body}`;
 
 describe("renderPlacement", () => {
-  it("keeps the fields it names and the body, and names every field it drops", () => {
+  it("keeps the fields it names and the body, and leaves out any other front matter", () => {
     const source = agent(
       "name: reviewer\ndescription: Reviews code.\ntools: Read, Grep\nmodel: sonnet\ncolor: cyan",
       "\n# Reviewer\n\nReview the diff.\n",
@@ -24,16 +24,7 @@ describe("renderPlacement", () => {
         '# Reviewer\n\nReview the diff."""',
         "",
       ].join("\n"),
-      dropped: ["tools", "model", "color"],
     });
-  });
-
-  it("leaves out the registry's runtime block without counting it as dropped", () => {
-    const source = agent(
-      "name: reviewer\ndescription: Reviews code.\nruntime:\n  harness: claude-code\nmodel: sonnet",
-      "Review the diff.\n",
-    );
-    expect(renderPlacement(AGENT, source)).toMatchObject({ dropped: ["model"] });
   });
 
   it("escapes backslashes, control characters and runs of quotes, and keeps unicode", () => {
@@ -48,7 +39,6 @@ describe("renderPlacement", () => {
         'Say ""\\"hi""\\" to C:\\\\temp\\\\new.\nTab\there, bell\\u0007, caf\u00e9 \u{1F600}.\nEnd "quoted\\"\\""""',
         "",
       ].join("\n"),
-      dropped: [],
     });
   });
 

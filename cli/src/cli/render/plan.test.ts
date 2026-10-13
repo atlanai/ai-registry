@@ -22,7 +22,6 @@ function printed(
     removed: [],
     kept: [],
     carried: [],
-    dropped: [],
     unrendered: [],
     ...applied,
   } as unknown as ApplyResult;
@@ -42,29 +41,6 @@ const link = (name: string, harness: string) =>
 const at = (harness: string) => ({ harness, path: "p", mode: "symlink" });
 
 describe("summarize", () => {
-  it("warns after the summary about each front-matter field a harness's own format left out", () => {
-    const actions = [link("reviewer", "claude"), link("reviewer", "codex")];
-    const lock = {
-      artifacts: { reviewer: { kind: "agent", links: [at("claude"), at("codex")] } },
-    };
-    const applied = {
-      performed: { link: 2 } as never,
-      installed: ["reviewer"],
-      added: ["reviewer"],
-      lock: lock as never,
-      dropped: [
-        { name: "reviewer", harness: "codex", fields: ["tools", "model", "color"] },
-        { name: "triage", harness: "codex", fields: ["model"] },
-      ],
-    };
-    expect(printed(actions, applied)).toEqual([
-      "✓ Installed reviewer for Claude Code and Codex.",
-      "warning: Codex cannot limit tools, so reviewer can use every tool there.",
-      "warning: Codex has no setting for model or color, so they were left out of reviewer.",
-      "warning: Codex has no setting for model, so it was left out of triage.",
-    ]);
-  });
-
   it("names the tools that load what was installed, not the folders or the steps", () => {
     const actions = [link("lint", "claude"), link("lint", "agents")];
     const lock = { artifacts: { lint: { kind: "skill", links: [at("claude"), at("agents")] } } };

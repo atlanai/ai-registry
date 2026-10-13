@@ -13,7 +13,6 @@ import {
   type ApplyNotice,
   appliedNotices,
   commit,
-  droppedNotices,
   type Loaded,
   prepareWrite,
   recordOf,
@@ -135,7 +134,6 @@ export async function applyLocal(
   notices.push(
     ...appliedNotices(loaded.roots, result, loaded.harnesses),
     ...unstagedNotices(result.unstaged),
-    ...droppedNotices(result, loaded.harnesses),
   );
   return {
     changed: Object.values(result.performed).reduce((sum, count) => sum + count, 0),

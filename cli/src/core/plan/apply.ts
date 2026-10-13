@@ -128,8 +128,6 @@ export interface ApplyResult {
   }[];
   /** Plugins this run installed or updated that carry something a harness starts on its own. */
   carried: { name: string; carries: Carried[] }[];
-  /** Front-matter fields a harness's own format had no place for, in each file this run wrote. */
-  dropped: { name: string; harness: string; fields: string[] }[];
   /** Placements in a harness's own format not written, because the artifact could not fill one. */
   unrendered: { name: string; harness: string; reason: string }[];
 }
@@ -224,7 +222,6 @@ interface Run {
   /** The lock as this run found it. */
   before: Lock | undefined;
   projections: ReadonlySet<string> | undefined;
-  dropped: ApplyResult["dropped"];
   unrendered: ApplyResult["unrendered"];
 }
 
@@ -359,9 +356,6 @@ async function writeRendered(
   await remove(action.to);
   await mkdir(dirname(action.to), { recursive: true });
   await writeAtomic(action.to, rendered.text);
-  if (rendered.dropped.length > 0) {
-    run.dropped.push({ name: action.name, harness: action.harness, fields: rendered.dropped });
-  }
   return "copy";
 }
 
@@ -574,7 +568,6 @@ export async function apply(
     recorded: undefined,
     before,
     projections: undefined,
-    dropped: [],
     unrendered: [],
   };
 
@@ -611,7 +604,6 @@ export async function apply(
     kept: run.kept,
     backedUp: run.backedUp,
     carried: await carriedBy(plan, run.recorded, roots),
-    dropped: run.dropped,
     unrendered: run.unrendered,
   };
 }
