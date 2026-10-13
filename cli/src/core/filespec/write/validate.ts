@@ -639,9 +639,12 @@ async function rowProblems(
     if (!isRecord(envelope) || !isRecord(envelope.metadata)) continue;
     const want = catalogDigest(envelope as unknown as Envelope, row);
     if (row.catalog_digest === want) continue;
+    // With the content as released, only the row's status moved it, and indexing recomputes it.
+    const indexed = contentDigest(envelope as unknown as Envelope) === row.digest;
     problems.push({
       path: at,
       message: `catalog_digest of ${row.version} is ${row.catalog_digest}, but its row and envelope give ${want}`,
+      ...(indexed ? { fix: "aireg registry index" } : {}),
     });
   }
   return problems;

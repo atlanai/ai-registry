@@ -29,10 +29,13 @@ import {
 import {
   type ArtifactKind,
   buildEnvelope,
+  contentDigest,
+  type Envelope,
   type EnvelopeMetadata,
   type FileDescriptor,
   sha256,
 } from "#adapter/index.ts";
+import { catalogDigest } from "#adapter/spec/canonical.ts";
 import { describeFile } from "#adapter/spec/envelope.ts";
 import { isDigest } from "#adapter/spec/ref.ts";
 import { ownDescription } from "#core/catalog/frontmatter.ts";
@@ -273,6 +276,12 @@ async function indexRootNow(root: string, at: string): Promise<Indexed> {
   const paths: string[] = [];
   const latest = new Map<string, OfferedVersion>();
   const folders = await versionFolders(root);
+  const documents = new Set(
+    folders.map((folder) => versionsPath(folder.namespace, folder.kind, folder.name)),
+  );
+  for (const versionsAt of documents) {
+    if (await recatalog(root, versionsAt)) paths.push(versionsAt);
+  }
   const kinds = await kindsOf(root);
   const listings = new Map<string, Map<string, unknown>>();
   const pending = new Map<string, unknown>();
@@ -314,9 +323,6 @@ async function indexRootNow(root: string, at: string): Promise<Indexed> {
   // A yank or a hand edit leaves `latest` behind without adding a version, so
   // every artifact's is recomputed, not only those just indexed.
   const moved: OfferedVersion[] = [];
-  const documents = new Set(
-    folders.map((folder) => versionsPath(folder.namespace, folder.kind, folder.name)),
-  );
   for (const versionsAt of documents) {
     if (latest.has(versionsAt)) continue;
     const found = await currentLatest(root, versionsAt);
@@ -333,7 +339,38 @@ async function indexRootNow(root: string, at: string): Promise<Indexed> {
     await writeAtomic(join(root, INDEX_DOCUMENT), specJson(index));
     paths.push(INDEX_DOCUMENT);
   }
-  return { added, moved, paths };
+  return { added, moved, paths: [...new Set(paths)] };
+}
+
+/**
+ * Section 9: a status change moves its row's `catalog_digest` too (section 4.3). Only a row
+ * whose envelope still has its content digest is recomputed, so changed content stays an error.
+ */
+async function recatalog(root: string, versionsAt: string): Promise<boolean> {
+  const document = await json(root, versionsAt).catch(() => undefined);
+  if (!isRecord(document) || !Array.isArray(document.versions)) return false;
+  const rows: unknown[] = document.versions;
+  const versions: unknown[] = [];
+  for (const row of rows) versions.push(await recataloged(root, versionsAt, row));
+  if (versions.every((row, at) => row === rows[at])) return false;
+  await writeAtomic(
+    join(root, ...versionsAt.split(posix.sep)),
+    specJson({ ...document, versions }),
+  );
+  return true;
+}
+
+async function recataloged(root: string, versionsAt: string, row: unknown): Promise<unknown> {
+  if (!isRecord(row) || typeof row.catalog_digest !== "string") return row;
+  if (typeof row.version !== "string" || !isVersion(row.version)) return row;
+  const envelope = await json(
+    root,
+    `${posix.dirname(versionsAt)}/${row.version}/${ENVELOPE}`,
+  ).catch(() => undefined);
+  if (!isRecord(envelope) || !isRecord(envelope.metadata)) return row;
+  if (contentDigest(envelope as unknown as Envelope) !== row.digest) return row;
+  const want = catalogDigest(envelope as unknown as Envelope, row);
+  return want === row.catalog_digest ? row : { ...row, catalog_digest: want };
 }
 
 /** An artifact whose `versions.json` is gone has nothing left to list. */
@@ -368,7 +405,7 @@ async function currentLatest(
   const version =
     newest(rows) ?? (typeof document.latest === "string" ? document.latest : undefined);
   const row = rows.find((item) => (item as { version?: unknown }).version === version) as
-    | { digest?: unknown; status?: unknown }
+    | { digest?: unknown; status?: unknown; catalog_digest?: unknown }
     | undefined;
   if (version === undefined || typeof row?.digest !== "string") return undefined;
   const [, namespace = "", kind = "", name = ""] = versionsAt.split(posix.sep);
@@ -386,6 +423,7 @@ async function currentLatest(
       digest: row.digest,
       ...(typeof description === "string" ? { description } : {}),
       ...(typeof row.status === "string" ? { status: row.status } : {}),
+      ...(typeof row.catalog_digest === "string" ? { catalogDigest: row.catalog_digest } : {}),
     },
     document: { ...document, latest: version },
     moved: document.latest !== version,

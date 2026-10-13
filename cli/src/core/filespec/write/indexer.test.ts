@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
 import { indexRoot } from "./indexer.ts";
+import { validateRoot } from "./validate.ts";
 
 const held = vi.hoisted(() => ({ paths: [] as string[] }));
 
@@ -149,6 +150,26 @@ describe("indexRoot", () => {
     const index = JSON.parse(await readFile(join(root, "index.json"), "utf8"));
     const row = index.entries.find((entry: { name: string }) => entry.name === "pr-review");
     expect(row).toMatchObject({ latest: "1.2.0", status: "deprecated" });
+  });
+
+  test("recomputes the catalog digest a yank moves", async () => {
+    const path = "artifacts/engineering/skill/pr-review/versions.json";
+    const at = join(root, path);
+    const versions = JSON.parse(await readFile(at, "utf8"));
+    Object.assign(versions.versions[0], { yanked: true, reason: "Flags false positives." });
+    await writeFile(at, JSON.stringify(versions));
+    expect((await validateRoot(root)).problems).toEqual([
+      expect.objectContaining({ path, fix: "aireg registry index" }),
+    ]);
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    expect((await validateRoot(root)).problems).toEqual([]);
+    const rows = JSON.parse(await readFile(at, "utf8")).versions;
+    const index = JSON.parse(await readFile(join(root, "index.json"), "utf8"));
+    expect(
+      index.entries.find((entry: { name: string }) => entry.name === "pr-review"),
+    ).toMatchObject({ latest: "1.2.0", catalog_digest: rows[0].catalog_digest });
   });
 
   test("drops the row of an artifact whose folder was deleted", async () => {
