@@ -482,7 +482,6 @@ async function follow(
   common: CommonOptions,
   sent: readonly Planned[],
 ) {
-  // Each row with the version it sent.
   const rows = new Map<string, string>();
   for (const item of sent) {
     const row = item.work.row;
@@ -520,7 +519,7 @@ async function follow(
           );
         } else {
           context.printer.warning(
-            `The registry serves ${row} ${other}, not the ${version} you published, so the copy here was left as it is. Run ${next} only once it serves ${version}: until then it would put ${other} in place of your copy.`,
+            `The registry serves ${row} ${other}, not the ${version} you published, so the copy here was left as it is. Run ${next} once it serves ${version}; before that it would replace your copy with ${other}.`,
           );
         }
       }
@@ -539,7 +538,7 @@ async function follow(
 export function moved(
   found: Scan,
   entry: LockArtifact | undefined,
-  /** The version just sent: a head older than it is not what was sent, as after `--force` into a clone. */
+  /** The version just sent; an older head is someone else's, as after `--force` into a clone. */
   sent?: string,
 ): boolean {
   const now = entry === undefined ? undefined : head(found, entry);
