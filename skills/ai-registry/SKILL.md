@@ -47,8 +47,8 @@ starts. Until then, read them where they were installed, such as
 
 ## 3. Try the example registry
 
-Offer this before the user builds their own. It installs into a new project, so nothing
-reaches the user scope:
+Offer this before the user builds their own, unless they already asked for something else.
+It installs into a new project, so nothing reaches the user scope:
 
 ```sh
 mkdir -p ~/try-aireg && cd ~/try-aireg && git init
@@ -65,11 +65,14 @@ links each coding agent reads.
 
 ## 4. Ask what the user wants next
 
-| The user wants | Follow |
-| --- | --- |
-| A registry of their own, or one for their team | The `new` skill. For one person, one namespace such as `personal` is enough, and the pull request check is optional. |
-| The skills and agents in a registry someone shared | The `add` skill |
-| To publish a skill or agent, or release a new version of one | The `publish` skill |
+If the user's first message already said what they want, do that now. Otherwise ask, and
+offer the use cases in [references/use-cases.md](references/use-cases.md) that fit them: 1
+to 3 for one person's coding agents, 4 and 5 for sharing a registry, 6 to 9 for a team.
+Each one gives its steps.
+
+For anything else, follow the `new` skill to set up a registry, the `add` skill to install
+from one, or the `publish` skill to publish to one. For one person, one namespace such as
+`personal` is enough, and the pull request check is optional.
 
 When the user brings skills in from their own harness folders, such as `~/.claude/skills`,
 move the originals out, with their yes, before installing the registry with `-g`. aireg
