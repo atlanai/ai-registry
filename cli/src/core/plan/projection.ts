@@ -40,7 +40,7 @@ export interface PlannedLink {
   fan?: boolean;
   /** The plugin name, when it had to differ from the namespace it holds. */
   renamed?: { namespace: string; name: string };
-  /** Written in the harness's own format rather than linked. */
+  /** Written in the harness's own format. */
   render?: Render;
 }
 
@@ -294,7 +294,7 @@ export function linksFor(
   for (const name of new Set(selected)) {
     const target = options.harnesses[name];
     if (target === undefined) continue;
-    // Its plugins carry only the kinds it maps as they are; any other kind is placed flat or not at all.
+    // Its plugins carry only kinds it maps unrendered; the rest are placed flat or not at all.
     const mapping = target.kinds[item.kind];
     if (!wrapped || !takesPlugin(target, scope) || mapping === undefined || mapping.render) {
       rest.push(name);

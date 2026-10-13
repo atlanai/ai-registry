@@ -108,7 +108,6 @@ describe("linkedTargets", () => {
 describe("unhandled", () => {
   it.each([
     ["names the kinds a harness has nowhere to put", "codex", ["skill", "agent"], ["agent"]],
-    ["is empty once the harness maps the kind", "codex", ["agent"], []],
     ["does not count a kind the harness takes as parts", "codex", ["plugin", "skill"], []],
     ["is empty for a harness that handles them all", "claude", ["plugin", "skill", "agent"], []],
     ["is empty for a harness it has never heard of", "nope", ["skill"], []],

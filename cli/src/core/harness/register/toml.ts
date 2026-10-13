@@ -38,10 +38,7 @@ export function quote(value: string): string {
   return `"${escaped(value).replaceAll('"', '\\"')}"`;
 }
 
-/**
- * A multi-line basic string, kept readable: lines and tabs stay as they are, and a quote is
- * escaped only where three in a row, or one before the closing quotes, would end it early.
- */
+/** A multi-line basic string; a quote is escaped only where it would end the string early. */
 export function multilineQuote(value: string): string {
   const text = escaped(value, "\n\t")
     .replace(/"+$/, (run) => run.replaceAll('"', '\\"'))

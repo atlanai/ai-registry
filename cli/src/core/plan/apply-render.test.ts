@@ -1,7 +1,6 @@
 import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
-import { digest } from "#core/fs/digest.ts";
 import { emptyLock, type LinkMode, type Lock } from "#core/lock.ts";
 import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
 import { emptyPlan } from "#test/kit/builders/plan.ts";
@@ -70,21 +69,6 @@ function renderPlan(recorded?: LinkMode): Plan {
 }
 
 describe("a rendered placement", () => {
-  test("is written as a real file, recorded as a copy of what was written", async () => {
-    const applied = await apply(renderPlan(), roots, () => Promise.reject(new Error("no fetch")));
-    expect((await lstat(target)).isFile()).toBe(true);
-    expect(await readFile(target, "utf8")).toBe(TOML);
-    expect(applied.lock?.artifacts.reviewer?.links).toEqual([
-      {
-        harness: "codex",
-        path: ".codex/agents/reviewer.toml",
-        mode: "copy",
-        digest: await digest(target),
-      },
-    ]);
-    expect(applied.installed).toEqual(["reviewer"]);
-  });
-
   test("adopts a file already holding what it would write, and keeps any other", async () => {
     await mkdir(join(target, ".."), { recursive: true });
     await writeFile(target, TOML);

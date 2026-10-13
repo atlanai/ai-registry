@@ -37,14 +37,11 @@ interface FileMapping {
   place?: undefined;
   manifest?: undefined;
   register?: undefined;
-  /** Written in the harness's own format, as a real file, for a harness that reads no Markdown. */
+  /** Written as a real file in the harness's own format. */
   render?: Render | undefined;
 }
 
-/**
- * A Markdown artifact as a document the harness reads: the front-matter `fields`, each required,
- * and the body under `body`. Any other front-matter field has no place there and is left out.
- */
+/** The front-matter `fields`, each required, and the Markdown body under `body`; nothing else. */
 export interface Render {
   format: "toml";
   fields: string[];

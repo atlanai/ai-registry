@@ -34,7 +34,7 @@ export async function guardLink(
       ? isWithin(canonical(dirname(roots.artifacts)), canonical(state.target))
       : recorded === "copy";
   if (ours) return "replace";
-  // A file already holding what would be written is taken on, as a link into the store is.
+  // A file already holding what would be written is ours to take on.
   if (rendered !== undefined && !state.isLink && (await sameText(to, rendered))) return "replace";
   return recorded === undefined ? "keep" : "backup";
 }

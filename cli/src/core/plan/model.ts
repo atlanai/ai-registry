@@ -129,7 +129,7 @@ export type Action =
       recorded?: LinkMode;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
-      /** Written in the harness's own format, always as a real file. */
+      /** Written in the harness's own format. */
       render?: Render;
     }
   | {

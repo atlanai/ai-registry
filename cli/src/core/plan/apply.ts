@@ -128,7 +128,7 @@ export interface ApplyResult {
   }[];
   /** Plugins this run installed or updated that carry something a harness starts on its own. */
   carried: { name: string; carries: Carried[] }[];
-  /** Placements in a harness's own format not written, because the artifact could not fill one. */
+  /** Rendered placements skipped because the artifact could not fill one. */
   unrendered: { name: string; harness: string; reason: string }[];
 }
 
@@ -335,14 +335,14 @@ async function assemblePlugin(run: Run, action: ActionOf<"link">): Promise<void>
   await assemble(action.from, action.content, found.harnesses);
 }
 
-/** What a placement in a harness's own format holds; undefined for a link, or before its source is copied. */
+/** A rendered placement's text; undefined for a link, or before its source is copied. */
 async function rendering(action: ActionOf<"link">): Promise<Rendered | undefined> {
   if (action.render === undefined) return undefined;
   const source = await readFile(action.from, "utf8").catch(() => undefined);
   return source === undefined ? undefined : renderPlacement(action.render, source);
 }
 
-/** Written whole and never linked: a harness that reads its own format may refuse a link. */
+/** Never linked: Codex refuses to run a linked agent. */
 async function writeRendered(
   run: Run,
   action: ActionOf<"link">,

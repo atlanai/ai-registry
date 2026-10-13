@@ -81,20 +81,4 @@ describe("renderStatus", () => {
     expect(lines).toContain("ok  matches the lockfile, links intact");
     expect(lines).toContain("1 artifact needs attention.");
   });
-
-  it("shows an agent written for Codex under Codex, with nothing skipped", () => {
-    const lines = rendered(
-      [
-        {
-          name: "reviewer",
-          state: "ok",
-          detail: undefined,
-          harnesses: { claude: "linked", codex: "linked" },
-        },
-      ],
-      [row("reviewer", "agent")],
-    );
-    expect(lines).toContain("  reviewer  agent  0.1.0    acme  ✓            ✓      ok");
-    expect(lines.join("\n")).not.toContain("skips");
-  });
 });

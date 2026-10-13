@@ -58,7 +58,7 @@ describe("an agent installed for Codex", () => {
     expect(status.stdout).toMatch(/reviewer +agent +1\.0\.0 +acme +✓ +✓ +ok/);
   });
 
-  test("is seen as edited, and an update leaves the edit", async () => {
+  test("is seen as edited, kept by update, and restored by install --force", async () => {
     await appendFile(toml(), "# mine\n");
     const status = await aireg(["status"]);
     expect(status.code).toBe(3);
@@ -68,10 +68,8 @@ describe("an agent installed for Codex", () => {
     expect(updated.stderr).toContain(
       "was edited after installation in .codex/agents/reviewer.toml",
     );
-    expect(await readFile(toml(), "utf8")).toBe(`${TOML}# mine\n`);
-  });
-
-  test("is written again by install --force", async () => {
+    expect(await readFile(toml(), "utf8")).toBe(`${TOML}# mine
+`);
     expect((await aireg(["install", "--force", "-y"])).code).toBe(0);
     expect(await readFile(toml(), "utf8")).toBe(TOML);
     expect((await aireg(["status"])).code).toBe(0);
