@@ -9,9 +9,9 @@
       "display_name": "Reviewer",
       "description": "Reviews pull requests on request and posts ranked findings as a review comment.",
       "latest": "0.3.0",
-      "digest": "sha256:07db2ce53967bc170c8b6feff2a5e49920ade2528a1b13bdc7ccd9e196837d7e",
+      "digest": "sha256:924fe67a225ad01100bdf9f91d206b3102179df9ce89242c91e54f08a976b7f6",
       "status": "active",
-      "catalog_digest": "sha256:4984033f131084b81e0bc594fd9ecf1e625fd1f9b682fd60711a79eff5955d6f",
+      "catalog_digest": "sha256:dd61c41e00a73292b05c3be1487cc38666d4f45c11bbeb39937f40cf903f1f1d",
       "updated_at": "2026-09-03T08:00:00Z"
     },
     {
