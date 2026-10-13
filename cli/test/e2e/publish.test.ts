@@ -33,9 +33,10 @@ test.beforeAll(async ({ tmp, project, git }) => {
     join(work, "skills", "deploy", "SKILL.md"),
     skillBody("deploy", "deploy", "Tag and publish.\n"),
   );
+  // Outside a harness folder, so it says what runs it itself.
   await writeFile(
     join(work, "agents", "triage.md"),
-    "---\nname: triage\ndescription: Label and route.\n---\nLabel and route.\n",
+    "---\nname: triage\ndescription: Label and route.\nruntime:\n  harness: claude-code\n---\nLabel and route.\n",
   );
   await git.init(project);
 }, 60_000);
@@ -224,9 +225,8 @@ describe("creating a registry and publishing into it", () => {
   }) => {
     const drafts = join(work, "drafts");
     await mkdir(drafts, { recursive: true });
-    const made = await aireg(["agent", "new", "planner", "--set", "description=Plan it."], {
-      cwd: drafts,
-    });
+    const set = ["--set", "description=Plan it.", "--set", "runtime.harness=claude-code"];
+    const made = await aireg(["agent", "new", "planner", ...set], { cwd: drafts });
     expect(made.code, made.stderr).toBe(0);
     const next = /next\s+(aireg publish \S+) --to/.exec(made.stdout)?.[1];
     expect(next).toBe("aireg publish planner/AGENT.md");
@@ -395,7 +395,7 @@ describe("authoring versions in a registry", () => {
     await mkdir(agent("0.1.0"), { recursive: true });
     await writeFile(
       agent("0.1.0", "AGENT.md"),
-      "---\nname: planner\ndescription: Plans a release.\n---\n\nPlan it.\n",
+      "---\nname: planner\ndescription: Plans a release.\nruntime:\n  harness: claude-code\n---\n\nPlan it.\n",
     );
     const needs = (to: string) =>
       JSON.stringify({ relationships: [{ rel_type: "depends_on", to }] });
@@ -483,7 +483,13 @@ describe("keeping the catalog honest", () => {
     const eng = join(catalog(), "artifacts", "eng");
     const card = [
       ...["agent", "new", "carded", "--file", "agent-card.json"],
-      ...["--set", "description=Answers from a card.", "-y"],
+      ...[
+        "--set",
+        "description=Answers from a card.",
+        "--set",
+        "runtime.harness=claude-code",
+        "-y",
+      ],
     ];
     expect((await aireg(card, { cwd: eng })).code).toBe(0);
     const indexed = await aireg(["registry", "index"], { cwd: catalog() });
@@ -492,9 +498,9 @@ describe("keeping the catalog honest", () => {
     expect(envelope.spec).toMatchObject({
       name: "carded",
       description: "Answers from a card.",
+      runtime: { harness: "claude-code" },
       card: { name: "carded" },
     });
-    expect(envelope.spec).not.toHaveProperty("runtime");
   });
 
   test("refuses a base that git would read as an option", async ({ aireg }) => {
@@ -751,11 +757,10 @@ describe("publishing from a project", () => {
     // A registry stores a version directory with the envelope beside the
     // native file, so that is what a publish adds - not a loose `agents/` path.
     const at = (path: string) => readFile(join(clone, path), "utf8");
-    // An agent goes in as AGENT.md, named and otherwise as written.
+    // An agent goes in as AGENT.md, named and given the harness its folder is for.
     const agent = await at("artifacts/mine/agent/hotfix/0.1.0/AGENT.md");
-    expect(agent).toBe(
-      "---\ndescription: Cut a hotfix.\nname: hotfix\n---\nBranch from the tag.\n",
-    );
+    expect(agent).toContain("Branch from the tag");
+    expect(agent).toMatch(/name: hotfix\nruntime:\n {2}harness: claude-code/);
     expect(await at("artifacts/mine/agent/hotfix/0.1.0/artifact.json")).toContain(
       '"namespace": "mine"',
     );

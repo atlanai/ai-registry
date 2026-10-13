@@ -23,13 +23,13 @@ aireg has one command for each kind of artifact. `skill` and `agent` are always 
 - **In a registry**, it creates version `0.1.0` in `artifacts/<namespace>/<kind>/<name>/0.1.0/`. The namespace is `--namespace`, or the `artifacts/<namespace>/` folder you're in, or on a terminal aireg asks. Without `<name>`, aireg asks for it on a terminal.
 - **Outside a registry**, it creates `./<name>/`, ready to publish with [`aireg publish`](publish.md). Publish a skill by its folder, and an agent by the path to its `AGENT.md`, since `publish` takes an agent as a single file.
 
-A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. A card's `name` and `description` are what `registry index` checks, so a card aireg writes indexes as it is.
+A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. A card's `name`, `description` and `runtime` are what `registry index` checks, so a card aireg writes indexes as it is.
 
 ### new --from
 
 `new --from` copies skills or agents you already have into the registry as version `0.1.0`. It checks each one first, and copies nothing if any of them isn't valid. The originals are left where they are.
 
-To copy in an agent, `--from` takes a folder that holds an `AGENT.md` or an `agent-card.json`. To bring in a coding agent's own file, such as `.claude/agents/reviewer.md`, [publish](publish.md) it into the registry folder, which copies it in as `AGENT.md` as it is.
+To copy in an agent, `--from` needs an `AGENT.md` or `agent-card.json` that sets `runtime.harness`. A coding agent's own agent file, such as `.claude/agents/reviewer.md`, doesn't have that field and isn't accepted.
 
 ### bump
 
@@ -50,7 +50,7 @@ An artifact names what has to be installed with it as `depends_on` relationships
 | Option | Description |
 |---|---|
 | `--namespace <namespace>` | The namespace in the registry, in lowercase letters, digits and hyphens. |
-| `--set <key>=<value>` | A field to fill in. Use dots for nested fields, such as `--set metadata.category=engineering`. Repeat it for more than one. |
+| `--set <key>=<value>` | A field to fill in. Use dots for nested fields, such as `--set runtime.harness=claude`. Repeat it for more than one. |
 | `--file <file>` | For a kind that offers more than one layout, the file to create, such as `agent-card.json` for an agent. |
 | `--from <path>` | An existing skill folder or agent file to copy in. Repeat it, or list more paths after it. |
 | `--name <name>` | With `--from`, the name to give the one artifact copied in. |
