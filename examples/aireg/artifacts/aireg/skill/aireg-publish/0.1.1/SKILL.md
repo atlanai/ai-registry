@@ -127,7 +127,7 @@ to create the token and add the secret; never ask for its value.
 | Bring an existing skill in | `aireg skill new --from <path> --namespace <namespace>` |
 | Bring an existing agent in | `aireg publish <file>.md --to ./<namespace> --yes --json`, from the registry's root |
 | Change one | `aireg skill bump <name> [patch\|minor\|major]`, then edit the new folder |
-| Release | `aireg registry index`, then commit everything it wrote with the change |
+| Release | `aireg registry index`, then commit everything it wrote with the change. Ask before `git push`, even when the user asked to release it |
 
 `new` writes `TODO` for every field it cannot know. Replace each: the description says what
 the artifact does and when an agent should use it. Choose `minor` or `major` when the change

@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": "2026-10-14T05:14:00.819Z",
+  "generated_at": "2026-10-14T06:48:29.021Z",
   "entries": [
     {
       "namespace": "aireg",
@@ -34,7 +34,7 @@
       "kind": "skill",
       "name": "aireg-add",
       "latest": "0.1.1",
-      "digest": "sha256:3b226949d241d4826699d470b5ea93dc1b2040d14353fbda9d4906ac202e5371",
+      "digest": "sha256:d173abdeba297234949827f327b430ac59d7d4745ff7da4acfb6cd355c5a7a56",
       "status": "active",
       "description": "Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI."
     },
@@ -43,7 +43,7 @@
       "kind": "skill",
       "name": "aireg-new",
       "latest": "0.2.0",
-      "digest": "sha256:0e053035fe53e03648cea267ed86cdf7f76f737cfe3a3721cf187f29d59d6c7d",
+      "digest": "sha256:81aa7b133089b828e2424ebec6015d2956c8f4961bd99c82734f4a008895b181",
       "status": "active",
       "description": "Set up a registry of skills and agents for a person or a team, from nothing to installed. Use when asked to create, start or set up a registry, share skills with a team, or turn a folder of existing skills into a registry."
     },
@@ -52,7 +52,7 @@
       "kind": "skill",
       "name": "aireg-publish",
       "latest": "0.1.1",
-      "digest": "sha256:7ed28e960fe655109ec7ec789fae3e856f47a5ff20bb09fa1145daf19f63a106",
+      "digest": "sha256:1b523f278da7241131e0712b5ac24c7671214999e1161602724a741cf9b0a790",
       "status": "active",
       "description": "Publish a skill or agent to a registry, or release a new version of one, including an edit made to an installed copy. Use when asked to publish, share, contribute or release a skill or agent, send an edit to an installed skill back to its registry, update one that is already in a registry, publish a project's skills from CI, or fix what registry validation reports."
     }

@@ -6,13 +6,13 @@
     "namespace": "aireg",
     "version": "0.2.0",
     "description": "Set up a registry of skills and agents for a person or a team, from nothing to installed. Use when asked to create, start or set up a registry, share skills with a team, or turn a folder of existing skills into a registry.",
-    "digest": "sha256:0e053035fe53e03648cea267ed86cdf7f76f737cfe3a3721cf187f29d59d6c7d"
+    "digest": "sha256:81aa7b133089b828e2424ebec6015d2956c8f4961bd99c82734f4a008895b181"
   },
   "files": [
     {
       "path": "SKILL.md",
-      "digest": "sha256:ad6a4d5c3b3f942e92e07da89817d3824aafbe6c2c6b108dd449512d3c24a199",
-      "size": 6042,
+      "digest": "sha256:966b21afd54d65567509f2f851403154feda55f553691815d0385c6f20760bd7",
+      "size": 6183,
       "media_type": "text/markdown",
       "urls": [
         "SKILL.md"

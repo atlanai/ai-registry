@@ -28,6 +28,9 @@ installed copy from the user's own, an edited one or one that's behind, so answe
 
 Add `-g` to each for the user's own installs.
 
+After any change, run `aireg status --json` (or `aireg list --json`) and report what it shows.
+Don't take the exit code as success: `add` can exit 0 when a skill reached no harness.
+
 ## 1. Check the CLI
 
 Run `aireg --version`. If it is missing, ask before running

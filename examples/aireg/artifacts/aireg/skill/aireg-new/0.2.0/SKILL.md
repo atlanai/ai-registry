@@ -13,6 +13,9 @@ own. Installs from a repository see a release once it is committed and pushed; a
 a folder on this machine is read as soon as `aireg registry index` runs. Pass `--json` to the
 CLI and read `data`.
 
+Ask before `gh repo create` and before `git push`, even when the user asked for a repository:
+confirm the owner, name and visibility first.
+
 ## 1. Agree on three things first
 
 Ask, unless the user already said:
