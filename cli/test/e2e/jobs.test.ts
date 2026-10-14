@@ -196,7 +196,7 @@ describe("a watch job over a namespace your user scope installs", () => {
     };
     await run();
     expect(await readFile(versions, "utf8")).toContain('"0.1.0"');
-    return { notes, versions, run, teammate };
+    return { notes, versions, run, teammate, job };
   };
 
   test("publishes each edit as the next version, and says so", async ({ aireg, home, tmp }) => {
@@ -252,6 +252,26 @@ describe("a watch job over a namespace your user scope installs", () => {
       expect(await readFile(join(backups, kept[0] ?? ""), "utf8")).toContain("New.");
       expect(await run()).not.toMatch(/published/);
       expect(await readFile(versions, "utf8")).not.toContain('"0.1.2"');
+    } finally {
+      await aireg(["daemon", "stop"]);
+    }
+  }, 120_000);
+
+  test("settles a job's conflict by the short name the hints print", async ({
+    aireg,
+    home,
+    tmp,
+  }) => {
+    try {
+      const { notes, versions, run, teammate, job } = await watching({ aireg, home, tmp });
+      await teammate();
+      await writeFile(notes, body("New."));
+      expect(await run()).toMatch(/attention\s+personal\/notes/);
+
+      const mine = await aireg(["sync", "resolve", "notes", "--mine", "--job", job]);
+      expect(mine.code, mine.stderr).toBe(0);
+      expect(await readFile(versions, "utf8")).toContain('"0.1.2"');
+      expect(await run()).not.toMatch(/attention/);
     } finally {
       await aireg(["daemon", "stop"]);
     }

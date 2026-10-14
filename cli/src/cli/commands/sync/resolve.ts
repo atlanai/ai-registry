@@ -1,13 +1,15 @@
 import { actionOf, builtin, type CommandContext } from "#cli/commands/index.ts";
 import { attentionHints, type Followed, follow } from "#cli/commands/sync/follow.ts";
-import { rowsNamed } from "#cli/names.ts";
+import { matchInstalled, rowsNamed } from "#cli/names.ts";
 import { parse } from "#cli/options.ts";
 import { cannotPublish } from "#cli/publish/target.ts";
 import { loadAdapter } from "#core/adapter/registry.ts";
-import { findJob } from "#core/config/model.ts";
+import { findJob, type Job } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
+import { readLock } from "#core/lock.ts";
+import { roots, scopeFor } from "#core/store/paths.ts";
 import type { RpcClient } from "#daemon/rpc/client.ts";
 import { withDaemon } from "#daemon/service.ts";
 import { FOREGROUND_POLICY } from "#engine/foreground.ts";
@@ -47,7 +49,7 @@ export async function run(context: CommandContext): Promise<void> {
       const job = findJob(config, own.job);
       const { run: started } = await client.request("conflict.resolve", {
         jobId: job?.id ?? own.job,
-        name,
+        name: await jobKey(job, name),
         resolution,
       });
       const registry = config.accounts.find((account) => account.id === job?.account)?.registry;
@@ -88,6 +90,16 @@ export async function run(context: CommandContext): Promise<void> {
       await attentionHints(context, loaded, waiting);
     }
   });
+}
+
+/** The row a name means in a job's scope, read as `sync resolve` reads it without `--job`. */
+async function jobKey(job: Job | undefined, name: string): Promise<string> {
+  const root = job?.steps.find((step) => step.root !== undefined)?.root;
+  if (root === undefined) return name;
+  const lock = await readLock(roots(scopeFor(root), root));
+  // A name this scope doesn't know goes as typed: the daemon says which job it looked in.
+  if (matchInstalled(name, lock).rows.length === 0) return name;
+  return rowsNamed(name, lock)[0] as string;
 }
 
 /** Waits for the run, printing how the artifact settled, as `aireg sync` does. */
