@@ -99,7 +99,7 @@ jobs:
         with:
           fetch-depth: 0    # brings the target branch, so validate needs no stored credentials
           persist-credentials: false
-      - run: curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.0 sh
+      - run: curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.1 sh
       - run: aireg registry validate
 ```
 

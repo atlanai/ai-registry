@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": "2026-10-14T04:49:13.421Z",
+  "generated_at": "2026-10-14T04:54:45.841Z",
   "entries": [
     {
       "namespace": "aireg",
@@ -43,7 +43,7 @@
       "kind": "skill",
       "name": "aireg-new",
       "latest": "0.2.0",
-      "digest": "sha256:662dde8f568c2ba0c5eec5c131bf75c45cb9cae085dabfca9c50f5c0b720992e",
+      "digest": "sha256:0e053035fe53e03648cea267ed86cdf7f76f737cfe3a3721cf187f29d59d6c7d",
       "status": "active",
       "description": "Set up a registry of skills and agents for a person or a team, from nothing to installed. Use when asked to create, start or set up a registry, share skills with a team, or turn a folder of existing skills into a registry."
     },
