@@ -3,6 +3,7 @@ import { rowsNamed } from "#cli/names.ts";
 import { parse } from "#cli/options.ts";
 import { cancel, confirmIfDestructive, interaction } from "#cli/prompt/flow.ts";
 import { defaultIo } from "#cli/prompt/index.ts";
+import { settleCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { asksFor } from "#core/manifest.ts";
 import { lockView } from "#core/plan/acquire.ts";
@@ -88,7 +89,8 @@ export async function run(context: CommandContext): Promise<void> {
 
   if (context.printer.format === "json") {
     context.printer.json({ ok: true, data: outcome(result, common.dryRun) });
-    return;
+  } else if (result.applied) {
+    summarize(context.printer, { ...result, applied: result.applied });
   }
-  if (result.applied) summarize(context.printer, { ...result, applied: result.applied });
+  settleCollisions(context, result.plan);
 }

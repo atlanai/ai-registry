@@ -106,7 +106,10 @@ function ambiguous(ref: Ref, found: readonly Entry[]): string | undefined {
   return `${formatRef(ref)} matches ${plural(found.length, "artifact")}: ${list(shown)}. Name one of them.`;
 }
 
-/** Which local name a source id was installed under, so a rename upstream follows. */
+/**
+ * Which local name a source id was installed under, so a rename upstream follows, and by
+ * address too: an id can carry its version, and a newer release keeps the name it had.
+ */
 function lockedNames(lock: Lock): Map<string, Map<string, string>> {
   const names = new Map<string, Map<string, string>>();
   for (const [localName, artifact] of Object.entries(lock.artifacts)) {
@@ -115,6 +118,7 @@ function lockedNames(lock: Lock): Map<string, Map<string, string>> {
     if (artifact.id === undefined) continue;
     const source = names.get(artifact.registry) ?? new Map<string, string>();
     source.set(artifact.id, localName);
+    if (artifact.address !== undefined) source.set(`\u0000${artifact.address}`, localName);
     names.set(artifact.registry, source);
   }
   return names;
@@ -131,10 +135,12 @@ interface Choosing {
   cliVersion: string | undefined;
   incompatible: Incompatible[];
   clashes: Clash[];
+  /** By registry address, the name an artifact takes because another holds its own. */
+  renames: ReadonlyMap<string, string>;
 }
 
 function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void {
-  const { locked, chosen, byAddress, warnings, cliVersion, incompatible, clashes } = pass;
+  const { locked, chosen, byAddress, warnings, cliVersion, incompatible, clashes, renames } = pass;
   if (cliVersion !== undefined && entry.engine !== undefined) {
     const needed = unmetEngine(cliVersion, entry.engine);
     if (needed !== undefined) {
@@ -158,10 +164,21 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void 
   if (reached !== undefined) {
     // Named as well, it holds its version against a dependent like any named artifact.
     if (ref.name !== undefined) reached.named = true;
+    // A name written with `as:` is the person's choice, wherever the entry sits.
+    if (ref.localName !== undefined && !chosen.has(ref.localName)) {
+      chosen.delete(reached.name);
+      reached.name = ref.localName;
+      chosen.set(reached.name, reached);
+    }
     return;
   }
-  const lockedName = locked.get(ref.registry)?.get(placement.id);
-  const name = ref.localName ?? lockedName ?? installedName(entry, ref);
+  const held = locked.get(ref.registry);
+  const lockedName = held?.get(placement.id) ?? held?.get(`\u0000${entry.path}`);
+  const name =
+    ref.localName ??
+    renames.get(addressOf(entry, ref.registry)) ??
+    lockedName ??
+    installedName(entry, ref);
   const existing = chosen.get(name);
   if (existing !== undefined) {
     const kept = addressOf({ ...existing, name: existing.upstreamName }, existing.source);
@@ -183,6 +200,7 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void 
     targets: ref.targets,
     named: ref.name !== undefined,
     ...(ref.copy === true ? { copy: true } : {}),
+    ...(ref.localName === undefined ? {} : { aliased: true }),
   };
   chosen.set(name, selected);
   byAddress.set(`${ref.registry}\u0000${entry.path}`, selected);
@@ -196,6 +214,7 @@ export function select(
   cliVersion?: string,
   incompatible: Incompatible[] = [],
   clashes: Clash[] = [],
+  renames: ReadonlyMap<string, string> = new Map(),
 ): Selected[] {
   const byAlias = new Map(acquired.map((entry) => [entry.alias, entry]));
   const chosen = new Map<string, Selected>();
@@ -207,6 +226,7 @@ export function select(
     cliVersion,
     incompatible,
     clashes,
+    renames,
   };
 
   for (const ref of manifest.artifacts) {

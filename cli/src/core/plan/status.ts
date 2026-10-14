@@ -23,6 +23,8 @@ export interface ArtifactStatus {
   harnesses: Record<string, LinkState>;
   /** A requested link that `install` cannot make while something else holds the path. */
   blocked?: true;
+  /** Another artifact holds it, rather than a folder of yours. */
+  taken?: true;
 }
 
 function worse(a: State, b: State): State {
@@ -80,6 +82,7 @@ export function status(lock: Lock, survey: Survey, roots: Roots): ArtifactStatus
       detail,
       harnesses,
       ...((entry.blocked?.length ?? 0) > 0 ? { blocked: true as const } : {}),
+      ...(entry.blocked?.some((held) => held.by !== undefined) ? { taken: true as const } : {}),
     });
   }
 

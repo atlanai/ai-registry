@@ -79,11 +79,10 @@ describe("a run that opened only some registries", () => {
     );
     expect(recorded(plan).artifacts.fmt).toEqual(lock.artifacts.fmt);
     expect(plan.actions.some((action) => "name" in action && action.name === "fmt")).toBe(false);
-    expect(plan.warnings).toContainEqual({
+    expect(plan.clashes).toContainEqual({
       name: "fmt",
-      message:
-        'kit/skill/fmt and far/skill/fmt would both install as "fmt"; keeping far/skill/fmt.',
-      hint: "Give one another name with `as:` in the manifest.",
+      kept: "far/skill/fmt",
+      dropped: "kit/skill/fmt",
     });
   });
 

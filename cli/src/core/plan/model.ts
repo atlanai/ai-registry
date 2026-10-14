@@ -131,6 +131,8 @@ export type Action =
       fan?: boolean;
       /** Written in the harness's own format. */
       render?: Render;
+      /** The name the copy's front matter takes: it installs under a name not its own. */
+      rename?: string;
     }
   | {
       kind: "unlink";
@@ -161,6 +163,8 @@ export interface Plan {
   rewritten: Rewritten[];
   /** Artifacts left out because another holds the name they install under. */
   clashes: Clash[];
+  /** Artifacts this run installs under another name, because another holds their own. */
+  renamed: Renamed[];
   /** What is installed only because other artifacts need it, by installed name: their names. */
   neededBy: Record<string, string[]>;
   /** Dependencies this plan removes because nothing needs them any more. */
@@ -179,6 +183,7 @@ export function emptyPlan(): Plan {
     incompatible: [],
     rewritten: [],
     clashes: [],
+    renamed: [],
     neededBy: {},
     pruned: [],
     unresolved: [],
@@ -280,6 +285,8 @@ export interface Selected {
   named?: boolean;
   /** Copied into each harness folder rather than linked. */
   copy?: boolean;
+  /** Its name was written with `as:`, so it is never renamed for it. */
+  aliased?: boolean;
 }
 
 export interface Incompatible {
@@ -294,6 +301,15 @@ export interface Clash {
   dropped: string;
   /** The harness path both would take, when they differ in name but not in where they land. */
   at?: string;
+}
+
+/** An artifact installed under another name because another artifact holds its own. */
+export interface Renamed {
+  /** Its registry address. */
+  artifact: string;
+  as: string;
+  /** The address of what holds its own name. */
+  by: string;
 }
 
 export interface Rewritten {

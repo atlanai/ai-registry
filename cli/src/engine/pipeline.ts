@@ -5,6 +5,8 @@ import { credentialsForManifest } from "#accounts/credentials.ts";
 import { isAdapterError, type Want } from "#adapter/index.ts";
 import { list, quoted, sanitizeText } from "#adapter/text.ts";
 import { loadAdapter } from "#core/adapter/registry.ts";
+import { type NameCollision, nameCollisionOf } from "#core/config/model.ts";
+import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
@@ -18,6 +20,7 @@ import { formatManifest, type Manifest, readManifest, writeManifest } from "#cor
 import type { Printer } from "#core/output.ts";
 import { acquire, answers, lockView, newlyYanked } from "#core/plan/acquire.ts";
 import { type ApplyResult, apply, guardsOf, type Recovered, recover } from "#core/plan/apply.ts";
+import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
 import { build, clashMessage } from "#core/plan/build.ts";
 import { formatNeed, type Unresolved, wantOf } from "#core/plan/depends.ts";
 import type { Acquired, Action, Plan } from "#core/plan/model.ts";
@@ -241,11 +244,21 @@ function refuseIncompatible(plan: Plan): void {
 function refuseClash(plan: Plan, adding: ReadonlySet<string> | undefined): void {
   const clash = plan.clashes.find(({ dropped }) => adding?.has(dropped));
   if (clash === undefined) return;
-  const { kept } = clash;
   throw new AiregError(`${clashMessage(clash)}.`, {
     code: ErrorCode.Usage,
-    hint: `Remove the installed one with \`aireg remove ${kept}\`, or list this one in the manifest with \`as: <name>\` and run \`aireg install\`.`,
+    hint: NAME_COLLISION_HINT,
   });
+}
+
+/** `fail` installs nothing at all, so a person picks before anything lands. */
+function refuseCollision(plan: Plan): void {
+  const [clash] = plan.clashes;
+  if (clash === undefined) return;
+  const taken = leafOf(clash.name);
+  throw new AiregError(
+    `Nothing was installed: ${shownAddress(clash.dropped)} needs the name ${taken}, which ${shownAddress(clash.kept)} already has.`,
+    { code: ErrorCode.Usage, hint: NAME_COLLISION_HINT },
+  );
 }
 
 function refuseRewritten(plan: Plan): void {
@@ -364,6 +377,7 @@ async function plan(
   cwd: string,
   hooks: RunHooks,
   targets: readonly string[],
+  nameCollision: NameCollision,
 ): Promise<{ planned: Plan; acquired: Acquired[] }> {
   const { roots, manifest, lock, harnesses } = loaded;
   const aliases = Object.keys(manifest.registries);
@@ -424,6 +438,7 @@ async function plan(
         copy: common.copy,
         refresh: hooks.refresh === true,
         cliVersion: VERSION,
+        nameCollision,
         ...(hooks.aliases === undefined ? {} : { opened: hooks.aliases }),
         ...(hooks.discard === undefined ? {} : { discard: hooks.discard }),
       });
@@ -590,8 +605,10 @@ async function write(
       ...manifest.artifacts.flatMap((ref) => ref.targets ?? []).filter((name) => name in harnesses),
     ]),
   ];
-  const { planned, acquired } = await plan(loaded, common, printer, cwd, hooks, targets);
+  const collision = nameCollisionOf(await readConfig());
+  const { planned, acquired } = await plan(loaded, common, printer, cwd, hooks, targets, collision);
   try {
+    if (collision === "fail") refuseCollision(planned);
     refuseClash(planned, hooks.adding);
     for (const warning of planned.warnings) {
       printer.warning(warning.message);

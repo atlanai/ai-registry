@@ -2,7 +2,7 @@ import { list as listOf, quoted } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import { closest, didYouMean } from "#cli/suggest.ts";
 import type { RegistryConfig } from "#core/config/model.ts";
-import { isNamespaceAddress } from "#core/config/model.ts";
+import { isNameCollision, isNamespaceAddress, nameCollisionOf } from "#core/config/model.ts";
 import { configPath, readConfig, updateConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { table } from "#core/term/table.ts";
@@ -29,9 +29,29 @@ const SETTINGS = {
           },
         );
       }
-      return { ...config, defaults: { namespace: value } };
+      return { ...config, defaults: { ...config.defaults, namespace: value } };
     },
-    clear: (config: RegistryConfig): RegistryConfig => ({ ...config, defaults: {} }),
+    clear: (config: RegistryConfig): RegistryConfig => {
+      const { namespace: _, ...rest } = config.defaults;
+      return { ...config, defaults: rest };
+    },
+  },
+  "defaults.name-collision": {
+    value: "rename | report | fail",
+    read: (config: RegistryConfig) => nameCollisionOf(config),
+    write: (config: RegistryConfig, value: string): RegistryConfig => {
+      if (!isNameCollision(value)) {
+        throw new AiregError(
+          `\`defaults.name-collision\` takes rename, report or fail, not ${quoted(value)}.`,
+          { code: ErrorCode.Usage, hint: "Run `aireg config set defaults.name-collision rename`." },
+        );
+      }
+      return { ...config, defaults: { ...config.defaults, nameCollision: value } };
+    },
+    clear: (config: RegistryConfig): RegistryConfig => {
+      const { nameCollision: _, ...rest } = config.defaults;
+      return { ...config, defaults: rest };
+    },
   },
   paused: {
     value: "true | false",

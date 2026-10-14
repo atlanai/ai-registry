@@ -11,6 +11,7 @@ import {
   silence,
 } from "#cli/prompt/flow.ts";
 import { canceled, defaultIo } from "#cli/prompt/index.ts";
+import { settleCollisions } from "#cli/render/collisions.ts";
 import { planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { loadedBy, toolName } from "#cli/render/tools.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -199,6 +200,7 @@ export async function run(context: CommandContext): Promise<void> {
         watched,
       },
     });
+    settleCollisions(context, plan);
     return;
   }
   keptWatched(context, lock, watched);
@@ -216,4 +218,5 @@ export async function run(context: CommandContext): Promise<void> {
   const told = new Set([...kept, ...watched]);
   if (result.applied)
     summarize(context.printer, { ...result, plan, applied: result.applied }, told);
+  settleCollisions(context, plan);
 }

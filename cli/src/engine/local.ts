@@ -54,6 +54,7 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
     incompatible: plan.incompatible,
     rewritten: plan.rewritten,
     clashes: plan.clashes,
+    renamed: plan.renamed,
     neededBy: plan.neededBy,
     pruned: plan.pruned.filter((name) => names.has(name)),
     unresolved: plan.unresolved,

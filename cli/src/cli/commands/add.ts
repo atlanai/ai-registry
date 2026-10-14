@@ -26,6 +26,7 @@ import {
   sameLocation,
   undeclaredRegistry,
 } from "#cli/registries.ts";
+import { settleCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, type Ran, summarize } from "#cli/render/plan.ts";
 import { noteUserScope } from "#cli/render/where.ts";
 import {
@@ -45,12 +46,12 @@ import {
 import { expandLocation, recordedLocation } from "#core/adapter/location.ts";
 import { type Entry, withoutCoveredLeaves } from "#core/catalog/model.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
-import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import { coveredByWhole, type RegistrySource } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
 import { reached } from "#core/plan/acquire.ts";
-import type { Clash, Selected } from "#core/plan/model.ts";
+import type { Selected } from "#core/plan/model.ts";
 import {
   formatAddress,
   formatRef,
@@ -67,6 +68,7 @@ import type { CommonOptions } from "#engine/options.ts";
 import {
   load,
   locate,
+  type RunResult,
   resolveScope,
   resolveTargets,
   run as runPipeline,
@@ -274,20 +276,12 @@ export async function run(context: CommandContext): Promise<void> {
       autoUpdate: own["no-auto-update"] !== true,
       pinned: refs.every((text) => parseRef(text).version !== undefined),
     });
+  } else {
+    // An applied add says it with its summary; a dry run has none.
+    settleCollisions(context, result.plan);
   }
-  const unlinked = settleUnlinked(context, refs, result);
   if (context.printer.format === "json") {
-    context.printer.json({
-      ok: true,
-      data: {
-        registry: alias,
-        artifacts: refs,
-        dependencies: result.plan.neededBy,
-        ...outcome(result, common.dryRun),
-        ...(jobId === undefined ? {} : { jobId }),
-        ...unlinked,
-      },
-    });
+    printAdded(context, { registry: alias, artifacts: refs, jobId }, result, common.dryRun);
     return;
   }
   if (choices.scope === "user") noteUserScope(context.printer, common.scope, context.cwd);
@@ -300,41 +294,22 @@ export async function run(context: CommandContext): Promise<void> {
   }
 }
 
-/**
- * A whole namespace or registry still installs the rest when one member's name is taken,
- * but that member reaches no harness, so the add did not do all it was asked: each is named,
- * the add exits 3, and JSON lists them in `unlinked`.
- */
-function settleUnlinked(
+function printAdded(
   context: CommandContext,
-  refs: readonly string[],
-  result: { applied?: unknown; plan: { clashes: readonly Clash[] } },
-): { unlinked?: { artifact: string; by: string; at?: string }[] } {
-  if (result.applied === undefined) return {};
-  const wholes = refs
-    .map(parseRef)
-    .filter((ref) => ref.name === undefined)
-    .map((ref) => `${formatAddress(ref)}/`);
-  const unlinked = result.plan.clashes.filter(({ dropped }) =>
-    wholes.some((prefix) => dropped.startsWith(prefix)),
-  );
-  if (unlinked.length === 0) return {};
-  for (const clash of unlinked) {
-    const where = clash.at === undefined ? `as ${quoted(clash.name)}` : `at ${clash.at}`;
-    context.printer.error(
-      `${clash.dropped} reached no harness: ${clash.kept} already installs ${where}.`,
-    );
-    // Removing the holder is the one-command fix: an `as:` beside a whole entry loses to it.
-    context.printer.hint(`To use it instead, run \`aireg remove ${clash.kept}\`.`);
-  }
-  context.exit = ExitCode.Changed;
-  return {
-    unlinked: unlinked.map(({ dropped, kept, at }) => ({
-      artifact: dropped,
-      by: kept,
-      ...(at === undefined ? {} : { at }),
-    })),
-  };
+  added: { registry: string; artifacts: readonly string[]; jobId: string | undefined },
+  result: RunResult,
+  dryRun: boolean,
+): void {
+  const { jobId, ...named } = added;
+  context.printer.json({
+    ok: true,
+    data: {
+      ...named,
+      dependencies: result.plan.neededBy,
+      ...outcome(result, dryRun),
+      ...(jobId === undefined ? {} : { jobId }),
+    },
+  });
 }
 
 /**
@@ -378,6 +353,7 @@ async function reportAdded(
   );
   const said = added.repinned.map((item) => item.name).filter((name) => !acted.has(name));
   summarize(printer, added.ran, new Set(said));
+  settleCollisions(context, added.ran.plan);
   if (added.scope === "user" && added.autoUpdate) {
     return keepCurrent(context, alias, added.config, added.pinned);
   }

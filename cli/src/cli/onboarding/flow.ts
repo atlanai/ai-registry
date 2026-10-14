@@ -179,7 +179,7 @@ async function setAccountNamespace(alias: string, namespace: string): Promise<vo
 /** `init` checked it before writing anything. */
 async function setNamespace(namespace: string): Promise<void> {
   const config = await readConfig();
-  await writeConfig({ ...config, defaults: { namespace } }, config.revision);
+  await writeConfig({ ...config, defaults: { ...config.defaults, namespace } }, config.revision);
 }
 
 /**

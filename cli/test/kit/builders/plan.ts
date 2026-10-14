@@ -173,6 +173,7 @@ export function emptyPlan(): Plan {
     incompatible: [],
     rewritten: [],
     clashes: [],
+    renamed: [],
     neededBy: {},
     pruned: [],
     unresolved: [],

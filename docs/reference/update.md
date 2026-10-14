@@ -44,8 +44,8 @@ The fields are those of [`aireg add`](add.md#json-output).
 
 - `0`: updated, or already up to date.
 - `1`: a name isn't installed, a registry can't be read, or a file doesn't match what its version describes.
-- `2`: `--force` was passed, or run outside a project without `-g`.
-- `3`: `--frozen` was passed and the update would change the lockfile or the manifest.
+- `2`: `--force` was passed, run outside a project without `-g`, or an artifact's name is taken and `defaults.name-collision` is `fail`.
+- `3`: `--frozen` was passed and the update would change the lockfile or the manifest, or an artifact wasn't installed because its name is taken and `defaults.name-collision` is `report`.
 
 ## Examples
 
