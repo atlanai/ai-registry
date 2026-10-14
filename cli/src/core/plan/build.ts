@@ -76,7 +76,12 @@ export function build(
   const carried = carryUnopened(state);
   const held = heldElsewhere(state, manifest, acquired, carried);
   state.crowded = crowdedContainers(namespaceWants(selected, carried, held, state), options);
-  for (const item of selected) {
+  // Links go first come, first served, and what is installed already comes first: adding
+  // another artifact under its name never unlinks it.
+  const linkedFirst = [...selected].sort(
+    (a, b) => Number(isLinked(lock, b)) - Number(isLinked(lock, a)),
+  );
+  for (const item of linkedFirst) {
     const holder = carried.has(item.name) ? lock.artifacts[item.name] : undefined;
     // A full run would weigh both; one that did not open the holder keeps it.
     if (holder !== undefined) clashes.push(heldClash(item, holder));
@@ -153,6 +158,10 @@ function planItem(item: Selected, build: BuildState): void {
     }),
     ...(blocked.length === 0 ? {} : { blocked }),
   };
+}
+
+function isLinked(lock: Lock, item: Selected): boolean {
+  return (lock.artifacts[item.name]?.links.length ?? 0) > 0;
 }
 
 /** What a row of a registry this run did not open keeps from one it did. */
