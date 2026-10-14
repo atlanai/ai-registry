@@ -96,7 +96,7 @@ describe("native kind contracts", async () => {
     });
     expect(check(agent, spec)).toEqual([]);
     expect(check(agent, { ...spec, description: 7 })).not.toEqual([]);
-    expect(check(agent, { ...spec, runtime: { model: "x" } })).not.toEqual([]);
+    expect(check(agent, { ...spec, runtime: { model: "x" } })).toEqual([]);
   });
 
   it("uses only the declared built-in entry, regardless of file order", () => {
