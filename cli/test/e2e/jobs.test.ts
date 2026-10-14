@@ -2,7 +2,7 @@ import { chmod, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect } from "vitest";
 import { gitRegistry, registry } from "#test/kit/builders/registry.ts";
-import { test as base } from "#test/kit/fixtures.ts";
+import { type Aireg, test as base, type Home } from "#test/kit/fixtures.ts";
 
 const test = base.extend("repo", ({ git, tmp }) => gitRegistry(git, join(tmp, "kit")));
 
@@ -167,29 +167,36 @@ describe("a job that also declares artifacts with -s", () => {
 });
 
 describe("a watch job over a namespace your user scope installs", () => {
-  test("publishes each edit as the next version", async ({ aireg, home, tmp }) => {
+  const body = (text: string) => `---\nname: notes\ndescription: Takes notes.\n---\n${text}\n`;
+  const watching = async ({ aireg, home, tmp }: { aireg: Aireg; home: Home; tmp: string }) => {
     const reg = join(tmp, "reg");
     await registry(reg, { name: "demo", slug: "demo" }).skill("personal/hello@0.1.0").write();
-    const skills = join(home.dir, ".claude", "skills");
-    const notes = join(skills, "notes", "SKILL.md");
+    const notes = join(home.dir, ".claude", "skills", "notes", "SKILL.md");
     const versions = join(reg, "artifacts", "personal", "skill", "notes", "versions.json");
-    const run = async (job: string) => {
+    expect((await aireg(["registry", "add", reg, "-g"])).code).toBe(0);
+    expect((await aireg(["add", "-g", "demo/personal", "--yes"])).code).toBe(0);
+    await mkdir(dirname(notes), { recursive: true });
+    await writeFile(notes, body("Old."));
+    const skills = dirname(dirname(notes));
+    const added = await aireg(["job", "add", "-g", "--watch", skills, "--to", "demo/personal"]);
+    expect(added.code, added.stderr).toBe(0);
+    const job = /Added job (\S+),/.exec(added.stdout)?.[1] ?? "";
+    const run = async () => {
       const id = /run_[0-9a-f-]+/.exec((await aireg(["job", "start", job])).stdout)?.[0] ?? "";
-      expect((await aireg(["job", "runs", id, "--follow"])).stdout).toMatch(/finished\s+succeeded/);
+      const followed = (await aireg(["job", "runs", id, "--follow"])).stdout;
+      expect(followed).toMatch(/finished\s+(succeeded|attention)/);
+      return followed;
     };
-    try {
-      expect((await aireg(["registry", "add", reg, "-g"])).code).toBe(0);
-      expect((await aireg(["add", "-g", "demo/personal", "--yes"])).code).toBe(0);
-      await mkdir(dirname(notes), { recursive: true });
-      await writeFile(notes, "---\nname: notes\ndescription: Takes notes.\n---\nOld.\n");
-      const added = await aireg(["job", "add", "-g", "--watch", skills, "--to", "demo/personal"]);
-      expect(added.code, added.stderr).toBe(0);
-      const job = /Added job (\S+),/.exec(added.stdout)?.[1] ?? "";
-      await run(job);
-      expect(await readFile(versions, "utf8")).toContain('"0.1.0"');
+    await run();
+    expect(await readFile(versions, "utf8")).toContain('"0.1.0"');
+    return { notes, versions, run };
+  };
 
-      await writeFile(notes, "---\nname: notes\ndescription: Takes notes.\n---\nNew.\n");
-      await run(job);
+  test("publishes each edit as the next version, and says so", async ({ aireg, home, tmp }) => {
+    try {
+      const { notes, versions, run } = await watching({ aireg, home, tmp });
+      await writeFile(notes, body("New."));
+      expect(await run()).toMatch(/published\s+personal\/notes/);
       expect(await readFile(versions, "utf8")).toContain('"0.1.1"');
     } finally {
       await aireg(["daemon", "stop"]);

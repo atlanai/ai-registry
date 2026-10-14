@@ -127,7 +127,7 @@ function portable(roots: Roots, path: string): string {
 }
 
 /** The lock key a folder artifact takes, which is what a publish then names. */
-function originKey(origin: Origin): string {
+export function originKey(origin: Origin): string {
   return `${origin.namespace}/${origin.name}`;
 }
 

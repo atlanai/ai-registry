@@ -24,7 +24,7 @@ import {
 } from "./decide.ts";
 import { type RunScope, registryOf, syncOptions } from "./inspect.ts";
 import { applyLocal } from "./local.ts";
-import { applyOrigins } from "./origins.ts";
+import { applyOrigins, originKey } from "./origins.ts";
 import { load } from "./pipeline.ts";
 import { settlePublished } from "./publish-settle.ts";
 import {
@@ -114,12 +114,17 @@ async function executeScanned(
   const initialOperations = new Map(
     [...classified.outcomes].map(([name, item]) => [name, item.operation]),
   );
-  // Settled after the publish, so a refusal is reported on its own artifact.
-  let deferred = reportClassified(outcomes, hooks);
-  const claimed = await claims(current, job, account.registry, scoped, mode, outcomes, hooks);
   // Read before the lease and reported either way: an import that changed is a
   // local write, so it needs the lease even when nothing goes upstream.
   const pending = await pendingOrigins(job, loaded, hooks);
+  // What an import is about to change settles as the rescan after it classifies it.
+  const importing = new Set(
+    pending.filter((item) => item.state === "refreshed").map((item) => originKey(item.origin)),
+  );
+  // Settled after the publish, so a refusal is reported on its own artifact.
+  const reported = reportClassified(outcomes, hooks, importing);
+  let deferred = reported.deferred;
+  const claimed = await claims(current, job, account.registry, scoped, mode, outcomes, hooks);
 
   if (
     classified.mutates ||
@@ -150,10 +155,11 @@ async function executeScanned(
       // The copies moved, so a push has to reread. Not the lock: the rows just
       // written live in it, and rereading would discard them.
       let operations: ReadonlyMap<string, SyncOperation> = initialOperations;
+      let after: ReturnType<typeof reclassify> | undefined;
       if (imported.refreshed.length > 0) {
         current = await rescan();
         // What was just imported is classified now, so it goes out in this run rather than the next.
-        const after = reclassify();
+        after = reclassify();
         operations = withRefreshed(initialOperations, imported.refreshed, after);
         deferred = importedDeferred(
           deferred,
@@ -163,6 +169,7 @@ async function executeScanned(
           initialOperations,
         );
       }
+      deferred.push(...settleHeld(reported.held, after, imported.refreshed, outcomes, hooks));
 
       // A refused publish must not skip pulls the run already classified.
       const { remote, remoteError } = await publishAndSettle(
@@ -215,37 +222,68 @@ async function executeScanned(
   return execution(outcomes);
 }
 
-/** Reports each classified outcome now, except a publish or archive, which waits for its answer. */
+function sends(outcome: SyncOutcome): boolean {
+  return (
+    (outcome.operation === "publish" || outcome.operation === "archive") &&
+    outcome.failure === undefined
+  );
+}
+
+/**
+ * Reports each classified outcome now, except a publish or archive, which waits for its answer,
+ * and one an import is about to change, which is held for the rescan after it.
+ */
 function reportClassified(
   outcomes: readonly SyncOutcome[],
   hooks: SyncExecutionHooks,
+  importing: ReadonlySet<string>,
+): { deferred: SyncOutcome[]; held: SyncOutcome[] } {
+  const deferred: SyncOutcome[] = [];
+  const held: SyncOutcome[] = [];
+  for (const outcome of outcomes) {
+    if (sends(outcome)) deferred.push(outcome);
+    else if (importing.has(outcome.artifact)) held.push(outcome);
+    else reportOutcome(outcome, hooks);
+  }
+  return { deferred, held };
+}
+
+/** A held row settles as the rescan after its import classified it, in the counts too. */
+function settleHeld(
+  held: readonly SyncOutcome[],
+  after: { outcomes: ReadonlyMap<string, SyncOutcome> } | undefined,
+  refreshed: readonly string[],
+  outcomes: SyncOutcome[],
+  hooks: SyncExecutionHooks,
 ): SyncOutcome[] {
   const deferred: SyncOutcome[] = [];
-  for (const outcome of outcomes) {
-    if (
-      (outcome.operation === "publish" || outcome.operation === "archive") &&
-      outcome.failure === undefined
-    ) {
-      deferred.push(outcome);
-      continue;
-    }
-    hooks.item(
-      outcome.artifact,
-      "classifying",
-      {
-        outcome: outcome.failure === undefined ? outcomeOf(outcome.operation) : "failed",
-        kind: outcome.kind,
-        disposition: outcome.disposition,
-        operation: outcome.operation,
-        ...(outcome.failure === undefined
-          ? {}
-          : { errorCode: outcome.failure.code, retryable: outcome.failure.retryable }),
-      },
-      // An error code alone cannot say which artifact the registry lost.
-      outcome.detail === undefined ? undefined : { detail: outcome.detail },
-    );
+  for (const before of held) {
+    const now =
+      (refreshed.includes(before.artifact) ? after?.outcomes.get(before.artifact) : undefined) ??
+      before;
+    outcomes[outcomes.indexOf(before)] = now;
+    if (sends(now)) deferred.push(now);
+    else reportOutcome(now, hooks);
   }
   return deferred;
+}
+
+function reportOutcome(outcome: SyncOutcome, hooks: SyncExecutionHooks): void {
+  hooks.item(
+    outcome.artifact,
+    "classifying",
+    {
+      outcome: outcome.failure === undefined ? outcomeOf(outcome.operation) : "failed",
+      kind: outcome.kind,
+      disposition: outcome.disposition,
+      operation: outcome.operation,
+      ...(outcome.failure === undefined
+        ? {}
+        : { errorCode: outcome.failure.code, retryable: outcome.failure.retryable }),
+    },
+    // An error code alone cannot say which artifact the registry lost.
+    outcome.detail === undefined ? undefined : { detail: outcome.detail },
+  );
 }
 
 /**
