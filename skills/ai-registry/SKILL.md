@@ -9,8 +9,9 @@ license: Apache-2.0
 
 ai-registry is an open specification for agent registries. A registry is a folder or a git
 repository that holds skills and agents, every version of each and their digests, laid out
-by the [file spec](../../spec/file-spec.md). aireg is a CLI client for it. It creates
-registries, publishes to them and installs from them into Claude Code, Codex and Cursor.
+by the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md).
+aireg is a CLI client for it. It creates registries, publishes to them and installs from
+them into Claude Code, Codex and Cursor.
 
 aireg asks no questions when it runs inside a coding agent, so ask the user yourself before
 each step that changes their machine.
@@ -43,7 +44,7 @@ command does and ask, then run it as printed:
 
 `aireg job list` then shows the job. Some coding agents load new skills only when a session
 starts. Until then, read them where they were installed, such as
-`~/.claude/skills/new/SKILL.md`.
+`~/.claude/skills/aireg-new/SKILL.md`.
 
 ## 3. Try the example registry
 
