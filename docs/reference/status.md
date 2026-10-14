@@ -25,7 +25,7 @@ Lines under the table explain each `-` and, when something needs attention, what
 
 `status` ends with what to run next. Run [`aireg install`](install.md) to restore missing or replaced artifacts, which first moves a file or folder of yours that replaced a link to `.registry/backups/`, and [`aireg sync`](sync.md) to compare an edit with the registry.
 
-A link aireg did not make is `missing` too, with the reason: a folder of yours already at the path, or another artifact of the same name installed there. `install` leaves your folder alone, so move it. Another artifact is there only when `defaults.name-collision` is `report`; set it to `rename` and run `aireg install` to install this one under its namespace and name.
+A link aireg did not make is `missing` too, with the reason: a folder of yours already at the path, or another artifact of the same name installed there. `install` leaves your folder alone, so move it. When another artifact holds the path, `aireg install` with `defaults.name-collision` set to `rename`, the default, installs this one under its namespace and name.
 
 Below the table, `status` lists the unmanaged artifacts: skills and agents in your harness folders that aireg didn't install. Publish one to a registry to manage it, with [`aireg publish`](publish.md).
 

@@ -3,7 +3,6 @@ import { STATE_MEANING, stateTone } from "#core/console/state-style.ts";
 import type { Harnesses } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { Printer } from "#core/output.ts";
-import { NAME_COLLISION_HINT } from "#core/plan/build/rename.ts";
 import type { ArtifactStatus, LinkState, State } from "#core/plan/status.ts";
 import { type Scope, scopeName } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
@@ -183,6 +182,8 @@ function absentHint(statuses: readonly ArtifactStatus[], flag: string): string {
     (item) => (item.state === "missing" || item.state === "dangling") && item.blocked !== true,
   );
   if (repairable) return `Run \`aireg install${flag}\` to restore what is missing.`;
-  if (statuses.some((item) => item.taken === true)) return NAME_COLLISION_HINT;
+  if (statuses.some((item) => item.taken === true)) {
+    return `Run \`aireg install${flag}\` with \`defaults.name-collision\` set to rename, the default, to install what was left out under its namespace and name.`;
+  }
   return `Move what is in the way, then run \`aireg install${flag}\`.`;
 }

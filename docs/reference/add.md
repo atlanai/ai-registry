@@ -42,7 +42,7 @@ To install from a registry without declaring it first, give its address with `--
 
 A version goes only on a single artifact's full name. Adding an artifact that is already installed, at another version, moves its pin. Adding it without a version removes the pin and installs the newest version straight away. Pinning one artifact of a whole registry or namespace you installed works the same way. Either way `add` says it pinned or unpinned the artifact, even when the version installed stays the same, and says `Rolled back` rather than `Updated` when the pin moves it to an older version.
 
-A coding agent finds each skill and agent by its name, so two can't install under one. When an artifact you add would take a name another one already has, aireg installs it under its namespace and name instead, such as `ops-review`, and says so. The one you already had keeps its name. Set [`defaults.name-collision`](config.md#settings) to `report` to leave the new one out instead, or to `fail` to install nothing.
+A coding agent finds each skill and agent by its name, so two can't install under one. When an artifact you add would take a name another one already has, aireg installs it under its namespace and name instead, such as `ops-review`, and says so. The one you already had keeps its name. Set [`defaults.name-collision`](config.md#settings) to `report` to leave the new one out, or to `fail` to install nothing.
 
 ### Questions
 

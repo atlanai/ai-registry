@@ -53,7 +53,7 @@ On a terminal, `remove` shows the plan and asks before changing anything. With n
 - `0`: removed, or canceled at a question.
 - `1`: nothing is installed, or a name isn't installed.
 - `2`: run outside a project without `-g`, a name matches more than one artifact, or nothing was named and aireg can't ask.
-- `3`: an artifact has local edits and `--force` wasn't passed, or `--frozen` was passed. A removal always changes the lockfile or the manifest, so it always fails that check, even for an artifact that stays installed because another one needs it.
+- `3`: an artifact has local edits and `--force` wasn't passed, `--frozen` was passed, or an artifact wasn't installed because its name is taken and `defaults.name-collision` is `report`. A removal always changes the lockfile or the manifest, so it always fails that check, even for an artifact that stays installed because another one needs it.
 
 ## Examples
 
