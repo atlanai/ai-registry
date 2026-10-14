@@ -75,7 +75,8 @@ function inNamespace(namespace: string, entries: readonly Entry[]): Entry[] {
   );
 }
 
-function excluded(ref: Ref, entry: Entry): boolean {
+/** Whether a whole registry or namespace entry leaves this artifact out. */
+export function excluded(ref: Ref, entry: Entry): boolean {
   if (ref.exclude === undefined) return false;
   const at = relativeTo(ref, { namespace: entry.group, kind: entry.kind, name: entry.name });
   return ref.exclude.includes(at);

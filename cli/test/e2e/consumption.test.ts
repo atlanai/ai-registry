@@ -139,6 +139,8 @@ describe("consuming a registry like a package manager", () => {
     const listed = (await aireg(["list"])).stdout;
     expect(listed).not.toContain("lint");
     expect(listed).toContain("changelog");
+    // A newer lint is published, but the namespace leaves it out, so it isn't an update.
+    expect((await aireg(["outdated"])).stdout).not.toMatch(/ lint\s/);
   });
 
   test("installs nothing published since when removing a namespace's last artifact", async () => {

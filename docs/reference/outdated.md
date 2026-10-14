@@ -12,7 +12,7 @@ aireg outdated [-g]
 
 `aireg outdated` asks each registry the scope installs from what it publishes now, and compares that with the lockfile. It changes nothing. Outside a project it checks your user scope.
 
-The table lists each artifact with a newer version: its registry, the version installed and the newest one. An artifact pinned in the manifest is marked `pinned`. When the manifest takes a whole namespace, artifacts the namespace has published since are listed as `new`. An artifact a watched folder publishes is marked `watched`. A registry's latest version that is older than the one installed, as after the installed one is yanked, isn't newer, so it isn't listed.
+The table lists each artifact with a newer version: its registry, the version installed and the newest one. An artifact pinned in the manifest is marked `pinned`. When the manifest takes a whole namespace, artifacts the namespace has published since are listed as `new`, except ones you removed from it with [`aireg remove`](remove.md). An artifact a watched folder publishes is marked `watched`. A registry's latest version that is older than the one installed, as after the installed one is yanked, isn't newer, so it isn't listed.
 
 `outdated` warns about each artifact it couldn't check, for example because its registry couldn't be read or no longer publishes it. It ends with `aireg update` when something unpinned can move.
 

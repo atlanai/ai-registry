@@ -12,6 +12,8 @@ import { type Manifest, pinOf } from "#core/manifest.ts";
 import { abbreviate, type Printer, sentence } from "#core/output.ts";
 import { type Request, wanted } from "#core/plan/acquire.ts";
 import { listedAt } from "#core/plan/model.ts";
+import { excluded } from "#core/plan/select.ts";
+import type { Ref } from "#core/ref.ts";
 import { olderThan } from "#core/semver.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
@@ -67,13 +69,9 @@ function asked(request: Request | undefined, lock: Lock, alias: string): [Want[]
 }
 
 /** The namespaces a manifest takes whole from one registry; `*` for all of it. */
-function whole(manifest: Manifest, alias: string): Set<string> {
-  const taken = new Set<string>();
-  for (const ref of manifest.artifacts) {
-    if (ref.registry !== alias || ref.name !== undefined) continue;
-    taken.add(ref.namespace ?? "*");
-  }
-  return taken;
+/** The manifest's whole-registry and whole-namespace entries for one registry. */
+function wholes(manifest: Manifest, alias: string): Ref[] {
+  return manifest.artifacts.filter((ref) => ref.registry === alias && ref.name === undefined);
 }
 
 async function head(alias: string, manifest: Manifest, lock: Lock, base: string): Promise<Head> {
@@ -182,8 +180,8 @@ function row(name: string, entry: LockArtifact, found: Head, pinned: string | un
 function additions(manifest: Manifest, lock: Lock, heads: Map<string, Head>): Row[] {
   const rows: Row[] = [];
   for (const [alias, found] of heads) {
-    const taken = whole(manifest, alias);
-    if (taken.size === 0 || found.why !== undefined) continue;
+    const refs = wholes(manifest, alias);
+    if (refs.length === 0 || found.why !== undefined) continue;
     const locked = new Set(
       Object.values(lock.artifacts)
         .filter((entry) => entry.registry === alias)
@@ -192,7 +190,14 @@ function additions(manifest: Manifest, lock: Lock, heads: Map<string, Head>): Ro
     for (const [address, upstream] of found.byAddress) {
       if (locked.has(address)) continue;
       const namespace = upstream.namespace;
-      if (!taken.has("*") && (namespace === undefined || !taken.has(namespace))) continue;
+      const entry = found.entries.find((item) => item.path === address);
+      // Covered as install reads it: by a whole entry that doesn't leave it out.
+      const covered = refs.some(
+        (ref) =>
+          (ref.namespace === undefined || ref.namespace === namespace) &&
+          (entry === undefined || !excluded(ref, entry)),
+      );
+      if (!covered) continue;
       rows.push({
         name: namespace === undefined ? upstream.name : `${namespace}/${upstream.name}`,
         registry: alias,
