@@ -34,10 +34,10 @@ import { sentence } from "#core/output.ts";
 import { listed, versionFolders } from "./indexer.ts";
 import {
   check,
+  fileProblems,
   type KindManifest,
   kindsOf,
   manifestProblems,
-  missingFiles,
   specOf,
 } from "./kinds.ts";
 
@@ -267,11 +267,8 @@ export function versionProblems(
   present: ReadonlySet<string>,
   contents: ReadonlyMap<string, string>,
 ): string[] {
-  const problems = missingFiles(manifest, present).map(
-    (missing) =>
-      `has no ${missing}, which ${/^[aeiou]/.test(at.kind) ? "an" : "a"} ${at.kind} needs`,
-  );
-  const spec = specOf(manifest, contents);
+  const problems = fileProblems(manifest, present);
+  const spec = specOf(manifest, contents, at.name);
   if (spec === undefined) return [...problems, "has no front matter to read its fields from"];
   problems.push(...check(manifest, spec));
   for (const field of placeholders(spec)) problems.push(`\`${field}\` is still ${PLACEHOLDER}`);

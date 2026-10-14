@@ -167,6 +167,16 @@ The envelope: a fixed header, an open `spec` the kind owns, the files the versio
 
 Writers MUST NOT invent header fields. Extension data belongs in `spec`, `labels`, or `annotations`.
 
+For the kinds defined here, `spec.name` MUST equal `metadata.name`. A skill carries its parsed
+`SKILL.md` front matter, with no additional fields beyond its schema; its name MUST NOT contain
+consecutive hyphens and `compatibility`, when present, MUST contain 1–500 characters. An agent
+carrying `AGENT.md` preserves its parsed native front matter, including tool-specific fields.
+An agent carrying `agent-card.json` instead wraps that unchanged object in `spec.card`, copies
+its description to `spec.description`, and uses the registry slug for `spec.name`. The card's
+own `name` remains its human-readable name and need not equal the slug. An agent MUST carry
+exactly one of these native entry files. Other supporting files are permitted; the optional
+file patterns in a kind manifest are non-exhaustive conventions.
+
 ### 3.5 Native files
 
 Every file named in `files[]` whose `urls` entry is a relative reference is stored at that path under the version directory, byte-identical to what the author wrote. The envelope wraps a kind's existing format; it never rewrites it.

@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kind-manifest.schema.json",
+  "title": "Kind manifest",
+  "description": "What registry.json's kinds[].manifest_url points at: a JSON Schema 2020-12 for the envelope's spec, plus x-registry-* keywords that say which spec paths feed search, which edges are legal, which files a version carries, and whether the kind is gated or attachment-only. This schema constrains the manifest's shape; it does not re-implement the JSON Schema meta-schema, so validate a manifest against both. The file spec leaves the manifest format open; this is the format this repository uses.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "$id": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "Identifier for this manifest. A relative reference is permitted; see spec/schemas/README.md."
+    },
+    "title": {
+      "type": "string",
+      "description": "The kind identifier.",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "type": {
+      "const": "object"
+    },
+    "additionalProperties": {
+      "description": "Each kind chooses whether to allow additional spec fields. Native formats may preserve tool-specific extensions."
+    },
+    "x-registry-schema-version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Revision marker for this draft manifest. The CLI does not negotiate revisions or enforce compatibility between revisions. Changes to validation rules must document their compatibility impact."
+    },
+    "x-registry-searchable": {
+      "type": "array",
+      "description": "JSON Pointers into spec whose text feeds full-text search.",
+      "items": {
+        "type": "string",
+        "pattern": "^(/[^/]+)+$"
+      },
+      "uniqueItems": true
+    },
+    "x-registry-embeddings": {
+      "type": "array",
+      "description": "JSON Pointers into spec whose text feeds vector search.",
+      "items": {
+        "type": "string",
+        "pattern": "^(/[^/]+)+$"
+      },
+      "uniqueItems": true
+    },
+    "x-registry-edges": {
+      "type": "array",
+      "description": "Legal outbound relationships from this kind.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rel_type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "to_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": [
+              "one",
+              "many"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "outbound"
+            ],
+            "description": "Envelopes store outbound edges only; inbound is derived by a server."
+          }
+        },
+        "required": [
+          "rel_type",
+          "to_kinds",
+          "cardinality",
+          "direction"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "x-registry-files": {
+      "type": "object",
+      "description": "Which files a version of this kind carries.",
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file_rule"
+          }
+        },
+        "optional": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file_rule"
+          },
+          "description": "Non-exhaustive conventions for supporting files. Files outside these patterns are permitted."
+        },
+        "one_of": {
+          "type": "array",
+          "description": "Exactly one of these file sets MUST be present in full.",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/file_rule"
+            },
+            "minItems": 1
+          },
+          "minItems": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "x-registry-attachment": {
+      "type": "boolean",
+      "description": "True when a version of this kind only ever attaches to another kind's version and has no standalone meaning.",
+      "default": false
+    },
+    "x-registry-gated": {
+      "type": "boolean",
+      "description": "True when a new version is born pending_review and needs a governance action to become active. Which action decides is server configuration.",
+      "default": false
+    }
+  },
+  "required": [
+    "$schema",
+    "$id",
+    "title",
+    "type",
+    "x-registry-schema-version",
+    "x-registry-files"
+  ],
+  "$defs": {
+    "file_rule": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "An exact relative path."
+        },
+        "glob": {
+          "type": "string",
+          "description": "A glob over relative paths; ** matches across directories."
+        },
+        "media_type": {
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "glob"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

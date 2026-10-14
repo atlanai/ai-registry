@@ -82,6 +82,7 @@
     "verify": "pnpm run typecheck && pnpm run lint:ci && pnpm run knip && pnpm run notices --check && pnpm run build && pnpm run check:package && pnpm run test"
   },
   "dependencies": {
+    "ajv": "8.20.0",
     "ink": "6.3.1",
     "react": "19.3.0",
     "string-width": "8.3.0",
@@ -93,7 +94,6 @@
     "@types/node": "26.6.4",
     "@types/react": "19.3.0",
     "@vitest/coverage-v8": "4.1.11",
-    "ajv": "8.20.0",
     "knip": "6.39.0",
     "publint": "0.3.24",
     "tsup": "8.5.1",

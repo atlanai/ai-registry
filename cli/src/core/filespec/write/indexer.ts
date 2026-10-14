@@ -247,7 +247,7 @@ async function envelopeOf(
     files,
     spec:
       existing?.spec === undefined
-        ? envelopeSpec(folder.kind, bytes, kinds)
+        ? envelopeSpec(folder.kind, bytes, kinds, folder.name)
         : (existing.spec as Record<string, unknown>),
     ...(Array.isArray(existing?.relationships)
       ? { relationships: existing.relationships as never }

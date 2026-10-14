@@ -120,7 +120,7 @@ Checks a registry against the file spec and reports every problem it finds, each
 - each artifact is of a kind the registry holds, has the files that kind needs, and holds no symlink and no file that may hold credentials
 - each artifact's front matter is valid, has no `TODO` left in it, and its `name` matches its folder
 - each [dependency](kinds.md#dependencies) names a version the registry holds
-- each kind manifest the registry serves can be read
+- each locally served kind manifest satisfies the manifest schema and JSON Schema Draft 2020-12, with its local references resolved
 - no released version was changed or deleted after it was released, and every released version is still listed in `versions.json` with its digest. To withdraw a release, set `"yanked": true` on it in `versions.json` instead.
 
 A released version stays as it was released, so a change to one goes into a new version. When the edited release is the newest, `validate` prints the three commands that do this, which you run from the registry's root: `aireg skill bump lint --namespace engineering` copies the edited files into the next version, `git checkout origin/main -- artifacts/engineering/skill/lint/0.1.0` restores the release from the base, and `aireg registry index` records the new version. For an older release, restore it first, then make the change again in the version `bump` starts from the newest. Without `--base`, the commands restore from the last commit, `HEAD`.
@@ -130,6 +130,15 @@ A released version stays as it was released, so a change to one goes into a new 
 | `--base <ref>` | A git ref to compare released versions against, such as `origin/main`. It must name a commit. |
 
 Run `validate` to check a change before you release it.
+
+Kind validation uses the full Draft 2020-12 validation vocabulary, with `format` treated as an
+annotation. It preserves input values. Schema references must resolve within the registry;
+external schemas are never downloaded. Agent cards retain their display name, while their
+wrapper uses the registry slug. Agent versions must have exactly one native entry file.
+
+The CLI does not enforce the kind manifest's relationship-kind restrictions, cardinality,
+search and embedding pointers, attachment or governance flags, or schema revision negotiation.
+These annotations describe future consumers; they do not change what this command guarantees.
 
 It also warns about a kind named like one of aireg's commands, which that command hides. A warning doesn't change the exit status.
 

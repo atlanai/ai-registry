@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "kinds/agent.json",
   "title": "agent",
-  "description": "An agent definition: either an A2A agent card (agent-card.json) or an AGENT.md with front-matter, optionally with a runtime block naming the harness, framework, provider, and model it runs on. spec wraps the card or the front-matter unchanged.",
+  "description": "An agent definition: either an A2A agent card (agent-card.json) or an AGENT.md with native front-matter preserved, including tool-specific fields. For cards, spec contains the registry slug as name, the card description, and the unchanged card in card. An optional runtime block describes what runs the agent.",
   "type": "object",
   "properties": {
     "name": {
@@ -65,7 +65,7 @@
     "name",
     "description"
   ],
-  "additionalProperties": false,
+  "additionalProperties": true,
   "x-registry-schema-version": 1,
   "x-registry-searchable": [
     "/name",

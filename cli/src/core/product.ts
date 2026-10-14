@@ -42,3 +42,6 @@ export const REPOSITORY = `github.com/${OWNER}/${REPOSITORY_NAME}`;
 
 /** The documentation site, as `site_url` in mkdocs.yml publishes it. */
 export const DOCS_URL = `https://${OWNER}.github.io/${REPOSITORY_NAME}/`;
+
+/** The native entry file for an A2A agent in a registry. */
+export const AGENT_CARD_ENTRY = "agent-card.json";

@@ -23,13 +23,26 @@ aireg has one command for each kind of artifact. `skill` and `agent` are always 
 - **In a registry**, it creates version `0.1.0` in `artifacts/<namespace>/<kind>/<name>/0.1.0/`. The namespace is `--namespace`, or the `artifacts/<namespace>/` folder you're in, or on a terminal aireg asks. Without `<name>`, aireg asks for it on a terminal.
 - **Outside a registry**, it creates `./<name>/`, ready to publish with [`aireg publish`](publish.md). Publish a skill by its folder, and an agent by the path to its `AGENT.md`, since `publish` takes an agent as a single file.
 
-A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. A card's `name` and `description` are what `registry index` checks, so a card aireg writes indexes as it is. An agent that runs outside a coding agent can say what it runs on in an optional `runtime` block, such as `--set runtime.harness=langgraph`; which coding agents install an agent is up to each project, so aireg never asks for it.
+A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. Exactly one agent entry file must be present. The card keeps its human-readable `name`; the registry folder supplies the slug in the envelope's `spec.name`. `spec.card` preserves the card and `spec.description` copies its description. Card content is otherwise opaque to this kind schema; this is not full A2A protocol validation. An agent that runs outside a coding agent can say what it runs on in an optional `runtime` block, such as `--set runtime.harness=langgraph`; which coding agents install an agent is up to each project, so aireg never asks for it.
+
+Native `AGENT.md` front matter can include fields such as `tools`, `model` and tool-specific
+extensions. These fields are preserved. Skill front matter remains limited to the Agent Skills
+fields; skill names cannot contain consecutive hyphens, and `compatibility`, if present, must
+contain 1–500 characters. Character limits count Unicode code points.
+
+Supporting README and JSON files are allowed, but never supply a built-in kind's identity or
+replace its native entry. `--file` must name an advertised file alternative; if a custom kind
+also has shared required files, those are created with the selected alternative.
 
 ### new --from
 
 `new --from` copies skills or agents you already have into the registry as version `0.1.0`. It checks each one first, and copies nothing if any of them isn't valid. The originals are left where they are.
 
 To copy in an agent, `--from` takes a folder that holds an `AGENT.md` or an `agent-card.json`. To bring in a coding agent's own file, such as `.claude/agents/reviewer.md`, [publish](publish.md) it into the registry folder, which copies it in as `AGENT.md` as it is.
+
+For a card named `Recipe Agent`, import derives the registry slug `recipe-agent`. Pass
+`--name recipe-helper` to choose a different slug. Both choices leave the card bytes unchanged.
+The normal artifact-name and collision checks apply.
 
 ### bump
 

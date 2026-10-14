@@ -23,8 +23,8 @@ import { inBlobStore } from "#core/filespec/write/indexer.ts";
 import { findRegistry, requireRegistry } from "#core/filespec/write/init.ts";
 import {
   check,
+  fileProblems,
   type KindManifest,
-  missingFiles,
   primaryFiles,
   type SchemaNode,
   specFile,
@@ -392,12 +392,12 @@ async function incoming(
   for (const path of entries.filter((item) => /\.(md|json)$/.test(item))) {
     texts.set(path, await readFile(join(dir, path), "utf8"));
   }
-  const spec = specOf(manifest, texts);
+  const spec = specOf(manifest, texts, named);
   const problems = [
     ...found.irregular
       .filter((entry) => visible(entry.path))
       .map((entry) => `${entry.path} ${refusal(entry)}`),
-    ...missingFiles(manifest, new Set(entries)).map((file) => `has no ${file}`),
+    ...fileProblems(manifest, new Set(entries)),
     ...(spec === undefined ? ["has no front matter"] : check(manifest, spec)),
   ];
   const fallback =

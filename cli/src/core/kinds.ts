@@ -24,6 +24,8 @@ export const SKILL_ENTRY = "SKILL.md";
 /** The one file a registry's agent version folder holds. */
 export const AGENT_ENTRY = "AGENT.md";
 
+export { AGENT_CARD_ENTRY } from "./product.ts";
+
 /** Shared directory and shape vocabulary for discovery and staging. */
 export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
   plugin: { dir: "plugins", shape: "directory", extensions: [] },

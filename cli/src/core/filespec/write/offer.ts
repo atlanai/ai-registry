@@ -84,7 +84,14 @@ export async function offerFrom(
     describeFile(file.path, sha256(file.content), file.content.byteLength),
   );
   const description = target.description ?? ownDescription(bytes, target.name);
-  const spec = envelopeSpec(target.kind, bytes);
+  // An explicitly supplied native agent file is its entry, even when the harness
+  // names it reviewer.md. Registry directories still use only declared entries.
+  const [entry] = files;
+  const nativeAgent = target.kind === "agent" && path.endsWith(".md") && !(await isDirectory(path));
+  const spec =
+    nativeAgent && entry !== undefined
+      ? (frontmatterRecord(Buffer.from(entry.content).toString("utf8")) ?? {})
+      : envelopeSpec(target.kind, bytes, undefined, target.name);
   const input: PublishInput = {
     ...(target.id === undefined || target.id === "" ? {} : { id: target.id }),
     name: target.name,

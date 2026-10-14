@@ -16,11 +16,17 @@ const SPEC_KINDS = join(import.meta.dirname, "..", "..", "..", "spec", "schemas"
 
 /** Each kind manifest's path under `schema/`, with the spec's bytes it must hold. */
 export function kindCopies(): Record<string, string> {
-  return Object.fromEntries(
-    readdirSync(SPEC_KINDS)
-      .filter((name) => name.endsWith(".json"))
-      .map((name) => [join("kinds", name), readFileSync(join(SPEC_KINDS, name), "utf8")]),
-  );
+  return {
+    "kind-manifest.schema.json": readFileSync(
+      join(SPEC_KINDS, "..", "kind-manifest.schema.json"),
+      "utf8",
+    ),
+    ...Object.fromEntries(
+      readdirSync(SPEC_KINDS)
+        .filter((name) => name.endsWith(".json"))
+        .map((name) => [join("kinds", name), readFileSync(join(SPEC_KINDS, name), "utf8")]),
+    ),
+  };
 }
 
 export function render(schema: unknown): string {

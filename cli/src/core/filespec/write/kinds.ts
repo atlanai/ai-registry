@@ -3,14 +3,21 @@ import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
-import { list, quoted } from "#adapter/text.ts";
+import { quoted, sanitizeName } from "#adapter/text.ts";
 import { frontmatterRecord } from "#core/catalog/frontmatter.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict, isRecord } from "#core/fields.ts";
+import { AGENT_CARD_ENTRY, AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import agent from "#schema/kinds/agent.json" with { type: "json" };
 import skill from "#schema/kinds/skill.json" with { type: "json" };
 
-/** The part of JSON Schema a kind manifest uses for its `spec`, which is all that is checked here. */
+import { prepareManifest } from "./schema.ts";
+
+export { check } from "./schema.ts";
+
+/** Fields the scaffolder understands; validation accepts the full JSON Schema vocabulary. */
 export interface SchemaNode {
+  [keyword: string]: unknown;
   type?: string | readonly string[];
   description?: string;
   properties?: Record<string, SchemaNode>;
@@ -104,36 +111,53 @@ async function served(root: string, url: string): Promise<Served> {
   if (!isRecord(raw) || !("x-registry-files" in raw)) {
     return { problem: "has no x-registry-files, so it is not a kind manifest" };
   }
+  try {
+    await prepareManifest(root, raw);
+  } catch (error) {
+    return { problem: `has an invalid kind schema: ${(error as Error).message}` };
+  }
   return { manifest: raw as unknown as KindManifest };
 }
 
-/** The files a new artifact of this kind is created with: the required ones, else the first set of a choice. */
+/** Shared required files plus the selected alternative, or the first alternative by default. */
 export function primaryFiles(manifest: KindManifest, choose?: string): string[] {
   const files = manifest["x-registry-files"];
   const required = (files.required ?? []).flatMap((rule) =>
     rule.path === undefined ? [] : [rule.path],
   );
-  if (required.length > 0) return required;
   const sets = (files.one_of ?? []).map((set) =>
     set.flatMap((rule) => (rule.path === undefined ? [] : [rule.path])),
   );
-  return sets.find((set) => choose !== undefined && set.includes(choose)) ?? sets[0] ?? [];
+  const selected = choose === undefined ? sets[0] : sets.find((set) => set.includes(choose));
+  if (
+    choose !== undefined &&
+    selected === undefined &&
+    !(sets.length === 0 && required.includes(choose))
+  ) {
+    throw new AiregError(`${quoted(choose)} is not a file alternative for ${manifest.title}.`, {
+      code: ErrorCode.Usage,
+    });
+  }
+  return [...new Set([...required, ...(selected ?? [])])];
 }
 
-/** Which required files, or file sets, a version is missing. */
-export function missingFiles(manifest: KindManifest, present: ReadonlySet<string>): string[] {
+/** Missing required files and conflicting complete file alternatives. */
+export function fileProblems(manifest: KindManifest, present: ReadonlySet<string>): string[] {
   const files = manifest["x-registry-files"];
   const missing = (files.required ?? [])
     .flatMap((rule) => (rule.path === undefined ? [] : [rule.path]))
-    .filter((path) => !present.has(path));
+    .filter((path) => !present.has(path))
+    .map((path) => `has no ${path}`);
   const sets = files.one_of ?? [];
   if (sets.length > 0) {
-    const whole = sets.some((set) =>
+    const whole = sets.filter((set) =>
       set.every((rule) => rule.path === undefined || present.has(rule.path)),
     );
-    if (!whole) {
-      missing.push(sets.map((set) => set.map((rule) => rule.path).join(" + ")).join(" or "));
-    }
+    const choices = sets
+      .map((set) => set.map((rule) => rule.path ?? rule.glob).join(" + "))
+      .join(" or ");
+    if (whole.length === 0) missing.push(`has no ${choices}`);
+    if (whole.length > 1) missing.push(`must contain exactly one file alternative: ${choices}`);
   }
   return missing;
 }
@@ -143,6 +167,8 @@ export function specFile(
   manifest: KindManifest,
   files: ReadonlyMap<string, string>,
 ): string | undefined {
+  if (manifest.title === "skill") return files.has(SKILL_ENTRY) ? SKILL_ENTRY : undefined;
+  if (manifest.title === "agent") return files.has(AGENT_ENTRY) ? AGENT_ENTRY : undefined;
   return [...primaryFiles(manifest), ...files.keys()].find(
     (path) => path.endsWith(".md") && files.has(path),
   );
@@ -156,6 +182,7 @@ export function envelopeSpec(
   kind: string,
   files: ReadonlyMap<string, Uint8Array>,
   manifests: Readonly<Record<string, KindManifest>> = BUNDLED,
+  name?: string,
 ): Record<string, unknown> {
   const manifest = manifests[kind];
   if (manifest === undefined) return {};
@@ -163,16 +190,23 @@ export function envelopeSpec(
   for (const [path, bytes] of files) {
     if (/\.(md|json)$/.test(path)) text.set(path, Buffer.from(bytes).toString("utf8"));
   }
-  return specOf(manifest, text) ?? {};
+  return specOf(manifest, text, name) ?? {};
 }
 
 export function specOf(
   manifest: KindManifest,
   files: ReadonlyMap<string, string>,
+  name?: string,
 ): Record<string, unknown> | undefined {
   const markdown = specFile(manifest, files);
   if (markdown !== undefined) return frontmatterRecord(files.get(markdown) ?? "");
-  const json = [...files.keys()].find((path) => path.endsWith(".json"));
+  if (manifest.title === "skill") return undefined;
+  const json =
+    manifest.title === "agent"
+      ? files.has(AGENT_CARD_ENTRY)
+        ? AGENT_CARD_ENTRY
+        : undefined
+      : [...files.keys()].find((path) => path.endsWith(".json"));
   if (json === undefined) return undefined;
   let card: unknown;
   try {
@@ -188,65 +222,9 @@ export function specOf(
       if (value !== undefined) lifted[field] = value;
     }
   }
+  if (manifest.title === "agent") {
+    if (name !== undefined) lifted.name = name;
+    else if (typeof lifted.name === "string") lifted.name = sanitizeName(lifted.name);
+  }
   return { ...lifted, card };
-}
-
-function typeOf(value: unknown): string {
-  if (value === null) return "null";
-  if (Array.isArray(value)) return "array";
-  return typeof value === "number" && Number.isInteger(value) ? "integer" : typeof value;
-}
-
-/** Problems with one value against a manifest's schema, each naming the field. */
-export function check(schema: SchemaNode, value: unknown, at = ""): string[] {
-  const where = at === "" ? "the front matter" : `\`${at}\``;
-  const types = schema.type === undefined ? [] : [schema.type].flat();
-  const actual = typeOf(value);
-  const numeric = actual === "integer" && types.includes("number");
-  if (types.length > 0 && !types.includes(actual) && !numeric) {
-    return [`${where} must be ${types.join(" or ")}`];
-  }
-  const problems: string[] = [];
-  if (schema.enum !== undefined && !schema.enum.includes(value)) {
-    problems.push(`${where} must be ${list(schema.enum.map(String), "or")}`);
-  }
-  if (typeof value === "string") problems.push(...stringProblems(schema, value, where));
-  if (actual === "object") {
-    problems.push(...objectProblems(schema, value as Record<string, unknown>, at));
-  }
-  return problems;
-}
-
-function stringProblems(schema: SchemaNode, value: string, where: string): string[] {
-  const problems: string[] = [];
-  if (schema.minLength !== undefined && value.length < schema.minLength) {
-    problems.push(
-      value === ""
-        ? `${where} is empty`
-        : `${where} is shorter than ${schema.minLength} characters`,
-    );
-  }
-  if (schema.maxLength !== undefined && value.length > schema.maxLength) {
-    problems.push(`${where} is longer than ${schema.maxLength} characters`);
-  }
-  if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value)) {
-    problems.push(`${where} ${quoted(value)} does not match ${schema.pattern}`);
-  }
-  return problems;
-}
-
-function objectProblems(schema: SchemaNode, record: Record<string, unknown>, at: string): string[] {
-  const field = (key: string) => (at === "" ? key : `${at}.${key}`);
-  const problems: string[] = [];
-  for (const key of schema.required ?? []) {
-    if (record[key] === undefined) problems.push(`\`${field(key)}\` is required`);
-  }
-  for (const [key, item] of Object.entries(record)) {
-    const child = schema.properties?.[key];
-    const extra = schema.additionalProperties;
-    if (child !== undefined) problems.push(...check(child, item, field(key)));
-    else if (extra === false) problems.push(`\`${field(key)}\` is not a field this kind takes`);
-    else if (typeof extra === "object") problems.push(...check(extra, item, field(key)));
-  }
-  return problems;
 }

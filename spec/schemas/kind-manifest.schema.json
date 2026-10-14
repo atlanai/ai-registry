@@ -26,13 +26,12 @@
       "const": "object"
     },
     "additionalProperties": {
-      "const": false,
-      "description": "spec schemas are closed; unknown spec fields are a publish error, not silently kept."
+      "description": "Each kind chooses whether to allow additional spec fields. Native formats may preserve tool-specific extensions."
     },
     "x-registry-schema-version": {
       "type": "integer",
       "minimum": 1,
-      "description": "Integer version of this manifest. Readers tolerate older; writers refuse newer. A manifest at version n+1 MUST accept every spec valid at version n."
+      "description": "Revision marker for this draft manifest. The CLI does not negotiate revisions or enforce compatibility between revisions. Changes to validation rules must document their compatibility impact."
     },
     "x-registry-searchable": {
       "type": "array",
@@ -109,7 +108,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/file_rule"
-          }
+          },
+          "description": "Non-exhaustive conventions for supporting files. Files outside these patterns are permitted."
         },
         "one_of": {
           "type": "array",
@@ -142,7 +142,6 @@
     "$id",
     "title",
     "type",
-    "additionalProperties",
     "x-registry-schema-version",
     "x-registry-files"
   ],
