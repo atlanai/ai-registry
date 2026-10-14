@@ -14,6 +14,7 @@ import { listedAt } from "#core/plan/model.ts";
 import { removeContained } from "#core/plan/removable.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { artifactPath, type Roots } from "#core/store/paths.ts";
+import { moveAside } from "./claim.ts";
 import type { Scan } from "./scan.ts";
 
 /**
@@ -324,4 +325,47 @@ export async function forgetOrigins(
   }
   if (forgotten.length > 0) await writeLock(roots, lock);
   return forgotten;
+}
+
+/** Your folder after `--theirs`: written, with where the old one went, or left as it was. */
+export interface Taken {
+  name: string;
+  folder: string;
+  backup: string | undefined;
+  written: boolean;
+}
+
+/**
+ * `sync resolve --theirs` on a row of yours: the registry's copy replaces your folder, kept in
+ * backups first, or the next run would read the old folder as an edit and send it back up.
+ */
+export async function takeIntoOrigins(
+  roots: Roots,
+  names: readonly string[],
+  stamp: string,
+): Promise<Taken[]> {
+  const lock = await readLock(roots);
+  const taken: Taken[] = [];
+  for (const name of names) {
+    const row = lock.artifacts[name];
+    if (row?.origin === undefined) continue;
+    const folder = resolve(roots.base, row.origin.path);
+    const copy = resolve(roots.base, row.path);
+    if (!(await exists(copy))) continue;
+    let backup: string | undefined;
+    if (await exists(folder)) {
+      const copies = [{ from: folder, target: row.origin.harness }];
+      [backup] = (await moveAside(row.kind, basename(folder), copies, roots, stamp)).map(
+        (moved) => moved.to,
+      );
+      // A folder aireg may not remove is never written over.
+      if (backup === undefined) {
+        taken.push({ name, folder, backup, written: false });
+        continue;
+      }
+    }
+    await copyAuthored(copy, folder);
+    taken.push({ name, folder, backup, written: true });
+  }
+  return taken;
 }

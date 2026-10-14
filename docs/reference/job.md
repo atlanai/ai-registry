@@ -46,7 +46,7 @@ Each registry has one job per scope on this machine. Running `job add` again for
 | Option | Description |
 |---|---|
 | `--registry <registry>` | The registry to keep in sync with. |
-| `--watch <folder>` | A folder whose skills and agents the job publishes, such as `~/.claude/skills`. Repeat it for more than one. aireg copies from these folders and never moves or deletes your files. Needs `--to`. |
+| `--watch <folder>` | A folder whose skills and agents the job publishes, such as `~/.claude/skills`. Repeat it for more than one. aireg copies from these folders and never moves or deletes your files, unless you settle a conflict with `aireg sync resolve --theirs`, which first moves your copy to `.registry/backups/`. Needs `--to`. |
 | `--to <registry>/<namespace>` | Where the watched folders publish. A git registry is refused: aireg doesn't push to git. |
 | `--interval <seconds>` | How often the job runs. Defaults to `900` (15 minutes). At least `60`, at most `86400`. |
 | `--name <name>` | The job's id. Defaults to `job_skills_<registry>`, or `job_skills_<registry>-<folder>` when another scope's job has that id. |

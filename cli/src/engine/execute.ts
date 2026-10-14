@@ -24,7 +24,7 @@ import {
 } from "./decide.ts";
 import { type RunScope, registryOf, syncOptions } from "./inspect.ts";
 import { applyLocal } from "./local.ts";
-import { applyOrigins, originKey } from "./origins.ts";
+import { applyOrigins, originKey, takeIntoOrigins } from "./origins.ts";
 import { load } from "./pipeline.ts";
 import { settlePublished } from "./publish-settle.ts";
 import {
@@ -215,6 +215,7 @@ async function executeScanned(
       for (const notice of applied.notices) {
         hooks.event(WARNING_EVENT, "applying", undefined, notice);
       }
+      await takeTheirs(overrides, loaded.roots, account.registry, hooks);
       if (remoteError !== undefined) throw remoteError;
     });
   }
@@ -266,6 +267,25 @@ function settleHeld(
     else reportOutcome(now, hooks);
   }
   return deferred;
+}
+
+/** `--theirs` on a row of yours writes your folder too, which a pull alone never touches. */
+async function takeTheirs(
+  overrides: Overrides,
+  roots: Parameters<typeof takeIntoOrigins>[0],
+  registry: string,
+  hooks: SyncExecutionHooks,
+): Promise<void> {
+  const theirs = [...overrides].filter(([, item]) => item === "pull").map(([name]) => name);
+  if (theirs.length === 0) return;
+  for (const taken of await takeIntoOrigins(roots, theirs, backupStamp())) {
+    const kept = taken.backup === undefined ? "" : `; yours is in ${taken.backup}`;
+    hooks.event(WARNING_EVENT, "applying", taken.name, {
+      message: taken.written
+        ? `Wrote ${registry}'s ${taken.name} into ${taken.folder}${kept}.`
+        : `Kept ${taken.folder} as it is, since aireg may not replace it.`,
+    });
+  }
 }
 
 function reportOutcome(outcome: SyncOutcome, hooks: SyncExecutionHooks): void {

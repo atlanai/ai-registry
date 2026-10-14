@@ -52,7 +52,7 @@ Settles a conflict, where you edited an artifact and its registry changed it too
 | Option | Description |
 |---|---|
 | `--mine` | Keep your copy, and publish it as a new version. A git registry takes no publishes, so aireg refuses this and names the `aireg publish` that sends your copy into your clone. |
-| `--theirs` | Take the registry's copy, and drop your edit. |
+| `--theirs` | Take the registry's copy, and drop your edit. For an artifact from a watched folder, the registry's copy is also written into that folder, and yours is moved to `.registry/backups/` first. |
 | `--job <job>` | Settle a conflict that a background job left waiting. Takes the job's name or id. |
 
 `<name>` is the installed artifact's name, as [`aireg list`](list.md) shows it. `resolve` runs in the daemon as `sync` does, and prints how the artifact settled.

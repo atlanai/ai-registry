@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect } from "vitest";
 import { gitRegistry, registry } from "#test/kit/builders/registry.ts";
@@ -187,9 +187,16 @@ describe("a watch job over a namespace your user scope installs", () => {
       expect(followed).toMatch(/finished\s+(succeeded|attention)/);
       return followed;
     };
+    // A teammate's 0.1.1, published straight into the registry.
+    const teammate = async () => {
+      expect((await aireg(["skill", "bump", "notes", "patch", "-y"], { cwd: reg })).code).toBe(0);
+      const next = join(reg, "artifacts", "personal", "skill", "notes", "0.1.1", "SKILL.md");
+      await writeFile(next, body("Teammate."));
+      expect((await aireg(["registry", "index"], { cwd: reg })).code).toBe(0);
+    };
     await run();
     expect(await readFile(versions, "utf8")).toContain('"0.1.0"');
-    return { notes, versions, run };
+    return { notes, versions, run, teammate };
   };
 
   test("publishes each edit as the next version, and says so", async ({ aireg, home, tmp }) => {
@@ -198,6 +205,53 @@ describe("a watch job over a namespace your user scope installs", () => {
       await writeFile(notes, body("New."));
       expect(await run()).toMatch(/published\s+personal\/notes/);
       expect(await readFile(versions, "utf8")).toContain('"0.1.1"');
+    } finally {
+      await aireg(["daemon", "stop"]);
+    }
+  }, 120_000);
+
+  test("never sends the folder back over a version someone else published", async ({
+    aireg,
+    home,
+    tmp,
+  }) => {
+    try {
+      const { notes, versions, run, teammate } = await watching({ aireg, home, tmp });
+      await teammate();
+      for (let round = 0; round < 2; round += 1) {
+        expect(await run()).toMatch(/attention\s+personal\/notes\s+changed in demo/);
+      }
+      expect(await readFile(versions, "utf8")).not.toContain('"0.1.2"');
+      expect(await readFile(notes, "utf8")).toContain("Old.");
+    } finally {
+      await aireg(["daemon", "stop"]);
+    }
+  }, 120_000);
+
+  test("holds an edit made against an older version until a person settles it", async ({
+    aireg,
+    home,
+    tmp,
+  }) => {
+    try {
+      const { notes, versions, run, teammate } = await watching({ aireg, home, tmp });
+      await teammate();
+      await writeFile(notes, body("New."));
+      for (let round = 0; round < 2; round += 1) {
+        expect(await run()).toMatch(/attention\s+personal\/notes/);
+      }
+      expect(await readFile(versions, "utf8")).not.toContain('"0.1.2"');
+
+      const theirs = await aireg(["sync", "resolve", "notes", "--theirs", "-g"]);
+      expect(theirs.code, theirs.stderr).toBe(0);
+      expect(await readFile(notes, "utf8")).toContain("Teammate.");
+      const backups = join(home.scope, "backups");
+      const kept = (await readdir(backups, { recursive: true })).filter((path) =>
+        path.endsWith("SKILL.md"),
+      );
+      expect(await readFile(join(backups, kept[0] ?? ""), "utf8")).toContain("New.");
+      expect(await run()).not.toMatch(/published/);
+      expect(await readFile(versions, "utf8")).not.toContain('"0.1.2"');
     } finally {
       await aireg(["daemon", "stop"]);
     }

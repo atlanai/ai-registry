@@ -223,7 +223,7 @@ function next(printer: Printer, moved: readonly Row[], scope: string): void {
   }
   if (moved.some((entry) => entry.watched !== undefined)) {
     printer.hint(
-      `Run \`aireg sync --dry-run${flag}\` to compare; the next publish from a watched folder replaces the newer version.`,
+      `Run \`aireg sync --dry-run${flag}\` to compare; a watched folder waits for \`aireg sync resolve\` before it publishes over it.`,
     );
   }
 }

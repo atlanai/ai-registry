@@ -34,7 +34,9 @@ export function lockRow({
 }: RowInput): LockArtifact {
   // An edited copy left in place stays based on what it was installed from, so
   // `outdated` still sees the newer version and a publish never skips over it.
-  const basis = !restage && editedAnywhere(previous, state) ? previous : undefined;
+  // A row of yours stays based on what it last sent, until a pull or a served publish moves it.
+  const yours = !restage && previous?.origin !== undefined;
+  const basis = yours || (!restage && editedAnywhere(previous, state)) ? previous : undefined;
   return {
     registry: item.source,
     id: basis?.id ?? item.id,
@@ -43,7 +45,7 @@ export function lockRow({
     namespace: item.group,
     address: basis?.address ?? item.path,
     path: posixRelative(base, copy),
-    content: basis?.content ?? item.contentId ?? previous?.content,
+    content: yours ? previous.content : (basis?.content ?? item.contentId ?? previous?.content),
     version: basis === undefined ? item.version : basis.version,
     // Never adopt a drifted digest: the lock records what we installed. The
     // survey fallback is a copy the lock forgot, so drift stays detectable.

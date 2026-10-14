@@ -99,6 +99,8 @@ export function restages(
   build: BuildState,
 ): boolean {
   const missing = state?.staged !== true;
+  // A row of yours is its folder's copy: only `sync resolve --theirs` puts the registry's over it.
+  if (previous?.origin !== undefined && !missing && !build.options.force) return false;
   return (
     shouldRestage(item, previous, state, build) || (missing && item.contentId !== previous?.content)
   );

@@ -62,6 +62,20 @@ describe("build", () => {
     expect(record?.kind === "record" && record.lock.artifacts.lint?.links).toEqual([]);
   });
 
+  test("keeps a row of yours on what it last sent when the registry moves, unless forced", () => {
+    const lock = installed();
+    const origin = { harness: "claude", path: ".claude/skills/lint", step: "onboarding" };
+    lock.artifacts.lint = { ...(lock.artifacts.lint as LockArtifact), origin, links: [] };
+    const moved = acquired([entry()], "c2", new Map([["skills/lint", "sha256:t2"]]));
+    const plan = build(kitManifest(), lock, moved, SYNCED, PLAN_OPTIONS);
+    expect(kinds(plan)).not.toContain("stage");
+    const record = plan.actions.at(-1);
+    expect(record?.kind === "record" && record.lock.artifacts.lint?.content).toBe("sha256:t1");
+
+    const forced = build(kitManifest(), lock, moved, SYNCED, { ...PLAN_OPTIONS, force: true });
+    expect(kinds(forced)).toContain("stage");
+  });
+
   test("does nothing when disk already matches", () => {
     const plan = build(kitManifest(), installed(), acquired([entry()]), SYNCED, PLAN_OPTIONS);
     expect(kinds(plan)).toEqual(["record"]);

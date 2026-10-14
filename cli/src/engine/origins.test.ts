@@ -6,7 +6,13 @@ import { digest } from "#core/fs/digest.ts";
 import { emptyLock, type Lock, writeLock } from "#core/lock.ts";
 import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { applyOrigins, forgetOrigins, recordServed, surveyOrigins } from "./origins.ts";
+import {
+  applyOrigins,
+  forgetOrigins,
+  recordServed,
+  surveyOrigins,
+  takeIntoOrigins,
+} from "./origins.ts";
 import type { Scan } from "./scan.ts";
 
 let home: string;
@@ -179,6 +185,22 @@ describe("forgetOrigins", () => {
     await forgetOrigins(roots, "kit", [join(home, ".claude", "skills")]);
     await expect(lstat(link)).rejects.toThrow();
     expect(await readFile(origin(), "utf8")).toContain("One.");
+  });
+});
+
+describe("takeIntoOrigins", () => {
+  test("writes the registry's copy into your folder, and keeps yours in backups", async () => {
+    await write("One.");
+    const lock = emptyLock();
+    await runOnce(lock);
+    await writeLock(roots, lock);
+    await writeFile(copy(), "---\nname: my-helper\ndescription: mine\n---\nTheirs.\n");
+    await write("Mine.");
+
+    const [taken] = await takeIntoOrigins(roots, ["mine/my-helper"], "20260101T000000Z");
+    expect(taken?.written).toBe(true);
+    expect(await readFile(origin(), "utf8")).toContain("Theirs.");
+    expect(await readFile(join(taken?.backup ?? "", "SKILL.md"), "utf8")).toContain("Mine.");
   });
 });
 

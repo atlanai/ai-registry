@@ -81,6 +81,36 @@ function classifyOrigin(digests: Digests): ReturnType<typeof classify> {
   return { disposition: "publish", detail: "changed in your folder" };
 }
 
+/** Only a person knows if your folder is behind or edited too, so `sync resolve` settles it. */
+function classifyMoved(digests: Digests, registry: string): ReturnType<typeof classify> {
+  if (digests.local !== undefined && digests.local === digests.upstream) {
+    return { disposition: "synced", detail: undefined };
+  }
+  return { disposition: "conflict", detail: `changed in ${registry} since your folder sent it` };
+}
+
+/**
+ * The import already moved the lock digest to the folder's edit, so a row of yours is never
+ * compared three ways: it is yours, or the registry has published past what it last sent.
+ */
+function watchOf(
+  previous: LockArtifact | undefined,
+  item: Selected | undefined,
+): "yours" | "moved" | undefined {
+  if (previous?.origin === undefined) return undefined;
+  return item !== undefined && item.contentId !== previous.content ? "moved" : "yours";
+}
+
+function classifyRow(
+  digests: Digests,
+  watch: ReturnType<typeof watchOf>,
+  registry: string,
+): ReturnType<typeof classify> {
+  if (watch === "yours") return classifyOrigin(digests);
+  if (watch === "moved") return classifyMoved(digests, registry);
+  return classify(digests);
+}
+
 /**
  * Read, never acted on. Every sync starts here and then decides what it is
  * willing to do, which is why `--dry-run` and a real run agree.
@@ -131,19 +161,16 @@ export async function reconcile(
       path,
     );
 
-    // A selected row of yours whose registry copy has not moved is still yours: its lock digest
-    // is already the edit, so a three-way compare would read the edit as the base.
-    const yours =
-      previous?.origin !== undefined &&
-      (item === undefined || (item.contentId !== undefined && item.contentId === previous.content));
+    const watch = watchOf(previous, item);
 
     // One artifact the registry will not serve is reported as that one
     // artifact, rather than ending the run without naming any.
     let digests: Digests;
     try {
-      digests = yours
-        ? await compareOrigin(previous, staged, acquired, content)
-        : await compare(item, previous, staged, content);
+      digests =
+        watch === "yours" && previous !== undefined
+          ? await compareOrigin(previous, staged, acquired, content)
+          : await compare(item, previous, staged, content);
     } catch (error) {
       if (!isAdapterError(error)) throw error;
       items.push({
@@ -159,7 +186,7 @@ export async function reconcile(
       continue;
     }
 
-    const classified = yours ? classifyOrigin(digests) : classify(digests);
+    const classified = classifyRow(digests, watch, source);
     const detail =
       classified.disposition === "unknown" && digests.base === undefined && previous !== undefined
         ? missingBase(lock, previous)
