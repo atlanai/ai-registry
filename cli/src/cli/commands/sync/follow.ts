@@ -20,13 +20,15 @@ export async function conflictHint(
   const first = names.filter((name) => name.split("/").at(-1) === short).length === 1 ? short : key;
   const id = loaded.lock.registries[registry]?.adapter;
   const adapter = id === undefined ? undefined : await loadAdapter(id).catch(() => undefined);
-  const theirs = `take the registry's copy with \`aireg sync resolve ${first} --theirs\``;
+  // Run as printed from anywhere: without `-g` a user scope's conflict is not found.
+  const resolve = `aireg sync resolve ${first}${loaded.roots.scope === "user" ? " -g" : ""}`;
+  const theirs = `take the registry's copy with \`${resolve} --theirs\``;
   if (adapter === undefined || adapter.capabilities.publish) {
-    return `Keep yours as a new version with \`aireg sync resolve ${first} --mine\`, or ${theirs}.`;
+    return `Keep yours as a new version with \`${resolve} --mine\`, or ${theirs}.`;
   }
   const namespace = loaded.lock.artifacts[key]?.namespace ?? "<namespace>";
   const instead = publishInstead(adapter, `aireg publish ${first} --to <folder>/${namespace}`);
-  return `Take the registry's copy with \`aireg sync resolve ${first} --theirs\`, or keep yours: ${instead}.`;
+  return `Take the registry's copy with \`${resolve} --theirs\`, or keep yours: ${instead}.`;
 }
 
 /** What `aireg publish` settles: an edit, or a removal, made here. */

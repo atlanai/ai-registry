@@ -242,7 +242,11 @@ describe("a watch job over a namespace your user scope installs", () => {
       }
       expect(await readFile(versions, "utf8")).not.toContain('"0.1.2"');
 
-      const theirs = await aireg(["sync", "resolve", "notes", "--theirs", "-g"]);
+      // The dry run's hint, run exactly as printed.
+      const dry = await aireg(["sync", "-g", "--dry-run"]);
+      const printed = /`aireg (sync resolve [^`]+ --theirs)`/.exec(dry.stdout + dry.stderr)?.[1];
+      expect(printed).toBe("sync resolve notes -g --theirs");
+      const theirs = await aireg((printed ?? "").split(" "));
       expect(theirs.code, theirs.stderr).toBe(0);
       expect(await readFile(notes, "utf8")).toContain("Teammate.");
       const backups = join(home.scope, "backups");
