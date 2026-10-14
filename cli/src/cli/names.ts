@@ -7,7 +7,10 @@ import { parseRef, type Ref } from "#core/ref.ts";
 /** The ways to write one installed artifact, shortest first; the last is unique in any scope. */
 function forms(key: string, row: LockArtifact): string[] {
   const namespace = row.namespace === undefined ? [] : [row.namespace];
+  // Installed under a name of its own, that name is the one its harness shows.
+  const own = !key.includes("/") && key !== row.name ? [key] : [];
   return [
+    ...own,
     row.name,
     [...namespace, row.name].join("/"),
     [...namespace, row.kind, row.name].join("/"),

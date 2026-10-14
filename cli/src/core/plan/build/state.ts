@@ -1,3 +1,4 @@
+import type { NameCollision } from "#core/config/model.ts";
 import type { Harnesses } from "#core/harness/index.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Acquired, Action, Clash, Rewritten, Survey, Warning } from "#core/plan/model.ts";
@@ -27,6 +28,8 @@ export interface BuildOptions {
    * lock rows and source as they are, and nothing is planned for it.
    */
   opened?: readonly string[];
+  /** What an artifact whose name another holds gets. Absent, it is left out, never renamed. */
+  nameCollision?: NameCollision;
 }
 
 /** What planning one run accumulates, shared by every step that plans part of it. */

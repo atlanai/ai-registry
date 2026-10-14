@@ -172,7 +172,45 @@ describe("an address", () => {
     expect(await manifest(dir)).toBe(before);
   }, 60_000);
 
-  test("installs the rest of a namespace whose member's name is taken, keeps the installed one, and exits 3", async ({
+  test("installs a member whose name is taken under its namespace and name, across releases", async ({
+    aireg,
+    newProject: project,
+    tmp,
+  }) => {
+    // Its own registry, so a later release doesn't reach the shared one.
+    const teams = join(tmp, "teams");
+    const publish = (versions: string[]) => {
+      const built = registry(teams, { name: "teams", slug: "teams" });
+      built.skill("eng/review@1.0.0", { description: "eng" });
+      for (const version of versions) {
+        built.skill(`ops/review@${version}`, { description: "ops", body: `ops ${version}\n` });
+      }
+      return built.write();
+    };
+    await publish(["1.0.0"]);
+    const dir = await project();
+    expect((await aireg(["registry", "add", teams], { cwd: dir })).code).toBe(0);
+    expect((await aireg(["add", "teams/eng", "-y"], { cwd: dir })).code).toBe(0);
+    const added = await aireg(["add", "teams/ops", "-y"], { cwd: dir });
+    expect(added.code, added.stderr).toBe(0);
+    expect(added.stdout + added.stderr).toContain(
+      "renamed  ops/review to ops-review, because review is taken by eng/review",
+    );
+    const copy = join(dir, ".claude", "skills", "ops-review", "SKILL.md");
+    const kept = join(dir, ".claude", "skills", "review", "SKILL.md");
+    expect(await readFile(copy, "utf8")).toMatch(/^name: ops-review$/m);
+    expect(await readFile(kept, "utf8")).toMatch(/^name: review$/m);
+    expect((await aireg(["status"], { cwd: dir })).code).toBe(0);
+
+    await publish(["1.0.0", "1.1.0"]);
+    const updated = await aireg(["update", "-y"], { cwd: dir });
+    expect(updated.code, updated.stderr).toBe(0);
+    expect(await readFile(copy, "utf8")).toContain("ops 1.1.0");
+    expect(await readFile(copy, "utf8")).toMatch(/^name: ops-review$/m);
+    expect((await aireg(["status"], { cwd: dir })).code).toBe(0);
+  }, 60_000);
+
+  test("leaves a member whose name is taken out, or installs nothing, as the setting says", async ({
     aireg,
     market,
     newProject: project,
@@ -180,20 +218,27 @@ describe("an address", () => {
     const dir = await project();
     expect((await aireg(["registry", "add", market], { cwd: dir })).code).toBe(0);
     expect((await aireg(["add", "kit/engineering/pr-review", "-y"], { cwd: dir })).code).toBe(0);
+    const before = await manifest(dir);
+
+    expect((await aireg(["config", "set", "defaults.name-collision", "fail"])).code).toBe(0);
+    const failed = await aireg(["add", "kit/design", "-y"], { cwd: dir });
+    expect(failed.code).toBe(2);
+    expect(failed.stderr).toContain(
+      "Nothing was installed: design/pr-review needs the name pr-review, which engineering/pr-review already has.",
+    );
+    expect(await manifest(dir)).toBe(before);
+
+    expect((await aireg(["config", "set", "defaults.name-collision", "report"])).code).toBe(0);
     const added = await aireg(["add", "kit/design", "-y"], { cwd: dir });
     expect(added.code).toBe(3);
-    expect(added.stderr).toContain(
-      "kit/design/skill/pr-review reached no harness: kit/engineering/skill/pr-review already installs",
+    expect(added.stdout + added.stderr).toContain(
+      "skipped  design/pr-review, because pr-review is taken by engineering/pr-review",
     );
     const copy = join(dir, ".claude", "skills", "pr-review", "SKILL.md");
     expect(await readFile(copy, "utf8")).toContain("engineering");
     expect(existsSync(join(dir, ".claude", "skills", "deploy", "SKILL.md"))).toBe(true);
-
-    // The hint's fix: removing the installed one puts the newcomer in its place.
-    expect(added.stderr).toContain("aireg remove kit/engineering/skill/pr-review");
-    const removed = await aireg(["remove", "kit/engineering/skill/pr-review", "-y"], { cwd: dir });
-    expect(removed.code, removed.stderr).toBe(0);
-    expect(await readFile(copy, "utf8")).toContain("design");
+    // A teammate's install says so too, rather than reporting success.
+    expect((await aireg(["install"], { cwd: dir })).code).toBe(3);
   }, 60_000);
 
   test("keeps what each of several parallel adds wrote", async ({

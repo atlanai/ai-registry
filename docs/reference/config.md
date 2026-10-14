@@ -29,6 +29,7 @@ aireg config path
 | Key | Value | Description |
 |---|---|---|
 | `defaults.namespace` | `<registry>/<namespace>` | Where [`aireg publish`](publish.md) sends work from this machine when no destination is named. Each part is lowercase letters, digits and hyphens. Used only in a scope that declares that registry. Not set by default; [`aireg init --publish-to`](init.md) sets it too. |
+| `defaults.name-collision` | `rename`, `report` or `fail` | What [`aireg add`](add.md), `install` and `update` do with an artifact whose name another installed artifact already has. `rename` installs it under its namespace and name, such as `ops-review`. `report` leaves it out and exits `3`. `fail` installs nothing and exits `2`. Defaults to `rename`. |
 | `paused` | `true` or `false` | Stop every background job's schedule. Runs you start yourself still work. The same as [`aireg job pause`](job.md#aireg-job-pause-and-aireg-job-resume). Defaults to `false`. |
 
 ## Options
@@ -39,7 +40,7 @@ aireg config path
 
 | Action | `data` |
 |---|---|
-| `list` | `{"defaults.namespace": null, "paused": false}` |
+| `list` | `{"defaults.namespace": null, "defaults.name-collision": "rename", "paused": false}` |
 | `get` | `{"key": "paused", "value": false}` |
 | `set` | `{"key": "paused", "value": true}` |
 | `unset` | `{"key": "defaults.namespace", "value": null}` |

@@ -588,14 +588,8 @@ describe("build", () => {
       PLAN_OPTIONS,
     );
     expect(plan.clashes).toEqual([{ name: "lint", kept, dropped }]);
-    const [first, second] = [kept, dropped].sort();
-    expect(plan.warnings).toEqual([
-      {
-        name: "lint",
-        message: `${first} and ${second} would both install as "lint"; keeping ${kept}.`,
-        hint: "Give one another name with `as:` in the manifest.",
-      },
-    ]);
+    // A command says what it did about each clash; the plan only records it.
+    expect(plan.warnings).toEqual([]);
   });
 
   test("resolves an address without its kind to the one artifact of that name", () => {

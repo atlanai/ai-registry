@@ -145,6 +145,20 @@ export interface Job {
 export interface Defaults {
   /** `<registry>/<namespace>`, the home for artifacts this machine authors. */
   namespace?: string;
+  /** What an install does with an artifact whose name another already holds. */
+  nameCollision?: NameCollision;
+}
+
+/** `rename` installs it under a name from its address, `report` skips it, `fail` stops. */
+const NAME_COLLISIONS = ["rename", "report", "fail"] as const;
+export type NameCollision = (typeof NAME_COLLISIONS)[number];
+
+export function isNameCollision(value: string): value is NameCollision {
+  return (NAME_COLLISIONS as readonly string[]).includes(value);
+}
+
+export function nameCollisionOf(config: Pick<RegistryConfig, "defaults">): NameCollision {
+  return config.defaults.nameCollision ?? "rename";
 }
 
 /** A namespace is `<registry>/<namespace>`: which registry, and whose corner of it. */

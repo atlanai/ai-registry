@@ -47,8 +47,8 @@ The fields are those of [`aireg add`](add.md#json-output).
 
 - `0`: installed, or already up to date.
 - `1`: a registry or the lockfile can't be read, a registry serves other content for a version the lockfile records, a file doesn't match what its version describes, the manifest names an unknown harness, a harness folder can't be written, or the project needs a newer aireg.
-- `2`: run outside a project without `-g`, `--for` names an unknown harness, or an argument was given.
-- `3`: `--frozen` was passed and the install would change the lockfile or the manifest.
+- `2`: run outside a project without `-g`, `--for` names an unknown harness, an argument was given, or an artifact's name is taken and `defaults.name-collision` is `fail`.
+- `3`: `--frozen` was passed and the install would change the lockfile or the manifest, or an artifact wasn't installed because its name is taken and `defaults.name-collision` is `report`.
 
 ## Examples
 

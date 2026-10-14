@@ -8,6 +8,7 @@ import { parseJob } from "./job.ts";
 import {
   CONFIG_SCHEMA_VERSION,
   type Defaults,
+  isNameCollision,
   isNamespaceAddress,
   type RegistryConfig,
   type Step,
@@ -42,13 +43,23 @@ function adapterPins(value: unknown): Readonly<Record<string, string>> {
 function defaults(value: unknown, where: string): Defaults {
   if (value === undefined || value === null) return {};
   const entry = record(value, where);
-  onlyKnown(entry, ["namespace"], where);
-  if (entry.namespace === undefined) return {};
-  const namespace = text(entry, "namespace", where);
-  if (!isNamespaceAddress(namespace)) {
-    throw new ConfigError(`\`${where}.namespace\` must be <registry>/<namespace>.`);
+  onlyKnown(entry, ["namespace", "nameCollision"], where);
+  const result: Defaults = {};
+  if (entry.namespace !== undefined) {
+    const namespace = text(entry, "namespace", where);
+    if (!isNamespaceAddress(namespace)) {
+      throw new ConfigError(`\`${where}.namespace\` must be <registry>/<namespace>.`);
+    }
+    result.namespace = namespace;
   }
-  return { namespace };
+  if (entry.nameCollision !== undefined) {
+    const policy = text(entry, "nameCollision", where);
+    if (!isNameCollision(policy)) {
+      throw new ConfigError(`\`${where}.nameCollision\` must be rename, report or fail.`);
+    }
+    result.nameCollision = policy;
+  }
+  return result;
 }
 
 function parseHooks(value: unknown): PipelineHook[] {

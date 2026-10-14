@@ -1,6 +1,7 @@
 import { lstat, mkdir, readFile, rm, rmdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { copyDescribed, reasonOf } from "#core/adapter/content.ts";
+import { withName } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isRecord } from "#core/fields.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
@@ -10,6 +11,7 @@ import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { entries, exists, present, pruneEmptyParent, remove, unseal } from "#core/fs/tree.ts";
 import { type Rendered, renderPlacement } from "#core/harness/render.ts";
+import { SKILL_ENTRY } from "#core/kinds.ts";
 import { assertLeasesHeld } from "#core/lease.ts";
 import { type LinkMode, type Lock, readLock, writeLock } from "#core/lock.ts";
 import { backupStamp } from "#core/store/backups.ts";
@@ -339,7 +341,18 @@ async function assemblePlugin(run: Run, action: ActionOf<"link">): Promise<void>
 async function rendering(action: ActionOf<"link">): Promise<Rendered | undefined> {
   if (action.render === undefined) return undefined;
   const source = await readFile(action.from, "utf8").catch(() => undefined);
-  return source === undefined ? undefined : renderPlacement(action.render, source);
+  if (source === undefined) return undefined;
+  return renderPlacement(
+    action.render,
+    action.rename === undefined ? source : withName(source, action.rename),
+  );
+}
+
+/** A copy under a name not its own says that name, so the harness shows it as installed. */
+async function renameCopy(to: string, name: string): Promise<void> {
+  const file = (await lstat(to)).isDirectory() ? join(to, SKILL_ENTRY) : to;
+  const text = await readFile(file, "utf8").catch(() => undefined);
+  if (text !== undefined) await writeAtomic(file, withName(text, name));
 }
 
 /** Never linked: Codex refuses to run a linked agent. */
@@ -404,6 +417,9 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   if (mode === undefined) {
     run.skipped.add(key);
     return;
+  }
+  if (action.rename !== undefined && action.render === undefined && mode === "copy") {
+    await renameCopy(action.to, action.rename);
   }
   if (fan) run.fanned.set(action.to, action.from);
   run.modes.set(key, mode);

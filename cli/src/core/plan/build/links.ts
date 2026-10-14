@@ -1,10 +1,11 @@
 import { resolve } from "node:path";
 import { list, quoted } from "#adapter/text.ts";
 import type { LinkMode, LockArtifact } from "#core/lock.ts";
-import { type ArtifactSurvey, copyEdited, type Selected } from "#core/plan/model.ts";
+import { type Action, type ArtifactSurvey, copyEdited, type Selected } from "#core/plan/model.ts";
 import { claim, linksFor, type PlannedLink } from "#core/plan/projection.ts";
 import { removal } from "#core/plan/removable.ts";
 import { addressOf } from "#core/plan/select.ts";
+import { renamedTo } from "./rename.ts";
 import type { BuildState } from "./state.ts";
 import { unlinkRecorded } from "./unlink.ts";
 
@@ -98,28 +99,17 @@ export function updateLinks(
 ): boolean {
   let touched = restage;
   for (const link of links) {
-    const copying = link.render !== undefined || build.options.copy || item.copy === true;
+    const rename = link.shared === true ? undefined : renamedTo(item);
+    const copying =
+      link.render !== undefined || rename !== undefined || build.options.copy || item.copy === true;
     const correct = inPlace(state?.links[link.relative], copying, link.from);
     const prior = previous?.links.find((old) => old.path === link.relative);
     if (keepsEditedCopy(prior, state, build)) continue;
     if ((restage || !correct) && !build.linked.has(link.absolute)) {
       build.linked.add(link.absolute);
-      const recorded = prior?.mode;
-      build.actions.push({
-        kind: "link",
-        name: item.name,
-        harness: link.harness,
-        from: link.from,
-        to: link.absolute,
-        copy: copying,
-        plugin: link.shared === true,
-        ...(link.content === undefined ? {} : { content: link.content }),
-        ...(link.fan === true ? { fan: true } : {}),
-        ...(link.render === undefined ? {} : { render: link.render }),
-        ...(recorded === undefined ? {} : { recorded }),
-      });
+      build.actions.push(linkAction(item, link, { copy: copying, rename, recorded: prior?.mode }));
       touched = true;
-      noteRenamed(item, link, recorded, build);
+      noteRenamed(item, link, prior?.mode, build);
     }
   }
   for (const stale of previous?.links ?? []) {
@@ -127,6 +117,27 @@ export function updateLinks(
     touched = unlinkRecorded(build, item.name, stale) || touched;
   }
   return touched;
+}
+
+function linkAction(
+  item: Selected,
+  link: PlannedLink,
+  how: { copy: boolean; rename: string | undefined; recorded: LinkMode | undefined },
+): Extract<Action, { kind: "link" }> {
+  return {
+    kind: "link",
+    name: item.name,
+    harness: link.harness,
+    from: link.from,
+    to: link.absolute,
+    copy: how.copy,
+    plugin: link.shared === true,
+    ...(link.content === undefined ? {} : { content: link.content }),
+    ...(link.fan === true ? { fan: true } : {}),
+    ...(link.render === undefined ? {} : { render: link.render }),
+    ...(how.rename === undefined ? {} : { rename: how.rename }),
+    ...(how.recorded === undefined ? {} : { recorded: how.recorded }),
+  };
 }
 
 /** A copy is a real folder; anywhere else one means the link was replaced by content we do not own. */

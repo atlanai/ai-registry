@@ -17,6 +17,7 @@ import { list, plural, quoted, sanitizeName } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import { cancel, type Interaction, interaction, interactive } from "#cli/prompt/flow.ts";
 import { canceled, defaultIo, select, text } from "#cli/prompt/index.ts";
+import { withName } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isRecord, RESERVED_KEYS } from "#core/fields.ts";
 import { inBlobStore } from "#core/filespec/write/indexer.ts";
@@ -359,13 +360,6 @@ interface Incoming {
   front: { file: string; name: string } | undefined;
 }
 
-/** Only the `name:` line changes, so the comments and key order a person wrote survive. */
-function renamed(text: string, name: string): string {
-  const end = text.indexOf("\n---", 3);
-  if (!text.startsWith("---") || end === -1) return text;
-  return text.slice(0, end).replace(/^name:.*$/m, `name: ${name}`) + text.slice(end);
-}
-
 async function incoming(
   kind: string,
   manifest: KindManifest,
@@ -474,7 +468,7 @@ async function newFrom(
     // `--name` renames the copy, and index checks the folder against its front matter.
     if (item.front !== undefined && item.front.name !== item.name) {
       const file = join(at, item.front.file);
-      await writeFile(file, renamed(await readFile(file, "utf8"), item.name), "utf8");
+      await writeFile(file, withName(await readFile(file, "utf8"), item.name), "utf8");
     }
     copied.push({ name: item.name, at });
   }

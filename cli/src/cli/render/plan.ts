@@ -11,6 +11,7 @@ import type { Roots } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { GLYPH } from "#core/term/theme.ts";
 import type { Chosen, PlanReport, RunResult } from "#engine/pipeline.ts";
+import { collisionFields } from "./collisions.ts";
 import { underHome } from "./home.ts";
 import { linkLoadedBy, loadedBy, toolName } from "./tools.ts";
 
@@ -292,6 +293,7 @@ export function outcome({ plan, applied }: RunResult, dryRun: boolean) {
         ...new Set(planned.flatMap((action) => (action.kind === "link" ? [action.name] : []))),
       ].sort(),
     kept: applied?.kept ?? [],
+    ...collisionFields(plan),
   };
 }
 

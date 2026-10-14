@@ -10,6 +10,7 @@ import {
 } from "#core/plan/build/carry.ts";
 import { placeLinks, updateLinks } from "#core/plan/build/links.ts";
 import { keepUnmovedRevisions, lockRow, rewrittenFrom } from "#core/plan/build/lock-row.ts";
+import { carriedOut, renamesFor } from "#core/plan/build/rename.ts";
 import { planCopy, restages } from "#core/plan/build/restage.ts";
 import type { BuildOptions, BuildState } from "#core/plan/build/state.ts";
 import { flushUnlinks, removeStale } from "#core/plan/build/unlink.ts";
@@ -22,7 +23,10 @@ import { addressOf, select } from "./select.ts";
 
 export type { BuildOptions } from "#core/plan/build/state.ts";
 
-/** Pure planning keeps dry runs and applied runs on the same decision path. */
+/**
+ * Pure planning keeps dry runs and applied runs on the same decision path. A clash this
+ * run may settle by renaming is planned again, under the names the first plan picked.
+ */
 export function build(
   manifest: Manifest,
   lock: Lock,
@@ -30,12 +34,32 @@ export function build(
   survey: Survey,
   options: BuildOptions,
 ): Plan {
+  const planned = planWith({ manifest, lock, acquired, survey, options }, new Map());
+  if (options.nameCollision !== "rename") return planned.plan;
+  const renames = renamesFor(planned.plan.clashes, planned.selected, Object.keys(lock.artifacts));
+  if (renames.size === 0) return planned.plan;
+  const { plan } = planWith({ manifest, lock, acquired, survey, options }, renames);
+  return { ...plan, renamed: carriedOut(renames, planned.plan.clashes, plan.clashes) };
+}
+
+interface Inputs {
+  manifest: Manifest;
+  lock: Lock;
+  acquired: readonly Acquired[];
+  survey: Survey;
+  options: BuildOptions;
+}
+
+function planWith(
+  { manifest, lock, acquired, survey, options }: Inputs,
+  renames: ReadonlyMap<string, string>,
+): { plan: Plan; selected: Selected[] } {
   const warnings: Warning[] = acquired.flatMap((source) =>
     source.catalog.warnings.map((message) => ({ name: source.alias, message })),
   );
   const incompatible: Incompatible[] = [];
   const clashes: Clash[] = [];
-  const top = select(manifest, lock, acquired, [], options.cliVersion, []);
+  const top = select(manifest, lock, acquired, [], options.cliVersion, [], [], renames);
   const needs = closure(top, acquired);
   const selected = select(
     { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
@@ -45,6 +69,7 @@ export function build(
     options.cliVersion,
     incompatible,
     clashes,
+    renames,
   );
   const next = emptyLock();
   for (const source of acquired) {
@@ -93,22 +118,16 @@ export function build(
   dropUnusedSources(next);
   keepUnmovedRevisions(lock, next);
 
-  for (const clash of clashes) {
-    warnings.push({
-      name: clash.name,
-      message: `${clashMessage(clash)}; keeping ${clash.kept}.`,
-      hint: "Give one another name with `as:` in the manifest.",
-    });
-  }
   state.actions.push({ kind: "record", lock: next });
   const direct = new Set(top.map((item) => item.name));
-  return {
+  const plan: Plan = {
     actions: state.actions,
     unchanged: state.unchanged,
     warnings,
     incompatible,
     rewritten: state.rewritten,
     clashes,
+    renamed: [],
     neededBy: dict(
       [...state.neededBy].filter(
         ([name]) => !direct.has(name) && next.artifacts[name] !== undefined,
@@ -118,6 +137,7 @@ export function build(
     unresolved: needs.unresolved,
     conflicts: [...needs.conflicts, ...nameClashes(needs, selected)],
   };
+  return { plan, selected };
 }
 
 function planItem(item: Selected, build: BuildState): void {
