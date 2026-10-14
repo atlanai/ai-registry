@@ -1,6 +1,6 @@
 ---
 name: aireg-add
-description: Find, read, install and update skills and agents from a registry, in this project or for the user. Use when asked to add or connect a registry, install or read a skill or agent, see what a registry offers, check that installed skills are current, or keep them checked in CI.
+description: Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI.
 compatibility: Needs the aireg CLI and git, on macOS or Linux.
 license: Apache-2.0
 ---
@@ -10,6 +10,23 @@ license: Apache-2.0
 An artifact's full name is `<registry>/<namespace>/<name>`, optionally `@<version>`. Add the
 kind, as in `<registry>/<namespace>/skill/<name>`, only when a skill and an agent share the name.
 Pass `--json` to every command and read `data`; nothing prompts under `--json`.
+
+## Answer from aireg, not from the folders
+
+`.claude/skills` and `.agents/skills` hold the user's own skills beside links to installed
+copies, and `.registry/` holds aireg's own files. Listing or reading them can't tell an
+installed copy from the user's own, an edited one or one that's behind, so answer with aireg:
+
+| Ask | Command |
+| --- | --- |
+| What is installed | `aireg list --json` |
+| Where one came from, and its version | `aireg list <name> --json`: `data.registry`, `data.address`, `data.version` |
+| Edited, missing in a harness, or why one isn't loading | `aireg status --json`: each of `data.artifacts` has its `state` and `harnesses`; `data.unmanaged` lists the skills in the harness folders that aireg doesn't manage |
+| Behind its registry | `aireg outdated --json` |
+| What an update would change | `aireg outdated --json`, then `aireg show <registry>/<namespace>/<name>@<version> --json` for the newer version |
+| Remove one | `aireg remove <name> --dry-run --json`, show the user `data.removed`, then run it without `--dry-run`, with `--yes` |
+
+Add `-g` to each for the user's own installs.
 
 ## 1. Check the CLI
 
@@ -76,6 +93,9 @@ aireg list --json
 
 Add `-g` to each for the user's own installs. `aireg status` also lists, in
 `data.unmanaged`, skills in the harness folders that aireg does not manage.
+
+To keep this project current in the background, ask, then run
+`aireg job add --registry <registry> --json` here. A `-g` install gets a job of its own.
 
 ## In CI
 

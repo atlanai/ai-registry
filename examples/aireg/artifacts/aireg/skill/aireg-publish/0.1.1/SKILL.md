@@ -1,6 +1,6 @@
 ---
 name: aireg-publish
-description: Publish a skill or agent to a registry, or release a new version of one. Use when asked to publish, share, contribute or release a skill or agent, update one that is already in a registry, publish a project's skills from CI, or fix what registry validation reports.
+description: Publish a skill or agent to a registry, or release a new version of one, including an edit made to an installed copy. Use when asked to publish, share, contribute or release a skill or agent, send an edit to an installed skill back to its registry, update one that is already in a registry, publish a project's skills from CI, or fix what registry validation reports.
 compatibility: Needs the aireg CLI and git, on macOS or Linux.
 license: Apache-2.0
 ---
@@ -12,9 +12,26 @@ and read `data`.
 
 Pick the path by where the user is working:
 
+- **An installed skill or agent the user edited**: send it home.
 - **Outside the registry's repository**, with a skill in some folder: contribute it.
 - **A project whose skills should reach a registry on every change**: publish from CI.
 - **Inside the registry's repository**: add or version it there, then release.
+
+## An installed skill you edited
+
+`aireg status --json` shows it `edited`. Publish it by name, and don't read `.registry/` to
+work out where it came from:
+
+```sh
+aireg publish <name> --dry-run --yes --json   # data.artifacts: the version it would release
+aireg publish <name> --yes --json
+```
+
+- A registry in a folder takes the next version in place.
+- A git registry exits 2 with `is a git registry`: publish into a clone instead, as below,
+  with `aireg publish <name> --to ../<clone>/<namespace> --yes --json`.
+- If a newer version was published since the edit, it refuses. Offer `aireg update` and
+  redoing the edit there, or `--force` to publish over it.
 
 ## Contribute from any folder
 

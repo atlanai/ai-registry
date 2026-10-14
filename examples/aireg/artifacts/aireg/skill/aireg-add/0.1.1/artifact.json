@@ -5,14 +5,14 @@
     "name": "aireg-add",
     "namespace": "aireg",
     "version": "0.1.1",
-    "description": "Find, read, install and update skills and agents from a registry, in this project or for the user. Use when asked to add or connect a registry, install or read a skill or agent, see what a registry offers, check that installed skills are current, or keep them checked in CI.",
-    "digest": "sha256:a319b8fec6c1de36c9152916a313a5e7cc18c3331edccc8b22b1a82cb565d0ec"
+    "description": "Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI.",
+    "digest": "sha256:3b226949d241d4826699d470b5ea93dc1b2040d14353fbda9d4906ac202e5371"
   },
   "files": [
     {
       "path": "SKILL.md",
-      "digest": "sha256:539bdce5bd2866997cc5571e89db843be6fb3f3c52833c09f5a54f3d703ffa8b",
-      "size": 5288,
+      "digest": "sha256:62441771689494eac83537178bce9753917f8a843a5c605f226d36ed5c2a95f4",
+      "size": 6781,
       "media_type": "text/markdown",
       "urls": [
         "SKILL.md"
@@ -21,7 +21,7 @@
   ],
   "spec": {
     "name": "aireg-add",
-    "description": "Find, read, install and update skills and agents from a registry, in this project or for the user. Use when asked to add or connect a registry, install or read a skill or agent, see what a registry offers, check that installed skills are current, or keep them checked in CI.",
+    "description": "Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI.",
     "compatibility": "Needs the aireg CLI and git, on macOS or Linux.",
     "license": "Apache-2.0"
   }
