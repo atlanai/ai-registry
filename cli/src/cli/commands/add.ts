@@ -324,10 +324,9 @@ function settleUnlinked(
     context.printer.error(
       `${clash.dropped} reached no harness: ${clash.kept} already installs ${where}.`,
     );
+    // Removing the holder is the one-command fix: an `as:` beside a whole entry loses to it.
+    context.printer.hint(`To use it instead, run \`aireg remove ${clash.kept}\`.`);
   }
-  context.printer.hint(
-    "Give one of them another name with `as:` in the manifest, then run `aireg install`.",
-  );
   context.exit = ExitCode.Changed;
   return {
     unlinked: unlinked.map(({ dropped, kept, at }) => ({
