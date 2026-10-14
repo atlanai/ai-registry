@@ -129,8 +129,7 @@ pr-review 1.2.0 in <org>/ai-registry is flagging false positives in generated co
 
 1. In an up-to-date clone of the registry, on a new branch:
    `aireg skill bump pr-review patch --namespace <namespace>`, then edit 1.2.1.
-2. In the skill's `versions.json`, set `"yanked": true` and a `reason` on the 1.2.0 row. If
-   the row has a `catalog_digest`, set it to the value `aireg registry index` reports.
+2. In the skill's `versions.json`, set `"yanked": true` and a `reason` on the 1.2.0 row.
 3. `aireg registry index`, `aireg registry validate` and a commit. Ask before you push and
    open the pull request.
 4. Once it merges, in each project: `aireg outdated`, then `aireg update`.
