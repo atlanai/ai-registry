@@ -172,6 +172,24 @@ describe("an address", () => {
     expect(await manifest(dir)).toBe(before);
   }, 60_000);
 
+  test("installs the rest of a namespace whose member's name is taken, keeps the installed one, and exits 3", async ({
+    aireg,
+    market,
+    newProject: project,
+  }) => {
+    const dir = await project();
+    expect((await aireg(["registry", "add", market], { cwd: dir })).code).toBe(0);
+    expect((await aireg(["add", "kit/engineering/pr-review", "-y"], { cwd: dir })).code).toBe(0);
+    const added = await aireg(["add", "kit/design", "-y"], { cwd: dir });
+    expect(added.code).toBe(3);
+    expect(added.stderr).toContain(
+      "kit/design/skill/pr-review reached no harness: kit/engineering/skill/pr-review already installs",
+    );
+    const copy = join(dir, ".claude", "skills", "pr-review", "SKILL.md");
+    expect(await readFile(copy, "utf8")).toContain("engineering");
+    expect(existsSync(join(dir, ".claude", "skills", "deploy", "SKILL.md"))).toBe(true);
+  }, 60_000);
+
   test("keeps what each of several parallel adds wrote", async ({
     aireg,
     market,

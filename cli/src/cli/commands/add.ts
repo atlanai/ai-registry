@@ -45,12 +45,12 @@ import {
 import { expandLocation, recordedLocation } from "#core/adapter/location.ts";
 import { type Entry, withoutCoveredLeaves } from "#core/catalog/model.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
-import { AiregError, ErrorCode } from "#core/errors.ts";
+import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import { coveredByWhole, type RegistrySource } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
 import { reached } from "#core/plan/acquire.ts";
-import type { Selected } from "#core/plan/model.ts";
+import type { Clash, Selected } from "#core/plan/model.ts";
 import {
   formatAddress,
   formatRef,
@@ -275,6 +275,7 @@ export async function run(context: CommandContext): Promise<void> {
       pinned: refs.every((text) => parseRef(text).version !== undefined),
     });
   }
+  const unlinked = settleUnlinked(context, refs, result);
   if (context.printer.format === "json") {
     context.printer.json({
       ok: true,
@@ -284,6 +285,7 @@ export async function run(context: CommandContext): Promise<void> {
         dependencies: result.plan.neededBy,
         ...outcome(result, common.dryRun),
         ...(jobId === undefined ? {} : { jobId }),
+        ...unlinked,
       },
     });
     return;
@@ -296,6 +298,44 @@ export async function run(context: CommandContext): Promise<void> {
       ),
     );
   }
+}
+
+/**
+ * A whole namespace or registry still installs the rest when one member's name is taken,
+ * but that member reaches no harness, so the add did not do all it was asked: each is named,
+ * the add exits 3, and JSON lists them in `unlinked`.
+ */
+function settleUnlinked(
+  context: CommandContext,
+  refs: readonly string[],
+  result: { applied?: unknown; plan: { clashes: readonly Clash[] } },
+): { unlinked?: { artifact: string; by: string; at?: string }[] } {
+  if (result.applied === undefined) return {};
+  const wholes = refs
+    .map(parseRef)
+    .filter((ref) => ref.name === undefined)
+    .map((ref) => `${formatAddress(ref)}/`);
+  const unlinked = result.plan.clashes.filter(({ dropped }) =>
+    wholes.some((prefix) => dropped.startsWith(prefix)),
+  );
+  if (unlinked.length === 0) return {};
+  for (const clash of unlinked) {
+    const where = clash.at === undefined ? `as ${quoted(clash.name)}` : `at ${clash.at}`;
+    context.printer.error(
+      `${clash.dropped} reached no harness: ${clash.kept} already installs ${where}.`,
+    );
+  }
+  context.printer.hint(
+    "Give one of them another name with `as:` in the manifest, then run `aireg install`.",
+  );
+  context.exit = ExitCode.Changed;
+  return {
+    unlinked: unlinked.map(({ dropped, kept, at }) => ({
+      artifact: dropped,
+      by: kept,
+      ...(at === undefined ? {} : { at }),
+    })),
+  };
 }
 
 /**
