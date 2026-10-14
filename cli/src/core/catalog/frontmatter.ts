@@ -52,6 +52,13 @@ export function frontmatterRecord(text: string): Record<string, unknown> | undef
   }
 }
 
+/** Only the `name:` line changes, so the comments and key order a person wrote survive. */
+export function withName(text: string, name: string): string {
+  const match = FENCE.exec(text);
+  if (match === null) return text;
+  return match[0].replace(/^name:.*$/m, `name: ${name}`) + text.slice(match[0].length);
+}
+
 /** What follows the front matter, or all of the text when it has none. */
 export function markdownBody(text: string): string {
   const match = FENCE.exec(text);
