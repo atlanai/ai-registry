@@ -631,9 +631,17 @@ export const COMMANDS: readonly CommandSpec[] = [
       {
         name: "remove",
         aliases: ["rm"],
-        summary: "Remove a job",
-        usage: ["aireg job remove <job>"],
+        summary: "Remove a job, or stop it watching a folder",
+        usage: ["aireg job remove <job> [--watch <folder>...]"],
         maxArguments: 1,
+        options: [
+          {
+            flag: "--watch",
+            value: "<folder>",
+            multiple: true,
+            describe: "Stop watching this folder and keep the job (repeatable)",
+          },
+        ],
       },
       {
         name: "start",

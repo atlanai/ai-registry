@@ -8,7 +8,7 @@ Manage background jobs and read their runs.
 aireg job add [<folder>] --registry <registry> [<options>]
 aireg job add [<folder>] --watch <folder>... --to <registry>/<namespace> [<options>]
 aireg job list
-aireg job remove <job>
+aireg job remove <job> [--watch <folder>...]
 aireg job start <job> [--mode sync | pull | publish]
 aireg job enable <job>
 aireg job disable <job>
@@ -70,6 +70,12 @@ Lists every job on this machine: its id, registry, its folder, how often it runs
 
 Removes a job. The artifacts it installed stay installed. For a job that watched folders, aireg forgets the copies it kept of what they hold, in the scope's lockfile and `.registry/artifacts/`, unless another job still watches them; your folders stay as they are, and what the job published stays in the registry. `rm` is the same command.
 
+Since a registry has one job per scope, the job `aireg add -g` starts and the one `job add -g --watch` makes are the same job. To stop watching a folder and keep the rest, name the folder:
+
+| Option | Description |
+|---|---|
+| `--watch <folder>` | Stop watching this folder, and forget the copies kept of it, as above. The job stays. Once it watches no folder, it is again the job `aireg add` starts: it keeps the scope in sync and reports edits made here rather than publishing them. Repeat it for more than one. |
+
 ## aireg job start
 
 Runs a job now, without waiting for its schedule. It works on a disabled job, and while jobs are paused. `start` returns once the run has started; follow it with `aireg job runs <run> --follow`.
@@ -117,7 +123,7 @@ Stops a run that is queued or running.
 |---|---|
 | `add` | `{"job": {...}, "revision": 4}` |
 | `list` | `{"paused": false, "jobs": [...]}` |
-| `remove` | `{"jobId": "job_skills_acme"}` |
+| `remove` | `{"jobId": "job_skills_acme"}`, and with `--watch` the folders it still watches: `{"jobId": "job_skills_acme", "watching": []}` |
 | `start`, `retry`, `cancel` | `{"run": {...}}` |
 | `enable`, `disable` | `{"jobId": "job_skills_acme", "enabled": true}` |
 | `pause`, `resume` | `{"paused": true, "revision": 5}` |
@@ -129,7 +135,7 @@ With `runs --follow --json`, each event prints as its own line.
 
 - `0`: success.
 - `1`: the registry isn't declared, it publishes nothing a `-s` name names, the job or run doesn't exist (including for `start`), the daemon didn't start or isn't running, or the run can't be retried.
-- `2`: the action is unknown, `remove`, `enable`, `disable` or `start` was given no job, `pause` or `resume` was given one, an option's value isn't valid, `--registry`, `--watch`, `--to` or `--account` is missing, `start` was given an unknown mode, `retry` or `cancel` was given no run, a run id isn't of the form `run_<uuid>`, or `--to` names a registry that takes no publishes.
+- `2`: the action is unknown, `remove`, `enable`, `disable` or `start` was given no job, `pause` or `resume` was given one, an option's value isn't valid, `--registry`, `--watch`, `--to` or `--account` is missing, `start` was given an unknown mode, `retry` or `cancel` was given no run, a run id isn't of the form `run_<uuid>`, `--to` names a registry that takes no publishes, or `remove --watch` names a folder the job doesn't watch.
 - `4`: the registry needs a sign-in and there is no account signed in to it. A job can't use `AIREG_TOKEN_<NAME>`, since the daemon never sees it: run `aireg auth login <registry>` first.
 
 ## Examples
@@ -146,6 +152,12 @@ Run that job now, then check what it did:
 ```bash
 aireg job start job_skills_acme
 aireg job runs
+```
+
+Stop publishing your skills, and keep what you installed up to date:
+
+```bash
+aireg job remove job_skills_acme --watch ~/.claude/skills
 ```
 
 Stop syncing:

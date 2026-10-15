@@ -3,6 +3,7 @@ import { list as listOf, plural, quoted } from "#adapter/text.ts";
 import { qualify } from "#cli/commands/add.ts";
 import { addContributedJob } from "#cli/commands/job/contributed.ts";
 import type { RunsOptions } from "#cli/commands/job/runs.ts";
+import { scopeName, watchedBy, withoutFolders } from "#cli/commands/job/watch.ts";
 import { parse } from "#cli/options.ts";
 import { cannotPublish } from "#cli/publish/target.ts";
 import { underHome } from "#cli/render/home.ts";
@@ -287,8 +288,13 @@ async function existing(wanted: string): Promise<void> {
   if (findJob(await readConfig(), wanted) === undefined) throw noJob(wanted);
 }
 
-async function remove(context: CommandContext, wanted: string | undefined): Promise<void> {
+async function remove(
+  context: CommandContext,
+  wanted: string | undefined,
+  folders: string[] | undefined,
+): Promise<void> {
   if (wanted === undefined) throw needsJob("remove");
+  if (folders !== undefined && folders.length > 0) return unwatch(context, wanted, folders);
   await existing(wanted);
   await withDaemon(async (client) => {
     const job = await withFreshConfig(client, async (config) => {
@@ -303,6 +309,40 @@ async function remove(context: CommandContext, wanted: string | undefined): Prom
     context.printer.format === "json"
       ? context.printer.json({ ok: true, data: { jobId: job.id } })
       : context.printer.success(`Removed job ${job.name ?? job.id}.`);
+  });
+}
+
+/** Stops watching some folders and keeps the job, which goes on keeping its scope in sync. */
+async function unwatch(context: CommandContext, wanted: string, folders: string[]): Promise<void> {
+  const before = findJob(await readConfig(), wanted);
+  if (before === undefined) throw noJob(wanted);
+  // Checked before the daemon starts: a folder the job does not watch does not need it.
+  withoutFolders(before, folders, context.cwd);
+  await withDaemon(async (client) => {
+    const { found, job } = await withFreshConfig(client, async (config) => {
+      const found = findJob(config, wanted);
+      if (found === undefined) throw noJob(wanted);
+      const job = withoutFolders(found, folders, context.cwd);
+      await client.request("settings.patch", {
+        expectedRevision: config.revision,
+        jobs: { upsert: [job] },
+      });
+      return { found, job };
+    });
+    const watching = watchedBy(job);
+    if (context.printer.format === "json") {
+      context.printer.json({ ok: true, data: { jobId: job.id, watching } });
+      return;
+    }
+    const stopped = watchedBy(found).filter((folder) => !watching.includes(folder));
+    const name = job.name ?? job.id;
+    const root = job.steps.find((step) => step.root !== undefined)?.root ?? context.cwd;
+    context.printer.success(
+      `Stopped watching ${listOf(stopped.map(underHome))}. ` +
+        (watching.length === 0
+          ? `Job ${name} still keeps ${scopeName(root, context.cwd)} up to date.`
+          : `Job ${name} still watches ${listOf(watching.map(underHome))}.`),
+    );
   });
 }
 
@@ -408,7 +448,7 @@ export async function run(context: CommandContext): Promise<void> {
   return runAction(spec, action, {
     list: () => list(context),
     add: () => add(context, argument, own, common),
-    remove: () => remove(context, argument),
+    remove: () => remove(context, argument, own.watch),
     start: () => start(context, argument, own.mode),
     enable: () => setEnabled(context, argument, true),
     disable: () => setEnabled(context, argument, false),

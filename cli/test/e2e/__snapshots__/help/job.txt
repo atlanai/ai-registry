@@ -5,7 +5,7 @@ Usage: aireg job [<action>] [options]
 Actions:
   add      Add a job that keeps a folder in sync with a registry
   list     List every job on this machine (alias: ls)
-  remove   Remove a job (alias: rm)
+  remove   Remove a job, or stop it watching a folder (alias: rm)
   start    Run a job now
   enable   Turn a job's schedule on
   disable  Turn a job's schedule off

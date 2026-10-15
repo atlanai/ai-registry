@@ -338,6 +338,36 @@ describe("a watch job over a namespace your user scope installs", () => {
     }
   }, 120_000);
 
+  const jobs = async (aireg: Aireg) =>
+    (
+      JSON.parse((await aireg(["job", "list", "--json"])).stdout) as {
+        data: { jobs: { id: string; steps: { kind: string; policy: string }[] }[] };
+      }
+    ).data.jobs;
+
+  test("stops watching a folder and keeps the job that keeps the install up to date", async ({
+    aireg,
+    home,
+    tmp,
+  }) => {
+    try {
+      const { notes, versions, run, job } = await watching({ aireg, home, tmp });
+      const skills = dirname(dirname(notes));
+      const unwatched = await aireg(["job", "remove", job, "--watch", skills]);
+      expect(unwatched.code, unwatched.stderr).toBe(0);
+      const steps = (await jobs(aireg)).map((item) =>
+        item.steps.map((step) => `${step.kind} ${step.policy}`),
+      );
+      expect(steps).toEqual([["pull on", "publish report", "prune report"]]);
+
+      await writeFile(notes, body("New."));
+      expect(await run()).not.toMatch(/published/);
+      expect(await readFile(versions, "utf8")).not.toContain('"0.1.1"');
+    } finally {
+      await aireg(["daemon", "stop"]);
+    }
+  }, 120_000);
+
   test("settles a job's conflict by the short name the hints print", async ({
     aireg,
     home,

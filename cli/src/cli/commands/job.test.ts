@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, vi } from "vitest";
-import { emptyRegistryConfig, type Job } from "#core/config/model.ts";
+import { withoutFolders } from "#cli/commands/job/watch.ts";
+import { emptyRegistryConfig, type Job, type StepPolicy } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { AiregError } from "#core/errors.ts";
 import { Printer } from "#core/output.ts";
@@ -50,6 +51,7 @@ describe("a job command that fails validation", () => {
     ["enable", "zz-nope"],
     ["disable", "zz-nope"],
     ["remove", "zz-nope"],
+    ["remove", "zz-nope", "--watch", "/tmp"],
     ["start", "zz-nope"],
     ["retry"],
     ["cancel"],
@@ -108,5 +110,56 @@ describe("a job named by a name other than its id", () => {
     await run(context(["remove", "nightly"], out));
     expect(sent).toEqual([{ expectedRevision: 1, jobs: { remove: ["job_contributed_1"] } }]);
     expect(JSON.parse(out.join(""))).toEqual({ ok: true, data: { jobId: "job_contributed_1" } });
+  });
+});
+
+/** One step of a job, rooted at `root`. */
+const step = (kind: string, root = "/scope", policy: StepPolicy = "on", needs: string[] = []) => ({
+  name: kind,
+  kind,
+  needs,
+  root,
+  select: [],
+  policy,
+  extra: {},
+});
+const job = (id: string, steps: Job["steps"], enabled = true): Job => ({
+  id,
+  account: "acc_acme",
+  schedule: { every: 900, enabled },
+  steps,
+});
+
+describe("a job told to stop watching folders", () => {
+  const watching = (folders: string[]) =>
+    job("job_skills_acme", [
+      { ...step("origins"), to: "acme/eng", select: folders.map((from) => ({ from })) },
+      step("pull", "/scope", "on", ["origins"]),
+      step("publish", "/scope", "on", ["pull"]),
+    ]);
+  const shape = (changed: Job) =>
+    changed.steps.map((item) => [item.kind, item.policy, item.needs, item.select.length]);
+
+  test("keeps the rest of the job while another folder is still watched", () => {
+    const changed = withoutFolders(watching(["/gone/a", "/gone/b"]), ["/gone/a"], "/");
+    expect(shape(changed)).toEqual([
+      ["origins", "on", [], 1],
+      ["pull", "on", ["origins"], 0],
+      ["publish", "on", ["pull"], 0],
+    ]);
+  });
+
+  test("goes back to the job aireg add makes once none is left, however the folder is typed", () => {
+    const changed = withoutFolders(watching(["/gone/skills"]), ["/gone/skills/"], "/");
+    expect(shape(changed)).toEqual([
+      ["pull", "on", [], 0],
+      ["publish", "report", ["pull"], 0],
+    ]);
+  });
+
+  test("refuses a folder it does not watch", () => {
+    expect(() => withoutFolders(watching(["/gone/a"]), ["/elsewhere"], "/")).toThrow(
+      /does not watch/,
+    );
   });
 });
