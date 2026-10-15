@@ -3,13 +3,19 @@ import { list as listOf, quoted } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/index.ts";
 import { existing, needsJob, noJob } from "#cli/commands/job/find.ts";
 import { underHome } from "#cli/render/home.ts";
-import { findJob, type Job, type RegistryConfig, type Step } from "#core/config/model.ts";
+import {
+  findJob,
+  type Job,
+  type RegistryConfig,
+  type Step,
+  watchedFolders,
+} from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { expandUserPath } from "#core/fs/path.ts";
 import { readManifest } from "#core/manifest.ts";
-import { roots, scopeFor } from "#core/store/paths.ts";
+import { roots, scopeFor, scopeName } from "#core/store/paths.ts";
 import { withFreshConfig } from "#daemon/rpc/client.ts";
 import { withDaemon } from "#daemon/service.ts";
 import { FOREGROUND_POLICY } from "#engine/foreground.ts";
@@ -19,18 +25,12 @@ function key(folder: string): string {
   return canonical(resolve(expandUserPath(folder)));
 }
 
-function watchedBy(job: Job): string[] {
-  return job.steps.flatMap((step) =>
-    step.kind === "origins" ? step.select.map((selector) => selector.from) : [],
-  );
-}
-
 /**
  * The job without the folders named. With none left it goes back to the job `aireg add`
  * makes: no folder step, and edits made here reported rather than published.
  */
 function withoutFolders(job: Job, folders: readonly string[], cwd: string): Job {
-  const watched = watchedBy(job);
+  const watched = watchedFolders(job);
   const keys = new Set(watched.map(key));
   const named = folders.map((folder) =>
     folder.startsWith("~") || isAbsolute(folder) ? folder : resolve(cwd, folder),
@@ -79,10 +79,12 @@ function pulledInto(job: Job): string | undefined {
   )?.root;
 }
 
-/** The scope a job keeps up to date, as a person reads it. */
-function scopeName(root: string, cwd: string): string {
-  if (scopeFor(root) === "user") return "your user scope";
-  return key(cwd) === key(root) ? "this project" : `the project at ${underHome(root)}`;
+/** The scope a job keeps up to date, as a person reads it from `cwd`. */
+function scopeAt(root: string, cwd: string): string {
+  const scope = scopeFor(root);
+  return scope === "project" && key(cwd) !== key(root)
+    ? `the project at ${underHome(root)}`
+    : scopeName(scope);
 }
 
 /** After a job is removed, says when nothing keeps what it kept up to date any more. */
@@ -102,7 +104,7 @@ async function warnUnkept(context: CommandContext, job: Job, after: RegistryConf
   if (!installs) return;
   const here = scope === "project" && key(context.cwd) === key(root);
   context.printer.warning(
-    `Artifacts from ${registry} in ${scopeName(root, context.cwd)} are no longer kept up to date in the background.`,
+    `Artifacts from ${registry} in ${scopeAt(root, context.cwd)} are no longer kept up to date in the background.`,
   );
   const again = `aireg job add${scope === "user" ? " -g" : ""} --registry ${registry}`;
   context.printer.hint(
@@ -110,7 +112,7 @@ async function warnUnkept(context: CommandContext, job: Job, after: RegistryConf
       ? `To keep them up to date, run \`${again}\` in ${underHome(root)}.`
       : `To keep them up to date, run \`${again}\`.`,
   );
-  if (watchedBy(job).length > 0) {
+  if (watchedFolders(job).length > 0) {
     context.printer.hint(
       "Next time, to stop only watching a folder, run `aireg job remove <job> --watch <folder>`.",
     );
@@ -160,18 +162,18 @@ async function unwatch(context: CommandContext, wanted: string, folders: string[
       });
       return { found, job };
     });
-    const watching = watchedBy(job);
+    const watching = watchedFolders(job);
     if (context.printer.format === "json") {
       context.printer.json({ ok: true, data: { jobId: job.id, watching } });
       return;
     }
-    const stopped = watchedBy(found).filter((folder) => !watching.includes(folder));
+    const stopped = watchedFolders(found).filter((folder) => !watching.includes(folder));
     const name = job.name ?? job.id;
     const root = job.steps.find((step) => step.root !== undefined)?.root ?? context.cwd;
     context.printer.success(
       `Stopped watching ${listOf(stopped.map(underHome))}. ` +
         (watching.length === 0
-          ? `Job ${name} still keeps ${scopeName(root, context.cwd)} up to date.`
+          ? `Job ${name} still keeps ${scopeAt(root, context.cwd)} up to date.`
           : `Job ${name} still watches ${listOf(watching.map(underHome))}.`),
     );
   });

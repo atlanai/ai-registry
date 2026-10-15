@@ -18,6 +18,7 @@ import {
   type Job,
   STEP_POLICIES,
   type StepPolicy,
+  watchedFolders,
 } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -154,9 +155,7 @@ interface Described {
 
 /** Where a job works: the folders it watches, its first rooted step, or its kinds. */
 function target(job: Job): string {
-  const watched = job.steps.flatMap((step) =>
-    step.kind === "origins" ? step.select.map((item) => underHome(item.from)) : [],
-  );
+  const watched = watchedFolders(job).map(underHome);
   if (watched.length > 0) return watched.join(", ");
   const rooted = job.steps.find((step) => step.root !== undefined);
   return rooted?.root === undefined

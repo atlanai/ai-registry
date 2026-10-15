@@ -202,6 +202,13 @@ export function findJob(config: RegistryConfig, wanted: string): Job | undefined
   return config.jobs.find((job) => job.id === wanted || job.name === wanted);
 }
 
+/** The folders a job watches and publishes from, as its folder steps store them. */
+export function watchedFolders(job: Pick<Job, "steps">): string[] {
+  return job.steps.flatMap((step) =>
+    step.kind === "origins" ? step.select.map((selector) => selector.from) : [],
+  );
+}
+
 /**
  * Replaces every composite step with the leaves it stands for, rewiring `needs`
  * so nothing outside the composite has to know it was one.
