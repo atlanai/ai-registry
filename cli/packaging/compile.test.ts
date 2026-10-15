@@ -58,6 +58,14 @@ describe("compileArgs", () => {
     expect(args({ keyring: "" })).toContain('__RELEASE_KEYRING__=""');
   });
 
+  it("gives a Windows binary its publisher and a numeric version, and only a Windows binary", () => {
+    const windows = args({ target: need("windows", "amd64"), version: "1.2.3-rc.1" });
+    expect(windows).toContain("--target=bun-windows-x64");
+    expect(windows).toContain("--windows-publisher=Atlan Pte. Ltd.");
+    expect(windows).toContain("--windows-version=1.2.3.0");
+    expect(args().some((arg) => arg.startsWith("--windows-"))).toBe(false);
+  });
+
   it("refuses a version that is not exact SemVer", () => {
     for (const version of ["latest", "v1.2.3", "1.2", "../../etc", "1.2.3+build"]) {
       expect(() => args({ version })).toThrow(/exact SemVer/);

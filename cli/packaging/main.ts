@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { envName, type Setting, setting } from "#core/env.ts";
 import { EXECUTABLE } from "#core/fs/mode.ts";
 import { isChannel } from "#core/release/origin.ts";
-import { renderInstaller } from "#packaging/installer/render.ts";
+import { renderInstaller, renderWindowsInstaller } from "#packaging/installer/render.ts";
 import { compile } from "./compile.ts";
 import { privateKeyFromSeed, signManifest, verifySigned } from "./manifest.ts";
 import { hostTarget, TARGETS, type Target } from "./targets.ts";
@@ -64,16 +64,19 @@ function compileTargets(args: readonly string[]): void {
   }
 }
 
-function writeInstaller(): void {
-  const script = renderInstaller({
+function writeInstallers(): void {
+  const config = {
     version: required("RELEASE_VERSION"),
     origin: required("RELEASE_ORIGIN"),
     binaryDir: BIN,
-  });
+  };
   mkdirSync(OUT, { recursive: true });
-  const path = join(OUT, "install.sh");
-  writeFileSync(path, script, { mode: EXECUTABLE });
-  process.stdout.write(`wrote ${path}\n`);
+  const sh = join(OUT, "install.sh");
+  writeFileSync(sh, renderInstaller(config), { mode: EXECUTABLE });
+  process.stdout.write(`wrote ${sh}\n`);
+  const powershell = join(OUT, "install.ps1");
+  writeFileSync(powershell, renderWindowsInstaller(config));
+  process.stdout.write(`wrote ${powershell}\n`);
 }
 
 /** `--name value` pairs; a repeated flag collects every value. */
@@ -141,7 +144,7 @@ function main(): void {
   if (command === "compile") {
     compileTargets(args);
   } else if (command === "installer") {
-    writeInstaller();
+    writeInstallers();
   } else if (command === "sign") {
     signChannel(args);
   } else if (command === "verify") {

@@ -66,6 +66,7 @@ detect_platform() {
   case "$(uname -s)" in
     Darwin) os=darwin ;;
     Linux) os=linux ;;
+    MINGW*|MSYS*|CYGWIN*) fail "on Windows, run this in PowerShell instead: irm $ORIGIN/install.ps1 | iex" ;;
     *) fail "unsupported operating system: $(uname -s)" ;;
   esac
   case "$(uname -m)" in

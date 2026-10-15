@@ -1,0 +1,112 @@
+# `irm <origin>/install.ps1 | iex` runs this in the caller's own session, so everything stays in
+# this script block, and a failure throws rather than calling `exit`, which would close the window.
+& {
+$ErrorActionPreference = 'Stop'
+# Windows PowerShell draws progress on every chunk, which slows a download many times over.
+$ProgressPreference = 'SilentlyContinue'
+Set-StrictMode -Version 3
+
+# Both are build-time literals. The version was checked against SemVer when this file was
+# generated, so nothing below re-parses it before using it as a directory name.
+$Version = '{{Version}}'
+$Origin = '{{Origin}}'
+$Name = '{{Name}}'
+
+function Fail([string] $Message) {
+  throw "$Name installer: $Message"
+}
+
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+  Fail "PowerShell 5.1 or later is required"
+}
+# Windows PowerShell 5.1 can default to TLS 1.0, which the release server refuses.
+if ($PSVersionTable.PSEdition -ne 'Core') {
+  [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+}
+
+# Another release installs through its own installer, which pins that release's digests.
+# Only SemVer's characters pass, so the version stays one path segment.
+function Install-Release([string] $Want) {
+  if ($Want -notmatch '^[0-9A-Za-z.+-]+$') {
+    Fail "{{VersionEnv}} must be a version, such as 1.2.3 (got $Want)"
+  }
+  Write-Host "Downloading the $Name $Want installer from $Origin..."
+  try {
+    $script = (Invoke-WebRequest -UseBasicParsing -Uri "{{Artifacts}}/v$Want/install.ps1").Content
+  } catch {
+    Fail "$Origin has no Windows installer for $Name $Want"
+  }
+  if ($script -is [byte[]]) { $script = [Text.Encoding]::UTF8.GetString($script) }
+  # That installer reads the same {{VersionEnv}}, which names its own version.
+  Invoke-Expression $script
+}
+
+# The machine's own architecture: an x64 PowerShell under emulation on ARM64 reports AMD64.
+function Get-Arch {
+  $native = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment').PROCESSOR_ARCHITECTURE
+  switch ($native) {
+    'AMD64' { return 'amd64' }
+    'ARM64' { return 'arm64' }
+    default { Fail "unsupported architecture: $native" }
+  }
+}
+
+$want = if ($env:{{VersionEnv}}) { $env:{{VersionEnv}} } else { $Version }
+$want = $want -replace '^v', ''
+if ($want -ne $Version) {
+  Install-Release $want
+  return
+}
+
+if ([Environment]::OSVersion.Platform -ne 'Win32NT') {
+  Fail "this installer is for Windows; on macOS and Linux run: curl -fsSL $Origin/install | sh"
+}
+$arch = Get-Arch
+$expected = switch ($arch) {
+  'amd64' { '{{WindowsAMD64}}' }
+  'arm64' { '{{WindowsARM64}}' }
+}
+
+# The same home aireg itself picks: {{HomeEnv}}, else the user's home.
+$userHome = @($env:HOME, $env:USERPROFILE) | Where-Object { $_ -and $_.Trim() } | Select-Object -First 1
+if (-not $userHome) { $userHome = [Environment]::GetFolderPath('UserProfile') }
+$homeDir = if ($env:{{HomeEnv}}) { $env:{{HomeEnv}} } else { Join-Path $userHome.Trim() '{{HomeDir}}' }
+$cliDir = Join-Path $homeDir 'cli'
+# Inside aireg's home, so the binary places itself with one rename on the same volume.
+$stageDir = Join-Path $cliDir ".incoming-$PID"
+# A killed installer leaves its staging folder; remove those whose process is gone.
+Get-ChildItem -Path $cliDir -Directory -Filter '.incoming-*' -ErrorAction SilentlyContinue | ForEach-Object {
+  $owner = $_.Name.Substring('.incoming-'.Length) -as [int]
+  if (-not $owner -or -not (Get-Process -Id $owner -ErrorAction SilentlyContinue)) {
+    Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+try {
+  New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+} catch {
+  Fail "cannot write $cliDir; set {{HomeEnv}} to a folder you own"
+}
+
+try {
+  Write-Host "Downloading $Name $Version for windows/$arch from $Origin..."
+  $binary = Join-Path $stageDir "$Name.exe"
+  Invoke-WebRequest -UseBasicParsing -Uri "{{ArtifactBase}}/$Name-windows-$arch.exe" -OutFile $binary
+  $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash.ToLowerInvariant()
+  if ($actual -ne $expected) {
+    Fail "checksum mismatch for $Name-windows-$arch.exe"
+  }
+
+  # `aireg --setup` places the binary, puts aireg on PATH and offers the default registries.
+  & $binary --setup
+  if ($LASTEXITCODE -ne 0) {
+    Fail "$Name $Version did not finish installing"
+  }
+  $installed = Join-Path $homeDir "bin\$Name.exe"
+  if (Test-Path -LiteralPath $installed) { & $installed --version | Out-Null }
+  if (-not (Test-Path -LiteralPath $installed) -or $LASTEXITCODE -ne 0) {
+    Fail "installed, but $installed does not run"
+  }
+} finally {
+  Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+}

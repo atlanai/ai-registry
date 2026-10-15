@@ -1,12 +1,12 @@
 name: Publish aireg
 description: >-
-  Signs a channel manifest for the four staged aireg binaries, uploads them and install.sh
-  write-once, then points the channel and its installer at them. Runs only Node built-ins, this
+  Signs a channel manifest for the staged aireg binaries, uploads them and both installers
+  write-once, then points the channel and its installers at them. Runs only Node built-ins, this
   repository's packaging code and the AWS CLI; needs Node, the checkout and AWS credentials.
 
 inputs:
   dir:
-    description: Absolute path of the staged binaries and install.sh
+    description: Absolute path of the staged binaries, install.sh and install.ps1
     required: true
   version:
     required: true
@@ -65,8 +65,9 @@ runs:
         key() { if [ -n "$PREFIX" ]; then printf '%s/%s' "$PREFIX" "$1"; else printf '%s' "$1"; fi; }
         manifest="$RUNNER_TEMP/aireg-manifest.json"
         artifacts=()
-        for platform in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64; do
-          artifacts+=(--artifact "$DIR/aireg-$platform")
+        for name in aireg-darwin-amd64 aireg-darwin-arm64 aireg-linux-amd64 aireg-linux-arm64 \
+          aireg-windows-amd64.exe aireg-windows-arm64.exe; do
+          artifacts+=(--artifact "$DIR/$name")
         done
         live="$(key "channels/$CHANNEL/manifest.json")"
         if [ -z "$MINIMUM" ] && aws s3api head-object --bucket "$BUCKET" --key "$live" >/dev/null 2>&1; then
@@ -106,16 +107,20 @@ runs:
           fi
         done
         # Beside its binaries, so `AIREG_VERSION=<version>` installers can reach this release.
-        object="$(key "artifacts/v$VERSION/install.sh")"
-        if ! aws s3api head-object --bucket "$BUCKET" --key "$object" >/dev/null 2>&1; then
-          aws s3api put-object --bucket "$BUCKET" --key "$object" --body install.sh --content-type text/x-shellscript \
-            --cache-control "public,max-age=31536000,immutable" --if-none-match '*' >/dev/null
-        fi
+        for installer in install.sh:text/x-shellscript "install.ps1:text/plain; charset=utf-8"; do
+          object="$(key "artifacts/v$VERSION/${installer%%:*}")"
+          if ! aws s3api head-object --bucket "$BUCKET" --key "$object" >/dev/null 2>&1; then
+            aws s3api put-object --bucket "$BUCKET" --key "$object" --body "${installer%%:*}" \
+              --content-type "${installer#*:}" --cache-control "public,max-age=31536000,immutable" \
+              --if-none-match '*' >/dev/null
+          fi
+        done
         check="$RUNNER_TEMP/uploaded"
         aws s3 cp --only-show-errors --recursive "s3://$BUCKET/$(key "artifacts/v$VERSION/")" "$check/"
         jq -r '.artifacts[] | "\(.sha256)  \(.name)"' "$manifest" > "$check/SHA256SUMS"
         (cd "$check" && sha256sum --check --quiet SHA256SUMS)
         cmp install.sh "$check/install.sh"
+        cmp install.ps1 "$check/install.ps1"
 
     # Last, so clients only ever see a manifest whose files are already served.
     - name: Move the channel
@@ -136,4 +141,5 @@ runs:
         # Served as <origin>/install only; the versioned copy under artifacts/ keeps its .sh name.
         if [ "$CHANNEL" = stable ]; then
           put install.sh install text/x-shellscript
+          put install.ps1 install.ps1 "text/plain; charset=utf-8"
         fi

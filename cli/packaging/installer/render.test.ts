@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { TARGETS } from "#packaging/targets.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { renderInstaller, renderTemplate } from "./render.ts";
+import { renderInstaller, renderTemplate, renderWindowsInstaller } from "./render.ts";
 
 /** This test's folder, which the kit removes after it. */
 let scratch: string;
@@ -74,16 +74,19 @@ describe("renderInstaller", () => {
     expect(script).not.toMatch(/\{\{|\}\}/);
   });
 
-  test("pins a SHA-256 for every platform", () => {
-    const dir = binaries((name) => `binary-of-${name}`);
-    const script = renderInstaller({
+  test("pins a SHA-256 for every platform, each in its own installer", () => {
+    const config = {
       version: "1.2.3",
       origin: "https://releases.example.com/aireg",
-      binaryDir: dir,
-    });
+      binaryDir: binaries((name) => `binary-of-${name}`),
+    };
+    const sh = renderInstaller(config);
+    const powershell = renderWindowsInstaller(config);
     for (const target of TARGETS) {
       const digest = createHash("sha256").update(`binary-of-${target.filename}`).digest("hex");
-      expect(script, target.filename).toContain(digest);
+      const [has, lacks] = target.os === "windows" ? [powershell, sh] : [sh, powershell];
+      expect(has, target.filename).toContain(digest);
+      expect(lacks, target.filename).not.toContain(digest);
     }
   });
 
@@ -91,7 +94,7 @@ describe("renderInstaller", () => {
   test("needs no Node and downloads no tarball", () => {
     const script = render();
     expect(script).not.toMatch(/\bnode\b|node -e|\.mjs|\.tgz|tar /);
-    expect(script).not.toMatch(/windows|\.exe/i);
+    expect(script).not.toMatch(/windows-|\.exe/i);
   });
 
   test("installs another release through that release's own installer", () => {
@@ -141,7 +144,44 @@ describe("renderInstaller", () => {
   });
 });
 
-describe("the rendered installer", () => {
+describe("renderWindowsInstaller", () => {
+  function renderWindows(): string {
+    return renderWindowsInstaller({
+      version: "1.2.3",
+      origin: "https://releases.example.com/aireg",
+      binaryDir: binaries(),
+    });
+  }
+
+  test("pins the version, origin and download URL, and leaves no placeholder", () => {
+    const script = renderWindows();
+    expect(script).toContain("$Version = '1.2.3'");
+    expect(script).toContain("$Origin = 'https://releases.example.com/aireg'");
+    expect(script).toContain(
+      '-Uri "https://releases.example.com/aireg/artifacts/v1.2.3/$Name-windows-$arch.exe"',
+    );
+    expect(script).not.toMatch(/\{\{|\}\}/);
+  });
+
+  // `irm | iex` runs the script in the caller's own session.
+  test("never exits the PowerShell session it runs in", () => {
+    expect(renderWindows()).not.toMatch(/^\s*exit\b/m);
+  });
+
+  test("installs another release through that release's own installer", () => {
+    expect(renderWindows()).toContain(
+      '"https://releases.example.com/aireg/artifacts/v$Want/install.ps1"',
+    );
+  });
+
+  test("hands the install to the verified binary", () => {
+    const script = renderWindows();
+    expect(script.indexOf("Get-FileHash")).toBeLessThan(script.indexOf("& $binary --setup"));
+  });
+});
+
+// install.sh is checked with POSIX sh and bash, which Windows runners do not ship as `sh`.
+describe.skipIf(process.platform === "win32")("the rendered installer", () => {
   test("is valid POSIX sh", () => {
     execFileSync("sh", ["-n"], { input: render() });
     execFileSync("bash", ["-n"], { input: render() });

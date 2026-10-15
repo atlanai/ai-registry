@@ -7,7 +7,8 @@ import type { ReleasePlatform } from "#core/release/urls.ts";
 import { TARGETS } from "#packaging/targets.ts";
 import { artifactBaseUrl, artifactsUrl, installerOrigin } from "./origin.ts";
 
-const TEMPLATE = new URL("install.sh.tmpl", import.meta.url);
+const SH_TEMPLATE = new URL("install.sh.tmpl", import.meta.url);
+const POWERSHELL_TEMPLATE = new URL("install.ps1.tmpl", import.meta.url);
 
 const PLACEHOLDER = /\{\{([A-Za-z0-9_]+)\}\}/g;
 
@@ -15,7 +16,7 @@ export interface InstallerConfig {
   readonly version: string;
   /** The https release origin, such as https://aireg.sh. */
   readonly origin: string;
-  /** Directory holding the compiled `aireg-<os>-<arch>` assets. */
+  /** Directory holding the compiled `aireg-<os>-<arch>[.exe]` assets. */
   readonly binaryDir: string;
 }
 
@@ -24,6 +25,8 @@ const DIGEST_KEY = {
   "darwin-arm64": "DarwinARM64",
   "linux-amd64": "LinuxAMD64",
   "linux-arm64": "LinuxARM64",
+  "windows-amd64": "WindowsAMD64",
+  "windows-arm64": "WindowsARM64",
 } as const satisfies Record<ReleasePlatform, string>;
 
 /**
@@ -50,7 +53,8 @@ function digestOf(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
-export function renderInstaller(config: InstallerConfig): string {
+/** The values both installers share, and the digests of the platforms `windows` selects. */
+function installerValues(config: InstallerConfig, windows: boolean): Record<string, string> {
   const origin = installerOrigin(config.origin);
   const artifactBase = artifactBaseUrl(config.origin, config.version);
   const artifacts = artifactsUrl(config.origin);
@@ -68,8 +72,18 @@ export function renderInstaller(config: InstallerConfig): string {
     HomeEnv: envName("HOME"),
   };
   for (const target of TARGETS) {
-    const key = DIGEST_KEY[target.platform];
-    values[key] = digestOf(join(config.binaryDir, target.filename));
+    if ((target.os === "windows") !== windows) continue;
+    values[DIGEST_KEY[target.platform]] = digestOf(join(config.binaryDir, target.filename));
   }
-  return renderTemplate(readFileSync(TEMPLATE, "utf8"), values);
+  return values;
+}
+
+/** `install.sh`, for macOS and Linux. */
+export function renderInstaller(config: InstallerConfig): string {
+  return renderTemplate(readFileSync(SH_TEMPLATE, "utf8"), installerValues(config, false));
+}
+
+/** `install.ps1`, for Windows. */
+export function renderWindowsInstaller(config: InstallerConfig): string {
+  return renderTemplate(readFileSync(POWERSHELL_TEMPLATE, "utf8"), installerValues(config, true));
 }

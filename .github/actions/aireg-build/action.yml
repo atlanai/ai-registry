@@ -51,7 +51,7 @@ runs:
       shell: bash
       working-directory: cli/dist-standalone/bin
       env:
-        BINARY: aireg-${{ inputs.os }}-${{ inputs.arch }}
+        BINARY: aireg-${{ inputs.os }}-${{ inputs.arch }}${{ inputs.os == 'windows' && '.exe' || '' }}
         VERSION: ${{ inputs.version }}
         AIREG_DISABLE_UPDATE_CHECK: "1"
       run: |
@@ -60,7 +60,12 @@ runs:
         if [ "$BINARY" = aireg-darwin-arm64 ]; then
           codesign --verify --strict "./$BINARY"
         fi
-        test "$("./$BINARY" --version)" = "$VERSION"
+        # Bun writes these properties only when it compiles on Windows; packaging/compile.ts sets them.
+        if [[ "$BINARY" == *.exe ]]; then
+          company=$(powershell -NoProfile -Command "(Get-Item -LiteralPath './$BINARY').VersionInfo.CompanyName" | tr -d '\r')
+          [ -n "$company" ] || { echo "::error::$BINARY has no publisher in its properties"; exit 1; }
+        fi
+        test "$("./$BINARY" --version | tr -d '\r')" = "$VERSION"
         "./$BINARY" --help >/dev/null
         # `doctor` runs far more of the binary than `--version` does.
         log="$RUNNER_TEMP/doctor.log"
@@ -69,3 +74,48 @@ runs:
           cat "$log"
           exit 1
         fi
+
+    # What the installer hands over to, in a throwaway home: placing itself, PATH and uninstalling.
+    # Outside GitHub Actions' view, so PATH goes where a person's would, not to $GITHUB_PATH.
+    - name: Install and uninstall
+      shell: bash
+      working-directory: cli/dist-standalone/bin
+      env:
+        BINARY: aireg-${{ inputs.os }}-${{ inputs.arch }}${{ inputs.os == 'windows' && '.exe' || '' }}
+        VERSION: ${{ inputs.version }}
+        AIREG_DISABLE_UPDATE_CHECK: "1"
+      run: |
+        set -euo pipefail
+        export HOME="$RUNNER_TEMP/home"
+        mkdir -p "$HOME"
+        exe=""
+        [[ "$BINARY" == *.exe ]] && exe=.exe
+        installed="$HOME/.aireg/bin/aireg$exe"
+        on_path() {
+          if [ -n "$exe" ]; then
+            powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path', 'User')" \
+              | tr ';' '\n' | tr -d '\r' | grep -qixF "$(cygpath -w "$HOME/.aireg/bin")"
+          else
+            grep -qF '.aireg/env' "$HOME/.profile"
+          fi
+        }
+        # Staged under its own name, as the installers stage it: only `aireg` installs itself.
+        stage="$RUNNER_TEMP/stage"
+        mkdir -p "$stage"
+        cp "$BINARY" "$stage/aireg$exe"
+        env -u GITHUB_ACTIONS "$stage/aireg$exe" --setup --yes
+        test "$("$installed" --version | tr -d '\r')" = "$VERSION"
+        on_path || { echo "::error::--setup did not put aireg on PATH"; exit 1; }
+        # The daemon is detached from the command that starts it, so it must outlive that command.
+        "$installed" daemon start
+        "$installed" daemon status | grep -qi "^running" || { echo "::error::the daemon did not stay up"; exit 1; }
+        "$installed" daemon stop
+        env -u GITHUB_ACTIONS "$installed" self uninstall --yes
+        # On Windows the folder holding the running aireg.exe goes once that process exits.
+        for _ in $(seq 30); do [ -e "$HOME/.aireg" ] || break; sleep 1; done
+        if [ -e "$HOME/.aireg" ]; then
+          echo "::error::self uninstall left $HOME/.aireg"
+          find "$HOME/.aireg"
+          exit 1
+        fi
+        if on_path; then echo "::error::self uninstall left aireg on PATH"; exit 1; fi

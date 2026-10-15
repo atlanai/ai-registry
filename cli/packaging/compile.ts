@@ -1,12 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { formatVersion, parseVersion } from "#adapter/semver.ts";
+import { dirname } from "node:path";
+import { formatVersion, parseVersion, type Version } from "#adapter/semver.ts";
+import { NAME, PUBLISHER } from "#core/product.ts";
 import { defines } from "./defines.ts";
 import { BUN_VERSION, type Target } from "./targets.ts";
 
-/** Bundled by Bun, not by tsup: the compiled binary has no `dist/` to load. */
-const ENTRY = join("src", "main.ts");
+/** Bundled by Bun, not by tsup: the compiled binary has no `dist/` to load. Bun reads `/` on Windows too. */
+const ENTRY = "src/main.ts";
 
 export interface CompileOptions {
   readonly target: Target;
@@ -24,6 +25,20 @@ export interface CompileOptions {
  * The `bun build` argv for one target. `--bytecode` and `--minify` are absent
  * on purpose; compile.test.ts asserts that and says why.
  */
+/**
+ * What Windows shows in a binary's properties and in Task Manager. Bun sets these only when
+ * compiling on Windows, which is where the release builds each Windows target.
+ */
+function windowsResources(version: Version): string[] {
+  return [
+    `--windows-title=${NAME}`,
+    `--windows-description=${NAME}`,
+    `--windows-publisher=${PUBLISHER}`,
+    `--windows-version=${version.major}.${version.minor}.${version.patch}.0`,
+    `--windows-copyright=Copyright ${PUBLISHER}`,
+  ];
+}
+
 export function compileArgs(options: CompileOptions): string[] {
   const version = parseVersion(options.version);
   if (version === undefined || formatVersion(version) !== options.version) {
@@ -45,6 +60,7 @@ export function compileArgs(options: CompileOptions): string[] {
         commit: options.commit ?? "",
       }),
     ).flatMap(([name, value]) => ["--define", `${name}=${value}`]),
+    ...(options.target.os === "windows" ? windowsResources(version) : []),
     `--outfile=${options.outFile}`,
     ENTRY,
   ];

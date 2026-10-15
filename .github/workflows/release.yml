@@ -3,7 +3,10 @@
 # optional RELEASE_PREFIX. Secrets, so logs mask every AWS detail: AWS_REGION, AWS_PUBLISH_ROLE and
 # AWS_SIGN_ROLE (to log in), and AWS_CONFIG_SECRET, the AWS Secrets Manager JSON secret everything else
 # comes from (keys `bucket`, `signing_key_secret`, `macos_signing_secret`), masked once read.
-# Approval is the release-gate environment on the jobs that log in to AWS, the only environment AWS trusts.
+# Windows binaries are signed with Azure Artifact Signing once RELEASE_WINDOWS_SIGNING_ENDPOINT,
+# RELEASE_WINDOWS_SIGNING_ACCOUNT and RELEASE_WINDOWS_SIGNING_PROFILE (variables) and AZURE_CLIENT_ID,
+# AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID (secrets) are set; until then they ship unsigned.
+# Approval is the release-gate environment on the jobs that log in to a cloud, the only environment they trust.
 name: Release
 
 on:
@@ -30,6 +33,9 @@ env:
   RELEASE_ORIGIN: ${{ vars.RELEASE_ORIGIN_PROD }}
   RELEASE_TRUSTED_KEYS: ${{ vars.RELEASE_TRUSTED_KEYS_PROD }}
   RELEASE_MACOS_CODESIGN_IDENTIFIER: ${{ vars.RELEASE_MACOS_CODESIGN_IDENTIFIER }}
+  RELEASE_WINDOWS_SIGNING_ENDPOINT: ${{ vars.RELEASE_WINDOWS_SIGNING_ENDPOINT }}
+  RELEASE_WINDOWS_SIGNING_ACCOUNT: ${{ vars.RELEASE_WINDOWS_SIGNING_ACCOUNT }}
+  RELEASE_WINDOWS_SIGNING_PROFILE: ${{ vars.RELEASE_WINDOWS_SIGNING_PROFILE }}
 
 jobs:
   plan:
@@ -76,6 +82,12 @@ jobs:
           done
           [[ "$RELEASE_MACOS_CODESIGN_IDENTIFIER" =~ ^[a-z0-9-]+(\.[a-z0-9-]+)+$ ]] || fail "RELEASE_MACOS_CODESIGN_IDENTIFIER '$RELEASE_MACOS_CODESIGN_IDENTIFIER' must be lowercase reverse-DNS, such as com.example.tool"
           [[ "$RELEASE_ORIGIN" == https://* ]] || fail "the release origin must be https"
+          if [ -z "$RELEASE_WINDOWS_SIGNING_ACCOUNT" ]; then
+            echo "::warning::RELEASE_WINDOWS_SIGNING_ACCOUNT is not set, so the Windows binaries ship unsigned"
+          else
+            [ -n "$RELEASE_WINDOWS_SIGNING_PROFILE" ] || fail "RELEASE_WINDOWS_SIGNING_PROFILE is not set"
+            [[ "$RELEASE_WINDOWS_SIGNING_ENDPOINT" =~ ^https://[a-z0-9]+\.codesigning\.azure\.net/?$ ]] || fail "RELEASE_WINDOWS_SIGNING_ENDPOINT must be an Artifact Signing endpoint, such as https://eus.codesigning.azure.net"
+          fi
           # Slash-separated plain segments, no leading or trailing slash; empty means the bucket root.
           [[ "$RELEASE_PREFIX" =~ ^([A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*)?$ ]] || fail "RELEASE_PREFIX '$RELEASE_PREFIX' must be empty or a/b/c with no leading or trailing slash"
           key_id=$(jq -er 'if type == "object" and length == 1 then keys[0] else error("") end' <<< "$RELEASE_TRUSTED_KEYS") || fail "the trusted keyring must hold exactly one key"
@@ -97,6 +109,9 @@ jobs:
           - {os: darwin, arch: amd64, runner: macos-26-intel}
           - {os: linux, arch: amd64, runner: ubuntu-26.04}
           - {os: linux, arch: arm64, runner: ubuntu-26.04-arm}
+          # Built on Windows, as only there does Bun write a binary's version and publisher.
+          - {os: windows, arch: amd64, runner: windows-2025}
+          - {os: windows, arch: arm64, runner: windows-11-arm}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -252,12 +267,90 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+  # Signs both Windows binaries. Artifact Signing runs only on x64 Windows; it signs the arm64 one too.
+  sign-windows:
+    name: Sign the Windows binaries
+    needs: [plan, build]
+    if: ${{ !cancelled() && !inputs.dry_run && needs.build.result == 'success' && vars.RELEASE_WINDOWS_SIGNING_ACCOUNT != '' }}
+    environment: release-gate
+    permissions:
+      id-token: write
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - name: Check the signing secrets
+        env:
+          # A boolean, so this log shows only true/false.
+          SECRETS_SET: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
+        shell: bash
+        run: |
+          if [ "$SECRETS_SET" != true ]; then
+            echo "::error::set the AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID repository secrets"
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: aireg-binary-windows-*
+          path: bin
+          merge-multiple: true
+
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ env.RELEASE_WINDOWS_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ env.RELEASE_WINDOWS_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ env.RELEASE_WINDOWS_SIGNING_PROFILE }}
+          files: |
+            ${{ github.workspace }}\bin\aireg-windows-amd64.exe
+            ${{ github.workspace }}\bin\aireg-windows-arm64.exe
+          description: aireg
+          description-url: https://github.com/${{ github.repository }}
+
+      - name: Check the signatures
+        working-directory: bin
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($binary in 'aireg-windows-amd64.exe', 'aireg-windows-arm64.exe') {
+            $signature = Get-AuthenticodeSignature -LiteralPath $binary
+            if ($signature.Status -ne 'Valid' -or -not $signature.TimeStamperCertificate) {
+              throw "$binary is not validly signed and timestamped: $($signature.StatusMessage)"
+            }
+          }
+          $env:HOME = $env:RUNNER_TEMP
+          $env:AIREG_DISABLE_UPDATE_CHECK = '1'
+          $ran = & ./aireg-windows-amd64.exe --version
+          if ($ran -ne $env:VERSION) { throw "the signed binary printed '$ran', not $env:VERSION" }
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aireg-binary-windows-amd64
+          path: bin/aireg-windows-amd64.exe
+          if-no-files-found: error
+          overwrite: true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aireg-binary-windows-arm64
+          path: bin/aireg-windows-arm64.exe
+          if-no-files-found: error
+          overwrite: true
+
   # Assembles every release file and attests it, with no cloud credentials and no installed
   # packages. Its digests output is what the later jobs check their download against.
   stage:
     name: Stage release files
-    needs: [plan, build, sign-macos]
-    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.sign-macos.result == 'success' || (inputs.dry_run && needs.sign-macos.result == 'skipped')) }}
+    needs: [plan, build, sign-macos, sign-windows]
+    # Windows signing is skipped, not failed, when it is not configured.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.sign-macos.result == 'success' || (inputs.dry_run && needs.sign-macos.result == 'skipped')) && (needs.sign-windows.result == 'success' || needs.sign-windows.result == 'skipped') }}
     permissions:
       contents: read
       id-token: write
@@ -283,7 +376,7 @@ jobs:
           merge-multiple: true
 
       # packaging/main.ts imports only Node built-ins and this repository, so no install is needed.
-      - name: Render the installer
+      - name: Render the installers
         working-directory: cli
         env:
           AIREG_RELEASE_VERSION: ${{ needs.plan.outputs.version }}
@@ -295,7 +388,8 @@ jobs:
           set -euo pipefail
           mkdir release
           cp cli/dist-standalone/bin/aireg-darwin-* cli/dist-standalone/bin/aireg-linux-* \
-            cli/dist-standalone/install.sh LICENSE NOTICE cli/THIRD_PARTY_NOTICES.txt release/
+            cli/dist-standalone/bin/aireg-windows-* cli/dist-standalone/install.sh \
+            cli/dist-standalone/install.ps1 LICENSE NOTICE cli/THIRD_PARTY_NOTICES.txt release/
           (cd release && sha256sum -- * > SHA256SUMS)
 
       - id: attest
@@ -305,6 +399,7 @@ jobs:
           subject-path: |
             release/aireg-*
             release/install.sh
+            release/install.ps1
 
       - id: digests
         working-directory: release
