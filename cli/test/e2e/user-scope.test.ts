@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { expect } from "vitest";
 import { registry } from "#test/kit/builders/registry.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { tree } from "#test/kit/tree.ts";
 
 // Both are documented settings, and a user lock is never committed, so its paths may leave HOME.
 test("reads its own lock back when the user scope and a harness home are outside HOME", async ({
@@ -19,7 +20,7 @@ test("reads its own lock back when the user scope and a harness home are outside
 
   const added = await aireg(["add", "-g", market, "--all", "--yes", "--for", "claude"], at);
   expect(added.code, added.stderr).toBe(0);
-  expect(existsSync(skill)).toBe(true);
+  expect(existsSync(skill), `${added.stdout}\n${tree(claude)}`).toBe(true);
 
   const listed = await aireg(["list", "-g"], at);
   expect(listed.code, listed.stderr).toBe(0);

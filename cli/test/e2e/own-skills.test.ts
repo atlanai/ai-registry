@@ -39,7 +39,10 @@ describe("aireg doctor, for the aireg skills", () => {
       detail: `pinned to aireg-v0.0.1, but aireg is ${version}`,
     });
     expect((await aireg(["doctor"])).stdout).toMatch(/!\s+aireg skills\s+pinned to aireg-v0\.0\.1/);
-    const [declared, added] = (stale?.fix ?? "").split(" && ").map((command) => command.split(" "));
+    // A path with a backslash is printed quoted for the shell; the words are what a shell runs.
+    const words = (command: string) =>
+      command.split(" ").map((word) => word.replace(/^'(.*)'$/, "$1"));
+    const [declared, added] = (stale?.fix ?? "").split(" && ").map(words);
     expect(declared).toEqual([
       "aireg",
       ...declare.slice(0, 3),

@@ -282,7 +282,8 @@ describe("a folder registry", () => {
     const dir = await project();
     const relativeMarket = relative(dir, market);
     expect((await aireg(["registry", "add", relativeMarket], { cwd: dir })).code).toBe(0);
-    expect(await manifest(dir)).toContain(`kit: ${relativeMarket}`);
+    // Written with forward slashes on every system, so the manifest travels.
+    expect(await manifest(dir)).toContain(`kit: ${relativeMarket.replaceAll("\\", "/")}`);
     const sub = join(dir, "sub");
     await mkdir(sub);
     const added = await aireg(["add", "kit/design/deploy", "-y"], { cwd: sub });

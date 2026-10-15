@@ -24,34 +24,34 @@ const test = base.extend("leased", async ({ aireg, git, project, tmp }) => {
 });
 
 describe("a scope lease", () => {
-  test("is handed back when the command holding it is interrupted", async ({
-    home,
-    project,
-    tmp,
-    leased,
-  }) => {
-    // A git that never answers holds the command inside its lease.
-    const bin = join(tmp, "hung-git");
-    await mkdir(bin, { recursive: true });
-    await writeFile(join(bin, "git"), "#!/bin/sh\nexec sleep 30\n");
-    await chmod(join(bin, "git"), 0o755);
+  // Ctrl-C to a process group is POSIX.
+  test.skipIf(process.platform === "win32")(
+    "is handed back when the command holding it is interrupted",
+    async ({ home, project, tmp, leased }) => {
+      // A git that never answers holds the command inside its lease.
+      const bin = join(tmp, "hung-git");
+      await mkdir(bin, { recursive: true });
+      await writeFile(join(bin, "git"), "#!/bin/sh\nexec sleep 30\n");
+      await chmod(join(bin, "git"), 0o755);
 
-    const child = spawn(process.execPath, [BIN, "update"], {
-      cwd: project,
-      detached: true,
-      stdio: "ignore",
-      env: { ...process.env, ...home.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
-    });
-    const exited = new Promise<NodeJS.Signals | null>((resolve) =>
-      child.once("exit", (_code, signal) => resolve(signal)),
-    );
-    await expect.poll(leased.held, { interval: 100, timeout: 10_000 }).toHaveLength(1);
+      const child = spawn(process.execPath, [BIN, "update"], {
+        cwd: project,
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env, ...home.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+      });
+      const exited = new Promise<NodeJS.Signals | null>((resolve) =>
+        child.once("exit", (_code, signal) => resolve(signal)),
+      );
+      await expect.poll(leased.held, { interval: 100, timeout: 10_000 }).toHaveLength(1);
 
-    // Ctrl-C reaches the whole process group, git included.
-    process.kill(-(child.pid as number), "SIGINT");
-    expect(await exited).toBe("SIGINT");
-    expect(await leased.held()).toEqual([]);
-  }, 60_000);
+      // Ctrl-C reaches the whole process group, git included.
+      process.kill(-(child.pid as number), "SIGINT");
+      expect(await exited).toBe("SIGINT");
+      expect(await leased.held()).toEqual([]);
+    },
+    60_000,
+  );
 
   test("names its holder while a command waits for it", async ({ home, project, leased }) => {
     const lease = join(leased.leases, `${leaseKey({ lock: lockPath(project) })}.lease`);

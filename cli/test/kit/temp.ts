@@ -17,10 +17,13 @@ export const TEST_ROOT = join(
   `${NAME}-test-${createHash("sha256").update(CHECKOUT).digest("hex").slice(0, 8)}`,
 );
 
-/** Resolved, so paths compare equal to what a spawned process reports (`/private/var` on macOS). */
+/**
+ * Resolved, so paths compare equal to what a spawned process reports: `/private/var` on
+ * macOS, and the long name of a Windows short one such as `RUNNER~1`.
+ */
 export function testRoot(): string {
   mkdirSync(TEST_ROOT, { recursive: true });
-  return realpathSync(TEST_ROOT);
+  return realpathSync.native(TEST_ROOT);
 }
 
 /** A fresh folder under the test root; the caller removes it. */

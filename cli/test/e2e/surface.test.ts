@@ -68,7 +68,7 @@ describe("the command surface", () => {
     const again = JSON.parse((await aireg(["install", "--json"], { cwd: own })).stdout).data;
     expect(again).toMatchObject({ changed: 0, installed: [] });
     expect(again.kept).toEqual([
-      { name: "deploy", path: expect.stringMatching(/\.claude\/skills\/deploy$/) },
+      { name: "deploy", path: expect.stringMatching(/\.claude[\\/]skills[\\/]deploy$/) },
     ]);
   }, 30_000);
 

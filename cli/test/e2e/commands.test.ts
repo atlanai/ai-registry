@@ -45,7 +45,7 @@ describe("a first-run mistake", () => {
         project,
         [
           `harnesses: [${harnesses}]`,
-          `registries: { kit: { source: "file://${repo}", ref: v1 } }`,
+          `registries: { kit: { source: ${JSON.stringify(`file://${repo}`)}, ref: v1 } }`,
           "artifacts: [kit/skill/lint]",
           "",
         ].join("\n"),

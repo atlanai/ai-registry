@@ -111,7 +111,8 @@ async function stopDaemon(home: Home): Promise<void> {
 // biome-ignore lint/correctness/noEmptyPattern: vitest reads a fixture's dependencies from this pattern.
 async function makeTmp({}, { onCleanup }: Cleanup): Promise<string> {
   const dir = await tempDir("test-");
-  onCleanup(() => rm(dir, { recursive: true, force: true }));
+  // Retried: Windows holds a file a moment after the process using it exits.
+  onCleanup(() => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   return dir;
 }
 

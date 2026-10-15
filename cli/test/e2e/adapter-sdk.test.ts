@@ -17,11 +17,16 @@ describe("an adapter written outside this repository", () => {
 
     const scope = join(dir, "node_modules", ...PACKAGE.split("/").slice(0, -1));
     await mkdir(scope, { recursive: true });
-    await symlink(CLI, join(dir, "node_modules", PACKAGE));
+    await symlink(CLI, join(dir, "node_modules", PACKAGE), "junction");
     await mkdir(join(dir, "node_modules", "@types"));
-    await symlink(join(CLI, "node_modules/@types/node"), join(dir, "node_modules/@types/node"));
+    await symlink(
+      join(CLI, "node_modules/@types/node"),
+      join(dir, "node_modules/@types/node"),
+      "junction",
+    );
 
-    await exec(join(CLI, "node_modules/.bin/tsc"), [], { cwd: dir });
+    // Through node, since Windows has only a .cmd launcher in node_modules/.bin.
+    await exec(process.execPath, [join(CLI, "node_modules/typescript/bin/tsc")], { cwd: dir });
     // Named, since node picks its default reporter from the terminal and the CI environment.
     const tested = await exec(
       process.execPath,

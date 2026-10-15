@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolveHarnesses } from "#core/harness/index.ts";
 import type { Lock } from "#core/lock.ts";
@@ -182,8 +183,12 @@ describe("planReport", () => {
   it("names the harnesses each link is for, not the folder it is in", () => {
     const lines = report(false);
     expect(lines).toContain("  action   artifact   harnesses    path");
-    expect(lines).toContain("  install  pr-review  Codex        t/agents/pr-review");
-    expect(lines).toContain("  install  pr-review  Claude Code  t/claude/pr-review");
+    expect(lines).toContain(
+      `  install  pr-review  Codex        ${join("t", "agents", "pr-review")}`,
+    );
+    expect(lines).toContain(
+      `  install  pr-review  Claude Code  ${join("t", "claude", "pr-review")}`,
+    );
   });
 
   it("names them in each step a verbose run prints", () => {

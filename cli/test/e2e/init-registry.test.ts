@@ -100,20 +100,24 @@ describe("outside a project", () => {
 describe("aireg registry validate on a pull request", () => {
   const injected = "x\n::warning title=INJECTED::fake annotation";
 
-  test("cannot be made to print a workflow command by a folder's name", async ({ acme, aireg }) => {
-    await mkdir(join(acme, "artifacts", "engineering", injected), { recursive: true });
-    const run = await aireg(["registry", "validate"], {
-      cwd: acme,
-      env: { GITHUB_ACTIONS: "true", GITHUB_WORKSPACE: acme },
-    });
-    expect(run.code).toBe(1);
-    const commands = run.stdout.split("\n").filter((line) => line.startsWith("::"));
-    expect(commands).toEqual([
-      "::error file=artifacts/engineering/x%0A%3A%3Awarning title=INJECTED%3A%3Afake annotation,title=registry" +
-        '::"x\\n::warning title=INJECTED::fake annotation" is not a kind.',
-    ]);
-    expect(run.stdout).toContain(
-      '✗ "artifacts/engineering/x\\n::warning title=INJECTED::fake annotation"\n',
-    );
-  });
+  // Windows refuses a folder name with a line break or a colon.
+  test.skipIf(process.platform === "win32")(
+    "cannot be made to print a workflow command by a folder's name",
+    async ({ acme, aireg }) => {
+      await mkdir(join(acme, "artifacts", "engineering", injected), { recursive: true });
+      const run = await aireg(["registry", "validate"], {
+        cwd: acme,
+        env: { GITHUB_ACTIONS: "true", GITHUB_WORKSPACE: acme },
+      });
+      expect(run.code).toBe(1);
+      const commands = run.stdout.split("\n").filter((line) => line.startsWith("::"));
+      expect(commands).toEqual([
+        "::error file=artifacts/engineering/x%0A%3A%3Awarning title=INJECTED%3A%3Afake annotation,title=registry" +
+          '::"x\\n::warning title=INJECTED::fake annotation" is not a kind.',
+      ]);
+      expect(run.stdout).toContain(
+        '✗ "artifacts/engineering/x\\n::warning title=INJECTED::fake annotation"\n',
+      );
+    },
+  );
 });

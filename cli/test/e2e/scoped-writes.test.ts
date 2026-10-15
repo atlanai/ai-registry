@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { registry } from "#test/kit/builders/registry.ts";
 import { fileTest } from "#test/kit/fixtures.ts";
+import { tree } from "#test/kit/tree.ts";
 
 const test = fileTest.extend("market", { scope: "file" }, async ({ tmp }) => ({
   near: await registry(join(tmp, "near"), { name: "near", slug: "near" })
@@ -41,7 +42,10 @@ describe("an add or remove opens only the registry it changes", () => {
     await rename(market.far, `${market.far}.gone`);
     const added = await aireg(["add", "-g", "near/team/skill/review", "-y"], outside(tmp));
     expect(added.code, added.stderr).toBe(0);
-    expect(existsSync(skillFile(home.dir, "review"))).toBe(true);
+    expect(
+      existsSync(skillFile(home.dir, "review")),
+      `${added.stdout}\n${tree(join(home.dir, ".claude"))}`,
+    ).toBe(true);
     expect(existsSync(skillFile(home.dir, "deploy"))).toBe(true);
     const listed = await aireg(["list", "-g"], outside(tmp));
     expect(listed.stdout).toMatch(/deploy\s+skill\s+1\.0\.0\s+far/);

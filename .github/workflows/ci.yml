@@ -196,6 +196,38 @@ jobs:
       CI_NODE_VERSION: "24"
     steps: *compat-steps
 
+  compat-windows:
+    name: CLI compatibility (Node 24, windows-latest)
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      # Git for Windows checks out CRLF by default, which fixtures compared byte for byte reject.
+      - run: git config --global core.autocrlf false
+        working-directory: .
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - run: corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+
+      - name: Test
+        run: pnpm run test
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@example.com
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@example.com
+
   # Each target is built and run on its own platform, so every binary is
   # proven to start where it ships.
   standalone-darwin-arm64:
@@ -250,6 +282,28 @@ jobs:
     timeout-minutes: 30
     env:
       CI_OS: linux
+      CI_ARCH: arm64
+    steps: *standalone-steps
+
+  standalone-windows-amd64:
+    name: CLI standalone (aireg-windows-amd64.exe)
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      CI_OS: windows
+      CI_ARCH: amd64
+    steps: *standalone-steps
+
+  standalone-windows-arm64:
+    name: CLI standalone (aireg-windows-arm64.exe)
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    env:
+      CI_OS: windows
       CI_ARCH: arm64
     steps: *standalone-steps
 

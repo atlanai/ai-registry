@@ -59,7 +59,7 @@ describe("aireg remove --dry-run", () => {
     const planned = await aireg(["remove", "lint", "--dry-run"]);
     expect(planned.code, planned.stderr).toBe(0);
     expect(planned.stdout).toMatch(
-      /move aside\s+lint\s+\.claude\/skills\/lint\s+yours, kept in backups/,
+      /move aside\s+lint\s+\.claude[\\/]skills[\\/]lint\s+yours, kept in backups/,
     );
     expect(planned.stdout).not.toContain("already up to date");
   });

@@ -87,7 +87,10 @@ describe("setting up a project in one command", () => {
     // Each event in words, one line per artifact, and no progress noise.
     const events = await aireg(["job", "runs", id ?? ""], { cwd: project });
     expect(events.stdout).toMatch(/^ {2}reading the registry$/m);
-    expect(events.stdout).toMatch(/^ {2}imported\s+probe\s+from .*\.cursor\/skills\/probe$/m);
+    // The job's own first run may import it before this one starts; the list below checks the result.
+    expect(events.stdout).toMatch(
+      /^ {2}(imported\s+probe\s+from .*\.cursor[\\/]skills[\\/]probe|unchanged\s+platform\/probe)$/m,
+    );
     expect(events.stdout).toMatch(/^ {2}finished\s+succeeded$/m);
     expect(events.stdout).not.toMatch(/run\.phase|artifact\.progress/);
 

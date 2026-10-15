@@ -20,6 +20,6 @@ describe("an agent for a harness that reads its own format", () => {
       action.kind === "link" && action.harness === "codex" ? [relative("/work", action.to)] : [],
     );
     expect(codex).toHaveLength(1);
-    expect(codex[0]).toMatch(/agents\/reviewer\.toml$/);
+    expect(codex[0]).toMatch(/agents[\\/]reviewer\.toml$/);
   });
 });

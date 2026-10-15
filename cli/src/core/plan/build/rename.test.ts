@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect } from "vitest";
 import type { Entry } from "#core/catalog/model.ts";
 import { emptyLock } from "#core/lock.ts";
@@ -48,7 +49,7 @@ describe("an artifact whose name another holds", () => {
     expect(linkFor(planned.actions, "engineering-pr-review")).toMatchObject({
       copy: true,
       rename: "engineering-pr-review",
-      to: "/work/.claude/skills/engineering-pr-review",
+      to: join("/work", ".claude", "skills", "engineering-pr-review"),
     });
     expect(linkFor(planned.actions, "design/pr-review")).toMatchObject({ copy: false });
     expect(linkFor(planned.actions, "design/pr-review")).not.toHaveProperty("rename");

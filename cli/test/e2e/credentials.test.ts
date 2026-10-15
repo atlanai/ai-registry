@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test as base } from "#test/kit/fixtures.ts";
+import { expectMode } from "#test/kit/mode.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
 
 const TOKEN = "synthetic-e2e-token";
@@ -92,7 +93,7 @@ describe("credentials.json, end to end", () => {
       );
 
       const file = join(home.aireg, "credentials.json");
-      expect((await stat(file)).mode & 0o777).toBe(0o600);
+      await expectMode(file, 0o600);
       const stored = JSON.parse(await readFile(file, "utf8"));
       const [id] = Object.keys(stored.credentials);
       expect(stored).toEqual({

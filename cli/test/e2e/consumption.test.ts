@@ -1,10 +1,9 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { appendFile, lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { beforeAll, describe, expect } from "vitest";
 import { registry } from "#test/kit/builders/registry.ts";
 import { type Aireg, type Git, fileTest as test } from "#test/kit/fixtures.ts";
-import { exec } from "#test/kit/run.ts";
 
 let aireg: Aireg;
 let git: Git;
@@ -176,14 +175,10 @@ describe("a copy the harness owns", () => {
   const copied = () => join(root, "copied");
   const run = (args: string[]) => aireg(args, { cwd: copied() });
   const harnessCopy = async (): Promise<string> => {
-    const { stdout } = await exec("find", [
-      join(copied(), ".claude"),
-      "-name",
-      "SKILL.md",
-      "-path",
-      "*lint*",
-    ]);
-    const found = stdout.trim().split("\n")[0];
+    const root = join(copied(), ".claude");
+    const found = readdirSync(root, { recursive: true, encoding: "utf8" })
+      .filter((path) => basename(path) === "SKILL.md" && path.includes("lint"))
+      .map((path) => join(root, path))[0];
     if (found === undefined || found === "") throw new Error("no copied SKILL.md");
     return found;
   };

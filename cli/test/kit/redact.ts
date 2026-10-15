@@ -23,16 +23,23 @@ const TIME =
 // Bounded so a registry's own `1.0.0` stays, and only the CLI's version is named.
 const VERSION_PATTERN = new RegExp(`(?<![\\w.-])${literal(VERSION)}(?![\\w.-])`, "g");
 
-/** A path as written and as resolved: macOS reports `/var/...` as `/private/var/...`. */
+/**
+ * A path as written and as resolved: macOS reports `/var/...` as `/private/var/...`. A
+ * Windows path also appears JSON-escaped, with each backslash doubled.
+ */
 function spellings(path: string): string[] {
   let real = path;
   try {
-    real = realpathSync(path);
+    real = realpathSync.native(path);
   } catch {
     // Not there (yet): only the spelling given can appear.
   }
-  return [...new Set([path, real, real.replace(/^\/private\//, "/")])];
+  const plain = [path, real, real.replace(/^\/private\//, "/")];
+  return [...new Set([...plain, ...plain.map((each) => each.replaceAll("\\", "\\\\"))])];
 }
+
+/** On Windows, what follows a placeholder reads as the POSIX path a scenario was written with. */
+const PLACED = /\[(?:PROJECT|HOME|ROOT)\][^\s"'`]*/g;
 
 /** Placeholders for everything that differs between runs; idempotent. */
 export function redact(text: string, places: Places = {}): string {
@@ -49,6 +56,9 @@ export function redact(text: string, places: Places = {}): string {
   named.sort(([, a], [, b]) => b.length - a.length);
   let out = text;
   for (const [label, spelling] of named) out = out.replaceAll(spelling, label);
+  if (process.platform === "win32") {
+    out = out.replaceAll(PLACED, (path) => path.replaceAll(/\\{1,2}/g, "/"));
+  }
   return out
     .replaceAll(SHA256, "[SHA256]")
     .replaceAll(TIME, "[TIME]")

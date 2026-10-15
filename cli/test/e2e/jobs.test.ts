@@ -7,33 +7,38 @@ import { type Aireg, test as base, type Home } from "#test/kit/fixtures.ts";
 const test = base.extend("repo", ({ git, tmp }) => gitRegistry(git, join(tmp, "kit")));
 
 describe("stopping the daemon", () => {
-  test("stops a run that waits on git, and exits 0", async ({ aireg, project, tmp, repo }) => {
-    const bin = join(tmp, "hung-git");
-    await mkdir(bin, { recursive: true });
-    await writeFile(join(bin, "git"), "#!/bin/sh\nexec sleep 30\n");
-    await chmod(join(bin, "git"), 0o755);
-    await aireg(["init", "--for", "claude"]);
-    const added = await aireg(["add", `file://${repo}`, "--as", "kit"]);
-    expect(added.code, added.stderr).toBe(0);
+  // The stand-in git is a shell script, which Windows does not run.
+  test.skipIf(process.platform === "win32")(
+    "stops a run that waits on git, and exits 0",
+    async ({ aireg, project, tmp, repo }) => {
+      const bin = join(tmp, "hung-git");
+      await mkdir(bin, { recursive: true });
+      await writeFile(join(bin, "git"), "#!/bin/sh\nexec sleep 30\n");
+      await chmod(join(bin, "git"), 0o755);
+      await aireg(["init", "--for", "claude"]);
+      const added = await aireg(["add", `file://${repo}`, "--as", "kit"]);
+      expect(added.code, added.stderr).toBe(0);
 
-    // The daemon this starts inherits the git that never answers.
-    const hung = { env: { PATH: `${bin}:${process.env.PATH ?? ""}` } };
-    try {
-      expect((await aireg(["job", "add", "--registry", "kit"], hung)).code).toBe(0);
-      const state = async () => {
-        const runs = JSON.parse((await aireg(["job", "runs", "--json"])).stdout) as {
-          data: { runs: { state: string }[] };
+      // The daemon this starts inherits the git that never answers.
+      const hung = { env: { PATH: `${bin}:${process.env.PATH ?? ""}` } };
+      try {
+        expect((await aireg(["job", "add", "--registry", "kit"], hung)).code).toBe(0);
+        const state = async () => {
+          const runs = JSON.parse((await aireg(["job", "runs", "--json"])).stdout) as {
+            data: { runs: { state: string }[] };
+          };
+          return runs.data.runs[0]?.state;
         };
-        return runs.data.runs[0]?.state;
-      };
-      await expect.poll(state, { interval: 100, timeout: 10_000 }).toBe("running");
+        await expect.poll(state, { interval: 100, timeout: 10_000 }).toBe("running");
 
-      const stopped = await aireg(["daemon", "stop"], { cwd: project });
-      expect(stopped.code, stopped.stderr).toBe(0);
-    } finally {
-      await aireg(["daemon", "stop"]);
-    }
-  }, 60_000);
+        const stopped = await aireg(["daemon", "stop"], { cwd: project });
+        expect(stopped.code, stopped.stderr).toBe(0);
+      } finally {
+        await aireg(["daemon", "stop"]);
+      }
+    },
+    60_000,
+  );
 });
 
 describe("background sync jobs", () => {

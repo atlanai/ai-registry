@@ -333,17 +333,17 @@ describe("chooseTargets", () => {
 
   it("shows where the highlighted tool loads what was picked, and nothing on other rows", async () => {
     const { shown } = await pick([], []);
-    expect(shown).toMatch(/Claude Code\s+\.claude\/skills, \.claude\/agents/);
+    expect(shown).toMatch(/Claude Code\s+\.claude[\\/]skills, \.claude[\\/]agents/);
     expect(shown).not.toMatch(/Codex\s+\.agents/);
     expect(shown).not.toContain("Found");
   });
 
   it("follows the cursor: Codex reads skills from .agents, Cursor from .agents and .claude", async () => {
     expect((await pick([], [KEY.down])).shown).toMatch(
-      /Codex\s+\.agents\/skills, \.codex\/agents$/m,
+      /Codex\s+\.agents[\\/]skills, \.codex[\\/]agents$/m,
     );
     expect((await pick([], [KEY.down, KEY.down])).shown).toMatch(
-      /Cursor\s+\.agents\/skills, \.claude\/agents$/m,
+      /Cursor\s+\.agents[\\/]skills, \.claude[\\/]agents$/m,
     );
   });
 
