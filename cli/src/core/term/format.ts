@@ -159,3 +159,8 @@ export function day(atMs: number, nowMs = Date.now()): string {
 export function duration(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
+
+/** A word a shell reads back unchanged: as it is when it can be, else single-quoted. */
+export function shellWord(value: string): string {
+  return /^[\w@%+=:,./~-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
+}

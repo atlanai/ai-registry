@@ -43,7 +43,7 @@ A folder the scope doesn't publish is refused, naming the scope that does when t
 
 ## aireg watch list
 
-Lists every watched folder on this machine: the folder, where it publishes, the job and its scope. `ls` is the same command.
+Lists every watched folder on this machine: the folder, where it publishes, the job and its scope, with a project named by its folder. `ls` is the same command.
 
 ## JSON output
 
@@ -51,7 +51,7 @@ Lists every watched folder on this machine: the folder, where it publishes, the 
 |---|---|
 | `add` | `{"job": {...}, "revision": 4}`, as for `job add` |
 | `remove` | `{"jobId": "job_skills_acme", "watching": []}`, the folders the job still watches |
-| `list` | `{"watches": [{"folder": "/home/me/.claude/skills", "to": "acme/engineering", "jobId": "job_skills_acme", "scope": "your user scope"}]}` |
+| `list` | `{"watches": [{"folder": "/home/me/.claude/skills", "to": "acme/engineering", "jobId": "job_skills_acme", "scope": "user", "root": "/home/me/.registry"}]}`: `scope` is `user` or `project`, and `root` is that scope's folder |
 
 ## Exit status
 

@@ -177,17 +177,17 @@ The above:
 
 ## Keep it in sync automatically
 
-To keep a folder of skills in sync with the registry automatically, connect the registry to your user scope and add a sync job:
+To publish a folder of skills to the registry automatically as you edit them, connect the registry to your user scope and watch the folder:
 
 ```bash
 aireg registry add ../acme-registry -g
-aireg job add -g --watch ~/.claude/skills --to acme/engineering
+aireg watch add ~/.claude/skills --to acme/engineering -g
 ```
 
-The daemon is a background process that runs sync jobs every 15 minutes. `aireg job add` starts it and runs the new job once straight away. The above:
+The daemon is a background process that runs sync jobs every 15 minutes. `aireg watch add` starts it and runs the scope's job once straight away. The above:
 
-1. Connects the registry to your user scope. `-g` on both commands makes the job keep your user scope in sync, whichever project you are in; without it, the job belongs to the current project.
-2. Adds a job that watches `~/.claude/skills` and publishes the skills in it to the `engineering` namespace. A skill the registry doesn't have yet is published as a new skill at 0.1.0, and each later edit becomes its next version, so keep skills you don't want to share out of that folder.
+1. Connects the registry to your user scope. `-g` on both commands keeps your user scope in sync, whichever project you are in; without it, the watch belongs to the current project.
+2. Watches `~/.claude/skills` and publishes the skills in it to the `engineering` namespace. A skill the registry doesn't have yet is published as a new skill at 0.1.0, and each later edit becomes its next version, so keep skills you don't want to share out of that folder.
 
 Edit a skill in `~/.claude/skills`, then run the job now instead of waiting:
 
@@ -203,11 +203,11 @@ To see what is running, and to stop it:
 aireg daemon status
 aireg job list
 aireg job runs
-aireg job remove job_skills_acme
+aireg watch remove ~/.claude/skills -g
 aireg daemon stop
 ```
 
-`aireg daemon status` shows whether the daemon is running, how many jobs it has, and whether autostart is on. `aireg job list` shows each job, its registry and its state, and `aireg job runs` shows recent runs and what they changed. `aireg job remove` stops syncing that folder, and `aireg daemon stop` stops the daemon. `aireg daemon status` prints:
+`aireg daemon status` shows whether the daemon is running, how many jobs it has, and whether autostart is on. `aireg job list` shows each job, its registry and its state, and `aireg job runs` shows recent runs and what they changed. `aireg watch remove` stops publishing that folder and keeps your installs up to date, and `aireg daemon stop` stops the daemon. `aireg daemon status` prints:
 
 ```text
 Running   version X.Y.Z, pid 14300

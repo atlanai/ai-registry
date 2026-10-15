@@ -1,8 +1,8 @@
-import { isAbsolute, resolve } from "node:path";
+import { resolve } from "node:path";
 import { list as listOf, plural, quoted } from "#adapter/text.ts";
 import { qualify } from "#cli/commands/add.ts";
 import { addContributedJob } from "#cli/commands/job/contributed.ts";
-import { existing, jobNamed, needsJob, noJob } from "#cli/commands/job/find.ts";
+import { existing, jobNamed, needsJob, noJob, typedFolder } from "#cli/commands/job/find.ts";
 import type { RunsOptions } from "#cli/commands/job/runs.ts";
 import { parse } from "#cli/options.ts";
 import { cannotPublish } from "#cli/publish/target.ts";
@@ -33,7 +33,7 @@ import { withDaemon } from "#daemon/service.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { builtin, type CommandContext, runAction } from "./index.ts";
 
-export interface Own extends Record<string, unknown>, RunsOptions {
+interface Own extends Record<string, unknown>, RunsOptions {
   account?: string;
   registry?: string;
   name?: string;
@@ -191,10 +191,7 @@ function originsOf(own: Own, cwd: string): { to: string; from: string[] } | unde
       hint: "Name where to publish: `aireg job add --watch <folder> --to <registry>/<namespace>`.",
     });
   }
-  const from = watched.map((folder) =>
-    folder.startsWith("~") || isAbsolute(folder) ? folder : resolve(cwd, folder),
-  );
-  return { to: own.to, from };
+  return { to: own.to, from: watched.map((folder) => typedFolder(folder, cwd)) };
 }
 
 /** What `job add` checks on its own, so a command that fails it never starts the daemon. */
@@ -281,8 +278,7 @@ function saved(job: Job, existed: boolean): string {
   if (to !== undefined && watched.length > 0) {
     return `${verb} job ${job.id}, which publishes ${listOf(watched)} to ${to}.`;
   }
-  const root = job.steps.find((step) => step.root !== undefined)?.root;
-  return `${verb} job ${job.id}, which syncs ${root === undefined ? target(job) : underHome(root)}.`;
+  return `${verb} job ${job.id}, which syncs ${target(job)}.`;
 }
 
 /**

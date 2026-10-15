@@ -1,11 +1,12 @@
 import { isAbsolute, resolve } from "node:path";
 import { quoted } from "#adapter/text.ts";
-import { findJob, isScopeStep, type Job, type RegistryConfig } from "#core/config/model.ts";
+import { underHome } from "#cli/render/home.ts";
+import { findJob, type Job, jobRoot, type RegistryConfig } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { expandUserPath } from "#core/fs/path.ts";
-import { roots, scopeFor, userScopeDir } from "#core/store/paths.ts";
+import { roots, scopeFor, scopeName, userScopeDir } from "#core/store/paths.ts";
 
 export function noJob(wanted: string, hint = "Run `aireg job list` to see the jobs."): AiregError {
   return new AiregError(`No job named ${quoted(wanted)}.`, { code: ErrorCode.NotFound, hint });
@@ -40,9 +41,16 @@ export function folderKey(folder: string): string {
   return canonical(resolve(expandUserPath(folder)));
 }
 
-/** The scope a job reconciles, as the runner reads it: its first rooted step, else your user scope. */
+/** The scope a job reconciles, by its manifest: the job's own folder, else your user scope. */
 export function jobScope(job: Job): string {
-  const root = job.steps.find((step) => isScopeStep(step) && step.root !== undefined)?.root;
-  const at = root ?? userScopeDir();
+  const at = jobRoot(job) ?? userScopeDir();
   return canonical(roots(scopeFor(at), at).manifest);
+}
+
+/** The scope at `root` as a person reads it from `cwd`: this project, or the project at a path. */
+export function scopeLabel(root: string, cwd: string): string {
+  const scope = scopeFor(root);
+  return scope === "project" && folderKey(cwd) !== folderKey(root)
+    ? `the project at ${underHome(root)}`
+    : scopeName(scope);
 }

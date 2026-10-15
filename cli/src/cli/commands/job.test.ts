@@ -53,7 +53,6 @@ describe("a job command that fails validation", () => {
     ["enable", "zz-nope"],
     ["disable", "zz-nope"],
     ["remove", "zz-nope"],
-    ["remove", "zz-nope", "--watch", "/tmp"],
     ["start", "zz-nope"],
     ["retry"],
     ["cancel"],

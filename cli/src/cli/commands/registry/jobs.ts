@@ -1,6 +1,13 @@
 import { list as listOf } from "#adapter/text.ts";
 import { jobScope } from "#cli/commands/job/find.ts";
-import { isScopeStep, type Job, type RegistryConfig, watchedFolders } from "#core/config/model.ts";
+import { underHome } from "#cli/render/home.ts";
+import {
+  isScopeStep,
+  type Job,
+  type RegistryConfig,
+  unwatchCommand,
+  watchedFolders,
+} from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import type { Roots } from "#core/store/paths.ts";
@@ -33,13 +40,12 @@ export function registryJobs(config: RegistryConfig, alias: string, scope: Roots
   if (kept !== undefined) {
     const own = kept.steps.filter((step) => !isScopeStep(step)).map((step) => step.kind);
     const does = own.length === 0 ? "publish your folders" : `run ${listOf([...new Set(own)])}`;
-    const folders = watchedFolders(kept);
-    const flag = scope.scope === "user" ? " -g" : "";
+    const folders = watchedFolders(kept).map(underHome);
     throw new AiregError(`Job ${jobName(kept)} uses registry ${alias} to ${does}.`, {
       code: ErrorCode.Conflict,
       hint:
         own.length === 0 && folders.length > 0
-          ? `Stop publishing them first with \`aireg watch remove ${folders.join(" ")}${flag}\`.`
+          ? `Stop publishing them first with \`${unwatchCommand(folders, scope.scope)}\`.`
           : `Remove it first with \`aireg job remove ${kept.id}\`.`,
     });
   }

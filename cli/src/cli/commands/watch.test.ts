@@ -134,9 +134,10 @@ describe("watch list", () => {
       0,
     );
     await run(context(["list"], out));
+    const at = { to: "acme/eng", jobId: "job_skills_acme", scope: "user", root: scope };
     expect(JSON.parse(out.join("")).data.watches).toEqual([
-      { folder: "/gone/a", to: "acme/eng", jobId: "job_skills_acme", scope: "your user scope" },
-      { folder: "/gone/b", to: "acme/eng", jobId: "job_skills_acme", scope: "your user scope" },
+      { folder: "/gone/a", ...at },
+      { folder: "/gone/b", ...at },
     ]);
   });
 });

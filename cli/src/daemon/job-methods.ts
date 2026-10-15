@@ -9,6 +9,7 @@ import {
   type Job,
   type RegistryConfig,
   type Step,
+  unwatchCommand,
 } from "#core/config/model.ts";
 import { readConfig, writeConfig } from "#core/config/repository.ts";
 import { tokenVariable } from "#core/env.ts";
@@ -408,19 +409,18 @@ function originsStep(
       `The destination must be <registry>/<namespace>, not ${quoted(to)}.`,
     );
   }
+  const kept = before?.select.map((selector) => selector.from) ?? [];
   // One job publishes to one place, so moving its folders elsewhere is asked for, never done in passing.
-  if (before !== undefined && before.to !== to && before.select.length > 0) {
-    const folders = before.select.map((selector) => selector.from);
+  if (before !== undefined && before.to !== to && kept.length > 0) {
     throw new ProtocolError(
       RpcErrorCode.InvalidParams,
-      `This scope already publishes ${list(folders)} to ${before.to}.`,
+      `This scope already publishes ${list(kept)} to ${before.to}.`,
       {
         code: ErrorCode.Usage,
-        hint: `Publish to ${before.to} instead, or first run \`aireg watch remove ${folders.join(" ")}${scope === "user" ? " -g" : ""}\`.`,
+        hint: `Publish to ${before.to} instead, or first run \`${unwatchCommand(kept, scope)}\`.`,
       },
     );
   }
-  const kept = before?.select.map((selector) => selector.from) ?? [];
   const folders = [...new Set([...kept, ...from])];
   return {
     name: "origins",

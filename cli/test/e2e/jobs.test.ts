@@ -161,7 +161,8 @@ describe("removing a registry", () => {
       expect(refused.stderr).toContain(
         "Job job_skills_demo uses registry demo to publish your folders.",
       );
-      expect(refused.stderr).toContain(`aireg watch remove ${mine} -g`);
+      // Written as the person reads it, and runnable as printed.
+      expect(refused.stderr).toContain("aireg watch remove ~/mine -g");
       expect(await jobIds(aireg, tmp)).toEqual(["job_skills_demo"]);
       expect(await readFile(join(home.scope, "manifest.yml"), "utf8")).toContain("demo:");
     } finally {

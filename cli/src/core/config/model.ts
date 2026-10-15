@@ -1,5 +1,7 @@
 import { isNamespace } from "#adapter/filespec/names.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
+import type { Scope } from "#core/store/paths.ts";
+import { shellWord } from "#core/term/format.ts";
 import type { PipelineHook } from "./hook-stages.ts";
 
 export const CONFIG_SCHEMA_VERSION = 1;
@@ -207,6 +209,16 @@ export function watchedFolders(job: Pick<Job, "steps">): string[] {
   return job.steps.flatMap((step) =>
     step.kind === "origins" ? step.select.map((selector) => selector.from) : [],
   );
+}
+
+/** The folder a job keeps in sync, as the runner reads it: its first scope step that names one. */
+export function jobRoot(job: Pick<Job, "steps">): string | undefined {
+  return job.steps.find((step) => isScopeStep(step) && step.root !== undefined)?.root;
+}
+
+/** What stops publishing these folders, written so a shell runs it as printed. */
+export function unwatchCommand(folders: readonly string[], scope: Scope): string {
+  return `aireg watch remove ${folders.map(shellWord).join(" ")}${scope === "user" ? " -g" : ""}`;
 }
 
 /**

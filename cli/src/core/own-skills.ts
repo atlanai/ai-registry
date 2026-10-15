@@ -1,4 +1,5 @@
 import { roots } from "#core/store/paths.ts";
+import { shellWord } from "#core/term/format.ts";
 import { readLock } from "./lock.ts";
 import { readManifest } from "./manifest.ts";
 import { NAME, REPOSITORY, REPOSITORY_NAME, releaseTag } from "./product.ts";
@@ -22,11 +23,6 @@ export function ownSkillsRef(version = VERSION): string | undefined {
 interface OwnSkillsSource {
   location: string;
   path: string | undefined;
-}
-
-/** A word a shell reads back unchanged: as it is when it can be, else single-quoted. */
-function shellWord(value: string): string {
-  return /^[\w@%+=:,./~-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
 /** What gives your agents the aireg skills: the same two steps as any registry. */
