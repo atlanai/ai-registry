@@ -1,0 +1,11 @@
+Publish a folder whenever it changes
+
+Usage: aireg watch add <folder>... --to <registry>/<namespace> [options]
+
+Options:
+      --to <registry>/<namespace>  Where the folder publishes
+  -g, --user                       Act on your user scope instead of this project
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/watch/

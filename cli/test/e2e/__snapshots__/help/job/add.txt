@@ -5,7 +5,7 @@ Usage: aireg job add [<folder>] --registry <registry> [options]
 
 Options:
       --registry <registry>        The registry to keep in sync with
-      --watch <folder>             A folder whose skills and agents the job publishes (repeatable)
+      --watch <folder>             A folder to publish as it changes, as `aireg watch add` does (repeatable)
       --to <registry>/<namespace>  Where the watched folders publish
       --interval <seconds>         How often the job runs, in seconds (default 900)
       --name <name>                An id for the job, in place of the default

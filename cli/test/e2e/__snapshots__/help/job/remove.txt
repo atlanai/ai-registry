@@ -1,10 +1,7 @@
-Remove a job, or stop it watching a folder
+Remove a job
 
-Usage: aireg job remove <job> [--watch <folder>...]
+Usage: aireg job remove <job>
 Aliases: aireg job rm
-
-Options:
-      --watch <folder>  Stop watching this folder and keep the job (repeatable)
 
 Learn more:
   Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).

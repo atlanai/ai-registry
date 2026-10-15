@@ -559,6 +559,53 @@ export const COMMANDS: readonly CommandSpec[] = [
     ],
     load: () => import("./publish.ts"),
   },
+  {
+    name: "watch",
+    summary: "Publish a folder's skills and agents whenever they change",
+    group: "Share",
+    usage: ["aireg watch [<action>] [options]"],
+    examples: [
+      {
+        command: "aireg watch add ~/.claude/skills --to acme/engineering -g",
+        what: "publish your skills as you edit them",
+      },
+      {
+        command: "aireg watch remove ~/.claude/skills -g",
+        what: "stop, and keep what you installed up to date",
+      },
+    ],
+    docs: "watch",
+    actions: [
+      {
+        name: "add",
+        summary: "Publish a folder whenever it changes",
+        usage: ["aireg watch add <folder>... --to <registry>/<namespace> [options]"],
+        options: [
+          {
+            flag: "--to",
+            value: "<registry>/<namespace>",
+            describe: "Where the folder publishes",
+          },
+          USER,
+        ],
+      },
+      {
+        name: "remove",
+        aliases: ["rm"],
+        summary: "Stop publishing a folder, and keep its scope in sync",
+        usage: ["aireg watch remove <folder>... [options]"],
+        options: [USER],
+      },
+      {
+        name: "list",
+        aliases: ["ls"],
+        summary: "List the folders published as they change",
+        usage: ["aireg watch list"],
+        maxArguments: 0,
+      },
+    ],
+    load: () => import("./watch.ts"),
+  },
 
   {
     name: "job",
@@ -567,8 +614,8 @@ export const COMMANDS: readonly CommandSpec[] = [
     usage: ["aireg job [<action>] [options]"],
     examples: [
       {
-        command: "aireg job add -g --watch ~/.claude/skills --to acme/engineering",
-        what: "publish your skills, and keep them in sync",
+        command: "aireg job add -g --registry acme",
+        what: "keep your user scope in sync with acme",
       },
       { command: "aireg job runs", what: "what the jobs did" },
     ],
@@ -592,7 +639,7 @@ export const COMMANDS: readonly CommandSpec[] = [
             flag: "--watch",
             value: "<folder>",
             multiple: true,
-            describe: "A folder whose skills and agents the job publishes (repeatable)",
+            describe: "A folder to publish as it changes, as `aireg watch add` does (repeatable)",
           },
           {
             flag: "--to",
@@ -631,17 +678,9 @@ export const COMMANDS: readonly CommandSpec[] = [
       {
         name: "remove",
         aliases: ["rm"],
-        summary: "Remove a job, or stop it watching a folder",
-        usage: ["aireg job remove <job> [--watch <folder>...]"],
+        summary: "Remove a job",
+        usage: ["aireg job remove <job>"],
         maxArguments: 1,
-        options: [
-          {
-            flag: "--watch",
-            value: "<folder>",
-            multiple: true,
-            describe: "Stop watching this folder and keep the job (repeatable)",
-          },
-        ],
       },
       {
         name: "start",

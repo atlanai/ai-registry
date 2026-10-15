@@ -65,7 +65,7 @@ describe("setting up a project in one command", () => {
       ["job", "add", "--watch", ".cursor/skills", "--to", "team/platform"],
       { cwd: project },
     );
-    const job = /Added job (\S+),/.exec(added.stdout)?.[1] ?? "";
+    const job = /(?:Added|Updated) job (\S+),/.exec(added.stdout)?.[1] ?? "";
     const id = /run_[0-9a-f-]+/.exec(
       (await aireg(["job", "start", job], { cwd: project })).stdout,
     )?.[0];

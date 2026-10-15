@@ -33,7 +33,7 @@ import { withDaemon } from "#daemon/service.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { builtin, type CommandContext, runAction } from "./index.ts";
 
-interface Own extends Record<string, unknown>, RunsOptions {
+export interface Own extends Record<string, unknown>, RunsOptions {
   account?: string;
   registry?: string;
   name?: string;
@@ -227,7 +227,8 @@ async function plannedJob(
   return { origins, alias, scope, jobRoot, source, refs, policy: policy(own) };
 }
 
-async function add(
+/** `aireg job add`, and `aireg watch add`, which is the same with only its folders. */
+export async function add(
   context: CommandContext,
   root: string | undefined,
   own: Own,
@@ -242,8 +243,12 @@ async function add(
   const planned = await plannedJob(context, root, own, common);
   const { origins, refs } = planned;
   return withDaemon(async (client) => {
-    const { config: updated, job } = await withFreshConfig(client, (config) =>
-      client.request("job.create", {
+    const {
+      config: updated,
+      job,
+      existed,
+    } = await withFreshConfig(client, async (config) => {
+      const made = await client.request("job.create", {
         expectedRevision: config.revision,
         root: planned.jobRoot,
         scope: planned.scope,
@@ -259,16 +264,25 @@ async function add(
           ...(origins === undefined ? {} : { publish: "on" as const }),
           ...planned.policy,
         },
-      }),
-    );
+      });
+      return { ...made, existed: config.jobs.some((item) => item.id === made.job.id) };
+    });
     context.printer.format === "json"
       ? context.printer.json({ ok: true, data: { job, revision: updated.revision } })
-      : context.printer.success(
-          origins === undefined
-            ? `Added job ${job.id}, which syncs ${target(job)}.`
-            : `Added job ${job.id}, which publishes ${listOf(origins.from.map(underHome))} to ${origins.to}.`,
-        );
+      : context.printer.success(saved(job, existed));
   });
+}
+
+/** What the job does now; one replaced under the id it had is updated, not added. */
+function saved(job: Job, existed: boolean): string {
+  const verb = existed ? "Updated" : "Added";
+  const to = job.steps.find((step) => step.kind === "origins")?.to;
+  const watched = watchedFolders(job).map(underHome);
+  if (to !== undefined && watched.length > 0) {
+    return `${verb} job ${job.id}, which publishes ${listOf(watched)} to ${to}.`;
+  }
+  const root = job.steps.find((step) => step.root !== undefined)?.root;
+  return `${verb} job ${job.id}, which syncs ${root === undefined ? target(job) : underHome(root)}.`;
 }
 
 /**
@@ -372,8 +386,7 @@ export async function run(context: CommandContext): Promise<void> {
   return runAction(spec, action, {
     list: () => list(context),
     add: () => add(context, argument, own, common),
-    remove: async () =>
-      (await import("#cli/commands/job/remove.ts")).remove(context, argument, own.watch),
+    remove: async () => (await import("#cli/commands/job/remove.ts")).remove(context, argument),
     start: () => start(context, argument, own.mode),
     enable: () => setEnabled(context, argument, true),
     disable: () => setEnabled(context, argument, false),

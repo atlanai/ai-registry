@@ -76,7 +76,7 @@ Removes a registry's declaration from the manifest. `rm` is the same command.
 
 `remove` refuses while the manifest still takes anything from that registry, whether or not it is installed. Remove those entries first with [`aireg remove`](remove.md).
 
-The background jobs that keep that scope in sync with the registry, such as the one `aireg add -g` creates, are removed with it, since they could only fail once it is gone. A job set up for more than that is never removed for you, such as one that publishes your own folders to the registry (`aireg job add --watch`) or one that runs an adapter's steps through it: `remove` refuses, naming the job, until you remove it with `aireg job remove`. If your jobs can't be read, `remove` says so and leaves them as they are.
+The background jobs that keep that scope in sync with the registry, such as the one `aireg add -g` creates, are removed with it, since they could only fail once it is gone. A job set up for more than that is never removed for you, such as one that publishes your own folders to the registry (`aireg job add --watch`) or one that runs an adapter's steps through it: `remove` refuses, naming the job, until you stop the folders with [`aireg watch remove`](watch.md#aireg-watch-remove) or remove the job with `aireg job remove`. If your jobs can't be read, `remove` says so and leaves them as they are.
 
 | Option | Description |
 |---|---|

@@ -1,0 +1,17 @@
+Publish a folder's skills and agents whenever they change
+
+Usage: aireg watch [<action>] [options]
+
+Actions:
+  add     Publish a folder whenever it changes
+  remove  Stop publishing a folder, and keep its scope in sync (alias: rm)
+  list    List the folders published as they change (alias: ls)
+
+Examples:
+  $ aireg watch add ~/.claude/skills --to acme/engineering -g  publish your skills as you edit them
+  $ aireg watch remove ~/.claude/skills -g                     stop, and keep what you installed up to date
+
+Learn more:
+  Run `aireg watch <action> --help` for an action's options.
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/watch/

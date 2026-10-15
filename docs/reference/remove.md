@@ -16,7 +16,7 @@ aireg remove
 
 `aireg remove` uninstalls artifacts from the current project, or with `-g` from your user scope. It removes each artifact's links from the harness folders and its stored copy, and updates the manifest and lockfile, then removes the dependencies nothing else needs any more. Files aireg didn't install are left alone: a folder or file of yours that replaced one of its links is moved to `.registry/backups/`, and `remove` names where it went.
 
-An artifact another installed artifact still needs is kept, and `remove` says which one needs it. So is one a job publishes from a folder of yours, since the job goes on reading that folder: `remove` names it, and [`aireg job remove <job> --watch <folder>`](job.md#aireg-job-remove) stops the job watching that folder.
+An artifact another installed artifact still needs is kept, and `remove` says which one needs it. So is one a job publishes from a folder of yours, since the job goes on reading that folder: `remove` names it, and [`aireg watch remove <folder>`](watch.md#aireg-watch-remove) stops publishing that folder.
 
 A name can be an installed artifact's name, as [`aireg list`](list.md) shows it, a longer form of it such as `engineering/pr-review`, or the full name [`aireg add`](add.md) takes. So `aireg remove acme/engineering/pr-review` undoes `aireg add acme/engineering/pr-review`.
 

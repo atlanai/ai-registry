@@ -1,19 +1,13 @@
 import { list as listOf } from "#adapter/text.ts";
-import { isScopeStep, type Job, type RegistryConfig } from "#core/config/model.ts";
+import { jobScope } from "#cli/commands/job/find.ts";
+import { isScopeStep, type Job, type RegistryConfig, watchedFolders } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
-import { type Roots, roots, scopeFor, userScopeDir } from "#core/store/paths.ts";
+import type { Roots } from "#core/store/paths.ts";
 import { withFreshConfig } from "#daemon/rpc/client.ts";
 import { withDaemon } from "#daemon/service.ts";
 
 const jobName = (job: Job) => job.name ?? job.id;
-
-/** The scope a job reconciles, as the runner reads it: its first rooted step, else your user scope. */
-function scopeOf(job: Job): string {
-  const root = job.steps.find((step) => isScopeStep(step) && step.root !== undefined)?.root;
-  const at = root ?? userScopeDir();
-  return canonical(roots(scopeFor(at), at).manifest);
-}
 
 /** Through the registry's account, or publishing into it, whatever account it runs as. */
 function uses(job: Job, alias: string, accounts: ReadonlySet<string>): boolean {
@@ -34,14 +28,19 @@ export function registryJobs(config: RegistryConfig, alias: string, scope: Roots
     config.accounts.filter((account) => account.registry === alias).map((account) => account.id),
   );
   const here = canonical(scope.manifest);
-  const jobs = config.jobs.filter((job) => scopeOf(job) === here && uses(job, alias, accounts));
+  const jobs = config.jobs.filter((job) => jobScope(job) === here && uses(job, alias, accounts));
   const kept = jobs.find((job) => !syncsOnly(job));
   if (kept !== undefined) {
     const own = kept.steps.filter((step) => !isScopeStep(step)).map((step) => step.kind);
     const does = own.length === 0 ? "publish your folders" : `run ${listOf([...new Set(own)])}`;
+    const folders = watchedFolders(kept);
+    const flag = scope.scope === "user" ? " -g" : "";
     throw new AiregError(`Job ${jobName(kept)} uses registry ${alias} to ${does}.`, {
       code: ErrorCode.Conflict,
-      hint: `Remove it first with \`aireg job remove ${kept.id}\`.`,
+      hint:
+        own.length === 0 && folders.length > 0
+          ? `Stop publishing them first with \`aireg watch remove ${folders.join(" ")}${flag}\`.`
+          : `Remove it first with \`aireg job remove ${kept.id}\`.`,
     });
   }
   return jobs;

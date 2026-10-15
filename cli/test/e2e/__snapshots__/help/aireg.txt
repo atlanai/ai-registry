@@ -39,6 +39,8 @@ Share:
   sync       Sync this project with its registries
              resolve
   publish    Publish artifacts to a registry, as new versions
+  watch      Publish a folder's skills and agents whenever they change
+             add  remove  list
   skill      Create a skill, or start its next version
              new  bump
   agent      Create an agent, or start its next version

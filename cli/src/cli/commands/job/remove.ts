@@ -1,23 +1,21 @@
-import { isAbsolute, resolve } from "node:path";
 import { list as listOf, quoted } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/index.ts";
-import { existing, jobNamed, needsJob } from "#cli/commands/job/find.ts";
+import {
+  existing,
+  jobNamed,
+  folderKey as key,
+  needsJob,
+  typedFolder,
+} from "#cli/commands/job/find.ts";
 import { underHome } from "#cli/render/home.ts";
 import { type Job, type RegistryConfig, type Step, watchedFolders } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { canonical } from "#core/fs/canonical.ts";
-import { expandUserPath } from "#core/fs/path.ts";
 import { readManifest } from "#core/manifest.ts";
 import { roots, scopeFor, scopeName } from "#core/store/paths.ts";
 import { withFreshConfig } from "#daemon/rpc/client.ts";
 import { withDaemon } from "#daemon/service.ts";
 import { FOREGROUND_POLICY } from "#engine/foreground.ts";
-
-/** A folder as the job stores it or a person types it, comparable either way, even once deleted. */
-function key(folder: string): string {
-  return canonical(resolve(expandUserPath(folder)));
-}
 
 /**
  * The job without the folders named. With none left it goes back to the job `aireg add`
@@ -26,9 +24,7 @@ function key(folder: string): string {
 function withoutFolders(job: Job, folders: readonly string[], cwd: string): Job {
   const watched = watchedFolders(job);
   const keys = new Set(watched.map(key));
-  const named = folders.map((folder) =>
-    folder.startsWith("~") || isAbsolute(folder) ? folder : resolve(cwd, folder),
-  );
+  const named = folders.map((folder) => typedFolder(folder, cwd));
   const missing = named.find((folder) => !keys.has(key(folder)));
   if (missing !== undefined) {
     throw new AiregError(
@@ -37,7 +33,7 @@ function withoutFolders(job: Job, folders: readonly string[], cwd: string): Job 
         code: ErrorCode.Usage,
         hint:
           watched.length === 0
-            ? "To remove the job, leave out `--watch`."
+            ? `To remove the job, run \`aireg job remove ${job.id}\`.`
             : `Name a folder it watches: ${listOf(
                 watched.map((folder) => underHome(key(folder))),
                 "or",
@@ -108,19 +104,14 @@ async function warnUnkept(context: CommandContext, job: Job, after: RegistryConf
   );
   if (watchedFolders(job).length > 0) {
     context.printer.hint(
-      "Next time, to stop only watching a folder, run `aireg job remove <job> --watch <folder>`.",
+      "Next time, to stop only publishing a folder, run `aireg watch remove <folder>`.",
     );
   }
 }
 
-/** Removes a job, or with `--watch` only stops it watching those folders. */
-export async function remove(
-  context: CommandContext,
-  wanted: string | undefined,
-  folders: string[] | undefined,
-): Promise<void> {
+/** Removes a job; `aireg watch remove` is what stops only its folders. */
+export async function remove(context: CommandContext, wanted: string | undefined): Promise<void> {
   if (wanted === undefined) throw needsJob("remove");
-  if (folders !== undefined && folders.length > 0) return unwatch(context, wanted, folders);
   await existing(wanted);
   await withDaemon(async (client) => {
     const job = await withFreshConfig(client, async (config) => {
@@ -139,7 +130,11 @@ export async function remove(
 }
 
 /** Stops watching some folders and keeps the job, which goes on keeping its scope in sync. */
-async function unwatch(context: CommandContext, wanted: string, folders: string[]): Promise<void> {
+export async function unwatch(
+  context: CommandContext,
+  wanted: string,
+  folders: readonly string[],
+): Promise<void> {
   const before = jobNamed(await readConfig(), wanted);
   // Checked before the daemon starts: a folder the job does not watch does not need it.
   withoutFolders(before, folders, context.cwd);

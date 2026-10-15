@@ -71,7 +71,7 @@ function keptWatched(context: CommandContext, lock: Lock, watched: readonly stri
     `Kept ${list(watched.map((name) => shown.get(name) ?? name))}, which a job publishes from your own ${watched.length === 1 ? "folder" : "folders"}.`,
   );
   context.printer.hint(
-    "Run `aireg job list` to see the job, and `aireg job remove <job>` to stop it.",
+    "Run `aireg watch list` to see the folder, and `aireg watch remove <folder>` to stop publishing it.",
   );
 }
 
