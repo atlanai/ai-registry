@@ -180,3 +180,42 @@ describe("candidates", () => {
     expect(found).toEqual({ local: [], undeclared: [] });
   });
 });
+
+describe("candidates, following links", () => {
+  const follow = (targets: string[], lock: Lock = emptyLock()) =>
+    candidates(roots, harnesses, targets, lock, new Set(), { followLinks: true });
+
+  test("finds a person's link to a folder outside the store", async () => {
+    const elsewhere = join(root, "dotfiles", "skills", "mine");
+    await write(join(elsewhere, "SKILL.md"), skill("mine"));
+    await mkdir(join(root, ".claude", "skills"), { recursive: true });
+    await symlink(elsewhere, join(root, ".claude", "skills", "mine"));
+    const found = await follow(["claude"]);
+    expect(found.local.map((item) => [item.name, item.from])).toEqual([
+      ["mine", join(root, ".claude", "skills", "mine")],
+    ]);
+  });
+
+  test("names every harness that links one folder", async () => {
+    const shared = join(root, ".agents", "skills", "shared");
+    await write(join(shared, "SKILL.md"), skill("shared"));
+    for (const harness of [".claude", ".cursor"]) {
+      await mkdir(join(root, harness, "skills"), { recursive: true });
+      await symlink(shared, join(root, harness, "skills", "shared"));
+    }
+    const found = await follow(["agents", "claude", "cursor"]);
+    expect(found.local.map((item) => item.name)).toEqual(["shared"]);
+    expect(found.local[0]?.target).toBe("agents");
+    expect(found.local[0]?.elsewhere.map((item) => item.target)).toEqual(["claude", "cursor"]);
+  });
+
+  test("still ignores a link into the staged tree, and one whose target is gone", async () => {
+    const staged = join(roots.artifacts, "kit", "eng", "skills", "installed");
+    await write(join(staged, "SKILL.md"), skill("installed"));
+    await mkdir(join(root, ".claude", "skills"), { recursive: true });
+    await symlink(staged, join(root, ".claude", "skills", "installed"));
+    await symlink(join(root, "gone"), join(root, ".claude", "skills", "gone"));
+    const found = await follow(["claude"]);
+    expect(found.local).toEqual([]);
+  });
+});

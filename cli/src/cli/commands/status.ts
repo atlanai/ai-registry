@@ -1,3 +1,4 @@
+import { lstat } from "node:fs/promises";
 import { relative } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { noArguments, parse } from "#cli/options.ts";
@@ -49,12 +50,23 @@ interface Unmanaged {
   path: string;
 }
 
-function unmanaged(item: Candidate): Unmanaged {
+async function isLink(path: string): Promise<boolean> {
+  try {
+    return (await lstat(path)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/** One row per artifact: each harness once, and the real folder rather than a link to it. */
+async function unmanaged(item: Candidate): Promise<Unmanaged> {
+  const found = [{ from: item.from, target: item.target }, ...item.elsewhere];
+  const links = await Promise.all(found.map(({ from }) => isLink(from)));
   return {
     name: item.name,
     kind: item.kind,
-    harnesses: [item.target, ...item.elsewhere.map(({ target }) => target)],
-    path: item.from,
+    harnesses: [...new Set(found.map(({ target }) => target))],
+    path: (found[links.indexOf(false)] ?? item).from,
   };
 }
 
@@ -68,8 +80,11 @@ export async function run(context: CommandContext): Promise<void> {
   const { roots, manifest, harnesses, lock } = await load(common, context.cwd, "user");
   const statuses = status(lock, await survey(lock, roots), roots);
   const clashes = await shadowed(roots.scope, context.cwd, lock);
-  const found = await candidates(roots, harnesses, names(harnesses), lock);
-  const loose = found.local.map(unmanaged);
+  // A skill kept once and linked into each harness is loaded by each; naming it adopts nothing.
+  const found = await candidates(roots, harnesses, names(harnesses), lock, new Set(), {
+    followLinks: true,
+  });
+  const loose = await Promise.all(found.local.map(unmanaged));
   const rows = installed(lock, manifest);
 
   if (context.printer.format === "json") {

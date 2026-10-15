@@ -65,6 +65,7 @@ async function collectKindCandidates(
   kind: ArtifactKind,
   mapping: KindMapping & { subdir: string },
   claimed: ReadonlySet<string>,
+  followLinks: boolean,
 ): Promise<Candidate[]> {
   const dir = join(root, mapping.subdir);
 
@@ -86,12 +87,16 @@ async function collectKindCandidates(
       ...entryOf(kind),
     },
     undefined,
+    { followLinks },
   );
 
+  const store = canonical(roots.artifacts);
   const found: Candidate[] = [];
   for (const entry of entries) {
     const full = join(root, ...entry.path.split(posix.sep));
-    if (claimed.has(canonical(full))) continue;
+    const real = canonical(full);
+    // A followed link into the staged tree is ours, whether or not the lock still names it.
+    if (claimed.has(real) || isWithin(store, real)) continue;
     if (await holdsStagedLink(roots, full)) continue;
 
     found.push({
@@ -121,6 +126,7 @@ export async function candidates(
    * publish is not local work; it is an artifact this project has not declared.
    */
   published: ReadonlySet<string> = new Set(),
+  { followLinks = false }: { followLinks?: boolean } = {},
 ): Promise<{ local: Candidate[]; undeclared: Candidate[] }> {
   // Real paths, so a home or project behind a symlink still matches what the lock says.
   const claimed = new Set<string>();
@@ -154,6 +160,7 @@ export async function candidates(
         kind,
         mapping as KindMapping & { subdir: string },
         claimed,
+        followLinks,
       );
       for (const item of items) {
         const key = `${kind}:${item.name}`;

@@ -1,3 +1,4 @@
+import type { Stats } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeName } from "#adapter/text.ts";
@@ -84,12 +85,22 @@ async function fileEntry(
   };
 }
 
+/** What a link points at, or undefined when its target is gone. */
+async function linked(path: string): Promise<Stats | undefined> {
+  try {
+    return await stat(path);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Scan one kind directory using the same naming rules for sources and harnesses. */
 export async function entriesIn(
   root: string,
   dir: string,
   spec: Omit<KindDir, "dir">,
   group: string | undefined,
+  { followLinks = false }: { followLinks?: boolean } = {},
 ): Promise<Entry[]> {
   if (!(await isDirectory(dir))) return [];
 
@@ -99,13 +110,16 @@ export async function entriesIn(
   for (const item of items.sort((a, b) => a.name.localeCompare(b.name))) {
     if (item.name.startsWith(".")) continue;
     const full = join(dir, item.name);
-    // A symlink is never an entry: whoever made it, such as a dotfiles checkout, owns what it points at.
+    // A link is an entry only to a caller that follows links, such as a report. Whoever made
+    // it, a dotfiles checkout for one, owns what it points at, so nothing adopts it.
+    const type = item.isSymbolicLink() ? (followLinks ? await linked(full) : undefined) : item;
+    if (type === undefined) continue;
     const entry =
       spec.shape === "directory"
-        ? item.isDirectory()
+        ? type.isDirectory()
           ? await directoryEntry(root, full, item.name, spec, group)
           : undefined
-        : item.isFile()
+        : type.isFile()
           ? await fileEntry(root, full, item.name, spec, group)
           : undefined;
     if (entry !== undefined) entries.push(entry);
