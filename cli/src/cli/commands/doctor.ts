@@ -12,7 +12,7 @@ import { fileExposure } from "#core/credentials/store.ts";
 import { ExitCode } from "#core/errors.ts";
 import { WRITABLE_BY_OTHERS } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
-import { ownSkillsCommand, ownSkillsInstalled } from "#core/own-skills.ts";
+import { ownSkillsCommand, ownSkillsInstalled, staleOwnSkillsPin } from "#core/own-skills.ts";
 import { NAME } from "#core/product.ts";
 import { type ReleaseStamp, releaseStamp } from "#core/release/stamp.ts";
 import { cacheDir, credentialsPath, toolHome, userScopeDir } from "#core/store/paths.ts";
@@ -134,7 +134,20 @@ async function ownSkills(cwd: string): Promise<Check> {
   if (installed instanceof Error) {
     return { name: "aireg skills", ok: true, detail: `unknown: ${installed.message}` };
   }
-  if (installed) return { name: "aireg skills", ok: true, detail: "installed" };
+  if (installed) {
+    // A self-update moves aireg on but not the release the skills were pinned to.
+    const stale = await staleOwnSkillsPin(cwd).catch((error: Error) => error);
+    if (stale instanceof Error) {
+      return { name: "aireg skills", ok: true, detail: `unknown: ${stale.message}` };
+    }
+    if (stale === undefined) return { name: "aireg skills", ok: true, detail: "installed" };
+    return {
+      name: "aireg skills",
+      ok: true,
+      detail: `pinned to ${stale.pinned}, but aireg is ${VERSION}`,
+      fix: stale.fix,
+    };
+  }
   return {
     name: "aireg skills",
     ok: true,

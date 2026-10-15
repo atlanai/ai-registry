@@ -24,7 +24,7 @@ It opens with the versions of aireg, Node.js and git. A missing git or a Node.js
 | `home` | Where aireg keeps its own files. A problem when other users can write to it, since aireg then refuses the credentials stored there. |
 | `credentials` | Whether aireg stores any sign-in, and that only you can read the file. |
 | `user scope` | Where your user scope is. |
-| `aireg skills` | Whether the skills that teach your coding agent to use aireg are installed, and the commands to install them if not. |
+| `aireg skills` | Whether the skills that teach your coding agent to use aireg are installed, and the commands to install them if not. If the skills installed come from another release's tag, such as after aireg updated itself, it shows `!` and the commands that pin them to this release, at the address your user scope declares them from. |
 | `telemetry` | aireg sends no usage analytics. An installed aireg checks its release server for updates at most every 15 minutes and installs them, unless `CI` is set or `AIREG_DISABLE_UPDATE_CHECK=1`; a build from source never does. See [Network and privacy](environment.md#network-and-privacy). |
 | `updates` | The release channel this aireg updates from and whether a newer one is available, or that it is a build that doesn't update itself. |
 
