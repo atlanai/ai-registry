@@ -1,5 +1,5 @@
 import { list, sanitizeName } from "#adapter/text.ts";
-import { rowsNamed, shownNames } from "#cli/names.ts";
+import { matchInstalled, rowsNamed, shownNames } from "#cli/names.ts";
 import { parse } from "#cli/options.ts";
 import {
   cancel,
@@ -32,9 +32,10 @@ import { builtin, type CommandContext } from "./index.ts";
 function without(ref: Ref, drop: ReadonlySet<string>, lock: Lock, whole: boolean): Ref[] {
   const covered = Object.entries(lock.artifacts).filter(([, entry]) => reaches(ref, entry));
   const dropped = covered.filter(([key]) => drop.has(key));
+  // Checked first: a namespace whose every member was already removed covers nothing.
+  if (whole && dropped.length === covered.length) return [];
   if (dropped.length === 0) return [ref];
   if (ref.name !== undefined) return [];
-  if (whole && dropped.length === covered.length) return [];
   const exclusions = dropped.map(([, entry]) =>
     relativeTo(ref, {
       namespace: entry.namespace,
@@ -140,9 +141,14 @@ export async function run(context: CommandContext): Promise<void> {
     planReport(context.printer),
     async (fresh) => {
       const lock = fresh.lock;
+      const declared = new Set(fresh.manifest.artifacts.map(formatAddress));
+      // A namespace the manifest still takes is named even when nothing it covers is installed.
+      const emptied = (name: string) =>
+        wholeAddress(name).some((address) => declared.has(address)) &&
+        matchInstalled(name, lock).rows.length === 0;
       dropped = removeAll
         ? Object.keys(lock.artifacts)
-        : names.flatMap((name) => rowsNamed(name, lock));
+        : names.flatMap((name) => (emptied(name) ? [] : rowsNamed(name, lock)));
       const drop = new Set(dropped);
       const edited = await editedAmong(lock, dropped, fresh.roots);
       if (edited.length > 0 && !common.force && !interactive(step)) {

@@ -159,6 +159,13 @@ describe("consuming a registry like a package manager", () => {
     expect(existsSync(join(project, ".claude", "skills", "triage"))).toBe(false);
     expect((await aireg(["update", "--dry-run"])).stdout).toContain("triage");
   });
+
+  test("removes a namespace by its address once none of its artifacts is installed", async () => {
+    const removed = await aireg(["remove", "acme/platform", "-y"]);
+    expect(removed.code, removed.stderr).toBe(0);
+    expect(await read(".registry/manifest.yml")).not.toContain("acme/platform");
+    expect((await aireg(["update", "--dry-run"])).stdout).not.toContain("triage");
+  });
 });
 
 describe("a copy the harness owns", () => {
