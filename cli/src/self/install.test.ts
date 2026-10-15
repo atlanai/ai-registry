@@ -1,8 +1,9 @@
-import { mkdir, readlink, symlink } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import { executableFile } from "#core/product.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { previousInstalled, rollback, versionsToPrune } from "./install.ts";
+import { installedVersion, previousInstalled, rollback, versionsToPrune } from "./install.ts";
 
 describe("versionsToPrune", () => {
   test("drops the oldest after keeping n newest", () => {
@@ -15,13 +16,15 @@ describe("rollback", () => {
     const home = tmp;
     const env = { AIREG_HOME: home };
     const cli = join(home, "cli");
-    await mkdir(join(cli, "0.1.0"), { recursive: true });
-    await mkdir(join(cli, "0.2.0"), { recursive: true });
-    await mkdir(join(cli, "0.3.0"), { recursive: true });
-    await symlink("0.3.0", join(cli, "current"));
+    for (const version of ["0.1.0", "0.2.0", "0.3.0"]) {
+      await mkdir(join(cli, version), { recursive: true });
+      await writeFile(join(cli, version, executableFile()), version);
+    }
+    if (process.platform === "win32") await writeFile(join(cli, "current"), "0.3.0\n");
+    else await symlink("0.3.0", join(cli, "current"));
     expect(await previousInstalled(env)).toBe("0.2.0");
     expect(await rollback(env)).toBe("0.2.0");
-    expect(await readlink(join(cli, "current"))).toBe("0.2.0");
+    expect(await installedVersion(env)).toBe("0.2.0");
   });
 
   test("says there is nothing to roll back to before any update", async ({ tmp }) => {

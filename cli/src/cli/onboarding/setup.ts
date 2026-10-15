@@ -239,6 +239,15 @@ async function putOnPath(
 
 /** The last line: how to reach aireg from the shell that ran the installer. */
 function sayNextStep(printer: Printer, env: NodeJS.ProcessEnv): void {
+  // A Windows terminal reads the user PATH only when it starts.
+  if (process.platform === "win32") {
+    printer.info(
+      isSet("NO_MODIFY_PATH", env)
+        ? `To start using aireg, add ${binDir(env)} to your PATH.`
+        : "Open a new terminal to start using aireg.",
+    );
+    return;
+  }
   if (isSet("NO_MODIFY_PATH", env)) {
     printer.info(
       `To start using aireg, add ${underHome(binDir(env))} to your PATH: export PATH="${binDir(env)}:$PATH"`,

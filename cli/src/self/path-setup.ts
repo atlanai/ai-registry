@@ -1,16 +1,19 @@
 import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, sep } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, sep } from "node:path";
 import { envName, setting } from "#core/env.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { isMissing, userHome } from "#core/fs/path.ts";
-import { NAME } from "#core/product.ts";
+import { executableFile, NAME } from "#core/product.ts";
 import { binDir, shimPath } from "#core/release/layout.ts";
 import { ensureHome, toolHome } from "#core/store/paths.ts";
+import { addToUserPath, removeFromUserPath, USER_PATH, userPathHas } from "./windows-path.ts";
+
+const WINDOWS = process.platform === "win32";
 
 export interface PathChange {
-  /** Startup files that now source the env file. */
+  /** Startup files that now source the env file, or the Windows user environment. */
   added: string[];
   /** Startup files that could not be written. */
   failed: string[];
@@ -29,9 +32,9 @@ const UNSAFE = /["'`$\\\n]/;
 
 /** What `aireg` resolves to on this PATH, as `command -v` would find it. */
 export function resolvedOnPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  for (const dir of (env.PATH ?? "").split(":")) {
+  for (const dir of (env.PATH ?? "").split(delimiter)) {
     if (!isAbsolute(dir)) continue;
-    const candidate = join(dir, NAME);
+    const candidate = join(dir, executableFile());
     try {
       accessSync(candidate, constants.X_OK);
       if (statSync(candidate).isFile()) return candidate;
@@ -99,6 +102,15 @@ function fishFile(env: NodeJS.ProcessEnv): string {
  * zsh gets .zshenv because agents run non-interactive `zsh -c` shells, which skip .zshrc.
  */
 export async function addToPath(env: NodeJS.ProcessEnv = process.env): Promise<PathChange> {
+  if (WINDOWS) {
+    ensureHome(env);
+    try {
+      const outcome = await addToUserPath(binDir(env), env);
+      return { added: outcome === "added" ? [USER_PATH] : [], failed: [] };
+    } catch {
+      return { added: [], failed: [USER_PATH] };
+    }
+  }
   const root = userHome(env);
   const aireg = toolHome(env);
   if (UNSAFE.test(aireg)) {
@@ -149,7 +161,8 @@ export async function addToPath(env: NodeJS.ProcessEnv = process.env): Promise<P
 }
 
 /** Startup files `addToPath` may have written, which hold its line or its fish file now. */
-export function onPathIn(env: NodeJS.ProcessEnv = process.env): string[] {
+export async function onPathIn(env: NodeJS.ProcessEnv = process.env): Promise<string[]> {
+  if (WINDOWS) return (await userPathHas(binDir(env), env)) ? [USER_PATH] : [];
   const line = sourceLine(env);
   const root = userHome(env);
   const found: string[] = [];
@@ -174,9 +187,17 @@ export interface PathRemoval {
 
 /** Undoes `addToPath` in every file it may have written, not only those it would write today. */
 export async function removeFromPath(env: NodeJS.ProcessEnv = process.env): Promise<PathRemoval> {
-  const line = sourceLine(env);
   const change: PathRemoval = { removed: [], failed: [] };
-  for (const file of onPathIn(env)) {
+  if (WINDOWS) {
+    try {
+      if (await removeFromUserPath(binDir(env), env)) change.removed.push(USER_PATH);
+    } catch {
+      change.failed.push(USER_PATH);
+    }
+    return change;
+  }
+  const line = sourceLine(env);
+  for (const file of await onPathIn(env)) {
     try {
       if (file === fishFile(env)) {
         await rm(file, { force: true });
@@ -201,6 +222,7 @@ export async function removeFromPath(env: NodeJS.ProcessEnv = process.env): Prom
 
 /** What makes `aireg` available in the shell that ran the installer, when one command can. */
 export function restartCommand(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  if (WINDOWS) return undefined;
   const shell = basename(env.SHELL ?? "sh");
   if (shell === "zsh" || shell === "fish") return `exec ${shell}`;
   if (["bash", "sh", "dash", "ksh"].includes(shell)) return sourceLine(env);

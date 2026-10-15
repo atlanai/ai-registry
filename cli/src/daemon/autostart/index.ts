@@ -47,11 +47,11 @@ export function supervised(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /**
- * A standalone build runs from a versioned directory that pruning deletes, so
- * the service names the shim, which follows `cli/current` across updates.
+ * A standalone build runs from a versioned directory that pruning deletes, so the service
+ * names what PATH finds, which every update replaces: the shim, or on Windows the copy.
  */
-function stableEntry(entry: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
-  if (platform === "win32" || !isWithin(cliRoot(env), entry)) return entry;
+function stableEntry(entry: string, env: NodeJS.ProcessEnv): string {
+  if (!isWithin(cliRoot(env), entry)) return entry;
   return existsSync(shimPath(env)) ? shimPath(env) : entry;
 }
 
@@ -82,11 +82,10 @@ export const NO_EXECUTABLE = "aireg cannot find its own executable, so it cannot
 
 export function serviceSpec(options: AutostartOptions = {}): ServiceSpec {
   const env = options.env ?? process.env;
-  const platform = options.platform ?? process.platform;
   const entry = options.entry ?? runningEntry();
   if (entry === undefined) throw new Error(NO_EXECUTABLE);
   const execPath = stableNode(options.execPath ?? process.execPath, env.PATH);
-  const stable = stableEntry(entry, env, platform);
+  const stable = stableEntry(entry, env);
   const argv = (args: string[]) => {
     const launch = launchArgv(stable, args, execPath);
     return [launch.command, ...launch.args];

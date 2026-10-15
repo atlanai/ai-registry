@@ -18,9 +18,20 @@ export const SERVICE = {
 export const DATABASE_FILE = `${NAME}.db`;
 export const LOG_FILE = `${NAME}.log`;
 
-export function releaseBinary(platform: string): string {
-  return `${NAME}-${platform}`;
+/** The CLI's executable on disk; Windows finds a program by its extension. */
+export function executableFile(platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32" ? `${NAME}.exe` : NAME;
 }
+
+export function releaseBinary(platform: string): string {
+  return `${NAME}-${platform}${platform.startsWith("windows-") ? ".exe" : ""}`;
+}
+
+/**
+ * A user variable set and cleared again, so Windows tells running programs, such as
+ * Explorer, that the user PATH changed.
+ */
+export const PATH_REFRESH_VARIABLE = `${NAME.toUpperCase()}_PATH_REFRESH`;
 /** An adapter's file on the release server; the path already says it is aireg's, so no prefix. */
 export const RELEASE_ADAPTER_FILE = "adapter.mjs";
 /** What an installed adapter is saved as, under `adapters/<id>/<version>/`. */
@@ -30,6 +41,9 @@ export const ADAPTER_MODULE_FILE = "adapter.mjs";
 export function releaseTag(version: string): string {
   return `${NAME}-v${version}`;
 }
+
+/** Who publishes aireg, as NOTICE says and a Windows binary's properties show. */
+export const PUBLISHER = "Atlan Pte. Ltd.";
 
 /** The npm package that publishes the adapter contract an adapter builds on. */
 export const PACKAGE = `@atlanai/${NAME}`;

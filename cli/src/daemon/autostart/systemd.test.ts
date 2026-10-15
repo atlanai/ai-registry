@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { fakeExec } from "#test/kit/fake-exec.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { expectMode } from "#test/kit/mode.ts";
 import type { ServiceSpec } from "./model.ts";
 import { renderUnit, systemdBackend } from "./systemd.ts";
 
@@ -55,7 +56,7 @@ describe("systemdBackend", () => {
   test("writes the unit, reloads, enables and restarts it", async () => {
     const fake = fakeExec();
     await systemdBackend(spec(home), fake.exec).install();
-    expect((await stat(unitPath())).mode & 0o777).toBe(0o644);
+    await expectMode(unitPath(), 0o644);
     expect(await readFile(unitPath(), "utf8")).toBe(renderUnit(spec(home)));
     expect(fake.calls).toEqual([
       "systemctl --user show-environment",

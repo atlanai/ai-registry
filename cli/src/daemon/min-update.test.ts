@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { executableFile } from "#core/product.ts";
 import type { ResolvedRelease } from "#self/source.ts";
 import {
   applyDaemonCliUpdate,
@@ -77,7 +78,10 @@ describe("applyDaemonCliUpdate", () => {
     expect(await applyDaemonCliUpdate(next)).toBe("replace");
     expect(next.install).toHaveBeenCalledWith(release, home, expect.any(Function));
     expect(next.close).toHaveBeenCalledOnce();
-    expect(next.start).toHaveBeenCalledWith(join("/tmp/aireg-home/cli/0.2.0/aireg"), "0.2.0");
+    expect(next.start).toHaveBeenCalledWith(
+      join("/tmp/aireg-home/cli/0.2.0", executableFile()),
+      "0.2.0",
+    );
   });
 
   it("leaves the replacement to a supervisor instead of spawning one", async () => {
@@ -125,7 +129,10 @@ describe("applyDaemonFollowInstalled", () => {
     const next = follow();
     expect(await applyDaemonFollowInstalled(next)).toBe("replace");
     expect(next.close).toHaveBeenCalledOnce();
-    expect(next.start).toHaveBeenCalledWith(join("/tmp/aireg-home/cli/0.2.0/aireg"), "0.2.0");
+    expect(next.start).toHaveBeenCalledWith(
+      join("/tmp/aireg-home/cli/0.2.0", executableFile()),
+      "0.2.0",
+    );
   });
 
   it("never downgrades, and skips when nothing runnable is installed", async () => {

@@ -33,7 +33,10 @@ describe("standaloneShim", () => {
     execFileSync("sh", ["-n"], { input: shim });
   });
 
-  test("execs the binary under cli/current and forwards its arguments", () => {
+  // The shim is for macOS and Linux; Windows puts the binary itself on PATH.
+  const posix = test.skipIf(process.platform === "win32");
+
+  posix("execs the binary under cli/current and forwards its arguments", () => {
     const home = installed("1.2.3", '#!/bin/sh\necho "ran $*"\n');
     expect(
       execFileSync(join(home, "bin", "aireg"), ["--version", "--json"], {
@@ -43,7 +46,7 @@ describe("standaloneShim", () => {
     ).toBe("ran --version --json");
   });
 
-  test("follows the symlink, so a moved current is the whole upgrade", () => {
+  posix("follows the symlink, so a moved current is the whole upgrade", () => {
     const home = installed("1.2.3", "#!/bin/sh\necho one\n");
     mkdirSync(join(home, "cli", "2.0.0"));
     const next = join(home, "cli", "2.0.0", "aireg");
@@ -59,7 +62,7 @@ describe("standaloneShim", () => {
     ).toBe("two");
   });
 
-  test("fails with a legible message when the install is gone", () => {
+  posix("fails with a legible message when the install is gone", () => {
     const home = installed("1.2.3", "#!/bin/sh\necho one\n");
     rmSync(join(home, "cli", "1.2.3"), { recursive: true });
     expect(() =>

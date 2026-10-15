@@ -27,6 +27,7 @@ import { extensionHost } from "#daemon/extension-host.ts";
 import { recycleDaemon } from "#daemon/service.ts";
 import { hintUpdate, refreshUpdates, scheduleUpdateCheck, UPDATE_CHECK_FLAG } from "#self/check.ts";
 import { applyMinimumUpdate } from "#self/minimum.ts";
+import { REMOVE_AFTER_FLAG, removeAfterExit } from "#self/remove-after.ts";
 
 registerBuiltinAdapters();
 
@@ -162,6 +163,10 @@ async function dispatch(
     process.chdir(homedir());
     const { runDaemon } = await import("#daemon/runtime.ts");
     return (await runDaemon(VERSION)) as ExitCode;
+  }
+  if (argv.length === 3 && argv[0] === REMOVE_AFTER_FLAG) {
+    await removeAfterExit(Number(argv[1]), argv[2] as string).catch(() => undefined);
+    return ExitCode.Ok;
   }
   if (argv.length === 1 && argv[0] === UPDATE_CHECK_FLAG) {
     await refreshUpdates(recycleDaemon).catch(() => undefined);

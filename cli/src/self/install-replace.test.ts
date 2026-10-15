@@ -5,7 +5,7 @@ import { launchArgv } from "#core/release/launch.ts";
 import { currentLink, shimPath, versionBin } from "#core/release/layout.ts";
 import { standaloneShim } from "#core/release/shim.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { installBinary } from "./install.ts";
+import { installBinary, installedVersion } from "./install.ts";
 
 /**
  * Announces itself, then blocks on stdin: the announcement is what proves the
@@ -110,5 +110,35 @@ describe("launchArgv", () => {
     expect(launchArgv("/repo/cli/src/main.ts", [], "/usr/bin/node").args).toContain(
       "--experimental-strip-types",
     );
+  });
+});
+
+describe.runIf(process.platform === "win32")("replacing a running executable on Windows", () => {
+  test("moves the running copies aside and puts the new one on PATH", async ({ tmp }) => {
+    const env = { AIREG_HOME: tmp };
+    // Any real executable will do; Node's own is at hand.
+    const bytes = new Uint8Array(await readFile(process.execPath));
+    const bin = await installBinary("0.1.0", bytes, env);
+    expect(await installedVersion(env)).toBe("0.1.0");
+
+    const running = [bin, shimPath(env)].map((path) =>
+      spawn(path, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" }),
+    );
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await installBinary("0.1.0", bytes, env);
+      await installBinary("0.2.0", bytes, env);
+      expect(await installedVersion(env)).toBe("0.2.0");
+      expect(await run(shimPath(env), ["-e", "console.log('ran')"])).toBe("ran");
+    } finally {
+      // Windows keeps a running file from being deleted, so the cleanup waits for both.
+      await Promise.all(
+        running.map((child) => {
+          const exited = new Promise((resolve) => child.once("exit", resolve));
+          child.kill();
+          return exited;
+        }),
+      );
+    }
   });
 });

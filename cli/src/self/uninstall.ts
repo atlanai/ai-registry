@@ -1,5 +1,8 @@
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { copyFile, rename } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { dict } from "#core/fields.ts";
 import { canonical } from "#core/fs/canonical.ts";
@@ -11,9 +14,12 @@ import { readManifest } from "#core/manifest.ts";
 import { apply, recover } from "#core/plan/apply.ts";
 import { build } from "#core/plan/build.ts";
 import { fetchFrom, type Plan } from "#core/plan/model.ts";
+import { spawnDetached } from "#core/process.ts";
+import { NAME } from "#core/product.ts";
 import { runningEntry } from "#core/release/launch.ts";
 import { type Roots, roots, toolHome, userScopeDir } from "#core/store/paths.ts";
 import { onPathIn } from "./path-setup.ts";
+import { REMOVE_AFTER_FLAG, removeTree } from "./remove-after.ts";
 
 /** The files aireg put on this machine outside projects, as `aireg self uninstall` finds them. */
 export interface Footprint {
@@ -61,7 +67,7 @@ export async function footprint(env: NodeJS.ProcessEnv = process.env): Promise<F
   if (entry !== undefined && !isWithin(toolHome(env), canonical(entry))) kept.push(entry);
   return {
     links: linksOf(await teardownPlan(roots("user", homeDir(env), env)), env),
-    startupFiles: onPathIn(env),
+    startupFiles: await onPathIn(env),
     folders: own,
     kept,
   };
@@ -86,12 +92,47 @@ export async function deleteFolders(
   const deleted: string[] = [];
   const failed: string[] = [];
   for (const dir of folders(env).folders) {
-    try {
-      await rm(dir, { recursive: true, force: true });
+    if (await removeTree(dir)) {
       deleted.push(dir);
-    } catch {
-      failed.push(dir);
+      continue;
     }
+    if (process.platform !== "win32" || !isWithin(canonical(dir), canonical(process.execPath))) {
+      failed.push(dir);
+      continue;
+    }
+    // Windows can move the running aireg.exe, though not delete it; across drives it cannot.
+    const moved = await moveToTemp(process.execPath);
+    if (moved !== undefined && (await removeTree(dir))) {
+      deleted.push(dir);
+      continue;
+    }
+    await deleteAfterExit(dir, moved ?? process.execPath).then(
+      () => deleted.push(dir),
+      () => failed.push(dir),
+    );
   }
   return { deleted, failed };
+}
+
+function helperPath(suffix: string): string {
+  return join(tmpdir(), `${NAME}-${suffix}-${randomBytes(4).toString("hex")}.exe`);
+}
+
+/** Into the temp folder, which Windows cleans; this fails when TEMP is on another drive. */
+async function moveToTemp(path: string): Promise<string | undefined> {
+  const to = helperPath("uninstalled");
+  return rename(path, to).then(
+    () => to,
+    () => undefined,
+  );
+}
+
+/**
+ * A copy in the temp folder, which a copy can reach on any drive, deletes the folder once this
+ * process exits; Windows cleans the copy with the rest of TEMP.
+ */
+async function deleteAfterExit(dir: string, executable: string): Promise<void> {
+  const helper = helperPath("uninstall");
+  await copyFile(executable, helper);
+  spawnDetached(helper, [REMOVE_AFTER_FLAG, String(process.pid), dir]);
 }

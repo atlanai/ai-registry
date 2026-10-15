@@ -1,13 +1,15 @@
 import { generateKeyPairSync, sign } from "node:crypto";
-import { readFile, readlink, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, vi } from "vitest";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { decodeTrustedKeys } from "#core/release/keyring.ts";
+import { versionBin } from "#core/release/layout.ts";
 import { canonicalPayload, type ReleaseManifest } from "#core/release/manifest.ts";
 import type { ReleaseStamp } from "#core/release/stamp.ts";
 import { binaryName, releasePlatform } from "#core/release/urls.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { installedVersion } from "./install.ts";
 import { installRelease, probeRelease } from "./minimum.ts";
 
 // The stamp is build-time only by design, so a test substitutes one here
@@ -111,12 +113,12 @@ describe("minimum update from the signed channel", () => {
     if (found === undefined) throw new Error("probe failed");
 
     await installRelease(found, env, $fetch);
-    expect(await readlink(join(home, "cli", "current"))).toBe("0.2.0");
+    expect(await installedVersion(env)).toBe("0.2.0");
 
-    const bin = join(home, "cli", "0.2.0", "aireg");
+    const bin = versionBin("0.2.0", env);
     expect(await readFile(bin, "utf8")).toContain("0.2.0");
     // Placed executable, not left for a later chmod: the shim execs it directly.
-    expect((await stat(bin)).mode & 0o111).not.toBe(0);
+    if (process.platform !== "win32") expect((await stat(bin)).mode & 0o111).not.toBe(0);
   });
 
   test("aborts before writing anything when the binary fails its checksum", async ({ tmp }) => {

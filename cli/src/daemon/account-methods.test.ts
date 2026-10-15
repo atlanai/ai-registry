@@ -7,6 +7,7 @@ import { writeConfig } from "#core/config/repository.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { ADAPTER, ENDPOINT, NAMESPACE, testClient } from "#test/kit/daemon.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { expectMode } from "#test/kit/mode.ts";
 
 /** So `account.login` can resolve the alias against the user's own manifest. */
 async function declareUserRegistry(scope: string): Promise<void> {
@@ -149,7 +150,7 @@ describe("account.logout", () => {
     const { client } = await daemon.start(testClient("logout_file_test"));
     const logged = await client.request("account.login", { registry: "personal" });
     const id = logged.account.id;
-    expect((await stat(file)).mode & 0o777).toBe(0o600);
+    await expectMode(file, 0o600);
     expect(JSON.parse(await readFile(file, "utf8"))).toEqual({
       version: 1,
       credentials: {

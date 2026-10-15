@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { executableFile } from "#core/product.ts";
 import { applyDaemonAdapterUpdate } from "./adapter-update.ts";
 
 describe("applyDaemonAdapterUpdate", () => {
@@ -18,7 +19,10 @@ describe("applyDaemonAdapterUpdate", () => {
   it("restarts on the same version after an adapter update, so it loads", async () => {
     const next = hooks(["acme 1.1.0"]);
     expect(await applyDaemonAdapterUpdate(next)).toBe("replace");
-    expect(next.start).toHaveBeenCalledWith(join("/tmp/aireg-home/cli/0.2.0/aireg"), "0.2.0");
+    expect(next.start).toHaveBeenCalledWith(
+      join("/tmp/aireg-home/cli/0.2.0", executableFile()),
+      "0.2.0",
+    );
   });
 
   it("stays up when nothing changed or a run is in flight", async () => {

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { fakeExec } from "#test/kit/fake-exec.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { expectMode } from "#test/kit/mode.ts";
 import { launchdBackend, renderPlist } from "./launchd.ts";
 import type { ServiceSpec } from "./model.ts";
 
@@ -72,7 +73,7 @@ describe("launchdBackend", () => {
       "launchctl print gui/501/sh.aireg.daemon": { code: 113 },
     });
     await launchdBackend(spec(home), fake.exec).install();
-    expect((await stat(plistPath())).mode & 0o777).toBe(0o644);
+    await expectMode(plistPath(), 0o644);
     expect(await readFile(plistPath(), "utf8")).toBe(renderPlist(spec(home)));
     expect(fake.calls).toEqual([
       "launchctl print gui/501/sh.aireg.daemon",

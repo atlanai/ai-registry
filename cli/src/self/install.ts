@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { constants, type Dirent } from "node:fs";
 import {
   access,
@@ -5,12 +6,13 @@ import {
   copyFile,
   mkdir,
   readdir,
+  readFile,
   readlink,
   rename,
   rm,
   symlink,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { gte, parseVersion } from "#adapter/semver.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -30,9 +32,13 @@ import { standaloneShim } from "#core/release/shim.ts";
 import { ensureHome } from "#core/store/paths.ts";
 import { VERSION } from "#core/version.ts";
 
+const WINDOWS = process.platform === "win32";
+
 export async function installedVersion(env: NodeJS.ProcessEnv = process.env): Promise<string> {
   try {
-    const target = await readlink(currentLink(env));
+    const target = WINDOWS
+      ? (await readFile(currentLink(env), "utf8")).trim()
+      : await readlink(currentLink(env));
     if (target !== "") return target;
   } catch {
     // Source and npm installs have no ~/.aireg/cli/current yet.
@@ -52,7 +58,13 @@ export async function installBinary(
   const bin = versionBin(version, env);
   ensureHome(env);
   await mkdir(versionDir(version, env), { recursive: true });
-  await writeAtomic(bin, bytes, EXECUTABLE);
+  if (WINDOWS) {
+    const staged = `${bin}.${process.pid}.tmp`;
+    await writeAtomic(staged, bytes, EXECUTABLE);
+    await swapIn(staged, bin);
+  } else {
+    await writeAtomic(bin, bytes, EXECUTABLE);
+  }
   return await goLive(version, bin, env);
 }
 
@@ -71,13 +83,13 @@ export async function installBinaryFrom(
     await mkdir(versionDir(version, env), { recursive: true });
     if (isWithin(canonical(cliRoot(env)), canonical(path))) {
       await chmod(path, EXECUTABLE);
-      await rename(path, bin);
+      await swapIn(path, bin);
     } else {
       const staged = `${bin}.${process.pid}.tmp`;
       try {
         await copyFile(path, staged);
         await chmod(staged, EXECUTABLE);
-        await rename(staged, bin);
+        await swapIn(staged, bin);
       } finally {
         await rm(staged, { force: true });
       }
@@ -104,22 +116,71 @@ async function goLive(version: string, bin: string, env: NodeJS.ProcessEnv): Pro
   } catch {
     throw new Error(`Installed aireg ${version}, but ${bin} is not executable.`);
   }
-  await pointCurrent(version, env);
-  await writeShims(env);
+  await activate(version, env);
+  await sweepReplaced(dirname(bin));
   return bin;
 }
 
+/**
+ * Renames `staged` over `target`. Windows refuses that while `target` runs, but lets the
+ * running file be renamed, so it moves aside until nothing runs it.
+ */
+async function swapIn(staged: string, target: string): Promise<void> {
+  if (WINDOWS) {
+    await rename(target, `${target}.${randomBytes(4).toString("hex")}.old`).catch(
+      (error: unknown) => {
+        if (!isMissing(error)) throw error;
+      },
+    );
+  }
+  await rename(staged, target);
+}
+
+/** Deletes what `swapIn` moved aside; one a process still runs stays until a later install. */
+async function sweepReplaced(dir: string): Promise<void> {
+  if (!WINDOWS) return;
+  for (const entry of await readdir(dir).catch(() => [])) {
+    if (entry.endsWith(".old")) await rm(join(dir, entry), { force: true }).catch(() => undefined);
+  }
+}
+
+async function activate(version: string, env: NodeJS.ProcessEnv): Promise<void> {
+  await pointCurrent(version, env);
+  await writeShims(version, env);
+}
+
+/**
+ * A symlink the shim follows. Windows runs a copy instead of a shim, and a link there needs
+ * Developer Mode, so `current` is a file that names the version.
+ */
 async function pointCurrent(version: string, env: NodeJS.ProcessEnv): Promise<void> {
   const current = currentLink(env);
+  if (WINDOWS) {
+    await writeAtomic(current, `${version}\n`);
+    return;
+  }
   const tmp = `${current}.${process.pid}.tmp`;
   await rm(tmp, { force: true });
   await symlink(version, tmp);
   await rename(tmp, current);
 }
 
-async function writeShims(env: NodeJS.ProcessEnv = process.env): Promise<void> {
-  await writeAtomic(shimPath(env), standaloneShim(), EXECUTABLE);
-  await chmod(binDir(env), EXECUTABLE);
+/** Windows runs no shell script from PATH, so the binary itself goes there. */
+async function writeShims(version: string, env: NodeJS.ProcessEnv): Promise<void> {
+  if (!WINDOWS) {
+    await writeAtomic(shimPath(env), standaloneShim(), EXECUTABLE);
+    await chmod(binDir(env), EXECUTABLE);
+    return;
+  }
+  await mkdir(binDir(env), { recursive: true });
+  const staged = `${shimPath(env)}.${process.pid}.tmp`;
+  try {
+    await copyFile(versionBin(version, env), staged);
+    await swapIn(staged, shimPath(env));
+  } finally {
+    await rm(staged, { force: true });
+  }
+  await sweepReplaced(binDir(env));
 }
 
 async function listedVersions(env: NodeJS.ProcessEnv): Promise<string[]> {
@@ -150,7 +211,7 @@ export async function previousInstalled(env: NodeJS.ProcessEnv = process.env): P
 
 export async function rollback(env: NodeJS.ProcessEnv = process.env): Promise<string> {
   const previous = await previousInstalled(env);
-  await pointCurrent(previous, env);
+  await activate(previous, env);
   return previous;
 }
 
@@ -164,7 +225,7 @@ export async function pruneOld(env: NodeJS.ProcessEnv = process.env): Promise<vo
   // An installer killed mid-download leaves its staging folder behind.
   for (const entry of await readdir(cliRoot(env))) {
     if (entry.startsWith(".incoming-")) {
-      await rm(join(cliRoot(env), entry), { recursive: true, force: true });
+      await rm(join(cliRoot(env), entry), { recursive: true, force: true }).catch(() => undefined);
     }
   }
   const names = await listedVersions(env);
@@ -172,6 +233,7 @@ export async function pruneOld(env: NodeJS.ProcessEnv = process.env): Promise<vo
     names.filter((name) => name !== current),
     1,
   )) {
-    await rm(join(cliRoot(env), stale), { recursive: true, force: true });
+    // Windows cannot delete a binary a process still runs; the next update tries again.
+    await rm(join(cliRoot(env), stale), { recursive: true, force: true }).catch(() => undefined);
   }
 }

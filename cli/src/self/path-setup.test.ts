@@ -22,7 +22,10 @@ const test = base.extend("shell", ({ home }) => {
   return { dir: tmp, env, read, line: '. "$HOME/.aireg/env"' };
 });
 
-describe("addToPath", () => {
+// Shell startup files are the macOS and Linux mechanism; windows-path.test.ts covers Windows.
+const unix = describe.skipIf(process.platform === "win32");
+
+unix("addToPath", () => {
   test("sources the env file from .profile once, keeping what was there", async ({ shell }) => {
     await writeFile(join(shell.dir, ".profile"), "export EDITOR=vi");
     const env = shell.env("sh");
@@ -82,7 +85,7 @@ describe("addToPath", () => {
   });
 });
 
-describe("onPathIn and removeFromPath", () => {
+unix("onPathIn and removeFromPath", () => {
   test("find every file the line went into, and take out only that line", async ({ shell }) => {
     await writeFile(join(shell.dir, ".profile"), "export EDITOR=vi\n");
     await writeFile(join(shell.dir, ".bashrc"), "alias ll='ls -l'\n");
@@ -90,13 +93,13 @@ describe("onPathIn and removeFromPath", () => {
     await addToPath(env);
     const fish = join(shell.dir, ".config", "fish", "conf.d", "aireg.fish");
 
-    expect(onPathIn(env).sort()).toEqual(
+    expect((await onPathIn(env)).sort()).toEqual(
       [join(shell.dir, ".bashrc"), join(shell.dir, ".profile"), fish].sort(),
     );
 
     const removal = await removeFromPath(env);
     expect(removal.failed).toEqual([]);
-    expect(onPathIn(env)).toEqual([]);
+    expect(await onPathIn(env)).toEqual([]);
     expect(await shell.read(".profile")).toBe("export EDITOR=vi\n");
     expect(await shell.read(".bashrc")).toBe("alias ll='ls -l'\n");
     expect(existsSync(fish)).toBe(false);

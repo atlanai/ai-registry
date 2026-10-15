@@ -23,17 +23,21 @@ describe("footprint", () => {
     });
   });
 
-  test("names the folders and startup files aireg left", async ({ home }) => {
-    await mkdir(home.aireg, { recursive: true, mode: 0o700 });
-    await mkdir(home.scope, { recursive: true });
-    await writeFile(join(home.dir, ".profile"), `export EDITOR=vi\n. "$HOME/.aireg/env"\n`);
+  // Windows keeps PATH in the registry, which a test must not edit; the CI install covers it.
+  test.skipIf(process.platform === "win32")(
+    "names the folders and startup files aireg left",
+    async ({ home }) => {
+      await mkdir(home.aireg, { recursive: true, mode: 0o700 });
+      await mkdir(home.scope, { recursive: true });
+      await writeFile(join(home.dir, ".profile"), `export EDITOR=vi\n. "$HOME/.aireg/env"\n`);
 
-    const found = await footprint(home.env);
+      const found = await footprint(home.env);
 
-    expect(found).toMatchObject({ links: [], kept: [] });
-    expect(found.folders.sort()).toEqual([home.aireg, home.scope].sort());
-    expect(found.startupFiles).toEqual([join(home.dir, ".profile")]);
-  });
+      expect(found).toMatchObject({ links: [], kept: [] });
+      expect(found.folders.sort()).toEqual([home.aireg, home.scope].sort());
+      expect(found.startupFiles).toEqual([join(home.dir, ".profile")]);
+    },
+  );
 
   test("keeps a folder that holds the home, and a CLI aireg did not install", async ({ home }) => {
     machine.entry = "/usr/local/lib/node_modules/aireg/bin/aireg.mjs";

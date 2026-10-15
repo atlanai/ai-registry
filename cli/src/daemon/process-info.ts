@@ -1,13 +1,46 @@
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { exec } from "#core/process.ts";
 
 const EXEC_MS = 2_000;
+/** PowerShell alone can take a second or two to start. */
+const WINDOWS_EXEC_MS = 15_000;
 
 function isDaemonCommand(command: string): boolean {
   return command.includes("--internal-daemon");
 }
 
+/** The system's own PowerShell, never one found on PATH. */
+function powershell(env: NodeJS.ProcessEnv = process.env): string {
+  return join(
+    env.SystemRoot ?? "C:\\Windows",
+    "System32",
+    "WindowsPowerShell",
+    "v1.0",
+    "powershell.exe",
+  );
+}
+
+/** Windows has no `ps` or `/proc`; CIM is what still reports another process's command line. */
+async function windowsCommandLine(pid: number): Promise<string | undefined> {
+  // Interpolated into a PowerShell filter, so only a plain positive integer gets there.
+  if (!Number.isSafeInteger(pid) || pid <= 0) return undefined;
+  const { code, stdout } = await exec(
+    powershell(),
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").CommandLine`,
+    ],
+    { timeoutMs: WINDOWS_EXEC_MS },
+  );
+  const line = stdout.trim();
+  return code !== 0 || line === "" ? undefined : line;
+}
+
 async function commandLine(pid: number): Promise<string | undefined> {
+  if (process.platform === "win32") return windowsCommandLine(pid);
   try {
     return (await readFile(`/proc/${String(pid)}/cmdline`, "utf8")).replace(/\0/g, " ").trim();
   } catch {

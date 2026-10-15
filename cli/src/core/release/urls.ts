@@ -12,6 +12,8 @@ export const RELEASE_PLATFORMS = [
   "darwin-arm64",
   "linux-amd64",
   "linux-arm64",
+  "windows-amd64",
+  "windows-arm64",
 ] as const;
 export type ReleasePlatform = (typeof RELEASE_PLATFORMS)[number];
 
@@ -22,6 +24,7 @@ export type ReleasePlatform = (typeof RELEASE_PLATFORMS)[number];
 const OS = new Map<string, string>([
   ["darwin", "darwin"],
   ["linux", "linux"],
+  ["win32", "windows"],
 ]);
 const ARCH = new Map<string, string>([
   ["x64", "amd64"],

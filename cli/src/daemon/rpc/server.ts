@@ -165,7 +165,15 @@ export class RpcServer {
     if (this.#server !== undefined) throw new Error("The JSON-RPC server is already listening.");
     await removeStale(endpoint);
     if (process.platform === "win32") {
-      this.#server = await bind(endpoint, (socket) => this.#accept(socket));
+      // A named pipe in use is one another daemon answers on; there is no file to check first.
+      try {
+        this.#server = await bind(endpoint, (socket) => this.#accept(socket));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
+          throw new DaemonAlreadyRunningError();
+        }
+        throw error;
+      }
       this.#endpoint = endpoint;
       return;
     }
