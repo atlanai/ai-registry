@@ -2,6 +2,7 @@ import { isAbsolute, resolve } from "node:path";
 import { list as listOf, plural, quoted } from "#adapter/text.ts";
 import { qualify } from "#cli/commands/add.ts";
 import { addContributedJob } from "#cli/commands/job/contributed.ts";
+import { existing, needsJob, noJob } from "#cli/commands/job/find.ts";
 import type { RunsOptions } from "#cli/commands/job/runs.ts";
 import { parse } from "#cli/options.ts";
 import { cannotPublish } from "#cli/publish/target.ts";
@@ -269,22 +270,6 @@ async function add(
             : `Added job ${job.id}, which publishes ${listOf(origins.from.map(underHome))} to ${origins.to}.`,
         );
   });
-}
-
-export function noJob(wanted: string, hint = "Run `aireg job list` to see the jobs."): AiregError {
-  return new AiregError(`No job named ${quoted(wanted)}.`, { code: ErrorCode.NotFound, hint });
-}
-
-export function needsJob(action: string): AiregError {
-  return new AiregError(`\`aireg job ${action}\` needs a job name.`, {
-    code: ErrorCode.Usage,
-    hint: `Name the job: \`aireg job ${action} <job>\`.`,
-  });
-}
-
-/** Looked up before the daemon starts: naming a job that does not exist does not need it. */
-export async function existing(wanted: string): Promise<void> {
-  if (findJob(await readConfig(), wanted) === undefined) throw noJob(wanted);
 }
 
 /**

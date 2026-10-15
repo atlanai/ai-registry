@@ -1,7 +1,7 @@
 import { isAbsolute, resolve } from "node:path";
 import { list as listOf, quoted } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/index.ts";
-import { existing, needsJob, noJob } from "#cli/commands/job.ts";
+import { existing, needsJob, noJob } from "#cli/commands/job/find.ts";
 import { underHome } from "#cli/render/home.ts";
 import { findJob, type Job, type RegistryConfig, type Step } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
