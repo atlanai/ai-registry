@@ -2,7 +2,7 @@ import { isAbsolute, resolve } from "node:path";
 import { list as listOf, plural, quoted } from "#adapter/text.ts";
 import { qualify } from "#cli/commands/add.ts";
 import { addContributedJob } from "#cli/commands/job/contributed.ts";
-import { existing, needsJob, noJob } from "#cli/commands/job/find.ts";
+import { existing, jobNamed, needsJob, noJob } from "#cli/commands/job/find.ts";
 import type { RunsOptions } from "#cli/commands/job/runs.ts";
 import { parse } from "#cli/options.ts";
 import { cannotPublish } from "#cli/publish/target.ts";
@@ -326,8 +326,7 @@ async function setEnabled(
   await existing(wanted);
   await withDaemon(async (client) => {
     const job = await withFreshConfig(client, async (config) => {
-      const found = findJob(config, wanted);
-      if (found === undefined) throw noJob(wanted);
+      const found = jobNamed(config, wanted);
       await client.request("settings.patch", {
         expectedRevision: config.revision,
         jobs: { upsert: [{ ...found, schedule: { ...found.schedule, enabled } }] },

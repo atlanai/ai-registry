@@ -1,15 +1,9 @@
 import { isAbsolute, resolve } from "node:path";
 import { list as listOf, quoted } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/index.ts";
-import { existing, needsJob, noJob } from "#cli/commands/job/find.ts";
+import { existing, jobNamed, needsJob } from "#cli/commands/job/find.ts";
 import { underHome } from "#cli/render/home.ts";
-import {
-  findJob,
-  type Job,
-  type RegistryConfig,
-  type Step,
-  watchedFolders,
-} from "#core/config/model.ts";
+import { type Job, type RegistryConfig, type Step, watchedFolders } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
@@ -130,8 +124,7 @@ export async function remove(
   await existing(wanted);
   await withDaemon(async (client) => {
     const job = await withFreshConfig(client, async (config) => {
-      const found = findJob(config, wanted);
-      if (found === undefined) throw noJob(wanted);
+      const found = jobNamed(config, wanted);
       await client.request("settings.patch", {
         expectedRevision: config.revision,
         jobs: { remove: [found.id] },
@@ -147,14 +140,12 @@ export async function remove(
 
 /** Stops watching some folders and keeps the job, which goes on keeping its scope in sync. */
 async function unwatch(context: CommandContext, wanted: string, folders: string[]): Promise<void> {
-  const before = findJob(await readConfig(), wanted);
-  if (before === undefined) throw noJob(wanted);
+  const before = jobNamed(await readConfig(), wanted);
   // Checked before the daemon starts: a folder the job does not watch does not need it.
   withoutFolders(before, folders, context.cwd);
   await withDaemon(async (client) => {
     const { found, job } = await withFreshConfig(client, async (config) => {
-      const found = findJob(config, wanted);
-      if (found === undefined) throw noJob(wanted);
+      const found = jobNamed(config, wanted);
       const job = withoutFolders(found, folders, context.cwd);
       await client.request("settings.patch", {
         expectedRevision: config.revision,
