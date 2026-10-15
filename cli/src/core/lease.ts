@@ -216,27 +216,50 @@ async function removeDir(dir: string): Promise<boolean> {
   }
 }
 
+/** Windows answers EPERM, not EEXIST, for a folder another process is still deleting. */
+function taken(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  return (
+    code === "EEXIST" || (process.platform === "win32" && (code === "EPERM" || code === "EBUSY"))
+  );
+}
+
+/** Since when entering has kept failing, so a refusal that never clears ends the wait. */
+interface Failing {
+  since?: number;
+}
+
+function stillFailing(failing: Failing): boolean {
+  failing.since ??= Date.now();
+  return Date.now() - failing.since < STUCK_MS;
+}
+
+/** One try at the coordination folder: entered, try again now, or wait a poll first. */
+async function enterOnce(dir: string, failing: Failing): Promise<"entered" | "retry" | "wait"> {
+  try {
+    await mkdir(dir);
+    return "entered";
+  } catch (error) {
+    if (!taken(error)) throw error;
+    // A delete still pending clears in moments; one that never does is a real refusal.
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST" && !stillFailing(failing)) throw error;
+    const age = await dirAgeMs(dir);
+    if (age === undefined || age <= COORDINATION_STALE_MS) return "wait";
+    if (await removeDir(dir)) return "retry";
+    if (!stillFailing(failing)) throw stuckError(dir, "lease_coordination_stuck");
+    return "wait";
+  }
+}
+
 /** Short-held, so create-versus-reclaim cannot interleave. */
 async function withCoordination<T>(parent: string, run: () => Promise<T>): Promise<T> {
   const dir = join(parent, ".coordination");
   await mkdir(parent, { recursive: true });
-  let failingSince: number | undefined;
+  const failing: Failing = {};
   for (;;) {
-    try {
-      await mkdir(dir);
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const age = await dirAgeMs(dir);
-      if (age !== undefined && age > COORDINATION_STALE_MS) {
-        if (await removeDir(dir)) continue;
-        failingSince ??= Date.now();
-        if (Date.now() - failingSince >= STUCK_MS) {
-          throw stuckError(dir, "lease_coordination_stuck");
-        }
-      }
-      await new Promise((wake) => setTimeout(wake, POLL_MS));
-    }
+    const step = await enterOnce(dir, failing);
+    if (step === "entered") break;
+    if (step === "wait") await new Promise((wake) => setTimeout(wake, POLL_MS));
   }
   try {
     return await run();
@@ -252,10 +275,18 @@ async function claim(dir: string, holder: LeaseHolder): Promise<Claim> {
   try {
     await mkdir(dir);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    if (!taken(error)) throw error;
     if (!(await stale(dir))) return "held";
     if (!(await removeDir(dir))) return "unremovable";
-    await mkdir(dir);
+    // Another claimant can get there between the remove and this, so it reads as held.
+    const made = await mkdir(dir).then(
+      () => true,
+      (again: unknown) => {
+        if (taken(again)) return false;
+        throw again;
+      },
+    );
+    if (!made) return "held";
   }
   // Ours from the moment it exists, so an interrupt before the metadata lands still hands it back.
   held.set(dir, holder.id);

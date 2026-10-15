@@ -26,23 +26,27 @@ test.beforeEach(async ({ tmp }) => {
 });
 
 describe("authored", () => {
-  test("leaves VCS and OS litter out, and names every symlink and special file", async () => {
-    const skill = join(root, "skill");
-    await mkdir(join(skill, ".git"), { recursive: true });
-    await writeFile(join(skill, "SKILL.md"), "body");
-    await writeFile(join(skill, ".DS_Store"), "x");
-    await writeFile(join(skill, ".git", "config"), "x");
-    await writeFile(join(root, "secret"), "x");
-    await symlink(join(root, "secret"), join(skill, "leak.txt"));
-    await promisify(execFile)("mkfifo", [join(skill, "pipe")]);
+  // mkfifo is POSIX; Windows has no named pipe in a folder.
+  test.skipIf(process.platform === "win32")(
+    "leaves VCS and OS litter out, and names every symlink and special file",
+    async () => {
+      const skill = join(root, "skill");
+      await mkdir(join(skill, ".git"), { recursive: true });
+      await writeFile(join(skill, "SKILL.md"), "body");
+      await writeFile(join(skill, ".DS_Store"), "x");
+      await writeFile(join(skill, ".git", "config"), "x");
+      await writeFile(join(root, "secret"), "x");
+      await symlink(join(root, "secret"), join(skill, "leak.txt"));
+      await promisify(execFile)("mkfifo", [join(skill, "pipe")]);
 
-    const found = await authored(skill);
-    expect(found.files.map((file) => file.path)).toEqual(["SKILL.md"]);
-    expect(found.irregular).toEqual([
-      { path: "leak.txt", reason: "is a symlink" },
-      { path: "pipe", reason: "is not a regular file" },
-    ]);
-  });
+      const found = await authored(skill);
+      expect(found.files.map((file) => file.path)).toEqual(["SKILL.md"]);
+      expect(found.irregular).toEqual([
+        { path: "leak.txt", reason: "is a symlink" },
+        { path: "pipe", reason: "is not a regular file" },
+      ]);
+    },
+  );
 
   test("leaves dependency folders out, and names every file that may hold credentials", async () => {
     const skill = join(root, "skill");
@@ -120,7 +124,9 @@ describe("copyAuthored", () => {
 
     expect(await copyAuthored(skill, join(root, "copy"))).toBeUndefined();
     expect((await readdir(join(root, "copy"))).sort()).toEqual(["SKILL.md", "scripts"]);
-    expect((await stat(join(root, "copy", "scripts", "run.sh"))).mode & 0o111).not.toBe(0);
+    if (process.platform !== "win32") {
+      expect((await stat(join(root, "copy", "scripts", "run.sh"))).mode & 0o111).not.toBe(0);
+    }
   });
 
   test("refuses a link inside the folder and copies nothing", async () => {

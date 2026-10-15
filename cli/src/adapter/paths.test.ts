@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { collidingPaths, expandHome, isSafePath } from "./paths.ts";
 
@@ -62,8 +63,12 @@ describe("collidingPaths", () => {
 describe("expandHome", () => {
   test("expands ~, and leaves anything else alone", () => {
     expect(expandHome("~", "/home/u")).toBe("/home/u");
-    expect(expandHome("~/.claude", "/home/u")).toBe("/home/u/.claude");
+    expect(expandHome("~/.claude", "/home/u")).toBe(join("/home/u", ".claude"));
     expect(expandHome("~other/x", "/home/u")).toBe("~other/x");
     expect(expandHome("/opt/tool", "/home/u")).toBe("/opt/tool");
+  });
+
+  test.runIf(process.platform === "win32")("expands ~\\ as Windows people type it", () => {
+    expect(expandHome("~\\work\\skills", "C:\\Users\\u")).toBe("C:\\Users\\u\\work\\skills");
   });
 });

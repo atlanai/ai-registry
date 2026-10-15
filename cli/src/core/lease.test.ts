@@ -7,7 +7,6 @@ import {
   readFile,
   realpath,
   rm,
-  stat,
   symlink,
   utimes,
   writeFile,
@@ -17,6 +16,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { expectMode } from "#test/kit/mode.ts";
 import {
   acquire,
   breakLease,
@@ -102,7 +102,7 @@ describe("acquire", () => {
     const roots = scope(join(home, "manifest.lock.yml"));
     const held = await acquire(roots, { env });
 
-    expect((await stat(leaseMeta(roots.lock))).mode & 0o777).toBe(0o600);
+    await expectMode(leaseMeta(roots.lock), 0o600);
     await held.release();
   });
 });

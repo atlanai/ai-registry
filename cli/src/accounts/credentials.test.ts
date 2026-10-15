@@ -153,37 +153,41 @@ describe("credentials", () => {
     );
   });
 
-  test("reads credentials.json only for a registry that could use a stored sign-in", async () => {
-    await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
-    const file = join(home, "credentials.json");
-    await writeFile(file, "{");
-    await chmod(file, 0o644);
-    const folder = join(home, "registry");
-    await mkdir(folder);
+  // Windows keeps no permission bits to refuse a readable file by.
+  test.skipIf(process.platform === "win32")(
+    "reads credentials.json only for a registry that could use a stored sign-in",
+    async () => {
+      await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
+      const file = join(home, "credentials.json");
+      await writeFile(file, "{");
+      await chmod(file, 0o644);
+      const folder = join(home, "registry");
+      await mkdir(folder);
 
-    // A folder registry, and one that signs in but has no account, never open the file.
-    expect(
-      await credentialsForManifest(
-        { kit: { location: folder, adapter: undefined, config: {} } },
-        home,
-      ),
-    ).toEqual({});
-    expect(await credentialsForManifest(project(SIGNED_IN), home)).toEqual({});
+      // A folder registry, and one that signs in but has no account, never open the file.
+      expect(
+        await credentialsForManifest(
+          { kit: { location: folder, adapter: undefined, config: {} } },
+          home,
+        ),
+      ).toEqual({});
+      expect(await credentialsForManifest(project(SIGNED_IN), home)).toEqual({});
 
-    // One with an account still refuses a file other users can read.
-    await writeConfig(
-      {
-        ...emptyRegistryConfig(),
-        revision: 1,
-        adapters: { dev: ADAPTER },
-        accounts: [{ id: "acc_one", registry: "acme" }],
-      },
-      1,
-    );
-    await expect(credentialsForManifest(project(SIGNED_IN), home)).rejects.toThrow(
-      "can be read by other users",
-    );
-  });
+      // One with an account still refuses a file other users can read.
+      await writeConfig(
+        {
+          ...emptyRegistryConfig(),
+          revision: 1,
+          adapters: { dev: ADAPTER },
+          accounts: [{ id: "acc_one", registry: "acme" }],
+        },
+        1,
+      );
+      await expect(credentialsForManifest(project(SIGNED_IN), home)).rejects.toThrow(
+        "can be read by other users",
+      );
+    },
+  );
 
   test("probes an undeclared address without a sign-in issued for another origin", async () => {
     await declareForUser(home, { acme: SIGNED_IN });

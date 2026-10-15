@@ -1,5 +1,5 @@
 import { readdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -22,7 +22,7 @@ test("keeps the newest two checkouts of a repository", async ({ tmp, git }) => {
   expect(kept.sort()).toEqual(
     taken
       .slice(1)
-      .map((root) => root.split("/").at(-1))
+      .map((root) => basename(root))
       .sort(),
   );
 });

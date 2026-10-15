@@ -12,7 +12,8 @@ function configYaml(id: string, modulePath: string): string {
     "schemaVersion: 1",
     "revision: 0",
     "adapters:",
-    `  ${id}: "${modulePath}"`,
+    // JSON is YAML, and quotes a Windows path's backslashes.
+    `  ${id}: ${JSON.stringify(modulePath)}`,
     "accounts: []",
     "jobs: []",
     "",

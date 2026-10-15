@@ -351,5 +351,7 @@ function shellWord(text: string): string {
 /** Nothing in a registry folder reaches anyone until its own checkout commits and pushes it. */
 export function commitAndPush(subject: string, folder = "."): string {
   const commit = `git add . && git commit -m ${shellWord(subject)} && git push`;
-  return folder === "." ? commit : `cd ${shellWord(folder)} && ${commit}`;
+  // Forward slashes, which every Windows shell also takes, so the line reads the same there.
+  const at = process.platform === "win32" ? folder.replaceAll("\\", "/") : folder;
+  return at === "." ? commit : `cd ${shellWord(at)} && ${commit}`;
 }

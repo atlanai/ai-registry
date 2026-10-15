@@ -111,7 +111,7 @@ describe("applyRegister", () => {
     );
     const config = join(root, "config.toml");
     expect(await readFile(config, "utf8")).toBe(
-      `[sources.acme]\npath = "${join(root, "plugins", "acme")}"\n`,
+      `[sources.acme]\npath = ${JSON.stringify(join(root, "plugins", "acme"))}\n`,
     );
 
     await rm(ops);

@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Lock } from "#core/lock.ts";
 import { LOCK_VERSION } from "#core/lock.ts";
@@ -84,7 +85,7 @@ describe("status", () => {
     });
     expect(status(lock, off, base)[0]).toMatchObject({
       state: "dangling",
-      detail: "claude: links to /elsewhere, not to aireg's copy",
+      detail: `claude: links to ${resolve("/elsewhere")}, not to aireg's copy`,
     });
   });
 

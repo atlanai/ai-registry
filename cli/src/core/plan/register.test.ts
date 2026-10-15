@@ -85,7 +85,7 @@ describe("codex plugins as a local marketplace", () => {
     });
     const text = await readFile(config, "utf8");
     expect(text).toContain(
-      `[marketplaces.acme-prod]\nsource_type = "local"\nsource = "${cache("acme-prod")}"\n`,
+      `[marketplaces.acme-prod]\nsource_type = "local"\nsource = ${JSON.stringify(cache("acme-prod"))}\n`,
     );
     expect(text).toContain('[plugins."sales@acme-prod"]\nenabled = true');
   });

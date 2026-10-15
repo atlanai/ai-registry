@@ -76,25 +76,32 @@ describe("doctor", () => {
     for (const harness of Object.keys(resolveHarnesses())) expect(names).not.toContain(harness);
   });
 
-  test("checks that credentials.json is owner-only without reading it", async () => {
-    const row = async () => {
-      const writes: string[] = [];
-      await run(context(cwd, writes));
-      const payload = JSON.parse(writes.join("")) as {
-        data: { checks: { name: string; ok: boolean; detail: string }[] };
+  // Windows keeps no POSIX permission bits for the owner-only check to read.
+  test.skipIf(process.platform === "win32")(
+    "checks that credentials.json is owner-only without reading it",
+    async () => {
+      const row = async () => {
+        const writes: string[] = [];
+        await run(context(cwd, writes));
+        const payload = JSON.parse(writes.join("")) as {
+          data: { checks: { name: string; ok: boolean; detail: string }[] };
+        };
+        return payload.data.checks.find((check) => check.name === "credentials");
       };
-      return payload.data.checks.find((check) => check.name === "credentials");
-    };
-    expect(await row()).toMatchObject({ ok: true, detail: "none stored" });
+      expect(await row()).toMatchObject({ ok: true, detail: "none stored" });
 
-    const file = join(cwd, "home", "credentials.json");
-    await mkdir(join(cwd, "home"), { recursive: true });
-    await writeFile(file, "not read");
-    await chmod(file, 0o600);
-    expect(await row()).toMatchObject({ ok: true, detail: expect.stringContaining("owner only") });
-    await chmod(file, 0o644);
-    expect(await row()).toMatchObject({ ok: false, fix: expect.stringContaining("chmod 600") });
-  });
+      const file = join(cwd, "home", "credentials.json");
+      await mkdir(join(cwd, "home"), { recursive: true });
+      await writeFile(file, "not read");
+      await chmod(file, 0o600);
+      expect(await row()).toMatchObject({
+        ok: true,
+        detail: expect.stringContaining("owner only"),
+      });
+      await chmod(file, 0o644);
+      expect(await row()).toMatchObject({ ok: false, fix: expect.stringContaining("chmod 600") });
+    },
+  );
 
   test.skipIf(process.platform === "win32")(
     "flags a credentials file every command would refuse",

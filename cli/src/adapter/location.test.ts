@@ -8,6 +8,7 @@ describe("registryNameFromLocation", () => {
     );
     expect(registryNameFromLocation("git@example.com:acme/kit.git", "git")).toBe("kit");
     expect(registryNameFromLocation("/src/Kit/", "local")).toBe("kit");
+    expect(registryNameFromLocation("C:\\work\\Acme-Registry\\", "local")).toBe("acme-registry");
   });
 
   it("falls back to the adapter when a bare origin has no path", () => {

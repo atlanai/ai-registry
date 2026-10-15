@@ -1,5 +1,5 @@
 import { isLocalPath } from "./paths.ts";
-import { sanitizeName, stripTrailing } from "./text.ts";
+import { sanitizeName } from "./text.ts";
 
 // How a registry's address reads to a person: its host, and the name it suggests.
 
@@ -26,9 +26,11 @@ export function registryNameFromLocation(location: string, fallback: string): st
   } catch {
     // Not a URL, so the whole address is the path.
   }
-  const last = stripTrailing(path, "/")
+  // A Windows folder path separates with backslashes.
+  const last = path
+    .replace(/[/\\]+$/, "")
     .replace(/\.git$/, "")
-    .split(/[/:]/)
+    .split(/[/\\:]/)
     .at(-1)
     ?.split("@")[0];
   return last === undefined || last === "" ? fallback : sanitizeName(last);

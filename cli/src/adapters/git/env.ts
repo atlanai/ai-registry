@@ -48,8 +48,15 @@ export function gitEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   });
 }
 
-/** Disable LFS filters even when git-lfs is not installed. */
-export const LFS_CONFIG: readonly string[] = [
+/**
+ * Files land as committed, so they match the digests the registry states: no LFS filters, even
+ * without git-lfs, and no line-ending conversion, which Git for Windows turns on by default.
+ */
+export const CHECKOUT_CONFIG: readonly string[] = [
+  "-c",
+  "core.autocrlf=false",
+  "-c",
+  "core.eol=lf",
   "-c",
   "filter.lfs.required=false",
   "-c",

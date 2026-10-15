@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { withLease } from "#core/lease.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { expectMode } from "#test/kit/mode.ts";
 import {
   CredentialStoreError,
   deleteCredential,
@@ -28,10 +29,6 @@ const API_KEY: StoredCredential = {
   credential: { type: "apiKey", header: "Authorization", value: "synthetic-key" },
 };
 
-async function mode(path: string): Promise<number> {
-  return (await stat(path)).mode & 0o777;
-}
-
 describe("credentials.json", () => {
   let root: string;
   let home: string;
@@ -55,8 +52,8 @@ describe("credentials.json", () => {
   test("writes one plain record per account, bound to its origin, owner-only", async () => {
     await saveCredential("acc_one", BEARER, env);
     await saveCredential("acc_two", API_KEY, env);
-    expect(await mode(home)).toBe(0o700);
-    expect(await mode(file)).toBe(0o600);
+    await expectMode(home, 0o700);
+    await expectMode(file, 0o600);
     expect(JSON.parse(await readFile(file, "utf8"))).toEqual({
       version: 1,
       credentials: {
@@ -108,7 +105,7 @@ describe("credentials.json", () => {
       await expect(saveCredential("acc_two", API_KEY, env)).rejects.toBeInstanceOf(
         CredentialStoreError,
       );
-      expect(await mode(file)).toBe(0o644);
+      await expectMode(file, 0o644);
     },
   );
 
@@ -143,7 +140,7 @@ describe("credentials.json", () => {
       try {
         const roots = { scope: "user" as const, lock: join(root, "manifest.lock.yml") };
         await withLease(roots, { env }, async () => {});
-        expect(await mode(home)).toBe(0o700);
+        await expectMode(home, 0o700);
         await saveCredential("acc_one", BEARER, env);
         await expect(readCredential("acc_one", env)).resolves.toEqual(BEARER);
       } finally {
@@ -174,7 +171,7 @@ describe("credentials.json", () => {
     await expect(deleteCredential("acc_one", env)).resolves.toBe(false);
     await expect(readCredential("acc_one", env)).resolves.toBeUndefined();
     await expect(readCredential("acc_two", env)).resolves.toEqual(API_KEY);
-    expect(await mode(file)).toBe(0o600);
+    await expectMode(file, 0o600);
   });
 
   test("refuses a malformed file without quoting it, and never overwrites it", async () => {

@@ -1,5 +1,5 @@
 import { mkdir, rm, symlink } from "node:fs/promises";
-import { basename, join, relative } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 import { assertUnredirected } from "#adapter/files.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { exists } from "#core/fs/tree.ts";
@@ -15,10 +15,14 @@ const ALIASES: Readonly<Record<string, readonly string[]>> = {
   commands: ["prompts"],
 };
 
-/** Relative, so moving the whole artifacts tree does not strand a projection. */
+/**
+ * Relative, so moving the artifacts tree does not strand a projection. On Windows a junction:
+ * a symlink needs Developer Mode, and a relative one inside a junction resolves the wrong way.
+ */
 async function pointAt(from: string, to: string): Promise<void> {
   await rm(from, { recursive: true, force: true });
-  await symlink(relative(join(from, ".."), to), from);
+  if (process.platform === "win32") await symlink(resolve(to), from, "junction");
+  else await symlink(relative(join(from, ".."), to), from);
 }
 
 /** What every harness's plugin manifest says, before any keys of its own. */

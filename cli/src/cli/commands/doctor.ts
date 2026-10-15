@@ -1,5 +1,5 @@
 import type { Stats } from "node:fs";
-import { lstat, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { advertisedCapabilities } from "#adapter/contract.ts";
@@ -36,6 +36,12 @@ interface Check {
 async function canLink(): Promise<Check> {
   const dir = await mkdtemp(join(tmpdir(), `${NAME}-doctor-`));
   try {
+    // Windows links folders with junctions, which need no Developer Mode, and copies files.
+    if (process.platform === "win32") {
+      await mkdir(join(dir, "a"));
+      await symlink(join(dir, "a"), join(dir, "b"), "junction");
+      return { name: "symlinks", ok: true, detail: "junctions supported" };
+    }
     await writeFile(join(dir, "a"), "");
     await symlink(join(dir, "a"), join(dir, "b"));
     return { name: "symlinks", ok: true, detail: "supported" };

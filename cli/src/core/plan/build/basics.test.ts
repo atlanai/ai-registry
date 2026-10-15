@@ -1,5 +1,5 @@
 import { mkdir, symlink } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { describe, expect } from "vitest";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import { emptyLock } from "#core/lock.ts";
@@ -43,7 +43,7 @@ describe("build", () => {
     const unlinked = plan.actions.flatMap((action) =>
       action.kind === "unlink" ? [relative("/work", action.to)] : [],
     );
-    expect(unlinked).toEqual([".claude/skills/lint"]);
+    expect(unlinked).toEqual([join(".claude", "skills", "lint")]);
     const record = plan.actions.find((action) => action.kind === "record");
     expect(record?.kind === "record" && record.lock.artifacts.lint).toMatchObject({
       origin,
@@ -452,7 +452,7 @@ describe("build", () => {
         PLAN_OPTIONS,
       );
       expect(unlinked(plan)).toEqual([
-        "/work/.claude/skills/lint",
+        resolve("/work/.claude/skills/lint"),
         artifactPath(PLAN_OPTIONS.roots, "kit", undefined, "skill", "lint", "skills/lint"),
       ]);
       expect(plan.warnings.filter((w) => /Did not remove/.test(w.message))).toHaveLength(
@@ -472,35 +472,39 @@ describe("build", () => {
     });
 
     // The checks above are on the path alone; these folders are links on disk.
-    test("never unlinks through a harness folder that is a symlink", async ({ tmp }) => {
-      const dir = tmp;
-      const project = join(dir, "proj");
-      await mkdir(join(project, ".claude"), { recursive: true });
-      await mkdir(join(project, ".cursor"), { recursive: true });
-      await mkdir(join(dir, "victim"));
-      await symlink("../..", join(project, ".claude", "skills"));
-      // Cursor is not a target, so nothing this run writes goes there.
-      await symlink("/", join(project, ".cursor", "skills"));
-      const options = { ...PLAN_OPTIONS, roots: roots("project", project) };
-      const plan = build(
-        { ...kitManifest(), artifacts: [] },
-        hostile([
-          "../victim",
-          ".claude/skills/victim",
-          join(".cursor", "skills", relative("/", join(dir, "victim"))),
-          join(dir, "victim"),
-        ]),
-        acquired([entry()]),
-        { artifacts: {} },
-        options,
-      );
-      expect(unlinked(plan)).toEqual([
-        artifactPath(options.roots, "kit", undefined, "skill", "lint", "skills/lint"),
-      ]);
-      const refused = plan.warnings.filter((w) => /Did not remove/.test(w.message));
-      expect(refused).toHaveLength(4);
-      expect(refused.filter((w) => /is a symlink/.test(w.message))).toHaveLength(2);
-    });
+    // Links to "../.." and "/" are POSIX fixtures.
+    test.skipIf(process.platform === "win32")(
+      "never unlinks through a harness folder that is a symlink",
+      async ({ tmp }) => {
+        const dir = tmp;
+        const project = join(dir, "proj");
+        await mkdir(join(project, ".claude"), { recursive: true });
+        await mkdir(join(project, ".cursor"), { recursive: true });
+        await mkdir(join(dir, "victim"));
+        await symlink("../..", join(project, ".claude", "skills"));
+        // Cursor is not a target, so nothing this run writes goes there.
+        await symlink("/", join(project, ".cursor", "skills"));
+        const options = { ...PLAN_OPTIONS, roots: roots("project", project) };
+        const plan = build(
+          { ...kitManifest(), artifacts: [] },
+          hostile([
+            "../victim",
+            ".claude/skills/victim",
+            join(".cursor", "skills", relative("/", join(dir, "victim"))),
+            join(dir, "victim"),
+          ]),
+          acquired([entry()]),
+          { artifacts: {} },
+          options,
+        );
+        expect(unlinked(plan)).toEqual([
+          artifactPath(options.roots, "kit", undefined, "skill", "lint", "skills/lint"),
+        ]);
+        const refused = plan.warnings.filter((w) => /Did not remove/.test(w.message));
+        expect(refused).toHaveLength(4);
+        expect(refused.filter((w) => /is a symlink/.test(w.message))).toHaveLength(2);
+      },
+    );
 
     test("never writes a link through a harness folder that is a symlink", async ({ tmp }) => {
       const dir = tmp;

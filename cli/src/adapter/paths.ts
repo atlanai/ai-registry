@@ -74,10 +74,11 @@ export function isLocalPath(input: string): boolean {
   return input.startsWith(".") || input.startsWith("~") || isAbsolute(input);
 }
 
-/** `~` and `~/…` as a person types them, against their home; anything else as written. */
+/** `~`, `~/…` and on Windows `~\…`, against the person's home; anything else as written. */
 export function expandHome(path: string, home = homedir()): string {
   if (path === "~") return home;
-  return path.startsWith("~/") ? join(home, path.slice(2)) : path;
+  const typed = path.startsWith("~/") || (sep === "\\" && path.startsWith("~\\"));
+  return typed ? join(home, path.slice(2)) : path;
 }
 
 /**

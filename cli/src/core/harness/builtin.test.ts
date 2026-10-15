@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
 import { pluginProjection, resolveHarnesses, takesPlugin } from "./index.ts";
@@ -21,7 +22,7 @@ describe("codex", () => {
     expect(takesPlugin(codex)).toBe(true);
     expect(codex.kinds.plugin?.place).toBe("fan");
     expect(pluginProjection(codex, "sales", "user", "/tmp/proj", env, "acme-prod")).toBe(
-      "/tmp/home/.codex/plugins/cache/acme-prod/sales/local",
+      resolve("/tmp/home/.codex/plugins/cache/acme-prod/sales/local"),
     );
     // Plugins are read from the user installation alone.
     expect(takesPlugin(codex, "project")).toBe(false);

@@ -38,27 +38,31 @@ describe("peel", () => {
 });
 
 describe("resolveRef", () => {
-  test("stops ls-remote at the limit the host sets, and names how to raise it", async ({ tmp }) => {
-    const hung = join(tmp, "git");
-    await writeFile(hung, "#!/bin/sh\nsleep 5\n");
-    await chmod(hung, 0o755);
-    vi.stubEnv("PATH", `${tmp}${delimiter}${process.env.PATH ?? ""}`);
-    try {
-      const spec: SourceSpec = {
-        location: tmp,
-        kind: "path",
-        ref: undefined,
-        alias: "x",
-        slug: undefined,
-        host: undefined,
-      };
-      const limits = { timeoutMs: 100, timeoutSetting: "AIREG_GIT_TIMEOUT_MS" };
-      await expect(resolveRef(spec, undefined, limits)).rejects.toMatchObject({
-        message: expect.stringMatching(/timed out/),
-        hint: expect.stringContaining("AIREG_GIT_TIMEOUT_MS"),
-      });
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
+  // The stand-in git is a shell script, which Windows does not run.
+  test.skipIf(process.platform === "win32")(
+    "stops ls-remote at the limit the host sets, and names how to raise it",
+    async ({ tmp }) => {
+      const hung = join(tmp, "git");
+      await writeFile(hung, "#!/bin/sh\nsleep 5\n");
+      await chmod(hung, 0o755);
+      vi.stubEnv("PATH", `${tmp}${delimiter}${process.env.PATH ?? ""}`);
+      try {
+        const spec: SourceSpec = {
+          location: tmp,
+          kind: "path",
+          ref: undefined,
+          alias: "x",
+          slug: undefined,
+          host: undefined,
+        };
+        const limits = { timeoutMs: 100, timeoutSetting: "AIREG_GIT_TIMEOUT_MS" };
+        await expect(resolveRef(spec, undefined, limits)).rejects.toMatchObject({
+          message: expect.stringMatching(/timed out/),
+          hint: expect.stringContaining("AIREG_GIT_TIMEOUT_MS"),
+        });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
 });

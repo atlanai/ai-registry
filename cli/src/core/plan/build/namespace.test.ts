@@ -1,3 +1,4 @@
+import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { emptyLock } from "#core/lock.ts";
 import { build } from "#core/plan/build.ts";
@@ -68,8 +69,8 @@ describe("a namespaced skill, projected", () => {
 
     const codex = links.filter((link) => link.harness === "codex");
     expect(codex.map((link) => link.from).sort()).toEqual(froms);
-    expect(codex.map((link) => link.to.split("/").at(-2)).sort()).toEqual(["engineering", "sales"]);
-    expect(codex.every((link) => link.to.endsWith("/local") && link.fan === true)).toBe(true);
+    expect(codex.map((link) => link.to.split(sep).at(-2)).sort()).toEqual(["engineering", "sales"]);
+    expect(codex.every((link) => link.to.endsWith(`${sep}local`) && link.fan === true)).toBe(true);
     // Codex has the namespace as a plugin, so it needs no flat copy as well.
     expect(links.some((link) => link.harness === "agents")).toBe(false);
   });
@@ -78,10 +79,12 @@ describe("a namespaced skill, projected", () => {
   it("places a skill as itself at user scope, where Claude and Codex read it", () => {
     const at = { ...OPTIONS, roots: roots("user", "/work") };
     const links = linksOf(planned(ENTRIES.slice(0, 1), at).actions);
-    expect(links.map((link) => [link.harness, link.to.split("/").slice(-3).join("/")])).toEqual([
-      ["agents", ".agents/skills/lint"],
-      ["claude", ".claude/skills/lint"],
-    ]);
+    expect(links.map((link) => [link.harness, link.to.split(/[\\/]/).slice(-3).join("/")])).toEqual(
+      [
+        ["agents", ".agents/skills/lint"],
+        ["claude", ".claude/skills/lint"],
+      ],
+    );
     expect(links.every((link) => link.plugin === false && link.fan === undefined)).toBe(true);
     expect(links.some((link) => link.from.includes(".projections"))).toBe(false);
   });
@@ -100,7 +103,7 @@ describe("a namespaced skill, projected", () => {
   it("keeps a project's Codex skills flat, where Codex reads them", () => {
     const links = linksOf(planned(ENTRIES.slice(0, 1)).actions);
     const flat = links.filter((link) => link.harness === "agents");
-    expect(flat.map((link) => link.to)).toEqual(["/work/.agents/skills/lint"]);
+    expect(flat.map((link) => link.to)).toEqual([join("/work", ".agents", "skills", "lint")]);
     expect(links.some((link) => link.fan === true)).toBe(false);
   });
 
@@ -109,9 +112,9 @@ describe("a namespaced skill, projected", () => {
     const flat = linksOf(planned(ENTRIES.slice(0, 1), at, true).actions).filter(
       (link) => link.harness !== "claude",
     );
-    expect(flat.map((link) => [link.harness, link.to.endsWith("/.agents/skills/lint")])).toEqual([
-      ["agents", true],
-    ]);
+    expect(
+      flat.map((link) => [link.harness, link.to.endsWith(join("/.agents", "skills", "lint"))]),
+    ).toEqual([["agents", true]]);
   });
 
   it("lets Cursor read Claude's folder when it holds the skill as itself", () => {

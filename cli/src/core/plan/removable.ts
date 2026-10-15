@@ -4,7 +4,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { redirection } from "#adapter/files.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
-import { isMissing, isStrictlyWithin } from "#core/fs/path.ts";
+import { isMissing, isStrictlyWithin, posixRelative } from "#core/fs/path.ts";
 import { present, remove } from "#core/fs/tree.ts";
 import { resolveHarnesses, targetRoot } from "#core/harness/index.ts";
 import { fixedPrefix } from "#core/harness/template.ts";
@@ -53,8 +53,9 @@ function ownLink(target: string, roots: RemovableRoots): boolean {
 }
 
 /** Relative to the folder it was found under, which is how a person knows it. */
+/** Spelled as the lock spells the path it is said beside, with forward slashes. */
 function shown(anchor: string, at: string): string {
-  return isStrictlyWithin(anchor, at) ? relative(anchor, at) : at;
+  return isStrictlyWithin(anchor, at) ? posixRelative(anchor, at) : at;
 }
 
 /**

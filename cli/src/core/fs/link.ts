@@ -101,8 +101,10 @@ export async function fanOut(source: string, dir: string): Promise<LinkMode> {
   return "fanout";
 }
 
+/** Compared resolved, since a Windows junction names its target in full. */
 async function linksTo(path: string, target: string): Promise<boolean> {
-  return (await readlink(path).catch(() => undefined)) === target;
+  const raw = await readlink(path).catch(() => undefined);
+  return raw !== undefined && resolve(dirname(path), raw) === resolve(dirname(path), target);
 }
 
 /** A copied manifest file that already holds the source's bytes; a manifest folder is always copied again. */

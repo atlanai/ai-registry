@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect } from "vitest";
 import { sanitizeName } from "#adapter/text.ts";
 import { test } from "#test/kit/fixtures.ts";
@@ -47,7 +47,7 @@ describe("toolHome", () => {
 
   test("takes AIREG_HOME, and never AIREG_USER_SCOPE, which names the user scope", ({ home }) => {
     const user = home.dir;
-    expect(toolHome({ AIREG_HOME: "/a", AIREG_USER_SCOPE: "/b" })).toBe("/a");
+    expect(toolHome({ AIREG_HOME: "/a", AIREG_USER_SCOPE: "/b" })).toBe(resolve("/a"));
     expect(toolHome({ AIREG_USER_SCOPE: "/b" })).toBe(join(user, ".aireg"));
   });
 });

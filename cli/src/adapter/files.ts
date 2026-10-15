@@ -219,6 +219,36 @@ async function syncDirectory(path: string): Promise<void> {
   }
 }
 
+/** Long enough for a reader or a virus scan to let go; a held lease is refused well before. */
+const REPLACE_RETRY_MS = 5_000;
+const HELD = new Set(["EPERM", "EACCES", "EBUSY"]);
+
+/**
+ * Windows refuses to replace a file another process has open, as the daemon reading a
+ * manifest or a virus scan of a fresh write briefly does; elsewhere the rename is atomic.
+ */
+export async function replaceFile(
+  temp: string,
+  target: string,
+  before: (() => Promise<void>) | undefined,
+  move: (from: string, to: string) => Promise<void> = rename,
+  platform: NodeJS.Platform = process.platform,
+  retryMs = REPLACE_RETRY_MS,
+): Promise<void> {
+  const deadline = Date.now() + retryMs;
+  for (let wait = 10; ; wait = Math.min(wait * 2, 100)) {
+    await before?.();
+    try {
+      await move(temp, target);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? "";
+      if (platform !== "win32" || !HELD.has(code) || Date.now() >= deadline) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+}
+
 /**
  * A killed process leaves the old file or the new one, never half of either: the
  * scratch sibling keeps the rename on one filesystem, and `mode` precedes it.
@@ -230,7 +260,7 @@ export async function writeAtomic(
     mode?: number;
     /** False skips the syncs, for files a caller can simply write again after a crash. */
     durable?: boolean;
-    /** Runs just before the rename lands the file; a throw leaves the old one. */
+    /** Runs before each attempt to land the file; a throw leaves the old one. */
     beforeRename?: () => Promise<void>;
   } = {},
 ): Promise<void> {
@@ -252,8 +282,7 @@ export async function writeAtomic(
   await file.close();
 
   try {
-    await options.beforeRename?.();
-    await rename(temp, target);
+    await replaceFile(temp, target, options.beforeRename);
     if (durable) await syncDirectory(parent);
   } catch (error) {
     await rm(temp, { force: true }).catch(() => {});

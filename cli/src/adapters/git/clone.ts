@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { gitEnv, LFS_CONFIG, transportEnv } from "./env.ts";
+import { CHECKOUT_CONFIG, gitEnv, transportEnv } from "./env.ts";
 import { GitError, type GitLimits, gh, git } from "./exec.ts";
 import { SHA } from "./resolve.ts";
 import { type Attempt, attempts, describeFailure } from "./transport.ts";
@@ -18,10 +18,22 @@ async function cloneShallow(
 ): Promise<void> {
   const branch = ref === undefined ? [] : ["--branch", ref];
   const run = (depth: readonly string[]) =>
-    git([...LFS_CONFIG, "clone", ...depth, "--no-tags", ...branch, "--end-of-options", url, dest], {
-      ...limits,
-      env: transportEnv(url),
-    });
+    git(
+      [
+        ...CHECKOUT_CONFIG,
+        "clone",
+        ...depth,
+        "--no-tags",
+        ...branch,
+        "--end-of-options",
+        url,
+        dest,
+      ],
+      {
+        ...limits,
+        env: transportEnv(url),
+      },
+    );
   await run(["--depth", "1"]).catch(async (error: unknown) => {
     if (!cannotShallow(error)) throw error;
     await rm(dest, { recursive: true, force: true });
@@ -36,10 +48,10 @@ async function cloneCommit(
   commit: string,
   limits: GitLimits,
 ): Promise<void> {
-  await git([...LFS_CONFIG, "init", "--quiet", dest], limits);
+  await git([...CHECKOUT_CONFIG, "init", "--quiet", dest], limits);
   await git(["remote", "add", "origin", "--", url], { ...limits, cwd: dest });
   const fetch = (depth: readonly string[]) =>
-    git([...LFS_CONFIG, "fetch", ...depth, "origin", "--end-of-options", commit], {
+    git([...CHECKOUT_CONFIG, "fetch", ...depth, "origin", "--end-of-options", commit], {
       ...limits,
       cwd: dest,
       env: transportEnv(url),
@@ -48,7 +60,7 @@ async function cloneCommit(
     if (!cannotShallow(error)) throw error;
     return fetch([]);
   });
-  await git([...LFS_CONFIG, "checkout", "--quiet", "FETCH_HEAD"], { ...limits, cwd: dest });
+  await git([...CHECKOUT_CONFIG, "checkout", "--quiet", "FETCH_HEAD"], { ...limits, cwd: dest });
 }
 
 async function cloneViaGh(
@@ -58,7 +70,7 @@ async function cloneViaGh(
   limits: GitLimits,
 ): Promise<void> {
   // After `--` these go to git clone, whose -c sets them before the checkout.
-  const flags = [...LFS_CONFIG, "--depth=1", ...(ref === undefined ? [] : ["--branch", ref])];
+  const flags = [...CHECKOUT_CONFIG, "--depth=1", ...(ref === undefined ? [] : ["--branch", ref])];
   const { code, stderr } = await gh(["repo", "clone", slug, dest, "--", ...flags], {
     ...limits,
     // gh runs git, which must keep the same protocol and prompt limits.
