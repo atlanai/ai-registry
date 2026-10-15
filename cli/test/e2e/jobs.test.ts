@@ -368,6 +368,29 @@ describe("a watch job over a namespace your user scope installs", () => {
     }
   }, 120_000);
 
+  test("says when removing a job leaves what it kept up to date without one", async ({
+    aireg,
+    home,
+    tmp,
+  }) => {
+    try {
+      const { job } = await watching({ aireg, home, tmp });
+      const removed = await aireg(["job", "remove", job]);
+      expect(removed.code, removed.stderr).toBe(0);
+      expect(removed.stderr).toContain("no longer kept up to date");
+
+      // The hint, run exactly as printed.
+      const printed = /`aireg (job add -g --registry demo)`/.exec(removed.stderr)?.[1];
+      expect(printed).toBeDefined();
+      expect((await aireg((printed ?? "").split(" "))).code).toBe(0);
+      expect((await jobs(aireg)).map((item) => item.steps.map((step) => step.kind))).toEqual([
+        ["pull", "publish", "prune"],
+      ]);
+    } finally {
+      await aireg(["daemon", "stop"]);
+    }
+  }, 120_000);
+
   test("settles a job's conflict by the short name the hints print", async ({
     aireg,
     home,

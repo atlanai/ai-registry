@@ -3,7 +3,7 @@ import { list as listOf, plural, quoted } from "#adapter/text.ts";
 import { qualify } from "#cli/commands/add.ts";
 import { addContributedJob } from "#cli/commands/job/contributed.ts";
 import type { RunsOptions } from "#cli/commands/job/runs.ts";
-import { scopeName, watchedBy, withoutFolders } from "#cli/commands/job/watch.ts";
+import { scopeName, warnUnkept, watchedBy, withoutFolders } from "#cli/commands/job/watch.ts";
 import { parse } from "#cli/options.ts";
 import { cannotPublish } from "#cli/publish/target.ts";
 import { underHome } from "#cli/render/home.ts";
@@ -309,6 +309,7 @@ async function remove(
     context.printer.format === "json"
       ? context.printer.json({ ok: true, data: { jobId: job.id } })
       : context.printer.success(`Removed job ${job.name ?? job.id}.`);
+    await warnUnkept(context, job, await readConfig());
   });
 }
 

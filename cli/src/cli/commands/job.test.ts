@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import { withoutFolders } from "#cli/commands/job/watch.ts";
 import { emptyRegistryConfig, type Job, type StepPolicy } from "#core/config/model.ts";
@@ -13,13 +15,14 @@ vi.mock("#daemon/service.ts", () => daemon);
 
 let home: string;
 
-function context(argv: string[], out: string[] = []): CommandContext {
+function context(argv: string[], out: string[] = [], err: string[] = []): CommandContext {
   return {
     argv,
     cwd: home,
     printer: new Printer({
       format: "json",
       out: { write: (text: string) => out.push(text), isTTY: false },
+      err: { write: (text: string) => err.push(text), isTTY: false },
     }),
     host: {
       version: "test",
@@ -128,6 +131,68 @@ const job = (id: string, steps: Job["steps"], enabled = true): Job => ({
   account: "acc_acme",
   schedule: { every: 900, enabled },
   steps,
+});
+
+describe("removing the job that keeps a project's installs up to date", () => {
+  const installs = "registries:\n  acme: ../acme\nartifacts:\n  - acme/engineering\n";
+  const removed = (root: string, policy: StepPolicy = "on", enabled = true) =>
+    job("job_skills_acme", [step("pull", root, policy)], enabled);
+
+  test.each([
+    ["warns", true, installs, (root: string) => [removed(root)]],
+    [
+      "warns when the only other job there is disabled",
+      true,
+      installs,
+      (root: string) => [removed(root), job("job_other", [step("pull", root)], false)],
+    ],
+    [
+      "says nothing for a disabled job",
+      false,
+      installs,
+      (root: string) => [removed(root, "on", false)],
+    ],
+    [
+      "says nothing for a job that never pulled",
+      false,
+      installs,
+      (root: string) => [removed(root, "off")],
+    ],
+    [
+      "says nothing while another job still pulls there",
+      false,
+      installs,
+      (root: string) => [removed(root), job("job_other", [step("artifacts", root)])],
+    ],
+    [
+      "still succeeds when the manifest cannot be read",
+      false,
+      "artifacts: [oops\n",
+      (root: string) => [removed(root)],
+    ],
+  ])("%s", async (_, warns, manifest, jobs) => {
+    const project = join(home, "project");
+    await mkdir(join(project, ".registry"), { recursive: true });
+    await writeFile(join(project, ".registry", "manifest.yml"), manifest);
+    const [first, ...kept] = jobs(project);
+    const config = {
+      ...emptyRegistryConfig(),
+      accounts: [{ id: "acc_acme", registry: "acme" }],
+      jobs: [first as Job, ...kept],
+    };
+    await writeConfig(config, 0);
+    const client = {
+      request: async (method: string) => {
+        if (method === "state.snapshot") return { config: { ...config, revision: 1 } };
+        await writeConfig({ ...config, jobs: kept }, 1);
+        return {};
+      },
+    };
+    daemon.withDaemon.mockImplementation((work: (client: unknown) => unknown) => work(client));
+    const err: string[] = [];
+    await run(context(["remove", "job_skills_acme"], [], err));
+    expect(err.join("").includes("no longer kept up to date")).toBe(warns);
+  });
 });
 
 describe("a job told to stop watching folders", () => {

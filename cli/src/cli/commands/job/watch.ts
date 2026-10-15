@@ -1,11 +1,13 @@
 import { isAbsolute, resolve } from "node:path";
 import { list as listOf, quoted } from "#adapter/text.ts";
+import type { CommandContext } from "#cli/commands/index.ts";
 import { underHome } from "#cli/render/home.ts";
-import type { Job, Step } from "#core/config/model.ts";
+import { expandSteps, type Job, type RegistryConfig, type Step } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { expandUserPath } from "#core/fs/path.ts";
-import { scopeFor } from "#core/store/paths.ts";
+import { readManifest } from "#core/manifest.ts";
+import { roots, scopeFor } from "#core/store/paths.ts";
 import { FOREGROUND_POLICY } from "#engine/foreground.ts";
 
 /** A folder as the job stores it or a person types it, comparable either way, even once deleted. */
@@ -65,8 +67,57 @@ export function withoutFolders(job: Job, folders: readonly string[], cwd: string
   };
 }
 
+/** The folder a job keeps up to date from its registry: enabled, and pulling there. */
+function pulledInto(job: Job): string | undefined {
+  if (!job.schedule.enabled) return undefined;
+  return expandSteps(job.steps).find(
+    (step) => step.kind === "pull" && step.policy !== "off" && step.root !== undefined,
+  )?.root;
+}
+
 /** The scope a job keeps up to date, as a person reads it. */
 export function scopeName(root: string, cwd: string): string {
   if (scopeFor(root) === "user") return "your user scope";
   return key(cwd) === key(root) ? "this project" : `the project at ${underHome(root)}`;
+}
+
+/** After a job is removed, says when nothing keeps what it kept up to date any more. */
+export async function warnUnkept(
+  context: CommandContext,
+  job: Job,
+  after: RegistryConfig,
+): Promise<void> {
+  const registry = after.accounts.find((account) => account.id === job.account)?.registry;
+  const root = pulledInto(job);
+  if (registry === undefined || root === undefined) return;
+  const still = after.jobs.some((other) => {
+    const at = other.account === job.account ? pulledInto(other) : undefined;
+    return at !== undefined && key(at) === key(root);
+  });
+  if (still) return;
+  const scope = scopeFor(root);
+  let installs: boolean;
+  try {
+    const manifest = await readManifest(roots(scope, root).manifest);
+    installs = manifest.artifacts.some((ref) => ref.registry === registry);
+  } catch {
+    // The job is already removed; a manifest that cannot be read only costs the warning.
+    return;
+  }
+  if (!installs) return;
+  const here = scope === "project" && key(context.cwd) === key(root);
+  context.printer.warning(
+    `Artifacts from ${registry} in ${scopeName(root, context.cwd)} are no longer kept up to date in the background.`,
+  );
+  const again = `aireg job add${scope === "user" ? " -g" : ""} --registry ${registry}`;
+  context.printer.hint(
+    scope === "project" && !here
+      ? `To keep them up to date, run \`${again}\` in ${underHome(root)}.`
+      : `To keep them up to date, run \`${again}\`.`,
+  );
+  if (watchedBy(job).length > 0) {
+    context.printer.hint(
+      "Next time, to stop only watching a folder, run `aireg job remove <job> --watch <folder>`.",
+    );
+  }
 }

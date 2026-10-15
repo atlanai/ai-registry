@@ -68,7 +68,7 @@ Lists every job on this machine: its id, registry, its folder, how often it runs
 
 ## aireg job remove
 
-Removes a job. The artifacts it installed stay installed. For a job that watched folders, aireg forgets the copies it kept of what they hold, in the scope's lockfile and `.registry/artifacts/`, unless another job still watches them; your folders stay as they are, and what the job published stays in the registry. `rm` is the same command.
+Removes a job. The artifacts it installed stay installed, but nothing keeps them up to date in the background any more; aireg warns when that is the case and prints the `aireg job add` that brings it back. For a job that watched folders, aireg forgets the copies it kept of what they hold, in the scope's lockfile and `.registry/artifacts/`, unless another job still watches them; your folders stay as they are, and what the job published stays in the registry. `rm` is the same command.
 
 Since a registry has one job per scope, the job `aireg add -g` starts and the one `job add -g --watch` makes are the same job. To stop watching a folder and keep the rest, name the folder:
 
