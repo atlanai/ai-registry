@@ -35,7 +35,7 @@ function watchedBy(job: Job): string[] {
  * The job without the folders named. With none left it goes back to the job `aireg add`
  * makes: no folder step, and edits made here reported rather than published.
  */
-export function withoutFolders(job: Job, folders: readonly string[], cwd: string): Job {
+function withoutFolders(job: Job, folders: readonly string[], cwd: string): Job {
   const watched = watchedBy(job);
   const keys = new Set(watched.map(key));
   const named = folders.map((folder) =>

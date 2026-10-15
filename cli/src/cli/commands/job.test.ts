@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
-import { withoutFolders } from "#cli/commands/job/remove.ts";
 import { emptyRegistryConfig, type Job, type StepPolicy } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { AiregError } from "#core/errors.ts";
@@ -195,36 +194,51 @@ describe("removing the job that keeps a project's installs up to date", () => {
   });
 });
 
-describe("a job told to stop watching folders", () => {
-  const watching = (folders: string[]) =>
-    job("job_skills_acme", [
+describe("job remove --watch", () => {
+  const unwatching = async (folders: string[], named: string[]) => {
+    const watching = job("job_skills_acme", [
       { ...step("origins"), to: "acme/eng", select: folders.map((from) => ({ from })) },
       step("pull", "/scope", "on", ["origins"]),
       step("publish", "/scope", "on", ["pull"]),
     ]);
-  const shape = (changed: Job) =>
-    changed.steps.map((item) => [item.kind, item.policy, item.needs, item.select.length]);
+    const config = {
+      ...emptyRegistryConfig(),
+      accounts: [{ id: "acc_acme", registry: "acme" }],
+      jobs: [watching],
+    };
+    await writeConfig(config, 0);
+    const sent: { jobs: { upsert: Job[] } }[] = [];
+    const client = {
+      request: async (method: string, params: { jobs: { upsert: Job[] } }) => {
+        if (method === "state.snapshot") return { config: { ...config, revision: 1 } };
+        sent.push(params);
+        return {};
+      },
+    };
+    daemon.withDaemon.mockImplementation((work: (client: unknown) => unknown) => work(client));
+    const flags = named.flatMap((folder) => ["--watch", folder]);
+    await run(context(["remove", "job_skills_acme", ...flags]));
+    const [changed] = sent[0]?.jobs.upsert ?? [];
+    return changed?.steps.map((item) => [item.kind, item.policy, item.needs, item.select.length]);
+  };
 
-  test("keeps the rest of the job while another folder is still watched", () => {
-    const changed = withoutFolders(watching(["/gone/a", "/gone/b"]), ["/gone/a"], "/");
-    expect(shape(changed)).toEqual([
+  test("keeps the rest of the job while another folder is still watched", async () => {
+    expect(await unwatching(["/gone/a", "/gone/b"], ["/gone/a"])).toEqual([
       ["origins", "on", [], 1],
       ["pull", "on", ["origins"], 0],
       ["publish", "on", ["pull"], 0],
     ]);
   });
 
-  test("goes back to the job aireg add makes once none is left, however the folder is typed", () => {
-    const changed = withoutFolders(watching(["/gone/skills"]), ["/gone/skills/"], "/");
-    expect(shape(changed)).toEqual([
+  test("goes back to the job aireg add makes once none is left, however the folder is typed", async () => {
+    expect(await unwatching(["/gone/skills"], ["/gone/skills/"])).toEqual([
       ["pull", "on", [], 0],
       ["publish", "report", ["pull"], 0],
     ]);
   });
 
-  test("refuses a folder it does not watch", () => {
-    expect(() => withoutFolders(watching(["/gone/a"]), ["/elsewhere"], "/")).toThrow(
-      /does not watch/,
-    );
+  test("refuses a folder it does not watch, before the daemon starts", async () => {
+    await expect(unwatching(["/gone/a"], ["/elsewhere"])).rejects.toThrow(/does not watch/);
+    expect(daemon.withDaemon).not.toHaveBeenCalled();
   });
 });
