@@ -134,56 +134,26 @@ const job = (id: string, steps: Job["steps"], enabled = true): Job => ({
 
 describe("removing the job that keeps a project's installs up to date", () => {
   const installs = "registries:\n  acme: ../acme\nartifacts:\n  - acme/engineering\n";
-  const removed = (root: string, policy: StepPolicy = "on", enabled = true) =>
-    job("job_skills_acme", [step("pull", root, policy)], enabled);
 
   test.each([
-    ["warns", true, installs, (root: string) => [removed(root)]],
-    [
-      "warns when the only other job there is disabled",
-      true,
-      installs,
-      (root: string) => [removed(root), job("job_other", [step("pull", root)], false)],
-    ],
-    [
-      "says nothing for a disabled job",
-      false,
-      installs,
-      (root: string) => [removed(root, "on", false)],
-    ],
-    [
-      "says nothing for a job that never pulled",
-      false,
-      installs,
-      (root: string) => [removed(root, "off")],
-    ],
-    [
-      "says nothing while another job still pulls there",
-      false,
-      installs,
-      (root: string) => [removed(root), job("job_other", [step("artifacts", root)])],
-    ],
-    [
-      "still succeeds when the manifest cannot be read",
-      false,
-      "artifacts: [oops\n",
-      (root: string) => [removed(root)],
-    ],
-  ])("%s", async (_, warns, manifest, jobs) => {
+    ["warns", true, installs, "on", true],
+    ["says nothing for a disabled job", false, installs, "on", false],
+    ["says nothing for a job that never pulled", false, installs, "off", true],
+    ["still succeeds when the manifest cannot be read", false, "artifacts: [oops\n", "on", true],
+  ] as const)("%s", async (_, warns, manifest, policy, enabled) => {
     const project = join(home, "project");
     await mkdir(join(project, ".registry"), { recursive: true });
     await writeFile(join(project, ".registry", "manifest.yml"), manifest);
-    const [first, ...kept] = jobs(project);
     const config = {
       ...emptyRegistryConfig(),
       accounts: [{ id: "acc_acme", registry: "acme" }],
-      jobs: [first as Job, ...kept],
+      jobs: [job("job_skills_acme", [step("pull", project, policy)], enabled)],
     };
     await writeConfig(config, 0);
     const client = {
       request: async (method: string) => {
         if (method === "state.snapshot") return { config: { ...config, revision: 1 } };
-        await writeConfig({ ...config, jobs: kept }, 1);
+        await writeConfig({ ...config, jobs: [] }, 1);
         return {};
       },
     };

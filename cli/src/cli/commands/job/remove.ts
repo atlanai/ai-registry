@@ -3,13 +3,7 @@ import { list as listOf, quoted } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/index.ts";
 import { existing, needsJob, noJob } from "#cli/commands/job.ts";
 import { underHome } from "#cli/render/home.ts";
-import {
-  expandSteps,
-  findJob,
-  type Job,
-  type RegistryConfig,
-  type Step,
-} from "#core/config/model.ts";
+import { findJob, type Job, type RegistryConfig, type Step } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
@@ -80,7 +74,7 @@ function withoutFolders(job: Job, folders: readonly string[], cwd: string): Job 
 /** The folder a job keeps up to date from its registry: enabled, and pulling there. */
 function pulledInto(job: Job): string | undefined {
   if (!job.schedule.enabled) return undefined;
-  return expandSteps(job.steps).find(
+  return job.steps.find(
     (step) => step.kind === "pull" && step.policy !== "off" && step.root !== undefined,
   )?.root;
 }
@@ -96,11 +90,6 @@ async function warnUnkept(context: CommandContext, job: Job, after: RegistryConf
   const registry = after.accounts.find((account) => account.id === job.account)?.registry;
   const root = pulledInto(job);
   if (registry === undefined || root === undefined) return;
-  const still = after.jobs.some((other) => {
-    const at = other.account === job.account ? pulledInto(other) : undefined;
-    return at !== undefined && key(at) === key(root);
-  });
-  if (still) return;
   const scope = scopeFor(root);
   let installs: boolean;
   try {
