@@ -59,6 +59,33 @@ describe("aireg status, for what nothing manages", () => {
     expect(course).toMatchObject({ harnesses: ["claude", "cursor"], path: real });
   });
 
+  test("reads Codex's own agent files, and names a link whose target is gone", async ({
+    status,
+    home,
+  }) => {
+    const agents = join(home.dir, ".codex", "agents");
+    await mkdir(agents, { recursive: true });
+    const toml = (name: string) =>
+      `name = "${name}"\ndescription = "Written by hand."\ndeveloper_instructions = "Hi."\n`;
+    await writeFile(join(agents, "triage.toml"), toml("triage"));
+    await writeFile(join(agents, "solo.toml"), toml("solo"));
+    const gone = join(home.dir, ".claude", "agents", "gone.md");
+    await symlink(join(home.dir, "nowhere.md"), gone);
+
+    const { data } = JSON.parse(await status(["--json"]));
+    const harnessesOf = (name: string) =>
+      data.unmanaged.find((item: { name: string }) => item.name === name)?.harnesses;
+    expect(harnessesOf("triage")).toEqual(["claude", "codex"]);
+    expect(harnessesOf("solo")).toEqual(["codex"]);
+    expect(data.dangling).toEqual([
+      { path: gone, target: join(home.dir, "nowhere.md"), harness: "claude" },
+    ]);
+
+    const text = await status([]);
+    expect(text).toContain("1 dangling link");
+    expect(text).toMatch(/~\/\.claude\/agents\/gone\.md\s+Claude Code\s+\S*nowhere\.md/);
+  });
+
   test("answers the same in JSON", async ({ status }) => {
     const { data } = JSON.parse(await status(["--json"]));
     expect(

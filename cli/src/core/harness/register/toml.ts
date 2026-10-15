@@ -265,11 +265,25 @@ function render({ nl, trailing }: Span, lines: readonly string[]): string {
   return rendered === "" ? "" : trailing ? `${rendered}${nl}` : rendered;
 }
 
-/** The keys the table at `at` sets, or undefined when there is no such table. */
+/** The root table's single-line keys: every statement before the first heading. Read only. */
+function readRoot(text: string): Record<string, TomlScalar | null> {
+  checked(text);
+  const out: Record<string, TomlScalar | null> = {};
+  for (const { start, end, heading, entry } of statements(text.split(/\r?\n/))) {
+    if (heading !== undefined) break;
+    const [key, ...dotted] = entry?.keys ?? [];
+    if (entry === undefined || key === undefined || dotted.length > 0) continue;
+    out[key] = end - start === 1 ? parseValue(entry.raw) : null;
+  }
+  return out;
+}
+
+/** The keys the table at `at` sets, or undefined when there is no such table; `[]` is the root. */
 export function readTable(
   text: string,
   at: readonly string[],
 ): Record<string, TomlScalar | null> | undefined {
+  if (at.length === 0) return readRoot(text);
   const { start, entries } = span(text, at);
   if (start < 0) return undefined;
   const out: Record<string, TomlScalar | null> = {};

@@ -45,6 +45,12 @@ describe("TOML tables", () => {
     expect(readTable(text, ["marketplaces", "other"])).toBeUndefined();
   });
 
+  it("reads the root table, the keys before any heading", () => {
+    const text =
+      'name = "critic"\ndescription = "Reviews."\nbody = """\nlong\n"""\n\n[tools]\nx = 1\n';
+    expect(readTable(text, [])).toEqual({ name: "critic", description: "Reviews.", body: null });
+  });
+
   it("escapes a Windows path and reads it back", () => {
     const path = "C:\\Users\\ada\\.codex\\plugins\\cache\\acme-prod";
     const next = setKeys("", MARKETPLACE, { source: path });

@@ -1,5 +1,6 @@
-import { readdir } from "node:fs/promises";
-import { join, posix, resolve } from "node:path";
+import type { Dirent } from "node:fs";
+import { readdir, readlink, stat } from "node:fs/promises";
+import { basename, dirname, join, posix, resolve } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { inspect } from "#core/fs/link.ts";
@@ -112,6 +113,64 @@ async function collectKindCandidates(
   return found;
 }
 
+/** Real paths, so a home or project behind a symlink still matches what the lock says. */
+function claimedPaths(roots: Roots, lock: Lock): Set<string> {
+  const claimed = new Set<string>();
+  for (const entry of Object.values(lock.artifacts)) {
+    for (const link of entry.links ?? []) {
+      const path = resolve(roots.base, link.path);
+      claimed.add(canonical(path));
+      // A link whose target is gone does not resolve, so it is also claimed by its own place.
+      claimed.add(join(canonical(dirname(path)), basename(path)));
+    }
+    // A row authored here has no link - the folder it came from is already
+    // where the harness reads it - so its origin is what marks it as spoken for.
+    if (entry.origin !== undefined) {
+      claimed.add(canonical(resolve(roots.base, entry.origin.path)));
+    }
+  }
+  return claimed;
+}
+
+/**
+ * A report lists everything a harness loads, links of yours and files in its own
+ * format included; adoption reads only what it could publish.
+ */
+interface ScanOptions {
+  report?: boolean;
+}
+
+interface KindDir {
+  target: string;
+  root: string;
+  kind: ArtifactKind;
+  mapping: KindMapping & { subdir: string };
+}
+
+function kindDirs(
+  roots: Roots,
+  harnesses: Harnesses,
+  targets: readonly string[],
+  report: boolean,
+): KindDir[] {
+  const dirs: KindDir[] = [];
+  for (const name of targets) {
+    const target = harnesses[name];
+    if (target === undefined) continue;
+    const root = targetRoot(target, roots.scope, roots.cwd);
+    // `SCANNED_KINDS`, not every kind: a harness may keep plugins and skills in
+    // one folder, so walking both would report every skill twice.
+    for (const kind of SCANNED_KINDS) {
+      const mapping = target.kinds[kind];
+      if (mapping?.subdir === undefined) continue;
+      // A file in the harness's own format cannot be published as it is.
+      if (mapping.render !== undefined && !report) continue;
+      dirs.push({ target: name, root, kind, mapping: mapping as KindDir["mapping"] });
+    }
+  }
+  return dirs;
+}
+
 /**
  * The reverse of projection: anything in a harness directory that is not a link
  * into this scope's own trees, and that the lock does not claim, is local work.
@@ -126,48 +185,18 @@ export async function candidates(
    * publish is not local work; it is an artifact this project has not declared.
    */
   published: ReadonlySet<string> = new Set(),
-  { followLinks = false }: { followLinks?: boolean } = {},
+  { report = false }: ScanOptions = {},
 ): Promise<{ local: Candidate[]; undeclared: Candidate[] }> {
-  // Real paths, so a home or project behind a symlink still matches what the lock says.
-  const claimed = new Set<string>();
-  for (const entry of Object.values(lock.artifacts)) {
-    for (const link of entry.links ?? []) claimed.add(canonical(resolve(roots.base, link.path)));
-    // A row authored here has no link - the folder it came from is already
-    // where the harness reads it - so its origin is what marks it as spoken for.
-    if (entry.origin !== undefined) {
-      claimed.add(canonical(resolve(roots.base, entry.origin.path)));
-    }
-  }
-
+  const claimed = claimedPaths(roots, lock);
   const found = new Map<string, Candidate>();
 
-  for (const name of targets) {
-    const target = harnesses[name];
-    if (target === undefined) continue;
-    const root = targetRoot(target, roots.scope, roots.cwd);
-
-    // `SCANNED_KINDS`, not every kind: a harness may keep plugins and skills in
-    // one folder, so walking both would report every skill twice.
-    for (const kind of SCANNED_KINDS) {
-      const mapping = target.kinds[kind];
-      // A rendered file is aireg's own output, not an artifact to read back.
-      if (mapping?.subdir === undefined || mapping.render !== undefined) continue;
-
-      const items = await collectKindCandidates(
-        roots,
-        root,
-        name,
-        kind,
-        mapping as KindMapping & { subdir: string },
-        claimed,
-        followLinks,
-      );
-      for (const item of items) {
-        const key = `${kind}:${item.name}`;
-        const first = found.get(key);
-        if (first === undefined) found.set(key, item);
-        else first.elsewhere.push({ from: item.from, target: item.target });
-      }
+  for (const { target, root, kind, mapping } of kindDirs(roots, harnesses, targets, report)) {
+    const items = await collectKindCandidates(roots, root, target, kind, mapping, claimed, report);
+    for (const item of items) {
+      const key = `${kind}:${item.name}`;
+      const first = found.get(key);
+      if (first === undefined) found.set(key, item);
+      else first.elsewhere.push({ from: item.from, target: item.target });
     }
   }
 
@@ -178,6 +207,56 @@ export async function candidates(
     local: all.filter((item) => !published.has(`${item.kind}:${item.name}`)),
     undeclared: all.filter((item) => published.has(`${item.kind}:${item.name}`)),
   };
+}
+
+async function reachable(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface DanglingLink {
+  path: string;
+  /** What the link names, as written. */
+  target: string;
+  harness: string;
+}
+
+/** Links of yours in a harness folder whose target is gone: the harness cannot load them. */
+export async function danglingLinks(
+  roots: Roots,
+  harnesses: Harnesses,
+  targets: readonly string[],
+  lock: Lock,
+): Promise<DanglingLink[]> {
+  const claimed = claimedPaths(roots, lock);
+  const store = canonical(roots.artifacts);
+  const seen = new Set<string>();
+  const found: DanglingLink[] = [];
+  for (const { target, root, mapping } of kindDirs(roots, harnesses, targets, true)) {
+    const dir = join(root, mapping.subdir);
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    let items: Dirent[];
+    try {
+      items = await readdir(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const item of items) {
+      if (item.name.startsWith(".") || !item.isSymbolicLink()) continue;
+      const path = join(dir, item.name);
+      // One aireg made is an installed artifact's `missing`, which status already says.
+      if (claimed.has(join(canonical(dir), item.name)) || (await reachable(path))) continue;
+      const points = await readlink(path).catch(() => undefined);
+      if (points === undefined || isWithin(store, resolve(canonical(dir), points))) continue;
+      found.push({ path, target: points, harness: target });
+    }
+  }
+  return found.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 /** Relative and POSIX, for reporting where inside the project it sits. */

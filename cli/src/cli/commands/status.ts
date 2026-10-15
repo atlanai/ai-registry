@@ -1,18 +1,19 @@
 import { lstat } from "node:fs/promises";
 import { relative } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
+import { plural } from "#adapter/text.ts";
 import { noArguments, parse } from "#cli/options.ts";
 import { underHome } from "#cli/render/home.ts";
 import { installed } from "#cli/render/installed.ts";
 import { renderStatus } from "#cli/render/status.ts";
 import { chosenFor, scopeTargets, toolName } from "#cli/render/tools.ts";
 import { ExitCode } from "#core/errors.ts";
-import { names } from "#core/harness/index.ts";
+import { type Harnesses, names } from "#core/harness/index.ts";
 import { type Lock, readLock } from "#core/lock.ts";
 import { status, worstState } from "#core/plan/status.ts";
 import { survey } from "#core/plan/survey.ts";
 import { roots as makeRoots } from "#core/store/paths.ts";
-import { type Candidate, candidates } from "#core/sync/adopt.ts";
+import { type Candidate, candidates, type DanglingLink, danglingLinks } from "#core/sync/adopt.ts";
 import { table } from "#core/term/table.ts";
 import { load } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
@@ -70,6 +71,28 @@ async function unmanaged(item: Candidate): Promise<Unmanaged> {
   };
 }
 
+/** A link of yours whose target is gone, which its harness cannot load. */
+function printDangling(
+  context: CommandContext,
+  roots: { scope: string; base: string },
+  harnesses: Harnesses,
+  dangling: readonly DanglingLink[],
+): void {
+  if (dangling.length === 0) return;
+  context.printer.info();
+  context.printer.info(context.printer.style.bold(plural(dangling.length, "dangling link")));
+  table(
+    context.printer,
+    [
+      { header: "link", value: (item: DanglingLink) => shown(roots, item.path) },
+      { header: "harness", value: (item: DanglingLink) => toolName(harnesses, item.harness) },
+      { header: "missing target", value: (item: DanglingLink) => underHome(item.target) },
+    ],
+    dangling,
+  );
+  context.printer.note("next", "rm <link>, which its harness cannot load");
+}
+
 /**
  * Offline by design: whether upstream moved is `outdated`, a different question.
  * Like `git status` with untracked files, it also names what nothing manages.
@@ -80,10 +103,11 @@ export async function run(context: CommandContext): Promise<void> {
   const { roots, manifest, harnesses, lock } = await load(common, context.cwd, "user");
   const statuses = status(lock, await survey(lock, roots), roots);
   const clashes = await shadowed(roots.scope, context.cwd, lock);
-  // A skill kept once and linked into each harness is loaded by each; naming it adopts nothing.
+  // Everything a harness loads, links and its own formats included; naming it adopts nothing.
   const found = await candidates(roots, harnesses, names(harnesses), lock, new Set(), {
-    followLinks: true,
+    report: true,
   });
+  const dangling = await danglingLinks(roots, harnesses, names(harnesses), lock);
   const loose = await Promise.all(found.local.map(unmanaged));
   const rows = installed(lock, manifest);
 
@@ -96,6 +120,7 @@ export async function run(context: CommandContext): Promise<void> {
         artifacts: statuses.map((item) => ({ ...item, neededBy: neededBy.get(item.name) })),
         shadowed: clashes,
         unmanaged: loose,
+        dangling,
       },
     });
   } else {
@@ -131,6 +156,7 @@ export async function run(context: CommandContext): Promise<void> {
       );
       context.printer.note("next", "aireg publish <path> --to <registry>/<namespace>");
     }
+    printDangling(context, roots, harnesses, dangling);
   }
 
   if (worstState(statuses) !== "ok") context.exit = ExitCode.Changed;

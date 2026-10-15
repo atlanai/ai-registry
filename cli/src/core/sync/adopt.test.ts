@@ -5,7 +5,7 @@ import { resolveHarnesses } from "#core/harness/index.ts";
 import { emptyLock, type Lock } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { candidates, registryPath } from "./adopt.ts";
+import { candidates, danglingLinks, registryPath } from "./adopt.ts";
 
 let root: string;
 let roots: Roots;
@@ -181,16 +181,16 @@ describe("candidates", () => {
   });
 });
 
-describe("candidates, following links", () => {
-  const follow = (targets: string[], lock: Lock = emptyLock()) =>
-    candidates(roots, harnesses, targets, lock, new Set(), { followLinks: true });
+describe("candidates, for a report", () => {
+  const report = (targets: string[], lock: Lock = emptyLock()) =>
+    candidates(roots, harnesses, targets, lock, new Set(), { report: true });
 
   test("finds a person's link to a folder outside the store", async () => {
     const elsewhere = join(root, "dotfiles", "skills", "mine");
     await write(join(elsewhere, "SKILL.md"), skill("mine"));
     await mkdir(join(root, ".claude", "skills"), { recursive: true });
     await symlink(elsewhere, join(root, ".claude", "skills", "mine"));
-    const found = await follow(["claude"]);
+    const found = await report(["claude"]);
     expect(found.local.map((item) => [item.name, item.from])).toEqual([
       ["mine", join(root, ".claude", "skills", "mine")],
     ]);
@@ -203,7 +203,7 @@ describe("candidates, following links", () => {
       await mkdir(join(root, harness, "skills"), { recursive: true });
       await symlink(shared, join(root, harness, "skills", "shared"));
     }
-    const found = await follow(["agents", "claude", "cursor"]);
+    const found = await report(["agents", "claude", "cursor"]);
     expect(found.local.map((item) => item.name)).toEqual(["shared"]);
     expect(found.local[0]?.target).toBe("agents");
     expect(found.local[0]?.elsewhere.map((item) => item.target)).toEqual(["claude", "cursor"]);
@@ -215,7 +215,113 @@ describe("candidates, following links", () => {
     await mkdir(join(root, ".claude", "skills"), { recursive: true });
     await symlink(staged, join(root, ".claude", "skills", "installed"));
     await symlink(join(root, "gone"), join(root, ".claude", "skills", "gone"));
-    const found = await follow(["claude"]);
+    const found = await report(["claude"]);
     expect(found.local).toEqual([]);
+  });
+
+  test("reads an agent in the harness's own format, by the name it declares", async () => {
+    await write(
+      join(root, ".codex", "agents", "file-name.toml"),
+      'name = "critic"\ndescription = "Reviews code."\ndeveloper_instructions = "Be critical."\n',
+    );
+    await write(join(root, ".claude", "agents", "critic.md"), skill("critic"));
+    const found = await report(["claude", "codex"]);
+    expect(found.local.map((item) => [item.kind, item.name, item.target])).toEqual([
+      ["agent", "critic", "claude"],
+    ]);
+    expect(found.local[0]?.elsewhere).toEqual([
+      { from: join(root, ".codex", "agents", "file-name.toml"), target: "codex" },
+    ]);
+  });
+
+  test("leaves out a file aireg rendered, which the lockfile claims", async () => {
+    await write(join(root, ".codex", "agents", "reviewer.toml"), 'name = "reviewer"\n');
+    const lock: Lock = emptyLock();
+    lock.artifacts.reviewer = {
+      registry: "kit",
+      id: "agents/reviewer",
+      name: "reviewer",
+      kind: "agent",
+      namespace: undefined,
+      address: "agents/reviewer",
+      path: "artifacts/reviewer",
+      origin: undefined,
+      content: "",
+      version: undefined,
+      digest: "",
+      links: [{ harness: "codex", path: ".codex/agents/reviewer.toml", mode: "copy" }],
+    };
+    expect((await report(["codex"], lock)).local).toEqual([]);
+  });
+});
+
+describe("danglingLinks", () => {
+  test("names a link of yours whose target is gone, and what it pointed at", async () => {
+    await write(join(root, ".claude", "agents", "live.md"), skill("live"));
+    await symlink(join(root, "nowhere.md"), join(root, ".claude", "agents", "gone.md"));
+    await symlink(
+      join(root, ".claude", "agents", "live.md"),
+      join(root, ".claude", "agents", "ok.md"),
+    );
+    expect(await danglingLinks(roots, harnesses, ["claude"], emptyLock())).toEqual([
+      {
+        path: join(root, ".claude", "agents", "gone.md"),
+        target: join(root, "nowhere.md"),
+        harness: "claude",
+      },
+    ]);
+  });
+
+  test("leaves a link aireg made to status's own report of it", async () => {
+    await mkdir(join(root, ".claude", "skills"), { recursive: true });
+    await symlink(join(roots.artifacts, "gone"), join(root, ".claude", "skills", "lint"));
+    const lock: Lock = emptyLock();
+    lock.artifacts.lint = {
+      registry: "kit",
+      id: "skills/lint",
+      name: "lint",
+      kind: "skill",
+      namespace: undefined,
+      address: "skills/lint",
+      path: "artifacts/lint",
+      origin: undefined,
+      content: "",
+      version: undefined,
+      digest: "",
+      links: [{ harness: "claude", path: ".claude/skills/lint", mode: "symlink" }],
+    };
+    expect(await danglingLinks(roots, harnesses, ["claude"], lock)).toEqual([]);
+  });
+
+  test("knows a link aireg made when the project is reached through a link", async () => {
+    const real = join(root, "real");
+    await mkdir(join(real, ".claude", "skills"), { recursive: true });
+    await symlink(real, join(root, "alias"));
+    const base = join(root, "alias");
+    const through = { ...roots, cwd: base, base, artifacts: join(base, ".registry", "artifacts") };
+    await symlink(join(root, "gone"), join(real, ".claude", "skills", "lint"));
+    const lock: Lock = emptyLock();
+    lock.artifacts.lint = {
+      registry: "kit",
+      id: "skills/lint",
+      name: "lint",
+      kind: "skill",
+      namespace: undefined,
+      address: "skills/lint",
+      path: "artifacts/lint",
+      origin: undefined,
+      content: "",
+      version: undefined,
+      digest: "",
+      links: [{ harness: "claude", path: ".claude/skills/lint", mode: "symlink" }],
+    };
+    expect(await danglingLinks(through, harnesses, ["claude"], lock)).toEqual([]);
+  });
+
+  test("leaves a link into the store that the lock no longer names", async () => {
+    await mkdir(join(root, ".claude", "skills"), { recursive: true });
+    await mkdir(roots.artifacts, { recursive: true });
+    await symlink(join(roots.artifacts, "gone"), join(root, ".claude", "skills", "stale"));
+    expect(await danglingLinks(roots, harnesses, ["claude"], emptyLock())).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import { descriptionText, frontmatter } from "#core/catalog/frontmatter.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { isDirectory } from "#core/fs/tree.ts";
+import { readTable } from "#core/harness/register/toml.ts";
 import type { ArtifactKind, KindSpec } from "#core/kinds.ts";
 
 type KindDir = KindSpec & { kind: ArtifactKind };
@@ -28,6 +29,25 @@ async function describe(
       name: sanitizeName(meta.name ?? fallback),
       description: meta.description === undefined ? undefined : descriptionText(meta.description),
       engine: meta.engine,
+    };
+  } catch {
+    return { name: sanitizeName(fallback), description: undefined, engine: undefined };
+  }
+}
+
+/** A harness's own TOML, such as a Codex agent: its name and description are top-level keys. */
+async function describeToml(
+  file: string,
+  fallback: string,
+): Promise<{ name: string; description: string | undefined; engine: undefined }> {
+  try {
+    const keys = readTable(await readFile(file, "utf8"), []) ?? {};
+    const text = (key: string) => (typeof keys[key] === "string" ? keys[key] : undefined);
+    const description = text("description");
+    return {
+      name: sanitizeName(text("name") ?? fallback),
+      description: description === undefined ? undefined : descriptionText(description),
+      engine: undefined,
     };
   } catch {
     return { name: sanitizeName(fallback), description: undefined, engine: undefined };
@@ -73,7 +93,9 @@ async function fileEntry(
   const { name, description, engine } =
     extension === ".json"
       ? { name: sanitizeName(stem), description: undefined, engine: undefined }
-      : await describe(full, stem);
+      : extension === ".toml"
+        ? await describeToml(full, stem)
+        : await describe(full, stem);
   return {
     name,
     kind: spec.kind,
