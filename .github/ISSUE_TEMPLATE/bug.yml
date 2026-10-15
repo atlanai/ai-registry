@@ -63,12 +63,14 @@ body:
     id: os
     attributes:
       label: Operating system
-      description: aireg runs on macOS and Linux.
+      description: aireg runs on macOS, Linux and Windows.
       options:
         - macOS, Apple silicon
         - macOS, Intel
         - Linux, x86-64
         - Linux, arm64
+        - Windows, x86-64
+        - Windows, arm64
         - Other
         - Not relevant
 

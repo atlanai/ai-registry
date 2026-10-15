@@ -12,7 +12,15 @@ To install the aireg CLI, run the following command:
 curl -fsSL https://aireg.sh/install | sh
 ```
 
-The installer downloads one self-contained binary for macOS or Linux, checks it against a pinned sha256, and installs it under `~/.aireg`. To read the script first, download it with `curl -fsSLO https://aireg.sh/install` and run it with `sh install`. To install a specific release, set `AIREG_VERSION`, as in `curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.0 sh`. Check the installation with `aireg --version`.
+On Windows, run this in PowerShell instead:
+
+```powershell
+irm https://aireg.sh/install.ps1 | iex
+```
+
+The installer downloads one self-contained binary for macOS, Linux or Windows, checks it against a pinned sha256, and installs it under `~/.aireg`. To read the script first, download it with `curl -fsSLO https://aireg.sh/install` and run it with `sh install`, or on Windows download `install.ps1` and run it with `powershell -ExecutionPolicy Bypass -File install.ps1`. To install a specific release, set `AIREG_VERSION`, as in `curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.0 sh`; in PowerShell, set `$env:AIREG_VERSION` before you run the installer. Check the installation with `aireg --version`.
+
+The rest of this guide is written for a POSIX shell. On Windows, run it in Git Bash, or adapt each block to PowerShell.
 
 ## Create your first registry
 

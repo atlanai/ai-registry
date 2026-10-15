@@ -38,6 +38,12 @@ Install the aireg CLI on macOS or Linux:
 curl -fsSL https://aireg.sh/install | sh
 ```
 
+On Windows, run this in PowerShell:
+
+```powershell
+irm https://aireg.sh/install.ps1 | iex
+```
+
 Check the installation with `aireg --version`. To read the install script first, or to install a specific release, see [Install the aireg CLI](https://atlanai.github.io/ai-registry/quickstart/#install-the-aireg-cli). To run aireg from source, see [CONTRIBUTING.md](CONTRIBUTING.md#cli).
 
 Then install the skills and agents from the example registry in this repository into a new project:

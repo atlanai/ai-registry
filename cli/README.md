@@ -11,6 +11,8 @@ aireg registry add github.com/atlanai/ai-registry --path examples/aireg -g
 aireg add ai-registry/aireg -g   # your agents can now set up, install from and publish to registries
 ```
 
+On Windows, install aireg with `irm https://aireg.sh/install.ps1 | iex` in PowerShell.
+
 Try it on the example registry in this repository, in a scratch project so nothing stays in
 your user scope:
 
