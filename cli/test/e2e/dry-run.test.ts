@@ -119,6 +119,7 @@ describe("--dry-run --json", () => {
     expect(await data("registry", "remove", "kit", "--dry-run")).toEqual({
       registry: "kit",
       dryRun: true,
+      jobs: [],
     });
   });
 });

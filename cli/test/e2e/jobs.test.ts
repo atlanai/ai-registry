@@ -93,6 +93,83 @@ describe("background sync jobs", () => {
   }, 60_000);
 });
 
+describe("removing a registry", () => {
+  const jobIds = async (aireg: Aireg, cwd: string) =>
+    (
+      JSON.parse((await aireg(["job", "list", "--json"], { cwd })).stdout) as {
+        data: { jobs: { id: string }[] };
+      }
+    ).data.jobs.map((job) => job.id);
+
+  test("takes the jobs that sync from it into that scope, and no other", async ({
+    aireg,
+    tmp,
+    repo,
+  }) => {
+    const project = join(tmp, "app");
+    await mkdir(project, { recursive: true });
+    try {
+      const user = await aireg(["add", `file://${repo}`, "--as", "kit", "-g"], { cwd: tmp });
+      expect(user.code, user.stderr).toBe(0);
+      await aireg(["init", "--for", "claude"], { cwd: project });
+      const declared = await aireg(["registry", "add", `file://${repo}`, "--as", "kit"], {
+        cwd: project,
+      });
+      expect(declared.code, declared.stderr).toBe(0);
+      expect((await aireg(["job", "add", "--registry", "kit"], { cwd: project })).code).toBe(0);
+      const projectJob = (await jobIds(aireg, tmp)).find((id) => id !== "job_skills_kit");
+
+      const planned = await aireg(["registry", "remove", "kit", "--dry-run"], { cwd: project });
+      expect(planned.stdout).toContain(
+        `Would remove registry kit and its background job ${projectJob}.`,
+      );
+      expect(await jobIds(aireg, tmp)).toHaveLength(2);
+
+      const removed = await aireg(["registry", "remove", "kit", "--json"], { cwd: project });
+      expect(removed.code, removed.stderr).toBe(0);
+      expect(JSON.parse(removed.stdout).data.jobs).toEqual([projectJob]);
+      expect(await jobIds(aireg, tmp)).toEqual(["job_skills_kit"]);
+
+      // Counted by what is installed: the one `kit` entry installs two artifacts.
+      const needed = await aireg(["registry", "remove", "kit", "-g"], { cwd: tmp });
+      expect(needed.code).toBe(1);
+      expect(needed.stderr).toContain("Registry kit still provides 2 installed artifacts.");
+
+      expect((await aireg(["remove", "--all", "-g", "-y"], { cwd: tmp })).code).toBe(0);
+      const gone = await aireg(["registry", "remove", "kit", "-g"], { cwd: tmp });
+      expect(gone.code, gone.stderr).toBe(0);
+      expect(gone.stdout).toContain("Removed registry kit and its background job job_skills_kit.");
+      expect(await jobIds(aireg, tmp)).toEqual([]);
+    } finally {
+      await aireg(["daemon", "stop"], { cwd: tmp });
+    }
+  }, 120_000);
+
+  test("keeps a registry a watch job publishes to", async ({ aireg, home, tmp }) => {
+    const reg = join(tmp, "reg");
+    await registry(reg, { name: "demo", slug: "demo" }).skill("personal/hello@0.1.0").write();
+    const mine = join(home.dir, "mine");
+    await mkdir(join(mine, "notes"), { recursive: true });
+    await writeFile(join(mine, "notes", "SKILL.md"), "---\nname: notes\ndescription: N.\n---\n");
+    try {
+      expect((await aireg(["registry", "add", reg, "-g"])).code).toBe(0);
+      const watch = await aireg(["job", "add", "-g", "--watch", mine, "--to", "demo/personal"]);
+      expect(watch.code, watch.stderr).toBe(0);
+
+      const refused = await aireg(["registry", "remove", "demo", "-g"]);
+      expect(refused.code).toBe(1);
+      expect(refused.stderr).toContain(
+        "Job job_skills_demo uses registry demo to publish your folders.",
+      );
+      expect(refused.stderr).toContain("aireg job remove job_skills_demo");
+      expect(await jobIds(aireg, tmp)).toEqual(["job_skills_demo"]);
+      expect(await readFile(join(home.scope, "manifest.yml"), "utf8")).toContain("demo:");
+    } finally {
+      await aireg(["daemon", "stop"], { cwd: tmp });
+    }
+  }, 60_000);
+});
+
 describe("a job for a registry the project declares by a relative folder", () => {
   test("declares it for your user scope at the same folder", async ({ aireg, home, tmp }) => {
     const work = join(tmp, "work");

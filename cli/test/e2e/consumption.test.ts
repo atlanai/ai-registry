@@ -161,6 +161,10 @@ describe("consuming a registry like a package manager", () => {
   });
 
   test("removes a namespace by its address once none of its artifacts is installed", async () => {
+    // The entry installs nothing, so the refusal names it rather than counting artifacts.
+    const refused = await aireg(["registry", "remove", "acme"]);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("The manifest still takes acme/platform from registry acme.");
     const removed = await aireg(["remove", "acme/platform", "-y"]);
     expect(removed.code, removed.stderr).toBe(0);
     expect(await read(".registry/manifest.yml")).not.toContain("acme/platform");
