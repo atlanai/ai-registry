@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import { emptyRegistryConfig, type Job, type Step } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
@@ -12,6 +12,9 @@ vi.mock("#daemon/service.ts", () => daemon);
 
 let home: string;
 let scope: string;
+
+/** A folder that was watched and is gone now, native to this platform. */
+const gone = (name: string) => join(home, "gone", name);
 
 function context(argv: string[], out: string[] = []): CommandContext {
   return {
@@ -94,7 +97,7 @@ const shape = (job: Job | undefined) =>
 
 describe("watch remove", () => {
   test("keeps the rest of the job while another folder is still watched", async () => {
-    const saved = await watch([watching(["/gone/a", "/gone/b"])], ["remove", "/gone/a", "-g"]);
+    const saved = await watch([watching([gone("a"), gone("b")])], ["remove", gone("a"), "-g"]);
     expect(shape(saved)).toEqual([
       ["origins", "on", [], 1],
       ["pull", "on", ["origins"], 0],
@@ -103,7 +106,10 @@ describe("watch remove", () => {
   });
 
   test("goes back to the job aireg add makes once none is left, however the folder is typed", async () => {
-    const saved = await watch([watching(["/gone/skills"])], ["remove", "/gone/skills/", "-g"]);
+    const saved = await watch(
+      [watching([gone("skills")])],
+      ["remove", `${gone("skills")}${sep}`, "-g"],
+    );
     expect(shape(saved)).toEqual([
       ["pull", "on", [], 0],
       ["publish", "report", ["pull"], 0],
@@ -111,8 +117,8 @@ describe("watch remove", () => {
   });
 
   test("refuses a folder this scope does not publish, before the daemon starts", async () => {
-    await expect(watch([watching(["/gone/a"])], ["remove", "/elsewhere", "-g"])).rejects.toThrow(
-      "/elsewhere is not published from your user scope.",
+    await expect(watch([watching([gone("a")])], ["remove", gone("b"), "-g"])).rejects.toThrow(
+      "is not published from your user scope.",
     );
     expect(daemon.withDaemon).not.toHaveBeenCalled();
   });
@@ -120,7 +126,7 @@ describe("watch remove", () => {
   test("names the scope that does publish a folder", async () => {
     const project = join(home, "app");
     await expect(
-      watch([watching(["/gone/a"], project)], ["remove", "/gone/a", "-g"]),
+      watch([watching([gone("a")], project)], ["remove", gone("a"), "-g"]),
     ).rejects.toMatchObject({ hint: expect.stringContaining("published from the project at") });
   });
 });
@@ -130,14 +136,14 @@ describe("watch list", () => {
     const out: string[] = [];
     const accounts = [{ id: "acc_acme", registry: "acme" }];
     await writeConfig(
-      { ...emptyRegistryConfig(), accounts, jobs: [watching(["/gone/a", "/gone/b"])] },
+      { ...emptyRegistryConfig(), accounts, jobs: [watching([gone("a"), gone("b")])] },
       0,
     );
     await run(context(["list"], out));
     const at = { to: "acme/eng", jobId: "job_skills_acme", scope: "user", root: scope };
     expect(JSON.parse(out.join("")).data.watches).toEqual([
-      { folder: "/gone/a", ...at },
-      { folder: "/gone/b", ...at },
+      { folder: gone("a"), ...at },
+      { folder: gone("b"), ...at },
     ]);
   });
 });
