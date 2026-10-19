@@ -74,7 +74,7 @@ export const codex = defineHarness({
         },
       },
     },
-    // Codex reads an agent only as TOML, and refuses to run a linked one.
+    // Codex reads an agent only as TOML, so each is written in its format.
     agent: {
       shape: "file",
       subdir: "agents",
@@ -86,6 +86,7 @@ export const codex = defineHarness({
       },
     },
   },
+  verified: { command: ["codex", "--version"], range: "0.162.1" },
   // A project's `.codex` folder, agents included, loads only once Codex trusts the project.
   trust: { agent: { run: "codex", scope: "project" } },
 });
