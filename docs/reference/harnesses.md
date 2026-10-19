@@ -32,6 +32,7 @@ Each path is in a project, then in your user scope.
 | Harness | `--for` | Skills | Agents | Moves the user folder |
 |---|---|---|---|---|
 | Claude Code | `claude` | `.claude/skills/<name>/`, `~/.claude/skills/<name>/` | `.claude/agents/<name>.md`, `~/.claude/agents/<name>.md` | `CLAUDE_CONFIG_DIR` |
+| Codex | `codex` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.codex/agents/<name>.toml`, `~/.codex/agents/<name>.toml`, as TOML | `CODEX_HOME` |
 
 ## Harness files
 
