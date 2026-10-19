@@ -57,14 +57,14 @@
     },
     "labels": {
       "type": "object",
-      "description": "Short, indexable key/value pairs. Catalog state: covered by the catalog digest, not the content digest.",
+      "description": "Short, indexable key/value pairs. Part of the version: covered by the content digest and fixed once released.",
       "propertyNames": { "pattern": "^[a-z0-9]([a-z0-9._/-]{0,61}[a-z0-9])?$" },
       "additionalProperties": { "type": "string", "maxLength": 128 },
       "maxProperties": 64
     },
     "annotations": {
       "type": "object",
-      "description": "Free-form key/value pairs that are stored but never indexed. Catalog state, like labels.",
+      "description": "Free-form key/value pairs that are stored but never indexed. Part of the version, like labels.",
       "propertyNames": { "pattern": "^[a-z0-9]([a-z0-9._/-]{0,61}[a-z0-9])?$" },
       "additionalProperties": { "type": "string", "maxLength": 4096 },
       "maxProperties": 64

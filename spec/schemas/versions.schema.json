@@ -27,7 +27,7 @@
           },
           "catalog_digest": {
             "$ref": "common.schema.json#/$defs/digest",
-            "description": "Digest over the content digest plus mutable catalog state, file spec section 4.3. Moves on relabel, status change, or yank."
+            "description": "Digest over the content digest plus mutable catalog state, file spec section 4.3. Moves on a status change or a yank."
           },
           "published_at": { "$ref": "common.schema.json#/$defs/timestamp" },
           "status": { "$ref": "common.schema.json#/$defs/status" },

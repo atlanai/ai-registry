@@ -13,7 +13,7 @@ A server serves the file spec's paths unchanged: `{root}/registry.json`, `{root}
 | Capability | What it means | Why the file spec does not have it |
 |---|---|---|
 | Publish | upload files by digest, then append a version, validating digests and writing `versions.json` and `index.json` | a repository root publishes through a pull request that carries what the indexer wrote, checked by the validator in CI |
-| Catalog state | edit labels, annotations, and relationships after publish; move a version through its lifecycle | a repository root edits `versions.json` through a pull request |
+| Catalog state | move a version through its lifecycle | a repository root edits `versions.json` through a pull request |
 | Search | full-text and vector search over the index with filters and facets | a client searches `index.json` offline |
 | Remotes | federate another root: index, proxy, or mirror it, and map its namespaces into local ones | a client links several roots itself |
 | Governance | gated kinds, scan and evaluation runs, approvals, audit | out of scope for files |

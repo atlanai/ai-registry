@@ -54,7 +54,7 @@ The example at [`examples/acme-registry`](../examples/acme-registry) is a comple
 | `name` | `^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$` | same grammar as namespace |
 | `version` | `^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$` | `latest` is reserved and MUST be rejected as a version |
 
-A version string is required. Semantic versioning SHOULD be used; range resolution by a client is defined only for versions that parse as semver. The digest, not the version string, is the truth about content. Whether semver is required rather than recommended is open.
+A version string is required. Semantic versioning SHOULD be used; range resolution by a client is defined only for versions that parse as semver. A version parses as semver when it is a valid SemVer 2.0.0 version: `1.2.0` and `1.2.0-rc.1` parse; `v1.2.0` and `01.2.0` do not. The digest, not the version string, is the truth about content. Whether semver is required rather than recommended is open.
 
 Path segments are case-sensitive. A registry MUST NOT contain two artifacts whose paths differ only by case.
 
@@ -141,7 +141,20 @@ At `artifacts/<namespace>/<kind>/<name>/versions.json`. Schema: [`schemas/versio
 }
 ```
 
-`latest` MUST name a listed version. When any version is `active` and not yanked, `latest` MUST be the newest of those: by semver precedence where the versions parse as semver, with a release ahead of every prerelease, and with a version that does not parse ranking below every one that does. A version is kept from `latest` by its status, not by pointing `latest` at another version. Entries SHOULD be ordered newest first. `status` is one of `draft`, `pending_review`, `active`, `blocked`, `deprecated`, `archived`; which transitions are legal is a server concern and not defined here.
+`latest` MUST name a listed version. When any version is `active` and not yanked, `latest` MUST be the newest of those: by semver precedence where the versions parse as semver, with a release ahead of every prerelease, and with a version that does not parse ranking below every one that does. When none of them parses, `latest` MUST be the first of them in `versions[]` order. A version is kept from `latest` by its status, not by pointing `latest` at another version. Entries SHOULD be ordered newest first.
+
+`status` is one of the values below; which transitions are legal is a server concern and not defined here. A request pins a version when it names that exact version, or the digest a lockfile records for it; any other request is unpinned.
+
+| Status | Meaning | A client |
+|---|---|---|
+| `draft` | not yet offered for use | MUST NOT resolve it for an unpinned request; MAY install it when pinned |
+| `pending_review` | waiting for review | as for `draft` |
+| `active` | offered for use | installs it |
+| `blocked` | withheld, for example because review rejected it or it is known to be harmful | MUST NOT install it, even when pinned |
+| `deprecated` | offered, but superseded or discouraged | installs it, and SHOULD warn that it is deprecated |
+| `archived` | retired | SHOULD NOT install it unless the request names the artifact |
+
+A client MUST NOT remove an installed copy because its status changed. When an update finds the installed version blocked and no other version to move to, the client SHOULD fail, naming the version and its `reason`, and leave removal to the user.
 
 ### 3.4 `<version>/artifact.json`
 
@@ -155,15 +168,15 @@ The envelope: a fixed header, an open `spec` the kind owns, the files the versio
 | `metadata.display_name` | no | short title, up to 200 characters |
 | `metadata.description` | no | up to 4000 characters |
 | `metadata.status` | no | the status at publish, and informative only; `versions.json` is authoritative. Removed before the content digest is computed, so status moves without breaking a pin |
-| `metadata.labels` | no | short indexable string pairs. Catalog state: covered by the catalog digest, not the content digest |
-| `metadata.annotations` | no | free-form string pairs, never indexed. Catalog state, like labels |
+| `metadata.labels` | no | short indexable string pairs. Part of the version: covered by the content digest, so changing them needs a new version |
+| `metadata.annotations` | no | free-form string pairs, never indexed. Part of the version, like labels |
 | `metadata.source` | no | provenance: `{type: git \| upload \| remote \| generated, uri?, revision?}` |
 | `metadata.created_at`, `.created_by` | no | publish time, and the subject that published. `created_by` is an opaque identifier and MUST NOT be an email address on a public root |
 | `metadata.digest` | SHOULD | the content digest of section 4.2. An indexer fills it; an author MAY omit it in a pull request |
 | `metadata.uid` | no | an identifier a hosted registry MAY mint. A client MUST NOT require it; the ref is the identity |
 | `files[]` | yes | at least one file descriptor; see 3.5 and 4.1. Schema: [`schemas/file-descriptor.schema.json`](schemas/file-descriptor.schema.json) |
 | `spec` | yes | the kind's own document, unchanged. Opaque to a reader by rule 4; validated against the kind manifest at publish |
-| `relationships[]` | no | outbound edges `{rel_type, to, annotations?}`, where `to` is a fully qualified ref. Catalog state. Schema: [`schemas/relationship.schema.json`](schemas/relationship.schema.json) |
+| `relationships[]` | no | outbound edges `{rel_type, to, annotations?}`, where `to` is a fully qualified ref. Part of the version, like labels. Schema: [`schemas/relationship.schema.json`](schemas/relationship.schema.json) |
 
 Writers MUST NOT invent header fields. Extension data belongs in `spec`, `labels`, or `annotations`.
 
@@ -201,22 +214,22 @@ To keep independent canonicalizers in agreement, an envelope MUST NOT contain no
 
 ### 4.3 Catalog digest
 
-`catalog_digest` covers the content digest plus mutable catalog state: the sha256 of the RFC 8785 serialization of
+`catalog_digest` covers the content digest plus the version's catalog state: the sha256 of the RFC 8785 serialization of
 
 ```json
 { "digest": "<content digest>", "status": "<status>", "yanked": <bool>,
   "labels": { … }, "annotations": { … }, "relationships": [ … ] }
 ```
 
-with `labels` and `annotations` from `metadata` (empty objects when absent) and `relationships` from the envelope (empty array when absent). It moves when a version is relabeled, deprecated, yanked, or archived. The exact field set is open.
+with `status` and `yanked` from the version's `versions.json` entry, `labels` and `annotations` from `metadata` (empty objects when absent), and `relationships` from the envelope (empty array when absent). Labels, annotations, and relationships are fixed with the version, so it moves only when `status` or `yanked` changes. The exact field set is open.
 
 ## 5. Rules
 
-1. **Versions are immutable.** A version directory is written once. The only mutable fields live in `versions.json`: `status`, `yanked`, `reason`, and the `catalog_digest` that covers them. `metadata.status` inside `artifact.json` records the status at publish and is informative; `versions.json` is authoritative.
+1. **Versions are immutable.** A version directory is written once. The only mutable fields live in `versions.json`: `status`, `yanked`, `reason`, and the `catalog_digest` that covers `status` and `yanked`. `metadata.status` inside `artifact.json` records the status at publish and is informative; `versions.json` is authoritative.
 2. **Digests are the truth.** Every mirror, CDN, and blob store between the root and the client is untrusted; the client verifies what it receives against the root's documents. Format 1 does not authenticate the root itself: a client that reads a root trusts what that root says.
 3. **Small files inline, large files in blobs.** A kind's readable files sit beside the envelope so a pull request stays reviewable. Content over a registry-level threshold, or shared across versions, is a descriptor without `urls`; the threshold is open.
 4. **Unknown is not an error.** Readers MUST ignore unknown envelope fields, unknown kinds, unknown `spec` content, and unknown root entries. Writers MUST NOT commit a `format_version` they do not understand.
-5. **Capabilities are advertised.** A client uses only what `registry.json` claims. No conformance suite exists yet; [`tools/check.py`](../tools/check.py) checks a file root's paths, documents, and digests.
+5. **Capabilities are advertised.** A client uses only what `registry.json` claims. [`tools/check.py`](../tools/check.py) checks a file root's paths, documents, and digests (section 12); no conformance suite exists yet for clients.
 6. **Writes to a repository root are pull requests.** An indexer generates `versions.json` and `index.json`. The one hand edit a pull request may make to them is a status change in `versions.json`, described in section 9.
 7. **Nothing is erased.** Yanking or archiving changes state in `versions.json`; bytes stay resolvable to a pinned digest. Physical removal is an operator action outside the spec.
 
@@ -281,9 +294,11 @@ Publishing to an HTTPS root needs a server and is [future work](registry/README.
 
 No atomic publish across several artifacts, no server-side search or inbound relationship queries, no access control finer than the root, and listing performance that degrades past a few thousand artifacts. Each is a server feature, listed in [registry/](registry/README.md).
 
-## 11. Client safety
+## 11. Security considerations
 
-A registry is untrusted input to the client that reads it. These rules bound what a client fetches, sends, and writes.
+A registry is untrusted input to the client that reads it. Anyone who can write to a root decides what it lists, and format 1 does not authenticate the root (rule 2): a digest proves only that the bytes match what the root listed. Installed content can also run, as scripts, hooks, or MCP servers, so a client SHOULD show what it is about to install and MUST NOT run installed content as part of installing it.
+
+These rules bound what a client fetches, sends, and writes.
 
 - **Schemes.** A client reads a root, a `blob_url`, a `manifest_url`, and a `files[].urls` entry over `https`, or from the local file system. It MUST NOT use plain `http` except to a loopback host (`localhost`, `127.0.0.0/8`, `::1`), and MUST refuse any other scheme.
 - **Relative references.** A relative `files[].urls` entry resolves against the version directory and MUST stay inside it. A relative `blob_url` or `manifest_url` resolves against the root and MUST stay inside it. A client refuses a reference with a `..` segment, and on a file system one that reaches outside through a symbolic link.
@@ -295,3 +310,14 @@ A registry is untrusted input to the client that reads it. These rules bound wha
 - **Cycles.** `depends_on` edges can form a cycle. A client resolves each ref once, so a cycle ends where it began.
 
 aireg reads directory and git roots, not HTTPS roots. It applies the path, reference, and cycle rules to both and verifies every file's size and digest before using it. It refuses plain `http://` except to a loopback host, sends a stored credential only to the origin it was issued for and a token from the environment only to the registry of that name, and bounds each git operation with a timeout.
+
+## 12. Conformance
+
+A root conforms when its documents satisfy the schemas and the requirements this document places on roots. A client conforms when it meets the requirements this document places on readers, including sections 3.3, 4, and 11. [`tools/check.py`](../tools/check.py) is the reference checker for roots; no conformance suite exists yet for clients.
+
+## 13. Versioning
+
+A breaking change MUST come with a version bump:
+
+- `format_version` covers the documents, the layout, and the digests. A change that a format 1 reader cannot handle needs a new format version.
+- A kind manifest's `x-registry-schema-version` covers that kind's `spec` schema. A change after which the schema rejects content it accepted before needs a new schema version.
