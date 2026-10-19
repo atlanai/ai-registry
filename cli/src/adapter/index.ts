@@ -27,6 +27,7 @@ export {
   type UnpublishInput,
   type UploadFile,
   type Want,
+  type Withheld,
 } from "./contract.ts";
 export type { Credential } from "./credential.ts";
 export { type AdapterInput, defineAdapter } from "./define.ts";

@@ -1,8 +1,9 @@
 import { resolve } from "node:path";
+import { withheldAt } from "#core/catalog/withheld.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
 import type { Closure } from "#core/plan/depends.ts";
-import type { Acquired, Selected } from "#core/plan/model.ts";
+import type { Acquired, Kept, Selected } from "#core/plan/model.ts";
 import { type NamespaceWant, namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
 import { addressOf } from "#core/plan/select.ts";
 import type { BuildState } from "./state.ts";
@@ -93,6 +94,25 @@ export function namespaceWants(
     }
   }
   return wants;
+}
+
+/**
+ * A row whose registry withholds the version it reached, as when it is blocked, stays as the lock
+ * has it: unpublished is taken for gone, withheld is not.
+ */
+export function carryWithheld(build: BuildState, acquired: readonly Acquired[]): Kept[] {
+  const kept: Kept[] = [];
+  for (const source of acquired) {
+    for (const [name, row] of Object.entries(build.lock.artifacts)) {
+      if (row.registry !== source.alias || build.next.artifacts[name] !== undefined) continue;
+      const at = { name: row.name, group: row.namespace, kind: row.kind };
+      const withheld = withheldAt(source.catalog.withheld, at);
+      if (withheld === undefined) continue;
+      keep(build, name, row);
+      kept.push({ name, installed: row.version, withheld });
+    }
+  }
+  return kept;
 }
 
 /**

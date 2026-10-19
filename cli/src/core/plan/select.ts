@@ -1,6 +1,7 @@
 import { posix } from "node:path";
 import { list, plural, quoted, sanitizeName } from "#adapter/text.ts";
 import { type Entry, entriesIn, entriesNamed, withoutCoveredLeaves } from "#core/catalog/model.ts";
+import { withheldAt } from "#core/catalog/withheld.ts";
 import { kindDir, stagedLeaf } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
@@ -235,6 +236,10 @@ export function select(
     const found = candidates(ref, source);
     if (found.length === 0) {
       if (ref.exclude !== undefined) continue;
+      // Published but withheld by status: what keeps or refuses it says why.
+      if (withheldAt(source.catalog.withheld, { ...ref, group: ref.namespace }) !== undefined) {
+        continue;
+      }
       const { message, guess } = unmatched(ref, source.catalog.entries);
       warnings.push({ name: undefined, message: guess === "" ? message : `${message} ${guess}` });
       continue;

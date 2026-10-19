@@ -1,5 +1,6 @@
 import { isRetryable } from "#adapter/errors.ts";
 import { isAdapterError } from "#adapter/index.ts";
+import { type Withheld, withheldAt, withheldMessage } from "#core/catalog/withheld.ts";
 import { digest } from "#core/fs/digest.ts";
 import { exists } from "#core/fs/tree.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
@@ -111,6 +112,17 @@ function classifyRow(
   return classify(digests);
 }
 
+/** What the registry withholds of an installed row, which is not the same as no longer publishing it. */
+function withheldRow(
+  previous: LockArtifact | undefined,
+  acquired: readonly Acquired[],
+): Withheld | undefined {
+  if (previous === undefined || previous.origin !== undefined) return undefined;
+  const source = acquired.find((entry) => entry.alias === previous.registry);
+  const at = { name: previous.name, group: previous.namespace, kind: previous.kind };
+  return withheldAt(source?.catalog.withheld, at);
+}
+
 /**
  * Read, never acted on. Every sync starts here and then decides what it is
  * willing to do, which is why `--dry-run` and a real run agree.
@@ -162,6 +174,20 @@ export async function reconcile(
     );
 
     const watch = watchOf(previous, item);
+    const withheld = item === undefined ? withheldRow(previous, acquired) : undefined;
+    if (withheld !== undefined) {
+      // Kept for a person to settle: the registry still lists it, at a version it will not serve.
+      items.push({
+        name,
+        kind,
+        source,
+        path,
+        disposition: "unavailable",
+        digests: { base: undefined, local: undefined, upstream: undefined },
+        detail: `${withheldMessage(withheld)}; run \`aireg remove ${name}\` to take it out`,
+      });
+      continue;
+    }
 
     // One artifact the registry will not serve is reported as that one
     // artifact, rather than ending the run without naming any.

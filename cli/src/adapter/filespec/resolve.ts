@@ -1,4 +1,11 @@
-import { type Artifact, covers, type FileRef, type Resolution, type Want } from "../contract.ts";
+import {
+  type Artifact,
+  covers,
+  type FileRef,
+  type Resolution,
+  type Want,
+  type Withheld,
+} from "../contract.ts";
 import type { ArtifactKind } from "../kinds.ts";
 import { collidingPaths, isSafePath } from "../paths.ts";
 import { contentDigest } from "../spec/canonical.ts";
@@ -165,8 +172,8 @@ function pinOf(reaching: readonly Want[]): string | undefined {
     .sort((a, b) => narrowness(b) - narrowness(a))[0]?.version;
 }
 
-/** Statuses `latest` never hands out, even when no version is active to take its place. */
-const UNRELEASED = new Set(["draft", "pending_review", "blocked"]);
+/** Statuses that install only when a request pins the version exactly. */
+const UNRELEASED = new Set(["draft", "pending_review"]);
 
 function usable(entry: IndexRow): boolean {
   return isNamespace(entry.namespace) && isArtifactName(entry.name) && isVersion(entry.latest);
@@ -189,6 +196,7 @@ export async function resolveFromRoot(
     if (options.all !== true && options.wanted.length > 0 && !asked) return [];
     return [{ entry, asked, pinned: pinOf(reaching) }];
   });
+  const withheld: Withheld[] = [];
   const artifacts = await inOrder(chosen, async ({ entry, asked, pinned }) => {
     // A malformed path segment is the indexer's mistake, and installing from
     // it would write that mistake into somebody's tree.
@@ -204,8 +212,21 @@ export async function resolveFromRoot(
     // Section 5 rule 7: a yanked version stays resolvable by name, because a
     // lockfile pinning one must keep resolving, but `latest` must not hand it out.
     if (version.yanked && pinned === undefined) return undefined;
-    // Draft and pending_review install only when pinned; resolveVersion refuses a blocked pin.
-    if (pinned === undefined && UNRELEASED.has(version.status ?? "")) return undefined;
+    // Blocked never installs, and draft and pending_review only when pinned; the caller is told,
+    // so an installed copy is kept rather than taken for unpublished.
+    const status = version.status ?? "";
+    if (status === "blocked" || (pinned === undefined && UNRELEASED.has(status))) {
+      const { namespace, kind, name } = entry;
+      withheld.push({
+        namespace,
+        kind,
+        name,
+        version: version.version,
+        status,
+        reason: version.reason,
+      });
+      return undefined;
+    }
     // An archived artifact is retired: named, it still installs, but taking a
     // whole namespace does not bring it along.
     if (version.status === "archived" && !asked) return undefined;
@@ -229,7 +250,10 @@ export async function resolveFromRoot(
     } satisfies Artifact;
   });
 
-  return { artifacts: artifacts.filter((artifact) => artifact !== undefined) };
+  return {
+    artifacts: artifacts.filter((artifact) => artifact !== undefined),
+    ...(withheld.length === 0 ? {} : { withheld }),
+  };
 }
 
 /** Entries read at once, up to this many: a registry of thousands is not read one by one. */

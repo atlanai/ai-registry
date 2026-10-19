@@ -55,6 +55,14 @@ class RegistryBuilder {
     return this;
   }
 
+  /** Blocks a version already published here, which nothing then installs. */
+  block(ref: string, reason?: string): this {
+    const version = this.#version(ref);
+    version.status = "blocked";
+    if (reason !== undefined) version.reason = reason;
+    return this;
+  }
+
   /** Writes registry.json, index.json and every version, returning the registry's root. */
   async write(): Promise<string> {
     const kinds = await kindsOf(undefined);

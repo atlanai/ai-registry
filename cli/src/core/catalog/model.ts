@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "#core/kinds.ts";
+import type { Withheld } from "./withheld.ts";
 
 /** Where an entry was read from. */
 interface Provenance {
@@ -30,6 +31,8 @@ export interface Catalog {
   /** Sorted by name, deduplicated. */
   entries: Entry[];
   warnings: string[];
+  /** What the registry reached but would not serve by status, so a copy of it is kept. */
+  withheld?: Withheld[];
 }
 
 export function emptyCatalog(root: string): Catalog {

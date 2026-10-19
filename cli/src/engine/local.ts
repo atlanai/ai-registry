@@ -59,6 +59,7 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
     pruned: plan.pruned.filter((name) => names.has(name)),
     unresolved: plan.unresolved,
     conflicts: plan.conflicts,
+    withheld: plan.withheld.filter((item) => names.has(item.name)),
   };
 }
 

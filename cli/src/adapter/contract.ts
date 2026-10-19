@@ -61,6 +61,21 @@ export interface Resolution {
   sourceRevision?: string | undefined;
   /** What the registry calls itself, so a client can name it without guessing from the address. */
   registry?: RegistryIdentity | undefined;
+  /** Artifacts a want reached that the registry's status rules kept back, rather than unpublished. */
+  withheld?: readonly Withheld[] | undefined;
+}
+
+/** An artifact whose version is not installable as asked, such as a blocked one or an unpinned draft. */
+export interface Withheld {
+  name: string;
+  namespace?: string | undefined;
+  kind: ArtifactKind;
+  /** The version the request reached. */
+  version: string;
+  /** The version's status, such as `blocked` or `draft`. */
+  status: string;
+  /** Why, as the registry gives it. */
+  reason?: string | undefined;
 }
 
 /** One artifact a client asks for. A name alone tracks latest; a version pins it. */

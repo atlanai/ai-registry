@@ -20,6 +20,7 @@ import { ENVELOPE_API_VERSION } from "#adapter/spec/types.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import type { Catalog, Entry } from "#core/catalog/model.ts";
 import { emptyCatalog, finalize, merge } from "#core/catalog/model.ts";
+import { withheldFrom } from "#core/catalog/withheld.ts";
 import { bindAdapter } from "#core/hook/bind.ts";
 import { KIND_SPECS, specKindDir } from "#core/kinds.ts";
 import { withLease } from "#core/lease.ts";
@@ -240,6 +241,8 @@ export async function resolveArtifacts(
   }
 
   merge(catalog, adapter.id, entries);
+  const withheld = withheldFrom(resolution.withheld);
+  if (withheld.length > 0) catalog.withheld = withheld;
   return {
     catalog: finalize(catalog),
     listed,

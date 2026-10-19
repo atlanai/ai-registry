@@ -45,6 +45,7 @@ import {
 } from "#cli/source.ts";
 import { expandLocation, recordedLocation } from "#core/adapter/location.ts";
 import { type Entry, withoutCoveredLeaves } from "#core/catalog/model.ts";
+import { withheldAt, withheldMessage } from "#core/catalog/withheld.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
@@ -573,6 +574,17 @@ async function read(
 
   const registry = resolved.alias ?? source.alias;
   const catalog = source.catalog;
+  const withheld = withheldAt(catalog.withheld, { ...resolved, group: resolved.namespace });
+  if (withheld !== undefined) {
+    spin?.stop();
+    throw new AiregError(`${withheldMessage(withheld)}, so nothing was installed.`, {
+      code: ErrorCode.Invalid,
+      hint:
+        withheld.status === "blocked"
+          ? "Pin another version, or ask the registry's owner why this one is blocked."
+          : `Pin the version, as in \`@${withheld.version}\`, to install it before its release.`,
+    });
+  }
   if (catalog.entries.length === 0) {
     spin?.stop();
     throw new AiregError(

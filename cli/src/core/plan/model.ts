@@ -2,6 +2,7 @@ import type { AdapterError, Envelope } from "#adapter/index.ts";
 import { quoted } from "#adapter/text.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
+import type { Withheld } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { Render } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
@@ -173,6 +174,15 @@ export interface Plan {
   unresolved: Unresolved[];
   /** Requirements no single installation can meet. */
   conflicts: Conflict[];
+  /** Installed artifacts kept as they are, because the registry withholds the version it reached. */
+  withheld: Kept[];
+}
+
+/** An installed artifact the plan keeps, by its installed name, at the version it has. */
+export interface Kept {
+  name: string;
+  installed: string | undefined;
+  withheld: Withheld;
 }
 
 export function emptyPlan(): Plan {
@@ -188,6 +198,7 @@ export function emptyPlan(): Plan {
     pruned: [],
     unresolved: [],
     conflicts: [],
+    withheld: [],
   };
 }
 

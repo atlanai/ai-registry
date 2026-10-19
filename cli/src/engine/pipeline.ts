@@ -5,6 +5,7 @@ import { credentialsForManifest } from "#accounts/credentials.ts";
 import { isAdapterError, type Want } from "#adapter/index.ts";
 import { list, quoted, sanitizeText } from "#adapter/text.ts";
 import { loadAdapter } from "#core/adapter/registry.ts";
+import { withheldAt, withheldMessage } from "#core/catalog/withheld.ts";
 import { type NameCollision, nameCollisionOf } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -23,7 +24,7 @@ import { type ApplyResult, apply, guardsOf, type Recovered, recover } from "#cor
 import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
 import { build, clashMessage } from "#core/plan/build.ts";
 import { formatNeed, type Unresolved, wantOf } from "#core/plan/depends.ts";
-import type { Acquired, Action, Plan } from "#core/plan/model.ts";
+import type { Acquired, Action, Kept, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
 import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
 import { survey } from "#core/plan/survey.ts";
@@ -291,6 +292,31 @@ function refuseConflicts(plan: Plan): void {
   }
 }
 
+/**
+ * A need its registry withholds by status is not asked for again: the lock keeps the copy it holds,
+ * and one it does not hold is refused, since nothing installs a blocked version.
+ */
+function keptWithheld(missing: Unresolved, sources: readonly Acquired[], lock: Lock): boolean {
+  const { alias, need, by } = missing;
+  const source = sources.find((item) => item.alias === alias);
+  const at = { name: need.name, group: need.namespace, kind: need.kind };
+  const withheld = withheldAt(source?.catalog.withheld, at);
+  if (withheld === undefined) return false;
+  const held = Object.values(lock.artifacts).some(
+    (row) =>
+      row.registry === alias &&
+      row.namespace === need.namespace &&
+      row.kind === need.kind &&
+      row.name === need.name &&
+      row.version === need.version,
+  );
+  if (held) return true;
+  throw new AiregError(`${by} needs ${withheldMessage(withheld)}, so nothing was installed.`, {
+    code: ErrorCode.Invalid,
+    hint: `Ask the registry's owner about it, or remove ${by}.`,
+  });
+}
+
 function unpublished({ alias, need, by }: Unresolved): AiregError {
   return new AiregError(
     `${by} needs ${formatNeed(need)}, which ${alias} does not publish, so nothing was installed.`,
@@ -357,6 +383,37 @@ function refuseUnstaged(
     hint: `Run the command again once the registry serves them intact. ${rest}`,
     // The adapter's code is what `--json` reports.
     cause: unstaged.find((item) => isAdapterError(item.error))?.error,
+  });
+}
+
+/** Why each kept copy stays: `pr-review 1.2.0 is blocked (...), so pr-review stays at 1.1.0`. */
+function keptLines(kept: readonly Kept[]): string[] {
+  return kept.map(({ name, installed, withheld }) => {
+    const at = installed === undefined ? "as installed" : `at ${installed}`;
+    return `${withheldMessage(withheld)}, so ${quoted(name)} was kept ${at}`;
+  });
+}
+
+/**
+ * A copy the registry now withholds stays installed. A blocked one this run was moving fails it,
+ * once the rest is in; one it only held is a warning, so an unrelated add still succeeds.
+ */
+function refuseWithheld(
+  plan: Plan,
+  printer: Printer,
+  moving: ReadonlySet<string> | undefined,
+): void {
+  const blocked = plan.withheld.filter(
+    (item) => item.withheld.status === "blocked" && moving?.has(item.name) === true,
+  );
+  for (const line of keptLines(plan.withheld.filter((item) => !blocked.includes(item)))) {
+    printer.warning(`${line}.`);
+  }
+  if (blocked.length === 0) return;
+  const commands = blocked.map(({ name }) => `\`aireg remove ${name}\``);
+  throw new AiregError(`${list(keptLines(blocked))}.`, {
+    code: ErrorCode.Invalid,
+    hint: `Run ${list(commands)} to take ${blocked.length === 1 ? "it" : "them"} out.`,
   });
 }
 
@@ -445,7 +502,10 @@ async function plan(
     let planned = planFrom([...settled.values(), ...acquired]);
     while (planned.conflicts.length === 0) {
       const needed = new Set(needsRegistry(planned, lock, settled));
-      for (const missing of planned.unresolved) {
+      const sources = [...settled.values(), ...acquired];
+      for (const missing of planned.unresolved.filter(
+        (item) => !keptWithheld(item, sources, lock),
+      )) {
         const asked = needs.get(missing.alias) ?? [];
         const want = wantOf(missing.need);
         if (asked.some((item) => JSON.stringify(item) === JSON.stringify(want))) {
@@ -631,6 +691,7 @@ async function write(
           printer.warning(keptMessage(roots, action.name, action.to, "Would not"));
       }
       report.plan(planned, roots, aside, { targets: named, harnesses });
+      for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
       return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
     }
 
@@ -664,6 +725,7 @@ async function write(
     if (edited && !landed && applied.unstaged.length > 0)
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
+    refuseWithheld(planned, printer, hooks.moving);
     return { plan: planned, applied, before: lock, targets: named, harnesses };
   } finally {
     await closeAll(acquired);

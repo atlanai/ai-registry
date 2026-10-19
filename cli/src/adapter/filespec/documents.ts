@@ -1,7 +1,7 @@
 import type { RegistryIdentity } from "../contract.ts";
 import { type ArtifactKind, isKind } from "../kinds.ts";
 import { SUPPORTED_FORMAT } from "../spec/types.ts";
-import { list, quoted, sanitizeText } from "../text.ts";
+import { list, quoted } from "../text.ts";
 import { INDEX_DOCUMENT, isVersion, REGISTRY_DOCUMENT, versionsPath } from "./names.ts";
 
 // The same paths work for every kind of root, so this is the only reader there is
@@ -266,39 +266,20 @@ export async function readVersions(
 /** How many versions a refusal suggests; `versions.json` lists the newest first. */
 const SUGGESTED = 5;
 
-/** The versions a refusal suggests instead, if there are any. */
-function suggested(document: VersionsDocument): string | undefined {
-  const offered = document.versions
-    .filter((item) => !item.yanked && item.status !== "blocked")
-    .map((item) => item.version);
-  if (offered.length === 0) return undefined;
-  const more = offered.length > SUGGESTED ? `, or another of its ${offered.length} versions` : "";
-  return `Use ${list(offered.slice(0, SUGGESTED), "or")}${more}.`;
-}
-
-/**
- * What a ref resolves to: the version it pins, or `latest`, skipping nothing. A blocked
- * version is refused even when pinned, since a registry blocks one so nothing installs it.
- */
+/** What a ref without `@<version>` resolves to: `latest`, skipping nothing. */
 export function resolveVersion(document: VersionsDocument, wanted: string | undefined): VersionRow {
   const version = wanted ?? document.latest;
   const found = document.versions.find((item) => item.version === version);
-  const artifact = [document.namespace, document.name].filter(Boolean).join("/");
-  const path = versionsPath(document.namespace, document.kind, document.name);
-  if (found?.status === "blocked" && wanted !== undefined) {
-    const reason = found.reason === undefined ? "" : ` (${sanitizeText(found.reason)})`;
-    throw new SpecError(`${artifact} ${version} is blocked${reason}, so it cannot be installed.`, {
-      path,
-      artifact,
-      hint: suggested(document),
-    });
-  }
   if (found !== undefined) return found;
+  const artifact = [document.namespace, document.name].filter(Boolean).join("/");
+  const offered = document.versions.filter((item) => !item.yanked).map((item) => item.version);
+  const more = offered.length > SUGGESTED ? `, or another of its ${offered.length} versions` : "";
   throw new SpecError(`${artifact} has no version ${version}.`, {
-    path,
+    path: versionsPath(document.namespace, document.kind, document.name),
     // Asking for a version that was never released is a wrong name, not a broken registry.
     missing: wanted !== undefined,
     artifact,
-    hint: suggested(document),
+    hint:
+      offered.length === 0 ? undefined : `Use ${list(offered.slice(0, SUGGESTED), "or")}${more}.`,
   });
 }

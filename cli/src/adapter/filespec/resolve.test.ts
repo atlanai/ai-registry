@@ -130,38 +130,47 @@ describe("resolveFromRoot", () => {
     expect(artifacts.map((item) => item.envelope.metadata.name)).toEqual(["use"]);
   });
 
-  test("refuses a blocked version even when pinned, and names what to use instead", async () => {
+  test("withholds a blocked version even when pinned, and says why", async () => {
     const read = await root([OPS_GATE]);
-    const failed = resolveFromRoot(read, {
+    const resolved = await resolveFromRoot(read, {
       blobUrl: "blobs",
       wanted: [{ name: "gate", namespace: "ops", version: "1.1.0" }],
     });
-    await expect(failed).rejects.toMatchObject({
-      message: "ops/gate 1.1.0 is blocked (leaks tokens), so it cannot be installed.",
-      code: "invalid",
-      artifact: "ops/gate",
-      hint: "Use 1.0.0.",
+    expect(resolved).toEqual({
+      artifacts: [],
+      withheld: [
+        {
+          namespace: "ops",
+          kind: "skill",
+          name: "gate",
+          version: "1.1.0",
+          status: "blocked",
+          reason: "leaks tokens",
+        },
+      ],
     });
   });
 
   test("never takes a blocked latest for a request that does not pin it", async () => {
     const read = await root([OPS_GATE]);
-    const { artifacts } = await resolveFromRoot(read, {
-      blobUrl: "blobs",
-      wanted: [{ name: "gate" }],
-    });
-    expect(artifacts).toEqual([]);
+    const resolved = await resolveFromRoot(read, { blobUrl: "blobs", wanted: [{ name: "gate" }] });
+    expect(resolved.artifacts).toEqual([]);
+    expect(resolved.withheld?.map((item) => [item.version, item.status])).toEqual([
+      ["1.1.0", "blocked"],
+    ]);
   });
 
-  test("skips a draft unless a pin names it", async () => {
+  test("withholds a draft unless a pin names it", async () => {
     const read = await root([OPS_DRAFT]);
     const unpinned = await resolveFromRoot(read, { blobUrl: "blobs", wanted: [{ name: "draft" }] });
     expect(unpinned.artifacts).toEqual([]);
+    expect(unpinned.withheld?.map((item) => item.status)).toEqual(["draft"]);
     const pinned = await resolveFromRoot(read, {
       blobUrl: "blobs",
       wanted: [{ name: "draft", version: "0.1.0" }],
     });
     expect(pinned.artifacts.map((item) => item.id)).toEqual(["artifacts/ops/skill/draft/0.1.0"]);
+    expect(pinned.withheld).toBeUndefined();
   });
 
   test("verifies the envelope as written, fields it does not know included", async () => {

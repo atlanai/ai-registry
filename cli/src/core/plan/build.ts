@@ -4,6 +4,7 @@ import type { Manifest } from "#core/manifest.ts";
 import {
   carryUnopened,
   carryUnresolved,
+  carryWithheld,
   heldElsewhere,
   keep,
   namespaceWants,
@@ -112,6 +113,7 @@ function planWith(
     if (holder !== undefined) clashes.push(heldClash(item, holder));
     else planItem(item, state);
   }
+  const withheld = carryWithheld(state, acquired);
   carryUnresolved(state, needs);
   removeStale(state);
   flushUnlinks(state, held);
@@ -136,6 +138,7 @@ function planWith(
     pruned: state.pruned.sort(),
     unresolved: needs.unresolved,
     conflicts: [...needs.conflicts, ...nameClashes(needs, selected)],
+    withheld,
   };
   return { plan, selected };
 }

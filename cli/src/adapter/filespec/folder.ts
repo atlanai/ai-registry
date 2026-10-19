@@ -99,7 +99,7 @@ export function openFolderRegistry(
         const read = rootReader(at, new Set());
         const registry = await readRegistry(read);
         const found = await resolveFromRoot(read, { blobUrl: registry.blobUrl, wanted, all });
-        resolution = { artifacts: found.artifacts, registry: identityOf(registry) };
+        resolution = { ...found, registry: identityOf(registry) };
         if (options.immutable === true) {
           SETTLED.delete(key);
           SETTLED.set(key, structuredClone(resolution));
