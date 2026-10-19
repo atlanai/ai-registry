@@ -202,6 +202,8 @@ export interface RunHooks {
   discard?: ReadonlySet<string>;
   /** Artifacts this run names: one left out for another's name is refused, not skipped. */
   adding?: ReadonlySet<string>;
+  /** Installed names whose identical copy already on disk this run takes over in place. */
+  adopt?: ReadonlySet<string>;
 }
 
 /** The harnesses a run installs for, so a report can name them as they were chosen. */
@@ -562,6 +564,7 @@ async function plan(
         nameCollision,
         ...(hooks.aliases === undefined ? {} : { opened: hooks.aliases }),
         ...(hooks.discard === undefined ? {} : { discard: hooks.discard }),
+        ...(hooks.adopt === undefined ? {} : { adopt: hooks.adopt }),
       });
     let planned = planFrom([...settled.values(), ...acquired]);
     while (planned.conflicts.length === 0) {
@@ -620,6 +623,11 @@ export function appliedNotices(
   const notices: ApplyNotice[] = applied.backedUp.map((moved) => ({
     message: `Moved your ${moved.what} ${displayPath(roots, moved.path)} to ${displayPath(roots, moved.to)}.`,
   }));
+  for (const { name, path } of applied.adopted) {
+    notices.push({
+      message: `Took over ${displayPath(roots, path)}, which already held ${name} as aireg installs it.`,
+    });
+  }
   if (applied.degraded.length > 0) {
     notices.push({
       message: `Copied into ${list(applied.degraded)} instead of linking, because this platform refused a symlink.`,

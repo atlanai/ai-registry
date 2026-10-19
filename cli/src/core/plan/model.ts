@@ -140,6 +140,8 @@ export type Action =
       content?: string;
       /** The plugin's own account of itself, for the manifests its projection gets. */
       document?: PluginDocument;
+      /** A real copy already at `to`, holding exactly these bytes, is taken over rather than rewritten. */
+      adopt?: boolean;
       /** How the lock recorded a link at this path, when aireg made one before. */
       recorded?: LinkMode;
       /** Placed as a real directory of links rather than one link. */

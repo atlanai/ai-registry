@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { isReadOnlyLayout, type LayoutId } from "#adapter/layouts/ids.ts";
+import { expandHome } from "#adapter/paths.ts";
 import { list, plural, quoted, sanitizeName, withoutCredentials } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import {
@@ -31,6 +32,7 @@ import {
 import { settleCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, type Ran, summarize } from "#cli/render/plan.ts";
 import { noteUserScope } from "#cli/render/where.ts";
+import { type LockedSkill, readSkillLock } from "#cli/skill-locks.ts";
 import {
   among,
   atAddress,
@@ -98,7 +100,66 @@ interface Gathered {
 }
 
 export async function run(context: CommandContext): Promise<void> {
-  const { positionals, common, own } = parse<AddFlags>(context.argv, builtin("add"));
+  const parsed = parse<AddFlags>(context.argv, builtin("add"));
+  if (parsed.own.from !== undefined) return addFrom(context, parsed, parsed.own.from);
+  return addAddress(context, parsed);
+}
+
+/**
+ * Adds what another installer's lock file records, one source at a time, taking over each copy
+ * already on disk that holds exactly what aireg installs.
+ */
+async function addFrom(context: CommandContext, parsed: Parsed, from: string): Promise<void> {
+  const { positionals, common, own } = parsed;
+  if (positionals.length > 0 || own.registry !== undefined || common.select !== undefined) {
+    throw new AiregError("`aireg add --from` takes no address and no -s.", {
+      code: ErrorCode.Usage,
+      hint: "Run `aireg add --from <file>` on its own: the file says what to add.",
+    });
+  }
+  const lock = await readSkillLock(resolve(context.cwd, expandHome(from)));
+  for (const skipped of lock.skipped) context.printer.warning(skipped);
+  if (lock.skills.length === 0) {
+    throw new AiregError(`${from} records no skill aireg can add.`, { code: ErrorCode.NotFound });
+  }
+  const sources = new Map<string, LockedSkill[]>();
+  for (const skill of lock.skills) {
+    const key = `${skill.address}\u0000${skill.ref ?? ""}`;
+    sources.set(key, [...(sources.get(key) ?? []), skill]);
+  }
+  const scope = common.scope ?? (lock.user ? "user" : undefined);
+  for (const skills of sources.values()) {
+    const [first] = skills as [LockedSkill, ...LockedSkill[]];
+    for (const skill of skills) {
+      const folder = skill.folder === "." ? undefined : basename(skill.folder);
+      if (folder !== undefined && folder !== skill.name) {
+        context.printer.warning(
+          `${quoted(skill.name)} installs as ${quoted(folder)}, the name of its folder, so a copy under ${quoted(skill.name)} stays as it is.`,
+        );
+      }
+    }
+    const names = skills.map((skill) =>
+      skill.folder === "." ? skill.name : basename(skill.folder),
+    );
+    await addAddress(
+      context,
+      {
+        positionals: [first.address],
+        common: { ...common, scope, select: names },
+        own: { ...own, from: undefined, ...(first.ref === undefined ? {} : { ref: first.ref }) },
+      },
+      new Set(names),
+    );
+  }
+}
+
+type Parsed = ReturnType<typeof parse<AddFlags>>;
+
+async function addAddress(
+  context: CommandContext,
+  { positionals, common, own }: Parsed,
+  adopt?: ReadonlySet<string>,
+): Promise<void> {
   const step = interaction(context.printer, defaultIo(), common.yes);
 
   // An address may name a registry this scope declares, or one declared for
@@ -237,6 +298,7 @@ export async function run(context: CommandContext): Promise<void> {
         // Every other registry stays as the lock has it, so adding one skill
         // does not fetch and re-plan the whole scope.
         aliases: [alias],
+        ...(adopt === undefined ? {} : { adopt }),
         // Naming something already locked is asking for its newest version again.
         moving: new Set(refs.flatMap((text) => reached(fresh.lock, parseRef(text)))),
         // A whole namespace still installs the rest when one member's name is taken.
@@ -379,6 +441,7 @@ type AddFlags = SourceFlags & {
   registry?: string;
   "no-auto-update"?: boolean;
   trust?: string[];
+  from?: string | undefined;
 };
 
 /**

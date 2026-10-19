@@ -8,6 +8,7 @@ Install artifacts from a registry.
 aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options]
 aireg add <namespace>[/<name>]... --registry <registry> [options]
 aireg add <address> [-s <name>]... [--as <name>] [options]
+aireg add --from <file> [options]
 aireg add
 ```
 
@@ -67,6 +68,12 @@ A site's web address, such as `https://example.com`, is read as its Agent Skills
 
 aireg tells how to read a source from what it holds, once, and records anything other than a registry, `layout: folder`, `layout: marketplace` or `layout: well-known`, with the source in the manifest. `--layout` says it instead.
 
+### Skills another installer recorded
+
+`aireg add --from <file>` adds the skills a lock file another skill installer wrote records, such as a project's `skills-lock.json` or a user's `~/.agents/.skill-lock.json`. aireg reads only where each skill came from: its source, of type `github`, `gitlab`, `git` or `well-known`, its `ref`, and the folder its `skillPath` names. It adds each source the way `add` adds any address, and skips an entry it cannot read, saying why. A user's file installs into your user scope unless you pass a scope.
+
+A copy already on disk where a skill would go, holding exactly what aireg installs, is taken over as aireg's own and never rewritten. One that differs reads as edited and stays as it is. A skill installs under the name of its folder, so a copy under another name stays as it is too. Running it again changes nothing.
+
 ### Questions
 
 On a terminal, `add` asks what to install, which scope to install into when the folder has no `.registry/manifest.yml`, which harnesses to install into, and whether to link or copy, then asks you to confirm the install, with each artifact and the harnesses that load it. It asks nothing when you name a namespace or an artifact, pass `--select`, or pass `--yes`. See [When aireg asks questions](options.md#when-aireg-asks-questions).
@@ -98,6 +105,7 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 | `--adapter <id>` | The adapter that reads the registry, when aireg can't tell from the address. Recorded in the manifest. |
 | `--layout <layout>` | How to read the source, `registry`, `marketplace`, `well-known` or `folder`, instead of telling from what it holds. Recorded in the manifest. See [Sources that are not registries](#sources-that-are-not-registries). |
 | `--config <key>=<value>` | A setting for that adapter, recorded with the registry in the manifest. Repeat it for more than one. A setting the adapter doesn't take is refused: git takes `ref` and `path`, and a local folder takes none. |
+| `--from <file>` | Add the skills another installer's lock file records. See [Skills another installer recorded](#skills-another-installer-recorded). |
 | `--trust <plugin>` | Install this plugin from a source that is not a registry although it carries hooks, servers or executables that run as you, and record that in the manifest. Repeat it for more than one. |
 | `--no-auto-update` | Don't keep a user-scope install current in the background. |
 

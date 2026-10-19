@@ -6,7 +6,7 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isRecord } from "#core/fields.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { digest } from "#core/fs/digest.ts";
-import { fanOut, link } from "#core/fs/link.ts";
+import { fanOut, inspect, link } from "#core/fs/link.ts";
 import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { entries, exists, present, pruneEmptyParent, remove, unseal } from "#core/fs/tree.ts";
@@ -122,6 +122,8 @@ export interface ApplyResult {
   unstaged: { name: string; reason: string; error: unknown }[];
   /** Links not made: a person's own file or folder is at the destination, or `reason` says why. */
   kept: { name: string; path: string; reason?: string }[];
+  /** Copies already on disk, byte for byte what this run installs, recorded as aireg's in place. */
+  adopted: { name: string; path: string }[];
   /** A person's own file or folder that stood where a recorded link was, and where it was moved. */
   backedUp: {
     path: string;
@@ -225,6 +227,7 @@ interface Run {
   performed: Performed;
   installed: Set<string>;
   kept: ApplyResult["kept"];
+  adopted: ApplyResult["adopted"];
   backedUp: ApplyResult["backedUp"];
   recorded: Lock | undefined;
   /** The lock as this run found it. */
@@ -405,6 +408,10 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
     });
   }
   if (guard === "keep") {
+    if (action.adopt === true) {
+      await adoptOrKeep(run, action, key);
+      return;
+    }
     run.kept.push({ name: action.name, path: action.to });
     run.skipped.add(key);
     return;
@@ -449,6 +456,35 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   run.pathModes.set(action.to, mode);
   if (mode === "copy") run.copies.set(action.to, await digest(action.to));
   if (!action.copy && mode === "copy") run.degraded.add(action.harness);
+  run.performed.link += 1;
+  run.installed.add(action.name);
+}
+
+/**
+ * A copy another tool left where this link goes is taken over as aireg's own when it holds exactly
+ * what this run installs, and is never rewritten; one that differs reads as edited and stays.
+ */
+async function adoptOrKeep(run: Run, action: ActionOf<"link">, key: string): Promise<void> {
+  const state = await inspect(action.to);
+  const same =
+    state.exists &&
+    !state.isLink &&
+    (await exists(action.from)) &&
+    (await digest(action.to)) === (await digest(action.from));
+  if (!same) {
+    run.kept.push({
+      name: action.name,
+      path: action.to,
+      reason:
+        "it holds other bytes than aireg installs, so it reads as edited and was left as it is",
+    });
+    run.skipped.add(key);
+    return;
+  }
+  run.modes.set(key, "copy");
+  run.pathModes.set(action.to, "copy");
+  run.copies.set(action.to, await digest(action.to));
+  run.adopted.push({ name: action.name, path: action.to });
   run.performed.link += 1;
   run.installed.add(action.name);
 }
@@ -615,6 +651,7 @@ export async function apply(
     performed: { stage: 0, clone: 0, link: 0, unlink: 0 },
     installed: new Set(),
     kept: [],
+    adopted: [],
     backedUp: [],
     recorded: undefined,
     before,
@@ -653,6 +690,7 @@ export async function apply(
     degraded: [...run.degraded].sort(),
     unstaged: [...run.unstaged].map(([name, { reason, error }]) => ({ name, reason, error })),
     kept: run.kept,
+    adopted: run.adopted,
     backedUp: run.backedUp,
     carried: await carriedBy(plan, run.recorded, roots),
     unrendered: run.unrendered,

@@ -100,19 +100,25 @@ export function updateLinks(
   let touched = restage;
   for (const link of links) {
     const rename = link.shared === true ? undefined : renamedTo(item);
+    const prior = previous?.links.find((old) => old.path === link.relative);
+    // A copy the lockfile records, such as one taken over in place, stays a copy.
+    const kept = prior?.mode === "copy" && link.shared !== true;
     const copying =
       link.codec !== undefined ||
       link.entry !== undefined ||
       link.copy === true ||
       rename !== undefined ||
       build.options.copy ||
-      item.copy === true;
+      item.copy === true ||
+      kept;
     const correct = inPlace(state?.links[link.relative], copying, link.from);
-    const prior = previous?.links.find((old) => old.path === link.relative);
     if (keepsEditedCopy(prior, state, build)) continue;
     if ((restage || !correct) && !build.linked.has(link.absolute)) {
       build.linked.add(link.absolute);
-      build.actions.push(linkAction(item, link, { copy: copying, rename, recorded: prior?.mode }));
+      const adopt = build.options.adopt?.has(item.name) === true;
+      build.actions.push(
+        linkAction(item, link, { copy: copying, rename, recorded: prior?.mode, adopt }),
+      );
       touched = true;
       noteRenamed(item, link, prior?.mode, build);
     }
@@ -127,7 +133,12 @@ export function updateLinks(
 function linkAction(
   item: Selected,
   link: PlannedLink,
-  how: { copy: boolean; rename: string | undefined; recorded: LinkMode | undefined },
+  how: {
+    copy: boolean;
+    rename: string | undefined;
+    recorded: LinkMode | undefined;
+    adopt: boolean;
+  },
 ): Extract<Action, { kind: "link" }> {
   return {
     kind: "link",
@@ -145,6 +156,9 @@ function linkAction(
     ...(link.entry === undefined ? {} : { entry: link.entry }),
     ...(how.rename === undefined ? {} : { rename: how.rename }),
     ...(how.recorded === undefined ? {} : { recorded: how.recorded }),
+    ...(how.adopt && link.codec === undefined && link.entry === undefined && link.shared !== true
+      ? { adopt: true }
+      : {}),
   };
 }
 

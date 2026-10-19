@@ -30,6 +30,8 @@ export interface BuildOptions {
   opened?: readonly string[];
   /** What an artifact whose name another holds gets. Absent, it is left out, never renamed. */
   nameCollision?: NameCollision;
+  /** Installed names whose copy already on disk, byte for byte what aireg installs, it takes over. */
+  adopt?: ReadonlySet<string>;
 }
 
 /** What planning one run accumulates, shared by every step that plans part of it. */

@@ -319,6 +319,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       "aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options]",
       "aireg add <namespace>[/<name>]... --registry <registry> [options]",
       "aireg add <address> [-s <name>]... [--as <name>] [options]",
+      "aireg add --from <file> [options]",
       "aireg add",
     ],
     examples: [
@@ -341,6 +342,11 @@ export const COMMANDS: readonly CommandSpec[] = [
       AS,
       { ...REGISTRY, describe: "The registry to install from, by name or address" },
       ...SOURCE,
+      {
+        flag: "--from",
+        value: "<file>",
+        describe: "Add the skills another installer's lock file records, such as skills-lock.json",
+      },
       {
         flag: "--trust",
         value: "<plugin>",
