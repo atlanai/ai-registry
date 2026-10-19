@@ -8,6 +8,7 @@ import type { Codec } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
+import type { Unlisted } from "./unlisted.ts";
 
 /** One resolved registry, in the shape the lock stores. */
 export interface Origin {
@@ -178,6 +179,8 @@ export interface Plan {
   conflicts: Conflict[];
   /** Installed artifacts kept as they are, because the registry withholds the version it reached. */
   withheld: Kept[];
+  /** Installed artifacts kept as they are, because their registry no longer lists them. */
+  unlisted: Unlisted[];
 }
 
 /** An installed artifact the plan keeps, by its installed name, at the version it has. */
@@ -201,6 +204,7 @@ export function emptyPlan(): Plan {
     unresolved: [],
     conflicts: [],
     withheld: [],
+    unlisted: [],
   };
 }
 

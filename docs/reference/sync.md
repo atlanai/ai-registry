@@ -25,7 +25,7 @@ aireg sync resolve <name> --mine | --theirs [-g]
 | `--adopt` | You wrote a skill or agent here that no registry publishes yet. | follows `--publish` |
 | `--claim` | A folder of yours holds exactly what the registry publishes, so aireg could manage it. | `off` |
 
-`on` makes the change, `report` lists it as needing your attention, and `off` ignores it. So by default `sync` takes what moved in the registry and reports what you changed, without publishing anything. A registry in a git repository is only reported to, since aireg doesn't push to git. A conflict, where both sides changed, is always reported and never decided for you.
+`on` makes the change, `report` lists it as needing your attention, and `off` ignores it. An artifact its registry stops listing isn't a change to pull: a listing cut short or emptied reads the same, so `sync` keeps the artifact, reports it as needing your attention, and names the `aireg remove <name>` that takes it out. So by default `sync` takes what moved in the registry and reports what you changed, without publishing anything. A registry in a git repository is only reported to, since aireg doesn't push to git. A conflict, where both sides changed, is always reported and never decided for you.
 
 Name a registry to sync only that one, and pass `-s` to sync only some artifacts.
 
@@ -67,14 +67,14 @@ Each artifact's `disposition` says how the two sides differ, and the text output
 |---|---|---|
 | `synced` | | The scope and the registry hold the same bytes. |
 | `pull` | `pull` | Only the registry changed it. |
-| `pull-delete` | `remove` | The registry removed it, and it is unchanged here. |
+| `pull-delete` | `remove` | The manifest no longer asks for it, and it is unchanged here. |
 | `publish` | `publish` | Only you changed it, here. |
 | `conflict` | `conflict` | Both sides changed it. Settle it with `aireg sync resolve`. |
 | `adopt` | `adopt` | You wrote it here, and no registry publishes it yet. |
 | `archive` | `archive` | You deleted it here, and the registry still publishes it. |
 | `removed` | `remove` | Both sides deleted it. |
 | `unknown` | `unknown` | Nothing records what was installed, so aireg can't tell which side changed. |
-| `unavailable` | `unavailable` | The registry lists it but would not serve it. |
+| `unavailable` | `unavailable` | The registry lists it but would not serve it, or no longer lists it. |
 
 ## Exit status
 

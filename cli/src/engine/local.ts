@@ -30,8 +30,8 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
   const next = cloneLock(previous);
   for (const name of names) {
     const artifact = generated.artifacts[name];
-    // Absent from the fresh plan means the registry no longer offers it, so
-    // the row goes. A name that was never locked has nothing to remove.
+    // Absent from the fresh plan means nothing asks for it any more, so the row
+    // goes. A name that was never locked has nothing to remove.
     if (artifact === undefined) delete next.artifacts[name];
     else next.artifacts[name] = artifact;
   }
@@ -60,6 +60,7 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
     unresolved: plan.unresolved,
     conflicts: plan.conflicts,
     withheld: plan.withheld.filter((item) => names.has(item.name)),
+    unlisted: plan.unlisted.filter((item) => names.has(item.name)),
   };
 }
 

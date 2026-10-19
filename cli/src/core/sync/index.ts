@@ -10,6 +10,7 @@ import { closure } from "#core/plan/depends.ts";
 import type { Acquired, Fetch, Selected } from "#core/plan/model.ts";
 import { fetchFrom, listedAt } from "#core/plan/model.ts";
 import { select } from "#core/plan/select.ts";
+import { type Unlisted, unlistedReason, unlistedRows } from "#core/plan/unlisted.ts";
 import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
 import { classify } from "./classify.ts";
 import type { Digests, SyncItem } from "./model.ts";
@@ -124,6 +125,27 @@ function withheldRow(
 }
 
 /**
+ * Why the registry will not hand an installed row over, which leaves it for a person to settle:
+ * it withholds the version, or no longer lists the artifact. Neither is a deletion.
+ */
+function heldBack(
+  name: string,
+  previous: LockArtifact | undefined,
+  acquired: readonly Acquired[],
+  unlisted: ReadonlyMap<string, Unlisted>,
+): string | undefined {
+  const withheld = withheldRow(previous, acquired);
+  const gone = unlisted.get(name);
+  const why =
+    withheld !== undefined
+      ? withheldMessage(withheld)
+      : gone === undefined
+        ? undefined
+        : unlistedReason(gone);
+  return why === undefined ? undefined : `${why}; run \`aireg remove ${name}\` to take it out`;
+}
+
+/**
  * Read, never acted on. Every sync starts here and then decides what it is
  * willing to do, which is why `--dry-run` and a real run agree.
  */
@@ -151,6 +173,7 @@ export async function reconcile(
       .map((copy) => [copy.name, copy]),
   );
   const names = new Set([...byName.keys(), ...Object.keys(lock.artifacts), ...unlocked.keys()]);
+  const unlisted = new Map(unlistedRows(manifest, lock, acquired).map((row) => [row.name, row]));
 
   const items: SyncItem[] = [];
   for (const name of [...names].sort()) {
@@ -174,9 +197,8 @@ export async function reconcile(
     );
 
     const watch = watchOf(previous, item);
-    const withheld = item === undefined ? withheldRow(previous, acquired) : undefined;
-    if (withheld !== undefined) {
-      // Kept for a person to settle: the registry still lists it, at a version it will not serve.
+    const held = item === undefined ? heldBack(name, previous, acquired, unlisted) : undefined;
+    if (held !== undefined) {
       items.push({
         name,
         kind,
@@ -184,7 +206,7 @@ export async function reconcile(
         path,
         disposition: "unavailable",
         digests: { base: undefined, local: undefined, upstream: undefined },
-        detail: `${withheldMessage(withheld)}; run \`aireg remove ${name}\` to take it out`,
+        detail: held,
       });
       continue;
     }

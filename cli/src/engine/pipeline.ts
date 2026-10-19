@@ -29,6 +29,7 @@ import type { Acquired, Action, Kept, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
 import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
 import { survey } from "#core/plan/survey.ts";
+import { type Unlisted, unlistedMessage } from "#core/plan/unlisted.ts";
 import { blockedTargets } from "#core/plan/writable.ts";
 import { unmetEngine } from "#core/semver.ts";
 import {
@@ -419,10 +420,35 @@ function refuseWithheld(
     printer.warning(`${line}.`);
   }
   if (blocked.length === 0) return;
-  const commands = blocked.map(({ name }) => `\`aireg remove ${name}\``);
   throw new AiregError(`${list(keptLines(blocked))}.`, {
     code: ErrorCode.Invalid,
-    hint: `Run ${list(commands)} to take ${blocked.length === 1 ? "it" : "them"} out.`,
+    hint: removeHint(blocked.map(({ name }) => name)),
+  });
+}
+
+/** The commands that take each kept row out, said once for all of them. */
+function removeHint(names: readonly string[]): string {
+  const commands = names.map((name) => `\`aireg remove ${name}\``);
+  return `Run ${list(commands)} to take ${names.length === 1 ? "it" : "them"} out.`;
+}
+
+/**
+ * A copy its registry stopped listing stays installed, never removed by a short listing. One this
+ * run was moving fails it, once the rest is in; one it only held is a warning.
+ */
+function refuseUnlisted(
+  unlisted: readonly Unlisted[],
+  printer: Printer,
+  moving: ReadonlySet<string> | undefined,
+): void {
+  const moved = unlisted.filter((item) => moving?.has(item.name) === true);
+  const held = unlisted.filter((item) => !moved.includes(item));
+  for (const item of held) printer.warning(`${unlistedMessage(item)}.`);
+  if (held.length > 0) printer.hint(removeHint(held.map((item) => item.name)));
+  if (moved.length === 0) return;
+  throw new AiregError(`${list(moved.map(unlistedMessage))}.`, {
+    code: ErrorCode.NotFound,
+    hint: removeHint(moved.map((item) => item.name)),
   });
 }
 
@@ -701,6 +727,7 @@ async function write(
       }
       report.plan(planned, roots, aside, { targets: named, harnesses });
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
+      refuseUnlisted(planned.unlisted, printer, undefined);
       return {
         plan: planned,
         applied: undefined,
@@ -749,6 +776,7 @@ async function write(
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
     refuseWithheld(planned, printer, hooks.moving);
+    refuseUnlisted(planned.unlisted, printer, hooks.moving);
     return { plan: planned, applied, before: lock, targets: named, harnesses, scope: roots.scope };
   } finally {
     await closeAll(acquired);

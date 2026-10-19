@@ -2,6 +2,7 @@ import { dict } from "#core/fields.ts";
 import { emptyLock, type Lock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
 import {
+  carryUnlisted,
   carryUnopened,
   carryUnresolved,
   carryWithheld,
@@ -114,6 +115,7 @@ function planWith(
     else planItem(item, state);
   }
   const withheld = carryWithheld(state, acquired);
+  const unlisted = carryUnlisted(state, manifest, acquired);
   carryUnresolved(state, needs);
   removeStale(state);
   flushUnlinks(state, held);
@@ -139,6 +141,7 @@ function planWith(
     unresolved: needs.unresolved,
     conflicts: [...needs.conflicts, ...nameClashes(needs, selected)],
     withheld,
+    unlisted,
   };
   return { plan, selected };
 }
