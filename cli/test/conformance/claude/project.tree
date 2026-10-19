@@ -1,0 +1,6 @@
+project/
+project/.claude/
+project/.claude/agents/
+project/.claude/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+project/.claude/skills/
+project/.claude/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint

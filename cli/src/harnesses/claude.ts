@@ -9,7 +9,7 @@ export const claude = defineHarness({
   detect: { env: ["CLAUDE_CONFIG_DIR"], binary: ["claude"], caller: ["CLAUDECODE"] },
   kinds: {
     // `plugins/` is Claude's own store and is never scanned; a plugin manifest
-    // makes a directory under `skills/` a plugin, in a project's as in the user's.
+    // makes a directory under `skills/` a plugin, which a project loads once trusted.
     plugin: {
       shape: "directory",
       subdir: "skills",
@@ -18,4 +18,5 @@ export const claude = defineHarness({
     skill: { shape: "directory", subdir: "skills" },
     agent: { shape: "file", subdir: "agents", extension: ".md" },
   },
+  verified: { command: ["claude", "--version"], range: "2.1.296" },
 });
