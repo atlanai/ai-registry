@@ -181,8 +181,11 @@ export interface HarnessDefinition {
   importable?: boolean | undefined;
   roots: {
     project: string;
-    /** `default` is under `~/`; `env` names the variable the harness itself reads to move it. */
-    user: { default: string; env?: string | undefined };
+    /**
+     * `default` is under `~/`; `env` names the variable the harness itself reads to move it,
+     * and `within` the root's path inside the folder that variable names, when not the folder itself.
+     */
+    user: { default: string; env?: string | undefined; within?: string | undefined };
   };
   detect?: Detect | "never" | undefined;
   /**
@@ -214,6 +217,8 @@ export interface Target {
   projectRoot: string;
   userRoot: string;
   envHome: string | undefined;
+  /** The root's path inside the folder `envHome` names, when not that folder itself. */
+  envWithin: string | undefined;
   detect: Signals | "never";
   kinds: Partial<Record<ArtifactKind, KindMapping>>;
   /** Only the kinds whose reads differ from this harness's own folder. */

@@ -22,6 +22,7 @@ function harness(register: RegisterEntry[]): Harnesses {
     projectRoot: ".tool",
     userRoot: root,
     envHome: undefined,
+    envWithin: undefined,
     detect: { env: [], binary: [], paths: [] },
     kinds: { plugin: { subdir: "plugins/{source}/{name}", shape: "directory", register } },
     reads: {},

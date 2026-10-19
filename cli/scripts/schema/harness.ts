@@ -179,6 +179,12 @@ export const Harness = Type.Object(
                 description: "The variable the harness itself reads to move it.",
               }),
             ),
+            within: Type.Optional(
+              Type.String({
+                minLength: 1,
+                description: "The root's path inside the folder `env` names, when not that folder.",
+              }),
+            ),
           },
           { additionalProperties: false },
         ),

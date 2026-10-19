@@ -1,9 +1,10 @@
 import { mkdir, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect } from "vitest";
 import { codex } from "#harnesses/codex.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { resolveHarnesses } from "./index.ts";
+import type { Target } from "./contract.ts";
+import { resolveHarnesses, targetRoot } from "./index.ts";
 import { loadHarnessFiles } from "./load.ts";
 
 let env: NodeJS.ProcessEnv;
@@ -49,6 +50,19 @@ describe("harness files", () => {
     const builtIn = resolveHarnesses({ ...env, AIREG_HOME: join(dir, "none") }).codex;
     expect(problems()).toEqual([]);
     expect({ ...resolveHarnesses(env).codex, origin: "built-in" }).toEqual(builtIn);
+  });
+
+  test("move a user root to its place inside the folder its variable names", async () => {
+    const roots = {
+      project: ".tool",
+      user: { default: "~/.tool", env: "TOOL_HOME", within: ".tool" },
+    };
+    await save("tool.json", { ...TOOL, roots });
+    const tool = resolveHarnesses(env).tool as Target;
+    expect(targetRoot(tool, "user", "/work", { TOOL_HOME: "/elsewhere" })).toBe(
+      resolve("/elsewhere", ".tool"),
+    );
+    expect(targetRoot(tool, "user", "/work", {})).toBe(join(env.HOME as string, ".tool"));
   });
 
   test("give each profile folder a harness of its own", async () => {

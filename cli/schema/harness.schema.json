@@ -464,6 +464,11 @@
               "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
               "description": "The variable the harness itself reads to move it.",
               "type": "string"
+            },
+            "within": {
+              "minLength": 1,
+              "description": "The root's path inside the folder `env` names, when not that folder.",
+              "type": "string"
             }
           }
         }

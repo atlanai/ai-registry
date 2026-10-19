@@ -39,6 +39,11 @@ export function harnessProblems(
     for (const path of [definition.roots.project, definition.roots.user.default.slice(2)]) {
       pathProblem(path, [], report);
     }
+    const within = definition.roots.user.within;
+    if (within !== undefined) {
+      pathProblem(within, [], report);
+      if (definition.roots.user.env === undefined) report("roots.user.within needs an env.");
+    }
     const instances = definition.instances?.root;
     if (instances !== undefined) instanceProblems(instances, report);
     for (const kind of KINDS) {

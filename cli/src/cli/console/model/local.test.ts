@@ -19,6 +19,7 @@ function harnesses(): Harnesses {
       projectRoot: join(root, "project"),
       userRoot: root,
       envHome: undefined,
+      envWithin: undefined,
       detect: { env: [], binary: [], paths: [] },
       kinds: { skill: { subdir: "skills", shape: "directory" } },
       reads: {},

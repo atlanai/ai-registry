@@ -38,7 +38,7 @@ A file holds the same keys a built-in harness has, as [`harness.schema.json`](ht
 | `id`, `displayName` | The name `--for` takes, and the name aireg prints. |
 | `overrides` | `true` to replace the built-in harness with this id. |
 | `kind` | `coding` (the default), `personal`, or `shared` for a folder several tools read. |
-| `roots` | `project`, the folder in a project, and `user.default`, the folder under `~/`. `user.env` names the variable the harness itself reads to move it. |
+| `roots` | `project`, the folder in a project, and `user.default`, the folder under `~/`. `user.env` names the variable the harness itself reads to move it, and `user.within` the root's path inside the folder that variable names, for a variable that names the folder holding the root. |
 | `detect` | Lists of variables (`env`), programs (`binary`) and folders (`paths`) whose presence means the harness is installed, or `never`. |
 | `reads` | The harnesses whose folders it also reads, per kind, most preferred first. |
 | `kinds` | Where each of `skill`, `agent` and `plugin` lands; see below. |

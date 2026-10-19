@@ -61,6 +61,7 @@ function toTarget(
     projectRoot: definition.roots.project,
     userRoot: expandUserPath(definition.roots.user.default, env),
     envHome: definition.roots.user.env,
+    envWithin: definition.roots.user.within,
     detect:
       detect === "never"
         ? "never"
@@ -104,6 +105,7 @@ function instancesOf(definition: HarnessDefinition, env: NodeJS.ProcessEnv, orig
         displayName: `${definition.displayName} (${profile})`,
         userRoot: join(dirname(pattern), folder),
         envHome: undefined,
+        envWithin: undefined,
       },
     ];
   });
@@ -279,7 +281,8 @@ export function targetRoot(
 ): string {
   if (scope !== "user") return join(cwd, target.projectRoot);
   const override = target.envHome === undefined ? undefined : env[target.envHome]?.trim();
-  return override !== undefined && override !== "" ? resolve(override) : target.userRoot;
+  if (override === undefined || override === "") return target.userRoot;
+  return resolve(override, target.envWithin ?? "");
 }
 
 /** Undefined when the harness does not load that kind. */
