@@ -1,10 +1,5 @@
 import { defineHarness } from "#core/harness/contract.ts";
 
-const PLUGIN_BODY = {
-  interface: { displayName: "{name}", shortDescription: "{description}" },
-  skills: "./skills/",
-};
-
 export const codex = defineHarness({
   id: "codex",
   displayName: "Codex",
@@ -25,14 +20,13 @@ export const codex = defineHarness({
       subdir: "plugins/cache/{source}/{name}/local",
       scope: "user",
       place: "fan",
+      // Only this manifest: under a portable root `plugin.json`, Codex skips linked skills.
       manifest: [
-        { path: ".codex-plugin/plugin.json", body: PLUGIN_BODY },
-        // The portable manifest, which Codex reads only under this schema.
         {
-          path: "plugin.json",
+          path: ".codex-plugin/plugin.json",
           body: {
-            $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-            ...PLUGIN_BODY,
+            interface: { displayName: "{name}", shortDescription: "{description}" },
+            skills: "./skills/",
           },
         },
       ],
