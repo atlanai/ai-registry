@@ -170,6 +170,7 @@ export interface RunResult {
   /** The harnesses this run installed for, so a report names them as they were chosen. */
   targets: readonly string[];
   harnesses: Harnesses;
+  scope: Scope;
 }
 
 export interface RunHooks {
@@ -692,13 +693,27 @@ async function write(
       }
       report.plan(planned, roots, aside, { targets: named, harnesses });
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
-      return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
+      return {
+        plan: planned,
+        applied: undefined,
+        before: lock,
+        targets: named,
+        harnesses,
+        scope: roots.scope,
+      };
     }
 
     await refuseBlocked(planned);
 
     if (hooks.approve !== undefined && !(await hooks.approve(planned, named))) {
-      return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
+      return {
+        plan: planned,
+        applied: undefined,
+        before: lock,
+        targets: named,
+        harnesses,
+        scope: roots.scope,
+      };
     }
 
     const edited = formatManifest(manifest) !== loaded.manifestAsRead;
@@ -726,7 +741,7 @@ async function write(
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
     refuseWithheld(planned, printer, hooks.moving);
-    return { plan: planned, applied, before: lock, targets: named, harnesses };
+    return { plan: planned, applied, before: lock, targets: named, harnesses, scope: roots.scope };
   } finally {
     await closeAll(acquired);
   }

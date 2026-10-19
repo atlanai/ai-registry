@@ -301,6 +301,12 @@ export function projectionPath(
   return join(targetRoot(target, scope, cwd, env), mapping.subdir, leaf);
 }
 
+/** The command a person runs before this harness loads a kind placed at `scope`, if any. */
+export function trustFor(target: Target, kind: ArtifactKind, scope: Scope): string | undefined {
+  const trust = target.trust[kind];
+  return trust === undefined || (trust.scope ?? scope) !== scope ? undefined : trust.run;
+}
+
 /** True when this harness loads a directory of artifacts as one plugin. */
 export function takesPlugin(target: Target, scope: Scope = "user"): boolean {
   const mapping = target.kinds.plugin;

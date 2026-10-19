@@ -8,11 +8,12 @@ import { installed } from "#cli/render/installed.ts";
 import { renderStatus } from "#cli/render/status.ts";
 import { chosenFor, scopeTargets, toolName } from "#cli/render/tools.ts";
 import { ExitCode } from "#core/errors.ts";
-import { type Harnesses, names } from "#core/harness/index.ts";
+import { type Harnesses, names, trustFor } from "#core/harness/index.ts";
 import { type Lock, readLock } from "#core/lock.ts";
+import { namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
 import { status, worstState } from "#core/plan/status.ts";
 import { survey } from "#core/plan/survey.ts";
-import { roots as makeRoots } from "#core/store/paths.ts";
+import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
 import { type Candidate, candidates, type DanglingLink, danglingLinks } from "#core/sync/adopt.ts";
 import { table } from "#core/term/table.ts";
 import { load } from "#engine/pipeline.ts";
@@ -35,6 +36,32 @@ async function shadowed(scope: string, cwd: string, lock: Lock): Promise<string[
     .filter(([, row]) => other.has(`${row.kind}\0${row.name}`))
     .map(([name]) => name)
     .sort();
+}
+
+/** The commands a person runs before each harness loads an artifact; aireg never runs them. */
+function needsApproval(
+  lock: Lock,
+  roots: Roots,
+  harnesses: Harnesses,
+): Map<string, { harness: string; run: string }[]> {
+  const out = new Map<string, { harness: string; run: string }[]>();
+  for (const [name, entry] of Object.entries(lock.artifacts)) {
+    const namespace = namespaceOf({
+      kind: entry.kind,
+      name,
+      group: entry.namespace,
+      source: entry.registry,
+    });
+    const steps = entry.links.flatMap((link) => {
+      const target = harnesses[link.harness];
+      if (target === undefined) return [];
+      const plugin = pluginLinkAt(link, namespace, entry.registry, { roots, harnesses });
+      const run = trustFor(target, plugin === undefined ? entry.kind : "plugin", roots.scope);
+      return run === undefined ? [] : [{ harness: link.harness, run }];
+    });
+    if (steps.length > 0) out.set(name, steps);
+  }
+  return out;
 }
 
 /** Relative inside a project, so the path reads the same in every checkout. */
@@ -113,11 +140,16 @@ export async function run(context: CommandContext): Promise<void> {
 
   if (context.printer.format === "json") {
     const neededBy = new Map(rows.map((row) => [row.name, row.neededBy]));
+    const approvals = needsApproval(lock, roots, harnesses);
     context.printer.json({
       ok: true,
       data: {
         scope: roots.scope,
-        artifacts: statuses.map((item) => ({ ...item, neededBy: neededBy.get(item.name) })),
+        artifacts: statuses.map((item) => ({
+          ...item,
+          neededBy: neededBy.get(item.name),
+          needsApproval: approvals.get(item.name),
+        })),
         shadowed: clashes,
         unmanaged: loose,
         dangling,

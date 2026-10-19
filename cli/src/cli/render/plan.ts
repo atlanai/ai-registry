@@ -1,5 +1,6 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
+import { type Harnesses, trustFor } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
@@ -149,9 +150,40 @@ function unchanged(printer: Printer, plan: Plan): void {
 type Tools = (names: readonly string[], folders?: (name: string) => string[]) => string;
 
 /** An applied run: the plan, what apply did, and the lockfile it started from. */
-export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses"> & {
+export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses" | "scope"> & {
   applied: ApplyResult;
 };
+
+/** What a harness asks of a person once it was given something; printed, never run. */
+function followUps(
+  printer: Printer,
+  shown: readonly Shown[],
+  kindOf: (name: string) => ArtifactKind | undefined,
+  harnesses: Harnesses,
+  scope: Ran["scope"],
+): void {
+  const steps = new Set<string>();
+  const reloads = new Set<string>();
+  for (const action of shown) {
+    const harness =
+      action.kind === "link"
+        ? action.harness
+        : action.kind === "unlink"
+          ? action.link?.harness
+          : undefined;
+    const target = harness === undefined ? undefined : harnesses[harness];
+    if (target === undefined) continue;
+    if (target.reload !== undefined) reloads.add(target.reload);
+    const kind = action.kind === "link" && action.plugin === true ? "plugin" : kindOf(action.name);
+    const run =
+      action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
+    if (run !== undefined) {
+      steps.add(`${target.displayName} loads ${kind}s here only after you run \`${run}\`.`);
+    }
+  }
+  for (const step of steps) printer.hint(step);
+  for (const reload of reloads) printer.hint(reload);
+}
 
 /**
  * Names what apply did, not what was planned: a link kept for a file of yours is not one.
@@ -159,7 +191,7 @@ export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses"> &
  */
 export function summarize(
   printer: Printer,
-  { plan, applied, before, targets, harnesses }: Ran,
+  { plan, applied, before, targets, harnesses, scope }: Ran,
   told: ReadonlySet<string> = new Set(),
 ): void {
   const shown = plan.actions.filter(
@@ -215,6 +247,14 @@ export function summarize(
     if (told.has(name) || harnessesOf(name).length === 0) continue;
     printer.note("runs", `${describeCarried(carries)} from ${name}, in ${tools([name])}`);
   }
+  const kindOf = (name: string) => held?.[name]?.kind ?? before.artifacts[name]?.kind;
+  followUps(
+    printer,
+    shown.filter((action) => acted.has(action.name)),
+    kindOf,
+    harnesses,
+    scope,
+  );
 }
 
 /**

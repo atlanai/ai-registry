@@ -12,6 +12,7 @@ function printed(
   applied: Partial<ApplyResult>,
   before: Record<string, unknown> = {},
   targets: string[] = ["claude", "codex"],
+  harnesses = resolveHarnesses({ HOME: "/home/dev" }),
 ): string[] {
   const lines: string[] = [];
   const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
@@ -31,7 +32,8 @@ function printed(
     applied: result,
     before: { artifacts: before, registries: {} } as unknown as Lock,
     targets,
-    harnesses: resolveHarnesses({ HOME: "/home/dev" }),
+    harnesses,
+    scope: "project",
   });
   return lines;
 }
@@ -94,6 +96,34 @@ describe("summarize", () => {
     expect(printed(actions, applied)).toEqual([
       "✓ Installed tools for Claude Code and Codex.",
       "  runs   hooks and MCP servers from tools, in Claude Code and Codex",
+    ]);
+  });
+
+  it("says once what a harness asks of a person before it loads what was placed", () => {
+    const harnesses = resolveHarnesses({ HOME: "/home/dev" });
+    harnesses.claude = {
+      ...harnesses.claude!,
+      trust: { skill: { run: "tool trust" }, agent: { run: "tool trust --agents", scope: "user" } },
+      reload: "Run `/reload` in Claude Code.",
+    };
+    const lock = {
+      artifacts: {
+        lint: { kind: "skill", links: [at("claude")] },
+        fmt: { kind: "skill", links: [at("claude")] },
+        reviewer: { kind: "agent", links: [at("claude")] },
+      },
+    };
+    const actions = [link("lint", "claude"), link("fmt", "claude"), link("reviewer", "claude")];
+    const applied = {
+      performed: { link: 3 } as never,
+      installed: ["lint", "fmt", "reviewer"],
+      added: ["lint", "fmt", "reviewer"],
+      lock: lock as never,
+    };
+    expect(printed(actions, applied, {}, ["claude"], harnesses)).toEqual([
+      "✓ Installed lint, fmt and reviewer for Claude Code.",
+      "hint: Claude Code loads skills here only after you run `tool trust`.",
+      "hint: Run `/reload` in Claude Code.",
     ]);
   });
 
