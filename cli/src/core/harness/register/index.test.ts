@@ -123,6 +123,44 @@ describe("applyRegister", () => {
     expect(await readFile(config, "utf8")).toBe("");
   });
 
+  test("lists a copy the lockfile records once in YAML, and restores the file with the last", async () => {
+    const LIST: RegisterEntry = {
+      file: "config.yaml",
+      format: "yaml",
+      at: ["skills", "dirs"],
+      append: "{root}/plugins/{source}",
+    };
+    const before = "# mine\nmodel: x # pinned\n";
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "config.yaml"), before);
+    const sales = placement("acme", "sales");
+    const ops = placement("acme", "ops");
+    await mkdir(sales, { recursive: true });
+    await mkdir(ops, { recursive: true });
+    const touched = [
+      { path: sales, harness: "tool" },
+      { path: ops, harness: "tool" },
+    ];
+    await applyRegister(touched, harness([LIST]), home, new Set([sales, ops]));
+    const config = join(root, "config.yaml");
+    expect(await readFile(config, "utf8")).toBe(
+      `${before}skills:\n  dirs:\n    - ${join(root, "plugins", "acme")}\n`,
+    );
+
+    await rm(ops, { recursive: true });
+    await applyRegister(
+      [{ path: ops, harness: undefined }],
+      harness([LIST]),
+      home,
+      new Set([sales]),
+    );
+    expect(await readFile(config, "utf8")).toContain("dirs:");
+
+    await rm(sales, { recursive: true });
+    await applyRegister([{ path: sales, harness: undefined }], harness([LIST]), home, new Set());
+    expect(await readFile(config, "utf8")).toBe(before);
+  });
+
   test.skipIf(process.platform === "win32")(
     "edits a linked config through its link and keeps its mode",
     async () => {

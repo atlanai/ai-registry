@@ -73,7 +73,7 @@ export type ConfigValue =
 interface RegisterBase {
   /** Relative to the harness root. */
   file: string;
-  format: "toml" | "json";
+  format: "toml" | "json" | "yaml";
   /** Key path to the table this entry writes in. */
   at: string[];
   /** What a missing file starts as; one back to this on removal is deleted. */
@@ -92,11 +92,19 @@ export type RegisterEntry = RegisterBase &
         /** Keys set in the table at `at`. */
         value: Record<string, ConfigValue>;
         upsert?: undefined;
+        append?: undefined;
       }
     | {
-        /** One item per placement in the JSON list at `at`, matched on `key`. */
+        /** One item per placement in the list at `at`, matched on `key`. */
         upsert: { key: string; item: Record<string, ConfigValue> };
         value?: undefined;
+        append?: undefined;
+      }
+    | {
+        /** One text item in the list at `at`, kept while any placement it expands for remains. */
+        append: string;
+        value?: undefined;
+        upsert?: undefined;
       }
   );
 

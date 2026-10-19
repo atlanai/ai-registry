@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+import { Document, isMap, isSeq, parseDocument } from "yaml";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isRecord } from "#core/fields.ts";
@@ -131,5 +133,66 @@ export function jsonDocument(text: string | undefined, start: Table, file: strin
     },
     render: () => `${JSON.stringify(root, null, 2)}\n`,
     value: () => root,
+  };
+}
+
+/** Edited through the document, so the comments and key order a person wrote survive. */
+export function yamlDocument(text: string | undefined, start: Table, file: string): ConfigDocument {
+  const invalid = (what: string) => new AiregError(`${file} ${what}.`, { code: ErrorCode.Invalid });
+  const doc =
+    text === undefined || text.trim() === ""
+      ? new Document(structuredClone(start))
+      : parseDocument(text, { logLevel: "error" });
+  if (doc.errors.length > 0) throw invalid("is not valid YAML");
+  if (!isMap(doc.contents)) throw invalid("does not hold a YAML mapping");
+
+  const get = (at: readonly string[]): unknown =>
+    at.reduce<unknown>((node, key) => (isRecord(node) ? node[key] : undefined), doc.toJS());
+  const table = (at: readonly string[]): Table | undefined => {
+    const found = get(at);
+    return isRecord(found) ? found : undefined;
+  };
+
+  return {
+    table,
+    set: (at, values) => {
+      const found = get(at);
+      if (found !== undefined && !isRecord(found)) {
+        throw invalid(`has a ${quoted(at.join("."))} that is not a mapping`);
+      }
+      for (const [key, value] of Object.entries(values)) doc.setIn([...at, key], value);
+    },
+    unset: (at, keys) => {
+      if (table(at) === undefined) return;
+      for (const key of keys) doc.deleteIn([...at, key]);
+    },
+    drop: (at) => {
+      doc.deleteIn(at);
+    },
+    list: (at) => {
+      const found = get(at);
+      if (found === undefined) return undefined;
+      if (!Array.isArray(found)) throw invalid(`has a ${quoted(at.join("."))} that is not a list`);
+      return found;
+    },
+    setList: (at, items) => {
+      const node = doc.getIn(at, true);
+      if (!isSeq(node)) {
+        doc.setIn(at, items);
+        return;
+      }
+      // Items already there keep their place and comments; only the difference changes.
+      node.items = node.items.filter((item) =>
+        items.some((want) => isDeepStrictEqual(want, (item as { toJSON(): unknown }).toJSON())),
+      );
+      for (const want of items) {
+        const has = node.items.some((item) =>
+          isDeepStrictEqual(want, (item as { toJSON(): unknown }).toJSON()),
+        );
+        if (!has) node.items.push(doc.createNode(want));
+      }
+    },
+    render: () => doc.toString(),
+    value: () => doc.toJS(),
   };
 }

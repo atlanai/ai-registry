@@ -545,7 +545,7 @@ async function finish(run: Run, plan: Plan): Promise<void> {
     await guardManagedPath(roots.artifacts, roots);
     await ensureScopeIgnore(roots);
   }
-  run.kept.push(...(await applyRegistrations(plan.actions, roots)));
+  run.kept.push(...(await applyRegistrations(plan.actions, roots, run.recorded ?? run.before)));
 }
 
 const linked = (lock: Lock | undefined, name: string): number =>
