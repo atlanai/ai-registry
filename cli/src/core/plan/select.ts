@@ -263,6 +263,7 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void 
     contents:
       entry.kind === "plugin" ? contentsOf(entry, source.catalog.entries, placement.plugin) : [],
     ...(placement.plugin === undefined ? {} : { plugin: placement.plugin }),
+    ...(placement.revision === undefined ? {} : { revision: placement.revision }),
     group: entry.group,
     targets: ref.targets,
     named: ref.name !== undefined,

@@ -128,12 +128,7 @@ function lockedRequest(
       const row = lock.artifacts[name] as LockArtifact;
       const pinned = pins.some((want) => covers(want, row));
       const free = moving.has(name) || pinned || row.version === undefined || whole || redeclared;
-      asked.set(name, {
-        name: row.name,
-        namespace: row.namespace,
-        kind: row.kind,
-        ...(free ? {} : { version: row.version }),
-      });
+      asked.set(name, lockedWant(row, free));
     }
   }
   // A dependency is held at the version its dependents needed; the closure moves it when they do.
@@ -147,6 +142,17 @@ function lockedRequest(
     });
   }
   return { want: [...request.want, ...asked.values()], all };
+}
+
+/** A locked row asked for again: at its version and commit, unless it is free to move. */
+function lockedWant(row: LockArtifact, free: boolean): Want {
+  return {
+    name: row.name,
+    namespace: row.namespace,
+    kind: row.kind,
+    ...(free ? {} : { version: row.version }),
+    ...(free || row.revision === undefined ? {} : { revision: row.revision }),
+  };
 }
 
 /** Whether the manifest still declares a registry the way the lock recorded reading it. */
@@ -239,6 +245,7 @@ function fromRows(
       contentId: row.content,
       version: row.version,
       needs: needs.get(name),
+      ...(row.revision === undefined ? {} : { revision: row.revision }),
     });
   }
   return {
@@ -392,6 +399,7 @@ async function acquireOne(
       ...(artifact.yanked === undefined ? {} : { yanked: artifact.yanked }),
       ...statusOf(artifact),
       ...(isReadOnlyLayout(listing.layout) ? pluginOf(artifact) : {}),
+      ...revisionOf(artifact),
     });
   }
 
@@ -439,6 +447,12 @@ async function acquireOne(
     },
     close: () => open.handle.close(),
   };
+}
+
+/** A commit an adapter reports for one artifact, which the lockfile records and hands back. */
+function revisionOf(artifact: Artifact): Pick<Placement, "revision"> {
+  const { revision } = artifact;
+  return typeof revision === "string" && /^[0-9a-f]{40}$/.test(revision) ? { revision } : {};
 }
 
 /** The manifest a layout reader wrote into a plugin's spec, as text an envelope can hold. */

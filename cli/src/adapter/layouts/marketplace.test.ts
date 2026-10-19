@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { marketplace, skillsFolder } from "#test/kit/builders/layouts.ts";
 import { test } from "#test/kit/fixtures.ts";
+import type { RemotePlugin } from "./layout.ts";
 import { marketplaceLayout } from "./marketplace.ts";
 import { openTree } from "./tree.ts";
 
@@ -148,5 +149,58 @@ describe("the marketplace layout", () => {
     expect((await read(root)).warnings).toEqual([
       'Skipped "out": its source, "./../elsewhere", is not a folder inside the marketplace.',
     ]);
+  });
+
+  test("says which fetched plugin a warning is about", async ({ tmp }) => {
+    const root = await skillsFolder(join(tmp, "mkt"))
+      .json(
+        ".claude-plugin/marketplace.json",
+        entries([{ name: "far-kit", source: { source: "github", repo: "acme/far" } }]),
+      )
+      .write();
+    const far = await skillsFolder(join(tmp, "far"))
+      .skill(".", { name: "far-kit" })
+      .link("CLAUDE.md", "/etc/hostname")
+      .write();
+    const fetch = async () => ({ root: far, revision: "0".repeat(40), version: undefined });
+    const found = await marketplaceLayout.enumerate(await openTree(root), { ...context, fetch });
+    expect(found.warnings).toEqual(['In "far-kit": Skipped CLAUDE.md, which is a symlink.']);
+  });
+
+  test("fetches remote plugins side by side, eight at most, and one repository's in turn", async ({
+    tmp,
+  }) => {
+    // Twenty plugins in ten repositories, two to each.
+    const names = Array.from({ length: 20 }, (_, at) => `p${at}`);
+    const repository = (name: string) => `acme/r${Number(name.slice(1)) % 10}`;
+    const root = await skillsFolder(join(tmp, "mkt"))
+      .json(
+        ".claude-plugin/marketplace.json",
+        entries(
+          names.map((name) => ({ name, source: { source: "github", repo: repository(name) } })),
+        ),
+      )
+      .write();
+    for (const name of names) await skillsFolder(join(tmp, name)).skill(".", { name }).write();
+    let running = 0;
+    let most = 0;
+    const busy = new Set<string>();
+    const overlapped: string[] = [];
+    const fetch = async (plugin: RemotePlugin) => {
+      if (busy.has(plugin.location)) overlapped.push(plugin.location);
+      busy.add(plugin.location);
+      most = Math.max(most, ++running);
+      await new Promise((done) => setTimeout(done, 5));
+      running -= 1;
+      busy.delete(plugin.location);
+      return { root: join(tmp, plugin.name), revision: "0".repeat(40), version: undefined };
+    };
+    const found = await marketplaceLayout.enumerate(await openTree(root), { ...context, fetch });
+    expect(most).toBe(8);
+    expect(overlapped).toEqual([]);
+    expect(found.warnings).toEqual([]);
+    expect(found.artifacts.filter((item) => item.kind === "plugin").map((item) => item.id)).toEqual(
+      names.map((name) => `@remote/${name}`),
+    );
   });
 });

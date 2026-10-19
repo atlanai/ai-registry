@@ -107,7 +107,8 @@ async function enumerated(
   const kept = immutable ? SETTLED.get(key) : undefined;
   if (kept !== undefined) return structuredClone(kept);
   const found = await layout.enumerate(tree, context);
-  if (immutable) {
+  // A fetched plugin may follow a branch, so only what the checkout alone holds is kept.
+  if (immutable && found.roots === undefined) {
     SETTLED.delete(key);
     SETTLED.set(key, structuredClone(found));
     const [oldest] = SETTLED.keys();
@@ -125,6 +126,7 @@ export function openLayoutRoot(options: { immutable?: boolean } = {}): LayoutRoo
   let root: string | undefined;
   let read: LayoutId | undefined;
   const listed = new Map<string, Artifact>();
+  let roots = new Map<string, string>();
 
   const within = (artifact: Artifact): string => {
     if (root === undefined || !listed.has(artifact.id)) {
@@ -144,6 +146,7 @@ export function openLayoutRoot(options: { immutable?: boolean } = {}): LayoutRoo
       root = at;
       read = layout;
       listed.clear();
+      roots = new Map();
       if (layout === "registry") {
         return { ...(await registry.resolve(at, wanted, resolveOptions.all)), layout };
       }
@@ -160,6 +163,7 @@ export function openLayoutRoot(options: { immutable?: boolean } = {}): LayoutRoo
       if (found.artifacts.length === 0) throw nothingFound([reader]);
       const artifacts = chosen(found.artifacts, wanted, resolveOptions.all === true);
       for (const artifact of artifacts) listed.set(artifact.id, artifact);
+      roots = found.roots ?? new Map();
       return {
         artifacts,
         registry: { name: found.name ?? resolveOptions.context.namespace },
@@ -171,6 +175,8 @@ export function openLayoutRoot(options: { immutable?: boolean } = {}): LayoutRoo
     async localRoot(artifact) {
       if (read === "registry") return registry.localRoot(artifact);
       const at = within(artifact);
+      // A fetched plugin lies outside the source, so it is copied into the store from its checkout.
+      if (roots.has(artifact.id)) return undefined;
       // A skill's folder is read where it lies, only what its envelope describes copied out.
       if (artifact.id === ROOT_ID) return at;
       return besideEnvelope(artifact) ? registryPath(at, artifact.id) : undefined;
@@ -178,7 +184,8 @@ export function openLayoutRoot(options: { immutable?: boolean } = {}): LayoutRoo
 
     async fetch(artifact, file) {
       if (read === "registry") return registry.fetch(artifact, file);
-      const bytes = await rootReader(within(artifact))(file.locator);
+      const at = within(artifact);
+      const bytes = await rootReader(roots.get(artifact.id) ?? at)(file.locator);
       if (bytes === undefined) {
         throw new SpecError(`${file.locator} is missing from the source.`, {
           path: file.locator,

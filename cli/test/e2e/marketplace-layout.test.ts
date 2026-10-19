@@ -147,7 +147,9 @@ describe("a plugin marketplace", () => {
     expect(shown.stderr).toContain(
       'Skipped "docs-kit": its entry is `strict: false`, but both it and plugins/docs-kit/.claude-plugin/plugin.json name components.',
     );
-    expect(shown.stderr).toContain('Skipped "far": its github source is not one aireg reads.');
+    expect(shown.stderr).toContain(
+      'Skipped "far": aireg fetches its github source only for a marketplace it reads with git.',
+    );
     expect(shown.stderr).toContain('Skipped "made": its command source is not one aireg reads.');
   }, 60_000);
 

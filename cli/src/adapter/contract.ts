@@ -45,6 +45,8 @@ export interface Artifact {
    * tag or pseudo-version. Outside the envelope, so it never changes the content digest.
    */
   version?: string | undefined;
+  /** The commit this one artifact was read at, where it is not the source's own, as for a plugin a marketplace fetches. */
+  revision?: string | undefined;
   /** Set when the version was withdrawn, which only a pin still resolves. */
   yanked?: { reason: string | undefined } | undefined;
   /**
@@ -103,6 +105,8 @@ export interface Want {
   namespace?: string | undefined;
   /** Narrows the want to one kind, as `namespace` narrows it to one namespace. */
   kind?: ArtifactKind | undefined;
+  /** The commit a lockfile recorded for this artifact alone, which reads it again there. */
+  revision?: string | undefined;
 }
 
 /** Whether a want reaches an artifact: by name, narrowed by the namespace and kind it gives. */

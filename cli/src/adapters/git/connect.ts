@@ -13,6 +13,7 @@ import { detectLayout, openLayoutRoot } from "#adapter/layouts/index.ts";
 import { list } from "#adapter/text.ts";
 import { fail, translating } from "./errors.ts";
 import { GitError, type GitLimits } from "./exec.ts";
+import { pluginFetcher } from "./plugins.ts";
 import { resolveRef } from "./resolve.ts";
 import { holdSnapshot, snapshot } from "./snapshot.ts";
 import { parseSource } from "./url.ts";
@@ -70,7 +71,8 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
 
   /** Not a registry: one commit, chosen by the versions asked for, the ref, or the newest release. */
   const targetOf = async (want: readonly Want[]): Promise<string> => {
-    const pinned = want.filter((item) => item.version !== undefined);
+    // A want with its own revision is a fetched plugin's, whose version is its own repository's.
+    const pinned = want.filter((item) => item.version !== undefined && item.revision === undefined);
     if (pinned.length > 0) {
       const commits = await Promise.all(
         pinned.map(async (item) => ({
@@ -103,14 +105,19 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
   ): Promise<Resolution> => {
     const target = await targetOf(want);
     const at = await checkout(target, target);
-    const resolution = await files.resolve(at.root, want, { all, layout, context: layoutContext });
+    const fetch = pluginFetcher(context, limits, held, want);
+    const resolution = await files.resolve(at.root, want, {
+      all,
+      layout,
+      context: { ...layoutContext, fetch },
+    });
     const names = resolution.artifacts.map((artifact) => artifact.envelope.metadata.name);
     const served = await versions.versionsAt(at.commit, names, at.root);
     return {
       ...resolution,
       artifacts: resolution.artifacts.map((artifact) => ({
         ...artifact,
-        version: served.get(artifact.envelope.metadata.name),
+        version: artifact.version ?? served.get(artifact.envelope.metadata.name),
       })),
       sourceRevision: at.commit,
     };

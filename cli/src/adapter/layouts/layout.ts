@@ -2,12 +2,38 @@ import type { Artifact } from "../contract.ts";
 import type { LayoutId } from "./ids.ts";
 import type { Tree } from "./tree.ts";
 
+/** A plugin a marketplace lists by where to fetch it, rather than by a folder inside it. */
+export interface RemotePlugin {
+  /** The plugin's name in the marketplace. */
+  name: string;
+  /** `github`, `url` or `git-subdir`. */
+  type: string;
+  /** `owner/repo` for github, a git URL otherwise. */
+  location: string;
+  /** The folder in the repository that holds the plugin, for git-subdir. */
+  path: string | undefined;
+  ref: string | undefined;
+  /** A full commit, which wins over `ref`. */
+  sha: string | undefined;
+}
+
+/** A remote plugin fetched to a folder on disk, at the commit it was read at. */
+export interface FetchedPlugin {
+  /** The plugin's folder, read as a tree of its own. */
+  root: string;
+  revision: string;
+  /** Its version in its own repository: a tag on the commit, or a pseudo-version. */
+  version: string | undefined;
+}
+
 /** What a layout is told about the source it reads. */
 export interface LayoutContext {
   /** The namespace an artifact is listed under when the layout gives it none: the registry's name. */
   namespace: string;
   /** What to call the source when it is one artifact on its own, such as a lone SKILL.md. */
   rootName: string;
+  /** Fetches a plugin listed by where it lives; absent, such a plugin is skipped. */
+  fetch?: ((plugin: RemotePlugin) => Promise<FetchedPlugin>) | undefined;
 }
 
 /** What a layout found, and what it left out. */
@@ -18,6 +44,8 @@ export interface Found {
   warnings: string[];
   /** What the source calls itself, such as a marketplace's name. */
   name?: string | undefined;
+  /** By artifact id, the folder it is read from, where that is not the source's root. */
+  roots?: Map<string, string> | undefined;
 }
 
 /** One way a source can lay out what it holds. */

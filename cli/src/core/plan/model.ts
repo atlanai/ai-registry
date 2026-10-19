@@ -47,6 +47,8 @@ export interface Placement {
   status?: { name: string; reason: string | undefined } | undefined;
   /** For a plugin read from a source that is not a registry, what places it. */
   plugin?: PluginDocument | undefined;
+  /** The commit it was read at, where that is its own rather than the registry's. */
+  revision?: string | undefined;
 }
 
 /** A resolved registry with lazy access to artifact content. */
@@ -323,6 +325,8 @@ export interface Selected {
   version: string | undefined;
   /** For a plugin read from a source that is not a registry, what places it. */
   plugin?: PluginDocument | undefined;
+  /** The commit it was read at, where that is its own rather than the registry's. */
+  revision?: string | undefined;
   /**
    * What a plugin holds, so a harness with no plugin directory can be given
    * its parts. Empty for every other kind.
