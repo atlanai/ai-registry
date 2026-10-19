@@ -33,6 +33,7 @@ Each path is in a project, then in your user scope.
 |---|---|---|---|---|
 | Claude Code | `claude` | `.claude/skills/<name>/`, `~/.claude/skills/<name>/` | `.claude/agents/<name>.md`, `~/.claude/agents/<name>.md` | `CLAUDE_CONFIG_DIR` |
 | Codex | `codex` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.codex/agents/<name>.toml`, `~/.codex/agents/<name>.toml`, as TOML | `CODEX_HOME` |
+| Cursor | `cursor` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.cursor/agents/<name>.md`, `~/.cursor/agents/<name>.md` | None |
 
 ## Harness files
 
