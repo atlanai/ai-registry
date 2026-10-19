@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import { emptyLock, type LinkMode, type Lock } from "#core/lock.ts";
@@ -34,7 +34,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function renderPlan(recorded?: LinkMode): Plan {
+function renderPlan(recorded?: LinkMode, entry?: { to: string; entry: string }): Plan {
   const lock: Lock = emptyLock();
   lock.artifacts.reviewer = {
     registry: "kit",
@@ -60,7 +60,7 @@ function renderPlan(recorded?: LinkMode): Plan {
         from: copy,
         to: target,
         copy: true,
-        codec: CODEC,
+        ...(entry === undefined ? { codec: CODEC } : entry),
         ...(recorded === undefined ? {} : { recorded }),
       },
       { kind: "record", lock },
@@ -91,5 +91,25 @@ describe("a rendered placement", () => {
     expect(applied.lock?.artifacts.reviewer?.links).toEqual([]);
     expect(applied.lock?.artifacts.reviewer?.blocked).toBeUndefined();
     await expect(lstat(target)).rejects.toThrow();
+  });
+
+  test("takes on a folder holding only its entry, and keeps one holding anything else", async () => {
+    const folder = join(roots.base, ".claude", "agents", "reviewer");
+    const entry = { to: folder, entry: "AGENT.md" };
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, "AGENT.md"), AGENT);
+    await writeFile(join(folder, "notes.md"), "mine\n");
+    const kept = await apply(renderPlan(undefined, entry), roots, () =>
+      Promise.reject(new Error("no fetch")),
+    );
+    expect(kept.kept).toEqual([{ name: "reviewer", path: folder }]);
+    expect(await readFile(join(folder, "notes.md"), "utf8")).toBe("mine\n");
+
+    await rm(join(folder, "notes.md"));
+    const adopted = await apply(renderPlan(undefined, entry), roots, () =>
+      Promise.reject(new Error("no fetch")),
+    );
+    expect(adopted.kept).toEqual([]);
+    expect(await readFile(join(folder, "AGENT.md"), "utf8")).toBe(AGENT);
   });
 });
