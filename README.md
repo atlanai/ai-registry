@@ -22,9 +22,9 @@ An agent registry stores your organization's AI artifacts and manages their life
 
 ### Why not just a git repository of skills, or a plugin marketplace?
 
-A registry can be a git repository. The spec defines what goes in it.
+A registry can be a git repository. The difference is the information it holds: the spec defines not only what each artifact is, but which version of each artifact is the approved one.
 
-- **A git repository of skills** holds the files but no record of which version is current, what its digest is, or whether it's deprecated. Each tool that reads it infers those from folder names and commits, and two tools can infer different answers. The spec records them in `versions.json` and `index.json`, so every client that implements it reads the same answer from the same repository.
+- **A git repository of skills** holds the files but no record of which version is approved, what its digest is, or whether it's deprecated. Each tool that reads it infers those from folder names and commits, and two tools can infer different answers. The spec records them in `versions.json` and `index.json`, so every client that implements it reads the same answer from the same repository.
 - **A plugin marketplace** uses a format its harness vendor defines, and that vendor's harness reads it. A registry wraps each native file, such as `SKILL.md`, byte for byte, so any client that implements the spec can read it, and aireg installs the same version into Claude Code, Codex and Cursor.
 
 ## Get started
