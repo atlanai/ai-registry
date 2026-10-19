@@ -176,6 +176,18 @@ export interface Dispatch {
   hosts?: readonly string[];
   /** Whether the adapter reads a folder on this machine. */
   paths?: boolean;
+  /**
+   * Web addresses on any host but those listed, such as a site's own: narrower than a scheme
+   * claim, so it wins over an adapter that takes the scheme alone.
+   */
+  sites?: SiteClaim;
+}
+
+/** A claim on URLs by scheme, leaving out hosts, with their subdomains, and path endings. */
+export interface SiteClaim {
+  schemes: readonly string[];
+  exceptHosts?: readonly string[];
+  exceptSuffixes?: readonly string[];
 }
 
 /** The registry a connection is for, as the manifest declares it. */

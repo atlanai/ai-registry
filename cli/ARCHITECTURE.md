@@ -13,7 +13,7 @@ main.ts             parses argv and runs one command; nothing imports it
 cli/                commands, prompts, rendering, the console UI and onboarding
 daemon/             the background service: JSON-RPC server, jobs, scheduler, run history
 self/  engine/      installing, updating and removing aireg itself; what the CLI and the daemon both run
-accounts/ adapters/ sign-in and the registries an account reaches; the built-in adapters, git/ and local/
+accounts/ adapters/ sign-in and the registries an account reaches; the built-in adapters, git/, local/ and well-known/
 core/               everything else, with no knowledge of the layers above
 harnesses/          one typed definition per harness; imports only core/harness/contract.ts
 adapter/            the public adapter contract; imports nothing else

@@ -10,7 +10,7 @@ import { ExitCode } from "#core/errors.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import { type Manifest, pinOf } from "#core/manifest.ts";
 import { abbreviate, type Printer, sentence } from "#core/output.ts";
-import { type Request, wanted } from "#core/plan/acquire.ts";
+import { type Request, recordedAdapter, wanted } from "#core/plan/acquire.ts";
 import { listedAt } from "#core/plan/model.ts";
 import { excluded } from "#core/plan/select.ts";
 import type { Ref } from "#core/ref.ts";
@@ -84,7 +84,7 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
   try {
     const credential = await credentialFor(alias, declared, location);
     const open = await connectSource(
-      { alias, location, adapter: declared.adapter, config: declared.config },
+      { alias, location, adapter: recordedAdapter(declared, lock, alias), config: declared.config },
       credential === undefined ? {} : { credential },
     );
     try {

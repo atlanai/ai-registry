@@ -19,6 +19,7 @@ export {
   type Resolution,
   type ResolvedSource,
   type ResolveOptions,
+  type SiteClaim,
   type SourceAdapter,
   type SourceAuth,
   type SourceContext,

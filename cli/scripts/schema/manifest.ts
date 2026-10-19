@@ -9,6 +9,8 @@ const LAYOUT_READS: Record<LayoutId, string> = {
   registry: "A registry laid out as the file spec describes, with a `registry.json` at its root.",
   marketplace:
     "A plugin marketplace, `.claude-plugin/marketplace.json` or else `.agents/plugins/marketplace.json`, or one plugin with its own manifest: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` or an Agent Plugins `plugin.json`.",
+  "well-known":
+    "A site's Agent Skills discovery index, `/.well-known/agent-skills/index.json` in the 0.2.0 format, whose skills are `SKILL.md` files or `.tar.gz` and `.zip` archives.",
   folder:
     "Skills as folders holding a `SKILL.md`, up to three levels down, and agents as `*.md` files in `agents/` or `.claude/agents/`.",
 };

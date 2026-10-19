@@ -89,6 +89,11 @@
                       "type": "string"
                     },
                     {
+                      "description": "A site's Agent Skills discovery index, `/.well-known/agent-skills/index.json` in the 0.2.0 format, whose skills are `SKILL.md` files or `.tar.gz` and `.zip` archives.",
+                      "const": "well-known",
+                      "type": "string"
+                    },
+                    {
                       "description": "Skills as folders holding a `SKILL.md`, up to three levels down, and agents as `*.md` files in `agents/` or `.claude/agents/`.",
                       "const": "folder",
                       "type": "string"

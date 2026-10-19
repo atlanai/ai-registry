@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Dispatch } from "#adapter/index.ts";
+import type { Dispatch, SiteClaim } from "#adapter/index.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { hasOnly, namesOf } from "#core/fields.ts";
@@ -94,16 +94,34 @@ function formatRecord(record: AdapterInstallRecord): Record<string, unknown> {
 }
 
 export function parseDispatch(raw: unknown): Dispatch | undefined {
-  if (!hasOnly(raw, ["hosts", "schemes", "paths"])) return undefined;
+  if (!hasOnly(raw, ["hosts", "schemes", "paths", "sites"])) return undefined;
   const doc = raw;
   const hosts = namesOf(doc.hosts);
   const schemes = namesOf(doc.schemes);
   if (doc.hosts !== undefined && hosts === undefined) return undefined;
   if (doc.schemes !== undefined && schemes === undefined) return undefined;
   if (doc.paths !== undefined && typeof doc.paths !== "boolean") return undefined;
+  const sites = doc.sites === undefined ? undefined : parseSites(doc.sites);
+  if (doc.sites !== undefined && sites === undefined) return undefined;
   return {
     ...(hosts === undefined ? {} : { hosts }),
     ...(schemes === undefined ? {} : { schemes }),
     ...(doc.paths === true ? { paths: true } : {}),
+    ...(sites === undefined ? {} : { sites }),
+  };
+}
+
+function parseSites(raw: unknown): SiteClaim | undefined {
+  if (!hasOnly(raw, ["schemes", "exceptHosts", "exceptSuffixes"])) return undefined;
+  const schemes = namesOf(raw.schemes);
+  const exceptHosts = namesOf(raw.exceptHosts);
+  const exceptSuffixes = namesOf(raw.exceptSuffixes);
+  if (schemes === undefined) return undefined;
+  if (raw.exceptHosts !== undefined && exceptHosts === undefined) return undefined;
+  if (raw.exceptSuffixes !== undefined && exceptSuffixes === undefined) return undefined;
+  return {
+    schemes,
+    ...(exceptHosts === undefined ? {} : { exceptHosts }),
+    ...(exceptSuffixes === undefined ? {} : { exceptSuffixes }),
   };
 }

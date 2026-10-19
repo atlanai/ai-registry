@@ -46,10 +46,34 @@ describe("CLI adapter composition", () => {
   test("dispatches on declared hosts, and falls back to git", async () => {
     registerBuiltinAdapters();
 
-    expect((await adapterFor("https://gateway.example.com", undefined)).id).toBe("git");
     expect((await adapterFor("acme/kit", undefined)).id).toBe("git");
     expect((await adapterFor("git@github.com:acme/kit.git", undefined)).id).toBe("git");
     expect((await adapterFor("/tmp/kit", undefined)).id).toBe("local");
+  });
+
+  test("reads a site's web address as its skills index, and a code host's as git", async () => {
+    registerBuiltinAdapters();
+
+    for (const site of [
+      "https://gateway.example.com",
+      "https://docs.example.com/guide/",
+      "http://localhost:8765",
+    ]) {
+      expect((await adapterFor(site, undefined)).id, site).toBe("well-known");
+    }
+    for (const repository of [
+      "https://github.com/acme/kit",
+      "https://www.github.com/acme/kit",
+      "https://gitlab.com/acme/kit",
+      "https://bitbucket.org/acme/kit",
+      "https://git.example.com/acme/kit.git",
+      "https://git.example.com/acme/kit.git/",
+      "ssh://git@example.com/acme/kit",
+      "file:///tmp/kit",
+    ]) {
+      expect((await adapterFor(repository, undefined)).id, repository).toBe("git");
+    }
+    expect((await adapterFor("https://git.example.com/acme/kit", "git")).id).toBe("git");
   });
 
   test("ships only the built-in adapters", async () => {

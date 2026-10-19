@@ -54,6 +54,22 @@ export interface AcquireOptions {
   locked?: Locked;
   /** Exact versions to ask for beyond the manifest, by alias: what its artifacts depend on. */
   needs?: ReadonlyMap<string, readonly Want[]>;
+  /** The lockfile, whose adapter for a registry the manifest names none for keeps reading it. */
+  recorded?: Lock;
+}
+
+/**
+ * A registry the manifest names no adapter for keeps the one its lockfile recorded, so a new
+ * adapter claiming its address does not take over a registry already read another way.
+ */
+export function recordedAdapter(
+  declared: RegistrySource,
+  lock: Lock | undefined,
+  alias: string,
+): string | undefined {
+  if (declared.adapter !== undefined) return declared.adapter;
+  const held = lock?.registries[alias];
+  return held !== undefined && held.location === declared.location ? held.adapter : undefined;
 }
 
 interface Locked {
@@ -348,7 +364,7 @@ async function acquireOne(
       alias,
       location,
       declared: declared.location,
-      adapter: declared.adapter,
+      adapter: recordedAdapter(declared, options.recorded ?? options.locked?.lock, alias),
       config: declared.config,
     },
     { credential: options.credentials?.[alias], signal: options.signal, onBytes: options.onBytes },

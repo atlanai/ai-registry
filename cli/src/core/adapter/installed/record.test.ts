@@ -1,11 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { test } from "#test/kit/fixtures.ts";
 import {
   assertInstallRecord,
   installRecordPath,
+  parseDispatch,
   parseInstallRecord,
   readInstallRecord,
   writeInstallRecord,
@@ -58,5 +59,14 @@ describe("install record", () => {
         JSON.stringify({ ...record, dispatch: { ...record.dispatch, extra: true } }),
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("parseDispatch", () => {
+  it("reads a site claim, and refuses one it cannot read", () => {
+    const sites = { schemes: ["https"], exceptHosts: ["github.com"], exceptSuffixes: [".git"] };
+    expect(parseDispatch({ sites })).toEqual({ sites });
+    expect(parseDispatch({ sites: { schemes: "https" } })).toBeUndefined();
+    expect(parseDispatch({ sites: { schemes: ["https"], other: true } })).toBeUndefined();
   });
 });

@@ -63,7 +63,9 @@ A plugin marketplace is read from `.claude-plugin/marketplace.json`, or else `.a
 
 A plugin from a source that is not a registry and that carries hooks, MCP servers, LSP servers, monitors or `bin/` installs only once you trust it: on a terminal `add` asks, and otherwise it is left out, the rest installs, and `add` prints the `--trust <plugin>` that takes it. The manifest records the plugins you trust. A sync or background job never takes a new version of a plugin that adds or changes what it runs; it reports it, and `aireg update <plugin>` takes it.
 
-aireg tells how to read a source from what it holds, once, and records anything other than a registry, `layout: folder` or `layout: marketplace`, with the source in the manifest. `--layout` says it instead.
+A site's web address, such as `https://example.com`, is read as its Agent Skills index, `/.well-known/agent-skills/index.json` in the 0.2.0 format: aireg looks beside the address first, then at the site's root, and refuses the older `/.well-known/skills/` index, which has no digests. Each skill installs only once its bytes match the digest the index gives; one that doesn't stops the whole add, and nothing from the site installs. An archive is a `.tar.gz` or `.zip` of at most 1000 files and 50 MB, holding no links and no path that leaves it. A skill on another host is fetched over `https` only. aireg sends the site no credentials, and a site's skills have no versions. The addresses of GitHub, GitLab and Bitbucket, and any address ending in `.git`, stay git repositories; for any other git server, pass `--adapter git`.
+
+aireg tells how to read a source from what it holds, once, and records anything other than a registry, `layout: folder`, `layout: marketplace` or `layout: well-known`, with the source in the manifest. `--layout` says it instead.
 
 ### Questions
 
@@ -94,7 +96,7 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 | `--ref <ref>` | For a git registry, the branch, tag or commit to read. |
 | `--path <folder>` | For a git registry, the folder in the repository that holds the registry. |
 | `--adapter <id>` | The adapter that reads the registry, when aireg can't tell from the address. Recorded in the manifest. |
-| `--layout <layout>` | How to read the source, `registry`, `marketplace` or `folder`, instead of telling from what it holds. Recorded in the manifest. See [Sources that are not registries](#sources-that-are-not-registries). |
+| `--layout <layout>` | How to read the source, `registry`, `marketplace`, `well-known` or `folder`, instead of telling from what it holds. Recorded in the manifest. See [Sources that are not registries](#sources-that-are-not-registries). |
 | `--config <key>=<value>` | A setting for that adapter, recorded with the registry in the manifest. Repeat it for more than one. A setting the adapter doesn't take is refused: git takes `ref` and `path`, and a local folder takes none. |
 | `--trust <plugin>` | Install this plugin from a source that is not a registry although it carries hooks, servers or executables that run as you, and record that in the manifest. Repeat it for more than one. |
 | `--no-auto-update` | Don't keep a user-scope install current in the background. |

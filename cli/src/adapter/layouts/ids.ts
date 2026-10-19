@@ -1,8 +1,8 @@
 /**
  * How a source lays out what it holds, which says how it is read: a registry by the file spec, a
- * plugin marketplace, or a plain folder of skills. Not a kind, which says what one artifact is.
+ * plugin marketplace, a site's Agent Skills index, or a plain folder of skills. Not a kind, which says what one artifact is.
  */
-export const LAYOUT_IDS = ["registry", "marketplace", "folder"] as const;
+export const LAYOUT_IDS = ["registry", "marketplace", "well-known", "folder"] as const;
 
 /** One of `LAYOUT_IDS`. */
 export type LayoutId = (typeof LAYOUT_IDS)[number];
@@ -20,6 +20,7 @@ export function isReadOnlyLayout(layout: string | undefined): boolean {
 const NOUNS: Readonly<Record<LayoutId, string>> = {
   registry: "a registry",
   marketplace: "a plugin marketplace",
+  "well-known": "a site's skills index",
   folder: "a folder of skills",
 };
 
