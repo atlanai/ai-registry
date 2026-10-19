@@ -27,6 +27,7 @@ describe("callingAgent", () => {
 
   it("takes no variable the agent does not set", () => {
     expect(callingAgent({ CLAUDE_CODE: "1" })).toBeUndefined();
+    expect(callingAgent({ CURSOR_TRACE_ID: "abc" })).toBeUndefined();
   });
 
   it("ignores a variable that is set but empty", () => {

@@ -9,7 +9,11 @@ describe("resolveHarnesses", () => {
 
   it("fills the defaults an entry leaves out", () => {
     const table = resolveHarnesses();
-    expect(table.cursor?.detect).toEqual({ env: [], binary: ["cursor"], paths: [] });
+    expect(table.cursor?.detect).toEqual({
+      env: [],
+      binary: ["cursor", "cursor-agent"],
+      paths: [],
+    });
     expect(table.claude?.reads).toEqual({});
     expect(table.claude?.shared).toBe(false);
   });

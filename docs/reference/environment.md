@@ -19,7 +19,7 @@
 | `CLICOLOR` | `0` turns color off. |
 | `CLAUDE_CONFIG_DIR` | Where Claude Code keeps its user folder, if not `~/.claude`. |
 | `CODEX_HOME` | Where Codex keeps its user folder, if not `~/.codex`. |
-| `AI_AGENT`, `CLAUDECODE`, `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_THREAD_ID`, `CURSOR_AGENT`, `CURSOR_TRACE_ID`, `GEMINI_CLI`, `ANTIGRAVITY_AGENT`, `AUGMENT_AGENT`, `OPENCODE_CLIENT`, `REPL_ID`, `COPILOT_MODEL`, `COPILOT_ALLOW_ALL` | Set by a coding agent that runs aireg, which then asks no questions. See [When aireg asks questions](options.md#when-aireg-asks-questions). |
+| `AI_AGENT`, `CLAUDECODE`, `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_THREAD_ID`, `CURSOR_AGENT`, `GEMINI_CLI`, `ANTIGRAVITY_AGENT`, `AUGMENT_AGENT`, `OPENCODE_CLIENT`, `REPL_ID`, `COPILOT_MODEL`, `COPILOT_ALLOW_ALL` | Set by a coding agent that runs aireg, which then asks no questions. See [When aireg asks questions](options.md#when-aireg-asks-questions). |
 | `CI` | Any value means a CI service runs aireg. aireg then asks no questions, skips its update check, and the installer offers no skills. |
 | `TERM` | `dumb` turns color and animation off. |
 | `HOME`, `USERPROFILE` | Your home folder, in that order, else the one your OS reports. `~` in a path you type means this folder. |
