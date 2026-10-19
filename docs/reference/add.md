@@ -39,7 +39,7 @@ A folder that no `registry.json` sits in or above, or a folder inside a registry
 
 To install from a registry without declaring it first, give its address with `--registry` and write the rest of the full name on its own: `aireg add engineering/pr-review --registry github.com/acme/ai-registry`.
 
-`-s` picks inside what you named: after `acme/engineering`, `-s pr-review` means `engineering/pr-review`. A name that two namespaces share is refused, with the full names that tell them apart.
+`-s` picks inside what you named: after `acme/engineering`, `-s pr-review` means `engineering/pr-review`. After a plugin, such as `acme-tools/docs-kit`, `-s pdf` installs that one skill on its own, filed under the plugin's name, rather than the whole plugin. A name that two namespaces share is refused, with the full names that tell them apart.
 
 Each version has a status in its registry. A `blocked` version never installs, even pinned, a `draft` installs only pinned, and a `deprecated` one installs with a warning; see [Version status](kinds.md#version-status).
 

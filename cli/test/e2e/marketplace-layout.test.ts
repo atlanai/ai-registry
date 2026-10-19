@@ -166,6 +166,46 @@ describe("a plugin marketplace", () => {
   }, 60_000);
 });
 
+describe("-s on a plugin", () => {
+  test("installs that one skill on its own, outside the plugin", async ({
+    aireg,
+    project,
+    tmp,
+  }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await init(aireg, "claude");
+    expect((await aireg(["registry", "add", root])).code).toBe(0);
+    const added = await aireg(["add", "acme-tools/docs-kit", "-s", "pdf"]);
+    expect(added.code, added.stderr).toBe(0);
+    const lock = parse(await read(lockPath(project))) as {
+      artifacts: Record<string, { kind: string; namespace?: string }>;
+    };
+    expect(lock.artifacts).toEqual({
+      pdf: expect.objectContaining({ kind: "skill", namespace: "docs-kit" }),
+    });
+    expect(existsSync(join(project, ".claude", "skills", "pdf", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(project, ".claude", "skills", "docs-kit"))).toBe(false);
+  }, 60_000);
+
+  test("lists the plugin's skills for a name it does not hold", async ({ aireg, tmp }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await init(aireg, "claude");
+    expect((await aireg(["registry", "add", root])).code).toBe(0);
+    const added = await aireg(["add", "acme-tools/docs-kit", "-s", "nope"]);
+    expect(added.code).toBe(1);
+    expect(added.stderr).toContain('acme-tools publishes nothing named "nope".');
+    expect(added.stderr).toContain("Use pdf or xlsx.");
+  }, 60_000);
+
+  test("leaves a whole-plugin install as it was", async ({ aireg, project, tmp }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await init(aireg, "claude");
+    expect((await aireg(["registry", "add", root])).code).toBe(0);
+    expect((await aireg(["add", "acme-tools/docs-kit"])).code).toBe(0);
+    expect(await locked(project)).toEqual(["docs-kit"]);
+  }, 60_000);
+});
+
 describe("a folder that is one plugin", () => {
   for (const [manifest, body] of [
     [".claude-plugin/plugin.json", { name: "hello" }],
