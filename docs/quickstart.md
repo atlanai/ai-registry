@@ -227,7 +227,7 @@ If you installed the aireg skills, `Jobs` counts their job too. Autostart is off
 
 ## Let your coding agent do it
 
-The ai-registry repository also comes packaged with agent skills to help you manage registries using your preferred harness: `new`, `add`, and `publish`.
+The ai-registry repository also comes packaged with agent skills to help you manage registries using your preferred harness: `aireg-new`, `aireg-add`, and `aireg-publish`.
 
 These skills respectively set up a registry of skills and agents for a person or a team, from nothing to installed; find, install, and update skills and agents from a registry, in a project or in your user scope; and publish a skill or agent to a registry, or release a new version of one.
 

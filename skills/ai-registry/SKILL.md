@@ -1,7 +1,7 @@
 ---
 name: ai-registry
 description: Get started with ai-registry, the open specification for agent registries. Installs the aireg CLI and its skills, then helps try the example registry, set up a registry for a person or a team, or install from one. Use when given github.com/atlanai/ai-registry, or asked to set up, install or try ai-registry or aireg.
-compatibility: Needs git, on macOS or Linux. GitHub steps use gh.
+compatibility: Needs git, on macOS, Linux or Windows. GitHub steps use gh.
 license: Apache-2.0
 ---
 
@@ -25,9 +25,17 @@ before you run it:
 curl -fsSL https://aireg.sh/install | sh
 ```
 
+On Windows, run this in PowerShell instead:
+
+```powershell
+irm https://aireg.sh/install.ps1 | iex
+```
+
 To read the script first, download it with `curl -fsSLO https://aireg.sh/install`, show it
-to the user, then run `sh install`. The installer puts aireg in `~/.aireg/bin` and adds that
-folder to the PATH of new shells only, so in this session run `~/.aireg/bin/aireg`.
+to the user, then run `sh install`; on Windows, download `install.ps1` and run it with
+`powershell -ExecutionPolicy Bypass -File install.ps1`. The installer puts aireg in
+`~/.aireg/bin` and adds that folder to the PATH of new shells only, so in this session run
+`~/.aireg/bin/aireg`.
 
 ## 2. Install the aireg skills
 
