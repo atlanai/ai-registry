@@ -2,10 +2,10 @@
 # Variables (public): RELEASE_ORIGIN_PROD, RELEASE_TRUSTED_KEYS_PROD, RELEASE_MACOS_CODESIGN_IDENTIFIER,
 # optional RELEASE_PREFIX. Secrets, so logs mask every AWS detail: AWS_REGION, AWS_PUBLISH_ROLE and
 # AWS_SIGN_ROLE (to log in), and AWS_CONFIG_SECRET, the AWS Secrets Manager JSON secret everything else
-# comes from (keys `bucket`, `signing_key_secret`, `macos_signing_secret`), masked once read.
-# Windows binaries are signed with Azure Artifact Signing once RELEASE_WINDOWS_SIGNING_ENDPOINT,
-# RELEASE_WINDOWS_SIGNING_ACCOUNT and RELEASE_WINDOWS_SIGNING_PROFILE (variables) and AZURE_CLIENT_ID,
-# AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID (secrets) are set; until then they ship unsigned.
+# comes from (keys `bucket`, `signing_key_secret`, `macos_signing_secret`, `windows_signing_secret`),
+# masked once read. Windows binaries are signed with Azure Artifact Signing once
+# RELEASE_WINDOWS_SIGNING_ENDPOINT, RELEASE_WINDOWS_SIGNING_ACCOUNT and RELEASE_WINDOWS_SIGNING_PROFILE
+# (variables) are set; until then they ship unsigned. Their Azure login IDs come from Secrets Manager too.
 # Approval is the release-gate environment on the jobs that log in to a cloud, the only environment they trust.
 name: Release
 
@@ -150,7 +150,7 @@ jobs:
           SECRETS_SET: ${{ secrets.AWS_SIGN_ROLE != '' && secrets.AWS_REGION != '' && secrets.AWS_CONFIG_SECRET != '' }}
         run: |
           if [ "$SECRETS_SET" != true ]; then
-            echo "::error::set the AWS_REGION, AWS_SIGN_ROLE and AWS_CONFIG_SECRET repository secrets"
+            echo "::error::set the AWS_REGION, AWS_SIGN_ROLE and AWS_CONFIG_SECRET release-gate environment secrets"
             exit 1
           fi
 
@@ -281,11 +281,11 @@ jobs:
       - name: Check the signing secrets
         env:
           # A boolean, so this log shows only true/false.
-          SECRETS_SET: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' && secrets.AZURE_SUBSCRIPTION_ID != '' }}
+          SECRETS_SET: ${{ secrets.AWS_SIGN_ROLE != '' && secrets.AWS_REGION != '' && secrets.AWS_CONFIG_SECRET != '' }}
         shell: bash
         run: |
           if [ "$SECRETS_SET" != true ]; then
-            echo "::error::set the AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID repository secrets"
+            echo "::error::set the AWS_REGION, AWS_SIGN_ROLE and AWS_CONFIG_SECRET release-gate environment secrets"
             exit 1
           fi
 
@@ -295,11 +295,38 @@ jobs:
           path: bin
           merge-multiple: true
 
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_SIGN_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-duration-seconds: 900
+          mask-aws-account-id: true
+
+      # The Azure OIDC IDs live in Secrets Manager, not GitHub, so they can be read back later.
+      # tr drops the CR that Windows jq can add; each value is masked before it reaches an output.
+      - name: Read the Azure login IDs
+        id: azure
+        env:
+          CONFIG_SECRET: ${{ secrets.AWS_CONFIG_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SIGNING_SECRET=$(aws secretsmanager get-secret-value --secret-id "$CONFIG_SECRET" \
+            --query SecretString --output text | jq -er '.windows_signing_secret | select(type == "string" and length > 0)' | tr -d '\r')
+          echo "::add-mask::$SIGNING_SECRET"
+          ids=$(aws secretsmanager get-secret-value --secret-id "$SIGNING_SECRET" --query SecretString --output text)
+          for key in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            value=$(jq -er --arg k "$key" '.[$k] | select(type == "string" and length > 0)' <<< "$ids" | tr -d '\r') \
+              || { echo "::error::the Windows signing secret has no $key"; exit 1; }
+            echo "::add-mask::$value"
+            echo "${key,,}=$value" >> "$GITHUB_OUTPUT"
+          done
+
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ steps.azure.outputs.azure_client_id }}
+          tenant-id: ${{ steps.azure.outputs.azure_tenant_id }}
+          subscription-id: ${{ steps.azure.outputs.azure_subscription_id }}
 
       - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
@@ -435,7 +462,7 @@ jobs:
           SECRETS_SET: ${{ secrets.AWS_PUBLISH_ROLE != '' && secrets.AWS_REGION != '' && secrets.AWS_CONFIG_SECRET != '' }}
         run: |
           if [ "$SECRETS_SET" != true ]; then
-            echo "::error::set the AWS_REGION, AWS_PUBLISH_ROLE and AWS_CONFIG_SECRET repository secrets"
+            echo "::error::set the AWS_REGION, AWS_PUBLISH_ROLE and AWS_CONFIG_SECRET release-gate environment secrets"
             exit 1
           fi
 
