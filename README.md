@@ -20,6 +20,13 @@ An agent registry stores your organization's AI artifacts and manages their life
 - **Open format:** Today each registry, and each coding agent's own store, has its own format for versions, ownership and approvals, so every client needs a connector per registry. With an open specification, a client integrates once, reads any registry that implements it, and installs into any downstream harness.
 - **Open storage:** Today a registry is tied to its own storage, so its records can only be read through that registry's software. With an open specification, a registry is just a set of files in a defined layout, so you can build one on infrastructure you already have, such as a git repository or an object storage bucket. The aireg CLI reads registries in folders and git repositories today.
 
+### Why not just a git repository of skills, or a plugin marketplace?
+
+A registry can be a git repository. The spec defines what goes in it.
+
+- **A git repository of skills** holds the files but no record of which version is current, what its digest is, or whether it's deprecated. Each tool that reads it infers those from folder names and commits, and two tools can infer different answers. The spec records them in `versions.json` and `index.json`, so every client that implements it reads the same answer from the same repository.
+- **A plugin marketplace** uses a format its harness vendor defines, and that vendor's harness reads it. A registry wraps each native file, such as `SKILL.md`, byte for byte, so any client that implements the spec can read it, and aireg installs the same version into Claude Code, Codex and Cursor.
+
 ## Get started
 
 The easiest way to get started is to follow the [Quickstart](https://atlanai.github.io/ai-registry/quickstart/).
