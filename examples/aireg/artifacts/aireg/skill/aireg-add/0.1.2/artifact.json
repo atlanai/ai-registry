@@ -1,0 +1,28 @@
+{
+  "apiVersion": "aireg.sh/v1",
+  "kind": "skill",
+  "metadata": {
+    "name": "aireg-add",
+    "namespace": "aireg",
+    "version": "0.1.2",
+    "description": "Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI.",
+    "digest": "sha256:75d0448117f7ab29d9ecaf2f9bd17c4aabd11bd083833a5f0825b94b58f46ee1"
+  },
+  "files": [
+    {
+      "path": "SKILL.md",
+      "digest": "sha256:b5591220e5a5a03be3342cff3d4495ba3334bdb60797f7686055226bbd581e69",
+      "size": 7043,
+      "media_type": "text/markdown",
+      "urls": [
+        "SKILL.md"
+      ]
+    }
+  ],
+  "spec": {
+    "name": "aireg-add",
+    "description": "Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI.",
+    "compatibility": "Needs the aireg CLI and git, on macOS, Linux or Windows.",
+    "license": "Apache-2.0"
+  }
+}

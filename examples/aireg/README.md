@@ -8,9 +8,9 @@ registry of their own. It was made with the CLI it documents, the way any regist
 ```
 registry.json                                      slug ai-registry
 index.json
-artifacts/aireg/skill/aireg-new/0.2.0/SKILL.md     set up a registry: create it, add skills, release, gate pull requests, hand it over
-artifacts/aireg/skill/aireg-add/0.1.1/SKILL.md     find, read, install and update from a registry, and check installs in CI
-artifacts/aireg/skill/aireg-publish/0.1.1/SKILL.md publish a skill, release its next version, or publish a project's skills from CI
+artifacts/aireg/skill/aireg-new/0.2.1/SKILL.md     set up a registry: create it, add skills, release, gate pull requests, hand it over
+artifacts/aireg/skill/aireg-add/0.1.2/SKILL.md     find, read, install and update from a registry, and check installs in CI
+artifacts/aireg/skill/aireg-publish/0.1.2/SKILL.md publish a skill, release its next version, or publish a project's skills from CI
 ```
 
 Give an agent the skills in your user scope, so every harness on your machine has them. In
