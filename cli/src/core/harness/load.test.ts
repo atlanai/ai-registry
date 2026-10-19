@@ -78,6 +78,8 @@ describe("harness files", () => {
       "tool",
       "tool:work",
     ]);
+    // A profile is this machine's alone, so a project never installs into it.
+    expect(harnesses["tool:work"]?.kinds.skill?.scope).toBe("user");
   });
 
   test.each([

@@ -98,9 +98,17 @@ function instancesOf(definition: HarnessDefinition, env: NodeJS.ProcessEnv, orig
     if (!folder.startsWith(prefix) || !folder.endsWith(suffix)) return [];
     const profile = folder.slice(prefix.length, folder.length - suffix.length);
     if (!PROFILE.test(profile)) return [];
+    const base = toTarget(definition, env, origin);
     return [
       {
-        ...toTarget(definition, env, origin),
+        ...base,
+        // A profile is this machine's alone, so a project never installs into it.
+        kinds: Object.fromEntries(
+          Object.entries(base.kinds).map(([kind, mapping]) => [
+            kind,
+            mapping.shape === "contents" ? mapping : { ...mapping, scope: "user" },
+          ]),
+        ),
         name: `${definition.id}:${profile}`,
         displayName: `${definition.displayName} (${profile})`,
         userRoot: join(dirname(pattern), folder),

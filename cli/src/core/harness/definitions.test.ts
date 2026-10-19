@@ -54,6 +54,11 @@ describe("harnessProblems", () => {
       /needs an entry file/,
     ],
     [
+      "profiles that are every folder in the home folder",
+      [harness({ instances: { root: "~/{profile}" } })],
+      /every folder in your home folder/,
+    ],
+    [
       "profiles named outside the last segment",
       [harness({ instances: { root: "~/.tool/{profile}/home" } })],
       /only in its last segment/,

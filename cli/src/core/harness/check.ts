@@ -63,6 +63,9 @@ function instanceProblems(root: string, report: Report) {
   if (!segments.at(-1)?.includes("{profile}") || segments.slice(0, -1).join("/").includes("{")) {
     report("the instances root names {profile} only in its last segment.");
   }
+  if (segments.length === 2 && segments[1] === "{profile}") {
+    report("the instances root would make every folder in your home folder a profile.");
+  }
 }
 
 function readProblem(
