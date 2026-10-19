@@ -98,4 +98,12 @@ describe("a harness a file of yours defines", () => {
     expect(existsSync(join(project, ".tool", "agents"))).toBe(false);
     expect(existsSync(config())).toBe(false);
   });
+
+  test("is named when a run cannot find the harness it would define", async ({ home }) => {
+    const file = join(home.aireg, "harnesses", "tool.json");
+    await writeFile(file, "{");
+    const refused = await aireg(["add", "fx/ns", "--all", "--for", "tool", "-y"]);
+    expect(refused.code).toBe(2);
+    expect(refused.stderr).toContain(`aireg skipped ${file}: run \`aireg harnesses\` to see why.`);
+  });
 });

@@ -19,22 +19,29 @@ export async function run(context: CommandContext): Promise<void> {
   const [action, argument] = positionals;
   if (action === undefined) return list(context);
   return runAction(builtin("harnesses"), action, {
-    show: async () => show(context, needed(argument, "show", "a harness id", "aireg harnesses")),
+    show: async () =>
+      show(
+        context,
+        needed(argument, "show", "a harness id", "Run `aireg harnesses` to see every id."),
+      ),
     check: async () =>
-      check(context, needed(argument, "check", "a file", "aireg harnesses check tool.json")),
+      check(
+        context,
+        needed(
+          argument,
+          "check",
+          "a file",
+          "Name the file to check: `aireg harnesses check <file>`.",
+        ),
+      ),
   });
 }
 
-function needed(
-  argument: string | undefined,
-  action: string,
-  what: string,
-  example: string,
-): string {
+function needed(argument: string | undefined, action: string, what: string, hint: string): string {
   if (argument !== undefined) return argument;
   throw new AiregError(`\`aireg harnesses ${action}\` needs ${what}.`, {
     code: ErrorCode.Usage,
-    hint: `Run \`${example}\`${action === "show" ? " to see every id" : ""}.`,
+    hint,
   });
 }
 
@@ -46,7 +53,10 @@ function origin(path: string): string {
 /** Files in your user scope aireg could not use; the built-ins keep working without them. */
 function warnSkipped(context: CommandContext): void {
   for (const file of loadHarnessFiles().skipped) {
-    context.printer.warning(`Skipped ${underHome(file.path)}: ${file.problems.join(" ")}`);
+    const problems = file.problems.join(" ");
+    context.printer.warning(
+      `Skipped ${underHome(file.path)}: ${problems.charAt(0).toLowerCase()}${problems.slice(1)}`,
+    );
   }
 }
 
@@ -94,7 +104,7 @@ async function list(context: CommandContext): Promise<void> {
         header: "where",
         value: (item: Detection) => style.dim(item.detected ? foundBy(item.by) : ""),
       },
-      // Only once a file of yours defines one, so the common case reads as before.
+      // Only once a file of yours defines one: with the built-ins alone it says nothing.
       ...(fromFiles
         ? [{ header: "from", value: (item: Detection) => style.dim(origin(item.target.origin)) }]
         : []),

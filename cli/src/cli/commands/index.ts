@@ -478,7 +478,6 @@ export const COMMANDS: readonly CommandSpec[] = [
     usage: ["aireg harnesses", "aireg harnesses show <id>", "aireg harnesses check <file>"],
     examples: [{ command: "aireg harnesses", what: "which coding agents this machine has" }],
     docs: "harnesses",
-    maxArguments: 0,
     actions: [
       {
         name: "show",

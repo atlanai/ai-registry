@@ -99,7 +99,7 @@ describe("harnesses", () => {
     await run(context(cwd, writes, "text"));
     const text = writes.join("");
     expect(text).toMatch(/Tool +tool +not found +~\/\.aireg\/harnesses\/tool\.json/);
-    expect(text).toContain("Skipped ~/.aireg/harnesses/broken.json: It is not valid JSON.");
+    expect(text).toContain("Skipped ~/.aireg/harnesses/broken.json: it is not valid JSON.");
   });
 
   test("shows a harness as aireg resolved it", async () => {
@@ -114,6 +114,20 @@ describe("harnesses", () => {
     await expect(run(context(cwd, [], "json", ["show", "ghost"]))).rejects.toThrow(
       'No harness named "ghost".',
     );
+  });
+
+  test("checks a file against the harnesses your other files define", async () => {
+    await mkdir(join(cwd, ".aireg", "harnesses"), { recursive: true });
+    await writeFile(join(cwd, ".aireg", "harnesses", "tool.json"), JSON.stringify(TOOL));
+    const reader = { ...TOOL, id: "reader", reads: { skill: ["tool"] } };
+    await writeFile(join(cwd, "reader.json"), JSON.stringify(reader));
+    const checked = context(cwd, [], "json", ["check", "reader.json"]);
+    await run(checked);
+    expect(checked.exit).toBeUndefined();
+  });
+
+  test("names its actions when given one it does not have", async () => {
+    await expect(run(context(cwd, [], "json", ["bogus"]))).rejects.toThrow(/Unknown/);
   });
 
   test("checks a file wherever it is, and says what is wrong with it", async () => {

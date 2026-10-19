@@ -80,7 +80,7 @@ function describe(error: ErrorObject): string | undefined {
       return undefined;
     case "required":
       if (error.schemaPath.includes("/oneOf/")) return undefined;
-      break;
+      return `${where} needs ${quoted(String(error.params.missingProperty))}.`;
   }
   const pattern = error.keyword === "pattern" ? PATTERNS[String(error.params.pattern)] : undefined;
   if (pattern !== undefined) return `${where} ${pattern}.`;
@@ -165,11 +165,19 @@ function crossProblems(file: HarnessFile, others: readonly HarnessDefinition[]):
   );
 }
 
-/** A file anyone can check, whatever folder it is in, against the built-in harnesses. */
-export function checkHarnessText(path: string, text: string): HarnessFile | SkippedFile {
+/**
+ * A file anyone can check, whatever folder it is in, against the built-in harnesses and the
+ * ones your other files define.
+ */
+export function checkHarnessText(
+  path: string,
+  text: string,
+  env: NodeJS.ProcessEnv = process.env,
+): HarnessFile | SkippedFile {
   const read = readOne(path, text);
   if ("problems" in read) return read;
-  const problems = crossProblems(read, BUILTIN_HARNESSES);
+  const yours = loadHarnessFiles(env).files.map((file) => file.definition);
+  const problems = crossProblems(read, [...BUILTIN_HARNESSES, ...yours]);
   return problems.length > 0 ? { path, problems } : read;
 }
 

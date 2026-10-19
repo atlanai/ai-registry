@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import { isAdapterError, type Want } from "#adapter/index.ts";
 import { list, quoted, sanitizeText } from "#adapter/text.ts";
@@ -14,6 +14,7 @@ import { writeAtomic } from "#core/fs/atomic.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { homeDir, readTextIfPresent } from "#core/fs/path.ts";
 import { DEFAULT_TARGETS, type Harnesses, names, resolveHarnesses } from "#core/harness/index.ts";
+import { loadHarnessFiles } from "#core/harness/load.ts";
 import { runPipelineHooks } from "#core/hook/run.ts";
 import { type LeaseHolder, withLease } from "#core/lease.ts";
 import { type Lock, lockChanges, readLock } from "#core/lock.ts";
@@ -153,9 +154,16 @@ export function resolveTargets(
   const unknown = wanted.filter((name) => !known.has(name));
   if (unknown.length > 0) {
     // From --for it is the command line; from the manifest it is file content.
+    // A file of yours that would define one, but was skipped, is the likelier story.
+    const skipped = loadHarnessFiles().skipped.filter((file) =>
+      unknown.some((name) => basename(file.path) === `${name}.json`),
+    );
     throw new AiregError(`No harness named ${list(unknown.map(quoted), "or")}.`, {
       code: common.targets === undefined ? ErrorCode.Invalid : ErrorCode.Usage,
-      hint: `Use ${list(names(harnesses), "or")}, or run \`aireg harnesses\` to see which this machine has.`,
+      hint:
+        skipped.length > 0
+          ? `aireg skipped ${list(skipped.map((file) => file.path))}: run \`aireg harnesses\` to see why.`
+          : `Use ${list(names(harnesses), "or")}, or run \`aireg harnesses\` to see which this machine has.`,
     });
   }
   return wanted;
