@@ -46,6 +46,20 @@ A version goes only on a single artifact's full name. Adding an artifact that is
 
 A coding agent finds each skill and agent by its name, so two can't install under one. When an artifact you add would take a name another one already has, aireg installs it under its namespace and name instead, such as `ops-review`, and says so. The one you already had keeps its name. Set [`defaults.name-collision`](config.md#settings) to `report` to leave the new one out, or to `fail` to install nothing.
 
+### Sources that are not registries
+
+`add` also installs from a folder, or a git repository, that holds skills and agents but no `registry.json`. aireg reads such a source and never publishes to it. It looks for:
+
+- a `SKILL.md` at the top, which makes the whole source one skill
+- otherwise, folders holding a `SKILL.md` up to three levels down, such as `pdf/`, `skills/pdf/`, `skills/<group>/pdf/`, `.claude/skills/pdf/` or `.agents/skills/pdf/`. It doesn't look inside a skill it found, or in `node_modules`, `dist`, `build` or hidden folders other than `.claude` and `.agents`.
+- agents, as `agents/*.md` and `.claude/agents/*.md`
+
+A skill is named after its folder and an agent after its file; front matter gives the description. Each is filed under a namespace named after the source, such as `skills-repo` for `github.com/acme/skills-repo`, except that `skills/<group>/<name>` is filed under `<group>`. When two skills, or two agents, in one namespace share a name, the first in path order installs, with a warning. A symlink is never followed: aireg skips it, and says so. Installed from a whole source, each keeps its plain name, such as `pdf`.
+
+A git repository is read at one commit, recorded in the lockfile. Without `--ref`, that is the newest release tag, such as `v1.2.0`, or the default branch when there is none. Each artifact's version is the tag on that commit, an artifact's own tag such as `pdf/v1.2.0` winning over the repository's, or else a pseudo-version such as `1.2.1-0.20261019120000-4e1d2c9a8b7f`, made from the newest tag before it, the commit's time and its first 12 characters. `@<version>` takes either, so a pseudo-version pins its commit. Everything installed from one repository moves together, so `aireg update` on one of them updates them all. A folder on this machine has no versions: what it holds now is what installs, and `@<version>` is refused.
+
+aireg tells how to read a source from what it holds, once, and records anything other than a registry as `layout: folder` with the source in the manifest. `--layout` says it instead.
+
 ### Questions
 
 On a terminal, `add` asks what to install, which scope to install into when the folder has no `.registry/manifest.yml`, which harnesses to install into, and whether to link or copy, then asks you to confirm the install, with each artifact and the harnesses that load it. It asks nothing when you name a namespace or an artifact, pass `--select`, or pass `--yes`. See [When aireg asks questions](options.md#when-aireg-asks-questions).
@@ -75,6 +89,7 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 | `--ref <ref>` | For a git registry, the branch, tag or commit to read. |
 | `--path <folder>` | For a git registry, the folder in the repository that holds the registry. |
 | `--adapter <id>` | The adapter that reads the registry, when aireg can't tell from the address. Recorded in the manifest. |
+| `--layout <layout>` | How to read the source, `registry` or `folder`, instead of telling from what it holds. Recorded in the manifest. See [Sources that are not registries](#sources-that-are-not-registries). |
 | `--config <key>=<value>` | A setting for that adapter, recorded with the registry in the manifest. Repeat it for more than one. A setting the adapter doesn't take is refused: git takes `ref` and `path`, and a local folder takes none. |
 | `--no-auto-update` | Don't keep a user-scope install current in the background. |
 
@@ -86,7 +101,7 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 {"ok": true, "data": {"registry": "acme", "artifacts": ["acme/engineering"], "dependencies": {}, "dryRun": false, "changed": 4, "installed": ["engineering/pr-review"], "kept": []}}
 ```
 
-`artifacts` holds the full names added to the manifest. `dependencies` maps each artifact installed only because others depend on it to their names. `changed` counts the changes made, `installed` names the artifacts linked into a harness, and `kept` the links not made because something of yours is already there. With `--dry-run`, `changed` and `installed` say what would be done, and `kept` is empty. `jobId` is the background job that keeps a user-scope install current, when there is one. `renamed` lists what was installed under another name because its own is taken: the `artifact`, the name it took (`as`), and the one that has its name (`by`). `unlinked` lists what wasn't installed because its name is taken: the `artifact`, the one that has the name (`by`), and where (`at`).
+`artifacts` holds the full names added to the manifest. `layout` is `marketplace`, `well-known` or `folder` for a source that is not a registry. `dependencies` maps each artifact installed only because others depend on it to their names. `changed` counts the changes made, `installed` names the artifacts linked into a harness, and `kept` the links not made because something of yours is already there. With `--dry-run`, `changed` and `installed` say what would be done, and `kept` is empty. `jobId` is the background job that keeps a user-scope install current, when there is one. `renamed` lists what was installed under another name because its own is taken: the `artifact`, the name it took (`as`), and the one that has its name (`by`). `unlinked` lists what wasn't installed because its name is taken: the `artifact`, the one that has the name (`by`), and where (`at`).
 
 ## Exit status
 

@@ -30,6 +30,7 @@ A path that starts with `./`, `../`, `/` or `~/` is read from disk. For a folder
 | `--ref <ref>` | For a git registry, the branch, tag or commit to read. |
 | `--path <folder>` | For a git registry, the folder in the repository that holds the registry. |
 | `--adapter <id>` | The adapter that reads the registry, when aireg can't tell from the address. |
+| `--layout <layout>` | How to read the source, `registry` or `folder`, instead of telling from what it holds. |
 | `--config <key>=<value>` | A setting for that adapter. Repeat it for more than one. A setting the adapter doesn't take is refused: git takes `ref` and `path`, and a local folder takes none. |
 
 `show` also takes `-g`, to look up registry names in your user scope only. See [Command options](options.md#command-options).

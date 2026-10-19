@@ -8,6 +8,7 @@ import {
   isAdapterError,
   type Want,
 } from "#adapter/index.ts";
+import { isLayoutId, isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import { materialize } from "#core/adapter/content.ts";
 import { expandLocation } from "#core/adapter/location.ts";
@@ -16,7 +17,7 @@ import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import { tokenVariable } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import type { Lock, LockArtifact } from "#core/lock.ts";
+import type { Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Manifest, RegistrySource } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
 import { formatAddress, type Ref } from "#core/ref.ts";
@@ -105,6 +106,12 @@ function lockedRequest(
   const asked = new Map<string, Want>();
   const named = new Set<string>();
   let all = false;
+  const source = lock.registries[alias];
+  // Read at one commit, a source that is not a registry moves as a whole or not at all; one
+  // declared anew, such as at another ref, no longer holds the versions it was locked at.
+  const whole =
+    isReadOnlyLayout(source?.config.layout) && view.rows(alias).some(([name]) => moving.has(name));
+  const redeclared = source !== undefined && !sameDeclaration(manifest.registries[alias], source);
   for (const ref of manifest.artifacts) {
     if (ref.registry !== alias) continue;
     const rows = view.reached(ref);
@@ -116,7 +123,7 @@ function lockedRequest(
     for (const name of rows) {
       const row = lock.artifacts[name] as LockArtifact;
       const pinned = pins.some((want) => covers(want, row));
-      const free = moving.has(name) || pinned || row.version === undefined;
+      const free = moving.has(name) || pinned || row.version === undefined || whole || redeclared;
       asked.set(name, {
         name: row.name,
         namespace: row.namespace,
@@ -136,6 +143,16 @@ function lockedRequest(
     });
   }
   return { want: [...request.want, ...asked.values()], all };
+}
+
+/** Whether the manifest still declares a registry the way the lock recorded reading it. */
+function sameDeclaration(declared: RegistrySource | undefined, locked: LockRegistry): boolean {
+  return (
+    declared !== undefined &&
+    declared.location === locked.location &&
+    (declared.adapter === undefined || declared.adapter === locked.adapter) &&
+    JSON.stringify(declared.config) === JSON.stringify(locked.config)
+  );
 }
 
 /** A lock as plans read it: rows grouped by registry once, each registry's view built once. */
@@ -190,6 +207,7 @@ function fromRows(
 ): Acquired | undefined {
   const source = lock.registries[alias];
   if (source === undefined) return undefined;
+  const { layout } = source.config;
   const entries: Entry[] = [];
   const placements = new Map<string, Placement>();
   const needs = new Map<string, Need[]>();
@@ -228,6 +246,7 @@ function fromRows(
       key: source.key,
       config: source.config,
       revision: source.revision,
+      ...(layout !== undefined && isLayoutId(layout) ? { layout } : {}),
     },
     placements,
     catalog: { root: source.adapter, layouts: [], entries, warnings: [] },
@@ -353,7 +372,8 @@ async function acquireOne(
   const placements = new Map<string, Placement>();
   for (const { path, artifact } of listing.listed) {
     const { needs, unusable } = needsOf(artifact.envelope);
-    const { name, version } = artifact.envelope.metadata;
+    const { name } = artifact.envelope.metadata;
+    const version = artifact.version ?? artifact.envelope.metadata.version;
     for (const to of unusable) {
       listing.catalog.warnings.push(
         `"${name}" depends on "${sanitizeText(to)}", which is not a namespace/kind/name@version aireg installs; it was left out.`,
@@ -383,6 +403,7 @@ async function acquireOne(
       key: open.key,
       config: declared.config,
       revision: listing.sourceRevision,
+      ...(listing.layout === undefined ? {} : { layout: listing.layout }),
     },
     placements,
     catalog: listing.catalog,

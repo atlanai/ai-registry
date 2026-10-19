@@ -195,11 +195,8 @@ describe("insideRegistry", () => {
     ).toMatchObject({ registry: "../../../..", address: "engineering/skill/pr-review@1.2.0" });
   });
 
-  test("refuses a folder no registry holds", async ({ tmp }) => {
-    const lone = tmp;
-    await expect(insideRegistry(lone, lone)).rejects.toThrow(
-      expect.objectContaining({ message: `No registry.json in ${lone} or any folder above it.` }),
-    );
+  test("leaves a folder no registry holds to be read as a source of its own", async ({ tmp }) => {
+    expect(await insideRegistry(tmp, tmp)).toBeUndefined();
   });
 
   test("refuses a folder inside a registry that is not an artifact", async () => {

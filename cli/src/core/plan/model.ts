@@ -1,4 +1,5 @@
 import type { AdapterError, Envelope } from "#adapter/index.ts";
+import type { LayoutId } from "#adapter/layouts/ids.ts";
 import { quoted } from "#adapter/text.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
@@ -24,6 +25,8 @@ export interface Origin {
   config: SourceConfig;
   /** What the source was at, when it has one revision covering everything. */
   revision: string | undefined;
+  /** How the source lays out what it holds, when its adapter says. */
+  layout?: LayoutId | undefined;
 }
 
 /** Upstream identity known before content is fetched. */

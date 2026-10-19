@@ -1,7 +1,15 @@
 import { Type } from "@sinclair/typebox";
+import { LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
 import { DEFAULT_TARGETS } from "#core/harness/index.ts";
 
 /** The shape of `manifest.yml`. The parser stays the authority on what is accepted. */
+
+/** What each layout reads, which an editor shows beside the value it offers. */
+const LAYOUT_READS: Record<LayoutId, string> = {
+  registry: "A registry laid out as the file spec describes, with a `registry.json` at its root.",
+  folder:
+    "Skills as folders holding a `SKILL.md`, up to three levels down, and agents as `*.md` files in `agents/` or `.claude/agents/`.",
+};
 
 const Registry = Type.Object(
   {
@@ -27,6 +35,15 @@ const Registry = Type.Object(
         description:
           "The folder inside the source that holds the registry, when it is not the root.",
       }),
+    ),
+    layout: Type.Optional(
+      Type.Union(
+        LAYOUT_IDS.map((id) => Type.Literal(id, { description: LAYOUT_READS[id] })),
+        {
+          description:
+            "How the source lays out what it holds, which aireg records the first time it reads one that is not a registry.",
+        },
+      ),
     ),
     config: Type.Optional(
       Type.Record(Type.String({ minLength: 1 }), Type.String({ minLength: 1 }), {

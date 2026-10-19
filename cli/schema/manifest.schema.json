@@ -75,6 +75,21 @@
                   "description": "The folder inside the source that holds the registry, when it is not the root.",
                   "type": "string"
                 },
+                "layout": {
+                  "description": "How the source lays out what it holds, which aireg records the first time it reads one that is not a registry.",
+                  "anyOf": [
+                    {
+                      "description": "A registry laid out as the file spec describes, with a `registry.json` at its root.",
+                      "const": "registry",
+                      "type": "string"
+                    },
+                    {
+                      "description": "Skills as folders holding a `SKILL.md`, up to three levels down, and agents as `*.md` files in `agents/` or `.claude/agents/`.",
+                      "const": "folder",
+                      "type": "string"
+                    }
+                  ]
+                },
                 "config": {
                   "description": "Adapter-defined scope selection, such as a workspace.",
                   "type": "object",

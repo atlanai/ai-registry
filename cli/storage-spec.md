@@ -117,6 +117,7 @@ A registry's `source` is its address, as the manifest declares it. An artifact's
 | `github.com/acme/ai-registry` | the repository | `git`: cloned into `cache/git/`, fetched incrementally after that |
 | `https://github.com/acme/ai-registry/tree/main/skills` | the repository, with `ref: main` and `path: skills` | `git`, from that folder at that ref |
 | `../acme-registry` | the folder | `local`: read in place; nothing is copied |
+| `../skills`, a folder of skills with no `registry.json` | the folder, with `layout: folder` | `local`, read in place and never published to |
 | any other address | the address | the adapter `adapter:` names, installed with `aireg adapter install` |
 
 A git registry is fetched into `cache/git/`, one checkout per repository and commit, of which the newest two per repository are kept between runs; each adapter keeps its own folder under `cache/`. An adapter that cannot read a registry in place stages bytes under `cache/.staging/sha256/<digest>/`, keyed by the artifact's content digest and checked against its envelope again whenever they are reused, before only the files the envelope describes are copied into a scope. Every byte aireg reads, from the network, a clone or a local folder, is verified the way the file spec requires before it is installed.

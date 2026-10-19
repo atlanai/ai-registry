@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { isReadOnlyLayout, type LayoutId } from "#adapter/layouts/ids.ts";
 import { list, plural, quoted, sanitizeName, withoutCredentials } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import {
@@ -282,7 +283,12 @@ export async function run(context: CommandContext): Promise<void> {
     settleCollisions(context, result.plan);
   }
   if (context.printer.format === "json") {
-    printAdded(context, { registry: alias, artifacts: refs, jobId }, result, common.dryRun);
+    printAdded(
+      context,
+      { registry: alias, layout: source.layout, artifacts: refs, jobId },
+      result,
+      common.dryRun,
+    );
     return;
   }
   if (choices.scope === "user") noteUserScope(context.printer, common.scope, context.cwd);
@@ -297,15 +303,21 @@ export async function run(context: CommandContext): Promise<void> {
 
 function printAdded(
   context: CommandContext,
-  added: { registry: string; artifacts: readonly string[]; jobId: string | undefined },
+  added: {
+    registry: string;
+    layout: LayoutId | undefined;
+    artifacts: readonly string[];
+    jobId: string | undefined;
+  },
   result: RunResult,
   dryRun: boolean,
 ): void {
-  const { jobId, ...named } = added;
+  const { jobId, layout, ...named } = added;
   context.printer.json({
     ok: true,
     data: {
       ...named,
+      ...(isReadOnlyLayout(layout) ? { layout } : {}),
       dependencies: result.plan.neededBy,
       ...outcome(result, dryRun),
       ...(jobId === undefined ? {} : { jobId }),

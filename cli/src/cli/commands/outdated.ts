@@ -96,7 +96,7 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
             item.path,
             {
               contentId: contentDigest(item.artifact.envelope),
-              version: item.artifact.envelope.metadata.version,
+              version: item.artifact.version ?? item.artifact.envelope.metadata.version,
               name: item.artifact.envelope.metadata.name,
               namespace: item.artifact.envelope.metadata.namespace,
             },

@@ -3,6 +3,7 @@ import type { CommandContext } from "#cli/commands/index.ts";
 import { publishInstead } from "#cli/publish/target.ts";
 import { itemLine } from "#cli/render/run.ts";
 import { loadAdapter } from "#core/adapter/registry.ts";
+import { readOnlyLayout } from "#core/adapter/writable.ts";
 import { ITEM_EVENT, isFailed, type RunRecord, WARNING_EVENT } from "#core/run/model.ts";
 import { followRun, type RpcClient } from "#daemon/rpc/client.ts";
 import type { load } from "#engine/pipeline.ts";
@@ -23,6 +24,10 @@ export async function conflictHint(
   // Run as printed from anywhere: without `-g` a user scope's conflict is not found.
   const resolve = `aireg sync resolve ${first}${loaded.roots.scope === "user" ? " -g" : ""}`;
   const theirs = `take the registry's copy with \`${resolve} --theirs\``;
+  const config = loaded.manifest.registries[registry]?.config ?? {};
+  if (readOnlyLayout(registry, config) !== undefined) {
+    return `Take the registry's copy with \`${resolve} --theirs\`, or keep yours by publishing it to a registry of your own, made with \`aireg registry init <folder>\`.`;
+  }
   if (adapter === undefined || adapter.capabilities.publish) {
     return `Keep yours as a new version with \`${resolve} --mine\`, or ${theirs}.`;
   }

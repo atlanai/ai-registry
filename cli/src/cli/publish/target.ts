@@ -9,6 +9,7 @@ import { ID as LOCAL } from "#adapters/local/api.ts";
 import { expandLocation } from "#core/adapter/location.ts";
 import { adapterFor } from "#core/adapter/registry.ts";
 import { type ConnectedSource, connectSource, resolveArtifacts } from "#core/adapter/source.ts";
+import { readOnlyLayout } from "#core/adapter/writable.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { kindsOf } from "#core/filespec/write/kinds.ts";
 import { type OfferTarget, offerFrom } from "#core/filespec/write/offer.ts";
@@ -83,6 +84,7 @@ export async function writableRegistries(
 ): Promise<Record<string, RegistrySource>> {
   const writable: Record<string, RegistrySource> = {};
   const refused: { alias: string; adapter: SourceAdapter }[] = [];
+  const layouts: AiregError[] = [];
   for (const alias of Object.keys(known).sort()) {
     const declared = known[alias] as RegistrySource;
     // An adapter that fails to load is reported when the publish opens it.
@@ -90,11 +92,18 @@ export async function writableRegistries(
       expandLocation(declared.location, cwd),
       declared.adapter,
     ).catch(() => undefined);
-    if (adapter === undefined || adapter.capabilities.publish) writable[alias] = declared;
+    const laidOut = readOnlyLayout(alias, declared.config);
+    if (laidOut !== undefined) layouts.push(laidOut);
+    else if (adapter === undefined || adapter.capabilities.publish) writable[alias] = declared;
     else refused.push({ alias, adapter });
   }
   const [first] = refused;
-  if (Object.keys(writable).length > 0 || first === undefined) return writable;
+  if (Object.keys(writable).length > 0) return writable;
+  // Only sources aireg reads by their layout: the first one's refusal says what to do.
+  if (first === undefined) {
+    if (layouts[0] !== undefined) throw layouts[0];
+    return writable;
+  }
   if (refused.length === 1) throw cannotPublish(first.adapter, first.alias);
   const instead =
     publishInstead(first.adapter) ?? "publish with `aireg publish --to <folder>/<namespace>`";
@@ -182,6 +191,8 @@ export async function readPublished(
   /** The command that publishes this work into a clone, for when the registry is a git one. */
   how?: string,
 ): Promise<Published> {
+  const refused = readOnlyLayout(alias, declared.config);
+  if (refused !== undefined) throw refused;
   const location = expandLocation(declared.location, cwd);
   const credential = await credentialFor(alias, declared, location);
   const source = await connectSource(

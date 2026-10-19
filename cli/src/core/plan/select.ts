@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import { list, plural, quoted, sanitizeName } from "#adapter/text.ts";
 import { type Entry, entriesIn, entriesNamed, withoutCoveredLeaves } from "#core/catalog/model.ts";
 import { withheldAt } from "#core/catalog/withheld.ts";
@@ -31,10 +32,14 @@ function contentsOf(plugin: Entry, entries: readonly Entry[]): Contained[] {
 const address = (segment: string | undefined): string | undefined =>
   segment === undefined ? undefined : sanitizeName(segment);
 
-/** Whole-registry names include the namespace so two `lint`s stay two rows. */
-function installedName(entry: Entry, ref: Ref): string {
+/**
+ * Whole-registry names include the namespace so two `lint`s stay two rows. A source that is not
+ * a registry gives its namespaces itself, so its artifacts keep their plain names.
+ */
+function installedName(entry: Entry, ref: Ref, source: Acquired): string {
   if (ref.name !== undefined) return refName(ref);
-  return entry.group === undefined ? entry.name : `${entry.group}/${entry.name}`;
+  if (entry.group === undefined || isReadOnlyLayout(source.origin.layout)) return entry.name;
+  return `${entry.group}/${entry.name}`;
 }
 
 /** The address that reaches this entry, through `registry` when one is given. */
@@ -179,7 +184,7 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void 
     ref.localName ??
     renames.get(addressOf(entry, ref.registry)) ??
     lockedName ??
-    installedName(entry, ref);
+    installedName(entry, ref, source);
   const existing = chosen.get(name);
   if (existing !== undefined) {
     const kept = addressOf({ ...existing, name: existing.upstreamName }, existing.source);

@@ -38,6 +38,24 @@ describe("manifest keys", () => {
   });
 });
 
+describe("a registry's layout", () => {
+  test("is a key of its own, beside `ref`, and reads under `config:` too", () => {
+    const own = parseManifest("registries:\n  kit: { source: ../kit, layout: folder }\n");
+    expect(own.registries.kit?.config).toEqual({ layout: "folder" });
+    expect(formatManifest(own)).toContain("  kit:\n    source: ../kit\n    layout: folder\n");
+    const nested = parseManifest(
+      "registries:\n  kit: { source: ../kit, config: { layout: folder } }\n",
+    );
+    expect(formatManifest(nested)).toBe(formatManifest(own));
+  });
+
+  test("is refused when aireg reads no such layout", () => {
+    expect(() => parseManifest("registries:\n  kit: { source: ../kit, layout: zip }\n")).toThrow(
+      'manifest.yml: Registry "kit" has layout "zip", which is not registry',
+    );
+  });
+});
+
 describe("engines", () => {
   test("reads `engines.aireg` and writes it back", () => {
     const manifest = parseManifest("engines:\n  aireg: 0.3.0\n");

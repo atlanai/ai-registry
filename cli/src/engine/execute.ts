@@ -1,6 +1,7 @@
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import type { Artifact } from "#adapter/index.ts";
 import { adapterFor } from "#core/adapter/registry.ts";
+import { readOnlyLayout } from "#core/adapter/writable.ts";
 import type { Account } from "#core/config/model.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import { withLease } from "#core/lease.ts";
@@ -80,10 +81,13 @@ async function executeScanned(
   // An adapter that cannot publish a kind reports those candidates and settles, rather than
   // failing the whole run at write time every interval.
   const adapter = await adapterFor(source.location, source.adapter).catch(() => undefined);
+  // A source read by its layout, such as a folder of skills, takes no publishes whatever its adapter.
+  const laidOut = readOnlyLayout(account.registry, source.config) !== undefined;
   const publishable: Publishable = (kind: ArtifactKind) =>
-    adapter === undefined ||
-    (adapter.capabilities.publish !== false &&
-      (adapter.publishKinds === undefined || adapter.publishKinds.includes(kind)));
+    !laidOut &&
+    (adapter === undefined ||
+      (adapter.capabilities.publish !== false &&
+        (adapter.publishKinds === undefined || adapter.publishKinds.includes(kind))));
 
   const credentials = await credentialsForManifest(
     { [account.registry]: source },

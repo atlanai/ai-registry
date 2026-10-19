@@ -14,6 +14,8 @@ aireg outdated [-g]
 
 The table lists each artifact with a newer version: its registry, the version installed and the newest one. An artifact pinned in the manifest is marked `pinned`. When the manifest takes a whole namespace, artifacts the namespace has published since are listed as `new`, except ones you removed from it with [`aireg remove`](remove.md). An artifact a watched folder publishes is marked `watched`. A registry's latest version that is older than the one installed, as after the installed one is yanked, isn't newer, so it isn't listed.
 
+From a git repository that is not a registry, the newest version is the one at its newest release tag, or with `--ref`, at the newest commit on that branch. An artifact is listed only when its files changed, though every artifact from the repository moves to the new version when you update.
+
 `outdated` warns about each artifact it couldn't check, for example because its registry couldn't be read or no longer publishes it. It ends with `aireg update` when something unpinned can move.
 
 ## Options

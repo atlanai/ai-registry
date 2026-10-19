@@ -10,6 +10,7 @@ import { underHome } from "#cli/render/home.ts";
 import { probeAddress, throughManifest } from "#cli/source.ts";
 import { expandLocation } from "#core/adapter/location.ts";
 import { adapterFor } from "#core/adapter/registry.ts";
+import { readOnlyLayout } from "#core/adapter/writable.ts";
 import { MINIMUM_INTERVAL_SECONDS } from "#core/config/job.ts";
 import {
   DEFAULT_INTERVAL_SECONDS,
@@ -217,6 +218,8 @@ async function plannedJob(
   const source = manifest.registries[alias];
   if (source === undefined) throw unknownRegistry(alias, scope, Object.keys(manifest.registries));
   if (origins !== undefined) {
+    const laidOut = readOnlyLayout(alias, source.config);
+    if (laidOut !== undefined) throw laidOut;
     const adapter = await adapterFor(expandLocation(source.location, jobRoot), source.adapter);
     if (!adapter.capabilities.publish) throw cannotPublish(adapter, alias);
   }

@@ -8,7 +8,9 @@ export default defineAdapter({
   displayName: "Git",
   artifactKinds: [...KINDS],
   dispatch: { schemes: ["http", "https", "ssh", "file"] },
-  configSchema: { properties: { ref: { type: "string" }, path: { type: "string" } } },
+  configSchema: {
+    properties: { ref: { type: "string" }, path: { type: "string" }, layout: { type: "string" } },
+  },
   capabilities: { pinsSource: true, publish: false, auth: false },
   credentialsHint: CREDENTIALS,
   readOnly: {

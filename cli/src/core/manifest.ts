@@ -11,6 +11,7 @@ import {
   type YAMLMap,
   type YAMLSeq,
 } from "yaml";
+import { isLayoutId, LAYOUT_IDS } from "#adapter/layouts/ids.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
@@ -75,7 +76,7 @@ export const MANIFEST_KEYS = [
 ] as const;
 
 /** Every transport's keys; which are legal together is checked below. */
-export const REGISTRY_KEYS = ["source", "adapter", "ref", "path", "config"] as const;
+export const REGISTRY_KEYS = ["source", "adapter", "ref", "path", "layout", "config"] as const;
 
 export class ManifestError extends AiregError {
   constructor(message: string, hint?: string) {
@@ -193,6 +194,12 @@ function parseSource(alias: string, raw: unknown): RegistrySource {
   const ref = optionalString(entry, "ref");
   const path = optionalString(entry, "path");
   const config = sourceConfig(entry.config, alias);
+  const layout = optionalString(entry, "layout") ?? config.layout;
+  if (layout !== undefined && !isLayoutId(layout)) {
+    throw new ManifestError(
+      `Registry ${quoted(alias)} has layout ${quoted(layout)}, which is not ${list([...LAYOUT_IDS], "or")}.`,
+    );
+  }
   return {
     location: address(alias, location),
     adapter: optionalString(entry, "adapter"),
@@ -200,6 +207,7 @@ function parseSource(alias: string, raw: unknown): RegistrySource {
       ...config,
       ...(ref === undefined ? {} : { ref }),
       ...(path === undefined ? {} : { path }),
+      ...(layout === undefined ? {} : { layout }),
     }),
   };
 }
@@ -349,12 +357,13 @@ function manifestData(manifest: Manifest): Record<string, unknown> {
   const registries: Record<string, unknown> = {};
   for (const alias of Object.keys(manifest.registries).sort()) {
     const source = manifest.registries[alias] as RegistrySource;
-    const { ref, path, ...rest } = source.config;
+    const { ref, path, layout, ...rest } = source.config;
     const written = withoutUndefined({
       source: source.location,
       adapter: source.adapter,
       ref,
       path,
+      layout,
       config: Object.keys(rest).length === 0 ? undefined : rest,
     });
     registries[alias] = Object.keys(written).length === 1 ? source.location : written;

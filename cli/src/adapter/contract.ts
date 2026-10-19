@@ -1,6 +1,7 @@
 import type { AdapterConfigSchema } from "./config.ts";
 import type { Credential } from "./credential.ts";
 import type { ArtifactKind } from "./kinds.ts";
+import type { LayoutId } from "./layouts/ids.ts";
 import type { Envelope } from "./spec/types.ts";
 
 /** The contract version this package defines; aireg loads only an adapter that declares it. */
@@ -39,6 +40,11 @@ export interface Artifact {
   engines?: { aireg?: string } | undefined;
   /** One per `envelope.files` entry, by path. */
   files: readonly FileRef[];
+  /**
+   * The version the source serves this at, where the envelope cannot say it: a git source's
+   * tag or pseudo-version. Outside the envelope, so it never changes the content digest.
+   */
+  version?: string | undefined;
   /** Set when the version was withdrawn, which only a pin still resolves. */
   yanked?: { reason: string | undefined } | undefined;
   /**
@@ -68,6 +74,10 @@ export interface Resolution {
   registry?: RegistryIdentity | undefined;
   /** Artifacts a want reached that the registry's status rules kept back, rather than unpublished. */
   withheld?: readonly Withheld[] | undefined;
+  /** What a person should know about how the source was read, one sentence each. */
+  warnings?: readonly string[] | undefined;
+  /** How the source lays out what it holds, where the adapter reads more than one way. */
+  layout?: LayoutId | undefined;
 }
 
 /** An artifact whose version is not installable as asked, such as a blocked one or an unpinned draft. */

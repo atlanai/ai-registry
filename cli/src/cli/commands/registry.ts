@@ -11,6 +11,7 @@ import {
   VERSIONS_DOCUMENT,
 } from "#adapter/filespec/names.ts";
 import { isAdapterError } from "#adapter/index.ts";
+import { isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import {
   list as listOf,
   plural,
@@ -574,6 +575,7 @@ async function show(
         registry: resolved.alias ?? source.alias,
         address: withoutCredentials(source.location),
         revision: source.revision,
+        ...(isReadOnlyLayout(source.layout) ? { layout: source.layout } : {}),
         layouts: catalog.layouts,
         entries: catalog.entries.map((entry) => ({
           name: entry.name,
@@ -596,7 +598,12 @@ async function show(
   context.printer.info(`${style.bold(resolved.alias ?? source.alias)}${revision}`);
   fields(context.printer, [
     ["address", underHome(withoutCredentials(source.location))],
-    ["layout", catalog.layouts.join(" + ") || "none"],
+    [
+      "layout",
+      isReadOnlyLayout(source.layout)
+        ? (source.layout as string)
+        : catalog.layouts.join(" + ") || "none",
+    ],
     ["artifacts", String(catalog.entries.length)],
   ]);
 

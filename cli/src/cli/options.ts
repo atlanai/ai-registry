@@ -1,5 +1,6 @@
 import { type ParseArgsConfig, parseArgs } from "node:util";
 import { isNamespace } from "#adapter/filespec/names.ts";
+import { LAYOUT_IDS } from "#adapter/layouts/ids.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { OptionSpec } from "#core/host/extend.ts";
@@ -77,8 +78,14 @@ const PATH: OptionSpec = {
   describe: "For a git registry, the folder that holds it",
 };
 
+const LAYOUT: OptionSpec = {
+  flag: "--layout",
+  value: "<layout>",
+  describe: `How to read the source, instead of telling from what it holds: ${list([...LAYOUT_IDS], "or")}`,
+};
+
 /** Taken by every command that reads a registry from its address. */
-export const SOURCE: readonly OptionSpec[] = [REF, PATH, ADAPTER, CONFIG];
+export const SOURCE: readonly OptionSpec[] = [REF, PATH, ADAPTER, LAYOUT, CONFIG];
 
 export const MAP_FORMATS = ["tree", "compact", "json"] as const;
 export type MapFormat = (typeof MAP_FORMATS)[number];

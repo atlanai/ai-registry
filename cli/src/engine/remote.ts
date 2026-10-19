@@ -3,6 +3,7 @@ import { AccountService } from "#accounts/service.ts";
 import type { PublishInput, SourceHandle, UnpublishInput } from "#adapter/index.ts";
 import { bumpVersion } from "#adapter/semver.ts";
 import { connectSource } from "#core/adapter/source.ts";
+import { readOnlyLayout } from "#core/adapter/writable.ts";
 import type { Account } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { offerFrom } from "#core/filespec/write/offer.ts";
@@ -256,6 +257,8 @@ export async function mutateRemote(
         ? undefined
         : await archive(opened, account.registry, archiving, archivingNames, result, hooks);
     if (publishing.length > 0) {
+      const laidOut = readOnlyLayout(account.registry, source.config);
+      if (laidOut !== undefined) throw laidOut;
       if (handle.publish === undefined) {
         throw readOnly(account.registry, adapter.displayName);
       }
