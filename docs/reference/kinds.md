@@ -58,6 +58,18 @@ An artifact names what has to be installed with it as `depends_on` relationships
 
 [`aireg add`](add.md) installs them. `bump` carries the last version's dependencies into the new one, so move the versions they name when you release new ones.
 
+### Version status
+
+Each version in `versions.json` has a status, which you change by hand and then run [`aireg registry index`](registry.md#aireg-registry-index). `add`, `install`, `update` and background jobs act on it:
+
+| Status | What aireg does |
+|---|---|
+| `active` | Installs it. |
+| `deprecated` | Installs it, with a warning that gives the version's `reason`. |
+| `draft`, `pending_review` | Never picks it as the newest version, or with a whole namespace or registry. Installs it only when you pin it, with a warning. |
+| `blocked` | Never installs it, even pinned, and says why. A copy already installed stays, and `update` names the `aireg remove` that takes it out. |
+| `archived` | Installs it only when you name the artifact, not with its namespace or registry. |
+
 ## Options
 
 | Option | Description |

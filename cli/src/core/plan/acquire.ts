@@ -366,6 +366,7 @@ async function acquireOne(
       version,
       needs,
       ...(artifact.yanked === undefined ? {} : { yanked: artifact.yanked }),
+      ...statusOf(artifact),
     });
   }
 
@@ -412,6 +413,14 @@ async function acquireOne(
     },
     close: () => open.handle.close(),
   };
+}
+
+/** Only a status worded as text, so a backend cannot print a control sequence through it. */
+function statusOf(artifact: Artifact): Pick<Placement, "status"> {
+  const { name, reason } = artifact.status ?? {};
+  if (typeof name !== "string" || name.trim() === "") return {};
+  const why = typeof reason === "string" && reason.trim() !== "" ? sanitizeText(reason) : undefined;
+  return { status: { name: sanitizeText(name), reason: why } };
 }
 
 function because(yanked: { reason: string | undefined }): string {

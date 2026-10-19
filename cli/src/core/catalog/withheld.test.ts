@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { withheldAt, withheldFrom, withheldMessage } from "./withheld.ts";
+import { statusWarning, withheldAt, withheldFrom, withheldMessage } from "./withheld.ts";
 
 describe("what a registry withholds", () => {
   it("drops what it cannot name, and shows a reason without its escapes", () => {
@@ -28,5 +28,20 @@ describe("what a registry withholds", () => {
     expect(withheldAt(withheld, { name: "sketch" })?.status).toBe("draft");
     expect(withheldAt(withheld, { name: "sketch", group: "data" })).toBeUndefined();
     expect(withheldAt(withheld, { name: "sketch", kind: "agent" })).toBeUndefined();
+  });
+});
+
+describe("statusWarning", () => {
+  const at = { name: "lint", group: "ops", kind: "skill" as const, version: "1.1.0" };
+  it("names a deprecated version and why", () => {
+    expect(statusWarning({ ...at, status: "deprecated", reason: "use fmt" })).toBe(
+      "ops/lint 1.1.0 is deprecated (use fmt).",
+    );
+  });
+
+  it("says a draft installs only because it was pinned", () => {
+    expect(statusWarning({ ...at, status: "pending_review", reason: undefined })).toBe(
+      "ops/lint 1.1.0 is pending review, and installs only because it is pinned.",
+    );
   });
 });

@@ -134,6 +134,11 @@ export async function applyLocal(
   );
   await refuseBlocked(narrowed);
   const result = await commit(loaded, narrowed, scan.acquired, targets, onStep);
+  // What the plan said about a row this run wrote, such as a deprecated version it pulled.
+  for (const { name, message, hint } of plan.warnings) {
+    if (name === undefined || !recording.has(name)) continue;
+    notices.push({ message, ...(hint === undefined ? {} : { hint }) });
+  }
   notices.push(
     ...appliedNotices(loaded.roots, result, loaded.harnesses),
     ...unstagedNotices(result.unstaged),

@@ -1,5 +1,6 @@
+import { statusWarning } from "#core/catalog/withheld.ts";
 import { dict } from "#core/fields.ts";
-import { emptyLock, type Lock } from "#core/lock.ts";
+import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
 import {
   carryUnlisted,
@@ -154,6 +155,7 @@ function planItem(item: Selected, build: BuildState): void {
     keep(build, item.name, previous);
     return;
   }
+  warnStatus(item, previous, build);
   const state = build.survey.artifacts[item.name];
   const copy = artifactPath(
     build.options.roots,
@@ -184,6 +186,25 @@ function planItem(item: Selected, build: BuildState): void {
     }),
     ...(blocked.length === 0 ? {} : { blocked }),
   };
+}
+
+/** A version installing with a status, such as deprecated, says so when this run moves to it. */
+function warnStatus(item: Selected, previous: LockArtifact | undefined, build: BuildState): void {
+  const status = build.byAlias.get(item.source)?.placements.get(item.path)?.status;
+  if (status === undefined || item.version === undefined) return;
+  if (previous !== undefined && previous.version === item.version) return;
+  const { upstreamName: name, group, kind, version } = item;
+  build.warnings.push({
+    name: item.name,
+    message: statusWarning({
+      name,
+      group,
+      kind,
+      version,
+      status: status.name,
+      reason: status.reason,
+    }),
+  });
 }
 
 function isLinked(lock: Lock, item: Selected): boolean {

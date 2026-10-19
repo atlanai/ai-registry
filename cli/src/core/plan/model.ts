@@ -38,6 +38,8 @@ export interface Placement {
   needs?: readonly Need[] | undefined;
   /** Withdrawn by the registry, and served only because something pinned it. */
   yanked?: { reason: string | undefined } | undefined;
+  /** Its status where it installs with a warning, such as `deprecated`. */
+  status?: { name: string; reason: string | undefined } | undefined;
 }
 
 /** A resolved registry with lazy access to artifact content. */

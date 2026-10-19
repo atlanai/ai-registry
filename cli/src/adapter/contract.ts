@@ -41,6 +41,11 @@ export interface Artifact {
   files: readonly FileRef[];
   /** Set when the version was withdrawn, which only a pin still resolves. */
   yanked?: { reason: string | undefined } | undefined;
+  /**
+   * The version's status where it installs with a warning, such as `deprecated`, or a `draft`
+   * only a pin reaches, with the registry's reason. Absent is `active`.
+   */
+  status?: { name: string; reason: string | undefined } | undefined;
 }
 
 /** How a registry names and describes itself, from its discovery document. */

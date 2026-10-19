@@ -175,6 +175,9 @@ function pinOf(reaching: readonly Want[]): string | undefined {
 /** Statuses that install only when a request pins the version exactly. */
 const UNRELEASED = new Set(["draft", "pending_review"]);
 
+/** Statuses that install, but with a warning the client gives from `Artifact.status`. */
+const CAUTIONED = new Set([...UNRELEASED, "deprecated", "archived"]);
+
 function usable(entry: IndexRow): boolean {
   return isNamespace(entry.namespace) && isArtifactName(entry.name) && isVersion(entry.latest);
 }
@@ -247,6 +250,7 @@ export async function resolveFromRoot(
       envelope,
       files: refsOf(envelope, dir, options.blobUrl),
       ...(version.yanked ? { yanked: { reason: version.reason } } : {}),
+      ...(CAUTIONED.has(status) ? { status: { name: status, reason: version.reason } } : {}),
     } satisfies Artifact;
   });
 

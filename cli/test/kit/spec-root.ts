@@ -27,7 +27,7 @@ export interface SpecArtifact {
   namespace: string;
   kind: "skill" | "agent";
   name: string;
-  /** Defaults to the last version that is not yanked. */
+  /** Defaults to the last active version that is not yanked, as the spec picks it. */
   latest?: string;
   versions: readonly SpecVersion[];
 }
@@ -88,7 +88,8 @@ function latestOf(artifact: SpecArtifact): SpecVersion {
     if (named === undefined) throw new Error(`${artifact.name} has no ${artifact.latest}.`);
     return named;
   }
-  return [...versions].reverse().find((entry) => entry.yanked !== true) ?? last;
+  const offered = [...versions].reverse().filter((entry) => entry.yanked !== true);
+  return offered.find((entry) => (entry.status ?? "active") === "active") ?? offered[0] ?? last;
 }
 
 /** Ordered so a reader can see which version a registry published first. */
