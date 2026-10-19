@@ -6,7 +6,7 @@ export const claude = defineHarness({
   default: true,
   importable: true,
   roots: { project: ".claude", user: { default: "~/.claude", env: "CLAUDE_CONFIG_DIR" } },
-  detect: { env: ["CLAUDE_CONFIG_DIR"], binary: ["claude"], caller: ["CLAUDECODE", "CLAUDE_CODE"] },
+  detect: { env: ["CLAUDE_CONFIG_DIR"], binary: ["claude"], caller: ["CLAUDECODE"] },
   kinds: {
     // `plugins/` is Claude's own store and is never scanned; a plugin manifest
     // makes a directory under `skills/` a plugin, in a project's as in the user's.

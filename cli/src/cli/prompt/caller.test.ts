@@ -25,6 +25,10 @@ describe("callingAgent", () => {
     expect(callingAgent({ REPL_ID: "abc" })).toBe("replit");
   });
 
+  it("takes no variable the agent does not set", () => {
+    expect(callingAgent({ CLAUDE_CODE: "1" })).toBeUndefined();
+  });
+
   it("ignores a variable that is set but empty", () => {
     expect(callingAgent({ CLAUDECODE: "  " })).toBeUndefined();
   });
