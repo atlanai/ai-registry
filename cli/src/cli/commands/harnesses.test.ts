@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import { Printer } from "#core/output.ts";
@@ -5,14 +6,20 @@ import { test } from "#test/kit/fixtures.ts";
 import { foundSummary, run } from "./harnesses.ts";
 import type { CommandContext } from "./index.ts";
 
-function context(cwd: string, writes: string[], format: "json" | "text" = "json"): CommandContext {
+function context(
+  cwd: string,
+  writes: string[],
+  format: "json" | "text" = "json",
+  argv: string[] = [],
+): CommandContext {
   return {
-    argv: [],
+    argv,
     cwd,
     printer: new Printer({
       format,
       color: "never",
       out: { write: (chunk: string) => writes.push(chunk), isTTY: false },
+      err: { write: (chunk: string) => writes.push(chunk), isTTY: false },
     }),
     host: {
       version: "test",
@@ -26,12 +33,20 @@ function context(cwd: string, writes: string[], format: "json" | "text" = "json"
   };
 }
 
+const TOOL = {
+  id: "tool",
+  displayName: "Tool",
+  roots: { project: ".tool", user: { default: "~/.tool" } },
+  kinds: { skill: { shape: "directory", subdir: "skills" } },
+};
+
 describe("harnesses", () => {
   let cwd: string;
 
   test.beforeEach(async ({ tmp }) => {
     cwd = tmp;
     vi.stubEnv("HOME", cwd);
+    vi.stubEnv("AIREG_HOME", join(cwd, ".aireg"));
     vi.stubEnv("PATH", "");
     vi.stubEnv("CLAUDE_CONFIG_DIR", join(cwd, ".claude"));
     vi.stubEnv("CODEX_HOME", "");
@@ -48,11 +63,19 @@ describe("harnesses", () => {
       data: { harnesses: Record<string, unknown>[] };
     };
     // In the order the text lists them, with the shared folder last.
+    const builtIn = { kind: "coding", shared: false, origin: "built-in" };
     expect(payload.data.harnesses).toEqual([
-      { name: "claude", displayName: "Claude Code", shared: false, detected: true, by: "env" },
-      { name: "codex", displayName: "Codex", shared: false, detected: false },
-      { name: "cursor", displayName: "Cursor", shared: false, detected: false },
-      { name: "agents", displayName: "Shared .agents folder", shared: true, detected: false },
+      { name: "claude", displayName: "Claude Code", ...builtIn, detected: true, by: "env" },
+      { name: "codex", displayName: "Codex", ...builtIn, detected: false },
+      { name: "cursor", displayName: "Cursor", ...builtIn, detected: false },
+      {
+        name: "agents",
+        displayName: "Shared .agents folder",
+        kind: "shared",
+        shared: true,
+        detected: false,
+        origin: "built-in",
+      },
     ]);
   });
 
@@ -65,6 +88,47 @@ describe("harnesses", () => {
     expect(lines.some((line) => /^ +(agents|Shared)/.test(line))).toBe(false);
     expect(lines).toContain("Codex and Cursor read skills from the shared .agents folder.");
     expect(lines).toContain("Found 1 of 3 supported harnesses on this machine.");
+  });
+
+  test("says which file defines a harness, and skips a broken one with a warning", async () => {
+    const dir = join(cwd, ".aireg", "harnesses");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "tool.json"), JSON.stringify(TOOL));
+    await writeFile(join(dir, "broken.json"), "{");
+    const writes: string[] = [];
+    await run(context(cwd, writes, "text"));
+    const text = writes.join("");
+    expect(text).toMatch(/Tool +tool +not found +~\/\.aireg\/harnesses\/tool\.json/);
+    expect(text).toContain("Skipped ~/.aireg/harnesses/broken.json: It is not valid JSON.");
+  });
+
+  test("shows a harness as aireg resolved it", async () => {
+    const writes: string[] = [];
+    await run(context(cwd, writes, "json", ["show", "codex"]));
+    const { data } = JSON.parse(writes.join("")) as { data: { harness: Record<string, unknown> } };
+    expect(data.harness).toMatchObject({
+      name: "codex",
+      origin: "built-in",
+      projectRoot: ".codex",
+    });
+    await expect(run(context(cwd, [], "json", ["show", "ghost"]))).rejects.toThrow(
+      'No harness named "ghost".',
+    );
+  });
+
+  test("checks a file wherever it is, and says what is wrong with it", async () => {
+    await writeFile(join(cwd, "tool.json"), JSON.stringify(TOOL));
+    const good: string[] = [];
+    await run(context(cwd, good, "text", ["check", "tool.json"]));
+    expect(good.join("")).toContain('tool.json defines the harness "tool".');
+    expect(good.join("")).toContain("Save it as ~/.aireg/harnesses/tool.json for aireg to use it.");
+
+    await writeFile(join(cwd, "bad.json"), JSON.stringify({ ...TOOL, colour: "red" }));
+    const bad: string[] = [];
+    const checked = context(cwd, bad, "text", ["check", "bad.json"]);
+    await run(checked);
+    expect(checked.exit).toBe(1);
+    expect(bad.join("")).toContain('The file has an unknown key "colour".');
   });
 
   test("sums up how many of the supported harnesses this machine has", () => {

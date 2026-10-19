@@ -151,10 +151,27 @@ interface Detect {
   caller?: string[] | undefined;
 }
 
+/** What a harness is: a coding agent, a personal agent, or a folder several tools read. */
+type HarnessKind = "coding" | "personal" | "shared";
+
+/** Profiles of one installation, each installed into as its own harness, `<id>:<profile>`. */
+interface Instances {
+  /** A profile's user root, under `~/`; `{profile}` in its last segment names each one. */
+  root: string;
+}
+
+/** A command a person runs before a harness loads what it was given, at `scope` alone when set. */
+interface Trust {
+  run: string;
+  scope?: "project" | "user" | undefined;
+}
+
 /** One harness aireg installs into, as its module under `src/harnesses` defines it. */
 export interface HarnessDefinition {
   id: string;
   displayName: string;
+  /** `coding` when absent. A `shared` folder is never detected and never a default. */
+  kind?: HarnessKind | undefined;
   /**
    * Installed into when a manifest names none. Fixed rather than detected, so
    * teammates with different tools still write the same lock.
@@ -162,8 +179,6 @@ export interface HarnessDefinition {
   default?: boolean | undefined;
   /** Its folders hold artifacts `init --import` reads. */
   importable?: boolean | undefined;
-  /** A folder several tools read rather than a tool: never detected, never a default. */
-  shared?: boolean | undefined;
   roots: {
     project: string;
     /** `default` is under `~/`; `env` names the variable the harness itself reads to move it. */
@@ -176,6 +191,13 @@ export interface HarnessDefinition {
    */
   reads?: Partial<Record<ArtifactKind, string[]>> | undefined;
   kinds: Partial<Record<ArtifactKind, KindMapping>>;
+  /** The program and arguments that print its version, and the versions this was checked against. */
+  verified?: { command: string[]; range: string } | undefined;
+  /** A command a person runs before the harness loads a kind it was given; printed, never run. */
+  trust?: Partial<Record<ArtifactKind, Trust>> | undefined;
+  instances?: Instances | undefined;
+  /** What to do after a change for the harness to see it; printed, never run. */
+  reload?: string | undefined;
 }
 
 /** What `detect` checks, every list present. */
@@ -196,7 +218,13 @@ export interface Target {
   kinds: Partial<Record<ArtifactKind, KindMapping>>;
   /** Only the kinds whose reads differ from this harness's own folder. */
   reads: Partial<Record<ArtifactKind, string[]>>;
+  kind: HarnessKind;
   shared: boolean;
+  verified: { command: string[]; range: string } | undefined;
+  trust: Partial<Record<ArtifactKind, Trust>>;
+  reload: string | undefined;
+  /** Built in, or the path of the file in your user scope that defines it. */
+  origin: string;
 }
 
 export type Harnesses = Record<string, Target>;

@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { onPath } from "#adapter/paths.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { present } from "#core/env.ts";
@@ -9,6 +9,7 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
 import type { HarnessDefinition, Harnesses, KindMapping, Target } from "./contract.ts";
+import { BUILT_IN, loadHarnessFiles } from "./load.ts";
 
 export type { Harnesses, KindMapping, Target } from "./contract.ts";
 
@@ -46,25 +47,81 @@ function kindsOf(definition: HarnessDefinition): Target["kinds"] {
   return kinds;
 }
 
-/** The built-in harnesses, the only ones aireg knows, as data that crosses the daemon RPC. */
+/** A definition as data that crosses the daemon RPC, with every default filled in. */
+function toTarget(
+  definition: HarnessDefinition,
+  env: NodeJS.ProcessEnv,
+  origin: string = BUILT_IN,
+): Target {
+  const detect = definition.detect ?? {};
+  const kind = definition.kind ?? "coding";
+  return {
+    name: definition.id,
+    displayName: definition.displayName,
+    projectRoot: definition.roots.project,
+    userRoot: expandUserPath(definition.roots.user.default, env),
+    envHome: definition.roots.user.env,
+    detect:
+      detect === "never"
+        ? "never"
+        : { env: detect.env ?? [], binary: detect.binary ?? [], paths: detect.paths ?? [] },
+    kinds: kindsOf(definition),
+    reads: { ...definition.reads },
+    kind,
+    shared: kind === "shared",
+    verified: definition.verified === undefined ? undefined : structuredClone(definition.verified),
+    trust: { ...definition.trust },
+    reload: definition.reload,
+    origin,
+  };
+}
+
+/** A profile name as both its folder and a harness id can carry it. */
+const PROFILE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+/** Each profile folder its `instances` root finds, as a harness of its own. */
+function instancesOf(definition: HarnessDefinition, env: NodeJS.ProcessEnv, origin: string) {
+  const root = definition.instances?.root;
+  if (root === undefined) return [];
+  const pattern = expandUserPath(root, env);
+  const [prefix, suffix] = basename(pattern).split("{profile}") as [string, string];
+  let found: string[];
+  try {
+    found = readdirSync(dirname(pattern), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+  return found.flatMap((folder): Target[] => {
+    if (!folder.startsWith(prefix) || !folder.endsWith(suffix)) return [];
+    const profile = folder.slice(prefix.length, folder.length - suffix.length);
+    if (!PROFILE.test(profile)) return [];
+    return [
+      {
+        ...toTarget(definition, env, origin),
+        name: `${definition.id}:${profile}`,
+        displayName: `${definition.displayName} (${profile})`,
+        userRoot: join(dirname(pattern), folder),
+        envHome: undefined,
+      },
+    ];
+  });
+}
+
+/** The built-in harnesses and the ones your user scope defines, as data that crosses the daemon RPC. */
 export function resolveHarnesses(env: NodeJS.ProcessEnv = process.env): Harnesses {
+  const definitions = new Map<string, { definition: HarnessDefinition; origin: string }>();
+  for (const definition of BUILTIN_HARNESSES) {
+    definitions.set(definition.id, { definition, origin: BUILT_IN });
+  }
+  for (const file of loadHarnessFiles(env).files) {
+    definitions.set(file.definition.id, { definition: file.definition, origin: file.path });
+  }
   const out: Harnesses = {};
-  for (const input of BUILTIN_HARNESSES) {
-    const detect = input.detect ?? {};
-    out[input.id] = {
-      name: input.id,
-      displayName: input.displayName,
-      projectRoot: input.roots.project,
-      userRoot: expandUserPath(input.roots.user.default, env),
-      envHome: input.roots.user.env,
-      detect:
-        detect === "never"
-          ? "never"
-          : { env: detect.env ?? [], binary: detect.binary ?? [], paths: detect.paths ?? [] },
-      kinds: kindsOf(input),
-      reads: { ...input.reads },
-      shared: input.shared ?? false,
-    };
+  for (const { definition, origin } of definitions.values()) {
+    out[definition.id] = toTarget(definition, env, origin);
+    for (const instance of instancesOf(definition, env, origin)) out[instance.name] = instance;
   }
   return out;
 }

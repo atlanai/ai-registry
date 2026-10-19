@@ -15,6 +15,7 @@ aireg keeps three folders apart: its own, and one for each scope it installs int
   bin/aireg                the command on PATH
   cli/<version>/           installed CLI releases
   adapters/                signed adapters, one folder per id and version
+  harnesses/               harness files of your own, <id>.json
   state/                   background service: run history (aireg.db), pid file, and on Windows the pipe's name
   run/                     the service's socket, when no folder under /tmp is this user's alone
   logs/                    aireg.log, daemon.log

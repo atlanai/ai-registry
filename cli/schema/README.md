@@ -10,6 +10,7 @@ run `pnpm run schema`. A test fails if these drift from them.
 |---|---|
 | [manifest.schema.json](manifest.schema.json) | `.registry/manifest.yml`, what a scope asks for |
 | [lockfile.schema.json](lockfile.schema.json) | `.registry/manifest.lock.yml`, what it resolved to |
+| [harness.schema.json](harness.schema.json) | `~/.aireg/harnesses/<id>.json`, a harness of your own |
 | [kinds/agent.json](kinds/agent.json), [kinds/skill.json](kinds/skill.json) | Copies of the file spec's kind manifests in [`spec/schemas/kinds`](../../spec/schemas/kinds), which the CLI bundles; edit the spec's copy |
 
 These describe the CLI's own files. The registry documents an artifact is

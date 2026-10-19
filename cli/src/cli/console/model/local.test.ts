@@ -22,7 +22,12 @@ function harnesses(): Harnesses {
       detect: { env: [], binary: [], paths: [] },
       kinds: { skill: { subdir: "skills", shape: "directory" } },
       reads: {},
+      kind: "coding",
       shared: false,
+      verified: undefined,
+      trust: {},
+      reload: undefined,
+      origin: "built-in",
     },
   };
 }

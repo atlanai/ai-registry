@@ -1,6 +1,12 @@
 List the harnesses aireg can install into, and which this machine has
 
 Usage: aireg harnesses
+       aireg harnesses show <id>
+       aireg harnesses check <file>
+
+Actions:
+  show   Print where a harness takes each kind, as aireg resolved it
+  check  Check a harness file before you use it
 
 Examples:
   $ aireg harnesses  which coding agents this machine has

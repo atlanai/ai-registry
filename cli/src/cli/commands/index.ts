@@ -475,9 +475,26 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: "harnesses",
     summary: "List the harnesses aireg can install into, and which this machine has",
     group: "Check",
-    usage: ["aireg harnesses"],
+    usage: ["aireg harnesses", "aireg harnesses show <id>", "aireg harnesses check <file>"],
     examples: [{ command: "aireg harnesses", what: "which coding agents this machine has" }],
     docs: "harnesses",
+    maxArguments: 0,
+    actions: [
+      {
+        name: "show",
+        summary: "Print where a harness takes each kind, as aireg resolved it",
+        usage: ["aireg harnesses show <id>"],
+        maxArguments: 1,
+        examples: [{ command: "aireg harnesses show codex", what: "where Codex gets each kind" }],
+      },
+      {
+        name: "check",
+        summary: "Check a harness file before you use it",
+        usage: ["aireg harnesses check <file>"],
+        maxArguments: 1,
+        examples: [{ command: "aireg harnesses check tool.json", what: "is this file usable?" }],
+      },
+    ],
     load: () => import("./harnesses.ts"),
   },
 

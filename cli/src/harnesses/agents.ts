@@ -6,7 +6,7 @@ export const agents = defineHarness({
   id: "agents",
   displayName: "Shared .agents folder",
   importable: true,
-  shared: true,
+  kind: "shared",
   roots: { project: ".agents", user: { default: "~/.agents" } },
   detect: "never",
   kinds: {

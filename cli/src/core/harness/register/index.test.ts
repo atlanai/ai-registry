@@ -25,7 +25,12 @@ function harness(register: RegisterEntry[]): Harnesses {
     detect: { env: [], binary: [], paths: [] },
     kinds: { plugin: { subdir: "plugins/{source}/{name}", shape: "directory", register } },
     reads: {},
+    kind: "coding",
     shared: false,
+    verified: undefined,
+    trust: {},
+    reload: undefined,
+    origin: "built-in",
   };
   return { tool: target };
 }

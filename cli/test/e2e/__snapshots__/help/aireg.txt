@@ -34,6 +34,7 @@ Check:
   list       List what is installed
   outdated   Check each registry for newer versions of what is installed
   harnesses  List the harnesses aireg can install into, and which this machine has
+             show  check
 
 Share:
   sync       Sync this project with its registries
