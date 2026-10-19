@@ -84,4 +84,6 @@ export const codex = defineHarness({
       },
     },
   },
+  // A project's `.codex` folder, agents included, loads only once Codex trusts the project.
+  trust: { agent: { run: "codex", scope: "project" } },
 });

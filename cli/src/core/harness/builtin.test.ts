@@ -36,4 +36,11 @@ describe("codex", () => {
     // Plugins are read from the user installation alone.
     expect(takesPlugin(codex, "project")).toBe(false);
   });
+
+  it("asks a person to trust a project before it loads the agents placed there", () => {
+    const codex = resolveHarnesses({ HOME: "/tmp/home" }).codex!;
+    expect(trustFor(codex, "agent", "project")).toBe("codex");
+    expect(trustFor(codex, "agent", "user")).toBeUndefined();
+    expect(trustFor(codex, "skill", "project")).toBeUndefined();
+  });
 });
