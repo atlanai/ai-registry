@@ -2,14 +2,24 @@ import { describe, expect, it } from "vitest";
 import { bumpVersion, compareVersion, formatVersion, gte, parseVersion } from "./semver.ts";
 
 describe("parseVersion", () => {
-  it("reads a plain triple, with or without a v prefix", () => {
+  it("reads a plain triple", () => {
     expect(parseVersion("1.2.3")).toEqual({
       major: 1,
       minor: 2,
       patch: 3,
       prerelease: [],
     });
-    expect(formatVersion(parseVersion("v1.2.3")!)).toBe("1.2.3");
+    expect(formatVersion(parseVersion("0.10.0")!)).toBe("0.10.0");
+  });
+
+  it("refuses what SemVer 2.0.0 does: a v prefix and leading zeros", () => {
+    expect(parseVersion("v1.2.3")).toBeUndefined();
+    expect(parseVersion("01.10.0")).toBeUndefined();
+    expect(parseVersion("1.02.0")).toBeUndefined();
+    expect(parseVersion("1.0.00")).toBeUndefined();
+    expect(parseVersion("1.0.0-01")).toBeUndefined();
+    expect(parseVersion("1.0.0-beta..1")).toBeUndefined();
+    expect(parseVersion("1.0.0-0.0a.alpha-1")?.prerelease).toEqual(["0", "0a", "alpha-1"]);
   });
 
   it("keeps a prerelease and drops build metadata", () => {

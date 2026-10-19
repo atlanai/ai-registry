@@ -5,6 +5,7 @@ describe("engines.aireg", () => {
   it("accepts an optional >= prefix and refuses a range", () => {
     expect(parseEngine(">=0.3.0")).toBe("0.3.0");
     expect(parseEngine("0.3.0")).toBe("0.3.0");
+    expect(parseEngine(">=v0.3.0")).toBe("0.3.0");
     expect(parseEngine("^0.3.0")).toBeUndefined();
     expect(parseEngine("0.3.0-beta")).toBeUndefined();
     expect(engineFromUnknown(3)).toBeUndefined();

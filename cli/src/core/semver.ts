@@ -2,11 +2,12 @@ import { compareVersion, formatVersion, gte, parseVersion } from "#adapter/semve
 import { isRecord } from "./fields.ts";
 import { NAME } from "./product.ts";
 
-/** `0.3.0` or `>=0.3.0` both mean this version or newer. Ranges are refused. */
+/** `0.3.0`, `>=0.3.0` and `>=v0.3.0` all mean this version or newer. Ranges are refused. */
 export function parseEngine(raw: string): string | undefined {
   const trimmed = raw.trim();
   const body = trimmed.startsWith(">=") ? trimmed.slice(2).trim() : trimmed;
-  const version = parseVersion(body);
+  // npm's engines take `v0.3.0` too, so the shared strict parser gets it bare.
+  const version = parseVersion(body.replace(/^v(?=\d)/, ""));
   if (version === undefined || version.prerelease.length > 0) return undefined;
   return formatVersion(version);
 }

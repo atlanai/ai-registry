@@ -37,7 +37,12 @@ REF_RE = re.compile(
     r"(?P<name>[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)@(?P<version>[A-Za-z0-9][A-Za-z0-9._+-]{0,127})$"
 )
 DIGEST_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
-SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$")
+# SemVer 2.0.0: no leading "v", and no leading zeros in a numeric identifier.
+_NUM = r"0|[1-9]\d*"
+_PRE = rf"(?:{_NUM}|\d*[A-Za-z-][0-9A-Za-z-]*)"
+SEMVER_RE = re.compile(
+    rf"^({_NUM})\.({_NUM})\.({_NUM})(?:-({_PRE}(?:\.{_PRE})*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
 CONTROL_RE = re.compile("[\x00-\x1f\x7f-\x9f]")
 # Code points HFS+ ignores in a name, so ".g\u200cit" is ".git" there.
 HFS_IGNORED_RE = re.compile("[\u200c-\u200f\u202a-\u202e\u206a-\u206f\ufeff]")
@@ -176,23 +181,22 @@ def _semver_key(version: str):
 
 def newest(rows: list) -> str | None:
     """Section 3.3: the newest active, non-yanked version, a release ahead of every
-    prerelease and a version that does not parse below every one that does."""
-    best = release = None
+    prerelease and a version that does not parse below every one that does. Equals,
+    and versions that do not parse, keep the first row, since the list is newest first."""
+    best = None
 
-    def outranks(than, key) -> bool:
-        return than is None or than[1] is None or (key is not None and key >= than[1])
+    def rank(key) -> tuple:
+        # A release outranks every prerelease, and a prerelease every unparsed version.
+        return (0,) if key is None else (1 + key[3], key)
 
     for row in rows:
         v = row.get("version") if isinstance(row, dict) else None
         if not isinstance(v, str) or row.get("status") != "active" or row.get("yanked") is True:
             continue
         key = _semver_key(v)
-        if outranks(best, key):
+        if best is None or rank(key) > rank(best[1]):
             best = (v, key)
-        if (key is None or key[3] == 1) and outranks(release, key):
-            release = (v, key)
-    chosen = release or best
-    return chosen[0] if chosen else None
+    return best[0] if best else None
 
 
 def _is_git_dir(segment: str) -> bool:

@@ -8,9 +8,14 @@ export interface Version {
   prerelease: readonly string[];
 }
 
-const CORE = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
+const NUMBER = String.raw`0|[1-9]\d*`;
+const PRE_IDENT = String.raw`(?:${NUMBER}|\d*[A-Za-z-][0-9A-Za-z-]*)`;
+const CORE = new RegExp(
+  String.raw`^(${NUMBER})\.(${NUMBER})\.(${NUMBER})` +
+    String.raw`(?:-(${PRE_IDENT}(?:\.${PRE_IDENT})*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`,
+);
 
-/** A SemVer version, with or without a leading `v`; undefined for anything else. */
+/** A SemVer 2.0.0 version: no leading `v` or leading zeros; undefined for anything else. */
 export function parseVersion(input: string): Version | undefined {
   const match = CORE.exec(input.trim());
   if (

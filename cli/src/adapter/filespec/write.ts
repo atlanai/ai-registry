@@ -41,27 +41,32 @@ function rowKey(row: Record<string, unknown>): string {
   return `${String(row.namespace)}\u0000${String(row.kind)}\u0000${String(row.name)}`;
 }
 
+/** A release outranks every prerelease, and a prerelease every version that does not parse. */
+function tier(parsed: Version | undefined): number {
+  if (parsed === undefined) return 0;
+  return parsed.prerelease.length === 0 ? 2 : 1;
+}
+
 /**
- * Section 3.3: highest active, non-yanked semver, so a backport never becomes latest. A prerelease
- * wins only while no release is active; non-semver never outranks semver; among equals, the later.
+ * Section 3.3: highest active, non-yanked semver, so a backport never becomes latest. Equals,
+ * and versions that do not parse, keep the first row, since the list is newest first.
  */
 export function newest(versions: readonly unknown[]): string | undefined {
   let best: { version: string; parsed: Version | undefined } | undefined;
-  let release: { version: string; parsed: Version | undefined } | undefined;
   for (const item of versions) {
     const { version, status, yanked } = item as Record<string, unknown>;
     if (typeof version !== "string" || status !== "active" || yanked === true) continue;
     const parsed = parseVersion(version);
-    const outranks = (than: typeof best) =>
-      than === undefined ||
-      than.parsed === undefined ||
-      (parsed !== undefined && compareVersion(parsed, than.parsed) >= 0);
-    if (outranks(best)) best = { version, parsed };
-    if ((parsed === undefined || parsed.prerelease.length === 0) && outranks(release)) {
-      release = { version, parsed };
-    }
+    const outranks =
+      best === undefined ||
+      tier(parsed) > tier(best.parsed) ||
+      (parsed !== undefined &&
+        best.parsed !== undefined &&
+        tier(parsed) === tier(best.parsed) &&
+        compareVersion(parsed, best.parsed) > 0);
+    if (outranks) best = { version, parsed };
   }
-  return (release ?? best)?.version;
+  return best?.version;
 }
 
 /** Section 3.3 lists newest first: a new row goes above the first version it outranks. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readIndex, readVersions, SpecError } from "./documents.ts";
-import { mergedIndex, mergedVersions, type OfferedVersion, specJson } from "./write.ts";
+import { mergedIndex, mergedVersions, newest, type OfferedVersion, specJson } from "./write.ts";
 
 const OFFER: OfferedVersion = {
   namespace: "mine",
@@ -131,6 +131,35 @@ describe("mergedVersions", () => {
     expect(() => mergedVersions(undefined, { ...OFFER, version: "not a version" }, "x")).toThrow(
       SpecError,
     );
+  });
+});
+
+describe("newest", () => {
+  const latest = (...versions: string[]) =>
+    newest(versions.map((version) => ({ version, status: "active", yanked: false })));
+
+  it("puts a prerelease ahead of a version that does not parse, in either order", () => {
+    expect(latest("2.0.0-beta", "2024-10-01")).toBe("2.0.0-beta");
+    expect(latest("2024-10-01", "2.0.0-beta")).toBe("2.0.0-beta");
+  });
+
+  it("takes the first row among equals", () => {
+    expect(latest("1.0.0+b", "1.0.0+a")).toBe("1.0.0+b");
+  });
+
+  it("takes the first row when no version parses", () => {
+    expect(latest("2024-10-01", "2024-09-01")).toBe("2024-10-01");
+    expect(latest("2024-09-01", "2024-10-01")).toBe("2024-09-01");
+  });
+
+  it("reads only strict SemVer, so a v prefix or a leading zero never outranks it", () => {
+    expect(latest("1.0.0", "v1.0.0")).toBe("1.0.0");
+    expect(latest("v1.0.0", "1.0.0")).toBe("1.0.0");
+    expect(latest("1.2.0", "01.10.0")).toBe("1.2.0");
+  });
+
+  it("takes the highest release from a mixed list", () => {
+    expect(latest("1.9.0", "2024-10-01", "1.10.0", "2.0.0-beta", "v2")).toBe("1.10.0");
   });
 });
 
