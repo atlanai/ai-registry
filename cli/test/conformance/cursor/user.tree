@@ -1,0 +1,15 @@
+.agents/
+.agents/skills/
+.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+.agents/skills/ship -> ../../.registry/artifacts/kit/kit/skills/ship
+.cursor/
+.cursor/agents/
+.cursor/agents/planner.md -> ../../.registry/artifacts/kit/kit/agents/planner.md
+.cursor/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+project/.cursor/
+project/.cursor/agents/
+project/.cursor/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
