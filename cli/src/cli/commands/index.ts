@@ -342,6 +342,13 @@ export const COMMANDS: readonly CommandSpec[] = [
       { ...REGISTRY, describe: "The registry to install from, by name or address" },
       ...SOURCE,
       {
+        flag: "--trust",
+        value: "<plugin>",
+        multiple: true,
+        describe:
+          "Install this plugin although it carries hooks, servers or executables that run as you",
+      },
+      {
         flag: "--no-auto-update",
         describe: "Do not keep a user scope install up to date in the background",
       },

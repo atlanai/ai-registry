@@ -8,7 +8,7 @@ import type { Found, Layout, LayoutContext } from "./layout.ts";
 import { type Skip, type Tree, walksInto } from "./tree.ts";
 
 /** The file that makes a folder a skill. */
-const SKILL_FILE = "SKILL.md";
+export const SKILL_FILE = "SKILL.md";
 
 /** The id of a source that is one skill, since an id is never empty. */
 export const ROOT_ID = ".";
@@ -28,7 +28,7 @@ const SKILL_FOLDERS = ["skills", ".claude/skills", ".agents/skills"];
 const holdsSkills = (dir: string) =>
   SKILL_FOLDERS.some((folder) => dir === folder || dir.startsWith(`${folder}/`));
 
-interface Candidate {
+export interface Candidate {
   kind: "skill" | "agent";
   /** The skill's folder, or the agent's file. */
   at: string;
@@ -36,7 +36,7 @@ interface Candidate {
   namespace: string;
 }
 
-function skipped(skip: Skip): string {
+export function skipped(skip: Skip): string {
   return `Skipped ${skip.path}, which ${skip.reason}.`;
 }
 
@@ -144,7 +144,11 @@ function checkName(candidate: Candidate, front: Frontmatter | undefined, warning
 }
 
 /** One skill folder or agent file as an artifact with a content-only envelope. */
-async function artifactOf(tree: Tree, candidate: Candidate, warnings: string[]): Promise<Artifact> {
+export async function artifactOf(
+  tree: Tree,
+  candidate: Candidate,
+  warnings: string[],
+): Promise<Artifact> {
   const entry = entryOf(candidate);
   const front = await frontOf(tree, entry);
   checkName(candidate, front, warnings);

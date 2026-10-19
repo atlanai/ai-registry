@@ -11,9 +11,10 @@ import {
   takesPlugin,
 } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
+import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
-import type { Selected } from "./model.ts";
+import type { PluginDocument, Selected } from "./model.ts";
 
 export interface ProjectionOptions {
   roots: {
@@ -46,6 +47,10 @@ export interface PlannedLink {
   entry?: string;
   /** Written as a real copy, for a harness that rewrites or refuses links. */
   copy?: boolean;
+  /** A plugin's command, written as a skill a person invokes under this name. */
+  command?: string;
+  /** The plugin's own account of itself, for the manifests its projection gets. */
+  document?: PluginDocument;
 }
 
 function plannedLink(
@@ -234,6 +239,7 @@ function pluginLink(
     ...plannedLink(name, container, dir, options),
     shared: true,
     content: namespaceDir(options.roots, item.source, namespace),
+    ...(item.plugin === undefined ? {} : { document: item.plugin }),
     ...(target.kinds.plugin?.place === "fan" ? { fan: true } : {}),
     ...(target.kinds.plugin?.place === "copy" ? { copy: true } : {}),
     ...(plugin === namespace ? {} : { renamed: { namespace, name: plugin } }),
@@ -271,7 +277,11 @@ function pluginLinks(
         const path = projectionPath(target, leaf.kind, leaf.name, scope, cwd);
         if (path === undefined) continue;
         const from = join(copy, ...leaf.within.split(posix.sep));
-        links.push(plannedLink(name, path, from, options, leaf.kind));
+        const link = plannedLink(name, path, from, options, leaf.kind);
+        links.push(
+          // A skill is a folder, so the command is written as one holding its SKILL.md.
+          leaf.command === true ? { ...link, entry: SKILL_ENTRY, command: leaf.name } : link,
+        );
       }
     }
   }

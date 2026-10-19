@@ -9,13 +9,27 @@ import type { Manifest } from "#core/manifest.ts";
 import type { Ref } from "#core/ref.ts";
 import { formatRef, isWholeNamespace, isWholeRegistry, refName, relativeTo } from "#core/ref.ts";
 import { unmetEngine } from "#core/semver.ts";
-import type { Acquired, Clash, Contained, Incompatible, Selected, Warning } from "./model.ts";
+import type { Carried } from "./carries.ts";
+import type {
+  Acquired,
+  Clash,
+  Contained,
+  Incompatible,
+  Placement,
+  PluginDocument,
+  Selected,
+  Warning,
+} from "./model.ts";
 
 /**
  * Membership is the group, not a path prefix: upstream addresses a member by
  * its own namespace, so the plugin's address is not a prefix of it.
  */
-function contentsOf(plugin: Entry, entries: readonly Entry[]): Contained[] {
+function contentsOf(
+  plugin: Entry,
+  entries: readonly Entry[],
+  document: PluginDocument | undefined,
+): Contained[] {
   const contents: Contained[] = [];
   for (const entry of entriesIn(entries, plugin.name)) {
     if (entry.kind === "plugin") continue;
@@ -23,10 +37,25 @@ function contentsOf(plugin: Entry, entries: readonly Entry[]): Contained[] {
     contents.push({
       name: entry.name,
       kind: entry.kind,
-      within: `${kindDir(entry.kind)}${posix.sep}${leaf}`,
+      within: withinPlugin(plugin, entry) ?? `${kindDir(entry.kind)}${posix.sep}${leaf}`,
     });
   }
+  // A harness without plugins runs a command as a skill, named for its plugin.
+  for (const command of document?.commands ?? []) {
+    const name = sanitizeName(`${plugin.name}-${command.name}`);
+    contents.push({ name, kind: "skill", within: command.path, command: true });
+  }
   return contents;
+}
+
+/** Where a member sits in its plugin, when the source gives both as folders, one inside the other. */
+function withinPlugin(plugin: Entry, member: Entry): string | undefined {
+  const [outer, inner] = [plugin.from.pointer, member.from.pointer];
+  if (plugin.from.file !== member.from.file || outer === "" || inner === "") return undefined;
+  // A plugin that is one skill holds it at its own root.
+  if (inner === outer) return "";
+  if (outer === ".") return inner;
+  return inner.startsWith(`${outer}/`) ? inner.slice(outer.length + 1) : undefined;
 }
 
 const address = (segment: string | undefined): string | undefined =>
@@ -143,6 +172,35 @@ interface Choosing {
   clashes: Clash[];
   /** By registry address, the name an artifact takes because another holds its own. */
   renames: ReadonlyMap<string, string>;
+  /** Plugins a manifest entry trusts, as `<registry>\u0000<name>`. */
+  trusted: ReadonlySet<string>;
+  untrusted: Untrusted[];
+}
+
+/** A plugin left out because it carries what runs on its own, and nobody said yes to it. */
+export interface Untrusted {
+  name: string;
+  registry: string;
+  carries: readonly Carried[];
+}
+
+function trustedIn(manifest: Manifest): Set<string> {
+  return new Set(
+    manifest.artifacts.flatMap((ref) =>
+      (ref.trust ?? []).map((name) => `${ref.registry}\u0000${sanitizeName(name)}`),
+    ),
+  );
+}
+
+/** A plugin from a source that is not a registry runs nothing until a person trusts it by name. */
+function needsTrust(ref: Ref, entry: Entry, placement: Placement, pass: Choosing): boolean {
+  const carries = placement.plugin?.carries ?? [];
+  if (entry.kind !== "plugin" || carries.length === 0) return false;
+  if (pass.trusted.has(`${ref.registry}\u0000${entry.name}`)) return false;
+  if (!pass.untrusted.some((item) => item.registry === ref.registry && item.name === entry.name)) {
+    pass.untrusted.push({ name: entry.name, registry: ref.registry, carries });
+  }
+  return true;
 }
 
 function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void {
@@ -163,6 +221,7 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void 
     });
     return;
   }
+  if (needsTrust(ref, entry, placement, pass)) return;
 
   // Two addresses can reach one artifact, a namespace and a pin inside it, and
   // it installs once, under whichever the manifest wrote first.
@@ -201,7 +260,9 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void 
     upstreamName: placement.name,
     contentId: placement.contentId,
     version: placement.version,
-    contents: entry.kind === "plugin" ? contentsOf(entry, source.catalog.entries) : [],
+    contents:
+      entry.kind === "plugin" ? contentsOf(entry, source.catalog.entries, placement.plugin) : [],
+    ...(placement.plugin === undefined ? {} : { plugin: placement.plugin }),
     group: entry.group,
     targets: ref.targets,
     named: ref.name !== undefined,
@@ -221,6 +282,7 @@ export function select(
   incompatible: Incompatible[] = [],
   clashes: Clash[] = [],
   renames: ReadonlyMap<string, string> = new Map(),
+  untrusted: Untrusted[] = [],
 ): Selected[] {
   const byAlias = new Map(acquired.map((entry) => [entry.alias, entry]));
   const chosen = new Map<string, Selected>();
@@ -233,6 +295,8 @@ export function select(
     incompatible,
     clashes,
     renames,
+    trusted: trustedIn(manifest),
+    untrusted,
   };
 
   for (const ref of manifest.artifacts) {

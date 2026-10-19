@@ -27,6 +27,11 @@ export interface Ref {
   targets?: string[] | undefined;
   /** Copied into each harness folder rather than linked. */
   copy?: boolean | undefined;
+  /**
+   * Plugins from a source that is not a registry, by name, that a person agreed may install
+   * with the hooks, servers or executables they carry.
+   */
+  trust?: string[] | undefined;
 }
 
 export class RefParseError extends AiregError {

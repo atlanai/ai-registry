@@ -328,6 +328,24 @@ export interface PlanContext {
   harnesses?: Harnesses | undefined;
 }
 
+/** Asked for each plugin that runs things as you; no is the default, and the answer without a terminal. */
+export async function confirmTrust(
+  step: Interaction,
+  name: string,
+  carries: string,
+): Promise<boolean> {
+  if (!interactive(step)) return false;
+  const answer = await confirm(
+    {
+      message: `${name} carries ${carries}, which a harness that loads it runs as you. Install it?`,
+      style: step.printer.errStyle,
+      initial: false,
+    },
+    step.io,
+  );
+  return !canceled(answer) && answer;
+}
+
 /** The plan, then one question. Nothing is written before the answer. */
 export async function confirmPlan(
   step: Interaction,

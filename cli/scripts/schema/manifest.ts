@@ -7,6 +7,8 @@ import { DEFAULT_TARGETS } from "#core/harness/index.ts";
 /** What each layout reads, which an editor shows beside the value it offers. */
 const LAYOUT_READS: Record<LayoutId, string> = {
   registry: "A registry laid out as the file spec describes, with a `registry.json` at its root.",
+  marketplace:
+    "A plugin marketplace, `.claude-plugin/marketplace.json` or else `.agents/plugins/marketplace.json`, or one plugin with its own manifest: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` or an Agent Plugins `plugin.json`.",
   folder:
     "Skills as folders holding a `SKILL.md`, up to three levels down, and agents as `*.md` files in `agents/` or `.claude/agents/`.",
 };
@@ -108,6 +110,13 @@ const DetailedReference = Type.Object(
           "Copy into each harness folder rather than linking, as `aireg add --copy` records.",
       }),
     ),
+    trust: Type.Optional(
+      Type.Array(Type.String({ minLength: 1 }), {
+        minItems: 1,
+        description:
+          "Plugins, by name, allowed to install with the hooks, servers or executables they carry, as `aireg add --trust` records.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -148,7 +157,7 @@ export const Manifest = Type.Object(
     artifacts: Type.Optional(
       Type.Array(Type.Union([Reference, DetailedReference]), {
         description:
-          "A string reference, or `{ ref, as, exclude, harnesses, copy }` to rename it, leave members out, narrow where it lands, or copy it rather than link it.",
+          "A string reference, or `{ ref, as, exclude, harnesses, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
       }),
     ),
   },

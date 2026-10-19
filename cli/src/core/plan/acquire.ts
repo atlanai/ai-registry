@@ -1,5 +1,6 @@
 import { covers } from "#adapter/contract.ts";
 import { adapterProblem, isAuthFailure } from "#adapter/errors.ts";
+import { isArtifactName } from "#adapter/filespec/names.ts";
 import {
   AdapterError,
   type Artifact,
@@ -9,6 +10,7 @@ import {
   type Want,
 } from "#adapter/index.ts";
 import { isLayoutId, isReadOnlyLayout } from "#adapter/layouts/ids.ts";
+import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import { materialize } from "#core/adapter/content.ts";
 import { expandLocation } from "#core/adapter/location.ts";
@@ -17,11 +19,13 @@ import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import { tokenVariable } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { isRecord } from "#core/fields.ts";
 import type { Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Manifest, RegistrySource } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { ensureHome, stagingPath, toolHome } from "#core/store/paths.ts";
+import { carriedIn } from "./carries.ts";
 import { type Need, needsOf } from "./depends.ts";
 import type { Acquired, Placement, Staged } from "./model.ts";
 import { wrapsNamespaces } from "./namespaces.ts";
@@ -387,6 +391,7 @@ async function acquireOne(
       needs,
       ...(artifact.yanked === undefined ? {} : { yanked: artifact.yanked }),
       ...statusOf(artifact),
+      ...(isReadOnlyLayout(listing.layout) ? pluginOf(artifact) : {}),
     });
   }
 
@@ -433,6 +438,44 @@ async function acquireOne(
       return pending;
     },
     close: () => open.handle.close(),
+  };
+}
+
+/** The manifest a layout reader wrote into a plugin's spec, as text an envelope can hold. */
+export function manifestOf(artifact: Artifact): Record<string, unknown> | undefined {
+  const text = artifact.envelope.spec?.manifest;
+  if (typeof text !== "string") return undefined;
+  try {
+    const manifest: unknown = JSON.parse(text);
+    return isRecord(manifest) ? manifest : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A plugin's manifest and command files from its spec, keeping only paths inside the plugin. */
+function pluginOf(artifact: Artifact): Pick<Placement, "plugin"> {
+  const spec = artifact.envelope.spec;
+  if (artifact.kind !== "plugin" || spec === undefined) return {};
+  const manifest = manifestOf(artifact);
+  const commands = (Array.isArray(spec.commands) ? spec.commands : []).flatMap((item: unknown) => {
+    const { name, path } = (item ?? {}) as { name?: unknown; path?: unknown };
+    if (typeof name !== "string" || !isArtifactName(name)) return [];
+    return typeof path === "string" && isSafePath(path) && path.endsWith(".md")
+      ? [{ name, path }]
+      : [];
+  });
+  const description = artifact.envelope.metadata.description;
+  const { carries, fingerprint } = carriedIn(artifact.envelope, manifest);
+  return {
+    plugin: {
+      name: sanitizeName(artifact.envelope.metadata.name),
+      ...(description === undefined ? {} : { description: sanitizeText(description) }),
+      ...(manifest === undefined ? {} : { manifest }),
+      commands,
+      carries,
+      ...(fingerprint === undefined ? {} : { fingerprint }),
+    },
   };
 }
 

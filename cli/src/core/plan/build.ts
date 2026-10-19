@@ -6,6 +6,7 @@ import {
   carryUnlisted,
   carryUnopened,
   carryUnresolved,
+  carryUntrusted,
   carryWithheld,
   heldElsewhere,
   keep,
@@ -22,7 +23,7 @@ import { closure, dependentsByName, nameClashes } from "./depends.ts";
 import type { Acquired, Clash, Incompatible, Plan, Selected, Survey, Warning } from "./model.ts";
 import { dropUnusedSources, lockSourceOf } from "./model.ts";
 import { crowdedContainers } from "./projection.ts";
-import { addressOf, select } from "./select.ts";
+import { addressOf, select, type Untrusted } from "./select.ts";
 
 export type { BuildOptions } from "#core/plan/build/state.ts";
 
@@ -64,6 +65,7 @@ function planWith(
   const clashes: Clash[] = [];
   const top = select(manifest, lock, acquired, [], options.cliVersion, [], [], renames);
   const needs = closure(top, acquired);
+  const untrusted: Untrusted[] = [];
   const selected = select(
     { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
     lock,
@@ -73,6 +75,7 @@ function planWith(
     incompatible,
     clashes,
     renames,
+    untrusted,
   );
   const next = emptyLock();
   for (const source of acquired) {
@@ -90,8 +93,11 @@ function planWith(
     rewritten: [],
     claimed: new Map(),
     linked: new Set(),
+    // Namespaces wrap only at user scope, as the adapter contract says, whoever loads plugins.
     wrapping: new Set(
-      acquired.filter((source) => source.namespacePlugins).map((source) => source.alias),
+      options.roots.scope === "user"
+        ? acquired.filter((source) => source.namespacePlugins).map((source) => source.alias)
+        : [],
     ),
     crowded: new Set(),
     unlinks: [],
@@ -117,6 +123,7 @@ function planWith(
   }
   const withheld = carryWithheld(state, acquired);
   const unlisted = carryUnlisted(state, manifest, acquired);
+  carryUntrusted(state, untrusted);
   carryUnresolved(state, needs);
   removeStale(state);
   flushUnlinks(state, held);
@@ -143,6 +150,7 @@ function planWith(
     conflicts: [...needs.conflicts, ...nameClashes(needs, selected)],
     withheld,
     unlisted,
+    untrusted,
   };
   return { plan, selected };
 }

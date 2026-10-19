@@ -247,7 +247,14 @@ export function summarize(
   // Instructions wait for an agent to read them; these run as you once a harness loads them.
   for (const { name, carries } of applied.carried) {
     if (told.has(name) || harnessesOf(name).length === 0) continue;
-    printer.note("runs", `${describeCarried(carries)} from ${name}, in ${tools([name])}`);
+    // A harness given only the plugin's skills and agents starts none of what it carries.
+    const whole = plan.actions.flatMap((action) =>
+      action.kind === "link" && action.name === name && action.plugin === true
+        ? [action.harness]
+        : [],
+    );
+    const where = tools([name], whole.length > 0 ? () => whole : undefined);
+    printer.note("runs", `${describeCarried(carries)} from ${name}, in ${where}`);
   }
   const kindOf = (name: string) => held?.[name]?.kind ?? before.artifacts[name]?.kind;
   followUps(

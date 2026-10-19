@@ -127,6 +127,26 @@ describe("summarize", () => {
     ]);
   });
 
+  it("says a plugin's hooks run only where it installs whole, not where its skills went", () => {
+    const actions = [
+      { ...link("tools", "claude"), plugin: true } as Action,
+      link("tools", "agents"),
+    ];
+    const lock = {
+      artifacts: { tools: { kind: "plugin", links: [at("claude"), at("agents")] } },
+    };
+    const applied = {
+      performed: { link: 2 } as never,
+      installed: ["tools"],
+      added: ["tools"],
+      lock: lock as never,
+      carried: [{ name: "tools", carries: ["hooks"] }] as ApplyResult["carried"],
+    };
+    expect(printed(actions, applied, {}, ["claude", "agents"]).at(-1)).toBe(
+      "  runs   hooks from tools, in Claude Code",
+    );
+  });
+
   it("calls a new version of an installed artifact an update", () => {
     const actions = [
       { kind: "clone", name: "lint", from: "f", to: "c" } as Action,

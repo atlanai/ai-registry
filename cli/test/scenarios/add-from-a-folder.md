@@ -49,7 +49,7 @@ A folder that holds nothing aireg reads, or a folder inside a registry that name
 ```console
 $ aireg add [ROOT]/lone
 ? 1
-error: This source holds nothing aireg reads: no registry.json, SKILL.md or agents/*.md.
+error: This source holds nothing aireg reads: no registry.json, marketplace.json, plugin.json, SKILL.md or agents/*.md.
   code: invalid
 hint: Check the address, or create a registry with `aireg registry init`.
 $ aireg add ../kit/artifacts/kit

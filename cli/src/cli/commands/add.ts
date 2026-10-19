@@ -10,6 +10,7 @@ import {
   chooseScope,
   chooseTargets,
   confirmPlan,
+  confirmTrust,
   equivalent,
   type Interaction,
   interaction,
@@ -53,6 +54,7 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import { coveredByWhole, type RegistrySource } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
 import { reached } from "#core/plan/acquire.ts";
+import { describeCarried } from "#core/plan/carries.ts";
 import type { Selected } from "#core/plan/model.ts";
 import {
   formatAddress,
@@ -154,6 +156,13 @@ export async function run(context: CommandContext): Promise<void> {
   const alias = resolved.declared
     ? aliasFor(input, true, known, source)
     : (own.as ?? aliasFor(input, false, known, source));
+  const trust = await trustFor(
+    asking,
+    source,
+    chosenEntries(choices.select, entries),
+    own.trust ?? [],
+    loaded.manifest.artifacts.flatMap((ref) => (ref.registry === alias ? (ref.trust ?? []) : [])),
+  );
 
   // Taking everything an address names is the address itself, not the whole
   // registry: `add acme/my-team --all` must not drag in every other team.
@@ -217,7 +226,7 @@ export async function run(context: CommandContext): Promise<void> {
 
       const narrowed = narrowedTargets(fresh, asked, choices.targets);
 
-      repinned = declare(manifest.artifacts, refs, narrowed, choices.copy, (ref) =>
+      repinned = declare(manifest.artifacts, refs, narrowed, choices.copy, trust, (ref) =>
         reached(fresh.lock, ref).at(0),
       );
       manifest.artifacts = manifest.artifacts.filter(
@@ -365,7 +374,34 @@ async function reportAdded(
   return undefined;
 }
 
-type AddFlags = SourceFlags & { as?: string; registry?: string; "no-auto-update"?: boolean };
+type AddFlags = SourceFlags & {
+  as?: string;
+  registry?: string;
+  "no-auto-update"?: boolean;
+  trust?: string[];
+};
+
+/**
+ * Plugins this add may install although a harness that loads them runs what they carry as you:
+ * named with `--trust`, trusted by the manifest already, or agreed to here on a terminal.
+ */
+async function trustFor(
+  step: Interaction,
+  source: Probed,
+  chosen: readonly Entry[],
+  flagged: readonly string[],
+  already: readonly string[],
+): Promise<string[]> {
+  const trust = flagged.map(sanitizeName);
+  const held = new Set([...trust, ...already]);
+  for (const entry of chosen) {
+    if (entry.kind !== "plugin" || held.has(entry.name)) continue;
+    const carries = source.carriesOf(entry);
+    if (carries.length === 0) continue;
+    if (await confirmTrust(step, entry.name, describeCarried(carries))) trust.push(entry.name);
+  }
+  return trust;
+}
 
 /** What an address selects: the names it carries, read the way `--select` would be. */
 function selection(resolved: Resolved, picks: CommonOptions) {
@@ -528,6 +564,8 @@ function declare(
   refs: readonly string[],
   narrowed: string[] | "scope" | undefined,
   copy: boolean,
+  /** Plugins the person trusts to run what they carry, recorded on each entry this adds. */
+  trust: readonly string[],
   /** The lockfile's name for what a ref already installs, if anything. */
   installedAs: (ref: Ref) => string | undefined,
 ): Repin[] {
@@ -536,11 +574,7 @@ function declare(
   for (const text of refs) {
     const already = declaredAt.get(formatAddress(parseRef(text)));
     const held = already === undefined ? undefined : artifacts[already];
-    const ref: Ref = {
-      ...parseRef(text),
-      targets: narrowed === "scope" ? undefined : (narrowed ?? held?.targets),
-      ...(copy || held?.copy === true ? { copy: true } : {}),
-    };
+    const ref = entryOf(text, held, { narrowed, copy, trust });
     readmit(artifacts, ref);
     const name = ref.name === undefined ? undefined : (installedAs(ref) ?? ref.name);
     if (already === undefined) {
@@ -556,16 +590,34 @@ function declare(
     if (name !== undefined && declared.version !== ref.version) {
       repinned.push({ name, version: ref.version });
     }
-    if (
-      formatRef(declared) !== formatRef(ref) ||
-      declared.exclude !== undefined ||
-      declared.targets?.join() !== ref.targets?.join() ||
-      declared.copy !== ref.copy
-    ) {
-      artifacts[already] = ref;
-    }
+    if (changed(declared, ref)) artifacts[already] = ref;
   }
   return repinned;
+}
+
+/** The entry an add writes, keeping what the entry it replaces already said. */
+function entryOf(
+  text: string,
+  held: Ref | undefined,
+  how: { narrowed: string[] | "scope" | undefined; copy: boolean; trust: readonly string[] },
+): Ref {
+  const trust = [...new Set([...(held?.trust ?? []), ...how.trust])].sort();
+  return {
+    ...parseRef(text),
+    targets: how.narrowed === "scope" ? undefined : (how.narrowed ?? held?.targets),
+    ...(how.copy || held?.copy === true ? { copy: true } : {}),
+    ...(trust.length === 0 ? {} : { trust }),
+  };
+}
+
+function changed(declared: Ref, ref: Ref): boolean {
+  return (
+    formatRef(declared) !== formatRef(ref) ||
+    declared.exclude !== undefined ||
+    declared.targets?.join() !== ref.targets?.join() ||
+    declared.trust?.join() !== ref.trust?.join() ||
+    declared.copy !== ref.copy
+  );
 }
 
 function readmit(artifacts: Ref[], added: Ref): void {

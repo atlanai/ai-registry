@@ -124,6 +124,11 @@
               "description": "What the registry published, where it has versions.",
               "type": "string"
             },
+            "carried": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "description": "A digest of what a plugin has a harness start, so a background job sees it change.",
+              "type": "string"
+            },
             "path": {
               "minLength": 1,
               "description": "Where this scope's copy is, relative to its base.",

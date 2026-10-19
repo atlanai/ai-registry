@@ -47,6 +47,7 @@ export function lockRow({
     path: posixRelative(base, copy),
     content: yours ? previous.content : (basis?.content ?? item.contentId ?? previous?.content),
     version: basis === undefined ? item.version : basis.version,
+    ...carriedOf(basis === undefined ? item.plugin?.fingerprint : basis.carried),
     // Never adopt a drifted digest: the lock records what we installed. The
     // survey fallback is a copy the lock forgot, so drift stays detectable.
     digest: restage ? "" : (previous?.digest ?? state?.digest ?? ""),
@@ -64,6 +65,10 @@ export function lockRow({
     }),
     ...(neededBy === undefined ? {} : { neededBy }),
   };
+}
+
+function carriedOf(fingerprint: string | undefined): Pick<LockArtifact, "carried"> {
+  return fingerprint === undefined ? {} : { carried: fingerprint };
 }
 
 /** A link this run makes records what `apply` made; one it leaves alone keeps what it was. */

@@ -59,7 +59,11 @@ A skill is named after its folder and an agent after its file; front matter give
 
 A git repository is read at one commit, recorded in the lockfile. Without `--ref`, that is the newest release tag, such as `v1.2.0`, or the default branch when there is none. Each artifact's version is the tag on that commit, an artifact's own tag such as `pdf/v1.2.0` winning over the repository's, or else a pseudo-version such as `1.2.1-0.20261019120000-4e1d2c9a8b7f`, made from the newest tag before it, the commit's time and its first 12 characters. `@<version>` takes either, so a pseudo-version pins its commit. Everything installed from one repository moves together, so `aireg update` on one of them updates them all. A folder on this machine has no versions: what it holds now is what installs, and `@<version>` is refused.
 
-aireg tells how to read a source from what it holds, once, and records anything other than a registry as `layout: folder` with the source in the manifest. `--layout` says it instead.
+A plugin marketplace is read from `.claude-plugin/marketplace.json`, or else `.agents/plugins/marketplace.json`; when both are there and list different plugins, aireg reads the first and says so. A folder with only a plugin manifest, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` or an Agent Plugins `plugin.json`, is a marketplace of one. Each plugin installs whole, as a plugin, and its skills and agents are filed under the plugin's name. aireg reads a plugin's components as Claude Code does: its marketplace entry is its manifest when it has none of its own, an entry adds components to its own unless it sets `"strict": false`, and `skills/`, `agents/`, `commands/`, `hooks/hooks.json`, `.mcp.json`, `.lsp.json`, `monitors/` and `bin/` are where it looks by default. A plugin whose source is a relative path, or a bare name under `metadata.pluginRoot`, installs; one whose source is anything else is skipped, with a warning.
+
+A plugin from a source that is not a registry and that carries hooks, MCP servers, LSP servers, monitors or `bin/` installs only once you trust it: on a terminal `add` asks, and otherwise it is left out, the rest installs, and `add` prints the `--trust <plugin>` that takes it. The manifest records the plugins you trust. A sync or background job never takes a new version of a plugin that adds or changes what it runs; it reports it, and `aireg update <plugin>` takes it.
+
+aireg tells how to read a source from what it holds, once, and records anything other than a registry, `layout: folder` or `layout: marketplace`, with the source in the manifest. `--layout` says it instead.
 
 ### Questions
 
@@ -75,7 +79,7 @@ An install into your user scope is kept current in the background: aireg checks 
 
 ### What you trust
 
-Adding a registry trusts whoever publishes to it. Skills and agents are instructions your agent reads, but a plugin can also carry hooks, MCP servers, LSP servers or monitors, which a harness starts by itself and runs as you. `add` names these after it installs such a plugin, and [`aireg show`](show.md) names them before you install it. A registry kept current in the background installs new versions without asking, including any of these a new version adds, so pin a version or pass `--no-auto-update` for a registry you have not reviewed.
+Adding a registry trusts whoever publishes to it. Skills and agents are instructions your agent reads, but a plugin can also carry hooks, MCP servers, LSP servers, monitors or executables in `bin/`, which a harness starts by itself and runs as you. `add` names these after it installs such a plugin, and [`aireg show`](show.md) names them before you install it. A registry kept current in the background installs new versions without asking, including any of these a new version adds, so pin a version or pass `--no-auto-update` for a registry you have not reviewed.
 
 ## Options
 
@@ -90,8 +94,9 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 | `--ref <ref>` | For a git registry, the branch, tag or commit to read. |
 | `--path <folder>` | For a git registry, the folder in the repository that holds the registry. |
 | `--adapter <id>` | The adapter that reads the registry, when aireg can't tell from the address. Recorded in the manifest. |
-| `--layout <layout>` | How to read the source, `registry` or `folder`, instead of telling from what it holds. Recorded in the manifest. See [Sources that are not registries](#sources-that-are-not-registries). |
+| `--layout <layout>` | How to read the source, `registry`, `marketplace` or `folder`, instead of telling from what it holds. Recorded in the manifest. See [Sources that are not registries](#sources-that-are-not-registries). |
 | `--config <key>=<value>` | A setting for that adapter, recorded with the registry in the manifest. Repeat it for more than one. A setting the adapter doesn't take is refused: git takes `ref` and `path`, and a local folder takes none. |
+| `--trust <plugin>` | Install this plugin from a source that is not a registry although it carries hooks, servers or executables that run as you, and record that in the manifest. Repeat it for more than one. |
 | `--no-auto-update` | Don't keep a user-scope install current in the background. |
 
 `add` also takes `-g`, `-y`, `--dry-run`, `--frozen` and `--force`. See [Command options](options.md#command-options).

@@ -30,6 +30,11 @@ class FolderBuilder {
     return this.file(at, skillFile(posix.basename(at, ".md"), options.description, options.body));
   }
 
+  /** A JSON document at `at`, such as a marketplace or a plugin manifest. */
+  json(at: string, value: unknown): this {
+    return this.file(at, `${JSON.stringify(value, null, 2)}\n`);
+  }
+
   file(at: string, body: string, executable = false): this {
     this.#files.set(at, { body, executable });
     return this;
@@ -59,4 +64,34 @@ class FolderBuilder {
 
 export function skillsFolder(root: string): FolderBuilder {
   return new FolderBuilder(root);
+}
+
+/**
+ * A marketplace of two plugins: `docs-kit`, with its own manifest, two skills and a command, and
+ * `deploy-kit`, which carries hooks and an MCP server and has only its entry for a manifest.
+ */
+export function marketplace(root: string): FolderBuilder {
+  return skillsFolder(root)
+    .json(".claude-plugin/marketplace.json", {
+      name: "acme-tools",
+      owner: { name: "Acme" },
+      plugins: [
+        { name: "docs-kit", source: "./plugins/docs-kit" },
+        { name: "deploy-kit", source: "./plugins/deploy-kit", description: "Ships builds." },
+      ],
+    })
+    .json("plugins/docs-kit/.claude-plugin/plugin.json", {
+      name: "docs-kit",
+      version: "1.0.0",
+      description: "Works with documents.",
+    })
+    .skill("plugins/docs-kit/skills/pdf")
+    .skill("plugins/docs-kit/skills/xlsx")
+    .file(
+      "plugins/docs-kit/commands/summarize.md",
+      "---\ndescription: Summarize the open file.\n---\nSummarize $ARGUMENTS.\n",
+    )
+    .skill("plugins/deploy-kit/skills/ship")
+    .json("plugins/deploy-kit/hooks/hooks.json", { hooks: {} })
+    .json("plugins/deploy-kit/.mcp.json", { mcpServers: { deploy: { command: "deploy-mcp" } } });
 }

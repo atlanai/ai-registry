@@ -20,8 +20,9 @@ import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { PROJECTIONS_DIR, type Roots } from "#core/store/paths.ts";
 import { assemble } from "./assemble.ts";
 import { type Carried, carriedBy } from "./carries.ts";
+import { commandSkill } from "./command-skill.ts";
 import { backUp, guardLink, type LinkGuard } from "./link-guard.ts";
-import type { Action, Fetch, Plan, Staged } from "./model.ts";
+import type { Action, Fetch, Plan, PluginDocument, Staged } from "./model.ts";
 import { projectionsOf } from "./projection.ts";
 import { applyRegistrations } from "./register.ts";
 import { assertRemovable, removal, removeContained } from "./removable.ts";
@@ -210,7 +211,10 @@ interface Run {
   copies: Map<string, string>;
   degraded: Set<string>;
   /** Projections to rebuild once every clone has landed: dir -> content, readers. */
-  plugins: Map<string, { content: string; harnesses: Set<string> }>;
+  plugins: Map<
+    string,
+    { content: string; harnesses: Set<string>; document?: PluginDocument | undefined }
+  >;
   /** Fan-out directories to refresh once their projections are final: dir -> projection. */
   fanned: Map<string, string>;
   /** Plugin directories placed as copies, copied again once every member has landed. */
@@ -335,11 +339,12 @@ async function assemblePlugin(run: Run, action: ActionOf<"link">): Promise<void>
   const found = run.plugins.get(action.from) ?? {
     content: action.content,
     harnesses: new Set<string>(),
+    document: action.document,
   };
   found.harnesses.add(action.harness);
   run.plugins.set(action.from, found);
   await guardManagedPath(action.from, run.roots);
-  await assemble(action.from, action.content, found.harnesses);
+  await assemble(action.from, action.content, found.harnesses, found.document);
 }
 
 /** Whether aireg writes this placement's file itself, rather than linking or copying a tree. */
@@ -358,6 +363,7 @@ async function rendering(action: ActionOf<"link">): Promise<Rendered | undefined
   const read = await readFile(action.from, "utf8").catch(() => undefined);
   if (read === undefined) return undefined;
   const source = action.rename === undefined ? read : withName(read, action.rename);
+  if (action.command !== undefined) return commandSkill(action.command, source);
   if (action.codec === undefined) return { text: source };
   return applyCodec(action.codec, source);
 }
@@ -560,9 +566,9 @@ function perform(run: Run, action: Action): Promise<void> {
 async function finish(run: Run, plan: Plan): Promise<void> {
   const { roots } = run;
   // At link time a projection would see only the kind whose artifact happened to be first.
-  for (const [dir, { content, harnesses }] of run.plugins) {
+  for (const [dir, { content, harnesses, document }] of run.plugins) {
     await guardManagedPath(dir, roots);
-    await assemble(dir, content, harnesses);
+    await assemble(dir, content, harnesses, document);
   }
   for (const [to, from] of run.fanned) {
     await assertRemovable(to, roots);

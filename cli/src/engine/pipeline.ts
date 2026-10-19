@@ -24,10 +24,12 @@ import { acquire, answers, lockView, newlyYanked } from "#core/plan/acquire.ts";
 import { type ApplyResult, apply, guardsOf, type Recovered, recover } from "#core/plan/apply.ts";
 import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
 import { build, clashMessage } from "#core/plan/build.ts";
+import { describeCarried } from "#core/plan/carries.ts";
 import { formatNeed, type Unresolved, wantOf } from "#core/plan/depends.ts";
 import type { Acquired, Action, Kept, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
 import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
+import type { Untrusted } from "#core/plan/select.ts";
 import { survey } from "#core/plan/survey.ts";
 import { type Unlisted, unlistedMessage } from "#core/plan/unlisted.ts";
 import { blockedTargets } from "#core/plan/writable.ts";
@@ -452,6 +454,33 @@ function refuseUnlisted(
   });
 }
 
+/** `"deploy-kit", which carries hooks and MCP servers`, for what was left out for want of trust. */
+function untrustedLine(untrusted: readonly Untrusted[]): string {
+  const carries = [...new Set(untrusted.flatMap((item) => item.carries))];
+  const names = list(untrusted.map((item) => quoted(item.name)));
+  return `${names}, which ${untrusted.length === 1 ? "carries" : "carry"} ${describeCarried(carries)}`;
+}
+
+/** The command that trusts each plugin, by the address that installs it. */
+function trustHint(untrusted: readonly Untrusted[]): string {
+  const commands = untrusted.map(
+    ({ registry, name }) => `\`aireg add ${registry}/${name} --trust ${name}\``,
+  );
+  return `Read what ${untrusted.length === 1 ? "it runs" : "they run"}, then run ${list(commands)}.`;
+}
+
+/**
+ * A plugin from a source that is not a registry carrying what a harness runs as you installs only
+ * once trusted by name; one left out fails the run after the rest is in.
+ */
+function refuseUntrusted(untrusted: readonly Untrusted[]): void {
+  if (untrusted.length === 0) return;
+  throw new AiregError(`Did not install ${untrustedLine(untrusted)} that run as you.`, {
+    code: ErrorCode.Usage,
+    hint: trustHint(untrusted),
+  });
+}
+
 function refuseOldCli(engine: string | undefined): void {
   const why = unmetEngine(VERSION, engine);
   if (why === undefined) return;
@@ -728,6 +757,10 @@ async function write(
       report.plan(planned, roots, aside, { targets: named, harnesses });
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
       refuseUnlisted(planned.unlisted, printer, undefined);
+      if (planned.untrusted.length > 0) {
+        printer.warning(`Would not install ${untrustedLine(planned.untrusted)} that run as you.`);
+        printer.hint(trustHint(planned.untrusted));
+      }
       return {
         plan: planned,
         applied: undefined,
@@ -777,6 +810,7 @@ async function write(
     refuseUnstaged(applied.unstaged, landed, printer);
     refuseWithheld(planned, printer, hooks.moving);
     refuseUnlisted(planned.unlisted, printer, hooks.moving);
+    refuseUntrusted(planned.untrusted);
     return { plan: planned, applied, before: lock, targets: named, harnesses, scope: roots.scope };
   } finally {
     await closeAll(acquired);

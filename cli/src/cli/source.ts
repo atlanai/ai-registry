@@ -9,7 +9,7 @@ import {
   type SourceAdapter,
   type Want,
 } from "#adapter/index.ts";
-import { isLayoutId, LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
+import { isLayoutId, isReadOnlyLayout, LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
 import { registryNameFromLocation } from "#adapter/location.ts";
 import { expandHome, isLocalPath } from "#adapter/paths.ts";
 import {
@@ -33,6 +33,8 @@ import { findRegistry } from "#core/filespec/write/init.ts";
 import { dotRelative, posixRelative } from "#core/fs/path.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { RegistrySource } from "#core/manifest.ts";
+import { manifestOf } from "#core/plan/acquire.ts";
+import { type Carried, carriedIn } from "#core/plan/carries.ts";
 import { wrapsNamespaces } from "#core/plan/namespaces.ts";
 import { unmatched } from "#core/plan/select.ts";
 import { parseRef, type Ref } from "#core/ref.ts";
@@ -67,6 +69,8 @@ export interface Probed {
   versionOf: (entry: Entry) => string | undefined;
   /** The spec's indexable string pairs on an entry, which a search reads as tags. */
   labelsOf: (entry: Entry) => Readonly<Record<string, string>> | undefined;
+  /** What a plugin from a source that is not a registry would have a harness start. */
+  carriesOf: (entry: Entry) => readonly Carried[];
   /** The bytes an entry names, fetched now if they are not already here. */
   content: (entry: Entry) => Promise<string>;
   close: () => Promise<void>;
@@ -489,6 +493,11 @@ export async function probe(
       return artifact?.version ?? artifact?.envelope.metadata.version;
     },
     labelsOf: (entry) => listedAt(entry)?.artifact.envelope.metadata.labels,
+    carriesOf: (entry) => {
+      const artifact = listedAt(entry)?.artifact;
+      if (artifact?.kind !== "plugin" || !isReadOnlyLayout(listing.layout)) return [];
+      return carriedIn(artifact.envelope, manifestOf(artifact)).carries;
+    },
     content: async (entry) => {
       const item = listedAt(entry);
       if (item === undefined) {

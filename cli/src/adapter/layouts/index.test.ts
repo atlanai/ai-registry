@@ -31,7 +31,7 @@ describe("detectLayout", () => {
   test("says what it looked for in a source that holds none of it", async ({ tmp }) => {
     const root = await skillsFolder(join(tmp, "empty")).file("README.md", "# Empty\n").write();
     await expect(detectLayout(root)).rejects.toThrow(
-      "This source holds nothing aireg reads: no registry.json, SKILL.md or agents/*.md.",
+      "This source holds nothing aireg reads: no registry.json, marketplace.json, plugin.json, SKILL.md or agents/*.md.",
     );
   });
 });

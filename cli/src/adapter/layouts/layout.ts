@@ -16,6 +16,8 @@ export interface Found {
   artifacts: Artifact[];
   /** One sentence each, such as a link that was skipped. */
   warnings: string[];
+  /** What the source calls itself, such as a marketplace's name. */
+  name?: string | undefined;
 }
 
 /** One way a source can lay out what it holds. */

@@ -8,7 +8,9 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { Codec } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
+import type { Carried } from "./carries.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
+import type { Untrusted } from "./select.ts";
 import type { Unlisted } from "./unlisted.ts";
 
 /** One resolved registry, in the shape the lock stores. */
@@ -43,6 +45,8 @@ export interface Placement {
   yanked?: { reason: string | undefined } | undefined;
   /** Its status where it installs with a warning, such as `deprecated`. */
   status?: { name: string; reason: string | undefined } | undefined;
+  /** For a plugin read from a source that is not a registry, what places it. */
+  plugin?: PluginDocument | undefined;
 }
 
 /** A resolved registry with lazy access to artifact content. */
@@ -132,12 +136,16 @@ export type Action =
       plugin?: boolean;
       /** The content this projection links to. Present with `plugin`. */
       content?: string;
+      /** The plugin's own account of itself, for the manifests its projection gets. */
+      document?: PluginDocument;
       /** How the lock recorded a link at this path, when aireg made one before. */
       recorded?: LinkMode;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
       /** Written in the harness's own format. */
       codec?: Codec;
+      /** A plugin's command, written as a skill a person invokes under this name. */
+      command?: string;
       /** Written as a real folder holding this file. */
       entry?: string;
       /** The name the copy's front matter takes: it installs under a name not its own. */
@@ -186,6 +194,8 @@ export interface Plan {
   withheld: Kept[];
   /** Installed artifacts kept as they are, because their registry no longer lists them. */
   unlisted: Unlisted[];
+  /** Plugins left out because they carry what runs on its own, and no entry trusts them. */
+  untrusted: Untrusted[];
 }
 
 /** An installed artifact the plan keeps, by its installed name, at the version it has. */
@@ -210,6 +220,7 @@ export function emptyPlan(): Plan {
     conflicts: [],
     withheld: [],
     unlisted: [],
+    untrusted: [],
   };
 }
 
@@ -277,6 +288,22 @@ export interface Contained {
   kind: ArtifactKind;
   /** Path within the plugin directory, POSIX separators. */
   within: string;
+  /** A command file, which a harness without plugins gets as a skill rendered from it. */
+  command?: boolean;
+}
+
+/** What a plugin read from a source that is not a registry says about itself, for placing it. */
+export interface PluginDocument {
+  name: string;
+  description?: string | undefined;
+  /** The manifest a harness loads it by, which a plugin without its own gets written for it. */
+  manifest?: Record<string, unknown> | undefined;
+  /** Its command files, by command name, relative to the plugin. */
+  commands: readonly { name: string; path: string }[];
+  /** What a harness that loads it would start on its own, which needs a person's yes. */
+  carries: readonly Carried[];
+  /** A digest of those parts, so a change to what runs is seen without fetching. */
+  fingerprint?: string | undefined;
 }
 
 export interface Selected {
@@ -294,6 +321,8 @@ export interface Selected {
   contentId: string | undefined;
   /** The version the source published, where it publishes versions. */
   version: string | undefined;
+  /** For a plugin read from a source that is not a registry, what places it. */
+  plugin?: PluginDocument | undefined;
   /**
    * What a plugin holds, so a harness with no plugin directory can be given
    * its parts. Empty for every other kind.

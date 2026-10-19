@@ -228,12 +228,13 @@ function artifactRef(raw: unknown): Ref {
     throw new ManifestError("`artifacts:` entries must be references or `{ ref, ... }` mappings.");
   }
   const entry = raw;
-  onlyKnown(entry, ["ref", "as", "exclude", "harnesses", "copy"], "An `artifacts:` entry");
+  onlyKnown(entry, ["ref", "as", "exclude", "harnesses", "copy", "trust"], "An `artifacts:` entry");
   const text = optionalString(entry, "ref");
   if (text === undefined) throw new ManifestError("An `artifacts:` entry has no `ref`.");
   const localName = optionalString(entry, "as");
   const exclude = stringList(entry.exclude, text, "exclude");
   const targets = stringList(entry.harnesses, text, "harnesses");
+  const trust = stringList(entry.trust, text, "trust");
   if (entry.copy !== undefined && typeof entry.copy !== "boolean") {
     throw new ManifestError(`\`copy\` of artifact ${quoted(text)} must be true or false.`);
   }
@@ -244,6 +245,7 @@ function artifactRef(raw: unknown): Ref {
   if (localName !== undefined) ref = withLocalName(ref, localName);
   if (exclude !== undefined) ref = withExclusions(ref, exclude);
   if (entry.copy === true) ref = { ...ref, copy: true };
+  if (trust !== undefined) ref = { ...ref, trust };
   return targets === undefined ? ref : { ...ref, targets };
 }
 
@@ -376,6 +378,7 @@ function manifestData(manifest: Manifest): Record<string, unknown> {
       exclude: ref.exclude,
       harnesses: ref.targets,
       copy: ref.copy === true ? true : undefined,
+      trust: ref.trust?.length ? [...ref.trust].sort() : undefined,
     });
     return Object.keys(written).length === 1 ? formatRef(ref) : written;
   });

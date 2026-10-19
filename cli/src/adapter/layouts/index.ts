@@ -7,10 +7,11 @@ import { list } from "../text.ts";
 import { folderLayout, ROOT_ID } from "./folder.ts";
 import type { LayoutId } from "./ids.ts";
 import type { Found, Layout, LayoutContext } from "./layout.ts";
+import { marketplaceLayout } from "./marketplace.ts";
 import { openTree, type Tree } from "./tree.ts";
 
 /** Tried in order: the first that matches reads the source. */
-const LAYOUTS: readonly Layout[] = [folderLayout];
+const LAYOUTS: readonly Layout[] = [marketplaceLayout, folderLayout];
 
 /** A registry is the file spec's own layout, read by the file spec reader. */
 async function isRegistry(root: string): Promise<boolean> {
@@ -45,10 +46,13 @@ function layoutOf(id: LayoutId): Layout | undefined {
   return LAYOUTS.find((layout) => layout.id === id);
 }
 
-/** What the source lists, narrowed to the wants; a want it does not list is left to the caller. */
+/**
+ * What the source lists, narrowed to the wants; a want it does not list is left to the caller.
+ * A plugin brings its members, which is what a harness without plugins installs instead.
+ */
 function chosen(found: readonly Artifact[], wanted: readonly Want[], all: boolean): Artifact[] {
   if (all || wanted.length === 0) return [...found];
-  return found.filter((artifact) =>
+  const reached = found.filter((artifact) =>
     wanted.some((want) =>
       covers(want, {
         name: artifact.envelope.metadata.name,
@@ -56,6 +60,13 @@ function chosen(found: readonly Artifact[], wanted: readonly Want[], all: boolea
         kind: artifact.kind,
       }),
     ),
+  );
+  const plugins = new Set(
+    reached.filter((item) => item.kind === "plugin").map((item) => item.envelope.metadata.name),
+  );
+  return found.filter(
+    (artifact) =>
+      reached.includes(artifact) || (artifact.group !== undefined && plugins.has(artifact.group)),
   );
 }
 
@@ -151,7 +162,7 @@ export function openLayoutRoot(options: { immutable?: boolean } = {}): LayoutRoo
       for (const artifact of artifacts) listed.set(artifact.id, artifact);
       return {
         artifacts,
-        registry: { name: resolveOptions.context.namespace },
+        registry: { name: found.name ?? resolveOptions.context.namespace },
         ...(found.warnings.length === 0 ? {} : { warnings: found.warnings }),
         layout,
       };

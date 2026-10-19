@@ -21,8 +21,8 @@ export interface ContentInput {
   kind: ArtifactKind;
   name: string;
   description?: string | undefined;
-  /** The namespace it is listed under. Outside the envelope, so it never changes the digest. */
-  group: string;
+  /** The namespace it is listed under, outside the envelope so it never changes the digest. */
+  group?: string | undefined;
   files: readonly ContentFile[];
   /** The kind's own document, built from the files alone. */
   spec?: Record<string, unknown> | undefined;
@@ -60,7 +60,7 @@ export async function contentArtifact(tree: Tree, input: ContentInput): Promise<
     id: input.id,
     kind: input.kind,
     envelope,
-    group: input.group,
+    ...(input.group === undefined ? {} : { group: input.group }),
     files,
   };
 }
