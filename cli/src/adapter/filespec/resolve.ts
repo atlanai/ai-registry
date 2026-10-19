@@ -165,6 +165,9 @@ function pinOf(reaching: readonly Want[]): string | undefined {
     .sort((a, b) => narrowness(b) - narrowness(a))[0]?.version;
 }
 
+/** Statuses `latest` never hands out, even when no version is active to take its place. */
+const UNRELEASED = new Set(["draft", "pending_review", "blocked"]);
+
 function usable(entry: IndexRow): boolean {
   return isNamespace(entry.namespace) && isArtifactName(entry.name) && isVersion(entry.latest);
 }
@@ -201,6 +204,8 @@ export async function resolveFromRoot(
     // Section 5 rule 7: a yanked version stays resolvable by name, because a
     // lockfile pinning one must keep resolving, but `latest` must not hand it out.
     if (version.yanked && pinned === undefined) return undefined;
+    // Draft and pending_review install only when pinned; resolveVersion refuses a blocked pin.
+    if (pinned === undefined && UNRELEASED.has(version.status ?? "")) return undefined;
     // An archived artifact is retired: named, it still installs, but taking a
     // whole namespace does not bring it along.
     if (version.status === "archived" && !asked) return undefined;
