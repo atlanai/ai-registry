@@ -7,8 +7,10 @@ interface ContentsMapping {
   extension?: undefined;
   scope?: undefined;
   place?: undefined;
+  entry?: undefined;
   manifest?: undefined;
   register?: undefined;
+  codec?: undefined;
   render?: undefined;
 }
 
@@ -19,12 +21,19 @@ interface DirectoryMapping {
   extension?: undefined;
   /** For a harness that reads this kind from the user installation alone. */
   scope?: "user" | undefined;
-  /** `fan` places a real directory of links, for a harness that will not load a linked one. */
-  place?: "link" | "fan" | undefined;
+  /**
+   * `fan` places a real directory of links, for a harness that will not load a linked one;
+   * `copy` real files, for one that rewrites or refuses links.
+   */
+  place?: "link" | "fan" | "copy" | undefined;
+  /** For a file-shaped kind: the file's name inside its folder, written as a copy. */
+  entry?: string | undefined;
   /** Manifests a plugin directory needs, written only when missing. */
   manifest?: ManifestEntry[] | undefined;
   /** Edits to the harness's own config that make it load what was placed, applied in order. */
   register?: RegisterEntry[] | undefined;
+  /** Rewrites the `entry` file in the harness's own format. */
+  codec?: Codec | undefined;
   render?: undefined;
 }
 
@@ -34,19 +43,41 @@ interface FileMapping {
   subdir: string;
   extension: string;
   scope?: "user" | undefined;
-  place?: undefined;
+  /** `copy` writes a real file, for a harness that rewrites or refuses links. */
+  place?: "link" | "copy" | undefined;
+  entry?: undefined;
   manifest?: undefined;
   register?: undefined;
   /** Written as a real file in the harness's own format. */
+  codec?: Codec | undefined;
+  /** @deprecated Read as the `frontmatter-toml` codec; use `codec`. */
   render?: Render | undefined;
 }
 
-/** The front-matter `fields`, each required, and the Markdown body under `body`; nothing else. */
+/** @deprecated The `frontmatter-toml` codec, under its earlier name. */
 export interface Render {
   format: "toml";
   fields: string[];
   body: string;
 }
+
+/**
+ * A built-in rewrite of the file a harness reads, chosen by id. A definition names one and
+ * never carries code, and one that would drop a restriction refuses to write.
+ */
+export type Codec =
+  /** The front-matter `fields`, each required, and the Markdown body under `body`; nothing else. */
+  | { id: "frontmatter-toml"; fields: string[]; body: string }
+  /** Only the front-matter keys in `keep`; dropping one of `restrictions` is refused. */
+  | { id: "frontmatter-strict"; keep: string[]; restrictions?: string[] | undefined }
+  /** Front-matter keys set to fixed values; changing one of `restrictions` is refused. */
+  | {
+      id: "frontmatter-set";
+      set: Record<string, ConfigValue>;
+      restrictions?: string[] | undefined;
+    }
+  /** A plugin command as a skill a person invokes by name, never the model on its own. */
+  | { id: "command-skill" };
 
 /** Where one artifact kind lands inside a harness root. */
 export type KindMapping = ContentsMapping | DirectoryMapping | FileMapping;

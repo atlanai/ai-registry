@@ -4,10 +4,11 @@ import { onPath } from "#adapter/paths.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { present } from "#core/env.ts";
 import { expandUserPath } from "#core/fs/path.ts";
+import { codecOf } from "#core/harness/codecs/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
-import type { Harnesses, Target } from "./contract.ts";
+import type { HarnessDefinition, Harnesses, KindMapping, Target } from "./contract.ts";
 
 export type { Harnesses, KindMapping, Target } from "./contract.ts";
 
@@ -31,6 +32,20 @@ export const CALLER_SIGNALS: readonly { agent: string; env: readonly string[] }[
       : [{ agent: harness.id, env: harness.detect.caller }],
   );
 
+/** Every mapping as the rest of aireg reads it: a `render` becomes the codec it names. */
+function kindsOf(definition: HarnessDefinition): Target["kinds"] {
+  const kinds: Target["kinds"] = {};
+  for (const [kind, mapping] of Object.entries(definition.kinds) as [ArtifactKind, KindMapping][]) {
+    if (mapping.shape !== "file" || mapping.render === undefined) {
+      kinds[kind] = structuredClone(mapping);
+      continue;
+    }
+    const { render: _, ...rest } = mapping;
+    kinds[kind] = { ...structuredClone(rest), codec: codecOf(mapping) };
+  }
+  return kinds;
+}
+
 /** The built-in harnesses, the only ones aireg knows, as data that crosses the daemon RPC. */
 export function resolveHarnesses(env: NodeJS.ProcessEnv = process.env): Harnesses {
   const out: Harnesses = {};
@@ -46,7 +61,7 @@ export function resolveHarnesses(env: NodeJS.ProcessEnv = process.env): Harnesse
         detect === "never"
           ? "never"
           : { env: detect.env ?? [], binary: detect.binary ?? [], paths: detect.paths ?? [] },
-      kinds: structuredClone(input.kinds),
+      kinds: kindsOf(input),
       reads: { ...input.reads },
       shared: input.shared ?? false,
     };

@@ -12,8 +12,8 @@ const AGENT =
   "---\nname: reviewer\ndescription: Reviews.\ntools: Read\nmodel: sonnet\n---\nReview it.\n";
 const TOML =
   'name = "reviewer"\ndescription = "Reviews."\ndeveloper_instructions = """\nReview it."""\n';
-const RENDER = {
-  format: "toml" as const,
+const CODEC = {
+  id: "frontmatter-toml" as const,
   fields: ["name", "description"],
   body: "developer_instructions",
 };
@@ -60,7 +60,7 @@ function renderPlan(recorded?: LinkMode): Plan {
         from: copy,
         to: target,
         copy: true,
-        render: RENDER,
+        codec: CODEC,
         ...(recorded === undefined ? {} : { recorded }),
       },
       { kind: "record", lock },

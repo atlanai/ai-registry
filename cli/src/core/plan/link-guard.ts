@@ -23,8 +23,8 @@ export async function guardLink(
   to: string,
   recorded: LinkMode | undefined,
   roots: RemovableRoots,
-  /** What a rendered placement would write, when that is known. */
-  rendered?: string,
+  /** What a written placement would hold, and the file it would hold it in. */
+  rendered?: { file: string; text: string },
 ): Promise<LinkGuard> {
   const state = await inspect(to);
   if (!state.exists) return "replace";
@@ -35,7 +35,9 @@ export async function guardLink(
       : recorded === "copy";
   if (ours) return "replace";
   // A file already holding what would be written is ours to take on.
-  if (rendered !== undefined && !state.isLink && (await sameText(to, rendered))) return "replace";
+  if (rendered !== undefined && !state.isLink && (await sameText(rendered.file, rendered.text))) {
+    return "replace";
+  }
   return recorded === undefined ? "keep" : "backup";
 }
 

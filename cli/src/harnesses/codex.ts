@@ -73,7 +73,11 @@ export const codex = defineHarness({
       shape: "file",
       subdir: "agents",
       extension: ".toml",
-      render: { format: "toml", fields: ["name", "description"], body: "developer_instructions" },
+      codec: {
+        id: "frontmatter-toml",
+        fields: ["name", "description"],
+        body: "developer_instructions",
+      },
     },
   },
 });

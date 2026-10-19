@@ -1,7 +1,7 @@
 import { dirname, join, posix, resolve } from "node:path";
 import { sanitizeName } from "#adapter/text.ts";
 import { posixRelative } from "#core/fs/path.ts";
-import type { Render } from "#core/harness/contract.ts";
+import type { Codec } from "#core/harness/contract.ts";
 import {
   type Harnesses,
   placementFor,
@@ -41,7 +41,11 @@ export interface PlannedLink {
   /** The plugin name, when it had to differ from the namespace it holds. */
   renamed?: { namespace: string; name: string };
   /** Written in the harness's own format. */
-  render?: Render;
+  codec?: Codec;
+  /** Written as a real folder holding this file. */
+  entry?: string;
+  /** Written as a real copy, for a harness that rewrites or refuses links. */
+  copy?: boolean;
 }
 
 function plannedLink(
@@ -51,13 +55,15 @@ function plannedLink(
   options: ProjectionOptions,
   kind?: ArtifactKind,
 ): PlannedLink {
-  const render = kind === undefined ? undefined : options.harnesses[name]?.kinds[kind]?.render;
+  const mapping = kind === undefined ? undefined : options.harnesses[name]?.kinds[kind];
   return {
     harness: name,
     absolute: path,
     relative: posixRelative(options.roots.base, path),
     from,
-    ...(render === undefined ? {} : { render }),
+    ...(mapping?.codec === undefined ? {} : { codec: mapping.codec }),
+    ...(mapping?.entry === undefined ? {} : { entry: mapping.entry }),
+    ...(mapping?.place === "copy" ? { copy: true } : {}),
   };
 }
 
@@ -229,6 +235,7 @@ function pluginLink(
     shared: true,
     content: namespaceDir(options.roots, item.source, namespace),
     ...(target.kinds.plugin?.place === "fan" ? { fan: true } : {}),
+    ...(target.kinds.plugin?.place === "copy" ? { copy: true } : {}),
     ...(plugin === namespace ? {} : { renamed: { namespace, name: plugin } }),
   };
 }
@@ -294,9 +301,10 @@ export function linksFor(
   for (const name of new Set(selected)) {
     const target = options.harnesses[name];
     if (target === undefined) continue;
-    // Its plugins carry only kinds it maps unrendered; the rest are placed flat or not at all.
+    // Its plugins carry only kinds it places as they are; the rest are placed flat or not at all.
     const mapping = target.kinds[item.kind];
-    if (!wrapped || !takesPlugin(target, scope) || mapping === undefined || mapping.render) {
+    const written = mapping?.codec !== undefined || mapping?.entry !== undefined;
+    if (!wrapped || !takesPlugin(target, scope) || mapping === undefined || written) {
       rest.push(name);
       continue;
     }

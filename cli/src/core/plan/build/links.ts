@@ -101,7 +101,12 @@ export function updateLinks(
   for (const link of links) {
     const rename = link.shared === true ? undefined : renamedTo(item);
     const copying =
-      link.render !== undefined || rename !== undefined || build.options.copy || item.copy === true;
+      link.codec !== undefined ||
+      link.entry !== undefined ||
+      link.copy === true ||
+      rename !== undefined ||
+      build.options.copy ||
+      item.copy === true;
     const correct = inPlace(state?.links[link.relative], copying, link.from);
     const prior = previous?.links.find((old) => old.path === link.relative);
     if (keepsEditedCopy(prior, state, build)) continue;
@@ -134,7 +139,8 @@ function linkAction(
     plugin: link.shared === true,
     ...(link.content === undefined ? {} : { content: link.content }),
     ...(link.fan === true ? { fan: true } : {}),
-    ...(link.render === undefined ? {} : { render: link.render }),
+    ...(link.codec === undefined ? {} : { codec: link.codec }),
+    ...(link.entry === undefined ? {} : { entry: link.entry }),
     ...(how.rename === undefined ? {} : { rename: how.rename }),
     ...(how.recorded === undefined ? {} : { recorded: how.recorded }),
   };

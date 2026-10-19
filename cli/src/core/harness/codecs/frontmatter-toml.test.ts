@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { Render } from "./contract.ts";
-import { renderPlacement } from "./render.ts";
+import type { Codec } from "#core/harness/contract.ts";
+import { applyCodec } from "./index.ts";
 
-const AGENT: Render = {
-  format: "toml",
+const AGENT: Codec = {
+  id: "frontmatter-toml",
   fields: ["name", "description"],
   body: "developer_instructions",
 };
 
+const renderPlacement = (codec: Codec, source: string) => applyCodec(codec, source, "r");
+
 const agent = (front: string, body: string) => `---\n${front}\n---\n${body}`;
 
-describe("renderPlacement", () => {
+describe("frontmatter-toml", () => {
   it("keeps the fields it names and the body, and leaves out any other front matter", () => {
     const source = agent(
       "name: reviewer\ndescription: Reviews code.\ntools: Read, Grep\nmodel: sonnet\ncolor: cyan",

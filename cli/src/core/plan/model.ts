@@ -4,7 +4,7 @@ import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import type { Render } from "#core/harness/contract.ts";
+import type { Codec } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
@@ -131,7 +131,9 @@ export type Action =
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
       /** Written in the harness's own format. */
-      render?: Render;
+      codec?: Codec;
+      /** Written as a real folder holding this file. */
+      entry?: string;
       /** The name the copy's front matter takes: it installs under a name not its own. */
       rename?: string;
     }

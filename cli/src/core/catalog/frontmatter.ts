@@ -59,6 +59,13 @@ export function withName(text: string, name: string): string {
   return match[0].replace(/^name:.*$/m, `name: ${name}`) + text.slice(match[0].length);
 }
 
+/** The front-matter text and what follows it; undefined when there is no block. */
+export function splitFrontmatter(text: string): { yaml: string; body: string } | undefined {
+  const match = FENCE.exec(text);
+  if (match === null) return undefined;
+  return { yaml: match[1] ?? "", body: text.slice(match[0].length) };
+}
+
 /** What follows the front matter, or all of the text when it has none. */
 export function markdownBody(text: string): string {
   const match = FENCE.exec(text);

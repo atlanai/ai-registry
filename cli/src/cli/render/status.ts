@@ -155,7 +155,7 @@ export function renderStatus(
     const folder = item.detail?.split(": ")[0] ?? "";
     const kind = kindOf(item);
     const mapping = kind === undefined ? undefined : chosen.harnesses[folder]?.kinds[kind];
-    return mapping?.render === undefined ? undefined : folder;
+    return mapping?.codec === undefined ? undefined : folder;
   };
   const edits = statuses.filter((item) => item.state === "edited");
   const written = edits.flatMap((item) => writtenFor(item) ?? []);

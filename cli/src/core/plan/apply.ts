@@ -1,5 +1,5 @@
 import { lstat, mkdir, readFile, rm, rmdir } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { copyDescribed, reasonOf } from "#core/adapter/content.ts";
 import { withName } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -10,7 +10,7 @@ import { fanOut, link } from "#core/fs/link.ts";
 import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { entries, exists, present, pruneEmptyParent, remove, unseal } from "#core/fs/tree.ts";
-import { type Rendered, renderPlacement } from "#core/harness/render.ts";
+import { applyCodec, type Rendered } from "#core/harness/codecs/index.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import { assertLeasesHeld } from "#core/lease.ts";
 import { type LinkMode, type Lock, readLock, writeLock } from "#core/lock.ts";
@@ -254,7 +254,10 @@ export async function guardsOf(plan: Plan, roots: Roots): Promise<Map<string, Li
     if (action.kind === "record" || guards.has(action.to)) continue;
     if (action.kind === "link") {
       const rendered = await rendering(action);
-      const text = rendered !== undefined && "text" in rendered ? rendered.text : undefined;
+      const text =
+        rendered !== undefined && "text" in rendered
+          ? { file: writtenFile(action), text: rendered.text }
+          : undefined;
       guards.set(action.to, await guardLink(action.to, action.recorded, roots, text));
     } else if (action.kind === "unlink" && action.link !== undefined) {
       guards.set(action.to, await guardLink(action.to, action.link.mode, roots));
@@ -337,15 +340,26 @@ async function assemblePlugin(run: Run, action: ActionOf<"link">): Promise<void>
   await assemble(action.from, action.content, found.harnesses);
 }
 
-/** A rendered placement's text; undefined for a link, or before its source is copied. */
+/** Whether aireg writes this placement's file itself, rather than linking or copying a tree. */
+function writes(action: ActionOf<"link">): boolean {
+  return action.codec !== undefined || action.entry !== undefined;
+}
+
+/** Where a written placement's file sits: inside its folder, for an `entry`. */
+function writtenFile(action: ActionOf<"link">): string {
+  return action.entry === undefined ? action.to : join(action.to, action.entry);
+}
+
+/** A written placement's text; undefined for a link, or before its source is copied. */
 async function rendering(action: ActionOf<"link">): Promise<Rendered | undefined> {
-  if (action.render === undefined) return undefined;
-  const source = await readFile(action.from, "utf8").catch(() => undefined);
-  if (source === undefined) return undefined;
-  return renderPlacement(
-    action.render,
-    action.rename === undefined ? source : withName(source, action.rename),
-  );
+  if (!writes(action)) return undefined;
+  const read = await readFile(action.from, "utf8").catch(() => undefined);
+  if (read === undefined) return undefined;
+  const source = action.rename === undefined ? read : withName(read, action.rename);
+  if (action.codec === undefined) return { text: source };
+  const name =
+    action.entry === undefined ? basename(action.to, extname(action.to)) : basename(action.to);
+  return applyCodec(action.codec, source, name);
 }
 
 /** A copy under a name not its own says that name, so the harness shows it as installed. */
@@ -355,7 +369,7 @@ async function renameCopy(to: string, name: string): Promise<void> {
   if (text !== undefined) await writeAtomic(file, withName(text, name));
 }
 
-/** Never linked: Codex refuses to run a linked agent. */
+/** Never linked: a harness reading its own format may refuse a link. */
 async function writeRendered(
   run: Run,
   action: ActionOf<"link">,
@@ -367,8 +381,8 @@ async function writeRendered(
     return undefined;
   }
   await remove(action.to);
-  await mkdir(dirname(action.to), { recursive: true });
-  await writeAtomic(action.to, rendered.text);
+  await mkdir(dirname(writtenFile(action)), { recursive: true });
+  await writeAtomic(writtenFile(action), rendered.text);
   return "copy";
 }
 
@@ -379,7 +393,10 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   // Its source may have been copied in by this run, after the guard was taken.
   const rendered = await rendering(action);
   if (guard === "keep" && rendered !== undefined && "text" in rendered) {
-    guard = await guardLink(action.to, action.recorded, roots, rendered.text);
+    guard = await guardLink(action.to, action.recorded, roots, {
+      file: writtenFile(action),
+      text: rendered.text,
+    });
   }
   if (guard === "keep") {
     run.kept.push({ name: action.name, path: action.to });
@@ -408,17 +425,16 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   }
   // A harness that will not load a linked plugin gets a real directory of links instead.
   const fan = action.fan === true && !action.copy;
-  const mode =
-    action.render !== undefined
-      ? await writeRendered(run, action, rendered)
-      : fan
-        ? await fanOut(action.from, action.to)
-        : await link(action.from, action.to, action.copy);
+  const mode = writes(action)
+    ? await writeRendered(run, action, rendered)
+    : fan
+      ? await fanOut(action.from, action.to)
+      : await link(action.from, action.to, action.copy);
   if (mode === undefined) {
     run.skipped.add(key);
     return;
   }
-  if (action.rename !== undefined && action.render === undefined && mode === "copy") {
+  if (action.rename !== undefined && !writes(action) && mode === "copy") {
     await renameCopy(action.to, action.rename);
   }
   if (fan) run.fanned.set(action.to, action.from);
