@@ -11,7 +11,7 @@ This repository holds the ai-registry file spec, `aireg` (a CLI that creates reg
 - `docs/` is the MkDocs documentation site.
 - `examples/` holds complete file registries. `examples/aireg` holds the `/aireg` skills.
 - `skills/ai-registry` is the setup skill an agent reads from this repository's GitHub link, before aireg is installed. The README's prompt points to it.
-- `tools/` holds the standard-library spec checks and the figure builder.
+- `tools/` holds the standard-library spec checks, the install pin check and the figure builder.
 
 ## Generated files
 
@@ -53,7 +53,7 @@ Run the checks for what you changed, and report any that could not run and any w
 
 - CLI: `pnpm run verify` in `cli/` (typecheck, lint, dead-code check, third-party notices check, build, package check, tests).
 - Spec, schemas, or examples: `python3 tools/check.py examples/<name>` for each example registry and `python3 tools/check_schemas.py`; both use the standard library, and the second skips its instance tier unless `jsonschema` is installed (`python3 -m pip install -r tools/requirements.txt`); CI passes `--require-jsonschema`, so it fails there instead. After building the CLI, also run `node dist/main.mjs registry validate ../examples/<name>` from `cli/` for each example registry you changed.
-- Docs: `python3 tools/build_figures.py --check` and `mkdocs build --strict`.
+- Docs: `python3 tools/build_figures.py --check`, `python3 tools/check_pins.py` and `mkdocs build --strict`.
 - Always: Check local Markdown links, the `CLAUDE.md` symlink and ignored local workspace files, and run `git diff --check`.
 
 Exercise interactive changes, such as `aireg console`, by running them.

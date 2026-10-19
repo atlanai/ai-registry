@@ -62,9 +62,13 @@ jobs:
                       selected = dict(cli=True, spec=True, docs=True)
                   elif path.startswith("cli/"):
                       selected["cli"] = True
+                      # The install pins in the docs follow the CLI's version.
+                      if path == "cli/package.json":
+                          selected["docs"] = True
                   elif path in ("tools/check.py", "tools/check_schemas.py", "tools/requirements.txt"):
                       selected["spec"] = True
-                  elif (path.startswith("docs/") or path in ("mkdocs.yml", "tools/build_figures.py")
+                  elif (path.startswith("docs/")
+                        or path in ("mkdocs.yml", "tools/build_figures.py", "tools/check_pins.py")
                         or ("/" not in path and path.endswith(".md"))):
                       selected["docs"] = True
                   else:
@@ -349,6 +353,8 @@ jobs:
           python-version: "3.12"
       - run: python3 -m pip install --require-hashes -r docs/requirements.txt
       - run: python3 tools/build_figures.py --check
+      # Fails when an install pin in the docs or the aireg skills is not cli/package.json's version.
+      - run: python3 tools/check_pins.py
       - run: mkdocs build --strict
 
   secrets:
