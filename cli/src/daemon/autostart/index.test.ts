@@ -61,6 +61,17 @@ unix("autostart", () => {
       });
     });
 
+    test("keeps the Windows copy even when a current folder exists", async ({ home }) => {
+      const install = await standalone(home.aireg);
+      const spec = serviceSpec({
+        platform: "win32",
+        entry: install.version,
+        uid: 501,
+        accountHome: home.dir,
+      });
+      expect(spec.daemon[0]).toBe(install.shim);
+    });
+
     test("falls back to the shim when there is no current link", async ({ home }) => {
       await mkdir(join(home.aireg, "bin"), { recursive: true, mode: 0o700 });
       await writeFile(join(home.aireg, "bin", "aireg"), "#!/bin/sh\n");

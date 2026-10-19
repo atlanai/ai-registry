@@ -62,6 +62,8 @@ Autostart is per user, so `autostart on` refuses to run with `sudo`. It register
 | Linux | A systemd user service, `~/.config/systemd/user/aireg-daemon.service` |
 | Windows | A per-user Run key, so it starts when you sign in |
 
+On macOS and Linux the service starts the aireg binary under `cli/current` directly, not the `bin/aireg` script on your `PATH`, so it follows every update. A service registered by an older aireg is moved to it the next time the daemon starts, and takes effect from the next sign-in.
+
 An aireg folder other than your account's own, such as one a different `HOME` or `AIREG_HOME` points at, registers under its own name, so it never replaces your service. `off` unregisters the service and stops starting it at login. On macOS and Linux it also stops the daemon the service manager started; on Windows a running daemon keeps running until it stops.
 
 On macOS, if autostart is registered but not running, check that aireg is allowed in System Settings > General > Login Items.

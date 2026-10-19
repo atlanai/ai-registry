@@ -50,9 +50,10 @@ export function supervised(env: NodeJS.ProcessEnv = process.env): boolean {
  * Pruning deletes versioned directories, so the service names a path every update relinks: the
  * signed binary under `current`, trusted over a shell script, else the shim or the Windows copy.
  */
-function stableEntry(entry: string, env: NodeJS.ProcessEnv): string {
+function stableEntry(entry: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
   if (!isWithin(cliRoot(env), entry)) return entry;
-  if (existsSync(currentBin(env))) return currentBin(env);
+  // On Windows `current` is a file naming the version, so only the copy is stable there.
+  if (platform !== "win32" && existsSync(currentBin(env))) return currentBin(env);
   return existsSync(shimPath(env)) ? shimPath(env) : entry;
 }
 
@@ -86,7 +87,7 @@ export function serviceSpec(options: AutostartOptions = {}): ServiceSpec {
   const entry = options.entry ?? runningEntry();
   if (entry === undefined) throw new Error(NO_EXECUTABLE);
   const execPath = stableNode(options.execPath ?? process.execPath, env.PATH);
-  const stable = stableEntry(entry, env);
+  const stable = stableEntry(entry, env, options.platform ?? process.platform);
   const argv = (args: string[]) => {
     const launch = launchArgv(stable, args, execPath);
     return [launch.command, ...launch.args];
