@@ -8,8 +8,6 @@ const AGENT: Codec = {
   body: "developer_instructions",
 };
 
-const renderPlacement = (codec: Codec, source: string) => applyCodec(codec, source, "r");
-
 const agent = (front: string, body: string) => `---\n${front}\n---\n${body}`;
 
 describe("frontmatter-toml", () => {
@@ -18,7 +16,7 @@ describe("frontmatter-toml", () => {
       "name: reviewer\ndescription: Reviews code.\ntools: Read, Grep\nmodel: sonnet\ncolor: cyan",
       "\n# Reviewer\n\nReview the diff.\n",
     );
-    expect(renderPlacement(AGENT, source)).toEqual({
+    expect(applyCodec(AGENT, source)).toEqual({
       text: [
         'name = "reviewer"',
         'description = "Reviews code."',
@@ -32,7 +30,7 @@ describe("frontmatter-toml", () => {
   it("escapes backslashes, control characters and runs of quotes, and keeps unicode", () => {
     const body =
       'Say """hi""" to C:\\temp\\new.\r\nTab\there, bell\u0007, caf\u00e9 \u{1F600}.\r\nEnd "quoted""';
-    const out = renderPlacement(AGENT, agent('name: r\ndescription: "A \\"quoted\\" one"', body));
+    const out = applyCodec(AGENT, agent('name: r\ndescription: "A \\"quoted\\" one"', body));
     expect(out).toEqual({
       text: [
         'name = "r"',
@@ -45,7 +43,7 @@ describe("frontmatter-toml", () => {
   });
 
   it("writes a multi-line description as one escaped line, as YAML reads it", () => {
-    const out = renderPlacement(AGENT, agent("name: r\ndescription: |\n  Two\n  lines", "Go."));
+    const out = applyCodec(AGENT, agent("name: r\ndescription: |\n  Two\n  lines", "Go."));
     expect(out).toMatchObject({
       text: expect.stringContaining('description = "Two\\nlines\\n"\n'),
     });
@@ -61,6 +59,6 @@ describe("frontmatter-toml", () => {
     ],
     ["an empty body", agent("name: r\ndescription: d", "\n \r\n"), "it has no instructions"],
   ])("refuses %s", (_, source, problem) => {
-    expect(renderPlacement(AGENT, source)).toEqual({ problem });
+    expect(applyCodec(AGENT, source)).toEqual({ problem });
   });
 });

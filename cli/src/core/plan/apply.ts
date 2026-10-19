@@ -1,5 +1,5 @@
 import { lstat, mkdir, readFile, rm, rmdir } from "node:fs/promises";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { copyDescribed, reasonOf } from "#core/adapter/content.ts";
 import { withName } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -357,9 +357,7 @@ async function rendering(action: ActionOf<"link">): Promise<Rendered | undefined
   if (read === undefined) return undefined;
   const source = action.rename === undefined ? read : withName(read, action.rename);
   if (action.codec === undefined) return { text: source };
-  const name =
-    action.entry === undefined ? basename(action.to, extname(action.to)) : basename(action.to);
-  return applyCodec(action.codec, source, name);
+  return applyCodec(action.codec, source);
 }
 
 /** A copy under a name not its own says that name, so the harness shows it as installed. */

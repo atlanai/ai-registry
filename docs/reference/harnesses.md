@@ -60,9 +60,8 @@ Each entry under `kinds` has a `shape`:
 | `frontmatter-toml` | The front-matter `fields` and the body under `body`, as TOML. |
 | `frontmatter-strict` | Only the front-matter keys in `keep`. |
 | `frontmatter-set` | The front matter with the keys in `set` added or changed. |
-| `command-skill` | A plugin command as a skill only a person invokes, named `<plugin>-<command>`. |
 
-A codec that would drop or change a key listed in its `restrictions`, such as an agent's `tools`, writes nothing and says why, rather than let the agent do more than its author allowed. A file names a codec; it never carries code.
+A codec that would drop or change a key that limits what an agent may use writes nothing and says why, rather than let the agent do more than its author allowed. Those keys are `tools`, `allowed-tools`, `disallowedTools`, `permissionMode` and `permission`, and any the codec's `restrictions` add. A file names a codec; it never carries code.
 
 ### What aireg refuses
 

@@ -62,22 +62,20 @@ export interface Render {
 }
 
 /**
- * A built-in rewrite of the file a harness reads, chosen by id. A definition names one and
- * never carries code, and one that would drop a restriction refuses to write.
+ * A built-in rewrite of the file a harness reads, chosen by id; a definition never carries code.
+ * A strict or set codec never drops or changes a key that limits an agent, `restrictions` included.
  */
 export type Codec =
   /** The front-matter `fields`, each required, and the Markdown body under `body`; nothing else. */
   | { id: "frontmatter-toml"; fields: string[]; body: string }
-  /** Only the front-matter keys in `keep`; dropping one of `restrictions` is refused. */
+  /** Only the front-matter keys in `keep`; dropping a key that limits the agent is refused. */
   | { id: "frontmatter-strict"; keep: string[]; restrictions?: string[] | undefined }
-  /** Front-matter keys set to fixed values; changing one of `restrictions` is refused. */
+  /** Front-matter keys set to fixed values; changing a key that limits the agent is refused. */
   | {
       id: "frontmatter-set";
       set: Record<string, ConfigValue>;
       restrictions?: string[] | undefined;
-    }
-  /** A plugin command as a skill a person invokes by name, never the model on its own. */
-  | { id: "command-skill" };
+    };
 
 /** Where one artifact kind lands inside a harness root. */
 export type KindMapping = ContentsMapping | DirectoryMapping | FileMapping;

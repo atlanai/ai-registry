@@ -19,7 +19,6 @@ describe("frontmatter-strict", () => {
     const out = applyCodec(
       { id: "frontmatter-strict", keep: ["name", "description", "tools"] },
       AGENT,
-      "r",
     );
     expect(out).toEqual({
       text: [
@@ -35,14 +34,18 @@ describe("frontmatter-strict", () => {
     });
   });
 
-  it("refuses to drop a restriction rather than widen what the agent may do", () => {
-    const codec: Codec = {
-      id: "frontmatter-strict",
-      keep: ["name", "description"],
-      restrictions: ["tools"],
-    };
-    expect(applyCodec(codec, AGENT, "r")).toEqual({
+  it("refuses to drop a key that limits the agent, rather than widen what it may do", () => {
+    const codec: Codec = { id: "frontmatter-strict", keep: ["name", "description"] };
+    expect(applyCodec(codec, AGENT)).toEqual({
       problem: "it sets tools, which this harness cannot read",
+    });
+  });
+
+  it("refuses to drop a key its definition lists as a restriction", () => {
+    const keep = ["name", "description", "tools"];
+    const codec: Codec = { id: "frontmatter-strict", keep, restrictions: ["color"] };
+    expect(applyCodec(codec, AGENT)).toEqual({
+      problem: "it sets color, which this harness cannot read",
     });
   });
 });
@@ -52,41 +55,14 @@ describe("frontmatter-set", () => {
     const out = applyCodec(
       { id: "frontmatter-set", set: { mode: "subagent", color: "red" } },
       AGENT,
-      "r",
     );
     expect(out).toEqual({ text: expect.stringContaining("color: red\nmode: subagent\n---\n") });
   });
 
   it("refuses to change a restriction the artifact sets", () => {
-    const codec: Codec = { id: "frontmatter-set", set: { tools: "*" }, restrictions: ["tools"] };
-    expect(applyCodec(codec, AGENT, "r")).toEqual({
+    const codec: Codec = { id: "frontmatter-set", set: { tools: "*" } };
+    expect(applyCodec(codec, AGENT)).toEqual({
       problem: "it sets tools, which this harness would change",
-    });
-  });
-});
-
-describe("command-skill", () => {
-  it("names the skill for its plugin and leaves invoking it to a person", () => {
-    const command =
-      "---\ndescription: Ship it.\nallowed-tools: Bash(git:*)\n---\nShip $ARGUMENTS.\n";
-    expect(applyCodec({ id: "command-skill" }, command, "kit-ship")).toEqual({
-      text: [
-        "---",
-        "description: Ship it.",
-        "allowed-tools: Bash(git:*)",
-        "name: kit-ship",
-        "disable-model-invocation: true",
-        "---",
-        "Ship $ARGUMENTS.",
-        "",
-      ].join("\n"),
-    });
-  });
-
-  it("refuses a command with no description, which a skill needs", () => {
-    const command = "---\nargument-hint: <branch>\n---\nShip it.\n";
-    expect(applyCodec({ id: "command-skill" }, command, "kit-ship")).toEqual({
-      problem: "it has no description",
     });
   });
 });

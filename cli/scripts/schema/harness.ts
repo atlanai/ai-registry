@@ -46,7 +46,7 @@ const Codec = tagged(
       {
         additionalProperties: false,
         description:
-          "Only the front-matter keys in `keep`; dropping one of `restrictions` is refused.",
+          "Only the front-matter keys in `keep`; dropping a key that limits the agent, or one of `restrictions`, is refused.",
       },
     ),
     Type.Object(
@@ -54,14 +54,7 @@ const Codec = tagged(
       {
         additionalProperties: false,
         description:
-          "Front-matter keys set to fixed values; changing one of `restrictions` is refused.",
-      },
-    ),
-    Type.Object(
-      { id: Type.Literal("command-skill") },
-      {
-        additionalProperties: false,
-        description: "A plugin command as a skill a person invokes by name.",
+          "Front-matter keys set to fixed values; changing a key that limits the agent, or one of `restrictions`, is refused.",
       },
     ),
   ],
