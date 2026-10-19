@@ -1,6 +1,6 @@
 import { isAbsolute } from "node:path";
 import { quoted } from "#adapter/text.ts";
-import { type ArtifactKind, KINDS } from "#core/kinds.ts";
+import { type ArtifactKind, KIND_SPECS, KINDS } from "#core/kinds.ts";
 import type { ConfigValue, HarnessDefinition, KindMapping, RegisterEntry } from "./contract.ts";
 import { templateVars } from "./template.ts";
 
@@ -44,6 +44,13 @@ export function harnessProblems(
       pathProblem(within, [], report);
       if (definition.roots.user.env === undefined) report("roots.user.within needs an env.");
     }
+    if (
+      definition.kind === "shared" &&
+      definition.detect !== undefined &&
+      definition.detect !== "never"
+    ) {
+      report('a shared folder is never detected, so detect must be "never".');
+    }
     const instances = definition.instances?.root;
     if (instances !== undefined) instanceProblems(instances, report);
     for (const kind of KINDS) {
@@ -80,7 +87,7 @@ function readProblem(
   }
 }
 
-function mappingProblems(kind: string, mapping: KindMapping, report: Report) {
+function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Report) {
   if (mapping.shape === "contents") return;
   pathProblem(mapping.subdir, TEMPLATE_VARS.placement, report);
   for (const entry of mapping.manifest ?? []) {
@@ -97,9 +104,14 @@ function mappingProblems(kind: string, mapping: KindMapping, report: Report) {
   if (mapping.shape === "directory" && mapping.entry !== undefined) {
     pathProblem(mapping.entry, [], report);
     if (mapping.entry.includes("/")) report(`kinds.${kind}: entry is not a file name.`);
+    if (KIND_SPECS[kind].shape !== "file")
+      report(`kinds.${kind}: entry is for a kind that is one file.`);
   }
   if (mapping.shape === "directory" && mapping.codec !== undefined && mapping.entry === undefined) {
     report(`kinds.${kind}: a codec on a folder needs an entry file.`);
+  }
+  if (mapping.shape === "file" && mapping.render !== undefined && mapping.codec !== undefined) {
+    report(`kinds.${kind}: render is the earlier name of a codec, so set codec alone.`);
   }
   // Written unquoted, so each key must be a bare one.
   const toml =

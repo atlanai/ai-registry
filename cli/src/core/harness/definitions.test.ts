@@ -54,6 +54,33 @@ describe("harnessProblems", () => {
       /needs an entry file/,
     ],
     [
+      "an entry for a kind that is a folder",
+      [harness({ kinds: { skill: { shape: "directory", subdir: "skills", entry: "SKILL.md" } } })],
+      /entry is for a kind that is one file/,
+    ],
+    [
+      "a shared folder that is detected",
+      [harness({ kind: "shared", detect: { binary: ["tool"] } })],
+      /never detected/,
+    ],
+    [
+      "both a render and a codec",
+      [
+        harness({
+          kinds: {
+            agent: {
+              shape: "file",
+              subdir: "agents",
+              extension: ".toml",
+              codec: { id: "frontmatter-toml", fields: ["name"], body: "body" },
+              render: { format: "toml", fields: ["name"], body: "body" },
+            },
+          },
+        }),
+      ],
+      /set codec alone/,
+    ],
+    [
       "profiles that are every folder in the home folder",
       [harness({ instances: { root: "~/{profile}" } })],
       /every folder in your home folder/,
