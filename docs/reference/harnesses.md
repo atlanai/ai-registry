@@ -31,7 +31,7 @@ A harness file defines a harness aireg doesn't ship, or replaces one it does, wi
 
 Only your user scope defines a harness. A project may select one by id, in `--for` or its manifest's `harnesses:` list, but never define one, so a repository you clone can't point aireg at folders of its choosing.
 
-A file holds the same keys a built-in harness has, as [`harness.schema.json`](https://github.com/atlanai/ai-registry/blob/main/cli/schema/harness.schema.json) describes:
+A file holds the keys a built-in harness has, except `default`, `importable` and `detect.caller`, which only a built-in harness sets, as [`harness.schema.json`](https://github.com/atlanai/ai-registry/blob/main/cli/schema/harness.schema.json) describes:
 
 | Key | What it says |
 |---|---|
@@ -44,13 +44,13 @@ A file holds the same keys a built-in harness has, as [`harness.schema.json`](ht
 | `kinds` | Where each of `skill`, `agent` and `plugin` lands; see below. |
 | `verified` | `command`, the program and arguments that print its version, and `range`, the versions this was checked against. |
 | `trust` | Per kind, a command a person runs before the harness loads what aireg placed, and the `scope` it applies to. |
-| `instances` | `root`, a folder under `~/` with `{profile}` in its last segment: each profile folder found there is a harness of its own, `<id>:<profile>`. |
+| `instances` | `root`, a folder under `~/` with `{profile}` in its last segment: each profile folder found there is a harness of its own, `<id>:<profile>`, which aireg installs into in your user scope alone. |
 | `reload` | What to do for the harness to see a change. |
 
 Each entry under `kinds` has a `shape`:
 
 - `contents` places nothing of its own: a plugin lands as the skills and agents it holds, where those kinds go.
-- `directory` places a folder per artifact under `subdir`. `place` is `link` (the default), `fan`, a real folder of links, or `copy`, real files, for a harness that rewrites or refuses links. For an agent, `entry` names the file it lands as inside its own folder, such as `AGENT.md`. A plugin's `manifest` lists the manifests aireg writes into it.
+- `directory` places a folder per artifact under `subdir`. `place` is `link` (the default), `fan`, a real folder of links, or `copy`, real files, for a harness that rewrites or refuses links. For an agent, `entry` names the file it lands as inside its own folder, such as `AGENT.md`, and a `codec` rewrites that file. A plugin's `manifest` lists the manifests aireg writes into it.
 - `file` places one file per artifact, `<subdir>/<name><extension>`, linked or, with `place: "copy"`, copied.
 
 `scope: "user"` keeps a kind out of projects. `register` lists edits to the harness's own TOML, JSON or YAML config that make it load what was placed; aireg makes each edit while a placement needs it, keeps the comments and key order a person wrote in a YAML file, and takes the edit back with the last placement. An `append` entry adds one item to a YAML list, with an `# aireg` comment beside it; aireg takes out only an item it marked, so one you listed yourself stays. `codec` rewrites the file a harness reads in its own format, with one of the codecs aireg builds in:
@@ -71,10 +71,10 @@ A codec that would drop or change a key that limits what an agent may use writes
 - names a codec aireg doesn't build in;
 - puts a root outside your home folder or the project, or a config file or manifest outside its harness's folder, including through `..`;
 - gives `detect` or `verified` a shell command instead of a program and a list of arguments;
-- uses an id another harness has, without `"overrides": true` for a built-in one;
-- is named other than `<id>.json`, or links to a file outside `~/.aireg/harnesses/`.
+- sets an `entry` for a kind that is a folder, both `render` and `codec`, or `detect` for a shared folder;
+- uses an id another harness has, without `"overrides": true` for a built-in one.
 
-A file aireg refuses is skipped with a warning, and the built-in harnesses keep working.
+Reading `~/.aireg/harnesses/`, aireg also refuses a file named other than `<id>.json`, and one that links to a file outside that folder. A file aireg refuses is skipped: `aireg harnesses` names it with what is wrong, a command that can't find the harness it would define names it too, and the built-in harnesses keep working.
 
 ### Trust and reload steps
 
