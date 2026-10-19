@@ -7,7 +7,7 @@ conformance({
   file: {
     id: "example",
     displayName: "Example",
-    roots: { project: ".example", user: { default: "~/.example" } },
+    roots: { project: ".example", user: { default: "~/.example", env: "EXAMPLE_HOME" } },
     kinds: {
       plugin: { shape: "contents" },
       skill: { shape: "directory", subdir: "skills" },

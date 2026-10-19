@@ -164,6 +164,13 @@ export function conformance(spec: Conformance): void {
     process.env.AIREG_CONFORMANCE === "1" &&
     probes.length > 0 &&
     probes.every((probe) => onPath(probe.argv[0] as string, process.env));
+  const programs = [...new Set(probes.map((probe) => probe.argv[0]))].join(", ");
+  // A skipped test shows only its name, so the name says what would run it.
+  const l2 = live
+    ? "L2: the harness lists what aireg placed"
+    : probes.length === 0
+      ? "L2: not run, since no command of the harness lists what it loaded"
+      : `L2: runs with AIREG_CONFORMANCE=1 and ${programs} on PATH`;
 
   // Windows places a link as a junction or a copy, so its trees differ by design.
   describe.skipIf(process.platform === "win32")(`${spec.id} conformance`, () => {
@@ -183,9 +190,12 @@ export function conformance(spec: Conformance): void {
       const builtIn = resolveHarnesses(env)[spec.id];
       await mkdir(join(env.AIREG_HOME, "harnesses"), { recursive: true });
       const twin = join(import.meta.dirname, "..", "fixtures", "harnesses", `${spec.id}.json`);
-      await copyFile(twin, join(env.AIREG_HOME, "harnesses", `${spec.id}.json`));
-      expect({ ...resolveHarnesses(env)[spec.id], origin: "built-in" }).toEqual(builtIn);
-      await rm(env.AIREG_HOME, { recursive: true });
+      try {
+        await copyFile(twin, join(env.AIREG_HOME, "harnesses", `${spec.id}.json`));
+        expect({ ...resolveHarnesses(env)[spec.id], origin: "built-in" }).toEqual(builtIn);
+      } finally {
+        await rm(env.AIREG_HOME, { recursive: true, force: true });
+      }
     });
 
     test("L1: places each kind in this project", async () => {
@@ -206,7 +216,7 @@ export function conformance(spec: Conformance): void {
 
     // A sandbox of its own: the harness may write its own state as it runs.
     test.skipIf(!live)(
-      "L2: the harness lists what aireg placed",
+      l2,
       async () => {
         const own = await sandbox(spec);
         try {
