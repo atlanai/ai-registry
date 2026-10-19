@@ -107,30 +107,16 @@ export async function run(context: CommandContext): Promise<void> {
     cancel(step);
     return;
   }
-  const {
-    input,
-    resolved,
-    inside: within,
-    exact,
-    picks,
-  } = await commandLineAddress(own, positionals, typed, known, common, context.cwd);
+  const address = await commandLineAddress(own, positionals, typed, known, common, context.cwd);
+  const { input, inside: within, exact, picks } = address;
+  let { resolved } = address;
   if (!resolved.declared) {
     const unknown = await undeclaredRegistry(input, known, common, context.cwd);
     if (unknown !== undefined) throw unknown;
   }
 
-  const namespace = selectScope(input, resolved, picks, within);
-
-  // The address carries the selection when it named one, so every later step
-  // reads it the same way `--select` would have been read.
-  const asked: CommonOptions =
-    picks.select !== undefined || resolved.name === undefined
-      ? picks
-      : { ...picks, select: [resolved.name] };
-  const named = asked.select?.includes("*") === true ? undefined : asked.select;
-  // Only one address is read on its own: a `--select` value may name a
-  // namespace, which the catalog has to be read to recognize.
-  const partial = resolved.name !== undefined && picks.select === undefined;
+  let namespace = selectScope(input, resolved, picks, within);
+  let { asked, named, partial } = selection(resolved, picks);
   // An address that says what to install is the whole answer; only a bare one is asked about.
   const complete = picks.select !== undefined || exact;
   const asking: Interaction = complete
@@ -139,6 +125,12 @@ export async function run(context: CommandContext): Promise<void> {
   preparing(asking);
 
   const { source } = await read(step, context, resolved, partial, named, namespace);
+  const short = shortForm(source, resolved, namespace, picks);
+  if (short !== undefined) {
+    resolved = short;
+    namespace = undefined;
+    ({ asked, named, partial } = selection(resolved, picks));
+  }
   const { catalogAlias, entries } = entriesFor(source, resolved, partial, namespace);
 
   const gathered = await gather(
@@ -374,6 +366,42 @@ async function reportAdded(
 }
 
 type AddFlags = SourceFlags & { as?: string; registry?: string; "no-auto-update"?: boolean };
+
+/** What an address selects: the names it carries, read the way `--select` would be. */
+function selection(resolved: Resolved, picks: CommonOptions) {
+  const asked: CommonOptions =
+    picks.select !== undefined || resolved.name === undefined
+      ? picks
+      : { ...picks, select: [resolved.name] };
+  return {
+    asked,
+    named: asked.select?.includes("*") === true ? undefined : asked.select,
+    // Only one address is read on its own: a `--select` value may name a
+    // namespace, which the catalog has to be read to recognize.
+    partial: resolved.name !== undefined && picks.select === undefined,
+  };
+}
+
+/**
+ * `acme/pdf` names a namespace. When the registry has no namespace `pdf` but exactly one artifact
+ * of that name, it names that artifact instead; the manifest records its full name.
+ */
+function shortForm(
+  source: Probed,
+  resolved: Resolved,
+  namespace: string | undefined,
+  picks: CommonOptions,
+): Resolved | undefined {
+  if (namespace === undefined || resolved.name !== undefined || picks.select !== undefined) {
+    return undefined;
+  }
+  const entries = source.catalog.entries;
+  const plugin = (entry: Entry) => entry.kind === "plugin" && entry.name === namespace;
+  if (entries.some((entry) => entry.group === namespace || plugin(entry))) return undefined;
+  const [only] = among(entries, resolved.alias ?? source.alias, { name: namespace });
+  if (only === undefined) return undefined;
+  return { ...resolved, name: only.name, namespace: only.group, kind: only.kind };
+}
 
 /** What the command line names, with a link to one artifact read as that artifact. */
 async function commandLineAddress(

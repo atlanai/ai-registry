@@ -21,6 +21,7 @@ What you name says what to install: a registry, a namespace in it, or one artifa
 |---|---|
 | `acme` | Everything the `acme` registry publishes. On a terminal, aireg asks which. |
 | `acme/engineering` | Everything in the `engineering` namespace, including what it publishes later. |
+| `acme/pr-review` | The one artifact named `pr-review`, when `acme` has no namespace of that name. A name two namespaces share is refused, with the full names that tell them apart. The manifest records the full name. |
 | `acme/engineering/pr-review` | One artifact. |
 | `acme/engineering/pr-review@1.2.0` | One artifact, pinned to version 1.2.0. |
 | `acme/engineering/skill/pr-review` | One artifact, when a skill and an agent share the name. |
