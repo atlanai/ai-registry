@@ -22,7 +22,7 @@ An agent registry stores your organization's AI artifacts and manages their life
 
 ### Why not just a git repository of skills, or a plugin marketplace?
 
-In a plain repository of skills or a marketplace, any change to a skill reaches every agent, and nobody can tell which version is running. A registry can live in a git repository too, but it pins and verifies every version, gives every machine identical bytes, rolls back or yanks a version for everyone, and installs into each harness from one record.
+In a plain repository of skills or a marketplace, everyone gets whatever copy is there when they install, so teammates end up running different copies, and nobody can tell which. A registry can live in a git repository too, but it pins and verifies every version, gives every machine identical bytes, rolls back or yanks a version for everyone, and keeps all your harnesses in sync from one record.
 
 ## Get started
 
