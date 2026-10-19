@@ -39,7 +39,7 @@ export function runKeyBackend(spec: ServiceSpec, exec: Exec): AutostartBackend {
     return result.code === 0 ? (queried(result.stdout, value) ?? "") : undefined;
   };
 
-  return {
+  const backend: AutostartBackend = {
     mechanism: "run-key",
     supervises: false,
     async state() {
@@ -82,5 +82,11 @@ export function runKeyBackend(spec: ServiceSpec, exec: Exec): AutostartBackend {
     async start() {
       return false;
     },
+    async starts(program) {
+      return (await read())?.startsWith(`"${program}"`) === true;
+    },
+    // A Run key value is read at each sign-in, so writing it is all a reload would do.
+    rewrite: () => backend.install(),
   };
+  return backend;
 }

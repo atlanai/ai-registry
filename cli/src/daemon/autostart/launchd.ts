@@ -11,6 +11,8 @@ import { type AutostartBackend, type Exec, type ServiceSpec, SUPERVISOR_ENV } fr
 const LABEL = SERVICE.launchd;
 const BOOTSTRAP_ATTEMPTS = 5;
 const BOOTSTRAP_RETRY_MS = 200;
+/** The first program argument, whatever whitespace the tool that last wrote the plist used. */
+const PROGRAM = /<key>ProgramArguments<\/key>\s*<array>\s*<string>([^<]*)<\/string>/;
 
 function launchdLabel(suffix: string): string {
   return suffix === "" ? LABEL : `${LABEL}.${suffix}`;
@@ -126,6 +128,13 @@ export function launchdBackend(spec: ServiceSpec, exec: Exec): AutostartBackend 
     async start() {
       if ((await readTextIfPresent(path)) === undefined || !(await loaded())) return false;
       return (await exec("launchctl", ["kickstart", service])).code === 0;
+    },
+    async rewrite() {
+      await writeAtomic(path, wanted, PUBLIC_FILE);
+    },
+    async starts(program) {
+      const found = await readTextIfPresent(path);
+      return found !== undefined && PROGRAM.exec(found)?.[1] === xml(program);
     },
   };
 }

@@ -22,7 +22,7 @@ import {
   type RunRecord,
 } from "#core/run/model.ts";
 import { type Scope, toolHome, userScopeDir } from "#core/store/paths.ts";
-import { RESTART_EXIT_CODE, supervised } from "#daemon/autostart/index.ts";
+import { RESTART_EXIT_CODE, refreshAutostart, supervised } from "#daemon/autostart/index.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { privateDirectory, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
 import {
@@ -453,6 +453,10 @@ export async function runDaemon(version: string): Promise<number> {
     throw error;
   }
   log.logger.info("daemon listening");
+  // Best effort: a definition still running the shim moves to the binary at its next start.
+  void refreshAutostart()
+    .then((moved) => moved && log.logger.info("autostart now runs the binary directly"))
+    .catch((error: unknown) => log.logger.warn("autostart refresh failed", { error }));
 
   const reason = await new Promise<string>((resolve) => {
     process.once("SIGINT", () => resolve("SIGINT"));

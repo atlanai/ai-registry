@@ -101,5 +101,14 @@ export function systemdBackend(spec: ServiceSpec, exec: Exec): AutostartBackend 
       if ((await readTextIfPresent(path)) === undefined || !(await enabled())) return false;
       return (await systemctl("start", unit)).code === 0;
     },
+    async rewrite() {
+      await writeAtomic(path, renderUnit(spec), PUBLIC_FILE);
+      await must("daemon-reload");
+    },
+    async starts(program) {
+      const head = `ExecStart=${execArg(program)}`;
+      const found = await readTextIfPresent(path);
+      return found?.split("\n").some((row) => row === head || row.startsWith(`${head} `)) === true;
+    },
   };
 }

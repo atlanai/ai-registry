@@ -9,7 +9,7 @@ import { DAEMON_STDERR_FILE, logPath } from "#core/log/index.ts";
 import { exec } from "#core/process.ts";
 import { HOME_DIR } from "#core/product.ts";
 import { launchArgv, runningEntry } from "#core/release/launch.ts";
-import { cliRoot, shimPath } from "#core/release/layout.ts";
+import { cliRoot, currentBin, shimPath } from "#core/release/layout.ts";
 import { toolHome } from "#core/store/paths.ts";
 import { homeIdentity } from "#daemon/rpc/endpoint.ts";
 import { launchdBackend } from "./launchd.ts";
@@ -47,11 +47,12 @@ export function supervised(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /**
- * A standalone build runs from a versioned directory that pruning deletes, so the service
- * names what PATH finds, which every update replaces: the shim, or on Windows the copy.
+ * Pruning deletes versioned directories, so the service names a path every update relinks: the
+ * signed binary under `current`, trusted over a shell script, else the shim or the Windows copy.
  */
 function stableEntry(entry: string, env: NodeJS.ProcessEnv): string {
   if (!isWithin(cliRoot(env), entry)) return entry;
+  if (existsSync(currentBin(env))) return currentBin(env);
   return existsSync(shimPath(env)) ? shimPath(env) : entry;
 }
 
@@ -154,6 +155,23 @@ export async function enableAutostart(
   if (backend.supervises) await stopDaemon();
   await backend.install();
   return { changed: true, state: await backend.state() };
+}
+
+/**
+ * Moves a definition that runs this install's shim onto the binary `serviceSpec` names now,
+ * from the manager's next start. Never turns autostart on, and leaves one that is off alone.
+ */
+export async function refreshAutostart(options: AutostartOptions = {}): Promise<boolean> {
+  const env = options.env ?? process.env;
+  const backend = backendFor(options);
+  if (backend === undefined) return false;
+  const program = serviceSpec(options).daemon[0];
+  if (program === undefined || program !== currentBin(env)) return false;
+  const state = await backend.state();
+  if (!state.registered || !state.loaded || state.current) return false;
+  if (!(await backend.starts(shimPath(env)))) return false;
+  await backend.rewrite();
+  return true;
 }
 
 /** Unloading stops a managed daemon too; the next command that needs one starts it by hand. */

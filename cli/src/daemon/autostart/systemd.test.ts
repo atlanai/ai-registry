@@ -66,6 +66,23 @@ describe("systemdBackend", () => {
     ]);
   });
 
+  test("knows which program the unit on disk runs", async () => {
+    const fake = fakeExec();
+    const backend = systemdBackend(spec(home), fake.exec);
+    expect(await backend.starts("/home/u/.aireg/bin/aireg")).toBe(false);
+    await backend.install();
+    expect(await backend.starts("/home/u/.aireg/bin/aireg")).toBe(true);
+    expect(await backend.starts("/home/u/.aireg/bin")).toBe(false);
+  });
+
+  // A reload makes the new unit the one the next start runs; nothing is restarted now.
+  test("rewrites the unit and reloads without restarting it", async () => {
+    const fake = fakeExec();
+    await systemdBackend(spec(home), fake.exec).rewrite();
+    expect(await readFile(unitPath(), "utf8")).toBe(renderUnit(spec(home)));
+    expect(fake.calls).toEqual(["systemctl --user daemon-reload"]);
+  });
+
   test("refuses when there is no user service manager, before writing anything", async () => {
     const fake = fakeExec({
       "systemctl --user show-environment": { code: 1, stderr: "Failed to connect to bus" },

@@ -14,6 +14,11 @@ export function currentLink(env: NodeJS.ProcessEnv = process.env): string {
   return join(cliRoot(env), "current");
 }
 
+/** The executable `current` links to: every install relinks it, so the path survives updates. */
+export function currentBin(env: NodeJS.ProcessEnv = process.env): string {
+  return join(currentLink(env), executableFile());
+}
+
 /** One standalone executable per version; there is no package tree around it. */
 export function versionBin(version: string, env: NodeJS.ProcessEnv = process.env): string {
   return join(versionDir(version, env), executableFile());

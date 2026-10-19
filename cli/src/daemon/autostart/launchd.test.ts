@@ -134,6 +134,28 @@ describe("launchdBackend", () => {
     expect(await backend.uninstall()).toBe(false);
   });
 
+  test("knows which program the definition on disk runs", async () => {
+    const fake = fakeExec();
+    const backend = launchdBackend(spec(home), fake.exec);
+    expect(await backend.starts("/Users/u/.aireg/bin/aireg")).toBe(false);
+    await backend.install();
+    expect(await backend.starts("/Users/u/.aireg/bin/aireg")).toBe(true);
+    expect(await backend.starts("/Users/u/.aireg/bin")).toBe(false);
+    expect(await backend.starts("--internal-daemon")).toBe(false);
+    const retabbed = (await readFile(plistPath(), "utf8")).replace(/\n\s+/g, "\n\t");
+    await writeFile(plistPath(), retabbed);
+    expect(await backend.starts("/Users/u/.aireg/bin/aireg")).toBe(true);
+  });
+
+  // launchd keeps running what it loaded, so a rewrite never restarts the daemon.
+  test("rewrites the definition without reloading it", async () => {
+    const fake = fakeExec();
+    await launchdBackend(spec(home), fake.exec).rewrite();
+    expect(await readFile(plistPath(), "utf8")).toBe(renderPlist(spec(home)));
+    await expectMode(plistPath(), 0o644);
+    expect(fake.calls).toEqual([]);
+  });
+
   test("starts through kickstart only when the agent is loaded", async () => {
     const fake = fakeExec();
     const backend = launchdBackend(spec(home), fake.exec);

@@ -48,4 +48,8 @@ export interface AutostartBackend {
   uninstall(): Promise<boolean>;
   /** Starts the daemon through the manager; false when nothing is registered. */
   start(): Promise<boolean>;
+  /** The definition on disk runs `program`. */
+  starts(program: string): Promise<boolean>;
+  /** Writes the definition without reloading it, so the manager runs it from its next start. */
+  rewrite(): Promise<void>;
 }

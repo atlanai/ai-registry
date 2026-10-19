@@ -1,4 +1,4 @@
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { fakeExec } from "#test/kit/fake-exec.ts";
@@ -7,9 +7,28 @@ import {
   autostartState,
   disableAutostart,
   enableAutostart,
+  refreshAutostart,
   serviceSpec,
   startManaged,
 } from "./index.ts";
+import { renderPlist } from "./launchd.ts";
+
+/** A standalone install as a release lays it out: the version, `current` and the shim. */
+async function standalone(
+  aireg: string,
+): Promise<{ version: string; current: string; shim: string }> {
+  const version = join(aireg, "cli", "1.2.3", "aireg");
+  await mkdir(join(aireg, "cli", "1.2.3"), { recursive: true, mode: 0o700 });
+  await writeFile(version, "binary\n");
+  await symlink("1.2.3", join(aireg, "cli", "current"));
+  await mkdir(join(aireg, "bin"), { recursive: true, mode: 0o700 });
+  await writeFile(join(aireg, "bin", "aireg"), "#!/bin/sh\n");
+  return {
+    version,
+    current: join(aireg, "cli", "current", "aireg"),
+    shim: join(aireg, "bin", "aireg"),
+  };
+}
 
 const unix = describe.skipIf(process.platform === "win32");
 
@@ -22,7 +41,27 @@ unix("autostart", () => {
   });
 
   describe("serviceSpec", () => {
-    test("names the shim rather than a versioned standalone binary", async ({ home }) => {
+    test("names the binary under current rather than a versioned one or the shim", async ({
+      home,
+    }) => {
+      const install = await standalone(home.aireg);
+      const spec = serviceSpec({
+        platform: "darwin",
+        entry: install.version,
+        uid: 501,
+        accountHome: home.dir,
+      });
+      expect(spec.daemon).toEqual([install.current, "--internal-daemon"]);
+      expect(spec.starter).toEqual([install.current, "daemon", "start"]);
+      expect(spec).toMatchObject({
+        suffix: "",
+        env: { PATH: "/opt/tools/bin:/usr/bin:/bin" },
+        home: home.dir,
+        configHome: join(home.dir, ".config"),
+      });
+    });
+
+    test("falls back to the shim when there is no current link", async ({ home }) => {
       await mkdir(join(home.aireg, "bin"), { recursive: true, mode: 0o700 });
       await writeFile(join(home.aireg, "bin", "aireg"), "#!/bin/sh\n");
       const spec = serviceSpec({
@@ -32,13 +71,6 @@ unix("autostart", () => {
         accountHome: home.dir,
       });
       expect(spec.daemon).toEqual([join(home.aireg, "bin", "aireg"), "--internal-daemon"]);
-      expect(spec.starter).toEqual([join(home.aireg, "bin", "aireg"), "daemon", "start"]);
-      expect(spec).toMatchObject({
-        suffix: "",
-        env: { PATH: "/opt/tools/bin:/usr/bin:/bin" },
-        home: home.dir,
-        configHome: join(home.dir, ".config"),
-      });
     });
 
     test("runs a script entry under the node that runs this CLI", () => {
@@ -158,6 +190,102 @@ unix("autostart", () => {
         })
       )?.current,
     ).toBe(true);
+  });
+
+  describe("refreshAutostart", () => {
+    const plist = (home: string) => join(home, "Library", "LaunchAgents", "sh.aireg.daemon.plist");
+    /** The definition this install wrote before it named the binary under current. */
+    async function shimDefinition(
+      home: { dir: string; aireg: string },
+      shim: string,
+      entry: string,
+    ) {
+      const spec = serviceSpec({ platform: "darwin", entry, uid: 501, accountHome: home.dir });
+      const old = { ...spec, daemon: [shim, "--internal-daemon"] };
+      await mkdir(join(home.dir, "Library", "LaunchAgents"), { recursive: true });
+      await writeFile(plist(home.dir), renderPlist(old));
+    }
+
+    test("moves a definition running the shim onto the binary, without reloading it", async ({
+      home,
+    }) => {
+      const install = await standalone(home.aireg);
+      await shimDefinition(home, install.shim, install.version);
+      const fake = fakeExec();
+      const options = {
+        platform: "darwin" as const,
+        entry: install.version,
+        exec: fake.exec,
+        uid: 501,
+        accountHome: home.dir,
+      };
+      expect(await refreshAutostart(options)).toBe(true);
+      expect(await readFile(plist(home.dir), "utf8")).toContain(
+        `<string>${install.current}</string>`,
+      );
+      expect(fake.calls.filter((call) => !call.startsWith("launchctl print"))).toEqual([]);
+      expect((await autostartState(options))?.current).toBe(true);
+      expect(await refreshAutostart(options)).toBe(false);
+    });
+
+    test("never turns autostart on", async ({ home }) => {
+      const install = await standalone(home.aireg);
+      const fake = fakeExec();
+      const options = {
+        platform: "darwin" as const,
+        entry: install.version,
+        exec: fake.exec,
+        uid: 501,
+        accountHome: home.dir,
+      };
+      expect(await refreshAutostart(options)).toBe(false);
+      await expect(readFile(plist(home.dir), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    // Turned off in System Settings, it stays off.
+    test("leaves a definition that is not loaded alone", async ({ home }) => {
+      const install = await standalone(home.aireg);
+      await shimDefinition(home, install.shim, install.version);
+      const before = await readFile(plist(home.dir), "utf8");
+      const fake = fakeExec({ "launchctl print gui/501/sh.aireg.daemon": { code: 113 } });
+      const options = {
+        platform: "darwin" as const,
+        entry: install.version,
+        exec: fake.exec,
+        uid: 501,
+        accountHome: home.dir,
+      };
+      expect(await refreshAutostart(options)).toBe(false);
+      expect(await readFile(plist(home.dir), "utf8")).toBe(before);
+    });
+
+    test("leaves a definition that runs another install alone", async ({ home }) => {
+      const install = await standalone(home.aireg);
+      await shimDefinition(home, "/opt/other/aireg", install.version);
+      const before = await readFile(plist(home.dir), "utf8");
+      const options = {
+        platform: "darwin" as const,
+        entry: install.version,
+        exec: fakeExec().exec,
+        uid: 501,
+        accountHome: home.dir,
+      };
+      expect(await refreshAutostart(options)).toBe(false);
+      expect(await readFile(plist(home.dir), "utf8")).toBe(before);
+    });
+
+    test("does nothing for a build outside the standalone layout", async ({ home }) => {
+      const install = await standalone(home.aireg);
+      await shimDefinition(home, install.shim, install.version);
+      const options = {
+        platform: "darwin" as const,
+        entry: "/opt/registry/bin/aireg",
+        exec: fakeExec().exec,
+        uid: 501,
+        accountHome: home.dir,
+      };
+      expect(await refreshAutostart(options)).toBe(false);
+    });
   });
 
   test("disables idempotently", async ({ home }) => {
