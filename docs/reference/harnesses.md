@@ -53,7 +53,7 @@ Each entry under `kinds` has a `shape`:
 - `directory` places a folder per artifact under `subdir`. `place` is `link` (the default), `fan`, a real folder of links, or `copy`, real files, for a harness that rewrites or refuses links. For an agent, `entry` names the file it lands as inside its own folder, such as `AGENT.md`. A plugin's `manifest` lists the manifests aireg writes into it.
 - `file` places one file per artifact, `<subdir>/<name><extension>`, linked or, with `place: "copy"`, copied.
 
-`scope: "user"` keeps a kind out of projects. `register` lists edits to the harness's own TOML, JSON or YAML config that make it load what was placed; aireg makes each edit while a placement needs it, keeps the comments and key order a person wrote in a YAML file, and takes the edit back with the last placement. `codec` rewrites the file a harness reads in its own format, with one of the codecs aireg builds in:
+`scope: "user"` keeps a kind out of projects. `register` lists edits to the harness's own TOML, JSON or YAML config that make it load what was placed; aireg makes each edit while a placement needs it, keeps the comments and key order a person wrote in a YAML file, and takes the edit back with the last placement. An `append` entry adds one item to a YAML list, with an `# aireg` comment beside it; aireg takes out only an item it marked, so one you listed yourself stays. `codec` rewrites the file a harness reads in its own format, with one of the codecs aireg builds in:
 
 | Codec | What it writes |
 |---|---|

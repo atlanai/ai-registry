@@ -83,7 +83,10 @@ interface Group {
   absent: Map<string, Vars>;
 }
 
-/** One shared list item: there while any placement needs it, and gone with the last. */
+/**
+ * One shared list item, marked as aireg's: there while any placement needs it, and gone with
+ * the last. An item a person wrote is theirs, and stays.
+ */
 function append(
   entry: RegisterEntry & { append: string },
   doc: ConfigDocument,
@@ -92,16 +95,12 @@ function append(
   const vars = first(group);
   const at = entry.at.map((key) => expand(key, vars));
   const value = expand(entry.append, vars);
-  const items = [...(doc.list(at) ?? [])];
-  const has = items.includes(value);
-  if (group.present.size > 0 && !has) doc.setList(at, [...items, value]);
-  if (group.present.size > 0 || !has) return;
-  const rest = items.filter((item) => item !== value);
-  if (rest.length > 0) {
-    doc.setList(at, rest);
+  if (group.present.size > 0) {
+    doc.addMarked(at, value);
     return;
   }
-  // A list this made, emptied, goes with any table it left empty.
+  if (!doc.dropMarked(at, value) || (doc.list(at) ?? []).length > 0) return;
+  // A list this emptied goes, with any table it left empty.
   doc.drop(at);
   for (let depth = at.length - 1; depth > 0; depth--) {
     const parent = at.slice(0, depth);
@@ -270,7 +269,9 @@ async function registerMapping(
   const pattern = placementPattern(template);
   const kept: Kept[] = [];
   for (const [root, paths] of touchedByRoot(touched, harness, pattern)) {
-    const members = await ours(await pattern.scan(root), owned.scopeDir, owned.copies);
+    // Only a kind placed as copies by design: a `--copy` install is not registered.
+    const copies = mapping.place === "copy" ? owned.copies : new Set<string>();
+    const members = await ours(await pattern.scan(root), owned.scopeDir, copies);
     // A link kept back for a person's own folder is theirs to register.
     for (const touch of touched) {
       if (touch.harness !== undefined && !members.has(touch.path)) paths.delete(touch.path);

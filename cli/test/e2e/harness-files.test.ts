@@ -72,7 +72,7 @@ describe("a harness a file of yours defines", () => {
       "---\nname: reviewer\ndescription: Reviews code.\nmode: subagent\n---\n\nReview the diff.\n",
     );
     expect(await readFile(config(), "utf8")).toBe(
-      `skills:\n  dirs:\n    - ${join(project, ".tool", "skills")}\n`,
+      `skills:\n  dirs:\n    - ${join(project, ".tool", "skills")} # aireg\n`,
     );
 
     const status = JSON.parse((await aireg(["status", "--json"])).stdout) as {

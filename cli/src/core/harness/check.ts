@@ -133,7 +133,7 @@ function registerProblems(
     valueProblems(entry.upsert.item, vars, report);
   }
   if (entry.append !== undefined) {
-    if (entry.format === "toml") report(`kinds.${kind}: append needs a JSON or YAML file.`);
+    if (entry.format !== "yaml") report(`kinds.${kind}: append needs a YAML file.`);
     templateProblems(entry.append, vars, report);
   }
   if (entry.init !== undefined && entry.format === "toml") {
