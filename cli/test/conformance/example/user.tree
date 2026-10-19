@@ -1,0 +1,13 @@
+.example/
+.example/agents/
+.example/agents/planner.md -> ../../.registry/artifacts/kit/kit/agents/planner.md
+.example/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+.example/skills/
+.example/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+.example/skills/ship -> ../../.registry/artifacts/kit/kit/skills/ship
+project/
+project/.example/
+project/.example/agents/
+project/.example/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+project/.example/skills/
+project/.example/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint

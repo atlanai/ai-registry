@@ -73,6 +73,7 @@
     "test:integration": "vitest run --project integration",
     "test:e2e": "vitest run --project e2e",
     "test:contract": "vitest run --project contract",
+    "test:conformance": "vitest run --project conformance",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "schema": "node --experimental-strip-types scripts/schema/generate.ts",

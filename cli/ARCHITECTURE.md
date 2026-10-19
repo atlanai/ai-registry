@@ -73,7 +73,7 @@ Background jobs run the same engine from the daemon (`daemon/runner.ts`), so a s
 
 ## Tests
 
-Vitest runs four projects. `pnpm test` runs them all, and `pnpm run test:unit`, `test:integration`, `test:e2e` and `test:contract` run one each.
+Vitest runs five projects. `pnpm test` runs them all, and `pnpm run test:unit`, `test:integration`, `test:e2e`, `test:contract` and `test:conformance` run one each.
 
 | Project | Where | What |
 |---|---|---|
@@ -81,6 +81,7 @@ Vitest runs four projects. `pnpm test` runs them all, and `pnpm run test:unit`, 
 | integration | `test/integration/` | Several modules together, in process, such as a client driving the daemon. |
 | e2e | `test/e2e/`, `test/scenarios/` | The built CLI in an isolated home. Each built-in command's `--help` is snapshotted. |
 | contract | `test/contract/` | The JSON Schemas against the spec, and the generated schemas against their definitions. |
+| conformance | `test/conformance/` | Each harness against its evidence: L1 compares what aireg places with golden trees, and L2, with `AIREG_CONFORMANCE=1` and the harness's own program on `PATH`, asks the harness what it loaded. |
 
 `test/kit/` holds what tests share: fixtures that give each test its own home, project, daemon and git identity and clean them up, builders for registries, manifests, locks and plans, and one redaction for paths, digests, times and versions. `test/fixtures/` holds static files only.
 
