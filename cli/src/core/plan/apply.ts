@@ -213,6 +213,8 @@ interface Run {
   plugins: Map<string, { content: string; harnesses: Set<string> }>;
   /** Fan-out directories to refresh once their projections are final: dir -> projection. */
   fanned: Map<string, string>;
+  /** Plugin directories placed as copies, copied again once every member has landed. */
+  copiedPlugins: Map<string, ActionOf<"link">>;
   /** Links whose source the source never served. */
   skipped: Set<string>;
   unstaged: Map<string, { reason: string; error: unknown }>;
@@ -436,6 +438,7 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
     await renameCopy(action.to, action.rename);
   }
   if (fan) run.fanned.set(action.to, action.from);
+  if (action.plugin === true && mode === "copy") run.copiedPlugins.set(action.to, action);
   run.modes.set(key, mode);
   run.pathModes.set(action.to, mode);
   if (mode === "copy") run.copies.set(action.to, await digest(action.to));
@@ -516,7 +519,18 @@ function patchRow(run: Run, name: string, entry: Lock["artifacts"][string]): voi
   }
 }
 
+/** A copied plugin was copied with the members cloned before it; this one holds them all. */
+async function recopyPlugins(run: Run): Promise<void> {
+  for (const [to, action] of run.copiedPlugins) {
+    await assemblePlugin(run, action);
+    await assertRemovable(to, run.roots);
+    await link(action.from, to, true);
+    run.copies.set(to, await digest(to));
+  }
+}
+
 async function record(run: Run, action: ActionOf<"record">): Promise<void> {
+  await recopyPlugins(run);
   // Taken first: a row whose restage failed may still have links reading its projection.
   run.projections = projectionsOf(action.lock, run.roots);
   await keepUnstaged(run, action.lock);
@@ -589,6 +603,7 @@ export async function apply(
     degraded: new Set(),
     plugins: new Map(),
     fanned: new Map(),
+    copiedPlugins: new Map(),
     skipped: new Set(),
     unstaged: new Map(),
     performed: { stage: 0, clone: 0, link: 0, unlink: 0 },
