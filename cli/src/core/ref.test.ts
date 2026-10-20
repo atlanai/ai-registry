@@ -47,7 +47,7 @@ describe("parseRef", () => {
 
   it.each([
     ["kit@1.0.0", /only one artifact can be pinned to a version/],
-    ["kit/sales@^1", /only one artifact can be pinned to a version/],
+    ["kit/sales@^1", /only one artifact can be given a version range/],
     ["kit/skill/lint@>= 1.0.0", /">= 1.0.0" is not a version or a version range/],
     ["kit/skill/lint@^", /is not a version or a version range/],
     ["kit/sales@1.0.0", /only one artifact can be pinned to a version/],

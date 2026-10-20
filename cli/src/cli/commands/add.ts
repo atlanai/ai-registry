@@ -421,13 +421,16 @@ async function reportAdded(
     }
   }
   if (added.copied) printer.success(`Added registry ${alias} to this project's manifest.`);
-  for (const { name, version, range } of added.repinned) {
+  // A range is not a pin: it says which versions `aireg update` moves among.
+  for (const { name, version, range, was } of added.repinned) {
     printer.success(
       range !== undefined
-        ? `Pinned ${name} to versions ${range}.`
-        : version === undefined
-          ? `Unpinned ${name}.`
-          : `Pinned ${name} at ${version}.`,
+        ? `Set ${name} to versions ${range}.`
+        : version !== undefined
+          ? `Pinned ${name} at ${version}.`
+          : was === "pinned"
+            ? `Unpinned ${name}.`
+            : `Set ${name} to its latest version.`,
     );
   }
   // A pin that moved nothing is said once, by the line above, rather than as "Already up to date".
@@ -624,10 +627,19 @@ interface Repin {
   name: string;
   version: string | undefined;
   range?: string | undefined;
+  /** Whether the entry it replaces pinned a version, gave a range, or neither. */
+  was: "pinned" | "range" | undefined;
 }
 
-function repinOf(name: string, ref: Ref): Repin {
-  return { name, version: ref.version, ...(ref.range === undefined ? {} : { range: ref.range }) };
+function repinOf(name: string, ref: Ref, held: Ref | undefined): Repin {
+  const was =
+    held?.version !== undefined ? "pinned" : held?.range !== undefined ? "range" : undefined;
+  return {
+    name,
+    version: ref.version,
+    ...(ref.range === undefined ? {} : { range: ref.range }),
+    was,
+  };
 }
 
 /**
@@ -655,16 +667,16 @@ function declare(
     if (already === undefined) {
       declaredAt.set(formatAddress(ref), artifacts.length);
       artifacts.push(ref);
-      // A pin on something a whole namespace installed is a pin all the same.
-      const pinned = ref.version !== undefined || ref.range !== undefined;
-      if (name !== undefined && pinned && installedAs(ref) !== undefined) {
-        repinned.push(repinOf(name, ref));
+      // A pin or range on something a whole namespace installed holds it all the same.
+      const holds = ref.version !== undefined || ref.range !== undefined;
+      if (name !== undefined && holds && installedAs(ref) !== undefined) {
+        repinned.push(repinOf(name, ref, undefined));
       }
       continue;
     }
     const declared = artifacts[already] as Ref;
     if (name !== undefined && (declared.version !== ref.version || declared.range !== ref.range)) {
-      repinned.push(repinOf(name, ref));
+      repinned.push(repinOf(name, ref, declared));
     }
     if (changed(declared, ref)) artifacts[already] = ref;
   }

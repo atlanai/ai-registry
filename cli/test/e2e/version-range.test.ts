@@ -64,7 +64,7 @@ describe("a version range a project asks for", () => {
   test("moves to another range when one is added in its place", async () => {
     const added = await aireg(["add", "acme/skill/lint@~2.0", "-y"]);
     expect(added.code, added.stderr).toBe(0);
-    expect(added.stdout).toContain("Pinned lint to versions ~2.0.");
+    expect(added.stdout).toContain("Set lint to versions ~2.0.");
     expect(await manifest()).toContain("acme/acme/skill/lint@~2.0");
     expect(await manifest()).not.toContain("@^1");
     expect(await lockedVersion()).toBe("2.0.0");
@@ -106,5 +106,21 @@ describe("a version range a project asks for", () => {
     expect((await aireg(["update", "-y"])).code).toBe(0);
     expect(await lockedVersion()).toBe("2.0.1");
     expect((await aireg(["outdated"])).code).toBe(0);
+  }, 60_000);
+
+  test("is listed with its range, which is not a pin", async () => {
+    const listed = await aireg(["list"]);
+    expect(listed.stdout).toMatch(/ lint\s+skill\s+2\.0\.1 ~2\.0\s+acme/);
+    expect(listed.stdout).not.toContain("pinned");
+    const json = await aireg(["list", "--json"]);
+    expect(JSON.parse(json.stdout).data.artifacts).toEqual([
+      expect.objectContaining({ name: "lint", ref: "2.0.1", pinned: false, range: "~2.0" }),
+    ]);
+
+    const unranged = await aireg(["add", "acme/skill/lint", "-y"]);
+    expect(unranged.code, unranged.stderr).toBe(0);
+    expect(unranged.stdout).toContain("Set lint to its latest version.");
+    expect(unranged.stdout).not.toContain("Unpinned");
+    expect(await manifest()).not.toContain("@~2.0");
   }, 60_000);
 });

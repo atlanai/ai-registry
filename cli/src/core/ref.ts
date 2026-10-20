@@ -133,7 +133,12 @@ export function parseRef(input: string): Ref {
   // Pinning anything broader than one artifact has no meaning: a namespace's
   // members are versioned one by one, so there is no version to hold them at.
   if ((version !== undefined || range !== undefined) && parts.length < 3) {
-    throw new RefParseError(input, "only one artifact can be pinned to a version");
+    throw new RefParseError(
+      input,
+      version !== undefined
+        ? "only one artifact can be pinned to a version"
+        : "only one artifact can be given a version range",
+    );
   }
 
   if (parts.length === 1) return { registry };
