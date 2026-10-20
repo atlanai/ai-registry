@@ -19,6 +19,7 @@
 | `CLICOLOR` | `0` turns color off. |
 | `CLAUDE_CONFIG_DIR` | Where Claude Code keeps its user folder, if not `~/.claude`. |
 | `CODEX_HOME` | Where Codex keeps its user folder, if not `~/.codex`. |
+| `HERMES_HOME` | Where Hermes Agent keeps its user folder, if not `~/.hermes`. |
 | `AI_AGENT`, `CLAUDECODE`, `CLAUDE_CODE`, `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_THREAD_ID`, `CURSOR_AGENT`, `CURSOR_TRACE_ID`, `GEMINI_CLI`, `HERMES_SESSION_ID`, `ANTIGRAVITY_AGENT`, `AUGMENT_AGENT`, `OPENCODE_CLIENT`, `REPL_ID`, `COPILOT_MODEL`, `COPILOT_ALLOW_ALL` | Set by a coding agent that runs aireg, which then asks no questions. See [When aireg asks questions](options.md#when-aireg-asks-questions). |
 | `CI` | Any value means a CI service runs aireg. aireg then asks no questions, skips its update check, and the installer offers no skills. |
 | `TERM` | `dumb` turns color and animation off. |
