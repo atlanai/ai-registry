@@ -5,7 +5,6 @@ import { plural, quoted } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import { foundBy } from "#cli/render/found.ts";
 import { underHome } from "#cli/render/home.ts";
-import { sharedReads } from "#cli/render/tools.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { type Detection, detectAll, resolveHarnesses } from "#core/harness/index.ts";
 import { BUILT_IN, checkHarnessText, loadHarnessFiles } from "#core/harness/load.ts";
@@ -96,11 +95,6 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
     harnessTable(context, shown);
     context.printer.info();
   }
-  const listed = new Set(shown.map((item) => item.target.name));
-  const reading = Object.fromEntries(
-    Object.entries(harnesses).filter(([name, target]) => target.shared || listed.has(name)),
-  );
-  for (const line of sharedReads(reading)) context.printer.info(line);
   context.printer.info(foundSummary(tools.filter((item) => item.detected).length, tools.length));
   if (shown.length < tools.length) {
     context.printer.hint("Run `aireg harnesses --all` to see every one.");
@@ -108,7 +102,7 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
   warnSkipped(context);
 }
 
-/** One row per coding agent; the shared folder is not a tool, so a note says who reads it. */
+/** One row per coding agent; the shared folder is not a tool, so it has no row. */
 function harnessTable(context: CommandContext, rows: readonly Detection[]): void {
   const { style } = context.printer;
   const fromFiles = rows.some((item) => item.target.origin !== BUILT_IN);

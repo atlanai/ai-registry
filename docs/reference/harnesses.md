@@ -14,7 +14,7 @@ aireg harnesses check <file>
 
 `aireg harnesses` lists the coding agents aireg found on this machine, and any a [harness file](#harness-files) of yours defines. It finds one by its environment variables, its program on your `PATH`, or its folder in the project or your home folder. With `--all`, it lists every harness name [`--for`](options.md#harnesses) accepts, found or not.
 
-Each row names a coding agent and the id `--for` takes. A line under the table names the agents that read the shared `.agents` folder. Once a [harness file](#harness-files) of yours defines one, a `from` column says where each harness comes from.
+Each row names a coding agent and the id `--for` takes. Once a [harness file](#harness-files) of yours defines one, a `from` column says where each harness comes from.
 
 `harnesses` doesn't need a project.
 
