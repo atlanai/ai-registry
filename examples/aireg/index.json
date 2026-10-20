@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": "2026-10-19T19:00:26.389Z",
+  "generated_at": "2026-10-20T20:39:43.339Z",
   "entries": [
     {
       "namespace": "aireg",
@@ -33,17 +33,17 @@
       "namespace": "aireg",
       "kind": "skill",
       "name": "aireg-add",
-      "latest": "0.1.2",
-      "digest": "sha256:75d0448117f7ab29d9ecaf2f9bd17c4aabd11bd083833a5f0825b94b58f46ee1",
+      "latest": "0.1.3",
+      "digest": "sha256:9598d3d8b6631eb4e892c832ab640140d40504f51876748a8416d0fe200f7ecb",
       "status": "active",
-      "description": "Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI."
+      "description": "Connect a registry and install, inspect, update or remove its skills and agents in a project or user scope. Use when managing registry installs, checking versions or provenance, or diagnosing missing, edited or blocked copies in coding agents."
     },
     {
       "namespace": "aireg",
       "kind": "skill",
       "name": "aireg-new",
-      "latest": "0.2.1",
-      "digest": "sha256:9a88e27c1e1d18092a76d59385a7824eb69ce6165b72ffdbe19bdea533221818",
+      "latest": "0.3.0",
+      "digest": "sha256:05f6f31b3675497c5c73b7f8945892b9121ff36ab90a40fa38ff33bf117395dd",
       "status": "active",
       "description": "Set up a registry of skills and agents for a person or a team, from nothing to installed. Use when asked to create, start or set up a registry, share skills with a team, or turn a folder of existing skills into a registry."
     },

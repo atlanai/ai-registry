@@ -8,7 +8,8 @@ the agent. The `aireg-new`, `aireg-add` and `aireg-publish` skills have the deta
 To start from nothing, put `https://github.com/atlanai/ai-registry` on the line before a
 prompt. The agent then sets up aireg first, as the setup skill describes.
 
-Ask the user before each step that changes their machine, and before any `git push`.
+Reuse choices and authorization the user already supplied. Ask before unapproved machine
+changes or pushes.
 
 ## Just you
 
@@ -25,8 +26,8 @@ I've written a few skills for Claude Code. Put them in a private registry in a n
    `aireg registry init --name my-skills --namespace personal -y`,
    `aireg skill new --from <path> --namespace personal` for each skill,
    `aireg registry index` and a commit.
-3. Move the originals out of the harness folders, with the user's yes. aireg doesn't link
-   over a folder of theirs.
+3. Follow `aireg-new`'s verified cleanup and release-readiness checks. Before moving active
+   harness copies, confirm the release is reachable from the registry address below.
 4. `aireg registry add github.com/<owner>/my-skills -g`, then `aireg add my-skills/personal -g`.
    Claude Code reads `~/.claude/skills`, and Codex and Cursor read `~/.agents/skills`.
 
@@ -70,10 +71,14 @@ This works the same for a teammate's machine or your own second laptop.
 
 1. For a private repository, the person needs read access to it, through `gh auth login` or
    a git credential helper.
-2. `aireg registry add github.com/<owner>/my-skills -g`, then `aireg add my-skills/personal -g`.
-3. Ask before `aireg daemon autostart on`, which starts the background updates at login.
+2. Connect with `aireg registry add github.com/<owner>/my-skills -g`, then follow
+   `aireg-add` to read the registry and migrate matching hand-installed copies on this machine.
+   Its backup and verification steps cover every target harness.
+3. Install with `aireg add my-skills/personal -g`, after resolving any blocking copies.
+4. Ask before `aireg daemon autostart on`, which starts the background updates at login.
 
-Check: `aireg list -g` shows the skills, and `aireg job list` shows a job for `my-skills`.
+Check: `aireg status -g` and each target harness confirm the skills are managed with no
+blocked placements, and `aireg job list` shows a job for `my-skills`.
 
 ### 5. Check a shared skill before you trust it
 
@@ -98,7 +103,9 @@ Set up an agent registry for our platform and data teams in a new private repo, 
 ```
 
 Follow the `aireg-new` skill. It creates the repository and the namespaces, releases the first
-skills, adds the validation workflow, and ends with the two commands the team runs.
+skills, adds the validation workflow, and ends with migration and install instructions
+for the team. An existing skills-only repository can be converted in place; follow
+`aireg-new` to verify the import and offer cleanup in the conversion PR.
 
 ### 7. Publish from application repositories on merge
 
