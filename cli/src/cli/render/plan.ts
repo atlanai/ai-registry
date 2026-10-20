@@ -174,7 +174,10 @@ function followUps(
     const target = harness === undefined ? undefined : harnesses[harness];
     if (target === undefined) continue;
     if (target.reload !== undefined) reloads.add(target.reload);
-    const kind = action.kind === "link" && action.plugin === true ? "plugin" : kindOf(action.name);
+    // A plugin a harness takes as its parts asks for each part's step, not the plugin's.
+    const placed =
+      action.kind !== "link" ? undefined : action.plugin === true ? "plugin" : action.part;
+    const kind = placed ?? kindOf(action.name);
     const run =
       action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
     if (run !== undefined) {

@@ -99,6 +99,25 @@ describe("a plugin marketplace", () => {
     );
   }, 60_000);
 
+  test("prints the trust step for the agents a plugin brings into a project", async ({
+    aireg,
+    project,
+    tmp,
+  }) => {
+    const root = await skillsFolder(join(tmp, "toolkit"))
+      .json(".claude-plugin/plugin.json", { name: "toolkit" })
+      .skill("skills/ship")
+      .agent("agents/planner.md")
+      .write();
+    await init(aireg, "codex");
+    const added = await aireg(["add", root, "--all"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect(existsSync(join(project, ".codex", "agents", "planner.toml"))).toBe(true);
+    expect(added.stdout + added.stderr).toContain(
+      "hint: Codex loads agents here only once you trust them: run `codex`.",
+    );
+  }, 60_000);
+
   test("asks for trust before a plugin that runs things as you, and records it", async ({
     aireg,
     project,

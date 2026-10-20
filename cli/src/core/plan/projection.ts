@@ -51,6 +51,8 @@ export interface PlannedLink {
   command?: string;
   /** The plugin's own account of itself, for the manifests its projection gets. */
   document?: PluginDocument;
+  /** The kind of the plugin part this places, where a harness takes the plugin as its parts. */
+  part?: ArtifactKind;
   /** Front-matter keys a harness reading this folder does not read as written. */
   keys?: Record<string, KeyRule>;
 }
@@ -303,6 +305,7 @@ function pluginLinks(
         const link = {
           ...plannedLink(name, path, from, options, leaf.kind),
           ...keysAt(name, leaf.kind, selected, options.harnesses),
+          part: leaf.kind,
         };
         links.push(
           // A skill is a folder, so the command is written as one holding its SKILL.md.

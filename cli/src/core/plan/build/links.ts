@@ -169,6 +169,7 @@ function linkAction(
     ...(link.codec === undefined ? {} : { codec: link.codec }),
     ...(link.command === undefined ? {} : { command: link.command }),
     ...(link.keys === undefined ? {} : { keys: link.keys }),
+    ...(link.part === undefined ? {} : { part: link.part }),
     ...(link.entry === undefined ? {} : { entry: link.entry }),
     ...(how.rename === undefined ? {} : { rename: how.rename }),
     ...(how.recorded === undefined ? {} : { recorded: how.recorded }),

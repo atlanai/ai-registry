@@ -160,6 +160,8 @@ export type Action =
       command?: string;
       /** Front-matter keys a harness reading this folder does not read as written. */
       keys?: Record<string, KeyRule>;
+      /** The kind of the plugin part this places, where a harness takes the plugin as its parts. */
+      part?: ArtifactKind;
       /** Written as a real folder holding this file. */
       entry?: string;
       /** The name the copy's front matter takes: it installs under a name not its own. */
