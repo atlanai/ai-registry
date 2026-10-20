@@ -8,6 +8,7 @@ export function canceled<T>(value: T | Canceled): value is Canceled {
 
 export interface PromptWriter {
   write(chunk: string): void;
+  readonly isTTY?: boolean;
   readonly columns?: number | undefined;
   readonly rows?: number | undefined;
 }

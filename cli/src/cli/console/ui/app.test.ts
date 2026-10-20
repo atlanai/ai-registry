@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+import { PassThrough, Writable } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import { render } from "ink";
 import { createElement } from "react";
@@ -49,23 +49,21 @@ const state: ConsoleState = {
   panels: {},
 };
 
-/** A terminal of this size after these keys, and the last frame Ink drew on it. */
-async function screen(rows: number, columns: number, keys: string[] = []): Promise<string[]> {
+/** Real streams exercise Ink's input parsing and output flush callbacks. */
+async function terminal(size?: { rows: number; columns: number }) {
   const writes: string[] = [];
-  const stdout = Object.assign(new EventEmitter(), {
-    columns,
-    rows,
-    isTTY: true,
-    write: (chunk: string) => writes.push(chunk),
+  const stdout = new Writable({
+    write(chunk, _encoding, callback) {
+      writes.push(String(chunk));
+      callback();
+    },
   });
-  const typed = [...keys];
-  const stdin = Object.assign(new EventEmitter(), {
+  if (size !== undefined) Object.assign(stdout, size, { isTTY: true });
+  const stdin = Object.assign(new PassThrough(), {
     isTTY: true,
     setRawMode() {},
-    setEncoding() {},
     ref() {},
     unref() {},
-    read: () => typed.shift() ?? null,
   });
   const instance = render(
     createElement(App, {
@@ -75,26 +73,38 @@ async function screen(rows: number, columns: number, keys: string[] = []): Promi
       upstream: undefined,
       viewer: undefined,
     }),
-    {
-      stdout: stdout as unknown as NodeJS.WriteStream,
-      stdin: stdin as unknown as NodeJS.ReadStream,
-      debug: true,
-      patchConsole: false,
-      exitOnCtrlC: false,
-    },
+    { stdout, stdin, debug: true, patchConsole: false, exitOnCtrlC: false },
   );
-  if (keys.length > 0) {
-    const drawn = writes.length;
-    stdin.emit("readable");
-    // Ink redraws once it has read the keys, so a frame after that shows them handled.
-    await vi.waitFor(() => {
-      if (typed.length > 0 || writes.length === drawn) throw new Error("keys not handled yet");
-    });
+  await instance.waitUntilRenderFlush();
+  return {
+    stdout,
+    async press(keys: string[]) {
+      for (const key of keys) stdin.write(key);
+      await instance.waitUntilRenderFlush();
+    },
+    async lines() {
+      await instance.waitUntilRenderFlush();
+      // Mouse mode switches share stdout; only frames contain the view tabs.
+      const frame = writes.findLast((chunk) => chunk.includes("Overview")) ?? "";
+      return stripVTControlCharacters(frame).trimEnd().split("\n");
+    },
+    async close() {
+      instance.unmount();
+      await instance.waitUntilExit();
+      stdin.destroy();
+      stdout.destroy();
+    },
+  };
+}
+
+async function screen(rows: number, columns: number, keys: string[] = []): Promise<string[]> {
+  const app = await terminal({ rows, columns });
+  try {
+    await app.press(keys);
+    return await app.lines();
+  } finally {
+    await app.close();
   }
-  instance.unmount();
-  // The mouse switches write to the same stream; a frame is what names the tabs.
-  const frame = writes.findLast((chunk) => chunk.includes("Overview")) ?? "";
-  return stripVTControlCharacters(frame).split("\n");
 }
 
 describe("App", () => {
@@ -123,5 +133,36 @@ describe("App", () => {
     expect(lines[3]).toMatch(/^─+$/);
     expect(lines[4]).toContain("Overview");
     expect(lines.at(-1)).toMatch(/v0\.0\.0$/);
+  });
+
+  it("redraws at the new terminal dimensions after a resize", async () => {
+    const app = await terminal({ rows: 30, columns: 100 });
+    try {
+      expect(await app.lines()).toHaveLength(29);
+      Object.assign(app.stdout, { rows: 24, columns: 80 });
+      app.stdout.emit("resize");
+      await vi.waitFor(async () => {
+        const lines = await app.lines();
+        expect(lines.length).toBeLessThanOrEqual(23);
+        expect(lines[1]).toHaveLength(80);
+        expect(lines[0]).toMatch(/^◆ aireg console /);
+        expect(lines.at(-1)).toMatch(/v0\.0\.0$/);
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("renders to a writable stream without terminal dimensions", async () => {
+    const app = await terminal();
+    try {
+      const lines = await app.lines();
+      expect(lines.length).toBeGreaterThanOrEqual(20);
+      expect(lines[0]).toMatch(/^◆ aireg console /);
+      expect(lines[4]).toContain("Overview");
+      expect(lines.at(-1)).toMatch(/v0\.0\.0$/);
+    } finally {
+      await app.close();
+    }
   });
 });
