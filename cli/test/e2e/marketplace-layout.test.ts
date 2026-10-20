@@ -132,6 +132,16 @@ describe("a plugin marketplace", () => {
     expect((await aireg(["install"])).code).toBe(0);
   }, 60_000);
 
+  test("does not take a plugin's own parts for skills written here", async ({ aireg, tmp }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await init(aireg, "agents");
+    expect((await aireg(["registry", "add", root])).code).toBe(0);
+    expect((await aireg(["add", "acme-tools/docs-kit", "-y"])).code).toBe(0);
+    const synced = await aireg(["sync"]);
+    expect(`${synced.stdout}${synced.stderr}`).not.toContain("published nowhere");
+    expect(synced.code, synced.stdout).toBe(0);
+  }, 60_000);
+
   test("lets a sync take no change to what a plugin runs, trusted or not", async ({
     aireg,
     project,
