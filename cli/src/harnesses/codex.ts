@@ -37,6 +37,7 @@ export const codex = defineHarness({
           at: ["plugins", "{name}@{source}"],
           value: { enabled: true },
           off: { enabled: false },
+          init: {},
         },
         // A plugin loads only through a marketplace, so each source is one,
         // pointed at its own cache.
@@ -45,6 +46,7 @@ export const codex = defineHarness({
           format: "toml",
           at: ["marketplaces", "{source}"],
           value: { source_type: "local", source: "{root}/plugins/cache/{source}" },
+          init: {},
           conflict: "keep",
           remove: "entry",
         },
