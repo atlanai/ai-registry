@@ -107,7 +107,7 @@ export function sharedReads(harnesses: Harnesses): string[] {
       return readers.length === 0
         ? []
         : [
-            `${list(readers.map((tool) => tool.displayName))} read ${kind}s from the shared ${folder.projectRoot} folder.`,
+            `${list(readers.map((tool) => tool.displayName))} read${readers.length === 1 ? "s" : ""} ${kind}s from the shared ${folder.projectRoot} folder.`,
           ];
     }),
   );
