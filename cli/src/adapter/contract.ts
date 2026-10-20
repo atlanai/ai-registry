@@ -64,6 +64,11 @@ export interface RegistryIdentity {
   slug?: string | undefined;
   /** One line on what it holds. */
   description?: string | undefined;
+  /**
+   * Its canonical `https` root, the file spec's `registry.json` `url`, which is what a
+   * `depends_on` edge's `registry` names it by. Absent, its declared address stands in.
+   */
+  url?: string | undefined;
 }
 
 /** What `resolve` found. */

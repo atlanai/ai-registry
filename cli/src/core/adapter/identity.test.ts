@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comparableLocation, sourceKey } from "./identity.ts";
+import { canonicalRegistryUrl, comparableLocation, sourceKey } from "./identity.ts";
 
 describe("a registry's identity", () => {
   it("is the same with or without a trailing slash", () => {
@@ -26,6 +26,47 @@ describe("a registry's identity", () => {
     expect(() => sourceKey("https://token@example.com/acme/kit.git", {})).toThrow(
       /must not contain credentials/,
     );
+  });
+});
+
+describe("a registry's canonical URL", () => {
+  it("is one https address however the registry was declared", () => {
+    for (const location of [
+      "github.com/acme/agent-registry",
+      "https://github.com/acme/agent-registry.git",
+      "https://GitHub.com/acme/agent-registry/",
+      "http://github.com/acme/agent-registry",
+      "git@github.com:acme/agent-registry.git",
+      "ssh://git@github.com:22/acme/agent-registry.git",
+      "github.com/acme/agent-registry@v2",
+    ]) {
+      expect(canonicalRegistryUrl(location), location).toBe(
+        "https://github.com/acme/agent-registry",
+      );
+    }
+    expect(canonicalRegistryUrl("https://example.com:8443/registry/")).toBe(
+      "https://example.com:8443/registry",
+    );
+  });
+
+  it("drops credentials, which never identify a registry", () => {
+    expect(canonicalRegistryUrl("https://token@example.com/acme/kit.git")).toBe(
+      "https://example.com/acme/kit",
+    );
+  });
+
+  it("is undefined for a folder, a bare name or an address with no host an https root has", () => {
+    for (const location of [
+      "./registry",
+      "/srv/registry",
+      "~/registry",
+      "acme",
+      "file:///srv/r",
+      "https://example.com/r?ref=x",
+      "",
+    ]) {
+      expect(canonicalRegistryUrl(location), location).toBeUndefined();
+    }
   });
 });
 

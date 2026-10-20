@@ -50,7 +50,7 @@ The normal artifact-name and collision checks apply.
 
 ### Dependencies
 
-An artifact names what has to be installed with it as `depends_on` relationships in its version's `artifact.json`, each a `<namespace>/<kind>/<name>@<version>` in the same registry, as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) describes. Write the file in the new version folder before [`aireg registry index`](registry.md#aireg-registry-index), which keeps what it says:
+An artifact names what has to be installed with it as `depends_on` relationships in its version's `artifact.json`, each a `<namespace>/<kind>/<name>@<version>` in the same registry unless the edge names another, as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) describes. Write the file in the new version folder before [`aireg registry index`](registry.md#aireg-registry-index), which keeps what it says:
 
 ```json
 { "relationships": [{ "rel_type": "depends_on", "to": "engineering/skill/pr-review@0.2.0" }] }
@@ -61,6 +61,14 @@ An edge may also carry `range`, the versions of that artifact it accepts, as a v
 ```json
 { "relationships": [{ "rel_type": "depends_on", "to": "engineering/skill/pr-review@0.2.0", "range": "^0.2.0" }] }
 ```
+
+An edge may name another registry by its canonical address, the `url` in that registry's `registry.json`, in `registry`:
+
+```json
+{ "relationships": [{ "rel_type": "depends_on", "to": "platform/skill/sql-style@1.2.0", "range": "^1.2.0", "registry": "https://github.com/acme/agent-registry" }] }
+```
+
+aireg installs it from the registry the project declares at that address, under that registry's name in the lockfile. A declared registry has the address its `registry.json` gives, or else the one it was declared at, written as `https://<host>/<path>` with no trailing `/` or `.git`, so `github.com/acme/agent-registry` matches. aireg never declares a registry because an edge names it: when no declared registry has that address, `add` installs nothing and names the [`aireg registry add`](registry.md#aireg-registry-add) that would allow it. An aireg older than this field looks for `to` in the artifact's own registry, so don't publish an edge with `registry` whose `to` that registry also holds.
 
 [`aireg add`](add.md) installs them. An edge without a range installs the version it names. An edge with one installs the newest version in the range that installs without a pin. Where several artifacts need one dependency, it installs once, at the newest version every edge accepts; when no version could satisfy them all, or the registry publishes none that does, `add` installs nothing and names each range and the artifact it came from. The lockfile records each range, and [`aireg update`](update.md) moves the dependency to the newest version that every range still accepts. `bump` carries the last version's dependencies into the new one, so move the versions they name when you release new ones.
 

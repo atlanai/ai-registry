@@ -123,6 +123,7 @@ export function identityOf(registry: RegistryDocument): RegistryIdentity {
     name: registry.name,
     ...(registry.slug === undefined ? {} : { slug: registry.slug }),
     ...(registry.description === undefined ? {} : { description: registry.description }),
+    ...(registry.url === undefined ? {} : { url: registry.url }),
   };
 }
 

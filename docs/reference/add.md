@@ -135,7 +135,7 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 ## Exit status
 
 - `0`: installed, nothing to do, or canceled at a question.
-- `1`: the registry isn't declared, the registry publishes nothing, a name, version, namespace or dependency doesn't exist, two artifacts need different versions of one dependency or ranges of it no published version satisfies together, the manifest names an unknown harness, or a file doesn't match what its version describes.
+- `1`: the registry isn't declared, a dependency is in a registry the scope doesn't declare, the registry publishes nothing, a name, version, namespace or dependency doesn't exist, two artifacts need different versions of one dependency or ranges of it no published version satisfies together, the manifest names an unknown harness, or a file doesn't match what its version describes.
 - `2`: nothing was named and aireg can't ask, more than 10 artifacts would be installed without `--select` or `--all`, a folder has no `registry.json` in or above it or names no artifact inside one, a name matches more than one artifact, another artifact already has the name it would take and `defaults.name-collision` is `report` or `fail`, `--as` isn't a valid name, the name already belongs to another address, or `--for` names an unknown harness.
 - `3`: `--frozen` was passed and the install would change the lockfile or the manifest, or an artifact wasn't installed because its name is taken and `defaults.name-collision` is `report`.
 

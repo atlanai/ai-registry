@@ -3,8 +3,8 @@ import { buildEnvelope } from "#adapter/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import { emptyLock } from "#core/lock.ts";
 import { acquired, entry } from "#test/kit/builders/plan.ts";
-import { closure, idOf, movesWithin, type Need, needsOf } from "./depends.ts";
-import type { Acquired, Selected } from "./model.ts";
+import { closure, idOf, movesWithin, type Need, needsOf, registryUrls } from "./depends.ts";
+import type { Acquired, Placement, Selected } from "./model.ts";
 
 /** `eng/<kind>/<name>` at each version given, with the edges each version declares. */
 type Published = [kind: ArtifactKind, name: string, version: string, ...needs: string[]];
@@ -324,6 +324,110 @@ describe("closure, with ranges", () => {
   });
 });
 
+describe("closure, across registries", () => {
+  const PLATFORM = "https://github.com/acme/agent-registry";
+  const style = { ...need("eng/skill/style@1.2.0 ^1.2.0"), registry: PLATFORM };
+
+  /** `kit`, whose reviewer needs `style` from the registry at PLATFORM, and that registry. */
+  function sources(alias: string, ...versions: string[]): Acquired[] {
+    const [kit] = registry(["agent", "reviewer", "0.3.0"]) as [Acquired];
+    (kit.placements.get(path("agent", "reviewer")) as Placement).needs = [style];
+    const [other] = registry(...versions.map((v): Published => ["skill", "style", v])) as [
+      Acquired,
+    ];
+    return [kit, { ...other, alias }];
+  }
+  const top = [selected("agent", "reviewer", "0.3.0")];
+  const declared = new Map([
+    ["kit", undefined],
+    ["platform", PLATFORM],
+  ]);
+
+  it("resolves in the registry declared at the edge's URL, under that registry's name", () => {
+    const result = closure(top, sources("platform", "1.3.0"), declared);
+
+    expect(result.refs).toEqual([
+      {
+        registry: "platform",
+        namespace: "eng",
+        kind: "skill",
+        name: "style",
+        version: "1.2.0",
+        range: "^1.2.0",
+      },
+    ]);
+    expect(result.neededBy.get(idOf("platform", "eng", "skill", "style"))).toEqual(
+      new Set([id("agent", "reviewer")]),
+    );
+    expect(result.unresolved).toEqual([]);
+    expect(result.undeclared).toEqual([]);
+  });
+
+  it("asks that registry again when it lists no version the edge accepts", () => {
+    const result = closure(top, sources("platform", "2.0.0"), declared);
+
+    expect(result.unresolved).toEqual([
+      { alias: "platform", need: style, by: "eng/agent/reviewer" },
+    ]);
+  });
+
+  it("reports a URL no declared registry is at, and takes nothing for it", () => {
+    const result = closure(top, sources("platform", "1.3.0"), new Map([["platform", undefined]]));
+
+    expect(result.refs).toEqual([]);
+    expect(result.unresolved).toEqual([]);
+    expect(result.undeclared).toEqual([{ url: PLATFORM, need: style, by: "eng/agent/reviewer" }]);
+  });
+
+  it("resolves in its dependent's own registry when the edge names that one's URL", () => {
+    const [kit] = sources("platform");
+    (kit as Acquired).catalog.entries.push(
+      entry({ name: "style", kind: "skill", path: path("skill", "style"), group: "eng" }),
+    );
+    (kit as Acquired).placements.set(path("skill", "style"), {
+      id: path("skill", "style"),
+      name: "style",
+      contentId: undefined,
+      version: "1.2.5",
+    });
+    const result = closure(top, [kit as Acquired], new Map([["kit", PLATFORM]]));
+
+    expect(refs(result)).toEqual(["skill/style@1.2.0"]);
+    expect(result.refs[0]?.registry).toBe("kit");
+  });
+
+  it("follows the registry a lockfile row recorded for a dependency", () => {
+    const [kit, platform] = sources("platform", "1.3.0") as [Acquired, Acquired];
+    const recorded = { ...need("eng/skill/style@1.3.0"), alias: "platform" };
+    (kit.placements.get(path("agent", "reviewer")) as Placement).needs = [recorded];
+    const result = closure(top, [kit, platform]);
+
+    expect(result.refs.map((ref) => ref.registry)).toEqual(["platform"]);
+    expect(result.undeclared).toEqual([]);
+  });
+});
+
+describe("registryUrls", () => {
+  it("knows a registry by the URL it reported, else by its declared address", () => {
+    const [read] = registry() as [Acquired];
+    read.origin.url = "https://example.com/mirror-of";
+    const urls = registryUrls(
+      {
+        kit: { location: "./kit", adapter: undefined, config: {} },
+        hub: { location: "https://github.com/acme/hub.git", adapter: undefined, config: {} },
+        disk: { location: "./disk", adapter: undefined, config: {} },
+      },
+      [read],
+    );
+
+    expect([...urls]).toEqual([
+      ["disk", undefined],
+      ["hub", "https://github.com/acme/hub"],
+      ["kit", "https://example.com/mirror-of"],
+    ]);
+  });
+});
+
 describe("needsOf", () => {
   const edges = (...relationships: { to: string; range?: unknown }[]) =>
     needsOf(
@@ -334,6 +438,22 @@ describe("needsOf", () => {
         relationships: relationships.map((edge) => ({ rel_type: "depends_on", ...edge }) as never),
       }),
     );
+
+  it("reads the registry an edge names as one URL, and leaves out one that is not https", () => {
+    expect(
+      edges(
+        { to: "eng/skill/lint@1.2.0", registry: "https://GitHub.com/acme/kit.git" } as never,
+        { to: "eng/skill/fmt@1.0.0", registry: "http://github.com/acme/kit" } as never,
+        { to: "eng/skill/sort@1.0.0", registry: 7 } as never,
+      ),
+    ).toEqual({
+      needs: [{ ...need("eng/skill/lint@1.2.0"), registry: "https://github.com/acme/kit" }],
+      unusable: [
+        { to: "eng/skill/fmt@1.0.0", registry: "http://github.com/acme/kit" },
+        { to: "eng/skill/sort@1.0.0", registry: "7" },
+      ],
+    });
+  });
 
   it("reads a range its own version satisfies, and leaves out one it does not", () => {
     expect(
