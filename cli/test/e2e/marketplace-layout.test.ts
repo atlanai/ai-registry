@@ -142,6 +142,15 @@ describe("a plugin marketplace", () => {
     expect(synced.code, synced.stdout).toBe(0);
   }, 60_000);
 
+  test("does not call a plugin's own parts new to a whole marketplace", async ({ aireg, tmp }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await init(aireg, "claude");
+    expect((await aireg(["add", root, "--all", "--trust", "deploy-kit"])).code).toBe(0);
+    const outdated = await aireg(["outdated"]);
+    expect(outdated.stdout).not.toContain("new");
+    expect(outdated.code, outdated.stdout).toBe(0);
+  }, 60_000);
+
   test("keeps what a trusted plugin runs on record through an install that reads nothing", async ({
     aireg,
     tmp,
