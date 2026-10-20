@@ -64,7 +64,8 @@ export function tomlDocument(text: string, file: string): ConfigDocument {
     addMarked: unsupported,
     dropMarked: unsupported,
     render: () => current,
-    value: () => current,
+    // A blank file is an empty table; one holding only comments is still someone's text.
+    value: () => (current.trim() === "" ? {} : current),
   };
 }
 

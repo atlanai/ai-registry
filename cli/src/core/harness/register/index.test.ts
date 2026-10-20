@@ -160,6 +160,24 @@ describe("applyRegister", () => {
     expect(await readFile(config, "utf8")).toBe("");
   });
 
+  test("deletes a TOML file it made once its last entry goes, but not one of comments", async () => {
+    const made = { ...GROUP, init: {} };
+    const sales = await place("acme", "sales");
+    const config = join(root, "config.toml");
+    await applyRegister([{ path: sales, harness: "tool" }], harness([made]), home);
+    expect(await readFile(config, "utf8")).toContain("[sources.acme]");
+    await rm(sales);
+    await applyRegister([{ path: sales, harness: undefined }], harness([made]), home);
+    await expect(readFile(config, "utf8")).rejects.toThrow();
+
+    await writeFile(config, '# model = "big"\n');
+    const ops = await place("acme", "ops");
+    await applyRegister([{ path: ops, harness: "tool" }], harness([made]), home);
+    await rm(ops);
+    await applyRegister([{ path: ops, harness: undefined }], harness([made]), home);
+    expect(await readFile(config, "utf8")).toBe('# model = "big"\n');
+  });
+
   test("lists a copy once in YAML, marked as aireg's, and restores the file with the last", async () => {
     const before = "# mine\nmodel: x # pinned\n";
     await writeConfig(before);

@@ -151,8 +151,8 @@ function registerProblems(
     if (entry.format !== "yaml") report(`kinds.${kind}: append needs a YAML file.`);
     templateProblems(entry.append, vars, report);
   }
-  if (entry.init !== undefined && entry.format === "toml") {
-    report(`kinds.${kind}: init is for JSON and YAML files.`);
+  if (entry.init !== undefined && entry.format === "toml" && Object.keys(entry.init).length > 0) {
+    report(`kinds.${kind}: a TOML file starts empty, so its init is {}.`);
   }
 }
 

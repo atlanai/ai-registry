@@ -127,7 +127,7 @@ describe("harnessProblems", () => {
           ],
         }),
       ],
-      /init is for JSON/,
+      /its init is \{\}/,
     ],
   ])("reports %s", (_, definitions, problem) => {
     expect(harnessProblems(definitions).join("\n")).toMatch(problem);
