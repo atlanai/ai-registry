@@ -113,6 +113,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
       - run: pnpm run lint:ci
+      # A pull request leaves every file it adds or edits clean, warnings included; files it leaves alone keep theirs.
+      - if: github.event_name == 'pull_request'
+        run: pnpm run lint:changed --since="$BASE_SHA"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
       - run: pnpm run knip
       # Fails on a stale THIRD_PARTY_NOTICES.txt or a license outside the allowlist.
       - run: pnpm run notices --check

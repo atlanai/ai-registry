@@ -42,21 +42,21 @@
       },
       "complexity": {
         "noExcessiveCognitiveComplexity": {
-          "level": "error",
+          "level": "warn",
           "options": { "maxAllowedComplexity": 25 }
         },
         "noExcessiveLinesPerFunction": {
-          "level": "error",
+          "level": "warn",
           "options": { "maxLines": 100, "skipBlankLines": true }
         }
       },
       "style": {
         "noExcessiveLinesPerFile": {
-          "level": "error",
+          "level": "warn",
           "options": { "maxLines": 1000, "skipBlankLines": true }
         },
         "noNonNullAssertion": "error",
-        "noParameterAssign": "error",
+        "noParameterAssign": "warn",
         "useConsistentArrayType": { "level": "error", "options": { "syntax": "shorthand" } },
         "useImportType": "error",
         "useNodejsImportProtocol": "error",
@@ -85,28 +85,6 @@
           "style": { "noExcessiveLinesPerFile": "off", "noNonNullAssertion": "off" }
         }
       }
-    },
-    {
-      "includes": [
-        "src/cli/commands/add.ts",
-        "src/cli/commands/remove.ts",
-        "src/cli/console/ui/app.ts",
-        "src/cli/render/status.ts",
-        "src/engine/execute.ts"
-      ],
-      "linter": { "rules": { "complexity": { "noExcessiveLinesPerFunction": "off" } } }
-    },
-    {
-      "includes": ["src/engine/execute.ts"],
-      "linter": { "rules": { "complexity": { "noExcessiveCognitiveComplexity": "off" } } }
-    },
-    {
-      "includes": ["src/adapter/filespec/resolve.test.ts"],
-      "linter": { "rules": { "style": { "noParameterAssign": "off" } } }
-    },
-    {
-      "includes": ["src/cli/commands/index.ts"],
-      "linter": { "rules": { "style": { "noExcessiveLinesPerFile": "off" } } }
     }
   ]
 }

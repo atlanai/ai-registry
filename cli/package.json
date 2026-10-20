@@ -66,6 +66,7 @@
     "typecheck": "tsc -b --force",
     "lint": "biome check .",
     "lint:ci": "biome ci .",
+    "lint:changed": "biome ci --changed --error-on-warnings --no-errors-on-unmatched .",
     "fix": "biome lint --only=correctness/noUnusedImports --write --unsafe . && biome check --write .",
     "knip": "knip",
     "test": "vitest run",
