@@ -39,7 +39,8 @@ export function unlistedRows(
       if (row.origin !== undefined || !reached.has(name) || listed(row, source)) continue;
       const at = { name: row.name, group: row.namespace, kind: row.kind };
       if (withheldAt(source.catalog.withheld, at) !== undefined) continue;
-      found.push({ name, registry: source.alias, empty: source.catalog.entries.length === 0 });
+      const empty = source.whole === true && source.catalog.entries.length === 0;
+      found.push({ name, registry: source.alias, empty });
     }
   }
   return found.sort((a, b) => a.name.localeCompare(b.name));

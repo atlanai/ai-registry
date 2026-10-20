@@ -10,6 +10,10 @@ import {
 } from "#test/kit/builders/plan.ts";
 import { unlistedRows } from "./unlisted.ts";
 
+/** A registry read whole this run, so an empty listing is all it lists. */
+const readWhole = (...args: Parameters<typeof acquired>) =>
+  acquired(...args).map((source) => ({ ...source, whole: true }));
+
 describe("unlistedRows", () => {
   it("finds a row the manifest asks for that its registry no longer lists", () => {
     const rows = unlistedRows(
@@ -21,8 +25,14 @@ describe("unlistedRows", () => {
   });
 
   it("says so when the registry lists nothing at all", () => {
-    expect(unlistedRows(kitManifest(), installed(), acquired([]))).toEqual([
+    expect(unlistedRows(kitManifest(), installed(), readWhole([]))).toEqual([
       { name: "lint", registry: "kit", empty: true },
+    ]);
+  });
+
+  it("does not call a registry empty when the run asked it for only some artifacts", () => {
+    expect(unlistedRows(kitManifest(), installed(), acquired([]))).toEqual([
+      { name: "lint", registry: "kit", empty: false },
     ]);
   });
 
@@ -42,7 +52,7 @@ describe("unlistedRows", () => {
 
 describe("a plan over a registry that stopped listing a row", () => {
   it("keeps the row and unlinks nothing", () => {
-    const plan = build(kitManifest(), installed(), acquired([]), SYNCED, PLAN_OPTIONS);
+    const plan = build(kitManifest(), installed(), readWhole([]), SYNCED, PLAN_OPTIONS);
     expect(plan.actions.filter((action) => action.kind === "unlink")).toEqual([]);
     const record = plan.actions.find((action) => action.kind === "record");
     expect(record?.kind === "record" && Object.keys(record.lock.artifacts)).toEqual(["lint"]);

@@ -453,6 +453,7 @@ async function acquireOne(
     placements,
     catalog: listing.catalog,
     namespacePlugins: wrapsNamespaces(open.adapter),
+    whole: request.all,
     content: (entryPath) => {
       const already = placed.get(entryPath);
       if (already !== undefined) return already;

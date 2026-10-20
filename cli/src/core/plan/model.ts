@@ -60,6 +60,8 @@ export interface Acquired {
   catalog: Catalog;
   /** Its adapter declares each namespace a plugin. Absent is off. */
   namespacePlugins?: boolean;
+  /** Read whole this run, so its catalog is everything it lists, not only what was asked for. */
+  whole?: boolean;
   /** An entry's content on disk, and the identity the store keyed it by. */
   content: (entryPath: string) => Promise<Staged>;
   /** Releases whatever the adapter opened. */
