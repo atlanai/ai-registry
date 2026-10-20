@@ -55,6 +55,12 @@ describe("a version range a project asks for", () => {
 
     const update = await aireg(["update", "lint", "-y"]);
     expect(update.code, update.stderr).toBe(0);
+    expect(update.stderr).toContain(
+      "lint stays in ^1, set by acme/acme/skill/lint@^1, though 2.1.0 is published.",
+    );
+    expect(update.stderr).toContain(
+      "Move the range with `aireg add acme/acme/skill/lint@<range>`, or drop it with `aireg add acme/acme/skill/lint`.",
+    );
     expect(await installed()).toContain("body 1.2.0");
     expect(await lockedVersion()).toBe("1.2.0");
     expect((await aireg(["update", "-y"])).code).toBe(0);
@@ -122,5 +128,11 @@ describe("a version range a project asks for", () => {
     expect(unranged.stdout).toContain("Set lint to its latest version.");
     expect(unranged.stdout).not.toContain("Unpinned");
     expect(await manifest()).not.toContain("@~2.0");
+
+    // Nothing newer is published outside this one, so there is nothing to warn about.
+    expect((await aireg(["add", "acme/skill/lint@^2", "-y"])).code).toBe(0);
+    const update = await aireg(["update", "-y"]);
+    expect(update.code, update.stderr).toBe(0);
+    expect(update.stderr).not.toContain("stays in");
   }, 60_000);
 });

@@ -1,3 +1,4 @@
+import { satisfies } from "#adapter/semver.ts";
 import { list } from "#adapter/text.ts";
 import { rowsNamed } from "#cli/names.ts";
 import { parse } from "#cli/options.ts";
@@ -5,16 +6,57 @@ import { cancel, confirmIfDestructive, interaction } from "#cli/prompt/flow.ts";
 import { defaultIo } from "#cli/prompt/index.ts";
 import { settleCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
+import { type Head, head } from "#cli/upstream.ts";
 import { asksFor } from "#core/manifest.ts";
 import { lockView } from "#core/plan/acquire.ts";
 import { movesWithin } from "#core/plan/depends.ts";
-import { formatRef, refName } from "#core/ref.ts";
-import { load, run as runPipeline } from "#engine/pipeline.ts";
+import { listedAt } from "#core/plan/model.ts";
+import { formatRef, type Ref, refName } from "#core/ref.ts";
+import { olderThan } from "#core/semver.ts";
+import { type Loaded, load, run as runPipeline } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
 /**
+ * A range holds an artifact back from what is published outside it, as a pin holds it at one
+ * version, so a newer version there is said the same way. A registry that cannot be asked says
+ * nothing here; `aireg outdated` names why.
+ */
+async function outsideRanges(
+  context: CommandContext,
+  loaded: Loaded,
+  ranged: readonly Ref[],
+): Promise<void> {
+  const lock = loaded.lock;
+  const view = lockView(lock);
+  const heads = new Map<string, Head>();
+  for (const ref of ranged) {
+    for (const key of view.reached(ref)) {
+      const row = lock.artifacts[key];
+      if (row?.version === undefined) continue;
+      let found = heads.get(row.registry);
+      if (found === undefined) {
+        found = await head(row.registry, loaded.manifest, lock, loaded.roots.base);
+        heads.set(row.registry, found);
+      }
+      const listed = listedAt(row, found.entries);
+      const latest = listed === undefined ? undefined : found.byAddress.get(listed)?.version;
+      if (latest === undefined || !olderThan(row.version, latest)) continue;
+      if (satisfies(latest, ref.range as string)) continue;
+      const address = formatRef(ref).replace(/@.*$/, "");
+      context.printer.warning(
+        `${refName(ref)} stays in ${ref.range}, set by ${formatRef(ref)}, though ${latest} is published.`,
+      );
+      context.printer.hint(
+        `Move the range with \`aireg add ${address}@<range>\`, or drop it with \`aireg add ${address}\`.`,
+      );
+    }
+  }
+}
+
+/**
  * The one command that moves locked versions: the rows it names, or every row,
- * resolve again. A version the manifest pinned survives, so it is reported.
+ * resolve again. A version the manifest pinned survives, and a range is never left, so
+ * both are reported.
  */
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common } = parse(context.argv, builtin("update"));
@@ -49,6 +91,14 @@ export async function run(context: CommandContext): Promise<void> {
         : `Move it with \`aireg add ${address}@<version>\`, or drop the pin with \`aireg add ${address}\`.`,
     );
   }
+  const ranged = loaded.manifest.artifacts.filter(
+    (ref) =>
+      ref.range !== undefined &&
+      (named.size === 0 ||
+        named.has(ref.registry) ||
+        view.reached(ref).some((key) => named.has(key))),
+  );
+  if (ranged.length > 0) await outsideRanges(context, loaded, ranged);
   // A dependency is at the version its dependents name, so it moves only when they do, or within
   // the ranges they give.
   for (const name of named) {
