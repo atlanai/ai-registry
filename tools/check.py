@@ -4,7 +4,7 @@
 Standard library only. Verifies path grammar and file paths, every file digest
 and size, the content digest and catalog digest of every version, that latest
 is the newest active release, that versions.json and index.json agree, and
-that every relationship resolves.
+that every relationship resolves and satisfies its own range.
 
     python3 tools/check.py examples/acme-registry
     python3 tools/check.py examples/acme-registry --print-digests
@@ -43,6 +43,10 @@ _PRE = rf"(?:{_NUM}|\d*[A-Za-z-][0-9A-Za-z-]*)"
 SEMVER_RE = re.compile(
     rf"^({_NUM})\.({_NUM})\.({_NUM})(?:-({_PRE}(?:\.{_PRE})*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
 )
+# Section 2.4: a number or a wildcard in a partial version.
+PART_RE = re.compile(rf"^(?:{_NUM}|[xX*])$")
+COMPARATOR_RE = re.compile(r"^(<=|>=|<|>|=|\^|~)?(.*)$")
+MAX_RANGE = 256
 CONTROL_RE = re.compile("[\x00-\x1f\x7f-\x9f]")
 # Code points HFS+ ignores in a name, so ".g\u200cit" is ".git" there.
 HFS_IGNORED_RE = re.compile("[\u200c-\u200f\u202a-\u202e\u206a-\u206f\ufeff]")
@@ -177,6 +181,79 @@ def _semver_key(version: str):
     pre = m.group(4).split(".") if m.group(4) else []
     idents = tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in pre)
     return (int(m.group(1)), int(m.group(2)), int(m.group(3)), 0 if pre else 1, idents)
+
+
+def _bound(numbers: list[int], at: int | None = None) -> tuple:
+    """The release a partial version's numbers give, zero-filled; with `at`, that number incremented."""
+    padded = (numbers + [0, 0, 0])[:3]
+    if at is not None:
+        padded = padded[:at] + [padded[at] + 1] + [0] * (2 - at)
+    return (*padded, 1, ())
+
+
+def _comparators(token: str) -> list[tuple[str, tuple]] | None:
+    """Section 2.4: one comparator as the (operator, version key) pairs it means, or None."""
+    op, body = COMPARATOR_RE.match(token).groups()
+    full = _semver_key(body)
+    if op in ("=", ">", ">=", "<", "<="):
+        return None if full is None else [(op, full)]
+    if full is not None:
+        numbers, lower = list(full[:3]), full
+    else:
+        parts = body.split(".")
+        if not 1 <= len(parts) <= 3 or not all(PART_RE.match(p) for p in parts):
+            return None
+        given = [p for p in parts if p not in ("x", "X", "*")]
+        if parts[: len(given)] != given:
+            return None  # a number after a wildcard
+        numbers, lower = [int(p) for p in given], _bound([int(p) for p in given])
+    if op is None:
+        if full is not None:
+            return [("=", full)]
+        return [] if not numbers else [(">=", lower), ("<", _bound(numbers, len(numbers) - 1))]
+    if not numbers:
+        return None
+    if op == "^":
+        at = next((i for i, n in enumerate(numbers) if n != 0), len(numbers) - 1)
+    else:
+        at = 1 if len(numbers) > 1 else 0
+    return [(">=", lower), ("<", _bound(numbers, at))]
+
+
+def parse_range(text: str) -> list[list[tuple[str, tuple]]] | None:
+    """Section 2.4: a range as its comparator sets, or None when it is outside the grammar."""
+    if not isinstance(text, str) or len(text) > MAX_RANGE:
+        return None
+    sets = []
+    for alternative in text.split("||"):
+        tokens = alternative.strip(" ").split(" ")
+        if tokens == [""]:
+            return None
+        pairs = []
+        for token in filter(None, tokens):
+            meant = _comparators(token)
+            if meant is None:
+                return None
+            pairs.extend(meant)
+        sets.append(pairs)
+    return sets
+
+
+def satisfies(version: str, sets: list[list[tuple[str, tuple]]]) -> bool:
+    """Section 2.4: a prerelease satisfies a set only when one of its comparators names that release's prerelease."""
+    key = _semver_key(version)
+    if key is None:
+        return False
+    holds = {
+        "=": lambda a, b: a == b, ">": lambda a, b: a > b, ">=": lambda a, b: a >= b,
+        "<": lambda a, b: a < b, "<=": lambda a, b: a <= b,
+    }
+    for pairs in sets:
+        if not all(holds[op](key, bound) for op, bound in pairs):
+            continue
+        if key[3] == 1 or any(bound[3] == 0 and bound[:3] == key[:3] for _, bound in pairs):
+            return True
+    return False
 
 
 def newest(rows: list) -> str | None:
@@ -431,10 +508,22 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
 
             for rel in env.get("relationships", []) or []:
                 to = rel.get("to", "")
-                if not REF_RE.match(to):
+                match = REF_RE.match(to) if isinstance(to, str) else None
+                if not match:
                     rep.error(f"{label}@{v}: relationship target {to!r} is not a valid ref")
-                else:
-                    pending_refs.append((f"{label}@{v}", to))
+                    continue
+                if "range" in rel:
+                    sets = parse_range(rel["range"])
+                    if sets is None:
+                        rep.error(f"{label}@{v}: relationship to {to} has range {rel['range']!r}, which is not a version range")
+                    elif not satisfies(match.group("version"), sets):
+                        rep.error(f"{label}@{v}: relationship target {to} is outside its own range {rel['range']!r}")
+                if "registry" in rel:
+                    url = rel["registry"]
+                    if not isinstance(url, str) or not url.startswith("https://") or url.endswith("/"):
+                        rep.error(f"{label}@{v}: relationship to {to} names registry {url!r}, which is not an https root")
+                    continue  # resolves in another root, which this check does not read
+                pending_refs.append((f"{label}@{v}", to))
 
         for child in name_dir.iterdir():
             if child.is_dir() and child.name not in listed:

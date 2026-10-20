@@ -12,7 +12,17 @@
     },
     "to": {
       "$ref": "common.schema.json#/$defs/ref",
-      "description": "Target as a fully qualified ref, resolved within the same root."
+      "description": "Target as a fully qualified ref, resolved within the same root unless registry names another. Its version MUST satisfy range when range is present."
+    },
+    "range": {
+      "type": "string",
+      "description": "The versions of the target artifact this edge accepts, as a version range. Without it the edge accepts the version to names, and no other. File spec section 2.4.",
+      "maxLength": 256,
+      "pattern": "^ *(?:[<>]=?|=|[~^])?(?:0|[1-9][0-9]*|[xX*])(?:\\.(?:0|[1-9][0-9]*|[xX*])){0,2}(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?(?:(?: +| *\\|\\| *)(?:[<>]=?|=|[~^])?(?:0|[1-9][0-9]*|[xX*])(?:\\.(?:0|[1-9][0-9]*|[xX*])){0,2}(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)* *$"
+    },
+    "registry": {
+      "$ref": "common.schema.json#/$defs/root_url",
+      "description": "The canonical root, its registry.json url, of the registry to resolves in, when that is not this root. A client resolves it only in a registry the consumer already declares at that URL. File spec sections 3.4 and 11."
     },
     "annotations": { "$ref": "common.schema.json#/$defs/annotations" }
   },
