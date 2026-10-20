@@ -13,5 +13,6 @@
     "skill": { "shape": "directory", "subdir": "skills" },
     "agent": { "shape": "file", "subdir": "agents", "extension": ".md" }
   },
+  "trust": { "plugin": { "run": "claude", "scope": "project" } },
   "verified": { "command": ["claude", "--version"], "range": "2.1.296" }
 }

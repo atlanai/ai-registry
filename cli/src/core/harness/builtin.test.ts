@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
-import { pluginProjection, resolveHarnesses, takesPlugin } from "./index.ts";
+import { pluginProjection, resolveHarnesses, takesPlugin, trustFor } from "./index.ts";
 
 const BUILTIN = Object.fromEntries(BUILTIN_HARNESSES.map((harness) => [harness.id, harness]));
 
@@ -12,6 +12,15 @@ describe("built-in harnesses", () => {
       const reads = Object.values(harness.reads ?? {}).flat();
       expect(Object.keys(harness.kinds).length + reads.length, id).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("claude", () => {
+  it("asks a person to trust a project before it loads the plugins placed there", () => {
+    const claude = resolveHarnesses({ HOME: "/tmp/home" }).claude!;
+    expect(trustFor(claude, "plugin", "project")).toBe("claude");
+    expect(trustFor(claude, "plugin", "user")).toBeUndefined();
+    expect(trustFor(claude, "skill", "project")).toBeUndefined();
   });
 });
 

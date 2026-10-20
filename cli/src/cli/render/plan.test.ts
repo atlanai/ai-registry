@@ -142,7 +142,7 @@ describe("summarize", () => {
       lock: lock as never,
       carried: [{ name: "tools", carries: ["hooks"] }] as ApplyResult["carried"],
     };
-    expect(printed(actions, applied, {}, ["claude", "agents"]).at(-1)).toBe(
+    expect(printed(actions, applied, {}, ["claude", "agents"])).toContain(
       "  runs   hooks from tools, in Claude Code",
     );
   });
