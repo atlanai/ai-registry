@@ -192,6 +192,11 @@ export const Harness = Type.Object(
             env: Type.Optional(Type.Array(Type.String({ pattern: VARIABLE }))),
             binary: Type.Optional(Type.Array(Type.String({ pattern: PROGRAM }))),
             paths: Type.Optional(Texts),
+            projectRoot: Type.Optional(
+              Type.Literal(false, {
+                description: "Its project folder is one many repositories hold, so proves nothing.",
+              }),
+            ),
           },
           { additionalProperties: false },
         ),

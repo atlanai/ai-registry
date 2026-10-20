@@ -490,6 +490,11 @@
                 "minLength": 1,
                 "type": "string"
               }
+            },
+            "projectRoot": {
+              "description": "Its project folder is one many repositories hold, so proves nothing.",
+              "const": false,
+              "type": "boolean"
             }
           }
         }

@@ -145,6 +145,8 @@ interface Detect {
   binary?: string[] | undefined;
   /** Folders beyond its roots that mean it is installed: `~/` for home, else the project. */
   paths?: string[] | undefined;
+  /** `false` when its project folder is one many repositories hold anyway, so it proves nothing. */
+  projectRoot?: false | undefined;
   /** Variables that, set, mean this process runs inside it. */
   caller?: string[] | undefined;
 }
@@ -206,6 +208,7 @@ interface Signals {
   env: string[];
   binary: string[];
   paths: string[];
+  projectRoot?: false | undefined;
 }
 
 /** A definition with its user root expanded and every default filled in. Data only. */

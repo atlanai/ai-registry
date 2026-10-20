@@ -39,7 +39,7 @@ A file holds the keys a built-in harness has, except `default`, `importable` and
 | `overrides` | `true` to replace the built-in harness with this id. |
 | `kind` | `coding` (the default), `personal`, or `shared` for a folder several tools read. |
 | `roots` | `project`, the folder in a project, and `user.default`, the folder under `~/`. `user.env` names the variable the harness itself reads to move it, and `user.within` the root's path inside the folder that variable names, for a variable that names the folder holding the root. |
-| `detect` | Lists of variables (`env`), programs (`binary`) and folders (`paths`) whose presence means the harness is installed, or `never`. |
+| `detect` | Lists of variables (`env`), programs (`binary`) and folders (`paths`) whose presence means the harness is installed, or `never`. `projectRoot: false` stops its project folder counting, for a folder many repositories hold anyway. |
 | `reads` | The harnesses whose folders it also reads, per kind, most preferred first. |
 | `kinds` | Where each of `skill`, `agent` and `plugin` lands; see below. |
 | `verified` | `command`, the program and arguments that print its version, and `range`, the versions this was checked against. |

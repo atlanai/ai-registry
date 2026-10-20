@@ -65,7 +65,12 @@ function toTarget(
     detect:
       detect === "never"
         ? "never"
-        : { env: detect.env ?? [], binary: detect.binary ?? [], paths: detect.paths ?? [] },
+        : {
+            env: detect.env ?? [],
+            binary: detect.binary ?? [],
+            paths: detect.paths ?? [],
+            ...(detect.projectRoot === false ? { projectRoot: false as const } : {}),
+          },
     kinds: kindsOf(definition),
     reads: { ...definition.reads },
     kind,
@@ -261,7 +266,10 @@ function detect(target: Target, cwd: string, env: NodeJS.ProcessEnv = process.en
   if (signals.binary.some((binary) => onPath(binary, env))) {
     return { target, detected: true, by: "binary" };
   }
-  const project = [target.projectRoot, ...signals.paths.filter((path) => !path.startsWith("~/"))];
+  const project = [
+    ...(signals.projectRoot === false ? [] : [target.projectRoot]),
+    ...signals.paths.filter((path) => !path.startsWith("~/")),
+  ];
   if (project.some((path) => existsSync(join(cwd, path)))) {
     return { target, detected: true, by: "project" };
   }

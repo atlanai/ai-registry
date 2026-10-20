@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 import { codex } from "#harnesses/codex.ts";
 import { test } from "#test/kit/fixtures.ts";
 import type { Target } from "./contract.ts";
-import { resolveHarnesses, targetRoot } from "./index.ts";
+import { detectAll, resolveHarnesses, targetRoot } from "./index.ts";
 import { loadHarnessFiles } from "./load.ts";
 
 let env: NodeJS.ProcessEnv;
@@ -63,6 +63,16 @@ describe("harness files", () => {
       resolve("/elsewhere", ".tool"),
     );
     expect(targetRoot(tool, "user", "/work", {})).toBe(join(env.HOME as string, ".tool"));
+  });
+
+  test("detect nothing from a project folder they say proves nothing", async ({ tmp }) => {
+    await save("tool.json", { ...TOOL, detect: { projectRoot: false } });
+    const project = join(tmp, "project");
+    await mkdir(join(project, ".tool"), { recursive: true });
+    const found = detectAll(resolveHarnesses(env), project, env).find(
+      (each) => each.target.name === "tool",
+    );
+    expect(found?.detected).toBe(false);
   });
 
   test("give each profile folder a harness of its own", async () => {
