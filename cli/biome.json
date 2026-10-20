@@ -42,7 +42,7 @@
       },
       "complexity": {
         "noExcessiveCognitiveComplexity": {
-          "level": "warn",
+          "level": "error",
           "options": { "maxAllowedComplexity": 25 }
         },
         "noExcessiveLinesPerFunction": {
@@ -90,6 +90,10 @@
         "src/engine/execute.ts"
       ],
       "linter": { "rules": { "complexity": { "noExcessiveLinesPerFunction": "off" } } }
+    },
+    {
+      "includes": ["src/engine/execute.ts"],
+      "linter": { "rules": { "complexity": { "noExcessiveCognitiveComplexity": "off" } } }
     }
   ]
 }

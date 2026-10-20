@@ -86,7 +86,7 @@ Vitest runs four projects. `pnpm test` runs them all, and `pnpm run test:unit`, 
 
 A scenario in `test/scenarios/*.md` is a CLI session: `$ aireg ...` lines with the output expected, `? <code>` for an exit status, and `file` blocks for what should be on disk. `UPDATE_SCENARIOS=1` rewrites the expected output after a deliberate change.
 
-`pnpm run verify` runs the typecheck, lint, dead-code check, third-party notices check, build, package check and tests. Lint fails a function over 100 lines, blank lines aside, outside tests. The files that already had one when the limit came in are listed in `biome.json`'s overrides; take a file off the list once it is split, and add none. While you work, `pnpm run fix` formats and drops unused imports, `pnpm run test:watch` reruns every project's tests as files change, and `pnpm run test:e2e -u` updates the help snapshots after a deliberate change.
+`pnpm run verify` runs the typecheck, lint, dead-code check, third-party notices check, build, package check and tests. Lint fails a function over 100 lines, blank lines aside, outside tests, and one whose cognitive complexity is over 25. The files that already broke a limit when it came in are listed in `biome.json`'s overrides; take a file off the list once it is split, and add none. While you work, `pnpm run fix` formats and drops unused imports, `pnpm run test:watch` reruns every project's tests as files change, and `pnpm run test:e2e -u` updates the help snapshots after a deliberate change.
 
 ## Messages
 
