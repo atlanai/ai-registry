@@ -136,13 +136,15 @@ describe("choosing a target", () => {
     await writeManifestIn(maker, `${EXPORTS}${targets}`);
     const unnamed = await publish("-y");
     expect(unnamed.code).toBe(2);
-    expect(unnamed.stderr).toContain(
-      "The manifest lists 2 publish targets; pass --to ./registry/eng or --to ./registry/ops.",
-    );
+    expect(unnamed.stderr).toContain("The manifest lists 2 publish targets.");
+    expect(unnamed.stderr).toContain("Pass `--to ./registry/eng` or `--to ./registry/ops`.");
     const other = await publish("--to", "./registry/other", "-y");
     expect(other.code).toBe(2);
     expect(other.stderr).toContain(
       '--to "./registry/other" is not one of the manifest\'s publish targets.',
+    );
+    expect(other.stderr).toContain(
+      "Pass `--to ./registry/eng` or `--to ./registry/ops`, or add it to `publish.to`.",
     );
   });
 

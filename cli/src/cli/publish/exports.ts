@@ -144,16 +144,16 @@ export function chooseTarget(
   names: (target: string) => boolean,
 ): string {
   const options = list(
-    listed.map((target) => `--to ${target}`),
+    listed.map((target) => `\`--to ${target}\``),
     "or",
   );
   const [only] = listed;
   if (to === undefined) {
     if (listed.length === 1 && only !== undefined) return only;
-    throw new AiregError(
-      `The manifest lists ${plural(listed.length, "publish target")}; pass ${options}.`,
-      { code: ErrorCode.Usage },
-    );
+    throw new AiregError(`The manifest lists ${plural(listed.length, "publish target")}.`, {
+      code: ErrorCode.Usage,
+      hint: `Pass ${options}.`,
+    });
   }
   const chosen = listed.find(names);
   if (chosen !== undefined) return chosen;

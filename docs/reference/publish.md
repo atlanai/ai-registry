@@ -96,7 +96,9 @@ The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-
 Each export goes to one of the `publish.to` targets. `<registry>/<namespace>` names a declared registry, and a path such as `./registry/engineering` names a namespace in a registry folder, relative to the project. With one target, that is where everything goes. With several, `--to` picks one, and `publish` refuses to guess:
 
 ```text
-error: The manifest lists 2 publish targets; pass --to acme/engineering or --to ./registry/engineering.
+error: The manifest lists 2 publish targets.
+  code: usage
+hint: Pass `--to acme/engineering` or `--to ./registry/engineering`.
 ```
 
 A `--to` that the manifest does not list is refused too. An export whose own `publish.to` leaves the target out is listed as `skip`, with the reason, and not sent:

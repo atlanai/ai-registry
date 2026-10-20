@@ -187,17 +187,19 @@ describe("chooseTarget", () => {
 
   test("needs --to among several, and refuses one the manifest does not list", () => {
     expect(() => chooseTarget(listed, undefined, () => false)).toThrow(
-      "The manifest lists 2 publish targets; pass --to acme/engineering or --to public/acme.",
-    );
-    try {
-      chooseTarget(listed, "acme/other", () => false);
-      expect.unreachable();
-    } catch (error) {
-      expect(error).toMatchObject({
-        message: '--to "acme/other" is not one of the manifest\'s publish targets.',
+      expect.objectContaining({
+        message: "The manifest lists 2 publish targets.",
+        hint: "Pass `--to acme/engineering` or `--to public/acme`.",
         code: "usage",
-      });
-    }
+      }),
+    );
+    expect(() => chooseTarget(listed, "acme/other", () => false)).toThrow(
+      expect.objectContaining({
+        message: '--to "acme/other" is not one of the manifest\'s publish targets.',
+        hint: "Pass `--to acme/engineering` or `--to public/acme`, or add it to `publish.to`.",
+        code: "usage",
+      }),
+    );
   });
 
   test("matches a registry as written, and a folder by where it is", () => {
