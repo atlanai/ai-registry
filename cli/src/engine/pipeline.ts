@@ -31,7 +31,7 @@ import { type ApplyResult, apply, guardsOf, type Recovered, recover } from "#cor
 import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
 import { build, clashMessage } from "#core/plan/build.ts";
 import { describeCarried } from "#core/plan/carries.ts";
-import { formatNeed, type Unresolved, wantOf } from "#core/plan/depends.ts";
+import { accepts, formatNeed, type Unresolved, unmet, wantOf } from "#core/plan/depends.ts";
 import type { Acquired, Action, Kept, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
 import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
@@ -327,7 +327,7 @@ function keptWithheld(missing: Unresolved, sources: readonly Acquired[], lock: L
       row.namespace === need.namespace &&
       row.kind === need.kind &&
       row.name === need.name &&
-      row.version === need.version,
+      accepts(need, row.version),
   );
   if (held) return true;
   throw new AiregError(`${by} needs ${withheldMessage(withheld)}, so nothing was installed.`, {
@@ -336,11 +336,37 @@ function keptWithheld(missing: Unresolved, sources: readonly Acquired[], lock: L
   });
 }
 
-function unpublished({ alias, need, by }: Unresolved): AiregError {
+/** Asked for and still not listed: ranges that overlap with no version in all of them conflict. */
+function unpublished(missing: Unresolved): AiregError {
+  const { alias, need, by } = missing;
+  const conflict = unmet(alias, missing);
+  if (conflict !== undefined) {
+    return new AiregError(conflict.message, { code: ErrorCode.Conflict, hint: conflict.hint });
+  }
   return new AiregError(
     `${by} needs ${formatNeed(need)}, which ${alias} does not publish, so nothing was installed.`,
     { code: ErrorCode.NotFound, hint: `Ask the registry's owner to publish it, or remove ${by}.` },
   );
+}
+
+function sameArtifact(left: Want, right: Want): boolean {
+  return left.name === right.name && left.namespace === right.namespace && left.kind === right.kind;
+}
+
+/**
+ * A registry that has no version in the range several edges agree on says so as a missing
+ * version of that artifact, which is their conflict, not the registry's failure.
+ */
+function unlisted(error: unknown, missed: readonly Unresolved[]): never {
+  if (isAdapterError(error) && error.failure === "not_found") {
+    const missing = missed.find(
+      ({ need, needed }) =>
+        needed !== undefined &&
+        (error.artifact === `${need.namespace}/${need.name}` || error.artifact === need.name),
+    );
+    if (missing !== undefined) throw unpublished(missing);
+  }
+  throw error;
 }
 
 export function recordOf(plan: Plan): Lock {
@@ -519,6 +545,8 @@ async function plan(
   const moving = hooks.moving ?? new Set<string>();
   // What the manifest's artifacts depend on, asked of their registry once a plan finds it missing.
   const needs = new Map<string, Want[]>();
+  // Every need ever asked for, so one asked for twice is known to be unpublished.
+  const everAsked = new Set<string>();
   const settled = new Map<string, Acquired>();
   const view = lockView(lock);
   for (const alias of hooks.aliases ?? aliases) {
@@ -569,14 +597,14 @@ async function plan(
     while (planned.conflicts.length === 0) {
       const needed = new Set(needsRegistry(planned, lock, settled));
       const sources = [...settled.values(), ...acquired];
-      for (const missing of planned.unresolved.filter(
-        (item) => !keptWithheld(item, sources, lock),
-      )) {
-        const asked = needs.get(missing.alias) ?? [];
+      const missed = planned.unresolved.filter((item) => !keptWithheld(item, sources, lock));
+      for (const missing of missed) {
         const want = wantOf(missing.need);
-        if (asked.some((item) => JSON.stringify(item) === JSON.stringify(want))) {
-          throw unpublished(missing);
-        }
+        const key = `${missing.alias}\u0000${JSON.stringify(want)}`;
+        if (everAsked.has(key)) throw unpublished(missing);
+        everAsked.add(key);
+        // A need asked for again, at a range more edges agree on, replaces what it asked before.
+        const asked = (needs.get(missing.alias) ?? []).filter((item) => !sameArtifact(item, want));
         needs.set(missing.alias, [...asked, want]);
         needed.add(missing.alias);
       }
@@ -586,7 +614,9 @@ async function plan(
       const kept = acquired.filter((source) => !needed.has(source.alias));
       await closeAll(acquired.filter((source) => needed.has(source.alias)));
       acquired.splice(0, acquired.length, ...kept);
-      acquired.push(...(await open([...needed])));
+      acquired.push(
+        ...(await open([...needed]).catch((error: unknown) => unlisted(error, missed))),
+      );
       planned = planFrom([...settled.values(), ...acquired]);
     }
     await runPipelineHooks("postPlan", { targets, aliases });

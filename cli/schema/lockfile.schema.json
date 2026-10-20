@@ -220,6 +220,16 @@
                 }
               }
             },
+            "depends_on": {
+              "description": "What this version's `depends_on` edges ask of each installed artifact they reach: the edge's version range, or the version an edge without one names. Written only when an edge has a range.",
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            },
             "needed_by": {
               "minItems": 1,
               "description": "Installed artifacts whose `depends_on` edges name this version.",

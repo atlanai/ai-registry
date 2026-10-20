@@ -7,6 +7,7 @@ import { settleCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { asksFor } from "#core/manifest.ts";
 import { lockView } from "#core/plan/acquire.ts";
+import { movesWithin } from "#core/plan/depends.ts";
 import { formatRef, refName } from "#core/ref.ts";
 import { load, run as runPipeline } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
@@ -48,10 +49,12 @@ export async function run(context: CommandContext): Promise<void> {
         : `Move it with \`aireg add ${address}@<version>\`, or drop the pin with \`aireg add ${address}\`.`,
     );
   }
-  // A dependency is at the version its dependents name, so it moves only when they do.
+  // A dependency is at the version its dependents name, so it moves only when they do, or within
+  // the ranges they give.
   for (const name of named) {
     const row = lock.artifacts[name];
     if (row?.neededBy === undefined || asksFor(loaded.manifest, row)) continue;
+    if (movesWithin(lock, name) !== undefined) continue;
     context.printer.warning(
       `${name} stays at ${row.version}, because ${whoNeeds(row.neededBy)} that version.`,
     );

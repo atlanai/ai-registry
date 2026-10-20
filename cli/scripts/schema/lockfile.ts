@@ -130,6 +130,12 @@ const Artifact = Type.Object(
     links: Type.Array(Link, {
       description: "Only this list is pruned, so a file the CLI never wrote is never removed.",
     }),
+    depends_on: Type.Optional(
+      Type.Record(Type.String({ minLength: 1 }), Type.String({ minLength: 1 }), {
+        description:
+          "What this version's `depends_on` edges ask of each installed artifact they reach: the edge's version range, or the version an edge without one names. Written only when an edge has a range.",
+      }),
+    ),
     needed_by: Type.Optional(
       Type.Array(Type.String({ minLength: 1 }), {
         minItems: 1,

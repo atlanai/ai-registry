@@ -14,7 +14,7 @@ aireg update [<name> | <registry>]... [-g] [--for <harness>,...] [--frozen] [--c
 
 `aireg update` reads each registry again and installs the newest version of every artifact the scope takes from it. Name installed artifacts, as [`aireg list`](list.md) shows them, or registries, to update only those.
 
-An artifact asked for by a version range, such as `acme/engineering/pr-review@^1.2`, moves to the newest version in the range, and never outside it. An artifact pinned to a version, such as `acme/engineering/pr-review@1.2.0`, stays at that version, with a warning. Move the pin with `aireg add acme/engineering/pr-review@<version>`, or remove it with `aireg add acme/engineering/pr-review`. A dependency stays at the version the artifacts that need it name, and moves when they do.
+An artifact asked for by a version range, such as `acme/engineering/pr-review@^1.2`, moves to the newest version in the range, and never outside it. An artifact pinned to a version, such as `acme/engineering/pr-review@1.2.0`, stays at that version, with a warning. Move the pin with `aireg add acme/engineering/pr-review@<version>`, or remove it with `aireg add acme/engineering/pr-review`. A dependency stays at the version the artifacts that need it name, and moves when they do. One their edges give a range for moves to the newest version every range accepts.
 
 When the manifest takes a whole namespace, `update` also installs the artifacts the namespace has published since.
 

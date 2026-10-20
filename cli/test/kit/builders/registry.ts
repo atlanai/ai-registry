@@ -13,7 +13,7 @@ interface VersionOptions {
   files?: Record<string, string>;
   /** What follows the default entry file's front matter. */
   body?: string;
-  /** Fully qualified refs this version's `depends_on` edges name. */
+  /** Fully qualified refs this version's `depends_on` edges name, each with its range after a space. */
   dependsOn?: readonly string[];
   status?: string;
 }
