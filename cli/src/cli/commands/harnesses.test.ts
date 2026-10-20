@@ -46,6 +46,7 @@ describe("harnesses", () => {
   test.beforeEach(async ({ tmp }) => {
     cwd = tmp;
     vi.stubEnv("HOME", cwd);
+    vi.stubEnv("USERPROFILE", cwd);
     vi.stubEnv("AIREG_HOME", join(cwd, ".aireg"));
     vi.stubEnv("PATH", "");
     vi.stubEnv("CLAUDE_CONFIG_DIR", join(cwd, ".claude"));
