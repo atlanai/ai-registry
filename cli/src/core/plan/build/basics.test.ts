@@ -132,9 +132,19 @@ describe("build", () => {
   });
 
   test("keeps the revision the lock was resolved at while nothing it holds moves", () => {
-    const plan = build(kitManifest(), installed(), acquired([entry()], "c2"), SYNCED, PLAN_OPTIONS);
-    const record = plan.actions.at(-1);
-    expect(record?.kind === "record" && record.lock.registries.kit?.revision).toBe("c1");
+    const revision = (sources: ReturnType<typeof acquired>) => {
+      const record = build(kitManifest(), installed(), sources, SYNCED, PLAN_OPTIONS).actions.at(
+        -1,
+      );
+      return record?.kind === "record" ? record.lock.registries.kit?.revision : undefined;
+    };
+    expect(revision(acquired([entry()], "c2"))).toBe("c1");
+    // At a new address it is another source, so the old revision does not carry over.
+    const moved = acquired([entry()], "c2").map((source) => ({
+      ...source,
+      origin: { ...source.origin, key: "sha256:elsewhere" },
+    }));
+    expect(revision(moved)).toBe("c2");
   });
 
   test("refuses new bytes under a version the lock already holds", () => {
