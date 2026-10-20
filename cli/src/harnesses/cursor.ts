@@ -8,8 +8,14 @@ export const cursor = defineHarness({
   detect: { binary: ["cursor", "cursor-agent"], caller: ["CURSOR_AGENT"] },
   reads: { skill: ["agents", "cursor", "claude", "codex"], agent: ["cursor", "claude"] },
   kinds: {
-    // Its own plugin folder takes only real files, which aireg cannot yet keep whole.
-    plugin: { shape: "contents" },
+    // It loads a local plugin only as real files, never through a link.
+    plugin: {
+      shape: "directory",
+      subdir: "plugins/local",
+      scope: "user",
+      place: "copy",
+      manifest: [{ path: ".cursor-plugin/plugin.json" }],
+    },
     skill: { shape: "directory", subdir: "skills" },
     agent: { shape: "file", subdir: "agents", extension: ".md" },
   },
