@@ -5,10 +5,11 @@ conformance({
   // So a probe runs the version tested, rather than one it updated itself to.
   env: () => ({ OPENCODE_DISABLE_AUTOUPDATE: "1" }),
   probes: [
+    // A skill both scopes hold loads once, from either.
     {
       scope: "project",
       argv: ["opencode", "debug", "skill"],
-      expect: [/"location": "[^"]*\/project\/\.agents\/skills\/lint\/SKILL\.md"/],
+      expect: [/"location": "[^"]*\/\.agents\/skills\/lint\/SKILL\.md"/],
     },
     { scope: "project", argv: ["opencode", "agent", "list"], expect: [/^reviewer \(all\)$/m] },
     {

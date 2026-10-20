@@ -43,14 +43,15 @@ Every page below was read on 2026-10-20. Source lines are in https://github.com/
 | Agents list without signing in | `opencode agent list`, no account | Exit 0, one `<name> (<mode>)` line per agent. | 1.19.0 | confirmed: L2 probe |
 | Its plugins are code | https://opencode.ai/docs/plugins/ | "A plugin is a JavaScript/TypeScript module that exports one or more plugin functions." and "Files in these directories are automatically loaded at startup." | docs | confirmed: `plugin: { shape: "contents" }` |
 | `OPENCODE_DISABLE_AUTOUPDATE` stops it updating itself | https://opencode.ai/docs/cli/ | "OPENCODE_DISABLE_AUTOUPDATE \| boolean \| Disable automatic update checks" | docs | confirmed: set for the probes |
+| Without `keys`, a plugin's command loads as a skill like any other | `aireg add <plugin folder> --all --for opencode`, the plugin holding `commands/deploy.md`, then `opencode debug skill` from the project | `toolkit-deploy` at `<sandbox>/project/.agents/skills/toolkit-deploy/SKILL.md` | 1.19.0 | confirmed |
+| `disable-model-invocation` keeps the model from running that skill on its own | https://opencode.ai/docs/skills/, read 2026-10-20; the source at `v1.19.0` | The page names no such key, and no file of the source holds the string `disable-model-invocation` With the key set to `false`, `aireg add <plugin folder> --all` printed `warning: Did not install toolkit-deploy for .agents: it sets disable-model-invocation, which OpenCode cannot read.`; `opencode debug skill` lists `ship` and `lint`, not `toolkit-deploy` | 1.19.0 | wrong: `keys` sets it to `false`, so a skill that sets it is left out |
 
 ## L2 probes
 
-`opencode debug skill` from the project lists `lint` at `<project>/.agents/skills/lint/SKILL.md`; from the home folder it lists `lint` and `ship` at `~/.agents/skills`. `opencode agent list` lists `reviewer (all)` from the project, and `planner (all)` and `reviewer (all)` from the home folder.
+`opencode debug skill` from the project lists `lint`, at `<project>/.agents/skills/lint/SKILL.md` or, since a skill of one name loads once, at the user scope's copy; from the home folder it lists `lint` and `ship` at `~/.agents/skills`. `opencode agent list` lists `reviewer (all)` from the project, and `planner (all)` and `reviewer (all)` from the home folder.
 
 ## Left out
 
 - **A plugin of OpenCode's own:** its plugins are code, so a plugin lands as its skills and agents.
-- **Plugin commands:** this registry model has no command kind.
 - **Agent keys beyond `description`:** a value OpenCode reads differently from the harness the agent was written for stops OpenCode loading any configuration.
 - **`reload`:** the docs say nothing about when OpenCode picks up a change.
