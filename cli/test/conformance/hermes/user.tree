@@ -1,0 +1,11 @@
+.hermes/
+.hermes/skills/
+.hermes/skills/lint/
+.hermes/skills/lint/SKILL.md 033c42c8b599
+.hermes/skills/ship/
+.hermes/skills/ship/SKILL.md 68d1965a1d18
+project/
+project/.hermes/
+project/.hermes/skills/
+project/.hermes/skills/lint/
+project/.hermes/skills/lint/SKILL.md 033c42c8b599

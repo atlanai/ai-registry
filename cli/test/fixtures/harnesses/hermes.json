@@ -1,0 +1,15 @@
+{
+  "id": "hermes",
+  "displayName": "Hermes Agent",
+  "overrides": true,
+  "kind": "personal",
+  "roots": { "project": ".hermes", "user": { "default": "~/.hermes", "env": "HERMES_HOME" } },
+  "detect": { "env": ["HERMES_HOME"], "binary": ["hermes"] },
+  "instances": { "root": "~/.hermes/profiles/{profile}" },
+  "trust": { "skill": { "run": "hermes skills trust", "scope": "project" } },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": { "shape": "directory", "subdir": "skills", "place": "copy" }
+  },
+  "verified": { "command": ["hermes", "--version"], "range": "0.21.6" }
+}
