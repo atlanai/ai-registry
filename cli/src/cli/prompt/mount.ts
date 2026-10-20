@@ -1,4 +1,5 @@
-import { EventEmitter } from "node:events";
+import type { EventEmitter } from "node:events";
+import { Writable } from "node:stream";
 import { Box, type Key, render, Text, useApp, useInput } from "ink";
 import { createElement, type ReactElement, useEffect, useReducer, useState } from "react";
 import { CSI_BODY, cells, ESC } from "#core/term/format.ts";
@@ -95,7 +96,7 @@ function Prompt<T>(props: PromptProps<T>): ReactElement {
  * Ink's view of the prompt stream. It has no height on purpose: frames are
  * fitted before they reach Ink, which clears the whole terminal once one fills it.
  */
-class Output extends EventEmitter {
+class Output extends Writable {
   readonly target: PromptWriter;
 
   constructor(target: PromptWriter) {
@@ -108,12 +109,21 @@ class Output extends EventEmitter {
   }
 
   get isTTY(): boolean {
-    return (this.target as { isTTY?: boolean }).isTTY === true;
+    return this.target.isTTY === true;
   }
 
-  write(chunk: string): boolean {
-    this.target.write(chunk);
-    return true;
+  override _write(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: (error?: Error) => void,
+  ): void {
+    try {
+      this.target.write(chunk.toString());
+    } catch (error) {
+      callback(error instanceof Error ? error : new Error("Prompt output failed."));
+      return;
+    }
+    callback();
   }
 }
 
@@ -195,7 +205,7 @@ function keyed(input: NodeJS.ReadStream): NodeJS.ReadStream {
 /** Draws the machine inline until it answers, leaving its last frame in the scrollback. */
 export async function mount<T>(io: PromptIo, machine: Machine<T>): Promise<T | Canceled> {
   let answer: T | Canceled = CANCEL;
-  const output = new Output(io.output) as unknown as NodeJS.WriteStream;
+  const output = new Output(io.output);
   const prompt = Prompt as (props: PromptProps<T>) => ReactElement;
   const props: PromptProps<T> = {
     machine,

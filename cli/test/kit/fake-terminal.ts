@@ -113,6 +113,7 @@ export function terminal(rows = 40, columns = 80): Terminal {
   const io: PromptIo = {
     input: input as unknown as NodeJS.ReadStream,
     output: {
+      isTTY: true,
       write(chunk: string) {
         written += chunk;
       },

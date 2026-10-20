@@ -1,4 +1,4 @@
-import { useApp, useInput, useStdout } from "ink";
+import { useApp, useInput, useWindowSize } from "ink";
 import type { ReactElement, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { step, windowAround } from "#cli/console/model/list.ts";
@@ -149,27 +149,14 @@ function counted(panel: { label: string; length: (view: PanelView) => number }, 
   }
 }
 
-function readSize(stdout: NodeJS.WriteStream): { width: number; height: number } {
+function useSize(): { width: number; height: number } {
+  const { columns, rows } = useWindowSize();
   return {
-    width: Math.max(80, stdout.columns ?? 120),
+    width: Math.max(80, columns),
     // Ink writes a newline after each frame; a frame as tall as the terminal
     // scrolls it a row, and the header off the top.
-    height: Math.max(20, (stdout.rows ?? 40) - 1),
+    height: Math.max(20, rows - 1),
   };
-}
-
-/** Read from the stream Ink draws to, so the frame matches the terminal it is on. */
-function useSize(): { width: number; height: number } {
-  const { stdout } = useStdout();
-  const [size, setSize] = useState(() => readSize(stdout));
-  useEffect(() => {
-    const onResize = () => setSize(readSize(stdout));
-    stdout.on("resize", onResize);
-    return () => {
-      stdout.off("resize", onResize);
-    };
-  }, [stdout]);
-  return size;
 }
 
 export interface AppProps {
@@ -183,11 +170,13 @@ export interface AppProps {
   viewer: string | undefined;
 }
 
-export function App(props: AppProps): ReactElement {
+type Key = Parameters<Parameters<typeof useInput>[0]>[1];
+
+function useSession(props: AppProps) {
   const { exit } = useApp();
   const { width, height } = useSize();
   const [state, setState] = useState<ConsoleState>(props.initial);
-  // `run` is memoized on `reload` alone, so its state must come from a ref.
+  // Commands read the latest state even when a memoized callback starts them.
   const stateRef = useRef(state);
   stateRef.current = state;
   const [accountId, setAccountId] = useState<string | undefined>(props.initial.account?.id);
@@ -243,7 +232,60 @@ export function App(props: AppProps): ReactElement {
     },
     [props.context],
   );
+  return {
+    props,
+    exit,
+    width,
+    height,
+    state,
+    setState,
+    stateRef,
+    accountId,
+    setAccountId,
+    accountRef,
+    view,
+    setView,
+    cursors,
+    setCursors,
+    folded,
+    setFolded,
+    filter,
+    setFilter,
+    filtering,
+    setFiltering,
+    flags,
+    setFlags,
+    overlay,
+    setOverlay,
+    activity,
+    setActivity,
+    busy,
+    setBusy,
+    nowMs,
+    setNowMs,
+    setPrefetched,
+    live,
+    setLive,
+    running,
+    reload,
+  };
+}
 
+function useViews(context: ReturnType<typeof useSession>) {
+  const {
+    props,
+    width,
+    height,
+    state,
+    view,
+    cursors,
+    setCursors,
+    folded,
+    filter,
+    flags,
+    nowMs,
+    setPrefetched,
+  } = context;
   const facts: LinkFacts = useMemo(
     () => ({
       location: state.account?.address ?? "",
@@ -313,11 +355,34 @@ export function App(props: AppProps): ReactElement {
     void prefetch(panelView).then((changed) => {
       if (changed) setPrefetched((count) => count + 1);
     });
-  }, [prefetch, panelView]);
+  }, [prefetch, panelView, setPrefetched]);
 
   const selectedArtifact: Line | undefined = artifacts.lines[cursor];
   const selectedJob = jobs[cursor];
+  return {
+    ...context,
+    facts,
+    app,
+    tabs,
+    panel,
+    artifacts,
+    jobs,
+    listHeight,
+    panelViewAt,
+    lengths,
+    collected,
+    length,
+    cursor,
+    panelView,
+    move,
+    prefetch,
+    selectedArtifact,
+    selectedJob,
+  };
+}
 
+function useCommands(context: ReturnType<typeof useViews>) {
+  const { props, state, stateRef, setActivity, reload } = context;
   const run = useCallback(
     (label: string, command: commands.Command) => {
       // Read before the child starts, so the outcome is observed not assumed.
@@ -347,7 +412,7 @@ export function App(props: AppProps): ReactElement {
         );
       });
     },
-    [reload],
+    [reload, setActivity, stateRef],
   );
 
   const planForRow = (row: ArtifactRow): PublishPlan | undefined => {
@@ -408,7 +473,11 @@ export function App(props: AppProps): ReactElement {
       ).display,
     };
   };
+  return { ...context, run, planForRow, importNow, publishPlan };
+}
 
+function useLinks(context: ReturnType<typeof useCommands>) {
+  const { props, view, facts, panel, panelView, selectedArtifact } = context;
   const artifactLink = (row: ArtifactRow): string | undefined =>
     props.upstream?.artifact?.(facts, row);
 
@@ -430,9 +499,115 @@ export function App(props: AppProps): ReactElement {
     url ??= props.upstream?.registry?.(facts);
     if (url !== undefined) commands.open(url);
   };
+  return { ...context, artifactLink, openSelected };
+}
 
-  type Key = Parameters<Parameters<typeof useInput>[0]>[1];
+function useNavigation(context: ReturnType<typeof useLinks>) {
+  const { state, setAccountId, view, setView, reload, tabs, move } = context;
+  const nextAccount = (): void => {
+    const index = state.accounts.findIndex((row) => row.id === state.account?.id);
+    const next = state.accounts[(index + 1) % Math.max(1, state.accounts.length)];
+    if (next !== undefined) {
+      setAccountId(next.id);
+      void reload(next.id);
+    }
+  };
 
+  const goToView = (delta: number): void => {
+    const index = tabs.findIndex((tab) => tab.id === view);
+    const next = tabs[(index + delta + tabs.length) % tabs.length];
+    if (next !== undefined) setView(next.id);
+  };
+
+  /** Movement, which every list-shaped view shares. */
+  const onNavKey = (input: string, key: Key): boolean => {
+    // Left and right walk the tabs; folding a group is `enter` on its header.
+    if (key.leftArrow) {
+      goToView(-1);
+      return true;
+    }
+    if (key.rightArrow) {
+      goToView(1);
+      return true;
+    }
+    const delta =
+      key.upArrow || input === "k"
+        ? -1
+        : key.downArrow || input === "j"
+          ? 1
+          : key.pageUp
+            ? -10
+            : key.pageDown
+              ? 10
+              : 0;
+    if (delta === 0) return false;
+    move(delta);
+    return true;
+  };
+  return { ...context, nextAccount, goToView, onNavKey };
+}
+
+function useGlobalKeys(context: ReturnType<typeof useNavigation>) {
+  const {
+    exit,
+    state,
+    setAccountId,
+    setOverlay,
+    reload,
+    run,
+    openSelected,
+    nextAccount,
+    onNavKey,
+  } = context;
+  /** Keys every view answers to. Returns false when the view should try it. */
+  const onGlobalKey = (input: string, key: Key): boolean => {
+    if (onNavKey(input, key)) return true;
+    // The digits match the labels on the registry tabs. Views move with the
+    // arrows, which is what their strip says.
+    const numbered = state.accounts[Number(input) - 1];
+    const actions: Record<string, () => void> = {
+      q: exit,
+      "?": () => setOverlay({ kind: "help" }),
+      g: () => void reload(),
+      o: openSelected,
+      u: () => run("pull latest", commands.pullLatest(state.account?.registry, state.scope)),
+    };
+    if (key.ctrl && input === "c") {
+      exit();
+      return true;
+    }
+    if (key.tab) {
+      nextAccount();
+      return true;
+    }
+    if (numbered !== undefined && input >= "1" && input <= "9") {
+      if (numbered.id !== state.account?.id) {
+        setAccountId(numbered.id);
+        void reload(numbered.id);
+      }
+      return true;
+    }
+    const chosen = actions[input];
+    if (chosen === undefined) return false;
+    chosen();
+    return true;
+  };
+  return { ...context, onGlobalKey };
+}
+
+function useOverlayKeys(context: ReturnType<typeof useGlobalKeys>) {
+  const {
+    state,
+    setFilter,
+    setFiltering,
+    overlay,
+    setOverlay,
+    run,
+    planForRow,
+    importNow,
+    artifactLink,
+    onNavKey,
+  } = context;
   /** While the filter is open it owns the keyboard, or typing "p" publishes. */
   const onFilterKey = (input: string, key: Key): void => {
     // The cursor still moves while you type, so a filter can be narrowed and
@@ -489,7 +664,31 @@ export function App(props: AppProps): ReactElement {
       if (url !== undefined) commands.open(url);
     }
   };
+  return { ...context, onFilterKey, publishFromDetail, onOverlayKey };
+}
 
+function useViewKeys(context: ReturnType<typeof useOverlayKeys>) {
+  const {
+    state,
+    view,
+    setView,
+    setCursors,
+    folded,
+    setFolded,
+    setFilter,
+    setFiltering,
+    setFlags,
+    setOverlay,
+    reload,
+    panel,
+    cursor,
+    panelView,
+    selectedArtifact,
+    selectedJob,
+    run,
+    importNow,
+    publishPlan,
+  } = context;
   /** aireg never publishes to a git registry; its rows already say where an edit goes. */
   const publishSelected = (): void => {
     if (state.account?.publishes === false) return;
@@ -565,82 +764,27 @@ export function App(props: AppProps): ReactElement {
       reload: () => void reload(),
     });
   };
+  return { ...context, publishSelected, onArtifactsKey, onJobsKey, onOverviewKey, onPanelKey };
+}
 
-  const nextAccount = (): void => {
-    const index = state.accounts.findIndex((row) => row.id === state.account?.id);
-    const next = state.accounts[(index + 1) % Math.max(1, state.accounts.length)];
-    if (next !== undefined) {
-      setAccountId(next.id);
-      void reload(next.id);
-    }
-  };
-
-  const goToView = (delta: number): void => {
-    const index = tabs.findIndex((tab) => tab.id === view);
-    const next = tabs[(index + delta + tabs.length) % tabs.length];
-    if (next !== undefined) setView(next.id);
-  };
-
-  /** Movement, which every list-shaped view shares. */
-  const onNavKey = (input: string, key: Key): boolean => {
-    // Left and right walk the tabs; folding a group is `enter` on its header.
-    if (key.leftArrow) {
-      goToView(-1);
-      return true;
-    }
-    if (key.rightArrow) {
-      goToView(1);
-      return true;
-    }
-    const delta =
-      key.upArrow || input === "k"
-        ? -1
-        : key.downArrow || input === "j"
-          ? 1
-          : key.pageUp
-            ? -10
-            : key.pageDown
-              ? 10
-              : 0;
-    if (delta === 0) return false;
-    move(delta);
-    return true;
-  };
-
-  /** Keys every view answers to. Returns false when the view should try it. */
-  const onGlobalKey = (input: string, key: Key): boolean => {
-    if (onNavKey(input, key)) return true;
-    // The digits match the labels on the registry tabs. Views move with the
-    // arrows, which is what their strip says.
-    const numbered = state.accounts[Number(input) - 1];
-    const actions: Record<string, () => void> = {
-      q: exit,
-      "?": () => setOverlay({ kind: "help" }),
-      g: () => void reload(),
-      o: openSelected,
-      u: () => run("pull latest", commands.pullLatest(state.account?.registry, state.scope)),
-    };
-    if (key.ctrl && input === "c") {
-      exit();
-      return true;
-    }
-    if (key.tab) {
-      nextAccount();
-      return true;
-    }
-    if (numbered !== undefined && input >= "1" && input <= "9") {
-      if (numbered.id !== state.account?.id) {
-        setAccountId(numbered.id);
-        void reload(numbered.id);
-      }
-      return true;
-    }
-    const chosen = actions[input];
-    if (chosen === undefined) return false;
-    chosen();
-    return true;
-  };
-
+function useMouseInteractions(context: ReturnType<typeof useViewKeys>) {
+  const {
+    state,
+    setAccountId,
+    view,
+    setView,
+    setCursors,
+    overlay,
+    activity,
+    reload,
+    tabs,
+    panel,
+    jobs,
+    listHeight,
+    length,
+    cursor,
+    move,
+  } = context;
   /** A click on the tab strips, which is the only chrome that is clickable. */
   const clickedTab = (event: MouseEvent): boolean => {
     if (event.row === LAYOUT.viewTabs) {
@@ -691,7 +835,25 @@ export function App(props: AppProps): ReactElement {
   };
 
   useMouse(onMouse);
+  return { ...context, clickedTab, rowAt, onMouse };
+}
 
+function useConsoleInput(context: ReturnType<typeof useMouseInteractions>) {
+  const {
+    view,
+    filtering,
+    overlay,
+    activity,
+    setActivity,
+    panel,
+    onGlobalKey,
+    onFilterKey,
+    onOverlayKey,
+    onArtifactsKey,
+    onJobsKey,
+    onOverviewKey,
+    onPanelKey,
+  } = context;
   useInput((input, key) => {
     if (filtering) {
       onFilterKey(input, key);
@@ -714,7 +876,30 @@ export function App(props: AppProps): ReactElement {
     else if (view === "artifacts") onArtifactsKey(input, key);
     else if (view === "jobs") onJobsKey(input);
   });
+  return { ...context };
+}
 
+function drawBody(context: ReturnType<typeof useConsoleInput>) {
+  const {
+    props,
+    width,
+    state,
+    view,
+    folded,
+    filter,
+    filtering,
+    flags,
+    nowMs,
+    panel,
+    artifacts,
+    jobs,
+    listHeight,
+    panelViewAt,
+    cursor,
+    panelView,
+    selectedArtifact,
+    selectedJob,
+  } = context;
   const lastPull = state.runs.find((row) => row.mode === "sync")?.requestedAtMs;
 
   /** A contributed block per panel, for the two views that aggregate. */
@@ -773,7 +958,29 @@ export function App(props: AppProps): ReactElement {
     if (view === "jobs") return jobsSummaryStrip({ width, line: selectedJob, nowMs });
     return null;
   };
+  return { ...context, lastPull, blocks, body, strip };
+}
 
+function drawFrame(context: ReturnType<typeof drawBody>) {
+  const {
+    props,
+    width,
+    height,
+    state,
+    view,
+    overlay,
+    activity,
+    busy,
+    nowMs,
+    live,
+    app,
+    tabs,
+    panel,
+    artifactLink,
+    lastPull,
+    body,
+    strip,
+  } = context;
   const overlayNode = (): ReactNode => {
     if (activity !== undefined) {
       return activityPanel({
@@ -844,6 +1051,21 @@ export function App(props: AppProps): ReactElement {
     fixed(overlaid === null ? strip() : plain("")),
     fixed(footer({ width, keys: footerKeys, right: `v${state.version}` })),
   );
+}
+
+export function App(props: AppProps): ReactElement {
+  const session = useSession(props);
+  const views = useViews(session);
+  const commands = useCommands(views);
+  const links = useLinks(commands);
+  const navigation = useNavigation(links);
+  const globalKeys = useGlobalKeys(navigation);
+  const overlayKeys = useOverlayKeys(globalKeys);
+  const viewKeys = useViewKeys(overlayKeys);
+  const mouse = useMouseInteractions(viewKeys);
+  const input = useConsoleInput(mouse);
+  const body = drawBody(input);
+  return drawFrame(body);
 }
 
 /** A contributed tab's footer is movement plus whatever keys it declares. */
