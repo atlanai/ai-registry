@@ -54,7 +54,7 @@ function edgeProblem(edge: PublishRelationship): string | undefined {
     return `has a ${type} edge to ${to} at ${quoted(range)}, which is not a version range that version satisfies`;
   }
   if (registry !== undefined && !ROOT_URL.test(registry)) {
-    return `has a ${type} edge to ${to} in ${quoted(registry)}, which is not an https URL`;
+    return `has a ${type} edge to ${to} in ${quoted(registry)}, which is not an https URL without a trailing slash`;
   }
   return undefined;
 }

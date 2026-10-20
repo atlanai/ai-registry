@@ -99,10 +99,10 @@ describe("offerFrom", () => {
       code: "invalid",
     });
     await expect(refused([{ ...edge, registry: "http://acme.example" }])).rejects.toThrow(
-      'lint has a depends_on edge to eng/skill/style@1.2.0 in "http://acme.example", which is not an https URL.',
+      'lint has a depends_on edge to eng/skill/style@1.2.0 in "http://acme.example", which is not an https URL without a trailing slash.',
     );
     await expect(refused([{ ...edge, registry: "https://acme.example/" }])).rejects.toThrow(
-      /which is not an https URL/,
+      'lint has a depends_on edge to eng/skill/style@1.2.0 in "https://acme.example/", which is not an https URL without a trailing slash.',
     );
   });
 
