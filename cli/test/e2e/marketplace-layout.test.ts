@@ -142,6 +142,19 @@ describe("a plugin marketplace", () => {
     expect(synced.code, synced.stdout).toBe(0);
   }, 60_000);
 
+  test("keeps what a trusted plugin runs on record through an install that reads nothing", async ({
+    aireg,
+    tmp,
+  }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await init(aireg, "claude");
+    expect((await aireg(["add", root, "--all", "--trust", "deploy-kit"])).code).toBe(0);
+    expect((await aireg(["install"])).code).toBe(0);
+    const synced = await aireg(["sync"]);
+    expect(synced.stdout).not.toContain("adds or changes");
+    expect(synced.code, synced.stdout).toBe(0);
+  }, 60_000);
+
   test("lets a sync take no change to what a plugin runs, trusted or not", async ({
     aireg,
     project,

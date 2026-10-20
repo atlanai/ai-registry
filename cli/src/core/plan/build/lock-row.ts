@@ -47,7 +47,7 @@ export function lockRow({
     path: posixRelative(base, copy),
     content: yours ? previous.content : (basis?.content ?? item.contentId ?? previous?.content),
     version: basis === undefined ? item.version : basis.version,
-    ...carriedOf(basis === undefined ? item.plugin?.fingerprint : basis.carried),
+    ...carriedOf(basis === undefined ? fingerprintOf(item, previous) : basis.carried),
     ...revisionOf(basis === undefined ? item.revision : basis.revision),
     // Never adopt a drifted digest: the lock records what we installed. The
     // survey fallback is a copy the lock forgot, so drift stays detectable.
@@ -66,6 +66,17 @@ export function lockRow({
     }),
     ...(neededBy === undefined ? {} : { neededBy }),
   };
+}
+
+/**
+ * What the plugin runs, as read this run; a run that read nothing of it, as an install off the
+ * lockfile, has the same bytes as before and so the same parts.
+ */
+function fingerprintOf(item: Selected, previous: LockArtifact | undefined): string | undefined {
+  if (item.plugin !== undefined) return item.plugin.fingerprint;
+  return item.contentId !== undefined && item.contentId === previous?.content
+    ? previous.carried
+    : undefined;
 }
 
 function carriedOf(fingerprint: string | undefined): Pick<LockArtifact, "carried"> {
