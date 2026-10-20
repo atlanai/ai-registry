@@ -52,6 +52,7 @@
       },
       "style": {
         "noNonNullAssertion": "error",
+        "noParameterAssign": "error",
         "useConsistentArrayType": { "level": "error", "options": { "syntax": "shorthand" } },
         "useImportType": "error",
         "useNodejsImportProtocol": "error",
@@ -94,6 +95,10 @@
     {
       "includes": ["src/engine/execute.ts"],
       "linter": { "rules": { "complexity": { "noExcessiveCognitiveComplexity": "off" } } }
+    },
+    {
+      "includes": ["src/adapter/filespec/resolve.test.ts"],
+      "linter": { "rules": { "style": { "noParameterAssign": "off" } } }
     }
   ]
 }
