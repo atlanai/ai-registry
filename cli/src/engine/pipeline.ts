@@ -654,8 +654,11 @@ function keptMessage(roots: Roots, name: string, path: string, verb: string): st
   return `${verb} install ${name}, because ${displayPath(roots, path)} already holds something of yours.`;
 }
 
+/** A tool by its name, and a shared folder by its path, as the summary names them. */
 function displayName(harnesses: Harnesses, harness: string): string {
-  return harnesses[harness]?.displayName ?? harness;
+  const target = harnesses[harness];
+  if (target === undefined) return harness;
+  return target.shared ? target.projectRoot : target.displayName;
 }
 
 export function unstagedNotices(unstaged: Readonly<ApplyResult["unstaged"]>): ApplyNotice[] {
