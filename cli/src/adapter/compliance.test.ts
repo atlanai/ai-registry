@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { assertAdapterCompliance, ComplianceError } from "./compliance.ts";
-import { ADAPTER_PROTOCOL, type SourceAdapter, type SourceContext } from "./contract.ts";
+import {
+  ADAPTER_PROTOCOL,
+  type Artifact,
+  type PublishInput,
+  type SourceAdapter,
+  type SourceContext,
+} from "./contract.ts";
 import { defineAdapter } from "./define.ts";
 import { ENVELOPE_API_VERSION } from "./spec/types.ts";
 
@@ -105,5 +111,67 @@ describe("assertAdapterCompliance", () => {
     await expect(assertAdapterCompliance(adapter, context())).rejects.toThrow(
       /publishes agent it does not serve/,
     );
+  });
+
+  describe("relationships", () => {
+    /** Publishes into memory, keeping each version's edges unless told to drop them. */
+    function storing(keep: boolean, publish = true): SourceAdapter {
+      const held: Artifact[] = [];
+      return defineAdapter({
+        id: "probe",
+        displayName: "Probe",
+        artifactKinds: ["skill"],
+        dispatch: { schemes: ["probe"] },
+        capabilities: { publish, relationships: true },
+        connect: async () => ({
+          resolve: async (want) => ({
+            artifacts: held.filter((artifact) =>
+              want.every((asked) => asked.name === artifact.envelope.metadata.name),
+            ),
+          }),
+          fetch: async () => BODY,
+          ...(publish
+            ? {
+                publish: async (changes: readonly PublishInput[]) => {
+                  for (const change of changes) {
+                    held.push({
+                      id: change.name,
+                      kind: change.kind,
+                      envelope: {
+                        apiVersion: ENVELOPE_API_VERSION,
+                        kind: change.kind,
+                        metadata: { name: change.name },
+                        files: [],
+                        ...(keep && change.relationships !== undefined
+                          ? { relationships: [...change.relationships] }
+                          : {}),
+                      },
+                      files: [],
+                    });
+                  }
+                  return {};
+                },
+              }
+            : {}),
+          close: async () => {},
+        }),
+      });
+    }
+
+    it("publishes an artifact with an edge and reads it back", async () => {
+      await expect(assertAdapterCompliance(storing(true), context())).resolves.toBeUndefined();
+    });
+
+    it("refuses an adapter that drops the edge", async () => {
+      await expect(assertAdapterCompliance(storing(false), context())).rejects.toThrow(
+        "probe declared relationships but aireg-compliance came back without the edge it was published with.",
+      );
+    });
+
+    it("refuses relationships without publish", async () => {
+      await expect(assertAdapterCompliance(storing(true, false), context())).rejects.toThrow(
+        "probe declared relationships but does not publish.",
+      );
+    });
   });
 });

@@ -2,8 +2,15 @@ import { access } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize } from "node:path";
 import { credentialFor } from "#accounts/credentials.ts";
 import { isArtifactName, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
-import type { Artifact, PublishInput, SourceAdapter } from "#adapter/index.ts";
+import type {
+  Artifact,
+  PublishInput,
+  PublishRelationship,
+  Relationship,
+  SourceAdapter,
+} from "#adapter/index.ts";
 import { type Bump, bumpVersion, parseVersion } from "#adapter/semver.ts";
+import { canonicalize } from "#adapter/spec/canonical.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { ID as LOCAL } from "#adapters/local/api.ts";
 import { expandLocation } from "#core/adapter/location.ts";
@@ -180,13 +187,21 @@ export async function folderTo(
   };
 }
 
+/** What a registry holds of one artifact now: its latest version, its files and its edges. */
+interface Current {
+  id: string;
+  version: string | undefined;
+  digests: string[];
+  relationships?: readonly Relationship[] | undefined;
+}
+
 /** What one registry publishes now, read once and kept open to publish into. */
 export interface Published {
   alias: string;
   location: string;
   source: ConnectedSource;
   namespaces: string[];
-  latest: Map<string, { id: string; version: string | undefined; digests: string[] }>;
+  latest: Map<string, Current>;
 }
 
 const keyOf = (namespace: string, kind: string, name: string) => `${namespace}/${kind}/${name}`;
@@ -221,7 +236,7 @@ export async function readPublished(
     throw cannotPublish(source.adapter, alias, how);
   }
   const listing = await resolveArtifacts(source, [], { all: true });
-  const latest = new Map<string, { id: string; version: string | undefined; digests: string[] }>();
+  const latest = new Map<string, Current>();
   const namespaces = new Set<string>();
   for (const { artifact } of listing.listed) {
     const { namespace, name, version } = artifact.envelope.metadata;
@@ -231,6 +246,7 @@ export async function readPublished(
       id: artifact.id,
       version,
       digests: digestsOf(artifact),
+      relationships: artifact.envelope.relationships,
     });
   }
   return { alias, location, source, namespaces: [...namespaces].sort(), latest };
@@ -285,6 +301,34 @@ async function refuseInvalid(
   );
 }
 
+/**
+ * An adapter without `capabilities.relationships` would publish the files alone, and the
+ * artifact would install without what it depends on, so nothing is sent to it at all.
+ */
+function refuseRelationships(
+  work: Work,
+  published: Published,
+  relationships: readonly PublishRelationship[] | undefined,
+): void {
+  if (relationships === undefined || relationships.length === 0) return;
+  if (published.source.adapter.capabilities.relationships === true) return;
+  throw new AiregError(
+    `${work.name} has dependencies, but ${published.alias} does not store them with a published version.`,
+    {
+      code: ErrorCode.Usage,
+      hint: "Publish it to a registry folder, which does: `aireg publish <path> --to <folder>/<namespace>`.",
+    },
+  );
+}
+
+/** The same edges, whatever order each one's fields were written in. */
+function sameEdges(
+  current: readonly Relationship[] | undefined,
+  offered: readonly PublishRelationship[] | undefined,
+): boolean {
+  return canonicalize(current ?? []) === canonicalize(offered ?? []);
+}
+
 export async function plan(
   work: Work,
   published: Published,
@@ -292,7 +336,14 @@ export async function plan(
   how: Bump,
   exact: string | undefined,
   force: boolean,
+  /**
+   * The edges this version carries. Absent, the publish does not manage them: the files alone
+   * decide sameness, as for work that names none. Present, even empty, an edge that changed is
+   * a new version too.
+   */
+  relationships?: readonly PublishRelationship[],
 ): Promise<Planned> {
+  refuseRelationships(work, published, relationships);
   const current = published.latest.get(keyOf(namespace, work.kind, work.name));
   const folder = published.source.adapter.capabilities.fileSpec === true;
   // An edit made on an older version, published as the newest, drops whatever
@@ -316,11 +367,15 @@ export async function plan(
     id: current?.id,
     description: work.description,
     asAgentDocument: folder,
+    relationships,
   });
-  // The files decide sameness: the digest covers the version, so it always moves.
+  // The files and the edges decide sameness: the digest covers the version, so it always moves.
   const probe = await offerFrom(work.path, target(exact ?? "0.1.0"));
   const same =
-    current !== undefined && current.digests.join() === probe.digests.join() && exact === undefined;
+    current !== undefined &&
+    current.digests.join() === probe.digests.join() &&
+    (relationships === undefined || sameEdges(current.relationships, probe.input.relationships)) &&
+    exact === undefined;
   if (exact !== undefined && (await taken(published, work.name, exact))) {
     throw new AiregError(`${namespace}/${work.name}@${exact} is already published.`, {
       code: ErrorCode.Conflict,

@@ -24,6 +24,7 @@ describe("defineAdapter", () => {
       messages: false,
       fileSpec: false,
       namespacePlugins: false,
+      relationships: false,
     });
   });
 

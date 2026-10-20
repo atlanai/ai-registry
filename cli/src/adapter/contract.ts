@@ -156,6 +156,12 @@ export interface Capabilities {
    * gets the namespace as one, named after it, rather than each artifact on its own.
    */
   namespacePlugins?: boolean;
+  /**
+   * `publish` stores each version's `relationships` with it, as the file spec's envelope does,
+   * so an artifact published with its dependencies is installed with them. aireg sends
+   * `relationships` to no other adapter, and refuses an artifact that has them instead.
+   */
+  relationships?: boolean;
 }
 
 /** Whether an adapter has a sign-in: its `auth.login`, which `capabilities.auth` must declare. */
@@ -174,6 +180,7 @@ export function advertisedCapabilities(
     messages: capabilities?.messages === true,
     fileSpec: capabilities?.fileSpec === true,
     namespacePlugins: capabilities?.namespacePlugins === true,
+    relationships: capabilities?.relationships === true,
   };
 }
 
@@ -251,6 +258,18 @@ export interface UploadFile {
   executable: boolean;
 }
 
+/** One edge a published version carries: a `relationships[]` entry of the file spec (section 3.4). */
+export interface PublishRelationship {
+  /** What the edge means, such as `depends_on`. */
+  rel_type: string;
+  /** The artifact it points at, as `<namespace>/<kind>/<name>@<version>`. */
+  to: string;
+  /** The versions of `to`'s artifact the edge accepts, a range that `to`'s own version satisfies. */
+  range?: string;
+  /** The canonical `https` root of the registry `to` resolves in, when that is not this one. */
+  registry?: string;
+}
+
 /** One artifact to publish. */
 export interface PublishInput {
   /** The source's own address for this, when it already holds it. Absent means new. */
@@ -264,11 +283,16 @@ export interface PublishInput {
   version?: string | undefined;
   /** One line on what it does. */
   description?: string | undefined;
-  /** The content digest of the envelope these files make, as `sha256:<hex>`. */
+  /** The content digest of the envelope these files and relationships make, as `sha256:<hex>`. */
   contentId: string;
   /** The kind's structured fields as the host read them from the files, for a source that stores them. */
   spec?: Record<string, unknown> | undefined;
   files: readonly UploadFile[];
+  /**
+   * The edges this version carries, already checked against the file spec's grammar. Only an
+   * adapter that declares `capabilities.relationships` is sent any; it stores them with the version.
+   */
+  relationships?: readonly PublishRelationship[] | undefined;
 }
 
 /**

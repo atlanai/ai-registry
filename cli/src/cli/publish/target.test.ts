@@ -48,6 +48,81 @@ describe("plan", () => {
   });
 });
 
+describe("plan with relationships", () => {
+  const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0", range: "^1.2.0" };
+
+  async function lint(): Promise<{ work: Work; digests: string[] }> {
+    const path = join(root, "lint");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "SKILL.md"), "---\nname: lint\ndescription: Lints code.\n---\n");
+    const work: Work = {
+      name: "lint",
+      kind: "skill",
+      path,
+      description: undefined,
+      home: undefined,
+      row: undefined,
+      base: undefined,
+    };
+    const { digests } = await offerFrom(path, { name: "lint", kind: "skill", version: "1.0.0" });
+    vi.mocked(offerFrom).mockClear();
+    return { work, digests };
+  }
+
+  const publishedAt = (
+    capabilities: Record<string, boolean>,
+    current?: { digests: string[]; relationships?: unknown[] },
+  ) =>
+    ({
+      alias: "acme",
+      source: { adapter: { id: "probe", capabilities } },
+      latest: new Map(
+        current === undefined
+          ? []
+          : [["eng/skill/lint", { id: "lint", version: "1.0.0", ...current }]],
+      ),
+    }) as unknown as Published;
+
+  test("refuses an adapter that does not store them, before reading the files", async () => {
+    const { work } = await lint();
+    const refused = plan(work, publishedAt({ fileSpec: true }), "eng", "patch", undefined, false, [
+      edge,
+    ]);
+    await expect(refused).rejects.toMatchObject({
+      message: "lint has dependencies, but acme does not store them with a published version.",
+      code: "usage",
+    });
+    expect(offerFrom).not.toHaveBeenCalled();
+    // Without any, the same adapter still takes the work.
+    await expect(
+      plan(work, publishedAt({ fileSpec: true }), "eng", "patch", undefined, false, []),
+    ).resolves.toMatchObject({ version: "0.1.0" });
+  });
+
+  test("sends them, and publishes again when only an edge moved", async () => {
+    const { work, digests } = await lint();
+    const stored = publishedAt({ relationships: true }, { digests, relationships: [edge] });
+
+    const same = await plan(work, stored, "eng", "patch", undefined, false, [edge]);
+    expect(same.same).toBe(true);
+
+    const moved = { ...edge, to: "eng/skill/style@1.3.0", range: "^1.3.0" };
+    const next = await plan(work, stored, "eng", "patch", undefined, false, [moved]);
+    expect(next).toMatchObject({ same: false, version: "1.0.1" });
+    expect(next.input.relationships).toEqual([moved]);
+
+    const dropped = await plan(work, stored, "eng", "patch", undefined, false, []);
+    expect(dropped.same).toBe(false);
+    expect(dropped.input).not.toHaveProperty("relationships");
+  });
+
+  test("leaves sameness to the files when the publish names no relationships", async () => {
+    const { work, digests } = await lint();
+    const stored = publishedAt({ relationships: true }, { digests, relationships: [edge] });
+    expect((await plan(work, stored, "eng", "patch", undefined, false)).same).toBe(true);
+  });
+});
+
 describe("commitAndPush", () => {
   test("commits in the folder named, quoting what a shell would read differently", () => {
     expect(commitAndPush("add triage 0.1.0")).toBe(

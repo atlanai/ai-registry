@@ -5,16 +5,20 @@ import {
   buildEnvelope,
   contentDigest,
   type PublishInput,
+  type PublishRelationship,
+  satisfies,
   sha256,
   type UploadFile,
 } from "#adapter/index.ts";
 import { describeFile } from "#adapter/spec/envelope.ts";
+import { quoted } from "#adapter/text.ts";
 import { frontmatterRecord, ownDescription } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { authored, isDirectory, refusal } from "#core/fs/tree.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { CONCURRENCY, limiter } from "#core/limit.ts";
 import { envelopeSpec } from "./kinds.ts";
+import { edgeVersion } from "./validate.ts";
 
 const reading = limiter(CONCURRENCY);
 
@@ -29,6 +33,51 @@ export interface OfferTarget {
   description?: string | undefined;
   /** Send an agent file as the `AGENT.md` a registry folder holds, rather than as `<name>.md`. */
   asAgentDocument?: boolean | undefined;
+  /** The edges the version carries, such as its `depends_on`. Absent, it carries none. */
+  relationships?: readonly PublishRelationship[] | undefined;
+}
+
+/** Relationship schema: `rel_type` is a lowercase word, as `depends_on` is. */
+const REL_TYPE = /^[a-z][a-z0-9_]*$/;
+/** Common schema `root_url`: an `https` origin and path, with no trailing slash. */
+const ROOT_URL = /^https:\/\/\S*[^/\s]$/;
+
+/** What is wrong with one edge, by the relationship schema, or undefined when nothing is. */
+function edgeProblem(edge: PublishRelationship): string | undefined {
+  const { rel_type: type, to, range, registry } = edge;
+  if (!REL_TYPE.test(type)) {
+    return `has a relationship of type ${quoted(type)}, which is not lowercase letters, digits and underscores`;
+  }
+  const version = edgeVersion(to);
+  if (version === undefined) {
+    return `has a ${type} edge to ${quoted(to)}, which is not a namespace/kind/name@version`;
+  }
+  if (range !== undefined && !satisfies(version, range)) {
+    return `has a ${type} edge to ${to} at ${quoted(range)}, which is not a version range that version satisfies`;
+  }
+  if (registry !== undefined && !ROOT_URL.test(registry)) {
+    return `has a ${type} edge to ${to} in ${quoted(registry)}, which is not an https URL`;
+  }
+  return undefined;
+}
+
+/**
+ * The edges as the envelope spells them: each checked before anything is sent, since the
+ * registry stores them as given, and copied field by field, so nothing else rides along.
+ */
+function edgesOf(target: OfferTarget): PublishRelationship[] {
+  return (target.relationships ?? []).map((edge) => {
+    const problem = edgeProblem(edge);
+    if (problem !== undefined) {
+      throw new AiregError(`${target.name} ${problem}.`, { code: ErrorCode.Invalid });
+    }
+    return {
+      rel_type: edge.rel_type,
+      to: edge.to,
+      ...(edge.range === undefined ? {} : { range: edge.range }),
+      ...(edge.registry === undefined ? {} : { registry: edge.registry }),
+    };
+  });
 }
 
 /** A harness's agent file may omit the name a registry agent requires; the artifact's name supplies it. */
@@ -76,6 +125,7 @@ export async function offerFrom(
   path: string,
   target: OfferTarget,
 ): Promise<{ input: PublishInput; digests: string[] }> {
+  const relationships = edgesOf(target);
   const files = await uploadFiles(path, target);
   const bytes = new Map(files.map((file) => [file.path, file.content]));
   // Described exactly as a registry describes what it holds, so publishing a
@@ -105,10 +155,13 @@ export async function offerFrom(
         metadata: { name: target.name, ...(description === undefined ? {} : { description }) },
         files: descriptors,
         spec,
+        // Part of the content identity: a version whose only change is an edge is a new one.
+        relationships,
       }),
     ),
     spec,
     files,
+    ...(relationships.length === 0 ? {} : { relationships }),
   };
   return { input, digests: descriptors.map((file) => file.digest).sort() };
 }
