@@ -32,7 +32,7 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (harness) => {
     skipped.add(build.options.harnesses[harness]?.displayName ?? harness);
   });
-  const links = claim(planned, item.name, build.claimed, (owner, link) => {
+  const collided = (owner: string, link: PlannedLink) => {
     const kept = build.addresses.get(owner) ?? owner;
     blocked.push({ harness: link.harness, path: link.relative, by: kept });
     if (!build.clashes.some((clash) => clash.dropped === address && clash.kept === kept)) {
@@ -40,7 +40,17 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
       const name = item.kind === "plugin" ? partName(link.relative) : item.name;
       build.clashes.push({ name, kept, dropped: address, at: link.relative });
     }
+  };
+  // A path the lockfile gives another artifact stays its own, though this one comes first, as a
+  // plugin linked beside it may. A plugin's own folder is shared, so it is never held this way.
+  const open = planned.filter((link) => {
+    if (link.shared === true || build.claimed.has(link.absolute)) return true;
+    const holder = build.recorded.get(link.absolute);
+    if (holder === undefined || holder === item.name) return true;
+    collided(holder, link);
+    return false;
   });
+  const links = claim(open, item.name, build.claimed, collided);
   return { links, skipped, blocked };
 }
 

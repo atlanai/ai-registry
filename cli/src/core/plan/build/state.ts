@@ -47,6 +47,8 @@ export interface BuildState {
   rewritten: Rewritten[];
   /** Plugin parts can collide in one harness path: the first writer wins, loudly. */
   claimed: Map<string, string>;
+  /** Harness paths the lockfile records for this run's artifacts, by the one that holds each. */
+  recorded: Map<string, string>;
   /** One link action per destination: a plugin is shared by its whole namespace. */
   linked: Set<string>;
   /** Registries read this run whose adapter declares each namespace a plugin. */

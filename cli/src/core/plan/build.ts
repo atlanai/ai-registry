@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { statusWarning } from "#core/catalog/withheld.ts";
 import { dict } from "#core/fields.ts";
 import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
@@ -92,6 +93,7 @@ function planWith(
     warnings,
     rewritten: [],
     claimed: new Map(),
+    recorded: new Map(),
     linked: new Set(),
     // Namespaces wrap only at user scope, as the adapter contract says, whoever loads plugins.
     wrapping: new Set(
@@ -107,6 +109,13 @@ function planWith(
     clashes,
   };
 
+  for (const item of selected) {
+    // Known before any item claims a path, so a collision names its holder however late it comes.
+    state.addresses.set(item.name, addressOf({ ...item, name: item.upstreamName }, item.source));
+    for (const link of lock.artifacts[item.name]?.links ?? []) {
+      state.recorded.set(resolve(options.roots.base, link.path), item.name);
+    }
+  }
   const carried = carryUnopened(state);
   const held = heldElsewhere(state, manifest, acquired, carried);
   state.crowded = crowdedContainers(namespaceWants(selected, carried, held, state), options);
