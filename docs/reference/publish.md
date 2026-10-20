@@ -9,7 +9,11 @@ aireg publish [<path> | <glob> | <name>]... [--to <registry>/<namespace>[/<name>
               [--to <folder>/<namespace>]
               [--bump patch | minor | major] [-m <message>] [--changed-since <commit>]
               [-g] [-y] [--dry-run] [--force]
+aireg publish [--to <publish target>] [--bump patch | minor | major] [-m <message>]
+              [--changed-since <commit>] [-y] [--dry-run]
 ```
+
+The second form publishes the manifest's `exports:`; see [Publishing a repository's exports](#publishing-a-repositorys-exports).
 
 ## Description
 
@@ -19,7 +23,7 @@ aireg publish [<path> | <glob> | <name>]... [--to <registry>/<namespace>[/<name>
 - a glob over paths, such as `'.claude/skills/*'`
 - the name of an installed artifact, to publish the edits you made to it
 
-With no arguments, `publish` takes the work edited in this scope: installed artifacts you changed, and skills and agents in your harness folders that no registry has yet. On a terminal it asks which to publish. Without a terminal, pass `--yes` to publish all of them.
+With no arguments, in a project whose manifest lists `exports:`, `publish` takes those exports, as [Publishing a repository's exports](#publishing-a-repositorys-exports) describes. Otherwise it takes the work edited in this scope: installed artifacts you changed, and skills and agents in your harness folders that no registry has yet. On a terminal it asks which to publish. Without a terminal, pass `--yes` to publish all of them.
 
 ### Where it goes
 
@@ -63,11 +67,72 @@ The `next` line is the git command that commits the new version in the registry'
 
 Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own file, such as `.claude/agents/reviewer.md`, goes in as it is, named after the file when its front matter has no `name`, and aireg checks it as `aireg registry validate` would.
 
+## Publishing a repository's exports
+
+A repository that makes skills and agents for others can list them in its manifest, with where they go and what each depends on, so a bare `aireg publish` publishes all of it the same way every time:
+
+```yaml
+registries:
+  acme: github.com/acme/agent-registry
+  public: github.com/acme/public-registry
+artifacts:
+  - public/platform/skill/sql-style@^1.2
+exports:
+  - .claude/skills/*
+  - path: .claude/agents/reviewer.md
+    depends_on:
+      - ./.claude/skills/review
+      - public/platform/skill/sql-style
+  - path: .claude/skills/scratch
+    publish: false
+publish:
+  to: [acme/engineering, ./registry/engineering]
+```
+
+The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-spec.md) defines each field. With no arguments, `publish` takes every export. A glob such as `.claude/skills/*` reaches only the files git tracks, in a git repository, and never an artifact aireg installed there. An entry with `publish: false` is left out. A path you name on the command line that is an export follows its entry's rules too; other paths behave as described above.
+
+### Targets
+
+Each export goes to one of the `publish.to` targets. `<registry>/<namespace>` names a declared registry, and a path such as `./registry/engineering` names a namespace in a registry folder, relative to the project. With one target, that is where everything goes. With several, `--to` picks one, and `publish` refuses to guess:
+
+```text
+error: The manifest lists 2 publish targets; pass --to acme/engineering or --to ./registry/engineering.
+```
+
+A `--to` that the manifest does not list is refused too. An export whose own `publish.to` leaves the target out is listed as `skip`, with the reason, and not sent:
+
+```text
+acme  github.com/acme/agent-registry
+  add     engineering/skill/review  0.1.0
+  skip    engineering/agent/reviewer  its publish.to does not list acme/engineering
+```
+
+### Versions
+
+An export with a `version` is published at that version. When the target already holds that version with the same files and dependencies, it is `same`; when it holds it with others, `publish` refuses, since a published version is never rewritten. An export without a `version` takes the next one, as any other artifact does.
+
+### Dependencies
+
+`publish` writes each `depends_on` entry into the version it publishes as a `depends_on` edge, which [`aireg add`](add.md) and [`aireg install`](install.md) follow to install the dependency too. Exports are published in dependency order, and `publish` refuses exports that depend on each other in a cycle.
+
+- **Another export**, `./<path>`, becomes an edge to the version this run publishes it at, or to the target's newest version when it is unchanged, accepting that version's compatible releases (`^0.3.2`). It must go to the same target, in this run or before it. When it doesn't, `publish` refuses, as in `reviewer depends on review, which is not published to acme/engineering.`
+- **An installed artifact**, `<registry>/<namespace>/<kind>/<name>`, must be installed, so the lockfile has its version; `publish` refuses one that isn't and says to run `aireg install`. The edge names the locked version and accepts what the `artifacts:` entry accepts: its range, only the version it pins, or, with neither, the locked version's compatible releases. When the artifact comes from a registry other than the target, the edge names that registry by its https address, so a project installing the export resolves it in the same registry, when it declares it. A registry with no https address, such as a folder on your machine, can't be named, and `publish` refuses the dependency.
+
+Each `add`, `update` and `same` line shows the dependencies it carries:
+
+```text
+acme  github.com/acme/agent-registry
+  add     engineering/skill/review  0.1.0
+  add     engineering/agent/reviewer  0.1.0, depends on review ^0.1.0, sql-style ^1.2
+```
+
+A version whose only change is a dependency is a new version. A registry that does not store dependencies with a version is refused before anything is sent; a registry folder stores them.
+
 ## Options
 
 | Option | Description |
 |---|---|
-| `--to <registry>/<namespace>` | Where to publish. Add `/<name>` to publish one artifact under that name, and `/<name>@<version>` to publish it at an exact version. A path, such as `../acme-registry/engineering`, publishes into that registry folder. |
+| `--to <registry>/<namespace>` | Where to publish. Add `/<name>` to publish one artifact under that name, and `/<name>@<version>` to publish it at an exact version. A path, such as `../acme-registry/engineering`, publishes into that registry folder. For exports, one of the manifest's `publish.to` targets; `/<name>` only with one path named. |
 | `--bump patch | minor | major` | How far to move the version. Defaults to `patch`. |
 | `-m`, `--message <message>` | The change message, for a registry that records one. Defaults to a message naming each artifact and its version. A registry folder records none, so put it in your git commit instead. |
 | `--changed-since <commit>` | Publish only the artifacts whose files changed since this git commit. The commit must be in the repository's history. |
@@ -82,16 +147,16 @@ Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own fil
 With `--json`, `publish` asks no questions and prints each artifact with its old and new version, and where it went:
 
 ```json
-{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "published": true}]}}
+{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}]}], "skipped": [{"name": "reviewer", "kind": "agent", "reason": "its publish.to does not list acme/engineering"}]}}
 ```
 
-`registry` is the registry's name, or for `--to <folder>`, the registry folder as `--to` gave it. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`.
+`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `skipped` lists the exports whose own `publish.to` leaves the target out.
 
 ## Exit status
 
 - `0`: published, nothing new to publish, a dry run, or canceled at a question.
-- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published.
-- `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder.
+- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published. For exports: an entry names nothing, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
+- `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder. For exports: the manifest lists several targets and `--to` names none, `--to` names one it doesn't list, or a registry without dependencies would receive an artifact that has them.
 - `3`: the artifact was edited from an older version than the one published since. Install the newer version and redo the edit, or pass `--force`.
 
 ## Examples
@@ -112,6 +177,13 @@ Publish every skill in a repository, without asking:
 
 ```bash
 aireg publish '.claude/skills/*' --to acme/engineering --yes
+```
+
+Publish this repository's exports to one of its `publish.to` targets, after checking what would go:
+
+```bash
+aireg publish --to acme/engineering --dry-run
+aireg publish --to acme/engineering --yes
 ```
 
 Publish only what changed in the last commit:

@@ -1,6 +1,6 @@
 import { relative, resolve } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
-import type { PublishResult } from "#adapter/index.ts";
+import type { PublishRelationship, PublishResult } from "#adapter/index.ts";
 import { isLocalPath } from "#adapter/paths.ts";
 import { BUMPS, type Bump, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { list, plural, quoted } from "#adapter/text.ts";
@@ -8,6 +8,17 @@ import { parse } from "#cli/options.ts";
 import { type Interaction, interaction, interactive } from "#cli/prompt/flow.ts";
 import { canceled, confirm, defaultIo, select, text } from "#cli/prompt/index.ts";
 import { multiselect } from "#cli/prompt/multiselect.ts";
+import {
+  chooseTarget,
+  dependsOnFor,
+  exportsOn,
+  exportWork,
+  forTarget,
+  inDependencyOrder,
+  installedPaths,
+  namesTarget,
+  type Skipped,
+} from "#cli/publish/exports.ts";
 import {
   commitAndPush,
   type Destination,
@@ -31,7 +42,13 @@ import { canonical } from "#core/fs/canonical.ts";
 import { digest } from "#core/fs/digest.ts";
 import { gitIn } from "#core/git.ts";
 import { type LockArtifact, writeLock } from "#core/lock.ts";
-import { pinOf, type RegistrySource, unknownRegistry } from "#core/manifest.ts";
+import {
+  type Export,
+  type Manifest,
+  pinOf,
+  type RegistrySource,
+  unknownRegistry,
+} from "#core/manifest.ts";
 import type { Printer } from "#core/output.ts";
 import { listedAt, type Placement } from "#core/plan/model.ts";
 import { applyLocal } from "#engine/local.ts";
@@ -153,11 +170,24 @@ async function destinationOf(
   return where;
 }
 
+/** `review ^0.3.2`: the name an edge reaches, and the versions it takes. */
+function dependencyOf(edge: PublishRelationship): string {
+  const at = edge.to.lastIndexOf("@");
+  const name = edge.to.slice(0, at).split("/").at(-1);
+  return `${name} ${edge.range ?? edge.to.slice(at + 1)}`;
+}
+
 function describe(item: Planned): string {
   const address = `${item.namespace}/${item.work.kind}/${item.work.name}`;
-  if (item.same) return `  same    ${address}  ${item.version}, already published`;
-  if (item.from === undefined) return `  add     ${address}  ${item.version}`;
-  return `  update  ${address}  ${item.from} → ${item.version}`;
+  const edges = item.input.relationships ?? [];
+  const needs = edges.length === 0 ? "" : `, depends on ${edges.map(dependencyOf).join(", ")}`;
+  if (item.same) return `  same    ${address}  ${item.version}, already published${needs}`;
+  if (item.from === undefined) return `  add     ${address}  ${item.version}${needs}`;
+  return `  update  ${address}  ${item.from} → ${item.version}${needs}`;
+}
+
+function describeSkip(skip: Skipped, namespace: string): string {
+  return `  skip    ${namespace}/${skip.kind}/${skip.name}  ${skip.reason}`;
 }
 
 type Sending = { alias: string; item: Planned }[];
@@ -168,6 +198,7 @@ function report(
   planned: Sending,
   results: ReadonlyMap<string, PublishResult | undefined>,
   dryRun: boolean,
+  skipped: readonly Skipped[],
 ): void {
   if (printer.format !== "json") return;
   const artifacts = planned.map(({ alias, item }) => {
@@ -180,10 +211,23 @@ function report(
       from: item.from ?? null,
       version: item.version,
       published: !item.same && results.has(alias) && result?.unchanged !== true,
+      dependsOn: (item.input.relationships ?? []).map(({ to, range, registry }) => ({
+        to,
+        ...(range === undefined ? {} : { range }),
+        ...(registry === undefined ? {} : { registry }),
+      })),
     };
   });
-  printer.json({ ok: true, data: { dryRun, artifacts } });
+  printer.json({ ok: true, data: { dryRun, artifacts, skipped } });
 }
+
+/** The edges an export carries into one target, given what this run plans for the others. */
+type EdgesFor = (
+  work: Work,
+  target: { registry: string; namespace: string },
+  published: Published,
+  planned: (path: string) => Promise<Planned | undefined>,
+) => Promise<PublishRelationship[] | undefined>;
 
 /** Planned at a patch first; asked how big only when something already published moved. */
 async function planAll(
@@ -194,18 +238,34 @@ async function planAll(
   bump: Bump | undefined,
   exact: string | undefined,
   force: boolean,
+  edgesFor: EdgesFor | undefined,
 ): Promise<Sending | undefined> {
-  const at = (how: Bump) =>
-    Promise.all(
-      works.map(async (work) => {
-        const target = where.get(work) as { registry: string; namespace: string };
+  const at = (how: Bump) => {
+    // In dependency order, so each export waits only for the versions its edges name.
+    const pending = new Map<Work, Promise<Sending[number]>>();
+    for (const work of works) {
+      const target = where.get(work) as { registry: string; namespace: string };
+      const planned = async (path: string) => {
+        const other = works.find(
+          (each) =>
+            each.path === path &&
+            where.get(each)?.registry === target.registry &&
+            where.get(each)?.namespace === target.namespace,
+        );
+        return other === undefined ? undefined : (await pending.get(other))?.item;
+      };
+      const next = async () => {
         const published = await open(target.registry);
+        const edges = await edgesFor?.(work, target, published, planned);
         return {
           alias: target.registry,
-          item: await plan(work, published, target.namespace, how, exact, force),
+          item: await plan(work, published, target.namespace, how, exact, force, edges),
         };
-      }),
-    );
+      };
+      pending.set(work, next());
+    }
+    return Promise.all(pending.values());
+  };
   const planned = await at(bump ?? "patch");
   const moved = planned.some(({ item }) => item.from !== undefined && !item.same);
   if (bump !== undefined || exact !== undefined || !moved || !interactive(step)) return planned;
@@ -229,6 +289,7 @@ async function review(
   open: (alias: string) => Promise<Published>,
   dryRun: boolean,
   asks: (alias: string) => Promise<boolean>,
+  skipped: { into: string; namespace: string; skipped: readonly Skipped[] } | undefined,
 ): Promise<Sending | undefined> {
   const printer = context.printer;
   const lines: string[] = [];
@@ -239,6 +300,8 @@ async function review(
     );
     for (const { item } of planned.filter((entry) => entry.alias === alias))
       lines.push(describe(item));
+    if (alias === skipped?.into)
+      for (const skip of skipped.skipped) lines.push(describeSkip(skip, skipped.namespace));
   }
   const print = () => {
     for (const line of lines) printer.info(line);
@@ -361,47 +424,183 @@ async function sendTo(
   return published;
 }
 
+/** `--to <registry>/<namespace>/<name>` renames one artifact; for exports, only one named by its path. */
+function nameOne(works: Work[], to: Destination | undefined, explicit: boolean): void {
+  if (to?.name === undefined) return;
+  if (!explicit) {
+    throw new AiregError("--to names one artifact, so it needs the path to publish.", {
+      code: ErrorCode.Usage,
+      hint: "Name it: `aireg publish <path> --to <registry>/<namespace>/<name>`.",
+    });
+  }
+  if (works.length !== 1)
+    throw new AiregError(
+      `--to names one artifact, but ${plural(works.length, "artifact")} were given.`,
+      {
+        code: ErrorCode.Usage,
+        hint: "Publish them one at a time, or leave the name off `--to`.",
+      },
+    );
+  (works[0] as Work).name = to.name;
+}
+
+/** Where this run sends work, and what of it the manifest's exports keep from going there. */
+interface Bound {
+  works: Work[];
+  skipped: Skipped[];
+  to: Destination | undefined;
+  checkout: Checkout | undefined;
+  /** The `publish.to` target chosen, as the manifest writes it. */
+  target: string | undefined;
+}
+
+/**
+ * Exports go to one of the manifest's `publish.to` targets: the only one, else the one `--to`
+ * names. A folder target is the manifest's, so it is read against the project, not where you are.
+ */
+async function boundFor(
+  works: Work[],
+  manifest: Manifest,
+  typed: string | undefined,
+  given: { to: Destination | undefined; checkout: Checkout | undefined },
+  known: Record<string, RegistrySource>,
+  dirs: { base: string; cwd: string },
+): Promise<Bound> {
+  if (manifest.publish === undefined)
+    return { ...forTarget(works, manifest, undefined), ...given, target: undefined };
+  if (!works.some((work) => work.exported !== undefined))
+    return { works, skipped: [], ...given, target: undefined };
+  const { to } = given;
+  const folder = typed !== undefined && isLocalPath(typed) ? to : undefined;
+  const root = folder === undefined ? undefined : known[folder.registry]?.location;
+  const target = chooseTarget(
+    manifest.publish.to,
+    typed,
+    (listed) => to !== undefined && namesTarget(listed, to, root, dirs.base),
+  );
+  const chosen =
+    to === undefined
+      ? await destinationFrom(target, isLocalPath(target) ? dirs.base : dirs.cwd, known)
+      : given;
+  return { ...forTarget(works, manifest, target), ...chosen, target };
+}
+
+/** Each export's edges for the target it goes to; other work's are left as they are. */
+function edgesOf(
+  loaded: Loaded,
+  found: ReadonlyMap<string, Export> | undefined,
+  known: Record<string, RegistrySource>,
+): EdgesFor | undefined {
+  if (found === undefined) return undefined;
+  return async (work, target, published, planned) =>
+    work.exported === undefined
+      ? undefined
+      : dependsOnFor(work, {
+          base: loaded.roots.base,
+          found,
+          manifest: loaded.manifest,
+          lock: loaded.lock,
+          known,
+          target,
+          published,
+          planned,
+        });
+}
+
+/** The paths named, else the manifest's exports, else the work edited here; each with its export. */
+async function gather(
+  step: Interaction,
+  loaded: Loaded,
+  common: CommonOptions,
+  cwd: string,
+  options: {
+    paths: readonly string[];
+    since: string | undefined;
+    found: ReadonlyMap<string, Export> | undefined;
+  },
+): Promise<Work[] | undefined> {
+  const { paths, since, found } = options;
+  const keep = async (works: Work[]) =>
+    since === undefined ? works : changedSince(works, since, cwd);
+  const works =
+    paths.length > 0
+      ? await keep(await fromArgs(paths, loaded, cwd))
+      : found !== undefined
+        ? await keep(await exportWork(found))
+        : await chooseWork(step, loaded, common, cwd, keep);
+  for (const work of works ?? []) work.exported = found?.get(work.path);
+  return works;
+}
+
+/**
+ * The registries a publish could be asked into, checked before any question so a scope with
+ * none refuses at once. With `publish.to`, where exports go is the manifest's to say instead.
+ */
+async function writableFirst(
+  to: Destination | undefined,
+  manifest: Manifest,
+  known: Readonly<Record<string, RegistrySource>>,
+  cwd: string,
+): Promise<Record<string, RegistrySource> | undefined> {
+  const planned = manifest.exports.length > 0 && manifest.publish !== undefined;
+  return to === undefined && !planned ? writableRegistries(known, cwd) : undefined;
+}
+
+function refuseUndeclared(
+  destination: Destination | undefined,
+  known: Readonly<Record<string, RegistrySource>>,
+  loaded: Loaded,
+): void {
+  if (destination === undefined || known[destination.registry] !== undefined) return;
+  throw unknownRegistry(
+    destination.registry,
+    loaded.roots.scope,
+    Object.keys(known),
+    undefined,
+    knownIn(loaded.roots.scope),
+  );
+}
+
+/** Nothing left to publish, and the exports left out of this target, if any. */
+function nothing(printer: Printer, bound: Bound, dryRun: boolean): void {
+  printer.info(printer.style.dim("Nothing to publish."));
+  for (const skip of bound.skipped) printer.info(describeSkip(skip, bound.to?.namespace ?? ""));
+  report(printer, [], new Map(), dryRun, bound.skipped);
+}
+
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common, own } = parse<Own>(context.argv, builtin("publish"));
   const printer = context.printer;
   const step = interaction(printer, defaultIo(), common.yes);
   const loaded = await load(common, context.cwd, "user");
   const known = { ...(await knownRegistries(common, context.cwd)) };
-  const { to, checkout } = await destinationFrom(own.to, context.cwd, known);
-  if (to !== undefined && known[to.registry] === undefined) {
-    throw unknownRegistry(
-      to.registry,
-      loaded.roots.scope,
-      Object.keys(known),
-      undefined,
-      knownIn(loaded.roots.scope),
-    );
-  }
-  const targets = to === undefined ? await writableRegistries(known, context.cwd) : known;
+  const declaredOnly = (destination: Destination | undefined) =>
+    refuseUndeclared(destination, known, loaded);
+  const given = await destinationFrom(own.to, context.cwd, known);
+  declaredOnly(given.to);
+  const { manifest } = loaded;
+  const base = loaded.roots.base;
+  const early = await writableFirst(given.to, manifest, known, context.cwd);
 
-  const since = own["changed-since"];
-  const keep = async (found: Work[]) =>
-    since === undefined ? found : changedSince(found, since, context.cwd);
-  const works =
-    positionals.length > 0
-      ? await keep(await fromArgs(positionals, loaded, context.cwd))
-      : await chooseWork(step, loaded, common, context.cwd, keep);
-  if (works === undefined) return printer.info("Canceled. Nothing was published.");
-  if (works.length === 0) {
-    printer.info(printer.style.dim("Nothing to publish."));
-    return report(printer, [], new Map(), common.dryRun);
-  }
-  if (to?.name !== undefined) {
-    if (works.length !== 1)
-      throw new AiregError(
-        `--to names one artifact, but ${plural(works.length, "artifact")} were given.`,
-        {
-          code: ErrorCode.Usage,
-          hint: "Publish them one at a time, or leave the name off `--to`.",
-        },
-      );
-    (works[0] as Work).name = to.name;
-  }
+  const found =
+    manifest.exports.length > 0
+      ? await exportsOn(manifest, base, installedPaths(loaded.lock, base))
+      : undefined;
+  const chosen = await gather(step, loaded, common, context.cwd, {
+    paths: positionals,
+    since: own["changed-since"],
+    found,
+  });
+  if (chosen === undefined) return printer.info("Canceled. Nothing was published.");
+  const bound = await boundFor(chosen, manifest, own.to, given, known, { base, cwd: context.cwd });
+  const { to, checkout, skipped, target } = bound;
+  declaredOnly(to);
+  const works = found === undefined ? bound.works : inDependencyOrder(bound.works, found, base);
+  const targets =
+    early ?? (to === undefined ? await writableRegistries(known, context.cwd) : known);
+  if (works.length === 0) return nothing(printer, bound, common.dryRun);
+  nameOne(works, to, positionals.length > 0 || target === undefined);
+  const edgesFor = edgesOf(loaded, found, known);
 
   const opened = new Map<string, Published>();
   const open = async (alias: string): Promise<Published> => {
@@ -434,6 +633,7 @@ export async function run(context: CommandContext): Promise<void> {
       bumpOf(own.bump),
       to?.version,
       common.force,
+      edgesFor,
     );
     if (planned === undefined) return printer.info("Canceled. Nothing was published.");
     // Only a person at a terminal is asked, and only by a source that records a reason.
@@ -441,8 +641,10 @@ export async function run(context: CommandContext): Promise<void> {
       interactive(step) &&
       own.message === undefined &&
       (await open(alias)).source.adapter.capabilities.messages === true;
-    const sending = await review(context, step, planned, open, common.dryRun, asks);
-    if (sending === undefined) return report(printer, planned, new Map(), common.dryRun);
+    const skips =
+      to === undefined ? undefined : { into: to.registry, namespace: to.namespace, skipped };
+    const sending = await review(context, step, planned, open, common.dryRun, asks, skips);
+    if (sending === undefined) return report(printer, planned, new Map(), common.dryRun, skipped);
 
     const results = new Map<string, PublishResult | undefined>();
     for (const alias of new Set(sending.map((entry) => entry.alias))) {
@@ -461,10 +663,12 @@ export async function run(context: CommandContext): Promise<void> {
       common,
       sending.map(({ item }) => item),
     );
-    report(printer, planned, results, false);
+    report(printer, planned, results, false, skipped);
     // A registry folder is not your user scope; an installed copy it sent from is.
-    const folder = own.to !== undefined && isLocalPath(own.to);
-    if (!folder || sending.some(({ item }) => item.work.row !== undefined)) {
+    if (
+      !isLocalPath(own.to ?? target ?? "") ||
+      sending.some(({ item }) => item.work.row !== undefined)
+    ) {
       noteUserScope(printer, common.scope, context.cwd);
     }
   } finally {

@@ -94,7 +94,7 @@ export interface Export {
  * What an export needs installed beside it: another export, by the path after its `./`,
  * or an artifact this project installs, by the address of its `artifacts:` entry.
  */
-type ExportDependency = { type: "local"; path: string } | { type: "remote"; ref: Ref };
+export type ExportDependency = { type: "local"; path: string } | { type: "remote"; ref: Ref };
 
 /** The published schema is held to this list. */
 export const MANIFEST_KEYS = [
@@ -330,7 +330,7 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
 const GLOB = /[*?[\]{}]/;
 
 /** Whether an export's path matches other paths rather than naming one. */
-function isGlob(path: string): boolean {
+export function isGlob(path: string): boolean {
   return GLOB.test(path);
 }
 

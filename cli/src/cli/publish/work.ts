@@ -11,6 +11,7 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { gitIn } from "#core/git.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
+import type { Export } from "#core/manifest.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/pipeline.ts";
@@ -28,6 +29,8 @@ export interface Work {
   row: string | undefined;
   /** The version an installed copy was edited from, so a newer one is not written over. */
   base: string | undefined;
+  /** The manifest's `exports:` entry for this path, whose version, dependencies and targets apply. */
+  exported?: Export | undefined;
 }
 
 const SHAPE_HINT = "Name a skill folder that holds SKILL.md, or an agent's .md file.";
@@ -53,7 +56,7 @@ function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
 }
 
 /** A skill is a directory with SKILL.md, reached by either; any other .md is an agent. */
-async function fromPath(path: string): Promise<Work> {
+export async function fromPath(path: string): Promise<Work> {
   const isDir = (await stat(path)).isDirectory();
   const root = !isDir && basename(path) === SKILL_ENTRY ? dirname(path) : path;
   const skill = isDir || root !== path;
@@ -82,7 +85,7 @@ async function fromPath(path: string): Promise<Work> {
   };
 }
 
-async function expand(pattern: string, cwd: string): Promise<string[]> {
+export async function expand(pattern: string, cwd: string): Promise<string[]> {
   const found: string[] = [];
   for await (const match of glob(pattern, { cwd })) found.push(resolve(cwd, match));
   if (found.length === 0 && existsSync(resolve(cwd, pattern))) found.push(resolve(cwd, pattern));

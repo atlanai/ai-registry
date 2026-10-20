@@ -74,7 +74,7 @@ artifacts:
       - claude
 ```
 
-A project that publishes what it makes lists it under `exports:`, and where it goes under `publish:`. aireg checks both when it reads the manifest and keeps them when it edits it, but `aireg publish` does not read them yet.
+A project that publishes what it makes lists it under `exports:`, and where it goes under `publish:`. aireg checks both when it reads the manifest and keeps them when it edits it, and `aireg publish` with no paths publishes the exports, writing each `depends_on` entry as a registry edge.
 
 - An `exports:` entry is a path relative to the project, written with `/`, or a glob over paths. A mapping gives one path, never a glob, an exact `version`, a `depends_on` list and its own `publish`; it may refine a path a glob also matches.
 - A `depends_on` entry is `./` and the path of another export, or the address `<registry>/<namespace>/<kind>/<name>` of an `artifacts:` entry, without a version: the entry's pin or range says which versions it takes.

@@ -14,6 +14,7 @@ Options:
 Examples:
   $ aireg publish .claude/skills/triage --to acme/engineering  a skill, to a team registry
   $ aireg publish pr-review --bump minor                       a new minor version of an edited skill
+  $ aireg publish --to acme/engineering                        the manifest's exports, with their dependencies
 
 Learn more:
   Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).

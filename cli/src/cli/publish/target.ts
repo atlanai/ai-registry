@@ -272,6 +272,29 @@ async function taken(published: Published, name: string, version: string): Promi
   }
 }
 
+/** What the registry holds at one version of this artifact, when it holds that version. */
+async function heldAt(
+  published: Published,
+  namespace: string,
+  work: Work,
+  version: string,
+): Promise<Current | undefined> {
+  const { name, kind } = work;
+  const found = await published.source.handle
+    .resolve([{ name, namespace, kind, version }])
+    .catch(() => undefined);
+  const artifact = found?.artifacts.find(
+    (each) => each.envelope.metadata.version === version && each.kind === kind,
+  );
+  if (artifact === undefined) return undefined;
+  return {
+    id: artifact.id,
+    version,
+    digests: digestsOf(artifact),
+    relationships: artifact.envelope.relationships,
+  };
+}
+
 /**
  * Refused before anything is sent. Only a registry folder lays an agent out as the
  * spec's agent kind does; another source takes it as one `<name>.md`.
@@ -369,17 +392,33 @@ export async function plan(
     asAgentDocument: folder,
     relationships,
   });
+  // An export's own version is what it is published at, unless `--to` names another.
+  const fixed = exact === undefined ? work.exported?.version : undefined;
   // The files and the edges decide sameness: the digest covers the version, so it always moves.
-  const probe = await offerFrom(work.path, target(exact ?? "0.1.0"));
+  const probe = await offerFrom(work.path, target(exact ?? fixed ?? "0.1.0"));
+  const matches = (held: Current) =>
+    held.digests.join() === probe.digests.join() &&
+    (relationships === undefined || sameEdges(held.relationships, probe.input.relationships));
+  // Asking again for a version already published with these files is a repeat, not a conflict.
+  const held =
+    fixed === undefined
+      ? undefined
+      : fixed === current?.version
+        ? current
+        : await heldAt(published, namespace, work, fixed);
   const same =
-    current !== undefined &&
-    current.digests.join() === probe.digests.join() &&
-    (relationships === undefined || sameEdges(current.relationships, probe.input.relationships)) &&
-    exact === undefined;
-  if (exact !== undefined && (await taken(published, work.name, exact))) {
-    throw new AiregError(`${namespace}/${work.name}@${exact} is already published.`, {
+    held !== undefined
+      ? matches(held)
+      : current !== undefined && matches(current) && exact === undefined && fixed === undefined;
+  const refused =
+    held !== undefined ? !same : exact !== undefined && (await taken(published, work.name, exact));
+  if (refused) {
+    throw new AiregError(`${namespace}/${work.name}@${exact ?? fixed} is already published.`, {
       code: ErrorCode.Conflict,
-      hint: "Choose a new version, or leave the version off; a published version is never rewritten.",
+      hint:
+        fixed === undefined
+          ? "Choose a new version, or leave the version off; a published version is never rewritten."
+          : `Change the \`version\` of export ${quoted(work.exported?.path ?? work.name)}, or remove it to take the next one; a published version is never rewritten.`,
     });
   }
   if (!same) await refuseInvalid(work, namespace, probe.input, folder);
@@ -387,6 +426,7 @@ export async function plan(
   if (
     !same &&
     exact === undefined &&
+    fixed === undefined &&
     current?.version !== undefined &&
     parseVersion(current.version) === undefined
   ) {
@@ -399,8 +439,8 @@ export async function plan(
     );
   }
   const version = same
-    ? (current?.version as string)
-    : (exact ?? bumpVersion(current?.version, how));
+    ? (fixed ?? (current?.version as string))
+    : (exact ?? fixed ?? bumpVersion(current?.version, how));
   // The version is not part of the content identity, so the files read once serve it.
   const input = version === probe.input.version ? probe.input : { ...probe.input, version };
   return { work, namespace, from: current?.version, version, same, input };
