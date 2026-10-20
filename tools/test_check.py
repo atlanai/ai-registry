@@ -32,14 +32,14 @@ class TrailingNewline(unittest.TestCase):
             self.assertIsNotNone(pattern.match(text[:-1]), repr(text))
             self.assertIsNone(pattern.match(text), repr(text))
 
-    def test_the_range_schema_refuses_it(self) -> None:
-        # jsonschema tests `pattern` with re.search, where `$` matches before a trailing newline.
+    def test_the_range_schema_stays_re2_compatible(self) -> None:
+        # The schema patterns use no lookahead, so every JSON Schema validator compiles them;
+        # check.py, not the schema, refuses the trailing newline Python's `$` lets through.
         schema = json.loads((SCHEMAS / "relationship.schema.json").read_text())
         pattern = schema["properties"]["range"]["pattern"]
+        self.assertNotIn("(?", pattern.replace("(?:", ""))
         for text in ("^1.2.0", ">=1.0.0 <2.0.0", "^0.3.2 || ^1.2.0", "*"):
             self.assertIsNotNone(re.search(pattern, text), repr(text))
-        for text in ("^1.2.0\n", "^1.2.0\n\n", "^1\n|| ^2"):
-            self.assertIsNone(re.search(pattern, text), repr(text))
 
 
 if __name__ == "__main__":

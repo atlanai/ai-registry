@@ -18,7 +18,7 @@
       "type": "string",
       "description": "The versions of the target artifact this edge accepts, as a version range. Without it the edge accepts the version to names, and no other. File spec section 2.4. The pattern opens with a lookahead that refuses a newline, since a regular expression engine whose $ matches before a trailing newline would otherwise let one through; RE2-based validators reject lookahead.",
       "maxLength": 256,
-      "pattern": "^(?!.*\n) *(?:[<>]=?|=|[~^])?(?:0|[1-9][0-9]*|[xX*])(?:\\.(?:0|[1-9][0-9]*|[xX*])){0,2}(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?(?:(?: +| *\\|\\| *)(?:[<>]=?|=|[~^])?(?:0|[1-9][0-9]*|[xX*])(?:\\.(?:0|[1-9][0-9]*|[xX*])){0,2}(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)* *$"
+      "pattern": "^ *(?:[<>]=?|=|[~^])?(?:0|[1-9][0-9]*|[xX*])(?:\\.(?:0|[1-9][0-9]*|[xX*])){0,2}(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?(?:(?: +| *\\|\\| *)(?:[<>]=?|=|[~^])?(?:0|[1-9][0-9]*|[xX*])(?:\\.(?:0|[1-9][0-9]*|[xX*])){0,2}(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)* *$"
     },
     "registry": {
       "$ref": "common.schema.json#/$defs/root_url",
