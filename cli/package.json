@@ -88,16 +88,16 @@
     "ink": "8.0.0",
     "react": "19.3.0",
     "string-width": "8.3.0",
-    "yaml": "2.9.0"
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "@sinclair/typebox": "0.34.52",
-    "@types/node": "26.6.4",
+    "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@vitest/coverage-v8": "4.1.11",
-    "knip": "6.39.0",
-    "publint": "0.3.24",
+    "knip": "6.41.0",
+    "publint": "0.3.25",
     "tsup": "8.5.1",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
