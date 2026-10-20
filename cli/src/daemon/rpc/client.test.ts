@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
-import { createConnection, type Socket } from "node:net";
+import { createConnection, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NAME } from "#core/product.ts";
 import type { RunEvent } from "#core/run/model.ts";
 import { cliClient, followRun, RpcClient, RpcClientError, withFreshConfig } from "./client.ts";
 import { RpcErrorCode } from "./codes.ts";
-import { PROTOCOL_VERSION } from "./protocol.ts";
+import { FrameDecoder } from "./frames.ts";
+import { encodeMessage, PROTOCOL_VERSION } from "./protocol.ts";
 import { RpcServer } from "./server.ts";
 
 const paths: string[] = [];
@@ -90,6 +92,58 @@ describe.skipIf(process.platform === "win32")("rpc handshake", () => {
       await server.close();
     }
   });
+});
+
+it("closes its connection without waiting for the peer to close", async () => {
+  const name = `rpc-close-${randomUUID().slice(0, 8)}`;
+  const path =
+    process.platform === "win32" ? `\\\\.\\pipe\\${name}` : join(tmpdir(), `${name}.sock`);
+  const peers: Socket[] = [];
+  const server = createServer({ allowHalfOpen: true }, (socket) => {
+    peers.push(socket);
+    const decoder = new FrameDecoder("the test client");
+    socket.on("data", (chunk) => {
+      const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+      for (const message of decoder.push(bytes)) {
+        if (!("id" in message) || !("method" in message) || message.method !== "initialize") {
+          continue;
+        }
+        socket.write(
+          encodeMessage({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: {
+              protocolVersion: PROTOCOL_VERSION,
+              server: { name: NAME, version: "1.0.0" },
+              daemon: { instanceId: "d", startedAtMs: 1, serverNowMs: 2 },
+            },
+          }),
+        );
+      }
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(path, resolve);
+  });
+  let client: RpcClient | undefined;
+  try {
+    client = await RpcClient.connect(path, cliClient("1.0.0"));
+    const closed = vi.fn();
+    client.onClose(closed);
+    const pending = client.request("state.snapshot", {});
+    void pending.catch(() => {});
+    client.close();
+    await vi.waitFor(() => expect(closed).toHaveBeenCalledOnce());
+    await expect(pending).rejects.toThrow();
+  } finally {
+    for (const socket of peers) socket.destroy();
+    client?.close();
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error === undefined ? resolve() : reject(error)));
+    });
+    if (process.platform !== "win32") await rm(path, { force: true });
+  }
 });
 
 describe("withFreshConfig", () => {

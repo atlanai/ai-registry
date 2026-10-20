@@ -229,7 +229,7 @@ export class RpcClient {
   }
 
   close(): void {
-    this.#socket.end();
+    this.#socket.destroy();
   }
 }
 
