@@ -217,8 +217,10 @@ async function addAddress(
   const alias = resolved.declared
     ? aliasFor(input, true, known, source)
     : (own.as ?? aliasFor(input, false, known, source));
+  // Trust is asked on a terminal however exactly the address says what to install: naming a
+  // plugin is not agreeing to what it runs. Only `--yes` or no terminal leaves it to `--trust`.
   const trust = await trustFor(
-    asking,
+    step,
     source,
     chosenEntries(choices.select, entries),
     own.trust ?? [],

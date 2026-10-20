@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -5,6 +6,7 @@ import { describe, expect } from "vitest";
 import { parse } from "yaml";
 import { marketplace, skillsFolder } from "#test/kit/builders/layouts.ts";
 import { type Aireg, test } from "#test/kit/fixtures.ts";
+import { BIN } from "#test/kit/run.ts";
 import { lockPath, manifestPath } from "#test/kit/scope.ts";
 
 const init = async (aireg: Aireg, harnesses = "claude,codex,cursor,agents") =>
@@ -84,6 +86,36 @@ describe("a plugin marketplace", () => {
     expect(await read(manifestPath(project))).toContain("trust:\n      - deploy-kit");
     expect((await aireg(["install"])).code).toBe(0);
   }, 60_000);
+
+  // util-linux's `script` runs aireg on a terminal of its own; other systems' `script` differs.
+  test.runIf(process.platform === "linux")(
+    "asks on a terminal before a plugin the address names exactly",
+    async ({ aireg, home, project, tmp }) => {
+      const root = await marketplace(join(tmp, "mkt")).write();
+      await init(aireg, "claude");
+      expect((await aireg(["registry", "add", root])).code).toBe(0);
+      const command = `${process.execPath} ${BIN} add acme-tools/deploy-kit`;
+      // Under CI aireg asks nothing, as it should, and its prompts draw no frames; this run
+      // stands in for a person's terminal, so neither variable is passed on at all.
+      const { CI: _ci, CONTINUOUS_INTEGRATION: _ci2, ...env } = { ...process.env, ...home.env };
+      const child = spawn("script", ["-qec", command, "/dev/null"], {
+        cwd: project,
+        env: { ...env, NO_COLOR: "1" },
+      });
+      let said = "";
+      // Keys sent before the prompt reads its input are lost, so each drawing of it is answered.
+      child.stdout.on("data", (chunk: Buffer) => {
+        said += chunk.toString();
+        if (chunk.toString().includes("Install it?")) child.stdin.write("y\r");
+      });
+      const code = await new Promise((done) => child.on("close", done));
+      expect(said).toContain("deploy-kit carries hooks and MCP servers");
+      expect(code).toBe(0);
+      expect(await locked(project)).toEqual(["deploy-kit"]);
+      expect(await read(manifestPath(project))).toContain("trust:\n      - deploy-kit");
+    },
+    60_000,
+  );
 
   test("leaves the manifest as it was when the one plugin an add names is refused", async ({
     aireg,
