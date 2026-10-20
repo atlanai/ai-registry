@@ -27,7 +27,7 @@ import { KIND_SPECS, specKindDir } from "#core/kinds.ts";
 import { withLease } from "#core/lease.ts";
 import { engineFromUnknown } from "#core/semver.ts";
 import { cacheDir, ensureHome } from "#core/store/paths.ts";
-import { type SourceConfig, sourceKey } from "./identity.ts";
+import { canonicalRegistryUrl, type SourceConfig, sourceKey } from "./identity.ts";
 import { adapterFor, limitsFor } from "./registry.ts";
 
 export interface DeclaredSource {
@@ -274,9 +274,15 @@ function identity(raw: RegistryIdentity | undefined): RegistryIdentity | undefin
     typeof value === "string" && value.trim() !== "" ? sanitizeText(value) : undefined;
   const slug = text(raw.slug);
   const description = text(raw.description);
+  // Only an https root is one an edge can name, read as the edge's own `registry` is.
+  const url =
+    typeof raw.url === "string" && /^https:\/\//i.test(raw.url)
+      ? canonicalRegistryUrl(raw.url)
+      : undefined;
   return {
     name: sanitizeText(raw.name),
     ...(slug === undefined ? {} : { slug }),
     ...(description === undefined ? {} : { description }),
+    ...(url === undefined ? {} : { url }),
   };
 }

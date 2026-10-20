@@ -70,7 +70,7 @@ An id that is built in, `git`, `local` or `well-known`, is refused.
 ### Writing an adapter
 
 - `dispatch` in `src/index.ts` names the hosts, URL schemes, sites or local paths whose addresses aireg would send to the adapter.
-- `connect` in `src/connect.ts` returns a handle. `resolve` lists each artifact with the file list that describes it, and `fetch` returns one file's bytes, which must match the digest that list gives.
+- `connect` in `src/connect.ts` returns a handle. `resolve` lists each artifact with the file list that describes it, and `fetch` returns one file's bytes, which must match the digest that list gives. `resolve` may also return `registry`, what the registry calls itself, with its canonical `https` address as `url` where it has one: a [dependency](kinds.md#dependencies) in another registry names it by that address.
 - `capabilities` turns on publishing and sign-in.
 
 ### The adapter contract

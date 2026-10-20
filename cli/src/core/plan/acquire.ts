@@ -27,7 +27,7 @@ import { abbreviate } from "#core/output.ts";
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { ensureHome, stagingPath, toolHome } from "#core/store/paths.ts";
 import { carriedIn } from "./carries.ts";
-import { movesWithin, type Need, needsOf } from "./depends.ts";
+import { movesWithin, type Need, needsOf, type Unusable } from "./depends.ts";
 import type { Acquired, Placement, Staged } from "./model.ts";
 import { wrapsNamespaces } from "./namespaces.ts";
 import { candidates } from "./select.ts";
@@ -140,7 +140,9 @@ function lockedRequest(
   { lock, moving, held = false }: Locked,
   view: LockView,
 ): Request | undefined {
-  const request = wanted(manifest, alias);
+  // A registry the manifest names nothing from may still hold what another registry's rows need.
+  const needed = view.rows(alias).some(([, row]) => row.neededBy !== undefined);
+  const request = wanted(manifest, alias) ?? (needed ? { want: [], all: false } : undefined);
   if (request === undefined) return undefined;
   const pins = request.want.filter((want) => want.version !== undefined);
   const asked = new Map<string, Want>();
@@ -271,11 +273,18 @@ function fromRows(
   const entries: Entry[] = [];
   const placements = new Map<string, Placement>();
   const needs = new Map<string, Need[]>();
-  for (const [name, row] of rows) {
+  // What this registry's rows need may sit in another registry, which the row says.
+  for (const [name, row] of Object.entries(lock.artifacts)) {
     if (row.namespace === undefined || row.version === undefined) {
       continue;
     }
-    const need = { namespace: row.namespace, kind: row.kind, name: row.name, version: row.version };
+    const need = {
+      namespace: row.namespace,
+      kind: row.kind,
+      name: row.name,
+      version: row.version,
+      ...(row.registry === alias ? {} : { alias: row.registry }),
+    };
     for (const by of row.neededBy ?? []) {
       // The range the dependent's edge carried, so a plan from the lock records it again.
       const range = lock.artifacts[by]?.dependsOn?.[name];
@@ -358,12 +367,16 @@ function withAlso(
   return { want: request?.want ?? [], all: true };
 }
 
-/** A need's version replaces the one the lock held its dependency at. */
+/**
+ * A need's version replaces the one the lock held its dependency at. A registry asked only for
+ * needs, as one another registry's edges name, is read for those alone.
+ */
 function withNeeds(
   request: Request | undefined,
   needs: readonly Want[] | undefined,
 ): Request | undefined {
-  if (request === undefined || needs === undefined) return request;
+  if (needs === undefined) return request;
+  if (request === undefined) return { want: [...needs], all: false };
   const same = (a: Want, b: Want) =>
     a.name === b.name && a.namespace === b.namespace && a.kind === b.kind;
   const held = request.want.filter((want) => !needs.some((need) => same(want, need)));
@@ -443,13 +456,7 @@ async function acquireOne(
     const { needs, unusable } = needsOf(artifact.envelope);
     const { name } = artifact.envelope.metadata;
     const version = artifact.version ?? artifact.envelope.metadata.version;
-    for (const { to, range } of unusable) {
-      listing.catalog.warnings.push(
-        range === undefined
-          ? `"${name}" depends on "${sanitizeText(to)}", which is not a namespace/kind/name@version aireg installs; it was left out.`
-          : `"${name}" depends on "${sanitizeText(to)}" at ${quoted(range)}, which is not a version range that version satisfies; it was left out.`,
-      );
-    }
+    for (const edge of unusable) listing.catalog.warnings.push(unusableWarning(name, edge));
     placements.set(path, {
       id: artifact.id,
       name,
@@ -477,6 +484,7 @@ async function acquireOne(
       config: declared.config,
       revision: listing.sourceRevision,
       ...(listing.layout === undefined ? {} : { layout: listing.layout }),
+      ...(listing.registry?.url === undefined ? {} : { url: listing.registry.url }),
     },
     placements,
     catalog: listing.catalog,
@@ -508,6 +516,17 @@ async function acquireOne(
     },
     close: () => open.handle.close(),
   };
+}
+
+/** Why an edge was left out, by what about it is wrong. */
+function unusableWarning(name: string, { to, range, registry }: Unusable): string {
+  const edge = `"${name}" depends on "${sanitizeText(to)}"`;
+  if (registry !== undefined) {
+    return `${edge} in ${quoted(registry)}, which is not the https address of a registry; it was left out.`;
+  }
+  return range === undefined
+    ? `${edge}, which is not a namespace/kind/name@version aireg installs; it was left out.`
+    : `${edge} at ${quoted(range)}, which is not a version range that version satisfies; it was left out.`;
 }
 
 /**

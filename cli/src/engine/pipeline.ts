@@ -31,7 +31,14 @@ import { type ApplyResult, apply, guardsOf, type Recovered, recover } from "#cor
 import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
 import { build, clashMessage } from "#core/plan/build.ts";
 import { describeCarried } from "#core/plan/carries.ts";
-import { accepts, formatNeed, type Unresolved, unmet, wantOf } from "#core/plan/depends.ts";
+import {
+  accepts,
+  formatNeed,
+  type Undeclared,
+  type Unresolved,
+  unmet,
+  wantOf,
+} from "#core/plan/depends.ts";
 import type { Acquired, Action, Kept, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
 import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
@@ -349,6 +356,59 @@ function unpublished(missing: Unresolved): AiregError {
   );
 }
 
+/**
+ * A need in a registry this scope does not declare. Only the person declares a registry, so an
+ * edge naming one is never a reason to read or trust it.
+ */
+function undeclared(
+  { url, need, by }: Undeclared,
+  scope: Roots["scope"],
+  alias?: string,
+): AiregError {
+  const here = scope === "user" ? "your user scope" : "this project";
+  const where = sanitizeText(url);
+  const add = `aireg registry add ${where}${alias === undefined ? "" : ` --as ${alias}`}${scope === "user" ? " -g" : ""}`;
+  return new AiregError(
+    `${by} needs ${need.namespace}/${need.kind}/${need.name} from ${where}, which ${here} does not declare.`,
+    { code: ErrorCode.NotFound, hint: `Run \`${add}\` to allow it.` },
+  );
+}
+
+/**
+ * Asks the declared registries not read yet for the URL an edge names, since one of them may
+ * report it. Once every one has been read, the edge names a registry this scope does not declare.
+ */
+function readForUrls(
+  planned: Plan,
+  read: { aliases: readonly string[]; acquired: readonly Acquired[]; roots: Roots },
+  needs: Map<string, Want[]>,
+  needed: Set<string>,
+): void {
+  const [elsewhere] = planned.undeclared;
+  if (elsewhere === undefined) return;
+  const { aliases, acquired, roots } = read;
+  const unread = aliases.filter((alias) => !acquired.some((source) => source.alias === alias));
+  if (unread.length === 0) throw undeclared(elsewhere, roots.scope);
+  for (const alias of unread) {
+    needs.set(alias, needs.get(alias) ?? []);
+    needed.add(alias);
+  }
+}
+
+/** A dependency the lockfile found in a registry the manifest no longer declares. */
+function refuseUndeclared(
+  missed: readonly Unresolved[],
+  manifest: Manifest,
+  lock: Lock,
+  roots: Roots,
+): void {
+  const missing = missed.find(({ alias }) => manifest.registries[alias] === undefined);
+  if (missing === undefined) return;
+  const { alias, need, by } = missing;
+  const url = lock.registries[alias]?.location ?? alias;
+  throw undeclared({ url, need, by }, roots.scope, alias);
+}
+
 function sameArtifact(left: Want, right: Want): boolean {
   return left.name === right.name && left.namespace === right.namespace && left.kind === right.kind;
 }
@@ -598,6 +658,7 @@ async function plan(
       const needed = new Set(needsRegistry(planned, lock, settled));
       const sources = [...settled.values(), ...acquired];
       const missed = planned.unresolved.filter((item) => !keptWithheld(item, sources, lock));
+      refuseUndeclared(missed, manifest, lock, roots);
       for (const missing of missed) {
         const want = wantOf(missing.need);
         const key = `${missing.alias}\u0000${JSON.stringify(want)}`;
@@ -608,6 +669,7 @@ async function plan(
         needs.set(missing.alias, [...asked, want]);
         needed.add(missing.alias);
       }
+      readForUrls(planned, { aliases, acquired, roots }, needs, needed);
       if (needed.size === 0) break;
       for (const alias of needed) settled.delete(alias);
       // Asked again with more wants, a registry replaces what it listed before.

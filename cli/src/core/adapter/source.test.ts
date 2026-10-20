@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { AdapterError, type Envelope, type SourceAdapter } from "#adapter/index.ts";
+import {
+  AdapterError,
+  type Envelope,
+  type RegistryIdentity,
+  type SourceAdapter,
+} from "#adapter/index.ts";
 import { ENVELOPE_API_VERSION } from "#adapter/spec/types.ts";
 import { resolveArtifacts } from "./source.ts";
 
 /** Composed by hand, not built: these listings are meant to be malformed. */
-function serving(files: { path: string; locator?: string }[]): SourceAdapter {
+function serving(
+  files: { path: string; locator?: string }[],
+  registry?: RegistryIdentity,
+): SourceAdapter {
   const envelope: Envelope = {
     apiVersion: ENVELOPE_API_VERSION,
     kind: "skill",
@@ -32,6 +40,7 @@ function serving(files: { path: string; locator?: string }[]): SourceAdapter {
             })),
           },
         ],
+        ...(registry === undefined ? {} : { registry }),
       }),
       fetch: async () => new Uint8Array(),
       close: async () => {},
@@ -55,6 +64,16 @@ async function resolveWith(adapter: SourceAdapter) {
   };
   return resolveArtifacts(open, []);
 }
+
+describe("the identity an adapter reports", () => {
+  it("keeps a URL only as the canonical https root an edge names", async () => {
+    const at = async (url: string) =>
+      (await resolveWith(serving([{ path: "SKILL.md" }], { name: "acme", url }))).registry?.url;
+    expect(await at("https://GitHub.com/acme/kit.git/")).toBe("https://github.com/acme/kit");
+    expect(await at("http://github.com/acme/kit")).toBeUndefined();
+    expect(await at("file:///srv/kit")).toBeUndefined();
+  });
+});
 
 describe("what the client refuses from an adapter", () => {
   it.each([

@@ -8,6 +8,14 @@ import { buildEnvelope, type Envelope } from "#adapter/index.ts";
  * one rather than a folder of loose skills, because that is what the client reads.
  */
 
+/** One `depends_on` edge, as the envelope writes it. */
+export interface SpecEdge {
+  to: string;
+  range?: string;
+  /** The canonical URL of another registry `to` resolves in. */
+  registry?: string;
+}
+
 export interface SpecVersion {
   version: string;
   description?: string;
@@ -19,8 +27,11 @@ export interface SpecVersion {
   reason?: string;
   /** `active` unless set, as `versions.json` records it. */
   status?: string;
-  /** Fully qualified refs this version's `depends_on` edges name, each with its range after a space. */
-  dependsOn?: readonly string[];
+  /**
+   * This version's `depends_on` edges: a fully qualified ref, with its range after a space, or
+   * the edge as written.
+   */
+  dependsOn?: readonly (string | SpecEdge)[];
 }
 
 export interface SpecArtifact {
@@ -57,6 +68,7 @@ function envelopeFor(artifact: SpecArtifact, version: SpecVersion): Envelope {
       urls: [path],
     })),
     relationships: (version.dependsOn ?? []).map((edge) => {
+      if (typeof edge !== "string") return { rel_type: "depends_on", ...edge };
       const [to, ...range] = edge.split(" ");
       return {
         rel_type: "depends_on",
@@ -149,7 +161,7 @@ async function writeArtifact(root: string, artifact: SpecArtifact): Promise<unkn
 export async function writeSpecRoot(
   root: string,
   artifacts: readonly SpecArtifact[],
-  options: { name?: string; slug?: string } = {},
+  options: { name?: string; slug?: string; url?: string } = {},
 ): Promise<void> {
   const entries: unknown[] = [];
   for (const artifact of artifacts) entries.push(await writeArtifact(root, artifact));
@@ -159,6 +171,7 @@ export async function writeSpecRoot(
     format_version: 1,
     name: options.name ?? basename(root),
     ...(options.slug === undefined ? {} : { slug: options.slug }),
+    ...(options.url === undefined ? {} : { url: options.url }),
     capabilities: ["files"],
     auth: { type: "none" },
     blob_url: "blobs/sha256/{digest}",

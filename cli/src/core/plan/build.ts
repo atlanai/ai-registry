@@ -20,7 +20,13 @@ import { planCopy, restages } from "#core/plan/build/restage.ts";
 import type { BuildOptions, BuildState } from "#core/plan/build/state.ts";
 import { flushUnlinks, removeStale } from "#core/plan/build/unlink.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
-import { closure, dependenciesByName, dependentsByName, nameClashes } from "./depends.ts";
+import {
+  closure,
+  dependenciesByName,
+  dependentsByName,
+  nameClashes,
+  registryUrls,
+} from "./depends.ts";
 import type { Acquired, Clash, Incompatible, Plan, Selected, Survey, Warning } from "./model.ts";
 import { dropUnusedSources, lockSourceOf } from "./model.ts";
 import { crowdedContainers } from "./projection.ts";
@@ -65,7 +71,7 @@ function planWith(
   const incompatible: Incompatible[] = [];
   const clashes: Clash[] = [];
   const top = select(manifest, lock, acquired, [], options.cliVersion, [], [], renames);
-  const needs = closure(top, acquired);
+  const needs = closure(top, acquired, registryUrls(manifest.registries, acquired));
   const untrusted: Untrusted[] = [];
   const selected = select(
     { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
@@ -157,6 +163,7 @@ function planWith(
     ),
     pruned: state.pruned.sort(),
     unresolved: needs.unresolved,
+    undeclared: needs.undeclared,
     conflicts: [...needs.conflicts, ...nameClashes(needs, selected)],
     withheld,
     unlisted,

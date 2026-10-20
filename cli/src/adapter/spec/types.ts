@@ -27,6 +27,8 @@ export interface Relationship {
   to: string;
   /** The versions of `to`'s artifact the edge accepts, a range that `to`'s own version satisfies. */
   range?: string;
+  /** The canonical `https` root of the registry `to` resolves in, when that is not this one. */
+  registry?: string;
 }
 
 /** Who an artifact is and what it says about itself. */
