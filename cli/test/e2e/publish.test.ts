@@ -114,6 +114,37 @@ describe("creating a registry and publishing into it", () => {
     expect(await versions("platform", "skill", "notify")).not.toMatch(/"0\.1\.0"/);
   });
 
+  test("counts the next version past a yanked one, though latest moved below it", async ({
+    aireg,
+  }) => {
+    const path = join(work, "yank", "format");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "SKILL.md"), skillBody("format", "format", "Format it.\n"));
+    const send = () =>
+      aireg(["publish", "yank/format", "--to", "team/platform", "--yes"], { cwd: work });
+    expect((await send()).code).toBe(0);
+    await appendFile(join(path, "SKILL.md"), "Then sort imports.\n");
+    expect((await send()).code).toBe(0);
+    const at = join(registryRoot, "artifacts", "platform", "skill", "format", "versions.json");
+    const document = JSON.parse(await readFile(at, "utf8"));
+    for (const row of document.versions) if (row.version === "0.1.1") row.yanked = true;
+    await writeFile(at, JSON.stringify(document, null, 2));
+    expect((await aireg(["registry", "index"], { cwd: registryRoot })).code).toBe(0);
+    expect(JSON.parse(await readFile(at, "utf8")).latest).toBe("0.1.0");
+
+    await appendFile(join(path, "SKILL.md"), "And wrap long lines.\n");
+    const sent = await send();
+    expect(sent.code, sent.stderr).toBe(0);
+    expect(sent.stdout).toMatch(/update\s+platform\/skill\/format\s+0\.1\.0 → 0\.1\.2/);
+    expect(
+      await readFile(
+        join(registryRoot, "artifacts", "platform", "skill", "format", "0.1.2", "SKILL.md"),
+        "utf8",
+      ),
+    ).toContain("And wrap long lines.");
+    expect((await aireg(["registry", "validate"], { cwd: registryRoot })).code).toBe(0);
+  });
+
   test("writes each of three publishes at once at the version it reports, or refuses it", async ({
     aireg,
   }) => {

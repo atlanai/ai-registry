@@ -1,4 +1,5 @@
-import type { Withheld as Reported } from "#adapter/contract.ts";
+import type { Withheld as Reported, Newest as ReportedNewest } from "#adapter/contract.ts";
+import { compareVersion, parseVersion } from "#adapter/semver.ts";
 import { sanitizeName, sanitizeText } from "#adapter/text.ts";
 import { type ArtifactKind, isKind } from "#core/kinds.ts";
 
@@ -35,6 +36,58 @@ export function withheldFrom(reported: unknown): Withheld[] {
       },
     ];
   });
+}
+
+/** The newest version a registry holds of one artifact, whatever its status, a yanked one included. */
+export interface Newest {
+  name: string;
+  group: string | undefined;
+  kind: ArtifactKind;
+  version: string;
+}
+
+/** What an adapter reported as each artifact's newest version, checked as withheld ones are. */
+export function newestFrom(reported: unknown): Newest[] {
+  if (!Array.isArray(reported)) return [];
+  return reported.flatMap((item: Partial<ReportedNewest>) => {
+    const [name, version] = [text(item?.name), text(item?.version)];
+    if (name === undefined || version === undefined) return [];
+    if (typeof item.kind !== "string" || !isKind(item.kind)) return [];
+    const group = text(item.namespace);
+    return [
+      {
+        name: sanitizeName(name),
+        group: group === undefined ? undefined : sanitizeName(group),
+        kind: item.kind,
+        version: sanitizeText(version),
+      },
+    ];
+  });
+}
+
+/**
+ * The version to count the next one from: this one, or the newest the registry holds of the
+ * artifact when that is above it, such as a yanked one, since a held version is never written again.
+ */
+export function countPast(
+  version: string | undefined,
+  newest: readonly Newest[] | undefined,
+  at: { name: string; group: string | undefined; kind: ArtifactKind },
+): string | undefined {
+  const name = sanitizeName(at.name);
+  const group = at.group === undefined ? undefined : sanitizeName(at.group);
+  const held = newest?.find(
+    (item) =>
+      item.name === name &&
+      item.kind === at.kind &&
+      (item.group === undefined || item.group === group),
+  )?.version;
+  const above = held === undefined ? undefined : parseVersion(held);
+  if (held === undefined || above === undefined) return version;
+  const now = version === undefined ? undefined : parseVersion(version);
+  // A version that is not SemVer has no next one, so it stays for the caller to refuse.
+  if (version !== undefined && now === undefined) return version;
+  return now === undefined || compareVersion(above, now) > 0 ? held : version;
 }
 
 /** The withheld artifact an address names; one with no namespace or kind matches any. */

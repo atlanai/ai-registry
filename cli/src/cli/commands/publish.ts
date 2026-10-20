@@ -23,6 +23,7 @@ import {
   commitAndPush,
   type Destination,
   folderTo,
+  heldUnlisted,
   type Planned,
   type Published,
   parseTo,
@@ -418,10 +419,14 @@ async function sendTo(
     if (canceled(typed)) return "canceled";
     message = typed;
   }
-  const published = await handle.publish?.(
-    items.map((item) => item.input),
-    { message, review: true },
-  );
+  const published = await handle
+    .publish?.(
+      items.map((item) => item.input),
+      { message, review: true },
+    )
+    .catch((error: unknown) => {
+      throw heldUnlisted(error, alias, items);
+    });
   const what = items.length === 1 ? items[0]?.work.name : plural(items.length, "artifact");
   printer.success(published?.summary ?? `Published ${what} to ${alias}.`);
   for (const note of published?.notes ?? []) printer.info(`  ${note}`);

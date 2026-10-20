@@ -298,6 +298,20 @@ export function versionsIn(document: VersionsDocument, range: string): VersionRo
   throw noVersion(document, `no version in ${range}`, true);
 }
 
+/**
+ * The newest version the document lists, whatever its status, a yanked one included: what a
+ * publish counts the next version past, since a listed version is never written again.
+ */
+export function newestListed(document: VersionsDocument): string {
+  let best: { version: string; parsed: Version } | undefined;
+  for (const { version } of document.versions) {
+    const parsed = parseVersion(version);
+    if (parsed === undefined) continue;
+    if (best === undefined || compareVersion(parsed, best.parsed) > 0) best = { version, parsed };
+  }
+  return best?.version ?? document.latest;
+}
+
 function noVersion(document: VersionsDocument, what: string, missing: boolean): SpecError {
   const artifact = [document.namespace, document.name].filter(Boolean).join("/");
   const offered = document.versions.filter((item) => !item.yanked).map((item) => item.version);

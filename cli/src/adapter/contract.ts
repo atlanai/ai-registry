@@ -81,6 +81,12 @@ export interface Resolution {
   registry?: RegistryIdentity | undefined;
   /** Artifacts a want reached that the registry's status rules kept back, rather than unpublished. */
   withheld?: readonly Withheld[] | undefined;
+  /**
+   * The newest version the source holds of an artifact the request reached, whatever its status,
+   * where that is not the version it served, such as a yanked one above `latest`. A publish counts
+   * the next version past it, since a version the source holds is never written again.
+   */
+  newest?: readonly Newest[] | undefined;
   /** What a person should know about how the source was read, one sentence each. */
   warnings?: readonly string[] | undefined;
   /** How the source lays out what it holds, where the adapter reads more than one way. */
@@ -125,6 +131,14 @@ export interface Withheld {
   status: string;
   /** Why, as the registry gives it. */
   reason?: string | undefined;
+}
+
+/** The newest version a source holds of one artifact, in any status, yanked included. */
+export interface Newest {
+  name: string;
+  namespace?: string | undefined;
+  kind: ArtifactKind;
+  version: string;
 }
 
 /** One artifact a client asks for. A name alone tracks latest; a version pins it. */

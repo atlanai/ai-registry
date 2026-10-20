@@ -277,6 +277,27 @@ describe("an export's own version", () => {
     ]);
     expect(await written()).toEqual(["0.1.5", "0.2.0", "0.2.1"]);
   });
+
+  test("goes past a yanked newest version, though latest moved below it", async () => {
+    await fixAt(undefined);
+    await appendFile(skill(), "Check the exports.\n");
+    expect((await send()).code).toBe(0);
+    const document = JSON.parse(await readFile(versionsAt(), "utf8")) as {
+      versions: { version: string; yanked?: boolean }[];
+    };
+    for (const row of document.versions) if (row.version === "0.2.2") row.yanked = true;
+    await writeFile(versionsAt(), JSON.stringify(document, null, 2));
+    expect((await aireg(["registry", "index"], { cwd: join(repo, "registry") })).code).toBe(0);
+    expect(JSON.parse(await readFile(versionsAt(), "utf8")).latest).toBe("0.2.1");
+
+    await appendFile(skill(), "Check the re-exports.\n");
+    const sent = await send("--json");
+    expect(sent.code, sent.stderr).toBe(0);
+    expect(JSON.parse(sent.stdout).data.artifacts).toEqual([
+      expect.objectContaining({ from: "0.2.1", version: "0.2.3", published: true }),
+    ]);
+    expect(await written()).toEqual(["0.1.5", "0.2.0", "0.2.1", "0.2.2", "0.2.3"]);
+  });
 });
 
 describe("a dependent whose export fixes its version", () => {

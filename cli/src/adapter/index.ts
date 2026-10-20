@@ -9,6 +9,7 @@ export {
   type FileRef,
   type Identity,
   type LoginContext,
+  type Newest,
   type PublishHold,
   type PublishInput,
   type PublishOptions,

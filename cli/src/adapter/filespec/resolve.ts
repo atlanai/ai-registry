@@ -2,6 +2,7 @@ import {
   type Artifact,
   covers,
   type FileRef,
+  type Newest,
   type Resolution,
   type Want,
   type Withheld,
@@ -14,6 +15,7 @@ import type { Envelope, FileDescriptor } from "../spec/types.ts";
 import { quoted } from "../text.ts";
 import {
   type IndexRow,
+  newestListed,
   object,
   type ReadPath,
   readIndex,
@@ -229,6 +231,7 @@ export async function resolveFromRoot(
     return [{ entry, asked, pinned: pinOf(reaching), range: rangeOf(reaching) }];
   });
   const withheld: Withheld[] = [];
+  const newest: Newest[] = [];
   const artifacts = await inOrder(chosen, async ({ entry, asked, pinned, range }) => {
     // A malformed path segment is the indexer's mistake, and installing from
     // it would write that mistake into somebody's tree.
@@ -241,52 +244,84 @@ export async function resolveFromRoot(
 
     const versions = await readVersions(read, entry.namespace, entry.kind, entry.name);
     const version = versionFor(versions, pinned, range);
-    // Section 5 rule 7: a yanked version stays resolvable by name, because a
-    // lockfile pinning one must keep resolving, but `latest` must not hand it out.
-    if (version.yanked && pinned === undefined) return undefined;
-    // Blocked never installs, and draft and pending_review only when pinned; the caller is told,
-    // so an installed copy is kept rather than taken for unpublished.
-    const status = version.status ?? "";
-    if (status === "blocked" || (pinned === undefined && UNRELEASED.has(status))) {
+    const served = await serve(read, { entry, version, asked, pinned }, withheld, options.blobUrl);
+    // A version above what was served or withheld, such as a yanked one, is still held: a publish
+    // goes past it.
+    const reported =
+      served !== undefined || heldBack(version, pinned) ? version.version : undefined;
+    const top = newestListed(versions);
+    if (reported !== top) {
       const { namespace, kind, name } = entry;
-      withheld.push({
-        namespace,
-        kind,
-        name,
-        version: version.version,
-        status,
-        reason: version.reason,
-      });
-      return undefined;
+      newest.push({ namespace, kind, name, version: top });
     }
-    // An archived artifact is retired: named, it still installs, but taking a
-    // whole namespace does not bring it along.
-    if (version.status === "archived" && !asked) return undefined;
-
-    const dir = versionDir(entry.namespace, entry.kind, entry.name, version.version);
-    const envelope = await readEnvelope(
-      read,
-      entry.namespace,
-      entry.kind,
-      entry.name,
-      version.version,
-      version.digest,
-    );
-    return {
-      id: dir,
-      kind: entry.kind,
-      group: entry.namespace,
-      envelope,
-      files: refsOf(envelope, dir, options.blobUrl),
-      ...(version.yanked ? { yanked: { reason: version.reason } } : {}),
-      ...(CAUTIONED.has(status) ? { status: { name: status, reason: version.reason } } : {}),
-    } satisfies Artifact;
+    return served;
   });
 
   return {
     artifacts: artifacts.filter((artifact) => artifact !== undefined),
     ...(withheld.length === 0 ? {} : { withheld }),
+    ...(newest.length === 0 ? {} : { newest }),
   };
+}
+
+/** Blocked never installs, and draft and pending_review only when pinned. */
+function heldBack(version: VersionRow, pinned: string | undefined): boolean {
+  const status = version.status ?? "";
+  return status === "blocked" || (pinned === undefined && UNRELEASED.has(status));
+}
+
+/** The artifact at the version a request resolved to, unless its status keeps it back. */
+async function serve(
+  read: ReadPath,
+  {
+    entry,
+    version,
+    asked,
+    pinned,
+  }: { entry: IndexRow; version: VersionRow; asked: boolean; pinned: string | undefined },
+  withheld: Withheld[],
+  blobUrl: string,
+): Promise<Artifact | undefined> {
+  // Section 5 rule 7: a yanked version stays resolvable by name, because a
+  // lockfile pinning one must keep resolving, but `latest` must not hand it out.
+  if (version.yanked && pinned === undefined) return undefined;
+  // The caller is told of a version held back, so an installed copy is kept rather than taken
+  // for unpublished.
+  const status = version.status ?? "";
+  if (heldBack(version, pinned)) {
+    const { namespace, kind, name } = entry;
+    withheld.push({
+      namespace,
+      kind,
+      name,
+      version: version.version,
+      status,
+      reason: version.reason,
+    });
+    return undefined;
+  }
+  // An archived artifact is retired: named, it still installs, but taking a
+  // whole namespace does not bring it along.
+  if (version.status === "archived" && !asked) return undefined;
+
+  const dir = versionDir(entry.namespace, entry.kind, entry.name, version.version);
+  const envelope = await readEnvelope(
+    read,
+    entry.namespace,
+    entry.kind,
+    entry.name,
+    version.version,
+    version.digest,
+  );
+  return {
+    id: dir,
+    kind: entry.kind,
+    group: entry.namespace,
+    envelope,
+    files: refsOf(envelope, dir, blobUrl),
+    ...(version.yanked ? { yanked: { reason: version.reason } } : {}),
+    ...(CAUTIONED.has(status) ? { status: { name: status, reason: version.reason } } : {}),
+  } satisfies Artifact;
 }
 
 /** Entries read at once, up to this many: a registry of thousands is not read one by one. */

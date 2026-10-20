@@ -1,9 +1,18 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
+import { AdapterError } from "#adapter/index.ts";
 import { offerFrom } from "#core/filespec/write/offer.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { commitAndPush, folderTo, type Published, parseTo, plan } from "./target.ts";
+import {
+  commitAndPush,
+  folderTo,
+  heldUnlisted,
+  type Planned,
+  type Published,
+  parseTo,
+  plan,
+} from "./target.ts";
 import type { Work } from "./work.ts";
 
 vi.mock("#core/filespec/write/offer.ts", async (importOriginal) => {
@@ -292,6 +301,74 @@ describe("plan with an export's version", () => {
     } as unknown as Published;
     const planned = await plan(work, published, "eng", "patch", undefined, false);
     expect(planned).toMatchObject({ same: false, from: "1.4.0", version: "1.4.1" });
+  });
+
+  test("takes the next version past one the listing does not show, such as a yanked one", async () => {
+    const path = join(root, "lint");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "SKILL.md"), "---\nname: lint\ndescription: Lints code.\n---\n");
+    const work: Work = {
+      name: "lint",
+      kind: "skill",
+      path,
+      description: undefined,
+      home: undefined,
+      row: undefined,
+      base: undefined,
+    };
+    const holding = (latest: [string, unknown][], newest: string) =>
+      ({
+        alias: "acme",
+        source: { adapter: { id: "probe", capabilities: {} } },
+        latest: new Map(latest),
+        withheld: new Map(),
+        newest: [
+          { name: "lint", group: "eng", kind: "skill", version: newest },
+          { name: "lint", group: "ops", kind: "skill", version: "9.0.0" },
+        ],
+      }) as unknown as Published;
+    const latest: [string, unknown][] = [
+      ["eng/skill/lint", { id: "lint", version: "0.1.0", digests: ["sha256:older"] }],
+    ];
+
+    const past = await plan(work, holding(latest, "0.1.1"), "eng", "patch", undefined, false);
+    expect(past).toMatchObject({ same: false, from: "0.1.0", version: "0.1.2" });
+    const minor = await plan(work, holding(latest, "0.3.0"), "eng", "minor", undefined, false);
+    expect(minor.version).toBe("0.4.0");
+    // Every version yanked, so the listing shows none: still never 0.1.0 again.
+    const none = await plan(work, holding([], "0.1.0"), "eng", "patch", undefined, false);
+    expect(none).toMatchObject({ from: "0.1.0", version: "0.1.1" });
+  });
+});
+
+describe("heldUnlisted", () => {
+  const planned = (exported?: { path: string; version: string | undefined }) =>
+    ({
+      work: { name: "lint", kind: "skill", exported },
+      namespace: "eng",
+      input: { name: "lint" },
+    }) as unknown as Planned;
+  const conflict = new AdapterError(
+    "local",
+    "conflict",
+    "eng/skill/lint@0.1.1 is already published with other content.",
+    { artifact: "lint", hint: "A published version is never rewritten." },
+  );
+
+  test("says how to name a version the registry does not hold, for a conflict only", () => {
+    expect(heldUnlisted(conflict, "./registry", [planned()])).toMatchObject({
+      name: "AdapterError",
+      failure: "conflict",
+      message: "eng/skill/lint@0.1.1 is already published with other content.",
+      hint: "Name a version ./registry does not hold yet: `aireg publish <path> --to ./registry/eng/lint@<version>`; a published version is never rewritten.",
+    });
+    expect(
+      heldUnlisted(conflict, "acme", [planned({ path: ".claude/skills/lint", version: "0.1.1" })]),
+    ).toMatchObject({
+      hint: 'Set the `version` of export ".claude/skills/lint" to one acme does not hold yet; a published version is never rewritten.',
+    });
+    const other = new AdapterError("local", "invalid", "Nope.");
+    expect(heldUnlisted(other, "acme", [planned()])).toBe(other);
   });
 });
 

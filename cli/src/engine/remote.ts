@@ -4,6 +4,7 @@ import type { PublishInput, SourceHandle, UnpublishInput } from "#adapter/index.
 import { bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { connectSource } from "#core/adapter/source.ts";
 import { readOnlyLayout } from "#core/adapter/writable.ts";
+import { countPast } from "#core/catalog/withheld.ts";
 import type { Account } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { offerFrom } from "#core/filespec/write/offer.ts";
@@ -35,7 +36,8 @@ async function publishInput(
 
 /**
  * The version to count the next one from: the lock's, or what the registry serves now when a
- * teammate published past it, since a registry never takes a version it already holds.
+ * teammate published past it, or the newest version it holds when that is above both, such as a
+ * yanked one, since a registry never takes a version it already holds.
  */
 function countFrom(scan: Scan, row: LockArtifact, locked: string): string {
   const acquired = scan.acquired.find((item) => item.alias === row.registry);
@@ -43,8 +45,14 @@ function countFrom(scan: Scan, row: LockArtifact, locked: string): string {
   const served = at === undefined ? undefined : acquired?.placements.get(at)?.version;
   const now = served === undefined ? undefined : parseVersion(served);
   const then = parseVersion(locked);
-  if (served === undefined || now === undefined || then === undefined) return locked;
-  return compareVersion(now, then) > 0 ? served : locked;
+  const ahead =
+    served !== undefined &&
+    now !== undefined &&
+    then !== undefined &&
+    compareVersion(now, then) > 0;
+  const from = ahead ? served : locked;
+  const artifact = { name: row.name, group: row.namespace, kind: row.kind };
+  return countPast(from, acquired?.catalog.newest, artifact) ?? from;
 }
 
 export interface RemoteMutationHooks {

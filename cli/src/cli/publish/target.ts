@@ -2,12 +2,14 @@ import { access } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize } from "node:path";
 import { credentialFor } from "#accounts/credentials.ts";
 import { isArtifactName, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
-import type {
-  Artifact,
-  PublishInput,
-  PublishRelationship,
-  Relationship,
-  SourceAdapter,
+import {
+  AdapterError,
+  type Artifact,
+  isAdapterError,
+  type PublishInput,
+  type PublishRelationship,
+  type Relationship,
+  type SourceAdapter,
 } from "#adapter/index.ts";
 import {
   type Bump,
@@ -23,7 +25,13 @@ import { expandLocation } from "#core/adapter/location.ts";
 import { adapterFor } from "#core/adapter/registry.ts";
 import { type ConnectedSource, connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import { readOnlyLayout } from "#core/adapter/writable.ts";
-import { statusClause, type Withheld, withheldFrom } from "#core/catalog/withheld.ts";
+import {
+  countPast,
+  type Newest,
+  statusClause,
+  type Withheld,
+  withheldFrom,
+} from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { kindsOf } from "#core/filespec/write/kinds.ts";
 import { type OfferTarget, offerFrom } from "#core/filespec/write/offer.ts";
@@ -213,6 +221,8 @@ export interface Published {
   latest: Map<string, Current>;
   /** Artifacts whose newest version the registry holds back, such as a blocked one, at that version. */
   withheld: Map<string, Current>;
+  /** Each artifact's newest version where the listing shows another, such as a yanked one above it. */
+  newest?: readonly Newest[] | undefined;
 }
 
 const keyOf = (namespace: string, kind: string, name: string) => `${namespace}/${kind}/${name}`;
@@ -271,7 +281,15 @@ export async function readPublished(
       withheld: item,
     });
   }
-  return { alias, location, source, namespaces: [...namespaces].sort(), latest, withheld };
+  return {
+    alias,
+    location,
+    source,
+    namespaces: [...namespaces].sort(),
+    latest,
+    withheld,
+    newest: listing.catalog.newest,
+  };
 }
 
 /** One artifact's outcome: a first version, the next one, or already there. */
@@ -404,6 +422,31 @@ function alreadyPublished(
   );
 }
 
+/**
+ * A version the registry refused as one it already holds, though its listing did not show it, as
+ * one whose adapter reports no yanked version leaves it: the hint says what to publish instead.
+ */
+export function heldUnlisted(error: unknown, alias: string, items: readonly Planned[]): unknown {
+  if (!isAdapterError(error) || error.failure !== "conflict") return error;
+  const [only] = items;
+  const item =
+    items.find((each) => each.input.name === error.artifact) ??
+    (items.length === 1 ? only : undefined);
+  if (item === undefined) return error;
+  const { work, namespace } = item;
+  const hint =
+    work.exported?.version === undefined
+      ? `Name a version ${alias} does not hold yet: \`aireg publish <path> --to ${alias}/${namespace}/${work.name}@<version>\`; a published version is never rewritten.`
+      : `Set the \`version\` of export ${quoted(work.exported.path)} to one ${alias} does not hold yet; a published version is never rewritten.`;
+  return new AdapterError(error.adapter, error.failure, error.message, {
+    artifact: error.artifact,
+    retryAfterMs: error.retryAfterMs,
+    problem: error.problem,
+    hint,
+    cause: error,
+  });
+}
+
 /** The same edges, whatever order each one's fields were written in. */
 function sameEdges(
   current: readonly Relationship[] | undefined,
@@ -521,9 +564,13 @@ export async function plan(
       },
     );
   }
-  const version = same
-    ? (asked ?? (current?.version as string))
-    : (asked ?? bumpVersion(current?.version, how));
+  // Counted past every version the registry holds, a yanked one included, never back onto one.
+  const from = countPast(current?.version, published.newest, {
+    name: work.name,
+    group: namespace,
+    kind: work.kind,
+  });
+  const version = asked ?? (same ? (current?.version as string) : bumpVersion(from, how));
   // The version is not part of the content identity, so the files read once serve it.
   const moved = version === probe.input.version ? probe.input : { ...probe.input, version };
   // What is already published is shown with the edges it carries, not those it was compared with.
@@ -534,7 +581,7 @@ export async function plan(
   return {
     work,
     namespace,
-    from: current?.version,
+    from: current?.version ?? from,
     version,
     same,
     belowLatest: below(version, current?.version),
