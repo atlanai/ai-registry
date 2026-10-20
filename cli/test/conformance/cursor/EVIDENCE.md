@@ -59,6 +59,8 @@ Not available. No command of the CLI lists skills, agents or plugins without sig
 - https://cursor.com/docs/cli/reference/parameters.md lists every command; none lists skills, agents or plugins. `/skills` and `/plugins` are slash commands inside a session.
 - `agent plugin --help` offers only `marketplace`, and `agent plugin marketplace list` lists marketplaces, not plugins. Without an account it printed `Error: Authentication required. Run 'agent login', pass --api-key/--auth-token, or set CURSOR_API_KEY/CURSOR_AUTH_TOKEN.` and exited 1.
 - `agent`, started on a terminal in a sandbox project to reach `/skills`, printed only `Signing in with the browser...` and a sign-in link. Nothing was signed in to.
+- `agent acp`, the Agent Client Protocol server, whose sessions report the commands a session offers, answered `initialize` with one auth method, `cursor_login`, and `session/new` with `{"code":-32000,"message":"Authentication required"}`.
+- The CLI's other commands, listed by its `--help` and its bundled `index.js`, manage sessions, cloud agents, MCP servers, marketplaces and the account; none reads local skills, agents or plugins.
 
 So `cursor.test.ts` has no probes, and this harness is checked at L1 only.
 
