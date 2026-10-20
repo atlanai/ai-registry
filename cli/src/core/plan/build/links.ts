@@ -19,6 +19,9 @@ interface Claimed {
   blocked: Blocked[];
 }
 
+/** `.agents/skills/pdf` or `.claude/agents/review.md`: the name a part is installed under. */
+const partName = (path: string) => (path.split(/[\\/]/).at(-1) ?? path).replace(/\.(md|toml)$/, "");
+
 /** The links this item may take, first come first served, recording what another holds. */
 function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const skipped = new Set<string>();
@@ -33,7 +36,9 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
     const kept = build.addresses.get(owner) ?? owner;
     blocked.push({ harness: link.harness, path: link.relative, by: kept });
     if (!build.clashes.some((clash) => clash.dropped === address && clash.kept === kept)) {
-      build.clashes.push({ name: item.name, kept, dropped: address, at: link.relative });
+      // A plugin's parts each land under a name of their own, which is the one that collided.
+      const name = item.kind === "plugin" ? partName(link.relative) : item.name;
+      build.clashes.push({ name, kept, dropped: address, at: link.relative });
     }
   });
   return { links, skipped, blocked };

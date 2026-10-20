@@ -229,6 +229,19 @@ describe("-s on a plugin", () => {
     expect(await locked(project)).toEqual(["docs-kit"]);
   }, 60_000);
 
+  test("names the part of a plugin whose name another skill already holds", async ({
+    aireg,
+    tmp,
+  }) => {
+    const mine = await skillsFolder(join(tmp, "mine")).skill("skills/pdf").write();
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await init(aireg, "agents");
+    expect((await aireg(["add", mine, "--all"])).code).toBe(0);
+    expect((await aireg(["registry", "add", root])).code).toBe(0);
+    const added = await aireg(["add", "acme-tools/docs-kit", "-y"]);
+    expect(added.stdout).toContain("docs-kit, because pdf is taken by mine/pdf");
+  }, 60_000);
+
   test("refuses a name that is both a plugin and a skill, naming how to take each", async ({
     aireg,
     project,
