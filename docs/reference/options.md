@@ -45,7 +45,7 @@ aireg installs into one of two scopes:
 
 ## Harnesses
 
-A harness is a coding agent that aireg installs into. aireg knows six:
+A harness is a coding agent that aireg installs into. aireg knows seven:
 
 | Name | Harness |
 |---|---|
@@ -54,6 +54,7 @@ A harness is a coding agent that aireg installs into. aireg knows six:
 | `cursor` | Cursor |
 | `copilot` | GitHub Copilot |
 | `gemini` | Gemini CLI |
+| `opencode` | OpenCode |
 | `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
 
 aireg links each artifact into the folder its harness reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`.
