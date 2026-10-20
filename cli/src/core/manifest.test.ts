@@ -1,10 +1,16 @@
 import { mkdir, readdir, readFile, realpath, stat, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 import { roots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { formatManifest, parseManifest, readManifest, writeManifest } from "./manifest.ts";
 import { parseRef } from "./ref.ts";
+
+// A release's version, so a manifest can ask for one older or newer than this CLI.
+vi.mock("#core/version.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#core/version.ts")>()),
+  VERSION: "0.5.0",
+}));
 
 describe("manifest keys", () => {
   test("reads `harnesses:` as the selection and `registries:` as the sources", () => {
@@ -61,6 +67,28 @@ describe("engines", () => {
     const manifest = parseManifest("engines:\n  aireg: 0.3.0\n");
     expect(manifest.engine).toBe("0.3.0");
     expect(formatManifest(manifest)).toContain("engines:\n  aireg: 0.3.0\n");
+  });
+
+  test("says a newer aireg is needed, not that a key it added is unknown", () => {
+    const newer = (rest: string) => () => parseManifest(`engines:\n  aireg: 99.0.0\n${rest}`);
+    const needed = "This project needs aireg 99.0.0 or later; this CLI is 0.5.0.";
+    expect(newer("exports: [skills/*]\n")).toThrow(needed);
+    expect(
+      newer("registries: { kit: acme/kit }\nartifacts:\n  - { ref: kit/lint, pin: 1 }\n"),
+    ).toThrow(needed);
+    expect(newer("exports: [skills/*]\n")).toThrow(
+      expect.objectContaining({ code: "error", hint: "Run `aireg self update`." }),
+    );
+  });
+
+  test("still names the unknown key when this aireg is new enough, or no version is asked for", () => {
+    const unknown = 'manifest.yml: The manifest does not take "exports"';
+    expect(() => parseManifest("engines:\n  aireg: 0.3.0\nexports: [skills/*]\n")).toThrow(unknown);
+    expect(() => parseManifest("exports: [skills/*]\n")).toThrow(unknown);
+  });
+
+  test("leaves a file it can read to the commands, which refuse to write for an older aireg", () => {
+    expect(parseManifest("engines:\n  aireg: 99.0.0\n").engine).toBe("99.0.0");
   });
 });
 
