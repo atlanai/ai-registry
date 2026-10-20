@@ -339,7 +339,8 @@ function pathProblem(path: string): string | undefined {
   if (path.includes("\\")) return "uses a backslash, where a path uses /";
   if (path.startsWith("/") || /^[A-Za-z]:/.test(path)) return "is absolute";
   const parts = path.split("/");
-  if (parts.includes("..")) return "leaves the project";
+  // A glob's brace alternatives are path parts too: `{..,skills}/*` climbs out as `../*` does.
+  if (parts.includes("..") || /(?:^|[/{,])\.\.(?=$|[/,}])/.test(path)) return "leaves the project";
   if (parts.some((part) => part === "" || part === ".")) return "has an empty or . part";
   return undefined;
 }

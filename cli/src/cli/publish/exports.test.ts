@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { type Manifest, parseManifest } from "#core/manifest.ts";
@@ -110,6 +110,41 @@ describe("exportsOn", () => {
       join(base, "agents", "reviewer.md"),
     ]);
     expect(works.map((work) => work.name)).toEqual(["review", "reviewer"]);
+  });
+
+  test("refuses an export that a tracked link takes outside the project", async ({
+    git,
+    fileTmp,
+  }) => {
+    const elsewhere = join(fileTmp, "elsewhere", "evil");
+    await mkdir(elsewhere, { recursive: true });
+    await writeFile(join(elsewhere, "SKILL.md"), "---\nname: evil\ndescription: Evil.\n---\n");
+    await symlink(elsewhere, join(base, "skills", "evil"));
+    await git.init(base);
+    await git(base, "add", "skills");
+    await expect(exportsOn(manifestWith("  - skills/*\n"), base)).rejects.toMatchObject({
+      message: 'Export "skills/*" reaches skills/evil, which is outside this project.',
+      code: "invalid",
+    });
+    await expect(exportsOn(manifestWith("  - skills/evil\n"), base)).rejects.toThrow(
+      "which is outside this project.",
+    );
+    // A link that stays inside the project publishes what it points to.
+    await mkdir(join(base, "lib", "inside"), { recursive: true });
+    await writeFile(
+      join(base, "lib", "inside", "SKILL.md"),
+      "---\nname: inside\ndescription: Inside.\n---\n",
+    );
+    await symlink(join(base, "lib", "inside"), join(base, "skills", "inside"));
+    const found = await exportsOn(manifestWith("  - skills/inside\n"), base);
+    expect([...found.keys()]).toEqual([join(base, "skills", "inside")]);
+  });
+
+  test("refuses a glob whose expansion leaves the project", async () => {
+    // Its braces climb out as `..` would, spelled so no part of it reads as `..`.
+    await expect(exportsOn(manifestWith("  - '{.,.}./*'\n"), base)).rejects.toThrow(
+      "which is outside this project.",
+    );
   });
 
   test("reaches only what git tracks in a repository", async ({ git }) => {

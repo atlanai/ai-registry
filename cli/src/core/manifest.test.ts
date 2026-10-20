@@ -181,6 +181,10 @@ describe("exports and publish", () => {
     expect(refused("exports: [skills/../../etc]\n")).toThrow(
       'Export "skills/../../etc" leaves the project.',
     );
+    for (const glob of ["'{..,skills}/*'", "'skills/{x,..}/*'", "'{..}/*'"]) {
+      expect(refused(`exports: [${glob}]\n`)).toThrow("leaves the project.");
+    }
+    expect(parseManifest("exports: ['skills/{a..b,c}']\n").exports).toHaveLength(1);
     expect(refused("exports: [./skills/lint]\n")).toThrow(
       'Export "./skills/lint" has an empty or . part.',
     );

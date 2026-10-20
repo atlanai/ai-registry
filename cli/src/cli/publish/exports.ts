@@ -12,7 +12,7 @@ import {
   reportedRegistryUrl,
 } from "#core/adapter/identity.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { canonical } from "#core/fs/canonical.ts";
+import { canonical, canonicalAsync } from "#core/fs/canonical.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { gitIn } from "#core/git.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
@@ -56,6 +56,24 @@ export function installedPaths(lock: Lock, base: string): Set<string> {
 }
 
 /**
+ * An export is published from where it really is: one that a link, or a glob, takes outside the
+ * project would publish whatever is there, so it is refused. A folder's own links are refused
+ * when its files are read, so its root decides where everything in it sits.
+ */
+async function refuseOutside(entry: Export, path: string, base: string): Promise<void> {
+  const [real, project] = await Promise.all([canonicalAsync(path), canonicalAsync(base)]);
+  if (isWithin(base, path) && isWithin(project, real)) return;
+  const shown = isWithin(base, path) ? posixRelative(base, path) : path;
+  throw new AiregError(
+    `Export ${quoted(entry.path)} reaches ${shown}, which is outside this project.`,
+    {
+      code: ErrorCode.Invalid,
+      hint: "Exports publish only what is in the project: replace a link with the files it points to, or leave the path out of `exports:`.",
+    },
+  );
+}
+
+/**
  * Every path `exports:` names, by its absolute path, with the entry whose rules apply to it.
  * In a git repository a glob reaches only what git tracks, so scratch work beside an export
  * is not published, and never what aireg installed there; a mapping for one of its paths
@@ -74,9 +92,11 @@ export async function exportsOn(
     if (!isGlob(entry.path)) continue;
     for (const path of await expand(entry.path, base)) {
       const root = artifactRoot(path);
+      if (!isWithin(base, root)) await refuseOutside(entry, root, base);
       if (installed.has(root)) continue;
-      if (tracked === undefined || tracked.some((file) => isWithin(path, file)))
-        found.set(root, entry);
+      if (tracked !== undefined && !tracked.some((file) => isWithin(path, file))) continue;
+      await refuseOutside(entry, root, base);
+      found.set(root, entry);
     }
   }
   for (const entry of manifest.exports) {
@@ -88,6 +108,7 @@ export async function exportsOn(
         hint: "Check its path under `exports:`, or remove the entry.",
       });
     }
+    await refuseOutside(entry, artifactRoot(path), base);
     found.set(artifactRoot(path), entry);
   }
   return found;

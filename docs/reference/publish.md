@@ -89,7 +89,7 @@ publish:
   to: [acme/engineering, ./registry/engineering]
 ```
 
-The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-spec.md) defines each field. With no arguments, `publish` takes every export. A glob such as `.claude/skills/*` reaches only the files git tracks, in a git repository, and never an artifact aireg installed there. An entry with `publish: false` is left out. A path you name on the command line that is an export follows its entry's rules too; other paths behave as described above.
+The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-spec.md) defines each field. With no arguments, `publish` takes every export. A glob such as `.claude/skills/*` reaches only the files git tracks, in a git repository, and never an artifact aireg installed there. An export is published from where it really is, so `publish` refuses one that a link, or a glob, takes outside the project, such as a tracked link `.claude/skills/shared` to a folder elsewhere on your machine. An entry with `publish: false` is left out. A path you name on the command line that is an export follows its entry's rules too; other paths behave as described above.
 
 ### Targets
 
@@ -163,7 +163,7 @@ With `--json`, `publish` asks no questions and prints each artifact with its old
 ## Exit status
 
 - `0`: published, nothing new to publish, a dry run, or canceled at a question.
-- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published, whatever its status. For exports: an entry names nothing, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
+- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published, whatever its status. For exports: an entry names nothing or reaches outside the project, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
 - `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder. For exports: the manifest lists several targets and `--to` names none, `--to` names one it doesn't list, or a registry without dependencies would receive an artifact that has them.
 - `3`: the artifact was edited from an older version than the one published since. Install the newer version and redo the edit, or pass `--force`.
 
