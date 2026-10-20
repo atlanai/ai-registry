@@ -227,7 +227,7 @@ export function conformance(spec: Conformance): void {
             const cwd = probe.scope === "project" ? own.project : own.home;
             const { stdout, stderr } = await run(program, args, {
               cwd,
-              env: { ...process.env, ...own.env },
+              env: { ...harnessEnv(process.env), ...own.env },
               timeout: 60_000,
             });
             for (const want of probe.expect) expect(`${stdout}${stderr}`).toMatch(want);
@@ -242,6 +242,16 @@ export function conformance(spec: Conformance): void {
 }
 
 const run = promisify(execFile);
+
+/**
+ * A probe never signs in, so no credential this machine holds reaches the harness, and it
+ * runs as a person would, without the test runner's own variables, which a harness may read.
+ */
+function harnessEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const kept = (name: string) =>
+    !/token|key|secret|password|auth|askpass|cred/i.test(name) && !name.startsWith("VITEST");
+  return Object.fromEntries(Object.entries(env).filter(([name]) => kept(name)));
+}
 
 async function removeAll(box: Sandbox): Promise<void> {
   await must(box.aireg(["remove", "ns/lint", "ns/reviewer", "--force", "-y"]));
