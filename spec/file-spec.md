@@ -54,7 +54,7 @@ The example at [`examples/acme-registry`](../examples/acme-registry) is a comple
 | `name` | `^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$` | same grammar as namespace |
 | `version` | `^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$` | `latest` is reserved and MUST be rejected as a version |
 
-A version string is required. Semantic versioning SHOULD be used; range resolution by a client is defined only for versions that parse as semver. A version parses as semver when it is a valid SemVer 2.0.0 version: `1.2.0` and `1.2.0-rc.1` parse; `v1.2.0` and `01.2.0` do not. The digest, not the version string, is the truth about content. Whether semver is required rather than recommended is open.
+A version string is required. Semantic versioning SHOULD be used; range resolution by a client (section 2.4) is defined only for versions that parse as semver. A version parses as semver when it is a valid SemVer 2.0.0 version: `1.2.0` and `1.2.0-rc.1` parse; `v1.2.0` and `01.2.0` do not. The digest, not the version string, is the truth about content. Whether semver is required rather than recommended is open.
 
 Path segments are case-sensitive. A registry MUST NOT contain two artifacts whose paths differ only by case.
 
@@ -91,6 +91,26 @@ A `files[].path` names a file inside the version directory, relative to it, with
 - No segment is one a file system stores as `.git`, which would make the version directory a repository. Segments are compared after removing the code points HFS+ ignores (U+200C to U+200F, U+202A to U+202E, U+206A to U+206F, U+FEFF), lowercasing, and removing trailing dots and spaces, and the 8.3 short name `git~1` counts as `.git`.
 
 Two paths of one version MUST NOT be equal after Unicode NFC normalization and lowercasing, and no path may sit under another path of the version compared the same way, because a case-insensitive disk stores them as one file. A reader MUST refuse an envelope that breaks these rules rather than skip the offending file.
+
+### 2.4 Version ranges
+
+A range names a set of semver versions, in the spirit of npm's ranges. It is at most 256 characters: one or more comparator sets separated by `||`, with optional spaces around each `||`. A set is one or more comparators separated by spaces. A version satisfies a range when it satisfies any of its sets, and a set when it satisfies every comparator in the set.
+
+A comparator has no space inside it. A *full* version parses as semver (section 2.1). A *partial* version is one to three dot-separated parts, each a number without leading zeros or a wildcard `x`, `X` or `*`, with no number after a wildcard; a part left out counts as a wildcard. Three numbers make a full version. Versions compare by SemVer 2.0.0 precedence, so build metadata never decides.
+
+| Comparator | Satisfied by |
+|---|---|
+| `=V`, `>V`, `>=V`, `<V`, `<=V`, with `V` full | versions equal to, above, at or above, below, or at or below `V` |
+| a full version `V` | as `=V` |
+| a partial version, such as `1`, `1.x`, `1.2` or `*` | versions whose numbers equal those it gives: `1` and `1.x` are `>=1.0.0 <2.0.0`, `1.2` is `>=1.2.0 <1.3.0`, and `*` is every version |
+| `^P` | from `P`, with wildcards read as 0, up to and excluding the version that increments the leftmost non-zero number `P` gives, or its last number when all are zero: `^1.2.3` is `>=1.2.3 <2.0.0`, `^1.2` is `>=1.2.0 <2.0.0`, `^0.3.2` is `>=0.3.2 <0.4.0`, `^0.0.3` is `>=0.0.3 <0.0.4` |
+| `~P` | from `P` as for `^`, up to and excluding the version that increments its minor number, or its major number when `P` gives only that: `~1.2.3` is `>=1.2.3 <1.3.0`, `~1` is `>=1.0.0 <2.0.0` |
+
+`^` and `~` take a partial or full version that gives at least its major number. Incrementing a number sets every number after it to 0.
+
+A version with a prerelease satisfies a set only when, besides every comparator, some comparator in the set names a full version with a prerelease and the same major, minor and patch numbers. So `>=1.2.3-rc.1` admits `1.2.3-rc.2` and `1.3.0` but not `1.3.0-rc.1`, and `^1.2.3` admits no prerelease. A version that does not parse as semver satisfies no range.
+
+A range outside this grammar is invalid, and a client MUST NOT read it as any other range. To resolve a range, a client picks the highest satisfying version that section 3.3 lets it resolve for an unpinned request, skipping yanked versions.
 
 ## 3. Documents
 
@@ -176,7 +196,7 @@ The envelope: a fixed header, an open `spec` the kind owns, the files the versio
 | `metadata.uid` | no | an identifier a hosted registry MAY mint. A client MUST NOT require it; the ref is the identity |
 | `files[]` | yes | at least one file descriptor; see 3.5 and 4.1. Schema: [`schemas/file-descriptor.schema.json`](schemas/file-descriptor.schema.json) |
 | `spec` | yes | the kind's own document, unchanged. Opaque to a reader by rule 4; validated against the kind manifest at publish |
-| `relationships[]` | no | outbound edges `{rel_type, to, annotations?}`, where `to` is a fully qualified ref. Part of the version, like labels. Schema: [`schemas/relationship.schema.json`](schemas/relationship.schema.json) |
+| `relationships[]` | no | outbound edges `{rel_type, to, range?, registry?, annotations?}`, where `to` is a fully qualified ref. `range` (section 2.4) is the versions of `to`'s artifact the edge accepts, and `to`'s version MUST satisfy it; without it the edge accepts `to`'s version only. `registry` is the canonical root, the `url` of section 3.1, of the registry `to` resolves in when that is not this root (section 11). Part of the version, like labels. Schema: [`schemas/relationship.schema.json`](schemas/relationship.schema.json) |
 
 Writers MUST NOT invent header fields. Extension data belongs in `spec`, `labels`, or `annotations`.
 
@@ -242,7 +262,7 @@ with `status` and `yanked` from the version's `versions.json` entry, `labels` an
 | resolve a ref | `artifacts/<ns>/<kind>/<name>/versions.json` | pick `latest` or the requested version; take its `digest` |
 | get the entry | `artifacts/<ns>/<kind>/<name>/<version>/artifact.json` | verify its content digest equals the one from `versions.json` |
 | get the bytes | each `files[]` descriptor: the relative URL under the version directory, or `blob_url` | verify digest and size |
-| follow an edge | `relationships[]` in the envelope | resolve each `to` ref the same way |
+| follow an edge | `relationships[]` in the envelope | resolve each `to` ref the same way, in the registry `registry` names when present, and at the highest version satisfying `range` (section 2.4) when present |
 | know which kinds exist | `registry.json` → `kinds[]` → each `manifest_url` | validate `spec` if you are a writer; readers treat `spec` as opaque |
 
 Two round trips resolve a ref to bytes: the versions document, then the entry and the files it names.
@@ -308,6 +328,7 @@ These rules bound what a client fetches, sends, and writes.
 - **Sizes and time.** A client MUST stop reading a file once it has received more bytes than the descriptor's `size`, and MUST verify the size and the digest before it uses the file. It SHOULD cap the size of each JSON document it parses, and give up on a request that takes too long rather than wait indefinitely.
 - **Paths.** A client writes a file only at a path section 2.3 allows, inside the folder it installs into, and MUST NOT follow a symbolic link it finds there.
 - **Cycles.** `depends_on` edges can form a cycle. A client resolves each ref once, so a cycle ends where it began.
+- **Other registries.** A client resolves an edge that carries `registry` only in a registry the consumer already declares at that URL, and MUST NOT add, read or trust a registry because an edge names it. When none is declared, the edge is unresolved.
 
 aireg reads directory and git roots, not HTTPS roots. It applies the path, reference, and cycle rules to both and verifies every file's size and digest before using it. It refuses plain `http://` except to a loopback host, sends a stored credential only to the origin it was issued for and a token from the environment only to the registry of that name, and bounds each git operation with a timeout.
 
