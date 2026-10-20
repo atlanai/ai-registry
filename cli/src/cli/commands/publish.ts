@@ -183,7 +183,8 @@ function describe(item: Planned): string {
   const needs = edges.length === 0 ? "" : `, depends on ${edges.map(dependencyOf).join(", ")}`;
   if (item.same) return `  same    ${address}  ${item.version}, already published${needs}`;
   if (item.from === undefined) return `  add     ${address}  ${item.version}${needs}`;
-  return `  update  ${address}  ${item.from} → ${item.version}${needs}`;
+  const below = item.belowLatest ? " (below latest)" : "";
+  return `  update  ${address}  ${item.from} → ${item.version}${below}${needs}`;
 }
 
 function describeSkip(skip: Skipped, namespace: string): string {
@@ -210,6 +211,7 @@ function report(
       namespace: item.namespace,
       from: item.from ?? null,
       version: item.version,
+      belowLatest: item.belowLatest,
       published: !item.same && results.has(alias) && result?.unchanged !== true,
       dependsOn: (item.input.relationships ?? []).map(({ to, range, registry }) => ({
         to,

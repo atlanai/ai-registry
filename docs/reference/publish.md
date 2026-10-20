@@ -38,7 +38,7 @@ The registry must be declared in the project or your user scope. See [`aireg reg
 
 ### Versions
 
-A first publish is version `0.1.0`. After that, `publish` takes the next patch version, or the version `--bump` names. To publish an exact version, add it to `--to`, such as `--to acme/engineering/pr-review@2.0.0`. A published version is never rewritten. After a version that isn't SemVer, such as `1`, there is no next version to work out, so `publish` asks you to name one.
+A first publish is version `0.1.0`. After that, `publish` takes the next patch version, or the version `--bump` names, counting from the newest published version, even one the registry holds back, such as a blocked one. To publish an exact version, add it to `--to`, such as `--to acme/engineering/pr-review@2.0.0`. A published version is never rewritten, whatever its status, so `publish` refuses a version that is already published, and never sends the work as another version instead. After a version that isn't SemVer, such as `1`, there is no next version to work out, so `publish` asks you to name one.
 
 An artifact whose files match the newest published version is listed as `same` and not sent. On a terminal, when an artifact changed and you didn't pass `--bump`, `publish` asks how big a change it is.
 
@@ -109,7 +109,13 @@ acme  github.com/acme/agent-registry
 
 ### Versions
 
-An export with a `version` is published at that version. When the target already holds that version with the same files and dependencies, it is `same`; when it holds it with others, `publish` refuses, since a published version is never rewritten. An export without a `version` takes the next one, as any other artifact does.
+An export with a `version` is published at that version. When the target already holds that version with the same files and dependencies, it is `same`; when it holds it with others, `publish` refuses, since a published version is never rewritten. A version the registry holds back by its status counts as published too: a draft or a version pending review is compared as any other, and `publish` refuses a blocked one, whose files the registry doesn't give, as in `engineering/review@0.2.0 is already published, and is blocked (leaks tokens).` An export without a `version` takes the next one, as any other artifact does.
+
+A `version` below the target's newest is published as that older version, and the `update` line says so:
+
+```text
+  update  engineering/skill/review  0.3.0 → 0.2.5 (below latest)
+```
 
 ### Dependencies
 
@@ -147,15 +153,15 @@ A version whose only change is a dependency is a new version. A registry that do
 With `--json`, `publish` asks no questions and prints each artifact with its old and new version, and where it went:
 
 ```json
-{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}]}], "skipped": [{"name": "reviewer", "kind": "agent", "reason": "its publish.to does not list acme/engineering"}]}}
+{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "belowLatest": false, "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}]}], "skipped": [{"name": "reviewer", "kind": "agent", "reason": "its publish.to does not list acme/engineering"}]}}
 ```
 
-`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `skipped` lists the exports whose own `publish.to` leaves the target out.
+`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and otherwise the registry's newest version. `belowLatest` is `true` when `version` sorts below `from`, as an export's own `version` can. `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `skipped` lists the exports whose own `publish.to` leaves the target out.
 
 ## Exit status
 
 - `0`: published, nothing new to publish, a dry run, or canceled at a question.
-- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published. For exports: an entry names nothing, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
+- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published, whatever its status. For exports: an entry names nothing, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
 - `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder. For exports: the manifest lists several targets and `--to` names none, `--to` names one it doesn't list, or a registry without dependencies would receive an artifact that has them.
 - `3`: the artifact was edited from an older version than the one published since. Install the newer version and redo the edit, or pass `--force`.
 

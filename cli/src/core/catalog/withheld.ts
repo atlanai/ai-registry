@@ -63,11 +63,16 @@ const WORDS: Readonly<Record<string, string>> = {
 /** Statuses only a pin reaches, which say so when one does. */
 const PINNED_ONLY = new Set(["draft", "pending_review"]);
 
+/** `is blocked (leaks tokens)`: what the status says of the version, to end a sentence with. */
+export function statusClause(item: Withheld): string {
+  const why = item.reason === undefined ? "" : ` (${item.reason})`;
+  return `${WORDS[item.status] ?? `is ${item.status}`}${why}`;
+}
+
 /** `engineering/pr-review 1.2.0 is blocked (leaks tokens)`, to end a sentence with. */
 export function withheldMessage(item: Withheld): string {
   const shown = [item.group, item.name].filter(Boolean).join("/");
-  const why = item.reason === undefined ? "" : ` (${item.reason})`;
-  return `${shown} ${item.version} ${WORDS[item.status] ?? `is ${item.status}`}${why}`;
+  return `${shown} ${item.version} ${statusClause(item)}`;
 }
 
 /** What a run installing a version of this status says: `acme/lint 1.1.0 is deprecated (superseded).` */

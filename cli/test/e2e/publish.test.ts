@@ -114,7 +114,9 @@ describe("creating a registry and publishing into it", () => {
     expect(await versions("platform", "skill", "notify")).not.toMatch(/"0\.1\.0"/);
   });
 
-  test("gives each of three publishes at once its own version", async ({ aireg }) => {
+  test("writes each of three publishes at once at the version it reports, or refuses it", async ({
+    aireg,
+  }) => {
     const racers = ["a", "b", "c"];
     for (const racer of racers) {
       await mkdir(join(work, "race", racer, "racer"), { recursive: true });
@@ -128,23 +130,30 @@ describe("creating a registry and publishing into it", () => {
         aireg(["publish", `race/${racer}/racer`, "--to", "team/platform", "--yes"], { cwd: work }),
       ),
     );
-    expect(
-      sent.map((run) => run.code),
-      sent.map((run) => run.stderr).join(""),
-    ).toEqual([0, 0, 0]);
-    const listed = JSON.parse(await versions("platform", "skill", "racer")).versions.map(
-      (row: { version: string }) => row.version,
-    );
-    expect(new Set(listed).size).toBe(3);
-    const bodies = await Promise.all(
-      listed.map((version: string) =>
-        readFile(
+    // Those that read the registry before another wrote ask for the same version, and only the
+    // first to write it lands; none is written at a version other than the one it reports.
+    const reported: string[] = [];
+    for (const [at, run] of sent.entries()) {
+      if (run.code !== 0) {
+        expect(run.stderr).toMatch(
+          /platform\/skill\/racer@[\d.]+ is already published with other content\./,
+        );
+        continue;
+      }
+      const version = /racer {2}(?:[\d.]+ → )?([\d.]+)/.exec(run.stdout)?.[1] ?? "";
+      reported.push(version);
+      expect(
+        await readFile(
           join(registryRoot, "artifacts", "platform", "skill", "racer", version, "SKILL.md"),
           "utf8",
         ),
-      ),
+      ).toContain(`Run ${racers[at]}.`);
+    }
+    expect(reported.length).toBeGreaterThan(0);
+    const listed = JSON.parse(await versions("platform", "skill", "racer")).versions.map(
+      (row: { version: string }) => row.version,
     );
-    expect(bodies.map((body) => /Run (\w)\./.exec(body)?.[1]).sort()).toEqual(racers);
+    expect([...listed].sort()).toEqual([...reported].sort());
     expect((await aireg(["registry", "validate"], { cwd: registryRoot })).code).toBe(0);
   }, 60_000);
 
@@ -212,6 +221,7 @@ describe("creating a registry and publishing into it", () => {
           namespace: "data",
           from: null,
           version: "0.1.0",
+          belowLatest: false,
           published: true,
           dependsOn: [],
         },

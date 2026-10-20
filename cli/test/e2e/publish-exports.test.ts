@@ -180,3 +180,98 @@ publish:
     );
   });
 });
+
+describe("an export's own version", () => {
+  /** A repository whose one export, a skill, fixes its version, publishing into its own registry folder. */
+  let repo: string;
+  const skill = () => join(repo, ".claude", "skills", "lint", "SKILL.md");
+  const versionsAt = () =>
+    join(repo, "registry", "artifacts", "eng", "skill", "lint", "versions.json");
+  const written = async () =>
+    (
+      JSON.parse(await readFile(versionsAt(), "utf8")) as { versions: { version: string }[] }
+    ).versions
+      .map((row) => row.version)
+      .sort();
+  const fixAt = (version: string | undefined) =>
+    writeManifestIn(
+      repo,
+      `exports:\n  - path: .claude/skills/lint${version === undefined ? "" : `\n    version: ${version}`}\npublish:\n  to: [./registry/eng]\n`,
+    );
+  /** Sets a version's status in `versions.json`, as a registry's maintainers do. */
+  const mark = async (version: string, status: string, reason?: string) => {
+    const document = JSON.parse(await readFile(versionsAt(), "utf8")) as {
+      versions: { version: string; status?: string; reason?: string }[];
+    };
+    for (const row of document.versions) {
+      if (row.version !== version) continue;
+      row.status = status;
+      if (reason !== undefined) row.reason = reason;
+    }
+    await writeFile(versionsAt(), JSON.stringify(document, null, 2));
+  };
+  const send = (...args: string[]) => aireg(["publish", "-y", ...args], { cwd: repo });
+
+  test.beforeAll(async ({ tmp, git }) => {
+    repo = join(tmp, "fixed");
+    await git.init(repo);
+    await mkdir(join(repo, ".claude", "skills", "lint"), { recursive: true });
+    await writeFile(skill(), skillBody("lint", "Lints a change."));
+    await fixAt("0.2.0");
+    const made = await aireg(["registry", "init", "registry", "--name", "fixed", "-y"], {
+      cwd: repo,
+    });
+    expect(made.code, made.stderr).toBe(0);
+    const first = await send();
+    expect(first.code, first.stderr).toBe(0);
+    expect(await written()).toEqual(["0.2.0"]);
+  }, 60_000);
+
+  test("is the same when a draft holds it with these files, every run", async () => {
+    await mark("0.2.0", "draft");
+    for (const _ of [1, 2]) {
+      const again = await send();
+      expect(again.code, again.stderr).toBe(0);
+      expect(again.stdout).toMatch(/same {4}eng\/skill\/lint {2}0\.2\.0, already published/);
+    }
+    expect(await written()).toEqual(["0.2.0"]);
+  });
+
+  test("is refused when a blocked version holds it, writing no other version, every run", async () => {
+    await mark("0.2.0", "blocked", "leaks tokens");
+    await appendFile(skill(), "Check the imports.\n");
+    for (const _ of [1, 2]) {
+      const refused = await send("--json");
+      expect(refused.code).toBe(1);
+      expect(JSON.parse(refused.stdout).error).toMatchObject({
+        code: "conflict",
+        message: "eng/lint@0.2.0 is already published, and is blocked (leaks tokens).",
+      });
+    }
+    expect(await written()).toEqual(["0.2.0"]);
+  });
+
+  test("goes past a blocked newest version once it fixes none, and says which", async () => {
+    await fixAt(undefined);
+    const sent = await send("--json");
+    expect(sent.code, sent.stderr).toBe(0);
+    expect(JSON.parse(sent.stdout).data.artifacts).toEqual([
+      expect.objectContaining({ from: "0.2.0", version: "0.2.1", published: true }),
+    ]);
+    expect(await written()).toEqual(["0.2.0", "0.2.1"]);
+  });
+
+  test("says when the version it fixes is below the newest", async () => {
+    await fixAt("0.1.5");
+    const shown = await send("--dry-run");
+    expect(shown.stdout).toMatch(
+      /update {2}eng\/skill\/lint {2}0\.2\.1 → 0\.1\.5 \(below latest\)/,
+    );
+    const sent = await send("--json");
+    expect(sent.code, sent.stderr).toBe(0);
+    expect(JSON.parse(sent.stdout).data.artifacts).toEqual([
+      expect.objectContaining({ from: "0.2.1", version: "0.1.5", belowLatest: true }),
+    ]);
+    expect(await written()).toEqual(["0.1.5", "0.2.0", "0.2.1"]);
+  });
+});

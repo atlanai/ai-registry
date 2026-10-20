@@ -38,6 +38,7 @@ describe("plan", () => {
       latest: new Map([
         ["eng/skill/lint", { id: "lint", version: "1.2.0", digests: ["sha256:older"] }],
       ]),
+      withheld: new Map(),
     } as unknown as Published;
 
     const planned = await plan(work, published, "eng", "minor", undefined, false);
@@ -81,6 +82,7 @@ describe("plan with relationships", () => {
           ? []
           : [["eng/skill/lint", { id: "lint", version: "1.0.0", ...current }]],
       ),
+      withheld: new Map(),
     }) as unknown as Published;
 
   test("refuses an adapter that does not store them, before reading the files", async () => {
@@ -142,7 +144,10 @@ describe("plan with an export's version", () => {
     return { work, digests };
   }
 
-  /** A registry whose newest lint is 1.0.0, and which also holds `older` at 0.9.0. */
+  /**
+   * A registry whose newest lint is 1.0.0, and which also holds `older` at 0.9.0, and 0.8.0 held
+   * back by its status, as a resolve reports one: by name and version, without its files.
+   */
   const holding = (latest: string[], older: string[] = ["sha256:other"]) =>
     ({
       alias: "acme",
@@ -162,10 +167,23 @@ describe("plan with an export's version", () => {
                   },
                 ]
               : [],
+            withheld: wants.some((want) => want.version === "0.8.0")
+              ? [
+                  {
+                    name: "lint",
+                    namespace: "eng",
+                    kind: "skill",
+                    version: "0.8.0",
+                    status: "blocked",
+                    reason: "leaks tokens",
+                  },
+                ]
+              : [],
           }),
         },
       },
       latest: new Map([["eng/skill/lint", { id: "lint", version: "1.0.0", digests: latest }]]),
+      withheld: new Map(),
     }) as unknown as Published;
 
   test("publishes that version, past the newest, rather than the next patch", async () => {
@@ -192,6 +210,57 @@ describe("plan with an export's version", () => {
     await expect(
       plan(work, holding(["sha256:newer"]), "eng", "patch", undefined, false),
     ).rejects.toMatchObject({ message: "eng/lint@0.9.0 is already published.", code: "conflict" });
+  });
+
+  test("refuses that version when the registry holds it back, though a resolve does not return it", async () => {
+    const { work } = await exported("0.8.0");
+    await expect(
+      plan(work, holding(["sha256:newer"]), "eng", "patch", undefined, false),
+    ).rejects.toMatchObject({
+      message: "eng/lint@0.8.0 is already published, and is blocked (leaks tokens).",
+      code: "conflict",
+    });
+    // `--to` naming that version exactly is refused the same way.
+    const named = { ...work, exported: undefined };
+    await expect(
+      plan(named, holding(["sha256:newer"]), "eng", "patch", "0.8.0", false),
+    ).rejects.toMatchObject({ code: "conflict" });
+  });
+
+  test("says when that version is below the newest", async () => {
+    const { work } = await exported("0.9.5");
+    const planned = await plan(work, holding(["sha256:newer"]), "eng", "patch", undefined, false);
+    expect(planned).toMatchObject({ from: "1.0.0", version: "0.9.5", belowLatest: true });
+    const past = await exported("2.0.0");
+    expect(
+      (await plan(past.work, holding(["sha256:newer"]), "eng", "patch", undefined, false))
+        .belowLatest,
+    ).toBe(false);
+  });
+
+  test("takes the next version past a newest one the registry holds back", async () => {
+    const path = join(root, "lint");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "SKILL.md"), "---\nname: lint\ndescription: Lints code.\n---\n");
+    const work: Work = {
+      name: "lint",
+      kind: "skill",
+      path,
+      description: undefined,
+      home: undefined,
+      row: undefined,
+      base: undefined,
+    };
+    const published = {
+      alias: "acme",
+      source: { adapter: { id: "probe", capabilities: {} } },
+      latest: new Map(),
+      withheld: new Map([
+        ["eng/skill/lint", { id: undefined, version: "1.4.0", digests: [], withheld: {} }],
+      ]),
+    } as unknown as Published;
+    const planned = await plan(work, published, "eng", "patch", undefined, false);
+    expect(planned).toMatchObject({ same: false, from: "1.4.0", version: "1.4.1" });
   });
 });
 

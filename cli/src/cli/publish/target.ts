@@ -9,7 +9,7 @@ import type {
   Relationship,
   SourceAdapter,
 } from "#adapter/index.ts";
-import { type Bump, bumpVersion, parseVersion } from "#adapter/semver.ts";
+import { type Bump, bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { canonicalize } from "#adapter/spec/canonical.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { ID as LOCAL } from "#adapters/local/api.ts";
@@ -17,6 +17,7 @@ import { expandLocation } from "#core/adapter/location.ts";
 import { adapterFor } from "#core/adapter/registry.ts";
 import { type ConnectedSource, connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import { readOnlyLayout } from "#core/adapter/writable.ts";
+import { statusClause, type Withheld, withheldFrom } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { kindsOf } from "#core/filespec/write/kinds.ts";
 import { type OfferTarget, offerFrom } from "#core/filespec/write/offer.ts";
@@ -189,10 +190,12 @@ export async function folderTo(
 
 /** What a registry holds of one artifact now: its latest version, its files and its edges. */
 interface Current {
-  id: string;
+  id: string | undefined;
   version: string | undefined;
   digests: string[];
   relationships?: readonly Relationship[] | undefined;
+  /** Published, but held back by its status, such as blocked: the registry gives no files for it. */
+  withheld?: Withheld | undefined;
 }
 
 /** What one registry publishes now, read once and kept open to publish into. */
@@ -202,6 +205,8 @@ export interface Published {
   source: ConnectedSource;
   namespaces: string[];
   latest: Map<string, Current>;
+  /** Artifacts whose newest version the registry holds back, such as a blocked one, at that version. */
+  withheld: Map<string, Current>;
 }
 
 const keyOf = (namespace: string, kind: string, name: string) => `${namespace}/${kind}/${name}`;
@@ -249,7 +254,18 @@ export async function readPublished(
       relationships: artifact.envelope.relationships,
     });
   }
-  return { alias, location, source, namespaces: [...namespaces].sort(), latest };
+  // Held back is still published: the next version goes past it, never back over it.
+  const withheld = new Map<string, Current>();
+  for (const item of listing.catalog.withheld ?? []) {
+    if (item.group === undefined) continue;
+    withheld.set(keyOf(item.group, item.kind, item.name), {
+      id: undefined,
+      version: item.version,
+      digests: [],
+      withheld: item,
+    });
+  }
+  return { alias, location, source, namespaces: [...namespaces].sort(), latest, withheld };
 }
 
 /** One artifact's outcome: a first version, the next one, or already there. */
@@ -259,17 +275,9 @@ export interface Planned {
   from: string | undefined;
   version: string;
   same: boolean;
+  /** The version sorts below the registry's newest, as an export's own older `version` can. */
+  belowLatest: boolean;
   input: PublishInput;
-}
-
-/** An exact version must be new: a published version directory is never rewritten. */
-async function taken(published: Published, name: string, version: string): Promise<boolean> {
-  try {
-    const found = await published.source.handle.resolve([{ name, version }]);
-    return found.artifacts.length > 0;
-  } catch {
-    return false;
-  }
 }
 
 /** What the registry holds at one version of this artifact, when it holds that version. */
@@ -286,13 +294,23 @@ async function heldAt(
   const artifact = found?.artifacts.find(
     (each) => each.envelope.metadata.version === version && each.kind === kind,
   );
-  if (artifact === undefined) return undefined;
-  return {
-    id: artifact.id,
-    version,
-    digests: digestsOf(artifact),
-    relationships: artifact.envelope.relationships,
-  };
+  if (artifact !== undefined) {
+    return {
+      id: artifact.id,
+      version,
+      digests: digestsOf(artifact),
+      relationships: artifact.envelope.relationships,
+    };
+  }
+  // A resolve hides a version its status holds back, such as a blocked one, but still names it.
+  const kept = withheldFrom(found?.withheld).find(
+    (item) =>
+      item.name === name &&
+      item.kind === kind &&
+      item.version === version &&
+      (item.group === undefined || item.group === namespace),
+  );
+  return kept === undefined ? undefined : { id: undefined, version, digests: [], withheld: kept };
 }
 
 /**
@@ -344,6 +362,42 @@ function refuseRelationships(
   );
 }
 
+/**
+ * An edit made on an older version, published as the newest, drops whatever
+ * was published in between; that is a conflict, the same one sync reports.
+ */
+function refuseBehind(work: Work, current: Current | undefined): void {
+  if (work.base === undefined || current?.version === undefined || work.base === current.version)
+    return;
+  throw new AiregError(
+    `${work.name} was edited from ${work.base}, but ${current.version} was published since, so publishing would drop the changes in ${current.version}.`,
+    {
+      code: ErrorCode.Changed,
+      hint: `Install ${current.version} first and redo the edit there, or pass \`--force\` to publish over it.`,
+    },
+  );
+}
+
+/** A version asked for that the registry holds with other content, or holds back unseen. */
+function alreadyPublished(
+  work: Work,
+  namespace: string,
+  held: Current,
+  fixed: string | undefined,
+): AiregError {
+  const status = held.withheld === undefined ? "" : `, and ${statusClause(held.withheld)}`;
+  return new AiregError(
+    `${namespace}/${work.name}@${held.version} is already published${status}.`,
+    {
+      code: ErrorCode.Conflict,
+      hint:
+        fixed === undefined
+          ? "Choose a new version, or leave the version off; a published version is never rewritten."
+          : `Change the \`version\` of export ${quoted(work.exported?.path ?? work.name)}, or remove it to take the next one; a published version is never rewritten.`,
+    },
+  );
+}
+
 /** The same edges, whatever order each one's fields were written in. */
 function sameEdges(
   current: readonly Relationship[] | undefined,
@@ -367,21 +421,10 @@ export async function plan(
   relationships?: readonly PublishRelationship[],
 ): Promise<Planned> {
   refuseRelationships(work, published, relationships);
-  const current = published.latest.get(keyOf(namespace, work.kind, work.name));
+  const key = keyOf(namespace, work.kind, work.name);
+  const current = published.latest.get(key) ?? published.withheld.get(key);
   const folder = published.source.adapter.capabilities.fileSpec === true;
-  // An edit made on an older version, published as the newest, drops whatever
-  // was published in between; that is a conflict, the same one sync reports.
-  const behind =
-    work.base !== undefined && current?.version !== undefined && work.base !== current.version;
-  if (behind && !force) {
-    throw new AiregError(
-      `${work.name} was edited from ${work.base}, but ${current.version} was published since, so publishing would drop the changes in ${current.version}.`,
-      {
-        code: ErrorCode.Changed,
-        hint: `Install ${current.version} first and redo the edit there, or pass \`--force\` to publish over it.`,
-      },
-    );
-  }
+  if (!force) refuseBehind(work, current);
   const target = (version: string): OfferTarget => ({
     name: work.name,
     kind: work.kind,
@@ -394,39 +437,33 @@ export async function plan(
   });
   // An export's own version is what it is published at, unless `--to` names another.
   const fixed = exact === undefined ? work.exported?.version : undefined;
+  const asked = exact ?? fixed;
   // The files and the edges decide sameness: the digest covers the version, so it always moves.
-  const probe = await offerFrom(work.path, target(exact ?? fixed ?? "0.1.0"));
+  const probe = await offerFrom(work.path, target(asked ?? "0.1.0"));
+  // A version held back gives no files to compare, so it is never the same.
   const matches = (held: Current) =>
+    held.withheld === undefined &&
     held.digests.join() === probe.digests.join() &&
     (relationships === undefined || sameEdges(held.relationships, probe.input.relationships));
-  // Asking again for a version already published with these files is a repeat, not a conflict.
+  // A version is looked up by itself, whatever its status, so one held back is never taken for new;
+  // a pin reaches a draft's files, which a listing withholds.
   const held =
-    fixed === undefined
+    asked === undefined
       ? undefined
-      : fixed === current?.version
+      : asked === current?.version && current.withheld === undefined
         ? current
-        : await heldAt(published, namespace, work, fixed);
+        : await heldAt(published, namespace, work, asked);
+  // Asking again for an export's version already published with these files is a repeat, not a conflict.
   const same =
     held !== undefined
-      ? matches(held)
-      : current !== undefined && matches(current) && exact === undefined && fixed === undefined;
-  const refused =
-    held !== undefined ? !same : exact !== undefined && (await taken(published, work.name, exact));
-  if (refused) {
-    throw new AiregError(`${namespace}/${work.name}@${exact ?? fixed} is already published.`, {
-      code: ErrorCode.Conflict,
-      hint:
-        fixed === undefined
-          ? "Choose a new version, or leave the version off; a published version is never rewritten."
-          : `Change the \`version\` of export ${quoted(work.exported?.path ?? work.name)}, or remove it to take the next one; a published version is never rewritten.`,
-    });
-  }
+      ? fixed !== undefined && matches(held)
+      : asked === undefined && current !== undefined && matches(current);
+  if (held !== undefined && !same) throw alreadyPublished(work, namespace, held, fixed);
   if (!same) await refuseInvalid(work, namespace, probe.input, folder);
   // Without SemVer there is no "next" to work out, and 0.1.0 would sort below it.
   if (
     !same &&
-    exact === undefined &&
-    fixed === undefined &&
+    asked === undefined &&
     current?.version !== undefined &&
     parseVersion(current.version) === undefined
   ) {
@@ -439,11 +476,25 @@ export async function plan(
     );
   }
   const version = same
-    ? (fixed ?? (current?.version as string))
-    : (exact ?? fixed ?? bumpVersion(current?.version, how));
+    ? (asked ?? (current?.version as string))
+    : (asked ?? bumpVersion(current?.version, how));
   // The version is not part of the content identity, so the files read once serve it.
   const input = version === probe.input.version ? probe.input : { ...probe.input, version };
-  return { work, namespace, from: current?.version, version, same, input };
+  return {
+    work,
+    namespace,
+    from: current?.version,
+    version,
+    same,
+    belowLatest: below(version, current?.version),
+    input,
+  };
+}
+
+function below(version: string, latest: string | undefined): boolean {
+  const left = parseVersion(version);
+  const right = latest === undefined ? undefined : parseVersion(latest);
+  return left !== undefined && right !== undefined && compareVersion(left, right) < 0;
 }
 
 /** The commit subject for releasing these versions: `add` for one artifact's first, else `release`. */
