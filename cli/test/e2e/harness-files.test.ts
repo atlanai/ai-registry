@@ -64,7 +64,9 @@ describe("a harness a file of yours defines", () => {
     const added = await aireg(["add", "fx/ns", "--all", "-y"]);
     expect(added.code, added.stderr).toBe(0);
     expect(added.stdout).toContain("Installed ns/lint and ns/reviewer for Tool.");
-    expect(added.stderr).toContain("Tool loads skills here only once you trust them: run `tool trust`.");
+    expect(added.stderr).toContain(
+      "Tool loads skills here only once you trust them: run `tool trust`.",
+    );
     expect(added.stderr).toContain("Restart Tool to load the change.");
 
     expect((await lstat(skill())).isSymbolicLink()).toBe(false);
