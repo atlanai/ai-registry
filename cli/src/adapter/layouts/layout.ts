@@ -34,6 +34,8 @@ export interface LayoutContext {
   rootName: string;
   /** Fetches a plugin listed by where it lives; absent, such a plugin is skipped. */
   fetch?: ((plugin: RemotePlugin) => Promise<FetchedPlugin>) | undefined;
+  /** Whether a plugin listed by where it lives is asked for, by its entry's name; absent, all are. */
+  asked?: ((name: string) => boolean) | undefined;
 }
 
 /** What a layout found, and what it left out. */

@@ -70,6 +70,24 @@ function chosen(found: readonly Artifact[], wanted: readonly Want[], all: boolea
   );
 }
 
+/** Whether an artifact is one a want asks for, whatever version the want names. */
+const reaches = (want: Want) => (artifact: Artifact) =>
+  covers(want, {
+    name: artifact.envelope.metadata.name,
+    namespace: artifact.group,
+    kind: artifact.kind,
+  });
+
+/**
+ * The plugins fetched from elsewhere that a resolve needs, by entry name: those wanted, or the
+ * plugin a wanted skill sits in. Undefined when it needs all of them.
+ */
+function askedFor(wanted: readonly Want[], all: boolean): ((name: string) => boolean) | undefined {
+  if (all || wanted.length === 0) return undefined;
+  const names = new Set(wanted.flatMap((want) => [want.name, want.namespace ?? want.name]));
+  return (name) => names.has(name);
+}
+
 /** How `LayoutRoot.resolve` reads a folder. */
 interface LayoutResolveOptions {
   all?: boolean | undefined;
@@ -107,8 +125,9 @@ async function enumerated(
   const kept = immutable ? SETTLED.get(key) : undefined;
   if (kept !== undefined) return structuredClone(kept);
   const found = await layout.enumerate(tree, context);
-  // A fetched plugin may follow a branch, so only what the checkout alone holds is kept.
-  if (immutable && found.roots === undefined) {
+  // A fetched plugin may follow a branch, so only what the checkout alone holds is kept, and
+  // only a whole reading of it.
+  if (immutable && found.roots === undefined && context.asked === undefined) {
     SETTLED.delete(key);
     SETTLED.set(key, structuredClone(found));
     const [oldest] = SETTLED.keys();
@@ -153,12 +172,13 @@ export function openLayoutRoot(options: { immutable?: boolean } = {}): LayoutRoo
       const reader = layoutOf(layout);
       if (reader === undefined) throw new SpecError(`aireg cannot read the ${layout} layout here.`);
       const tree = await openTree(at);
-      const found = await enumerated(
-        reader,
-        tree,
-        resolveOptions.context,
-        options.immutable === true,
-      );
+      const immutable = options.immutable === true;
+      const asked = askedFor(wanted, resolveOptions.all === true);
+      let found = await enumerated(reader, tree, { ...resolveOptions.context, asked }, immutable);
+      // A want no entry's name reaches, such as a plugin known by another name, reads them all.
+      if (asked !== undefined && !wanted.every((want) => found.artifacts.some(reaches(want)))) {
+        found = await enumerated(reader, tree, resolveOptions.context, immutable);
+      }
       // Forced, a layout that finds nothing says what it looked for, as detection does.
       if (found.artifacts.length === 0) throw nothingFound([reader]);
       const artifacts = chosen(found.artifacts, wanted, resolveOptions.all === true);

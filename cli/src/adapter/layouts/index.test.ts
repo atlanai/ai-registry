@@ -4,7 +4,9 @@ import { describe, expect } from "vitest";
 import { skillsFolder } from "#test/kit/builders/layouts.ts";
 import { registry } from "#test/kit/builders/registry.ts";
 import { test } from "#test/kit/fixtures.ts";
+import type { Want } from "../contract.ts";
 import { detectLayout, openLayoutRoot } from "./index.ts";
+import type { RemotePlugin } from "./layout.ts";
 
 const context = { namespace: "kit", rootName: "kit" };
 
@@ -48,6 +50,49 @@ describe("openLayoutRoot", () => {
     expect(await files.localRoot(pdf)).toBe(join(root, "pdf"));
     const bytes = await files.fetch(pdf, pdf.files[0]!);
     expect(new TextDecoder().decode(bytes)).toContain("name: pdf");
+  });
+
+  test("fetches only the remote plugins a resolve asks for, and every one when it asks for all", async ({
+    tmp,
+  }) => {
+    const names = ["far", "near", "wide"];
+    const root = await skillsFolder(join(tmp, "mkt"))
+      .json(".claude-plugin/marketplace.json", {
+        name: "acme-tools",
+        owner: { name: "Acme" },
+        plugins: names.map((name) => ({
+          name,
+          source: { source: "github", repo: `acme/${name}` },
+        })),
+      })
+      .write();
+    for (const name of names) {
+      await skillsFolder(join(tmp, name)).skill("skills/tip", { name: "tip" }).write();
+    }
+    const fetched: string[] = [];
+    const fetch = async (plugin: RemotePlugin) => {
+      fetched.push(plugin.name);
+      return { root: join(tmp, plugin.name), revision: "0".repeat(40), version: undefined };
+    };
+    const files = openLayoutRoot();
+    const read = async (wanted: Want[], all = false) => {
+      fetched.length = 0;
+      const resolution = await files.resolve(root, wanted, { all, context: { ...context, fetch } });
+      return resolution.artifacts.map((item) => item.id);
+    };
+
+    expect(await read([{ name: "near" }])).toEqual(["@remote/near", "@remote/near/skills/tip"]);
+    expect(fetched).toEqual(["near"]);
+    // A skill of a plugin is asked for by its plugin's name, as its namespace.
+    expect(await read([{ name: "tip", namespace: "wide", kind: "skill" }])).toEqual([
+      "@remote/wide/skills/tip",
+    ]);
+    expect(fetched).toEqual(["wide"]);
+    // A name no entry has, such as one a plugin goes by elsewhere, reads them all to find it.
+    expect(await read([{ name: "tip", kind: "skill" }])).toHaveLength(3);
+    expect(fetched).toEqual(names);
+    await read([], true);
+    expect(fetched).toEqual(names);
   });
 
   test("reads a registry as the file spec reader does", async ({ tmp }) => {

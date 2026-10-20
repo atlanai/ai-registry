@@ -198,7 +198,8 @@ function prefetch(marketplace: Marketplace, context: LayoutContext): Map<Json, P
   for (const entry of marketplace.entries) {
     const name = textOf(entry.name);
     const at = name === undefined ? undefined : sourceOf(entry, name, marketplace);
-    if (at === undefined || !("remote" in at)) continue;
+    if (at === undefined || !("remote" in at) || context.asked?.(at.remote.name) === false)
+      continue;
     const warnings: string[] = [];
     const repository = repositoryOf(at.remote);
     const fetched = (turns.get(repository) ?? Promise.resolve()).then(async () => {
