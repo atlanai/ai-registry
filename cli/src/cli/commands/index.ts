@@ -559,6 +559,10 @@ export const COMMANDS: readonly CommandSpec[] = [
         command: "aireg publish pr-review --bump minor",
         what: "a new minor version of an edited skill",
       },
+      {
+        command: "aireg publish --to acme/engineering",
+        what: "the manifest's exports, with their dependencies",
+      },
     ],
     docs: "publish",
     options: [

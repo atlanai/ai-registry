@@ -213,8 +213,10 @@ describe("creating a registry and publishing into it", () => {
           from: null,
           version: "0.1.0",
           published: true,
+          dependsOn: [],
         },
       ],
+      skipped: [],
     });
     expect(await versions("data", "agent", "triage")).toContain("0.1.0");
   });

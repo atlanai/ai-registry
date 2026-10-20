@@ -123,6 +123,78 @@ describe("plan with relationships", () => {
   });
 });
 
+describe("plan with an export's version", () => {
+  async function exported(version: string): Promise<{ work: Work; digests: string[] }> {
+    const path = join(root, "lint");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "SKILL.md"), "---\nname: lint\ndescription: Lints code.\n---\n");
+    const work: Work = {
+      name: "lint",
+      kind: "skill",
+      path,
+      description: undefined,
+      home: undefined,
+      row: undefined,
+      base: undefined,
+      exported: { path: "lint", version, dependsOn: [], publish: undefined },
+    };
+    const { digests } = await offerFrom(path, { name: "lint", kind: "skill", version });
+    return { work, digests };
+  }
+
+  /** A registry whose newest lint is 1.0.0, and which also holds `older` at 0.9.0. */
+  const holding = (latest: string[], older: string[] = ["sha256:other"]) =>
+    ({
+      alias: "acme",
+      source: {
+        adapter: { id: "probe", capabilities: {} },
+        handle: {
+          resolve: async (wants: { version?: string }[]) => ({
+            artifacts: wants.some((want) => want.version === "0.9.0")
+              ? [
+                  {
+                    id: "lint",
+                    kind: "skill",
+                    envelope: {
+                      metadata: { version: "0.9.0" },
+                      files: older.map((digest) => ({ digest })),
+                    },
+                  },
+                ]
+              : [],
+          }),
+        },
+      },
+      latest: new Map([["eng/skill/lint", { id: "lint", version: "1.0.0", digests: latest }]]),
+    }) as unknown as Published;
+
+  test("publishes that version, past the newest, rather than the next patch", async () => {
+    const { work } = await exported("2.0.0");
+    const planned = await plan(work, holding(["sha256:older"]), "eng", "patch", undefined, false);
+    expect(planned).toMatchObject({ same: false, from: "1.0.0", version: "2.0.0" });
+  });
+
+  test("is the same when the registry holds that version with these files", async () => {
+    const newest = await exported("1.0.0");
+    const same = await plan(newest.work, holding(newest.digests), "eng", "patch", undefined, false);
+    expect(same).toMatchObject({ same: true, version: "1.0.0" });
+
+    const older = await exported("0.9.0");
+    const held = holding(["sha256:newer"], older.digests);
+    expect(await plan(older.work, held, "eng", "patch", undefined, false)).toMatchObject({
+      same: true,
+      version: "0.9.0",
+    });
+  });
+
+  test("refuses that version when the registry holds it with other files", async () => {
+    const { work } = await exported("0.9.0");
+    await expect(
+      plan(work, holding(["sha256:newer"]), "eng", "patch", undefined, false),
+    ).rejects.toMatchObject({ message: "eng/lint@0.9.0 is already published.", code: "conflict" });
+  });
+});
+
 describe("commitAndPush", () => {
   test("commits in the folder named, quoting what a shell would read differently", () => {
     expect(commitAndPush("add triage 0.1.0")).toBe(
