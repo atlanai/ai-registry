@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -50,6 +50,21 @@ describe("assembling a projection", () => {
     await rm(join(content(), "agents"), { recursive: true, force: true });
     await assemble(projection(), content(), ["claude"]);
     expect(await readdir(projection())).not.toContain("agents");
+  });
+
+  test("copies a file on Windows, where a junction reaches only a folder", async () => {
+    await publish("skills", "lint");
+    await writeFile(join(content(), ".mcp.json"), '{"mcpServers":{}}\n');
+    const platform = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      await assemble(projection(), content(), ["claude"]);
+    } finally {
+      Object.defineProperty(process, "platform", platform);
+    }
+    const mcp = join(projection(), ".mcp.json");
+    expect((await lstat(mcp)).isSymbolicLink()).toBe(false);
+    expect(await readFile(mcp, "utf8")).toBe('{"mcpServers":{}}\n');
   });
 
   test("writes one manifest per harness that reads it, and a portable root", async () => {

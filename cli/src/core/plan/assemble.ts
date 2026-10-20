@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, symlink } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm, stat, symlink } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
 import { assertUnredirected, readRegular } from "#adapter/files.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
@@ -21,11 +21,13 @@ const CLAUDE_MANIFEST = ".claude-plugin/plugin.json";
 /**
  * Relative, so moving the artifacts tree does not strand a projection. On Windows a junction:
  * a symlink needs Developer Mode, and a relative one inside a junction resolves the wrong way.
+ * A junction reaches only a folder, so there a file, such as `.mcp.json`, is copied.
  */
 async function pointAt(from: string, to: string): Promise<void> {
   await rm(from, { recursive: true, force: true });
-  if (process.platform === "win32") await symlink(resolve(to), from, "junction");
-  else await symlink(relative(join(from, ".."), to), from);
+  if (process.platform !== "win32") await symlink(relative(join(from, ".."), to), from);
+  else if ((await stat(to)).isDirectory()) await symlink(resolve(to), from, "junction");
+  else await copyFile(to, from);
 }
 
 /** What every harness's plugin manifest says, before any keys of its own. */
