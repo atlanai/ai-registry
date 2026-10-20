@@ -111,6 +111,38 @@ const CASES: Case[] = [
     message: "depends on eng/skill/gone@1.0.0, which this registry does not hold",
   },
   {
+    name: "a dependency in a registry named by an address that is not https",
+    build: (registry) =>
+      registry.agent("eng/helper@1.0.0", {
+        dependsOn: [{ to: "platform/skill/sql-style@1.2.0", registry: "http://example.com/r" }],
+        files: { "AGENT.md": AGENT.replace("name: reviewer", "name: helper") },
+      }),
+    path: "artifacts/eng/agent/helper/1.0.0",
+    message:
+      'depends on platform/skill/sql-style@1.2.0 in "http://example.com/r", which is not an https URL',
+  },
+  {
+    name: "a dependency in another registry that is not a namespace/kind/name@version",
+    build: (registry) =>
+      registry.agent("eng/helper@1.0.0", {
+        dependsOn: [{ to: "platform/sql-style@1.2.0", registry: "https://example.com/r" }],
+        files: { "AGENT.md": AGENT.replace("name: reviewer", "name: helper") },
+      }),
+    path: "artifacts/eng/agent/helper/1.0.0",
+    message: "depends on platform/sql-style@1.2.0, which is not a namespace/kind/name@version",
+  },
+  {
+    name: "a dependency at a range its own version is outside of",
+    build: (registry) =>
+      registry.agent("eng/helper@1.0.0", {
+        dependsOn: ["eng/skill/lint@1.0.0 ^2.0.0"],
+        files: { "AGENT.md": AGENT.replace("name: reviewer", "name: helper") },
+      }),
+    path: "artifacts/eng/agent/helper/1.0.0",
+    message:
+      'depends on eng/skill/lint@1.0.0 at "^2.0.0", which is not a version range that version satisfies',
+  },
+  {
     name: "a released file edited in place",
     edit: (root) =>
       put(
@@ -180,6 +212,23 @@ describe("validateRoot", () => {
 
     expect(validated).toMatchObject({ name: "team", namespaces: 1, artifacts: 2, versions: 2 });
     expect(validated.problems).toEqual([]);
+  });
+
+  test("takes a dependency in another registry, which this one need not hold", async ({ root }) => {
+    await clean(root)
+      .agent("eng/helper@1.0.0", {
+        dependsOn: [
+          {
+            to: "platform/skill/sql-style@1.2.0",
+            range: "^1.2.0",
+            registry: "https://github.com/acme/agent-registry",
+          },
+        ],
+        files: { "AGENT.md": AGENT.replace("name: reviewer", "name: helper") },
+      })
+      .write();
+
+    expect((await validateRoot(root)).problems).toEqual([]);
   });
 
   test("keeps taking an agent released with a runtime block", async ({ root }) => {

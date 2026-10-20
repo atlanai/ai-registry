@@ -23,7 +23,7 @@ import { isRemote, locatorOf } from "#adapter/filespec/resolve.ts";
 import { newest } from "#adapter/filespec/write.ts";
 import { contentDigest, type Envelope } from "#adapter/index.ts";
 import { collidingPaths, isSafePath } from "#adapter/paths.ts";
-import { compareVersion, parseVersion } from "#adapter/semver.ts";
+import { compareVersion, parseVersion, satisfies } from "#adapter/semver.ts";
 import { catalogDigest } from "#adapter/spec/canonical.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -278,15 +278,61 @@ export function versionProblems(
   return problems;
 }
 
-/** The refs a version's envelope says it depends on, as written there. */
-async function dependsOn(root: string, at: string): Promise<string[]> {
+interface Edge {
+  to: string;
+  range: unknown;
+  registry: unknown;
+}
+
+/** The `depends_on` edges a version's envelope declares, as written there. */
+async function dependsOn(root: string, at: string): Promise<Edge[]> {
   const raw = await readJson(rootReader(root), `${at}/${ENVELOPE}`).catch(() => undefined);
   const edges = isRecord(raw) ? raw.relationships : undefined;
   if (!Array.isArray(edges)) return [];
   return edges.flatMap((edge) => {
-    const { rel_type: type, to } = (edge ?? {}) as { rel_type?: unknown; to?: unknown };
-    return type === "depends_on" && typeof to === "string" ? [to] : [];
+    const { rel_type: type, to, range, registry } = (edge ?? {}) as Record<string, unknown>;
+    return type === "depends_on" && typeof to === "string" ? [{ to, range, registry }] : [];
   });
+}
+
+/** Whether `to` is the `<namespace>/<kind>/<name>@<version>` an edge names, and its version. */
+function edgeVersion(to: string): string | undefined {
+  const at = to.lastIndexOf("@");
+  const [namespace, kind, name, ...rest] = to.slice(0, Math.max(at, 0)).split("/");
+  const version = to.slice(at + 1);
+  const named =
+    at > 0 &&
+    rest.length === 0 &&
+    isNamespace(namespace ?? "") &&
+    isKindSegment(kind ?? "") &&
+    isArtifactName(name ?? "") &&
+    isVersion(version);
+  return named ? version : undefined;
+}
+
+/**
+ * What is wrong with one edge. One naming another registry is resolved there, so only its own
+ * fields are checked; one without resolves in this registry, which must hold `to`.
+ */
+function edgeProblems({ to, range, registry }: Edge, held: ReadonlySet<string>): string[] {
+  const version = edgeVersion(to);
+  const problems: string[] = [];
+  if (registry !== undefined) {
+    if (typeof registry !== "string" || !/^https:\/\/./i.test(registry)) {
+      problems.push(`depends on ${to} in ${quoted(String(registry))}, which is not an https URL`);
+    }
+    if (version === undefined) {
+      problems.push(`depends on ${to}, which is not a namespace/kind/name@version`);
+    }
+  } else if (!held.has(to)) {
+    problems.push(`depends on ${to}, which this registry does not hold`);
+  }
+  if (range !== undefined && (typeof range !== "string" || !satisfies(version ?? "", range))) {
+    problems.push(
+      `depends on ${to} at ${quoted(String(range))}, which is not a version range that version satisfies`,
+    );
+  }
+  return problems;
 }
 
 /** Paths a version's envelope describes that no client writes: the grammar every reader enforces. */
@@ -431,13 +477,8 @@ async function folderProblems(
   for (const message of versionProblems(manifest, folder, present, contents)) {
     problems.push({ path: where, message });
   }
-  for (const to of await dependsOn(root, where)) {
-    if (!held.has(to)) {
-      problems.push({
-        path: where,
-        message: `depends on ${to}, which this registry does not hold`,
-      });
-    }
+  for (const edge of await dependsOn(root, where)) {
+    for (const message of edgeProblems(edge, held)) problems.push({ path: where, message });
   }
 
   problems.push(...(await unwritable(root, where)));
