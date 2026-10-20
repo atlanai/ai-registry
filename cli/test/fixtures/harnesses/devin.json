@@ -1,0 +1,17 @@
+{
+  "id": "devin",
+  "displayName": "Devin",
+  "overrides": true,
+  "roots": {
+    "project": ".devin",
+    "user": { "default": "~/.config/devin", "env": "XDG_CONFIG_HOME", "within": "devin" }
+  },
+  "detect": { "binary": ["devin", "devin-desktop"], "paths": ["~/.codeium/windsurf"] },
+  "reads": { "skill": ["agents", "devin", "claude"], "agent": ["devin", "agents"] },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": { "shape": "directory", "subdir": "skills" },
+    "agent": { "shape": "file", "subdir": "agents", "extension": ".md" }
+  },
+  "verified": { "command": ["devin", "--version"], "range": "3000.11.3" }
+}

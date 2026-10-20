@@ -1,0 +1,7 @@
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+project/.devin/
+project/.devin/agents/
+project/.devin/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md

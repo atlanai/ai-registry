@@ -23,7 +23,7 @@
 | `CI` | Any value means a CI service runs aireg. aireg then asks no questions, skips its update check, and the installer offers no skills. |
 | `TERM` | `dumb` turns color and animation off. |
 | `HOME`, `USERPROFILE` | Your home folder, in that order, else the one your OS reports. `~` in a path you type means this folder. |
-| `XDG_CONFIG_HOME` | Where the fish startup file and the Linux daemon service go, if not `~/.config`. |
+| `XDG_CONFIG_HOME` | Where the fish startup file, the Linux daemon service and Devin's `devin/` user folder go, if not `~/.config`. |
 | `XDG_RUNTIME_DIR` | Where the daemon's socket goes, if set to an absolute path. Otherwise the system's temporary folder. A folder there that another user made first is passed over, ending at `run/` in aireg's folder. |
 | `SHELL`, `ZDOTDIR` | Which shell startup files the installer adds aireg to, and where zsh keeps them. |
 | `GITHUB_ACTIONS` | Set to `true` by GitHub Actions. The installer then puts aireg on `PATH` through `GITHUB_PATH`, and `aireg registry validate` prints problems as annotations. |
