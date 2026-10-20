@@ -2,8 +2,9 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
+import { registry } from "#test/kit/builders/registry.ts";
 import { type Aireg, fileTest as test } from "#test/kit/fixtures.ts";
-import { lockPath, writeManifestIn } from "#test/kit/scope.ts";
+import { lockPath, manifestPath, writeManifestIn } from "#test/kit/scope.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
 // A repository lists what it makes under `exports:` and where it goes under `publish.to`, so a bare
@@ -342,5 +343,53 @@ publish:
     const sent = await send("--bump", "minor");
     expect(sent.code).toBe(1);
     expect(sent.stderr).toContain("eng/reviewer@0.0.5 is already published.");
+  });
+});
+
+describe("removing an artifact an export depends on", () => {
+  let repo: string;
+  const run = (...args: string[]) => aireg(args, { cwd: repo });
+  const manifest = () => readFile(manifestPath(repo), "utf8");
+  const DEPENDS = "    depends_on:\n      - acme/acme/skill/lint\n";
+
+  test.beforeAll(async ({ tmp }) => {
+    repo = join(tmp, "depending");
+    const market = await registry(join(tmp, "lint-market"), { name: "acme", slug: "acme" })
+      .skill("acme/lint@1.0.0")
+      .write();
+    await mkdir(join(repo, ".claude", "agents"), { recursive: true });
+    await writeFile(
+      join(repo, ".claude", "agents", "reviewer.md"),
+      "---\nname: reviewer\ndescription: Reviews a pull request.\n---\nReview it.\n",
+    );
+    expect((await run("init", "-y")).code).toBe(0);
+    expect((await run("registry", "add", market, "--as", "acme")).code).toBe(0);
+    const added = await run("add", "acme/acme/skill/lint", "-y");
+    expect(added.code, added.stderr).toBe(0);
+    await appendFile(
+      manifestPath(repo),
+      `exports:\n  - path: .claude/agents/reviewer.md\n${DEPENDS}`,
+    );
+  }, 60_000);
+
+  test("is refused before anything is written, naming the export", async () => {
+    const before = await manifest();
+    for (const args of [["lint"], ["--all"]]) {
+      const removed = await run("remove", ...args, "-y");
+      expect(removed.code).toBe(1);
+      expect(removed.stderr).toContain(
+        'lint is a dependency of export ".claude/agents/reviewer.md".',
+      );
+      expect(removed.stderr).toContain("Remove it from that export's `depends_on` first.");
+    }
+    expect(await manifest()).toBe(before);
+    expect((await run("list")).stdout).toMatch(/ lint\s+skill/);
+  });
+
+  test("goes ahead once the export no longer depends on it", async () => {
+    await writeFile(manifestPath(repo), (await manifest()).replace(DEPENDS, ""));
+    const removed = await run("remove", "lint", "-y");
+    expect(removed.code, removed.stderr).toBe(0);
+    expect(await manifest()).not.toContain("acme/acme/skill/lint");
   });
 });

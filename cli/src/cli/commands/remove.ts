@@ -1,4 +1,4 @@
-import { list, sanitizeName } from "#adapter/text.ts";
+import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { matchInstalled, rowsNamed, shownNames } from "#cli/names.ts";
 import { parse } from "#cli/options.ts";
 import {
@@ -17,7 +17,7 @@ import { loadedBy, toolName } from "#cli/render/tools.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import type { Lock } from "#core/lock.ts";
-import { reaches } from "#core/manifest.ts";
+import { artifactFor, type Manifest, reaches } from "#core/manifest.ts";
 import { editedAnywhere } from "#core/plan/model.ts";
 import { survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
@@ -61,6 +61,36 @@ async function editedAmong(lock: Lock, names: readonly string[], roots: Roots): 
   const going = Object.entries(lock.artifacts).filter(([name]) => wanted.has(name));
   const found = await survey({ ...lock, artifacts: dict(going) }, roots);
   return names.filter((name) => editedAnywhere(lock.artifacts[name], found.artifacts[name]));
+}
+
+/**
+ * An export's `depends_on` names its `artifacts:` entry, which says the versions the export
+ * takes, so a manifest without the entry would not be read again. Refused before anything is
+ * written, rather than as that manifest.
+ */
+function refuseExportDependency(manifest: Manifest, lock: Lock, dropped: readonly string[]): void {
+  const shown = shownNames(lock);
+  for (const name of dropped) {
+    const row = lock.artifacts[name];
+    if (row === undefined) continue;
+    const exports = manifest.exports.filter((entry) =>
+      entry.dependsOn.some(
+        (dependency) =>
+          dependency.type === "remote" &&
+          reaches(dependency.ref, row) &&
+          artifactFor(manifest.artifacts, dependency.ref) === undefined,
+      ),
+    );
+    if (exports.length === 0) continue;
+    const one = exports.length === 1;
+    throw new AiregError(
+      `${shown.get(name) ?? name} is a dependency of ${one ? "export" : "exports"} ${list(exports.map((entry) => quoted(entry.path)))}.`,
+      {
+        code: ErrorCode.Conflict,
+        hint: `Remove it from ${one ? "that export's" : "those exports'"} \`depends_on\` first.`,
+      },
+    );
+  }
 }
 
 /** Said whenever a removal leaves a row a job publishes, so it is never kept silently. */
@@ -164,6 +194,7 @@ export async function run(context: CommandContext): Promise<void> {
       fresh.manifest.artifacts = fresh.manifest.artifacts.flatMap((ref) =>
         without(ref, drop, lock, removeAll || wholes.has(formatAddress(ref))),
       );
+      refuseExportDependency(fresh.manifest, lock, dropped);
 
       const touched = [...new Set(dropped.map((key) => lock.artifacts[key]?.registry ?? ""))];
       return {

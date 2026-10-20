@@ -273,7 +273,7 @@ describe("exports and publish", () => {
     expect(refused(entry("    depends_on: [public/platform/skill/lint]\n"))).toThrow(
       expect.objectContaining({
         message: `manifest.yml: ${of} "public/platform/skill/lint", which is not listed under \`artifacts:\`.`,
-        hint: "Add it with `aireg add public/platform/skill/lint`.",
+        hint: "List it under `artifacts:`, such as `- public/platform/skill/lint`.",
       }),
     );
     // A whole namespace installs it too, but has no one entry to say which versions.

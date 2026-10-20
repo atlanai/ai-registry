@@ -473,7 +473,8 @@ function dependency(text: string, path: string, artifacts: readonly Ref[]): Expo
   if (artifactFor(artifacts, ref) === undefined) {
     throw new ManifestError(
       `${of}, which is not listed under \`artifacts:\`.`,
-      `Add it with \`aireg add ${address}\`.`,
+      // Not `aireg add`, which reads this manifest first and so stops here too.
+      `List it under \`artifacts:\`, such as \`- ${address}\`.`,
     );
   }
   return { type: "remote", ref };
