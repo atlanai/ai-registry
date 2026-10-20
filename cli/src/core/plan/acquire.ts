@@ -90,6 +90,11 @@ export function wanted(manifest: Manifest, alias: string): Request | undefined {
   for (const ref of manifest.artifacts) {
     if (ref.registry !== alias) continue;
     asked = true;
+    const plugin = namespacePlugin(manifest, alias, ref);
+    if (plugin !== undefined) {
+      byAddress.set(formatAddress(ref), plugin);
+      continue;
+    }
     if (ref.name === undefined) {
       all = true;
       continue;
@@ -108,6 +113,16 @@ export function wanted(manifest: Manifest, alias: string): Request | undefined {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, item]) => item);
   return { want, all };
+}
+
+/**
+ * A marketplace files each plugin's parts under the plugin's name, so a namespace there is one
+ * plugin, asked for by name rather than by reading every plugin the marketplace lists.
+ */
+function namespacePlugin(manifest: Manifest, alias: string, ref: Ref): Want | undefined {
+  if (ref.name !== undefined || ref.namespace === undefined) return undefined;
+  const layout = manifest.registries[alias]?.config.layout;
+  return layout === "marketplace" ? { name: ref.namespace, kind: "plugin" } : undefined;
 }
 
 /**
@@ -137,7 +152,8 @@ function lockedRequest(
     const rows = view.reached(ref);
     for (const name of rows) named.add(name);
     if (ref.name === undefined && !held && rows.every((name) => moving.has(name))) {
-      all = true;
+      // `wanted` asks for a marketplace's plugin by name, which brings whatever it holds now.
+      if (namespacePlugin(manifest, alias, ref) === undefined) all = true;
       continue;
     }
     for (const name of rows) {
