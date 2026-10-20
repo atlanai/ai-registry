@@ -475,9 +475,10 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: "harnesses",
     summary: "List the harnesses aireg can install into, and which this machine has",
     group: "Check",
-    usage: ["aireg harnesses", "aireg harnesses show <id>", "aireg harnesses check <file>"],
+    usage: ["aireg harnesses [--all]", "aireg harnesses show <id>", "aireg harnesses check <file>"],
     examples: [{ command: "aireg harnesses", what: "which coding agents this machine has" }],
     docs: "harnesses",
+    options: [{ ...ALL, describe: "List every harness aireg supports, not only those found" }],
     actions: [
       {
         name: "show",

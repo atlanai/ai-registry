@@ -15,9 +15,9 @@ import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
 import { builtin, type CommandContext, runAction } from "./index.ts";
 
 export async function run(context: CommandContext): Promise<void> {
-  const { positionals } = parse(context.argv, builtin("harnesses"));
+  const { positionals, common } = parse(context.argv, builtin("harnesses"));
   const [action, argument] = positionals;
-  if (action === undefined) return list(context);
+  if (action === undefined) return list(context, common.all);
   return runAction(builtin("harnesses"), action, {
     show: async () =>
       show(
@@ -61,7 +61,7 @@ function warnSkipped(context: CommandContext): void {
 }
 
 /** Each harness and what detected it: env, binary, then directories. */
-async function list(context: CommandContext): Promise<void> {
+async function list(context: CommandContext, all: boolean): Promise<void> {
   // Every name `--for` takes; a shared folder such as `.agents` is never detected.
   const harnesses = resolveHarnesses();
   const rows = detectAll(harnesses, context.cwd);
@@ -88,9 +88,30 @@ async function list(context: CommandContext): Promise<void> {
     return;
   }
 
+  // A harness this machine lacks is noise, but one your own file defines stays in view.
+  const shown = all
+    ? tools
+    : tools.filter((item) => item.detected || item.target.origin !== BUILT_IN);
+  if (shown.length > 0) {
+    harnessTable(context, shown);
+    context.printer.info();
+  }
+  const listed = new Set(shown.map((item) => item.target.name));
+  const reading = Object.fromEntries(
+    Object.entries(harnesses).filter(([name, target]) => target.shared || listed.has(name)),
+  );
+  for (const line of sharedReads(reading)) context.printer.info(line);
+  context.printer.info(foundSummary(tools.filter((item) => item.detected).length, tools.length));
+  if (shown.length < tools.length) {
+    context.printer.hint("Run `aireg harnesses --all` to see every one.");
+  }
+  warnSkipped(context);
+}
+
+/** One row per coding agent; the shared folder is not a tool, so a note says who reads it. */
+function harnessTable(context: CommandContext, rows: readonly Detection[]): void {
   const { style } = context.printer;
-  const fromFiles = tools.some((item) => item.target.origin !== BUILT_IN);
-  // The shared folder is not a tool: a person picks the tools, and the note says who reads it.
+  const fromFiles = rows.some((item) => item.target.origin !== BUILT_IN);
   table(
     context.printer,
     [
@@ -109,12 +130,8 @@ async function list(context: CommandContext): Promise<void> {
         ? [{ header: "from", value: (item: Detection) => style.dim(origin(item.target.origin)) }]
         : []),
     ],
-    tools,
+    rows,
   );
-  context.printer.info();
-  for (const line of sharedReads(harnesses)) context.printer.info(line);
-  context.printer.info(foundSummary(tools.filter((item) => item.detected).length, tools.length));
-  warnSkipped(context);
 }
 
 export function foundSummary(found: number, supported: number): string {

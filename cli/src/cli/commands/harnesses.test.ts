@@ -80,15 +80,23 @@ describe("harnesses", () => {
     ]);
   });
 
-  test("names each coding agent with its id, and says who reads the shared folder", async () => {
-    const writes: string[] = [];
-    await run(context(cwd, writes, "text"));
-    const lines = writes.join("").split("\n");
-    expect(lines).toContain("  harness      id      status     where");
-    expect(lines).toContain("  Claude Code  claude  found      from its environment variables");
-    expect(lines.some((line) => /^ +(agents|Shared)/.test(line))).toBe(false);
-    expect(lines).toContain("Codex and Cursor read skills from the shared .agents folder.");
+  test("lists the coding agents this machine has, and every one with --all", async () => {
+    const found: string[] = [];
+    await run(context(cwd, found, "text"));
+    const lines = found.join("").split("\n");
+    expect(lines).toContain("  harness      id      status  where");
+    expect(lines).toContain("  Claude Code  claude  found   from its environment variables");
+    expect(lines.some((line) => /^ +(Codex|Cursor|agents|Shared)/.test(line))).toBe(false);
+    expect(lines).not.toContain("Codex and Cursor read skills from the shared .agents folder.");
     expect(lines).toContain("Found 1 of 3 supported harnesses on this machine.");
+    expect(lines).toContain("hint: Run `aireg harnesses --all` to see every one.");
+
+    const every: string[] = [];
+    await run(context(cwd, every, "text", ["--all"]));
+    const all = every.join("").split("\n");
+    expect(every.join("")).toMatch(/^ +Cursor +cursor +not found$/m);
+    expect(all).toContain("Codex and Cursor read skills from the shared .agents folder.");
+    expect(all.some((line) => line.includes("--all"))).toBe(false);
   });
 
   test("says which file defines a harness, and skips a broken one with a warning", async () => {

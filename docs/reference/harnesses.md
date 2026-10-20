@@ -5,14 +5,14 @@ List the harnesses aireg can install into, and which this machine has.
 ## Synopsis
 
 ```text
-aireg harnesses
+aireg harnesses [--all]
 aireg harnesses show <id>
 aireg harnesses check <file>
 ```
 
 ## Description
 
-`aireg harnesses` lists every harness name [`--for`](options.md#harnesses) accepts, and whether aireg found that coding agent on this machine. It finds one by its environment variables, its program on your `PATH`, or its folder in the project or your home folder.
+`aireg harnesses` lists the coding agents aireg found on this machine, and any a [harness file](#harness-files) of yours defines. It finds one by its environment variables, its program on your `PATH`, or its folder in the project or your home folder. With `--all`, it lists every harness name [`--for`](options.md#harnesses) accepts, found or not.
 
 Each row names a coding agent and the id `--for` takes. A line under the table names the agents that read the shared `.agents` folder. Once a [harness file](#harness-files) of yours defines one, a `from` column says where each harness comes from.
 
@@ -55,7 +55,9 @@ Some harnesses load what aireg placed only after you trust it. aireg never takes
 
 ## Options
 
-`harnesses` has no options of its own.
+| Option | Description |
+|---|---|
+| `--all` | List every harness aireg supports, not only those found. |
 
 ## JSON output
 
@@ -63,7 +65,7 @@ Some harnesses load what aireg placed only after you trust it. aireg never takes
 {"ok": true, "data": {"harnesses": [{"name": "claude", "displayName": "Claude Code", "kind": "coding", "shared": false, "detected": true, "by": "binary", "origin": "built-in"}], "skipped": []}}
 ```
 
-The harnesses are in the order the text lists them, plus the shared `.agents` folder, which the table leaves out; `shared` is true for it. `by` is `env`, `binary`, `project` or `user`, and is left out when the harness wasn't found. `origin` is `built-in` or the path of the file that defines the harness. `skipped` lists each harness file aireg refused, with its `path` and `problems`.
+The harnesses are every one `--all` lists, in its order, plus the shared `.agents` folder, which the table leaves out; `shared` is true for it. `by` is `env`, `binary`, `project` or `user`, and is left out when the harness wasn't found. `origin` is `built-in` or the path of the file that defines the harness. `skipped` lists each harness file aireg refused, with its `path` and `problems`.
 
 `show` prints `{"harness": {...}}`, the harness as aireg resolved it. `check` prints `{"path": "...", "id": "tool", "problems": []}`, with `ok` false when it found a problem.
 
@@ -82,13 +84,11 @@ aireg harnesses
 ```
 
 ```text
-  harness      id      status     where
-  Claude Code  claude  found      on your PATH
-  Codex        codex   not found
-  Cursor       cursor  not found
+  harness      id      status  where
+  Claude Code  claude  found   on your PATH
 
-Codex and Cursor read skills from the shared .agents folder.
 Found 1 of 3 supported harnesses on this machine.
+hint: Run `aireg harnesses --all` to see every one.
 ```
 
 See where Codex takes each kind:
