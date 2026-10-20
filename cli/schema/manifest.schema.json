@@ -181,6 +181,99 @@
           }
         ]
       }
+    },
+    "exports": {
+      "description": "What this project makes for others to install: a path or glob, or `{ path, version, depends_on, publish }` to give one path an exact version, dependencies or its own targets.",
+      "type": "array",
+      "items": {
+        "description": "One path, or one path and what to publish it with.",
+        "anyOf": [
+          {
+            "pattern": "^(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+            "description": "A path relative to the project, or a glob over paths, such as .claude/skills/*.",
+            "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "path": {
+                "pattern": "^(?![^*?[\\]{}]*[*?[\\]{}])(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+                "description": "One path relative to the project, such as .claude/agents/reviewer.md.",
+                "type": "string"
+              },
+              "version": {
+                "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-(0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*))*)?$",
+                "description": "The exact version to publish it at, such as 2.0.0.",
+                "type": "string"
+              },
+              "depends_on": {
+                "uniqueItems": true,
+                "description": "What it needs installed beside it.",
+                "type": "array",
+                "items": {
+                  "pattern": "^\\./(?![^*?[\\]{}]*[*?[\\]{}])(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){3}$",
+                  "description": "Another export, as ./ and its path, or an artifact listed under `artifacts:`, as <registry>/<namespace>/<kind>/<name> with no version.",
+                  "type": "string"
+                }
+              },
+              "publish": {
+                "description": "`false`, or `{ to }` naming some of the top-level `publish.to`.",
+                "anyOf": [
+                  {
+                    "description": "Never publish it.",
+                    "const": false,
+                    "type": "boolean"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "to"
+                    ],
+                    "properties": {
+                      "to": {
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "description": "The top-level targets it goes to, when not all of them.",
+                        "type": "array",
+                        "items": {
+                          "pattern": "^[^./][^/]*/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$|^(\\.[^/]*)?(/.*)?/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$",
+                          "description": "A declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "publish": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "to"
+      ],
+      "properties": {
+        "to": {
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Where exports are published, each as `aireg publish --to` takes it.",
+          "type": "array",
+          "items": {
+            "pattern": "^[^./][^/]*/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$|^(\\.[^/]*)?(/.*)?/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$",
+            "description": "A declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }

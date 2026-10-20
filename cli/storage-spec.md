@@ -74,6 +74,27 @@ artifacts:
       - claude
 ```
 
+A project that publishes what it makes lists it under `exports:`, and where it goes under `publish:`. aireg checks both when it reads the manifest and keeps them when it edits it, but `aireg publish` does not read them yet.
+
+- An `exports:` entry is a path relative to the project, written with `/`, or a glob over paths. A mapping gives one path, never a glob, an exact `version`, a `depends_on` list and its own `publish`; it may refine a path a glob also matches.
+- A `depends_on` entry is `./` and the path of another export, or the address `<registry>/<namespace>/<kind>/<name>` of an `artifacts:` entry, without a version: the entry's pin or range says which versions it takes.
+- `publish.to` lists targets as `aireg publish --to` takes them: `<registry>/<namespace>` in a declared registry, or a registry folder ending in a namespace. An export's `publish` is `false`, to leave it out, or a `to` naming some of those targets.
+
+```yaml
+artifacts:
+  - acme/platform/skill/sql-style@^1.2
+exports:
+  - .claude/skills/*
+  - path: .claude/agents/reviewer.md
+    version: 2.0.0
+    depends_on:
+      - ./.claude/skills/review
+      - acme/platform/skill/sql-style
+publish:
+  to:
+    - acme/engineering
+```
+
 **`manifest.lock.yml`** is what the scope resolved to. aireg writes it on every install and reads it back on the next one. It records each registry once, with the adapter that read it, a key for what was read and, for a git registry, the commit. Each artifact records its registry, version and the content digest that registry published, where the copy lives, a digest of that copy, and every link aireg made for it. A plugin fetched from a repository of its own also records that repository's commit as `revision`, and one that carries hooks, servers or executables records a digest of them as `carried`. A dependency records `needed_by`, the installed names whose `depends_on` edges reached it, and its own registry, which is another one than theirs when the edge named one by its address. An artifact with an edge that carries a version range records `depends_on`, by the installed name of each artifact its edges reach, the range, or the version an edge without one names; an older aireg ignores it. Paths are relative to the project, or to your home folder for the user scope, and there are no timestamps, so two branches that add different artifacts merge without a conflict.
 
 ```yaml

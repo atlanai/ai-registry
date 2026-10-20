@@ -127,6 +127,79 @@ const DetailedReference = Type.Object(
   { additionalProperties: false },
 );
 
+/** Below the project, with `/`: not absolute, and no empty, `.` or `..` part. */
+const PATH = String.raw`(?![A-Za-z]:)(?!(?:[^/]*/)*\.\.?(?:/|$))[^/\\]+(?:/[^/\\]+)*`;
+
+/** One path, not a glob over several. */
+const ONE_PATH = String.raw`(?![^*?[\]{}]*[*?[\]{}])${PATH}`;
+
+const NAMESPACE = "[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?";
+
+/** `<registry>/<namespace>`, or a folder, starting with `.` or `/`, that ends in one. */
+const Target = Type.String({
+  pattern: `^[^./][^/]*/${NAMESPACE}$|^(\\.[^/]*)?(/.*)?/${NAMESPACE}$`,
+  description:
+    "A declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
+});
+
+const SEMVER_IDENT = String.raw`(0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
+
+const DetailedExport = Type.Object(
+  {
+    path: Type.String({
+      pattern: `^${ONE_PATH}$`,
+      description: "One path relative to the project, such as .claude/agents/reviewer.md.",
+    }),
+    version: Type.Optional(
+      Type.String({
+        pattern: String.raw`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-${SEMVER_IDENT}(\.${SEMVER_IDENT})*)?$`,
+        description: "The exact version to publish it at, such as 2.0.0.",
+      }),
+    ),
+    depends_on: Type.Optional(
+      Type.Array(
+        Type.String({
+          pattern: String.raw`^\./${ONE_PATH}$|^[^@\\/]+(/[^@\\/]+){3}$`,
+          description:
+            "Another export, as ./ and its path, or an artifact listed under `artifacts:`, as <registry>/<namespace>/<kind>/<name> with no version.",
+        }),
+        { uniqueItems: true, description: "What it needs installed beside it." },
+      ),
+    ),
+    publish: Type.Optional(
+      Type.Union(
+        [
+          Type.Literal(false, { description: "Never publish it." }),
+          Type.Object(
+            {
+              to: Type.Array(Target, {
+                minItems: 1,
+                uniqueItems: true,
+                description: "The top-level targets it goes to, when not all of them.",
+              }),
+            },
+            { additionalProperties: false },
+          ),
+        ],
+        { description: "`false`, or `{ to }` naming some of the top-level `publish.to`." },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+const AnyExport = Type.Union(
+  [
+    Type.String({
+      pattern: `^${PATH}$`,
+      description:
+        "A path relative to the project, or a glob over paths, such as .claude/skills/*.",
+    }),
+    DetailedExport,
+  ],
+  { description: "One path, or one path and what to publish it with." },
+);
+
 export const Manifest = Type.Object(
   {
     $schema: Type.Optional(
@@ -165,6 +238,24 @@ export const Manifest = Type.Object(
         description:
           "A string reference, or `{ ref, as, exclude, harnesses, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
       }),
+    ),
+    exports: Type.Optional(
+      Type.Array(AnyExport, {
+        description:
+          "What this project makes for others to install: a path or glob, or `{ path, version, depends_on, publish }` to give one path an exact version, dependencies or its own targets.",
+      }),
+    ),
+    publish: Type.Optional(
+      Type.Object(
+        {
+          to: Type.Array(Target, {
+            minItems: 1,
+            uniqueItems: true,
+            description: "Where exports are published, each as `aireg publish --to` takes it.",
+          }),
+        },
+        { additionalProperties: false },
+      ),
     ),
   },
   {
