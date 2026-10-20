@@ -59,7 +59,7 @@ aireg add acme/engineering
 aireg list
 ```
 
-aireg links them into the folders your coding agents read, and records each exact version in `.registry/manifest.lock.yml`.
+aireg links them into the folders your coding agents read, and records each exact version in `.registry/manifest.lock.yml`. `aireg add` also installs from a plugin marketplace, a site's Agent Skills index, or a folder or repository of skills; see [`aireg add`](https://atlanai.github.io/ai-registry/reference/add/#sources-that-are-not-registries).
 
 When it runs in a terminal, the installer offers the aireg skills, from the release it installs. They let your coding agent set up, install from and publish to registries for you. To add them later:
 

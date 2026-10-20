@@ -50,7 +50,17 @@ A coding agent finds each skill and agent by its name, so two can't install unde
 
 ### Sources that are not registries
 
-`add` also installs from a folder, or a git repository, that holds skills and agents but no `registry.json`. aireg reads such a source and never publishes to it. It looks for:
+`add` also installs from sources that aren't registries, and records exactly what it installed in the lockfile, as it does for a registry. aireg only reads them, and never publishes to them.
+
+| Source | Example |
+|---|---|
+| A folder or git repository of skills and agents | `aireg add github.com/acme/skills --all` |
+| A plugin marketplace, or a plugin's own manifest | `aireg add github.com/acme/plugins --all` |
+| A site's Agent Skills index | `aireg add https://example.com --all` |
+
+A source with a `registry.json` is always a registry, and one whose `registry.json` is broken is an error rather than a folder of skills.
+
+A folder, or a git repository, that holds skills and agents but no `registry.json` is read as a folder of skills. aireg looks for:
 
 - a `SKILL.md` at the top, which makes the whole source one skill
 - otherwise, folders holding a `SKILL.md` up to three levels down, such as `pdf/`, `skills/pdf/`, `skills/<group>/pdf/`, `.claude/skills/pdf/` or `.agents/skills/pdf/`. It doesn't look inside a skill it found, or in `node_modules`, `dist`, `build` or hidden folders other than `.claude` and `.agents`.
