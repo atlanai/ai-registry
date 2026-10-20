@@ -1,5 +1,6 @@
 import type { RegistryIdentity } from "../contract.ts";
 import { type ArtifactKind, isKind } from "../kinds.ts";
+import { compareVersion, parseRange, parseVersion, satisfies, type Version } from "../semver.ts";
 import { SUPPORTED_FORMAT } from "../spec/types.ts";
 import { list, quoted } from "../text.ts";
 import { INDEX_DOCUMENT, isVersion, REGISTRY_DOCUMENT, versionsPath } from "./names.ts";
@@ -271,13 +272,38 @@ export function resolveVersion(document: VersionsDocument, wanted: string | unde
   const version = wanted ?? document.latest;
   const found = document.versions.find((item) => item.version === version);
   if (found !== undefined) return found;
+  // Asking for a version that was never released is a wrong name, not a broken registry.
+  throw noVersion(document, `no version ${version}`, wanted !== undefined);
+}
+
+/**
+ * The versions a range admits, newest first and never a yanked one (section 2.4). A range
+ * none of them satisfies is refused as a version never released is.
+ */
+export function versionsIn(document: VersionsDocument, range: string): VersionRow[] {
+  const parsed = parseRange(range);
+  if (parsed === undefined) {
+    throw new SpecError(`${quoted(range)} is not a version range.`, {
+      path: versionsPath(document.namespace, document.kind, document.name),
+      hint: "Write a range such as ^1.2.0, ~1.2 or >=1.0.0 <2.0.0.",
+    });
+  }
+  const found = document.versions
+    .filter((item) => !item.yanked && satisfies(item.version, parsed))
+    .map((item) => ({ item, version: parseVersion(item.version) as Version }))
+    .sort((a, b) => compareVersion(b.version, a.version))
+    .map(({ item }) => item);
+  if (found.length > 0) return found;
+  throw noVersion(document, `no version in ${range}`, true);
+}
+
+function noVersion(document: VersionsDocument, what: string, missing: boolean): SpecError {
   const artifact = [document.namespace, document.name].filter(Boolean).join("/");
   const offered = document.versions.filter((item) => !item.yanked).map((item) => item.version);
   const more = offered.length > SUGGESTED ? `, or another of its ${offered.length} versions` : "";
-  throw new SpecError(`${artifact} has no version ${version}.`, {
+  return new SpecError(`${artifact} has ${what}.`, {
     path: versionsPath(document.namespace, document.kind, document.name),
-    // Asking for a version that was never released is a wrong name, not a broken registry.
-    missing: wanted !== undefined,
+    missing,
     artifact,
     hint:
       offered.length === 0 ? undefined : `Use ${list(offered.slice(0, SUGGESTED), "or")}${more}.`,

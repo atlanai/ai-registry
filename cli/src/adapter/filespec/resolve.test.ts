@@ -190,6 +190,90 @@ describe("resolveFromRoot", () => {
     expect(pinned.withheld).toBeUndefined();
   });
 
+  test("resolves a range to its newest version that installs without a pin", async () => {
+    const LINT: SpecArtifact = {
+      namespace: "ops",
+      kind: "skill",
+      name: "lint",
+      latest: "2.0.0",
+      versions: [
+        ["1.0.0"],
+        ["1.1.0"],
+        ["1.2.0", { yanked: true }],
+        ["1.3.0", { status: "draft" }],
+        ["1.4.0", { status: "pending_review" }],
+        ["1.5.0", { status: "blocked" }],
+        ["1.6.0-rc.1"],
+        ["2.0.0"],
+      ].map(([version, rest]) => ({
+        version: version as string,
+        ...(rest as object),
+        files: { "SKILL.md": skillBody("lint", "lint", version as string) },
+      })),
+    };
+    const read = await root([LINT]);
+    const at = async (range: string, extra: { version?: string } = {}) =>
+      (
+        await resolveFromRoot(read, {
+          blobUrl: "blobs",
+          wanted: [{ name: "lint", namespace: "ops", kind: "skill", range, ...extra }],
+        })
+      ).artifacts.map((item) => item.envelope.metadata.version);
+
+    expect(await at("^1.0.0")).toEqual(["1.1.0"]);
+    expect(await at("^1.0.0 || >=1.6.0-rc.1 <1.7.0")).toEqual(["1.6.0-rc.1"]);
+    expect(await at("*")).toEqual(["2.0.0"]);
+    // A pin wins over a range, as the contract says.
+    expect(await at("^2", { version: "1.0.0" })).toEqual(["1.0.0"]);
+  });
+
+  test("takes a range from the want that names the artifact most narrowly, as a pin", async () => {
+    const read = await root([OPS_ADD]);
+    const { artifacts } = await resolveFromRoot(read, {
+      blobUrl: "blobs",
+      wanted: [
+        { name: "add", range: "^0.1.0" },
+        { name: "add", namespace: "ops", kind: "skill", range: "<1.1.0" },
+      ],
+    });
+    expect(artifacts.map((item) => item.id)).toEqual([
+      "artifacts/aireg/skill/add/0.1.0",
+      "artifacts/ops/skill/add/1.0.0",
+    ]);
+  });
+
+  test("withholds a range whose every version is withheld, naming the newest", async () => {
+    const read = await root([OPS_GATE, OPS_DRAFT]);
+    const resolved = await resolveFromRoot(read, {
+      blobUrl: "blobs",
+      wanted: [
+        { name: "gate", namespace: "ops", range: ">1.0.0" },
+        { name: "draft", namespace: "ops", range: "^0.1.0" },
+      ],
+    });
+    expect(resolved.artifacts).toEqual([]);
+    expect(resolved.withheld?.map((item) => [item.name, item.version, item.status])).toEqual([
+      ["gate", "1.1.0", "blocked"],
+      ["draft", "0.1.0", "draft"],
+    ]);
+  });
+
+  test("refuses a range no version satisfies, as a version never released", async () => {
+    const read = await root([OPS_ADD]);
+    const asked = (range: string) =>
+      resolveFromRoot(read, {
+        blobUrl: "blobs",
+        wanted: [{ name: "add", namespace: "ops", kind: "skill", range }],
+      });
+    // 1.1.0 is yanked, so only a pin reaches it.
+    await expect(asked("^1.1.0")).rejects.toMatchObject({
+      message: "ops/add has no version in ^1.1.0.",
+      missing: true,
+      hint: "Use 1.0.0.",
+    });
+    await expect(asked(">= 1")).rejects.toThrow('">= 1" is not a version range.');
+  });
+
   test("verifies the envelope as written, fields it does not know included", async () => {
     const dir = await mkdtemp(join(scratch, "aireg-spec-read-"));
     const read = await root([], dir);

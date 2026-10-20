@@ -225,11 +225,11 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
 
   return {
     async resolve(want: readonly Want[], options): Promise<Resolution> {
-      const pinned = want.find((item) => item.version !== undefined);
+      const pinned = want.find((item) => item.version !== undefined || item.range !== undefined);
       if (pinned !== undefined) {
         throw fail(
           "invalid",
-          `${registry} is a site's skills index, which has no versions, so ${pinned.name}@${pinned.version} cannot be installed.`,
+          `${registry} is a site's skills index, which has no versions, so ${pinned.name}@${pinned.version ?? pinned.range} cannot be installed.`,
           "Leave off the `@<version>`: aireg installs what the site serves now.",
         );
       }

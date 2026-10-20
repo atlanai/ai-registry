@@ -11,6 +11,7 @@ import {
 } from "#adapter/index.ts";
 import { isLayoutId, isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import { isSafePath } from "#adapter/paths.ts";
+import { satisfies } from "#adapter/semver.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import { materialize } from "#core/adapter/content.ts";
 import { expandLocation } from "#core/adapter/location.ts";
@@ -100,12 +101,15 @@ export function wanted(manifest: Manifest, alias: string): Request | undefined {
       continue;
     }
     const address = formatAddress(ref);
-    const version = ref.version ?? byAddress.get(address)?.version;
+    const before = byAddress.get(address);
+    const version = ref.version ?? before?.version;
+    const range = version === undefined ? (ref.range ?? before?.range) : undefined;
     byAddress.set(address, {
       name: ref.name,
       ...(ref.namespace === undefined ? {} : { namespace: ref.namespace }),
       ...(ref.kind === undefined ? {} : { kind: ref.kind }),
       ...(version === undefined ? {} : { version }),
+      ...(range === undefined ? {} : { range }),
     });
   }
   if (!asked) return undefined;
@@ -126,8 +130,9 @@ function namespacePlugin(manifest: Manifest, alias: string, ref: Ref): Want | un
 }
 
 /**
- * Locked rows are asked for at their locked version unless moved or pinned, so later publishes wait
- * for `update`; a whole reference reaching no row is new and asks for everything, unless `held`.
+ * Locked rows are asked for at their locked version unless moved, pinned, or outside the range the
+ * manifest asks for, so later publishes wait for `update`; a whole reference reaching no row is new
+ * and asks for everything, unless `held`.
  */
 function lockedRequest(
   manifest: Manifest,
@@ -158,9 +163,7 @@ function lockedRequest(
     }
     for (const name of rows) {
       const row = lock.artifacts[name] as LockArtifact;
-      const pinned = pins.some((want) => covers(want, row));
-      const free = moving.has(name) || pinned || row.version === undefined || whole || redeclared;
-      asked.set(name, lockedWant(row, free));
+      asked.set(name, rowWant(ref, row, pins, moving.has(name) || whole || redeclared));
     }
   }
   // A dependency is held at the version its dependents needed; the closure moves it when they do.
@@ -176,13 +179,26 @@ function lockedRequest(
   return { want: [...request.want, ...asked.values()], all };
 }
 
-/** A locked row asked for again: at its version and commit, unless it is free to move. */
-function lockedWant(row: LockArtifact, free: boolean): Want {
+/** A locked row a manifest reference reaches, asked for again; `free` moves it whatever it asks. */
+function rowWant(ref: Ref, row: LockArtifact, pins: readonly Want[], free: boolean): Want {
+  const pinned = pins.some((want) => covers(want, row));
+  // A range the manifest moved away from the locked version frees it, as a new pin would.
+  const outside = ref.range !== undefined && !satisfies(row.version ?? "", ref.range);
+  const moves = free || pinned || outside || row.version === undefined;
+  return lockedWant(row, moves, pinned ? undefined : ref.range);
+}
+
+/**
+ * A locked row asked for again: at its version and commit, unless it is free to move, when it
+ * moves within the range the manifest asks for, if any.
+ */
+function lockedWant(row: LockArtifact, free: boolean, range: string | undefined): Want {
   return {
     name: row.name,
     namespace: row.namespace,
     kind: row.kind,
     ...(free ? {} : { version: row.version }),
+    ...(free && range !== undefined ? { range } : {}),
     ...(free || row.revision === undefined ? {} : { revision: row.revision }),
   };
 }
@@ -317,9 +333,11 @@ export function answers(manifest: Manifest, source: Acquired, held = false): boo
     .every((ref) => {
       const found = candidates(ref, source);
       if (found.length === 0) return held && ref.exclude !== undefined;
+      const at = (entry: Entry) => source.placements.get(entry.path)?.version;
       return (
-        ref.version === undefined ||
-        found.every((entry) => source.placements.get(entry.path)?.version === ref.version)
+        (ref.version === undefined || found.every((entry) => at(entry) === ref.version)) &&
+        (ref.range === undefined ||
+          found.every((entry) => satisfies(at(entry) ?? "", ref.range as string)))
       );
     });
 }
@@ -391,6 +409,7 @@ async function acquireOne(
   let listing: Awaited<ReturnType<typeof resolveArtifacts>>;
   try {
     listing = await resolveArtifacts(open, request.want, { all: request.all });
+    refuseOutside(alias, request.want, listing.listed);
   } catch (error) {
     await open.handle.close();
     throw await withSignInHint(error, alias);
@@ -480,6 +499,36 @@ async function acquireOne(
     },
     close: () => open.handle.close(),
   };
+}
+
+/**
+ * An adapter that does not read a want's range serves what it would serve without one, so a
+ * version outside the range is refused here rather than installed.
+ */
+function refuseOutside(
+  alias: string,
+  want: readonly Want[],
+  listed: readonly { artifact: Artifact }[],
+): void {
+  for (const { artifact } of listed) {
+    const { name } = artifact.envelope.metadata;
+    const reaching = want.filter((item) =>
+      covers(item, { name, namespace: artifact.group, kind: artifact.kind }),
+    );
+    if (reaching.some((item) => item.version !== undefined)) continue;
+    const version = artifact.version ?? artifact.envelope.metadata.version ?? "";
+    const range = reaching.find(
+      (item) => item.range !== undefined && !satisfies(version, item.range),
+    )?.range;
+    if (range === undefined) continue;
+    throw new AiregError(
+      `${alias} returned ${sanitizeText(name)} ${sanitizeText(version || "with no version")}, which is outside ${sanitizeText(range)}.`,
+      {
+        code: ErrorCode.Invalid,
+        hint: "Pin a version with `@<version>` instead, or ask the registry's owner about it.",
+      },
+    );
+  }
 }
 
 /** A commit an adapter reports for one artifact, which the lockfile records and hands back. */

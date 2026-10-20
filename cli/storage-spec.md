@@ -58,7 +58,7 @@ After `aireg add acme/engineering/hello-registry` in a project:
 .agents/skills/hello-registry -> ../../.registry/artifacts/acme/engineering/skills/hello-registry
 ```
 
-**`manifest.yml`** is what the scope asks for: the harnesses to install into, the registries it reads, and the artifacts it wants. aireg edits it on `registry add`, `add` and `remove`; after editing it by hand, `aireg install` makes the scope match. An unknown key is refused. Without `harnesses:`, aireg installs into Claude Code and Codex.
+**`manifest.yml`** is what the scope asks for: the harnesses to install into, the registries it reads, and the artifacts it wants. aireg edits it on `registry add`, `add` and `remove`; after editing it by hand, `aireg install` makes the scope match. An unknown key is refused. Without `harnesses:`, aireg installs into Claude Code and Codex. One artifact's entry may end in `@<version>`, which pins it, or `@<range>`, a version range such as `^1.2` that the newest admitted version installs from and that `update` moves within.
 
 ```yaml
 harnesses:
@@ -68,6 +68,7 @@ registries:
   acme: github.com/acme/ai-registry
 artifacts:
   - acme/engineering/skill/lint
+  - acme/engineering/skill/review-style@^0.3
   - ref: acme/engineering/skill/pr-review@1.2.0
     harnesses:
       - claude

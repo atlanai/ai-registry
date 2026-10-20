@@ -88,3 +88,150 @@ export function gte(current: string, min: string): boolean {
   const right = parseVersion(min);
   return left !== undefined && right !== undefined && compareVersion(left, right) >= 0;
 }
+
+/** The longest range the file spec reads (section 2.4). */
+export const MAX_RANGE = 256;
+
+type Operator = "=" | ">" | ">=" | "<" | "<=";
+
+/** One bound a version is held to, once `^`, `~` and partial versions are read as the bounds they mean. */
+interface Comparator {
+  operator: Operator;
+  version: Version;
+}
+
+/**
+ * A version range as the file spec defines it (section 2.4): a version satisfies it when it
+ * meets every comparator of any one set.
+ */
+export interface Range {
+  readonly sets: readonly (readonly Comparator[])[];
+}
+
+const PART = new RegExp(`^(?:${NUMBER}|[xX*])$`);
+const WILDCARD = /^[xX*]$/;
+const OPERATOR = /^(?:<=|>=|<|>|=|\^|~)/;
+
+/** A full version with nothing around it, since a comparator has no space inside. */
+function full(text: string): Version | undefined {
+  return /\s/.test(text) ? undefined : parseVersion(text);
+}
+
+/** The release a partial version's numbers give, zero-filled; with `at`, that number incremented. */
+function release(numbers: readonly number[], at?: number): Version {
+  const given = at === undefined ? numbers : [...numbers.slice(0, at), (numbers[at] ?? 0) + 1];
+  const [major = 0, minor = 0, patch = 0] = given;
+  return { major, minor, patch, prerelease: [] };
+}
+
+/** The numbers a partial version gives, in order, or undefined when it is not one. */
+function partial(text: string): number[] | undefined {
+  const parts = text.split(".");
+  if (parts.length > 3 || !parts.every((part) => PART.test(part))) return undefined;
+  const given = parts.findIndex((part) => WILDCARD.test(part));
+  const numbers = given === -1 ? parts : parts.slice(0, given);
+  // A number after a wildcard says nothing a reader could honor.
+  if (parts.slice(numbers.length).some((part) => !WILDCARD.test(part))) return undefined;
+  const values = numbers.map(Number);
+  return values.every((value) => Number.isSafeInteger(value)) ? values : undefined;
+}
+
+/** One comparator as the bounds it means, or undefined when it is outside the grammar. */
+function comparators(token: string): Comparator[] | undefined {
+  const operator = OPERATOR.exec(token)?.[0];
+  const body = token.slice(operator?.length ?? 0);
+  const exact = full(body);
+  if (operator !== undefined && operator !== "^" && operator !== "~") {
+    return exact === undefined ? undefined : [{ operator: operator as Operator, version: exact }];
+  }
+  const numbers = exact === undefined ? partial(body) : [exact.major, exact.minor, exact.patch];
+  if (numbers === undefined) return undefined;
+  const lower = exact ?? release(numbers);
+  if (operator === undefined) {
+    if (exact !== undefined) return [{ operator: "=", version: exact }];
+    if (numbers.length === 0) return [];
+    const upper = release(numbers, numbers.length - 1);
+    return [
+      { operator: ">=", version: lower },
+      { operator: "<", version: upper },
+    ];
+  }
+  // `^` and `~` need the major number at least.
+  if (numbers.length === 0) return undefined;
+  const nonZero = numbers.findIndex((value) => value !== 0);
+  const at =
+    operator === "^"
+      ? nonZero === -1
+        ? numbers.length - 1
+        : nonZero
+      : Math.min(numbers.length - 1, 1);
+  return [
+    { operator: ">=", version: lower },
+    { operator: "<", version: release(numbers, at) },
+  ];
+}
+
+/** A range as the file spec writes it (section 2.4); undefined for anything outside that grammar. */
+export function parseRange(text: string): Range | undefined {
+  if (typeof text !== "string" || text.length > MAX_RANGE) return undefined;
+  const sets: Comparator[][] = [];
+  for (const alternative of text.split("||")) {
+    const tokens = alternative.split(" ").filter((token) => token !== "");
+    if (tokens.length === 0) return undefined;
+    const set: Comparator[] = [];
+    for (const token of tokens) {
+      const meant = comparators(token);
+      if (meant === undefined) return undefined;
+      set.push(...meant);
+    }
+    sets.push(set);
+  }
+  return { sets };
+}
+
+function holds({ operator, version }: Comparator, candidate: Version): boolean {
+  const cmp = compareVersion(candidate, version);
+  if (operator === "=") return cmp === 0;
+  if (operator === ">") return cmp > 0;
+  if (operator === ">=") return cmp >= 0;
+  if (operator === "<") return cmp < 0;
+  return cmp <= 0;
+}
+
+/** Same major, minor and patch, which is what lets a comparator admit a prerelease. */
+function sameRelease(left: Version, right: Version): boolean {
+  return left.major === right.major && left.minor === right.minor && left.patch === right.patch;
+}
+
+function inSet(set: readonly Comparator[], candidate: Version): boolean {
+  if (!set.every((comparator) => holds(comparator, candidate))) return false;
+  // A prerelease satisfies a set only when the set names a prerelease of that release.
+  return (
+    candidate.prerelease.length === 0 ||
+    set.some(({ version }) => version.prerelease.length > 0 && sameRelease(version, candidate))
+  );
+}
+
+/** Whether a version satisfies a range; a version that is not SemVer, or a range that does not parse, satisfies nothing. */
+export function satisfies(version: string, range: Range | string): boolean {
+  const parsed = typeof range === "string" ? parseRange(range) : range;
+  const candidate = full(version);
+  if (parsed === undefined || candidate === undefined) return false;
+  return parsed.sets.some((set) => inSet(set, candidate));
+}
+
+/** The highest of `versions` that satisfies the range, as written there. */
+export function maxSatisfying(
+  versions: readonly string[],
+  range: Range | string,
+): string | undefined {
+  const parsed = typeof range === "string" ? parseRange(range) : range;
+  if (parsed === undefined) return undefined;
+  let best: { text: string; version: Version } | undefined;
+  for (const text of versions) {
+    if (!satisfies(text, parsed)) continue;
+    const version = full(text) as Version;
+    if (best === undefined || compareVersion(version, best.version) > 0) best = { text, version };
+  }
+  return best?.text;
+}

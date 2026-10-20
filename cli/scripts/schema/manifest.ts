@@ -69,14 +69,18 @@ const AnyRegistry = Type.Union(
   { description: "One address, and whatever the adapter reading it needs to know." },
 );
 
-/** An address; only one artifact, three segments or more, may carry `@<version>`: a version token as `adapter/spec/ref.ts` reads it. */
+/**
+ * An address; only one artifact, three segments or more, may carry `@<version>`, a version token
+ * as `adapter/spec/ref.ts` reads it, or `@<range>`, in the characters a range is written with.
+ */
 const REFERENCE =
-  "^[^@\\\\/]+(/[^@\\\\/]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){2,}@[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$";
+  "^[^@\\\\/]+(/[^@\\\\/]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){2,}@([A-Za-z0-9][A-Za-z0-9._+-]{0,127}|[0-9A-Za-z.+*^~<>=| -]{1,256})$";
 
 const Reference = Type.String({
   minLength: 1,
   pattern: REFERENCE,
-  description: "An address, such as acme/platform or acme/platform/skill/lint@1.2.0.",
+  description:
+    "An address, such as acme/platform, acme/platform/skill/lint@1.2.0 or acme/platform/skill/lint@^1.2.",
 });
 
 const DetailedReference = Type.Object(

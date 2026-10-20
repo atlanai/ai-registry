@@ -123,8 +123,8 @@
         "anyOf": [
           {
             "minLength": 1,
-            "pattern": "^[^@\\\\/]+(/[^@\\\\/]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){2,}@[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$",
-            "description": "An address, such as acme/platform or acme/platform/skill/lint@1.2.0.",
+            "pattern": "^[^@\\\\/]+(/[^@\\\\/]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){2,}@([A-Za-z0-9][A-Za-z0-9._+-]{0,127}|[0-9A-Za-z.+*^~<>=| -]{1,256})$",
+            "description": "An address, such as acme/platform, acme/platform/skill/lint@1.2.0 or acme/platform/skill/lint@^1.2.",
             "type": "string"
           },
           {
@@ -136,7 +136,7 @@
             "properties": {
               "ref": {
                 "minLength": 1,
-                "pattern": "^[^@\\\\/]+(/[^@\\\\/]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){2,}@[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$",
+                "pattern": "^[^@\\\\/]+(/[^@\\\\/]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){2,}@([A-Za-z0-9][A-Za-z0-9._+-]{0,127}|[0-9A-Za-z.+*^~<>=| -]{1,256})$",
                 "description": "Any reference a string entry takes.",
                 "type": "string"
               },
