@@ -23,7 +23,8 @@ describe("openTree", () => {
       ["a/.claude/kept", false],
       ["a/.env.example", false],
       ["a/SKILL.md", false],
-      ["a/run.sh", true],
+      // Windows keeps no execute bit.
+      ["a/run.sh", process.platform !== "win32"],
     ]);
     expect(walked.skipped).toEqual([{ path: "a/outside", reason: "is a symlink" }]);
     expect(await tree.isFile("a/SKILL.md")).toBe(true);

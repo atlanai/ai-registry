@@ -150,7 +150,9 @@ describe("the folder layout", () => {
     // Golden: a change here changes the identity of every skill read from a folder.
     expect(contentDigest(one?.envelope as never)).toBe(GOLDEN);
     expect(contentDigest(other?.envelope as never)).toBe(GOLDEN);
-    expect(one?.files.find((file) => file.path === "scripts/fill.sh")?.executable).toBe(true);
+    expect(one?.files.find((file) => file.path === "scripts/fill.sh")?.executable).toBe(
+      process.platform !== "win32",
+    );
   });
 
   test("does not match a source with neither skills nor agents", async ({ tmp }) => {

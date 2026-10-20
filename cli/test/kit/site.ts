@@ -125,8 +125,11 @@ export async function wellKnownSite(
     const bytes = skill.archive ?? Buffer.from(skillFile(skill.name));
     const url =
       skill.url ?? (type === "archive" ? `${skill.name}.tar.gz` : `${skill.name}/SKILL.md`);
-    await mkdir(dirname(join(folder, url)), { recursive: true });
-    await writeFile(join(folder, url), bytes);
+    // An entry on another host is never served from here.
+    if (!/^[a-z][a-z\d+.-]*:/i.test(url)) {
+      await mkdir(dirname(join(folder, url)), { recursive: true });
+      await writeFile(join(folder, url), bytes);
+    }
     entries.push({
       name: skill.name,
       type,
