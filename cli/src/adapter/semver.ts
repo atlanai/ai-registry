@@ -235,3 +235,70 @@ export function maxSatisfying(
   }
   return best?.text;
 }
+
+/** The stricter of two bounds on one side: further in, by `inward`, or as far and exclusive. */
+function stricter(held: Comparator | undefined, bound: Comparator, inward: 1 | -1): Comparator {
+  if (held === undefined) return bound;
+  const cmp = compareVersion(bound.version, held.version) * inward;
+  if (cmp > 0) return bound;
+  return cmp === 0 && (bound.operator === ">" || bound.operator === "<") ? bound : held;
+}
+
+/** A set as its tightest bounds, which admit the same versions; undefined when none can satisfy it. */
+function tightened(set: readonly Comparator[]): Comparator[] | undefined {
+  let lower: Comparator | undefined;
+  let upper: Comparator | undefined;
+  let exact: Version | undefined;
+  for (const comparator of set) {
+    const { operator, version } = comparator;
+    if (operator === "=") {
+      if (exact !== undefined && compareVersion(exact, version) !== 0) return undefined;
+      exact = version;
+      continue;
+    }
+    if (operator === ">" || operator === ">=") lower = stricter(lower, comparator, 1);
+    else upper = stricter(upper, comparator, -1);
+  }
+  if (exact !== undefined) {
+    const meets = [lower, upper].every((bound) => bound === undefined || holds(bound, exact));
+    return meets ? [{ operator: "=", version: exact }] : undefined;
+  }
+  if (lower !== undefined && upper !== undefined) {
+    const cmp = compareVersion(lower.version, upper.version);
+    const closed = lower.operator === ">=" && upper.operator === "<=";
+    if (cmp > 0 || (cmp === 0 && !closed)) return undefined;
+    if (cmp === 0) return [{ operator: "=", version: lower.version }];
+  }
+  return [lower, upper].filter((bound) => bound !== undefined);
+}
+
+/**
+ * The versions every one of the ranges admits, as one range, or undefined when no version can
+ * satisfy them all. Each set keeps its tightest bounds, so a prerelease the merged set admits may
+ * still be refused by one of the ranges on its own; check each before taking a version.
+ */
+export function intersect(ranges: readonly Range[]): Range | undefined {
+  let sets: Comparator[][] = [[]];
+  for (const range of ranges) {
+    const next = new Map<string, Comparator[]>();
+    for (const left of sets) {
+      for (const right of range.sets) {
+        const merged = tightened([...left, ...right]);
+        if (merged !== undefined) next.set(formatSet(merged), merged);
+      }
+    }
+    if (next.size === 0) return undefined;
+    sets = [...next.values()];
+  }
+  return { sets };
+}
+
+function formatSet(set: readonly Comparator[]): string {
+  if (set.length === 0) return "*";
+  return set.map(({ operator, version }) => `${operator}${formatVersion(version)}`).join(" ");
+}
+
+/** The range written in the file spec's grammar, so it reads back as the same range. */
+export function formatRange(range: Range): string {
+  return range.sets.map(formatSet).join(" || ");
+}

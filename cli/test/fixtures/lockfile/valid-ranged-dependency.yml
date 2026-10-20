@@ -1,0 +1,33 @@
+version: 1
+registries:
+  acme:
+    source: ./registry
+    adapter: local
+    key: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+artifacts:
+  review:
+    registry: acme
+    name: review
+    kind: skill
+    namespace: engineering
+    address: artifacts/engineering/skill/review
+    content: "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    version: 0.3.4
+    path: .registry/artifacts/acme/engineering/skills/review
+    digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    links: []
+    needed_by:
+      - reviewer
+  reviewer:
+    registry: acme
+    name: reviewer
+    kind: agent
+    namespace: engineering
+    address: artifacts/engineering/agent/reviewer
+    content: "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    version: 0.3.0
+    path: .registry/artifacts/acme/engineering/agents/reviewer.md
+    digest: "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    links: []
+    depends_on:
+      review: ^0.3.2

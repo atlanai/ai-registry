@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   bumpVersion,
   compareVersion,
+  formatRange,
   formatVersion,
   gte,
+  intersect,
   MAX_RANGE,
   maxSatisfying,
   parseRange,
@@ -221,5 +223,39 @@ describe("version ranges", () => {
     expect(maxSatisfying(versions, parseRange("~1.9")!)).toBe("1.9.0");
     expect(maxSatisfying(versions, "^3")).toBeUndefined();
     expect(maxSatisfying(versions, "not a range")).toBeUndefined();
+  });
+});
+
+describe("intersect", () => {
+  const both = (...ranges: string[]) => {
+    const met = intersect(ranges.map((range) => parseRange(range)!));
+    return met === undefined ? undefined : formatRange(met);
+  };
+
+  it("keeps the versions every range admits, at their tightest bounds", () => {
+    expect(both("^0.3.2", "^0.3.4")).toBe(">=0.3.4 <0.4.0");
+    expect(both("^1.2.0", "~1.4", "<1.4.5")).toBe(">=1.4.0 <1.4.5");
+    expect(both(">1.0.0", ">=1.0.0")).toBe(">1.0.0");
+    expect(both("^1.2.0", "=1.3.0")).toBe("=1.3.0");
+    expect(both(">=1.0.0", "<=1.0.0")).toBe("=1.0.0");
+    expect(both("*", "*")).toBe("*");
+    expect(both("^1.0.0 || ^3.0.0", ">=1.5.0")).toBe(">=1.5.0 <2.0.0 || >=3.0.0 <4.0.0");
+  });
+
+  it("is undefined when no version could satisfy them all", () => {
+    expect(both("^0.3.2", "^0.4.0")).toBeUndefined();
+    expect(both(">1.0.0", "<=1.0.0")).toBeUndefined();
+    expect(both(">=1.0.0", "<1.0.0")).toBeUndefined();
+    expect(both("=1.0.0", "=1.0.1")).toBeUndefined();
+    expect(both("^1.0.0", "=2.0.0")).toBeUndefined();
+    expect(both("^1 || ^2", "^3 || ^4")).toBeUndefined();
+  });
+
+  it("writes a range that reads back as the same versions", () => {
+    const met = intersect([parseRange("^1.2.3-rc.1")!, parseRange("<1.5.0")!])!;
+    expect(formatRange(met)).toBe(">=1.2.3-rc.1 <1.5.0");
+    for (const version of ["1.2.3-rc.2", "1.2.3", "1.4.9", "1.5.0", "1.3.0-rc.1"]) {
+      expect(satisfies(version, formatRange(met)), version).toBe(satisfies(version, met));
+    }
   });
 });

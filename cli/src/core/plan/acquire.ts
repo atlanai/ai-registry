@@ -27,7 +27,7 @@ import { abbreviate } from "#core/output.ts";
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { ensureHome, stagingPath, toolHome } from "#core/store/paths.ts";
 import { carriedIn } from "./carries.ts";
-import { type Need, needsOf } from "./depends.ts";
+import { movesWithin, type Need, needsOf } from "./depends.ts";
 import type { Acquired, Placement, Staged } from "./model.ts";
 import { wrapsNamespaces } from "./namespaces.ts";
 import { candidates } from "./select.ts";
@@ -166,17 +166,19 @@ function lockedRequest(
       asked.set(name, rowWant(ref, row, pins, moving.has(name) || whole || redeclared));
     }
   }
-  // A dependency is held at the version its dependents needed; the closure moves it when they do.
+  // A dependency is held at the version its dependents needed; the closure moves it when they do,
+  // and a run that moves it takes the newest version their ranges admit.
   for (const [name, row] of view.rows(alias)) {
     if (row.neededBy === undefined || named.has(name)) continue;
-    asked.set(name, {
-      name: row.name,
-      namespace: row.namespace,
-      kind: row.kind,
-      ...(row.version === undefined ? {} : { version: row.version }),
-    });
+    asked.set(name, dependencyWant(row, moving.has(name) ? movesWithin(lock, name) : undefined));
   }
   return { want: [...request.want, ...asked.values()], all };
+}
+
+function dependencyWant(row: LockArtifact, range: string | undefined): Want {
+  const at =
+    range !== undefined ? { range } : row.version === undefined ? {} : { version: row.version };
+  return { name: row.name, namespace: row.namespace, kind: row.kind, ...at };
 }
 
 /** A locked row a manifest reference reaches, asked for again; `free` moves it whatever it asks. */
@@ -269,12 +271,17 @@ function fromRows(
   const entries: Entry[] = [];
   const placements = new Map<string, Placement>();
   const needs = new Map<string, Need[]>();
-  for (const [, row] of rows) {
+  for (const [name, row] of rows) {
     if (row.namespace === undefined || row.version === undefined) {
       continue;
     }
     const need = { namespace: row.namespace, kind: row.kind, name: row.name, version: row.version };
-    for (const by of row.neededBy ?? []) needs.set(by, [...(needs.get(by) ?? []), need]);
+    for (const by of row.neededBy ?? []) {
+      // The range the dependent's edge carried, so a plan from the lock records it again.
+      const range = lock.artifacts[by]?.dependsOn?.[name];
+      const asked = range === undefined || range === row.version ? need : { ...need, range };
+      needs.set(by, [...(needs.get(by) ?? []), asked]);
+    }
   }
   for (const [name, row] of rows) {
     if (row.id === undefined || row.address === undefined) continue;
@@ -436,9 +443,11 @@ async function acquireOne(
     const { needs, unusable } = needsOf(artifact.envelope);
     const { name } = artifact.envelope.metadata;
     const version = artifact.version ?? artifact.envelope.metadata.version;
-    for (const to of unusable) {
+    for (const { to, range } of unusable) {
       listing.catalog.warnings.push(
-        `"${name}" depends on "${sanitizeText(to)}", which is not a namespace/kind/name@version aireg installs; it was left out.`,
+        range === undefined
+          ? `"${name}" depends on "${sanitizeText(to)}", which is not a namespace/kind/name@version aireg installs; it was left out.`
+          : `"${name}" depends on "${sanitizeText(to)}" at ${quoted(range)}, which is not a version range that version satisfies; it was left out.`,
       );
     }
     placements.set(path, {

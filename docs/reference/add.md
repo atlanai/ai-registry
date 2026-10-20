@@ -14,7 +14,7 @@ aireg add
 
 ## Description
 
-`aireg add` installs artifacts into the current project, or with `-g` into your user scope, and records them in the scope's manifest and lockfile. It also installs the versions each artifact's [dependencies](kinds.md#dependencies) name, which only the lockfile records. A dependency that a whole namespace or registry also takes installs at the version its dependents need; one you name yourself has to agree with them, or `add` stops and says which needs what. Each artifact is stored once in the scope and linked into every harness folder, such as `.claude/skills/`.
+`aireg add` installs artifacts into the current project, or with `-g` into your user scope, and records them in the scope's manifest and lockfile. It also installs the versions each artifact's [dependencies](kinds.md#dependencies) name, or the newest in the ranges they give, which only the lockfile records. A dependency that a whole namespace or registry also takes installs at the version its dependents need; one you name yourself has to agree with them, or `add` stops and says which needs what. Each artifact is stored once in the scope and linked into every harness folder, such as `.claude/skills/`.
 
 What you name says what to install: a registry, a namespace in it, or one artifact by its full name.
 
@@ -135,7 +135,7 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 ## Exit status
 
 - `0`: installed, nothing to do, or canceled at a question.
-- `1`: the registry isn't declared, the registry publishes nothing, a name, version, namespace or dependency doesn't exist, two artifacts need different versions of one dependency, the manifest names an unknown harness, or a file doesn't match what its version describes.
+- `1`: the registry isn't declared, the registry publishes nothing, a name, version, namespace or dependency doesn't exist, two artifacts need different versions of one dependency or ranges of it no published version satisfies together, the manifest names an unknown harness, or a file doesn't match what its version describes.
 - `2`: nothing was named and aireg can't ask, more than 10 artifacts would be installed without `--select` or `--all`, a folder has no `registry.json` in or above it or names no artifact inside one, a name matches more than one artifact, another artifact already has the name it would take and `defaults.name-collision` is `report` or `fail`, `--as` isn't a valid name, the name already belongs to another address, or `--for` names an unknown harness.
 - `3`: `--frozen` was passed and the install would change the lockfile or the manifest, or an artifact wasn't installed because its name is taken and `defaults.name-collision` is `report`.
 

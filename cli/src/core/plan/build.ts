@@ -20,7 +20,7 @@ import { planCopy, restages } from "#core/plan/build/restage.ts";
 import type { BuildOptions, BuildState } from "#core/plan/build/state.ts";
 import { flushUnlinks, removeStale } from "#core/plan/build/unlink.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
-import { closure, dependentsByName, nameClashes } from "./depends.ts";
+import { closure, dependenciesByName, dependentsByName, nameClashes } from "./depends.ts";
 import type { Acquired, Clash, Incompatible, Plan, Selected, Survey, Warning } from "./model.ts";
 import { dropUnusedSources, lockSourceOf } from "./model.ts";
 import { crowdedContainers } from "./projection.ts";
@@ -104,6 +104,7 @@ function planWith(
     crowded: new Set(),
     unlinks: [],
     neededBy: dependentsByName(needs, selected, lock),
+    dependsOn: dependenciesByName(needs, selected, lock),
     pruned: [],
     addresses: new Map(),
     clashes,
@@ -200,6 +201,7 @@ function planItem(item: Selected, build: BuildState): void {
       copy,
       base: build.options.roots.base,
       neededBy: build.neededBy.get(item.name),
+      dependsOn: build.dependsOn.get(item.name),
     }),
     ...(blocked.length === 0 ? {} : { blocked }),
   };

@@ -56,7 +56,13 @@ An artifact names what has to be installed with it as `depends_on` relationships
 { "relationships": [{ "rel_type": "depends_on", "to": "engineering/skill/pr-review@0.2.0" }] }
 ```
 
-[`aireg add`](add.md) installs them. `bump` carries the last version's dependencies into the new one, so move the versions they name when you release new ones.
+An edge may also carry `range`, the versions of that artifact it accepts, as a version range the file spec defines, such as `^0.2.0` or `>=0.2.0 <0.4.0`. The version `to` names has to be in its own range, or aireg leaves the edge out with a warning:
+
+```json
+{ "relationships": [{ "rel_type": "depends_on", "to": "engineering/skill/pr-review@0.2.0", "range": "^0.2.0" }] }
+```
+
+[`aireg add`](add.md) installs them. An edge without a range installs the version it names. An edge with one installs the newest version in the range that installs without a pin. Where several artifacts need one dependency, it installs once, at the newest version every edge accepts; when no version could satisfy them all, or the registry publishes none that does, `add` installs nothing and names each range and the artifact it came from. The lockfile records each range, and [`aireg update`](update.md) moves the dependency to the newest version that every range still accepts. `bump` carries the last version's dependencies into the new one, so move the versions they name when you release new ones.
 
 ### Version status
 

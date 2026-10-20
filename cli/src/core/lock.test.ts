@@ -177,6 +177,28 @@ describe("lock version", () => {
     expect(parseLock(text).artifacts.lint?.neededBy).toEqual(["review", "z"]);
     expect(parseLock(text).artifacts.review?.neededBy).toBeUndefined();
   });
+
+  test("keeps what an artifact's edges ask of each dependency, sorted by name", () => {
+    const value = lock();
+    value.artifacts.review = {
+      ...(value.artifacts.review as LockArtifact),
+      dependsOn: { lint: "^1.2.0", fmt: "1.0.0" },
+    };
+    const text = formatLock(value);
+    expect(text).toContain("depends_on:\n      fmt: 1.0.0\n      lint: ^1.2.0\n");
+    expect(parseLock(text).artifacts.review?.dependsOn).toEqual({ fmt: "1.0.0", lint: "^1.2.0" });
+    expect(parseLock(text).artifacts.lint?.dependsOn).toBeUndefined();
+  });
+
+  test("drops what it cannot read of `depends_on` rather than refusing the lockfile", () => {
+    const text = formatLock(lock()).replace(
+      "  review:\n",
+      "  review:\n    depends_on:\n      lint: ^1.2.0\n      ../up: ^1\n      fmt: 3\n      sort: [1]\n",
+    );
+    expect(parseLock(text).artifacts.review?.dependsOn).toEqual({ lint: "^1.2.0" });
+    const junk = formatLock(lock()).replace("  review:\n", "  review:\n    depends_on: yes\n");
+    expect(parseLock(junk).artifacts.review?.dependsOn).toBeUndefined();
+  });
 });
 
 describe("reading a lock", () => {

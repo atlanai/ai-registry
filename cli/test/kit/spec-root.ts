@@ -19,7 +19,7 @@ export interface SpecVersion {
   reason?: string;
   /** `active` unless set, as `versions.json` records it. */
   status?: string;
-  /** Fully qualified refs this version's `depends_on` edges name. */
+  /** Fully qualified refs this version's `depends_on` edges name, each with its range after a space. */
   dependsOn?: readonly string[];
 }
 
@@ -56,7 +56,14 @@ function envelopeFor(artifact: SpecArtifact, version: SpecVersion): Envelope {
       ...digestOf(body),
       urls: [path],
     })),
-    relationships: (version.dependsOn ?? []).map((to) => ({ rel_type: "depends_on", to })),
+    relationships: (version.dependsOn ?? []).map((edge) => {
+      const [to, ...range] = edge.split(" ");
+      return {
+        rel_type: "depends_on",
+        to: to as string,
+        ...(range.length === 0 ? {} : { range: range.join(" ") }),
+      };
+    }),
   });
 }
 

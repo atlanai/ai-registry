@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { buildEnvelope } from "#adapter/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
+import { emptyLock } from "#core/lock.ts";
 import { acquired, entry } from "#test/kit/builders/plan.ts";
-import { closure, idOf, type Need } from "./depends.ts";
+import { closure, idOf, movesWithin, type Need, needsOf } from "./depends.ts";
 import type { Acquired, Selected } from "./model.ts";
 
 /** `eng/<kind>/<name>` at each version given, with the edges each version declares. */
@@ -9,10 +11,18 @@ type Published = [kind: ArtifactKind, name: string, version: string, ...needs: s
 
 const path = (kind: ArtifactKind, name: string) => `artifacts/eng/${kind}/${name}`;
 
+/** `eng/skill/lint@1.0.0`, or with a range after a space: `eng/skill/lint@1.0.0 ^1.0.0`. */
 function need(ref: string): Need {
-  const [address, version] = ref.split("@") as [string, string];
+  const [to, ...range] = ref.split(" ");
+  const [address, version] = (to as string).split("@") as [string, string];
   const [namespace, kind, name] = address.split("/") as [string, ArtifactKind, string];
-  return { namespace, kind, name, version };
+  return {
+    namespace,
+    kind,
+    name,
+    version,
+    ...(range.length === 0 ? {} : { range: range.join(" ") }),
+  };
 }
 
 /** One registry, `kit`, holding one version of each artifact. */
@@ -162,5 +172,224 @@ describe("closure", () => {
       published,
     );
     expect(scoped.refs[0]?.targets).toBeUndefined();
+  });
+});
+
+describe("closure, with ranges", () => {
+  const review = (version: string, ...needs: string[]): Published => [
+    "skill",
+    "review",
+    version,
+    ...needs,
+  ];
+  const two = (...published: Published[]) =>
+    closure(
+      [selected("agent", "reviewer", "0.3.0"), selected("agent", "triage", "1.0.0")],
+      registry(
+        ["agent", "reviewer", "0.3.0", "eng/skill/review@0.3.2 ^0.3.2"],
+        ["agent", "triage", "1.0.0", "eng/skill/review@0.3.4 ^0.3.4"],
+        ...published,
+      ),
+    );
+
+  it("takes the version a registry lists when every range accepts it", () => {
+    const result = two(review("0.3.9"));
+    expect(result.unresolved).toEqual([]);
+    expect(result.conflicts).toEqual([]);
+    expect(result.neededBy.get(id("skill", "review"))).toEqual(
+      new Set([id("agent", "reviewer"), id("agent", "triage")]),
+    );
+    expect(result.dependsOn.get(id("agent", "triage"))).toEqual(
+      new Map([[id("skill", "review"), "^0.3.4"]]),
+    );
+  });
+
+  it("asks again at the range every edge admits, naming each", () => {
+    const result = two(review("0.3.3"));
+    expect(result.conflicts).toEqual([]);
+    expect(result.unresolved).toEqual([
+      {
+        alias: "kit",
+        need: need("eng/skill/review@0.3.2 >=0.3.4 <0.4.0"),
+        by: "eng/agent/reviewer",
+        needed: [
+          { at: "^0.3.2", by: "eng/agent/reviewer" },
+          { at: "^0.3.4", by: "eng/agent/triage" },
+        ],
+      },
+    ]);
+  });
+
+  it("asks for one range as the edge wrote it", () => {
+    const result = closure(
+      [selected("agent", "reviewer", "0.3.0")],
+      registry(["agent", "reviewer", "0.3.0", "eng/skill/review@0.3.2 ^0.3.2"]),
+    );
+    expect(result.unresolved).toEqual([
+      { alias: "kit", need: need("eng/skill/review@0.3.2 ^0.3.2"), by: "eng/agent/reviewer" },
+    ]);
+  });
+
+  it("refuses ranges no version could satisfy together, naming every one and who set it", () => {
+    const result = closure(
+      [selected("agent", "reviewer", "0.3.0"), selected("agent", "triage", "1.0.0")],
+      registry(
+        ["agent", "reviewer", "0.3.0", "eng/skill/review@0.3.2 ^0.3.2"],
+        ["agent", "triage", "1.0.0", "eng/skill/review@0.4.0 ^0.4.0"],
+        review("0.3.9"),
+      ),
+    );
+    expect(result.unresolved).toEqual([]);
+    expect(result.conflicts).toEqual([
+      {
+        message:
+          "eng/skill/review is needed at versions that do not overlap: ^0.3.2 by eng/agent/reviewer, and ^0.4.0 by eng/agent/triage.",
+        hint: "Only one version can be installed here. Remove one of them, or ask the registry's owner to publish versions that agree.",
+      },
+    ]);
+  });
+
+  it("holds an edge without a range to its version, which every range must accept", () => {
+    const exact = closure(
+      [selected("agent", "reviewer", "0.3.0"), selected("agent", "triage", "1.0.0")],
+      registry(
+        ["agent", "reviewer", "0.3.0", "eng/skill/review@0.3.6 ^0.3.2"],
+        ["agent", "triage", "1.0.0", "eng/skill/review@0.3.5"],
+        review("0.3.9"),
+      ),
+    );
+    expect(exact.unresolved.map((item) => item.need)).toEqual([need("eng/skill/review@0.3.5")]);
+
+    const outside = closure(
+      [selected("agent", "reviewer", "0.3.0"), selected("agent", "triage", "1.0.0")],
+      registry(
+        ["agent", "reviewer", "0.3.0", "eng/skill/review@0.3.6 ^0.3.6"],
+        ["agent", "triage", "1.0.0", "eng/skill/review@0.3.5"],
+        review("0.3.9"),
+      ),
+    );
+    expect(outside.conflicts[0]?.message).toBe(
+      "eng/skill/review is needed at versions that do not overlap: ^0.3.6 by eng/agent/reviewer, and 0.3.5 by eng/agent/triage.",
+    );
+  });
+
+  it("holds a version the manifest names against a range, accepting one inside it", () => {
+    const published = registry(["agent", "reviewer", "0.3.0", "eng/skill/review@0.3.2 ^0.3.2"]);
+    const inside = closure(
+      [selected("agent", "reviewer", "0.3.0"), selected("skill", "review", "0.3.7")],
+      published,
+    );
+    expect(inside.conflicts).toEqual([]);
+    expect(inside.refs).toEqual([]);
+    expect(inside.neededBy.get(id("skill", "review"))).toEqual(new Set([id("agent", "reviewer")]));
+
+    const outside = closure(
+      [selected("agent", "reviewer", "0.3.0"), selected("skill", "review", "0.4.0")],
+      published,
+    );
+    expect(outside.conflicts).toEqual([
+      {
+        message:
+          "eng/agent/reviewer needs eng/skill/review ^0.3.2, but the manifest installs 0.4.0.",
+        hint: "Only one version can be installed here. Pin the one it needs with `aireg add kit/eng/skill/review@0.3.2`, or remove one of them.",
+      },
+    ]);
+  });
+
+  it("drops what a dependency read at a version a later edge refuses raised, and asks again", () => {
+    // reviewer reads lint at 1.2.0, whose own edges conflict with reviewer's, before triage's
+    // edge, read through helper, says lint must be at least 1.5.0.
+    const result = closure(
+      [selected("agent", "reviewer", "0.3.0"), selected("agent", "triage", "1.0.0")],
+      registry(
+        ["agent", "reviewer", "0.3.0", "eng/skill/lint@1.0.0 ^1.0.0", "eng/skill/fmt@2.0.0"],
+        ["agent", "triage", "1.0.0", "eng/skill/helper@1.0.0"],
+        ["skill", "helper", "1.0.0", "eng/skill/lint@1.5.0 ^1.5.0"],
+        ["skill", "lint", "1.2.0", "eng/skill/fmt@1.0.0", "eng/skill/gone@1.0.0"],
+        ["skill", "fmt", "2.0.0"],
+      ),
+    );
+    expect(result.conflicts).toEqual([]);
+    expect(result.unresolved).toEqual([
+      {
+        alias: "kit",
+        need: need("eng/skill/lint@1.0.0 >=1.5.0 <2.0.0"),
+        by: "eng/agent/reviewer",
+        needed: [
+          { at: "^1.0.0", by: "eng/agent/reviewer" },
+          { at: "^1.5.0", by: "eng/skill/helper" },
+        ],
+      },
+    ]);
+  });
+});
+
+describe("needsOf", () => {
+  const edges = (...relationships: { to: string; range?: unknown }[]) =>
+    needsOf(
+      buildEnvelope({
+        kind: "agent",
+        metadata: { name: "reviewer" },
+        files: [{ path: "AGENT.md", digest: `sha256:${"0".repeat(64)}`, size: 1 }],
+        relationships: relationships.map((edge) => ({ rel_type: "depends_on", ...edge }) as never),
+      }),
+    );
+
+  it("reads a range its own version satisfies, and leaves out one it does not", () => {
+    expect(
+      edges(
+        { to: "eng/skill/lint@1.2.0", range: "^1.2.0" },
+        { to: "eng/skill/fmt@1.0.0", range: "^2.0.0" },
+        { to: "eng/skill/sort@1.0.0", range: ">= 1" },
+        { to: "eng/skill/tidy@1.0.0", range: 3 },
+        { to: "eng/skill/wrap@1.0.0" },
+      ),
+    ).toEqual({
+      needs: [need("eng/skill/lint@1.2.0 ^1.2.0"), need("eng/skill/wrap@1.0.0")],
+      unusable: [
+        { to: "eng/skill/fmt@1.0.0", range: "^2.0.0" },
+        { to: "eng/skill/sort@1.0.0", range: ">= 1" },
+        { to: "eng/skill/tidy@1.0.0", range: "3" },
+      ],
+    });
+  });
+});
+
+describe("movesWithin", () => {
+  /** `review`, needed by each dependent, which recorded what it asks of it. */
+  function needing(...asked: (string | undefined)[]) {
+    const lock = emptyLock();
+    const row = {
+      registry: "kit",
+      id: undefined,
+      name: "review",
+      kind: "skill" as const,
+      namespace: "eng",
+      address: undefined,
+      content: undefined,
+      version: "0.3.4",
+      path: "",
+      digest: "",
+      origin: undefined,
+      links: [],
+    };
+    lock.artifacts.review = { ...row, neededBy: asked.map((_, at) => `agent-${at}`) };
+    asked.forEach((at, index) => {
+      lock.artifacts[`agent-${index}`] = {
+        ...row,
+        name: `agent-${index}`,
+        kind: "agent",
+        ...(at === undefined ? {} : { dependsOn: { review: at } }),
+      };
+    });
+    return movesWithin(lock, "review");
+  }
+
+  it("moves within every dependent's range, and holds what any of them names exactly", () => {
+    expect(needing("^0.3.2")).toBe("^0.3.2");
+    expect(needing("^0.3.2", "~0.3.4")).toBe(">=0.3.4 <0.4.0");
+    expect(needing("^0.3.2", "0.3.4")).toBeUndefined();
+    expect(needing("^0.3.2", undefined)).toBeUndefined();
+    expect(needing("^0.3.2", "^0.4.0")).toBeUndefined();
   });
 });

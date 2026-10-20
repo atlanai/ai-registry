@@ -101,6 +101,11 @@ export interface LockArtifact {
   /** Installed names whose `depends_on` edges name this version. Absent when nothing needs it. */
   neededBy?: string[] | undefined;
   /**
+   * What this version's `depends_on` edges ask of each artifact they reach, by its installed name:
+   * the edge's range, or the version an edge without one names. Absent unless an edge has a range.
+   */
+  dependsOn?: Record<string, string> | undefined;
+  /**
    * Links asked for but not made, because something of yours is at the path.
    * Read by status, never by prune: nothing listed here is ours to remove.
    */
@@ -187,6 +192,20 @@ function parseNames(raw: unknown): string[] | undefined {
   return names.length === 0 ? undefined : [...new Set(names)].sort();
 }
 
+/** Entries that cannot be read are dropped, not refused: an update writes them again. */
+function parseDependsOn(raw: unknown): Record<string, string> | undefined {
+  if (!isRecord(raw)) return undefined;
+  const entries = Object.entries(raw).flatMap(([name, at]) => {
+    const value = textOf(at);
+    return value === undefined || !isSafePath(name) ? [] : [[name, value] as const];
+  });
+  return entries.length === 0 ? undefined : sortedDict(entries);
+}
+
+function sortedDict(entries: readonly (readonly [string, string])[]): Record<string, string> {
+  return dict([...entries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
 function parseOrigin(entry: unknown, scope: Scope): LockOrigin | undefined {
   if (!isRecord(entry)) return undefined;
   const harness = textOf(entry.harness);
@@ -224,8 +243,15 @@ function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
     origin,
     links,
     neededBy: parseNames(entry.needed_by),
+    ...withDependsOn(parseDependsOn(entry.depends_on)),
     blocked: parseBlocked(entry.blocked, scope),
   };
+}
+
+function withDependsOn(
+  dependsOn: Record<string, string> | undefined,
+): Pick<LockArtifact, "dependsOn"> {
+  return dependsOn === undefined ? {} : { dependsOn };
 }
 
 /** A lockfile that is there but cannot be read. */
@@ -344,6 +370,10 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
         mode: link.mode,
         digest: link.mode === "copy" ? link.digest : undefined,
       })),
+    depends_on:
+      artifact.dependsOn === undefined || Object.keys(artifact.dependsOn).length === 0
+        ? undefined
+        : sortedDict(Object.entries(artifact.dependsOn)),
     needed_by: artifact.neededBy?.length ? [...artifact.neededBy].sort() : undefined,
     blocked: artifact.blocked?.length
       ? [...artifact.blocked].sort((a, b) => a.path.localeCompare(b.path))

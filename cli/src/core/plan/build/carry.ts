@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { withheldAt } from "#core/catalog/withheld.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
-import type { Closure } from "#core/plan/depends.ts";
+import { accepts, type Closure } from "#core/plan/depends.ts";
 import type { Acquired, Kept, Selected } from "#core/plan/model.ts";
 import { type NamespaceWant, namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
 import { addressOf, type Untrusted } from "#core/plan/select.ts";
@@ -155,7 +155,7 @@ export function carryUnresolved(build: BuildState, needs: Closure): void {
         row.namespace === need.namespace &&
         row.kind === need.kind &&
         row.name === need.name &&
-        row.version === need.version,
+        accepts(need, row.version),
     );
     if (found === undefined || build.next.artifacts[found[0]] !== undefined) continue;
     const [name, row] = found;

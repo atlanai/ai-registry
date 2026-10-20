@@ -19,6 +19,7 @@ interface RowInput {
   copy: string;
   base: string;
   neededBy: string[] | undefined;
+  dependsOn: Record<string, string> | undefined;
 }
 
 /** The lock row a planned artifact records. */
@@ -31,6 +32,7 @@ export function lockRow({
   copy,
   base,
   neededBy,
+  dependsOn,
 }: RowInput): LockArtifact {
   // An edited copy left in place stays based on what it was installed from, so
   // `outdated` still sees the newer version and a publish never skips over it.
@@ -65,7 +67,15 @@ export function lockRow({
       };
     }),
     ...(neededBy === undefined ? {} : { neededBy }),
+    // A row based on what it was installed from keeps the edges that version recorded.
+    ...dependsOnOf(basis === undefined ? dependsOn : basis.dependsOn),
   };
+}
+
+function dependsOnOf(
+  dependsOn: Record<string, string> | undefined,
+): Pick<LockArtifact, "dependsOn"> {
+  return dependsOn === undefined ? {} : { dependsOn };
 }
 
 /**
