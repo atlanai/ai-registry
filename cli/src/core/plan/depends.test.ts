@@ -2,8 +2,17 @@ import { describe, expect, it } from "vitest";
 import { buildEnvelope } from "#adapter/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import { emptyLock } from "#core/lock.ts";
+import { lock } from "#test/kit/builders/lock.ts";
 import { acquired, entry } from "#test/kit/builders/plan.ts";
-import { closure, idOf, movesWithin, type Need, needsOf, registryUrls } from "./depends.ts";
+import {
+  closure,
+  idOf,
+  movesWithin,
+  type Need,
+  needsOf,
+  registryUrls,
+  unknownUrls,
+} from "./depends.ts";
 import type { Acquired, Placement, Selected } from "./model.ts";
 
 /** `eng/<kind>/<name>` at each version given, with the edges each version declares. */
@@ -396,6 +405,47 @@ describe("closure, across registries", () => {
     expect(result.refs[0]?.registry).toBe("kit");
   });
 
+  it("refuses a URL more than one declared registry is at, naming them", () => {
+    const [kit, platform] = sources("platform", "1.3.0") as [Acquired, Acquired];
+    const urls = new Map([
+      ["aaa", PLATFORM],
+      ["kit", undefined],
+      ["platform", PLATFORM],
+    ]);
+    const result = closure(top, [kit, platform, { ...platform, alias: "aaa" }], urls);
+
+    expect(result.refs).toEqual([]);
+    expect(result.conflicts).toEqual([
+      {
+        message: `eng/agent/reviewer needs eng/skill/style from ${PLATFORM}, and 2 declared registries are at that URL: "aaa" and "platform".`,
+        hint: "Keep one of them, and remove the others with `aireg registry remove <name>`.",
+      },
+    ]);
+  });
+
+  it("waits on a registry whose URL is unknown before choosing where an edge resolves", () => {
+    // Read, `disk` could report the same URL, which would make the edge ambiguous.
+    const result = closure(top, sources("platform", "1.3.0"), declared, ["disk"]);
+
+    expect(result.refs).toEqual([]);
+    expect(result.undeclared).toEqual([{ url: PLATFORM, need: style, by: "eng/agent/reviewer" }]);
+  });
+
+  it("does not resolve in a registry that only claims the edge's URL", () => {
+    // A registry declared at an https address is known by it, whatever its registry.json says.
+    const [kit, platform] = sources("platform", "1.3.0") as [Acquired, Acquired];
+    const evil = { ...platform, alias: "aaa" };
+    evil.origin = { ...platform.origin, url: PLATFORM };
+    const manifest = {
+      aaa: { location: "https://github.com/evil/aaa", adapter: undefined, config: {} },
+      kit: { location: "./kit", adapter: undefined, config: {} },
+    };
+    const result = closure(top, [kit, evil], registryUrls(manifest, [kit, evil]));
+
+    expect(result.refs).toEqual([]);
+    expect(result.undeclared).toEqual([{ url: PLATFORM, need: style, by: "eng/agent/reviewer" }]);
+  });
+
   it("follows the registry a lockfile row recorded for a dependency", () => {
     const [kit, platform] = sources("platform", "1.3.0") as [Acquired, Acquired];
     const recorded = { ...need("eng/skill/style@1.3.0"), alias: "platform" };
@@ -408,14 +458,16 @@ describe("closure, across registries", () => {
 });
 
 describe("registryUrls", () => {
-  it("knows a registry by the URL it reported, else by its declared address", () => {
+  const declared = (location: string) => ({ location, adapter: undefined, config: {} });
+
+  it("knows a registry by its declared address, and a folder by the https URL it reported", () => {
     const [read] = registry() as [Acquired];
     read.origin.url = "https://example.com/mirror-of";
     const urls = registryUrls(
       {
-        kit: { location: "./kit", adapter: undefined, config: {} },
-        hub: { location: "https://github.com/acme/hub.git", adapter: undefined, config: {} },
-        disk: { location: "./disk", adapter: undefined, config: {} },
+        kit: declared("./kit"),
+        hub: declared("https://github.com/acme/hub.git"),
+        disk: declared("./disk"),
       },
       [read],
     );
@@ -425,6 +477,49 @@ describe("registryUrls", () => {
       ["hub", "https://github.com/acme/hub"],
       ["kit", "https://example.com/mirror-of"],
     ]);
+  });
+
+  it("never lets what a registry with an https address reports stand for another one", () => {
+    // `evil` claims shared's URL in its own registry.json; only what the person declared counts.
+    const [evil] = registry() as [Acquired];
+    const claimed = { ...evil, alias: "evil" };
+    claimed.origin = { ...evil.origin, url: "https://github.com/acme/shared" };
+    const urls = registryUrls({ evil: declared("https://github.com/evil/registry") }, [claimed]);
+
+    expect([...urls]).toEqual([["evil", "https://github.com/evil/registry"]]);
+  });
+
+  it("takes a folder's URL from the lockfile when the folder was not read", () => {
+    const recorded = lock()
+      .registry("disk", { location: "./disk", url: "https://github.com/acme/disk" })
+      .registry("moved", { location: "./old", url: "https://github.com/acme/moved" })
+      .build();
+    const urls = registryUrls({ disk: declared("./disk"), moved: declared("./new") }, [], recorded);
+
+    // Recorded for another address, the URL says nothing about what is declared now.
+    expect([...urls]).toEqual([
+      ["disk", "https://github.com/acme/disk"],
+      ["moved", undefined],
+    ]);
+  });
+
+  it("says which registries only reading them can tell the URL of", () => {
+    const [read] = registry() as [Acquired];
+    const recorded = lock()
+      .registry("disk", { location: "./disk", url: "https://github.com/acme/disk" })
+      .build();
+    const unknown = unknownUrls(
+      {
+        disk: declared("./disk"),
+        hub: declared("https://github.com/acme/hub"),
+        kit: declared("./kit"),
+        other: declared("./other"),
+      },
+      [read],
+      recorded,
+    );
+
+    expect(unknown).toEqual(["other"]);
   });
 });
 

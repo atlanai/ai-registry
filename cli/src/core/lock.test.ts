@@ -9,6 +9,8 @@ import {
   type Lock,
   type LockArtifact,
   LockError,
+  type LockRegistry,
+  lockChanges,
   parseLock,
   readLock,
 } from "./lock.ts";
@@ -85,6 +87,29 @@ describe("formatLock", () => {
     expect(back.registries).toEqual(value.registries);
     expect(back.artifacts.review).toEqual(value.artifacts.review);
     expect(back.artifacts.lint).toEqual(value.artifacts.lint);
+  });
+
+  test("keeps the https url a folder registry reported, and drops any other", () => {
+    const head = "version: 1\nregistries:\n  disk: {source: ./disk, adapter: local, key: k, url: ";
+    const read = (url: string) => parseLock(`${head}${url}}\n`).registries.disk?.url;
+    expect(read("'https://GitHub.com/acme/disk.git/'")).toBe("https://github.com/acme/disk");
+    expect(read("'http://github.com/acme/disk'")).toBeUndefined();
+    expect(read("7")).toBeUndefined();
+    const value = lock();
+    value.registries.disk = {
+      location: "./disk",
+      adapter: "local",
+      key: "sha256:disk",
+      config: {},
+      revision: undefined,
+      url: "https://github.com/acme/disk",
+    };
+    expect(formatLock(value)).toContain("    url: https://github.com/acme/disk\n");
+    // A url recorded or dropped is no change `--frozen` refuses: it changes nothing installed.
+    const before = lock();
+    before.registries.disk = { ...(value.registries.disk as LockRegistry), url: undefined };
+    expect(lockChanges(before, value)).toEqual([]);
+    expect(lockChanges(before, { ...value, registries: {} })).toEqual(["disk", "kit"]);
   });
 
   test("records a revision once per source, not once per artifact", () => {

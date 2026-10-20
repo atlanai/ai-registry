@@ -309,12 +309,38 @@ describe("dependsOnFor", () => {
     ]);
   });
 
+  /** The `vendor` folder as a registry whose registry.json names `url`. */
+  const writeVendor = async (url: string) => {
+    await mkdir(join(base, "vendor"), { recursive: true });
+    const document = { kind: "registry", format_version: 1, name: "vendor", url };
+    await writeFile(join(base, "vendor", "registry.json"), JSON.stringify(document));
+  };
+
+  test("names a folder registry by the https url its registry.json names", async () => {
+    // The URL a project declaring this folder matches the edge by.
+    await writeVendor("https://GitHub.com/acme/vendor-registry.git/");
+    const { manifest, found, works } = await exported(["vendor/platform/skill/notes"]);
+    expect(await dependsOnFor(named(works, "reviewer"), context(found, manifest))).toEqual([
+      {
+        rel_type: "depends_on",
+        to: "platform/skill/notes@1.0.0",
+        range: "^1.0.0",
+        registry: "https://github.com/acme/vendor-registry",
+      },
+    ]);
+  });
+
   test("refuses a registry with no https address, and an artifact not installed", async () => {
     const { manifest, found, works } = await exported(["vendor/platform/skill/notes"]);
     const reviewer = named(works, "reviewer");
     await expect(dependsOnFor(reviewer, context(found, manifest))).rejects.toMatchObject({
       message:
         "reviewer depends on notes from vendor, which has no https address, so a published artifact cannot name it.",
+      code: "invalid",
+    });
+    // A folder whose registry.json names a URL that is not https is refused all the same.
+    await writeVendor("http://github.com/acme/vendor-registry");
+    await expect(dependsOnFor(reviewer, context(found, manifest))).rejects.toMatchObject({
       code: "invalid",
     });
     const bare = context(found, manifest, { lock: lock().build() });

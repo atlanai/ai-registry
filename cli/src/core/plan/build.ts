@@ -26,6 +26,7 @@ import {
   dependentsByName,
   nameClashes,
   registryUrls,
+  unknownUrls,
 } from "./depends.ts";
 import type { Acquired, Clash, Incompatible, Plan, Selected, Survey, Warning } from "./model.ts";
 import { dropUnusedSources, lockSourceOf } from "./model.ts";
@@ -71,7 +72,12 @@ function planWith(
   const incompatible: Incompatible[] = [];
   const clashes: Clash[] = [];
   const top = select(manifest, lock, acquired, [], options.cliVersion, [], [], renames);
-  const needs = closure(top, acquired, registryUrls(manifest.registries, acquired));
+  const needs = closure(
+    top,
+    acquired,
+    registryUrls(manifest.registries, acquired, lock),
+    unknownUrls(manifest.registries, acquired, lock),
+  );
   const untrusted: Untrusted[] = [];
   const selected = select(
     { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },

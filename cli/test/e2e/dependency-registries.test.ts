@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
@@ -31,9 +31,12 @@ interface Row {
   needed_by?: string[];
   depends_on?: Record<string, string>;
 }
-const lock = async (): Promise<Record<string, Row>> =>
-  (parse(await readFile(lockPath(project), "utf8")) as { artifacts?: Record<string, Row> })
-    .artifacts ?? {};
+const lockfile = async () =>
+  parse(await readFile(lockPath(project), "utf8")) as {
+    registries?: Record<string, { url?: string }>;
+    artifacts?: Record<string, Row>;
+  };
+const lock = async (): Promise<Record<string, Row>> => (await lockfile()).artifacts ?? {};
 const style = () => readFile(join(project, ".claude", "skills", "sql-style", "SKILL.md"), "utf8");
 
 test.beforeAll(async ({ aireg: run, tmp, project: dir }) => {
@@ -44,6 +47,7 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir }) => {
       body: "agent\n",
       dependsOn: [{ to: "platform/skill/sql-style@1.2.0", range: "^1.2.0", registry: PLATFORM }],
     })
+    .skill("eng/notes@1.0.0", { body: "notes\n" })
     .write();
   await publishPlatform("1.2.0", "1.3.0", "2.0.0");
   expect((await aireg(["init", "-y"])).code).toBe(0);
@@ -79,6 +83,8 @@ describe("a dependency in another registry", () => {
       registry: "acme",
       depends_on: { "sql-style": "^1.2.0" },
     });
+    // A folder's URL is recorded, so the next run matches the edge without reading it again.
+    expect((await lockfile()).registries?.platform?.url).toBe(PLATFORM);
   }, 60_000);
 
   test("installs from the lock as it is, and moves within the range only on update", async () => {
@@ -101,6 +107,36 @@ describe("a dependency in another registry", () => {
     expect(updated.code, updated.stderr).toBe(0);
     expect(await style()).toContain("style 1.4.0");
     expect((await lock())["sql-style"]).toMatchObject({ registry: "platform", version: "1.4.0" });
+  }, 60_000);
+
+  test("matches the edge by the recorded URL after that registry's folder moves away", async () => {
+    const away = `${platform}-away`;
+    await rename(platform, away);
+    try {
+      const added = await aireg(["add", "acme/eng/skill/notes", "-y"]);
+      expect(added.code, added.stderr).toBe(0);
+      expect((await lock())["sql-style"]).toMatchObject({ registry: "platform", version: "1.4.0" });
+    } finally {
+      await rename(away, platform);
+    }
+    expect((await aireg(["remove", "notes", "-y"])).code).toBe(0);
+  }, 60_000);
+
+  test("refuses an edge's URL that two declared registries are at, naming both", async () => {
+    // A second folder whose registry.json claims the same URL could serve anything under it.
+    const claimant = `${platform}-claimant`;
+    await registry(claimant, { name: "aaa", slug: "aaa", url: PLATFORM })
+      .skill("platform/sql-style@1.9.0", { body: "not the platform's\n" })
+      .write();
+    expect((await aireg(["registry", "add", claimant, "--as", "aaa"])).code).toBe(0);
+    const updated = await aireg(["update", "-y"]);
+    expect(updated.code).toBe(1);
+    expect(updated.stderr).toContain(
+      `eng/agent/reviewer needs platform/skill/sql-style from ${PLATFORM}, and 2 declared registries are at that URL: "aaa" and "platform".`,
+    );
+    expect(updated.stderr).toContain("aireg registry remove <name>");
+    expect(await style()).toContain("style 1.4.0");
+    expect((await aireg(["registry", "remove", "aaa"])).code).toBe(0);
   }, 60_000);
 
   test("fails once that registry is no longer declared, naming where the lockfile found it", async () => {

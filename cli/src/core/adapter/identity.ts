@@ -102,6 +102,25 @@ export function canonicalRegistryUrl(location: string): string | undefined {
   return `https://${host}${bare}`;
 }
 
+/** A `url` a registry reports, as `canonicalRegistryUrl` writes it, when it is an `https` root. */
+export function reportedRegistryUrl(url: string | undefined): string | undefined {
+  return url !== undefined && /^https:\/\//i.test(url.trim())
+    ? canonicalRegistryUrl(url)
+    : undefined;
+}
+
+/**
+ * The URL a `registry` edge reaches a declared registry by: its declared address's `https` form.
+ * What the registry says of itself is not the person's to have checked, so the `url` it reports
+ * stands in only where the declared address has no such form, such as a folder on disk.
+ */
+export function declaredRegistryUrl(
+  location: string,
+  reported: string | undefined,
+): string | undefined {
+  return canonicalRegistryUrl(location) ?? reportedRegistryUrl(reported);
+}
+
 /**
  * Identity of the thing being read, not of the code reading it: the adapter is
  * absent so a lockfile stays valid when the source changes protocol.

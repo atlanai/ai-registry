@@ -3,7 +3,7 @@ import { stringify } from "yaml";
 import { type ArtifactKind, isKind } from "#adapter/index.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
-import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
+import { canonicalConfig, reportedRegistryUrl, type SourceConfig } from "#core/adapter/identity.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
@@ -47,6 +47,11 @@ export interface LockRegistry {
   key: string;
   config: SourceConfig;
   revision: string | undefined;
+  /**
+   * The `https` URL a registry declared by a folder or other address with no such form reported,
+   * so an edge naming it is matched on the next run without reading the registry again.
+   */
+  url?: string | undefined;
 }
 
 interface LockLink {
@@ -148,7 +153,14 @@ function parseRegistry(entry: unknown): LockRegistry | undefined {
     key,
     config: canonicalConfig(textMapOf(entry.config) ?? {}),
     revision: textOf(entry.revision),
+    ...urlOf(textOf(entry.url)),
   };
+}
+
+/** A recorded `url` that is not an `https` root is dropped, not fatal. */
+function urlOf(text: string | undefined): { url?: string } {
+  const url = reportedRegistryUrl(text);
+  return url === undefined ? {} : { url };
 }
 
 /** A field only when it has a value, so a row without it reads back as it was written. */
@@ -337,6 +349,7 @@ function registryDoc(source: LockRegistry): Record<string, unknown> {
     key: source.key,
     config: Object.keys(source.config).length === 0 ? undefined : source.config,
     revision: source.revision,
+    url: source.url,
   });
 }
 
@@ -395,7 +408,10 @@ export function lockChanges(before: Lock, after: Lock): string[] {
   ])) {
     const was = before.registries[name];
     const now = after.registries[name];
-    if (differ(was && registryDoc(was), now && registryDoc(now))) changed.add(name);
+    // A `url` is what the registry says of itself, kept for the next run; it changes nothing installed.
+    const doc = (source: LockRegistry | undefined) =>
+      source && registryDoc({ ...source, url: undefined });
+    if (differ(doc(was), doc(now))) changed.add(name);
   }
   for (const name of new Set([...Object.keys(before.artifacts), ...Object.keys(after.artifacts)])) {
     const was = before.artifacts[name];

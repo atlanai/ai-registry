@@ -1,7 +1,7 @@
 import type { AdapterError, Envelope } from "#adapter/index.ts";
 import type { LayoutId } from "#adapter/layouts/ids.ts";
 import { quoted } from "#adapter/text.ts";
-import type { SourceConfig } from "#core/adapter/identity.ts";
+import { canonicalRegistryUrl, type SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -29,7 +29,10 @@ export interface Origin {
   revision: string | undefined;
   /** How the source lays out what it holds, when its adapter says. */
   layout?: LayoutId | undefined;
-  /** The canonical `https` root its `registry.json` names, when it was read and names one. */
+  /**
+   * The `https` root its `registry.json` names, as `reportedRegistryUrl` writes it, when it was
+   * read, or the lockfile recorded it, and names one.
+   */
   url?: string | undefined;
 }
 
@@ -112,6 +115,11 @@ export function lockSourceOf(origin: Origin): LockRegistry {
     key: origin.key,
     config: origin.config,
     revision: origin.revision,
+    // Only where the declared address has no `https` form is the URL it reported what an edge
+    // reaches it by (`declaredRegistryUrl`), so only there is it kept.
+    ...(origin.url === undefined || canonicalRegistryUrl(origin.declared) !== undefined
+      ? {}
+      : { url: origin.url }),
   };
 }
 

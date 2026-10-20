@@ -1,10 +1,16 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { readRegistry } from "#adapter/filespec/documents.ts";
+import { rootReader } from "#adapter/filespec/folder.ts";
 import type { ArtifactKind, PublishRelationship } from "#adapter/index.ts";
-import { isLocalPath, isWithin } from "#adapter/paths.ts";
+import { expandHome, isLocalPath, isWithin } from "#adapter/paths.ts";
 import { parseVersion } from "#adapter/semver.ts";
 import { list, plural, quoted } from "#adapter/text.ts";
-import { canonicalRegistryUrl, comparableLocation } from "#core/adapter/identity.ts";
+import {
+  comparableLocation,
+  declaredRegistryUrl,
+  reportedRegistryUrl,
+} from "#core/adapter/identity.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { posixRelative } from "#core/fs/path.ts";
@@ -251,7 +257,7 @@ export async function dependsOnFor(
     edges.push(
       need.type === "local"
         ? await localEdge(work, entry, need.path, context)
-        : remoteEdge(work, need.ref, context),
+        : await remoteEdge(work, need.ref, context),
     );
   }
   return edges;
@@ -293,7 +299,25 @@ async function localEdge(
   return { rel_type: "depends_on", to: `${namespace}/${kind}/${name}@${version}`, ...range };
 }
 
-function remoteEdge(work: Work, ref: Ref, context: EdgeContext): PublishRelationship {
+/**
+ * The `https` URL its `registry.json` names, for a registry in a folder: what a consumer that
+ * declares the folder matches an edge by, read from disk so publishing reaches no other host.
+ * Undefined for any other address, or a folder that is no registry.
+ */
+async function folderUrl(location: string): Promise<string | undefined> {
+  if (!isLocalPath(location)) return undefined;
+  try {
+    return reportedRegistryUrl((await readRegistry(rootReader(expandHome(location)))).url);
+  } catch {
+    return undefined;
+  }
+}
+
+async function remoteEdge(
+  work: Work,
+  ref: Ref,
+  context: EdgeContext,
+): Promise<PublishRelationship> {
   const address = formatAddress(ref);
   const row = Object.values(context.lock.artifacts).find(
     (each) =>
@@ -324,13 +348,15 @@ function remoteEdge(work: Work, ref: Ref, context: EdgeContext): PublishRelation
       : `^${locked}`);
   let registry: string | undefined;
   if (!sameRegistry(context, ref.registry)) {
-    registry = canonicalRegistryUrl(context.known[ref.registry]?.location ?? "");
+    // The URL a consumer matches the edge by (`declaredRegistryUrl`), so the two never disagree.
+    const location = context.known[ref.registry]?.location ?? "";
+    registry = declaredRegistryUrl(location, await folderUrl(location));
     if (registry === undefined) {
       throw new AiregError(
         `${work.name} depends on ${row.name} from ${ref.registry}, which has no https address, so a published artifact cannot name it.`,
         {
           code: ErrorCode.Invalid,
-          hint: `Install ${row.name} from a registry with an https address, or publish ${work.name} to ${ref.registry}.`,
+          hint: `Give ${ref.registry}'s registry.json an https \`url\`, install ${row.name} from a registry with an https address, or publish ${work.name} to ${ref.registry}.`,
         },
       );
     }

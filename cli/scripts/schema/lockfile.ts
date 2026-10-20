@@ -58,6 +58,13 @@ const Registry = Type.Object(
         description: "What the registry was at, when one revision covers every artifact.",
       }),
     ),
+    url: Type.Optional(
+      Type.String({
+        pattern: "^https://",
+        description:
+          "The https root a registry declared at an address with none, such as a folder, reported, which a depends_on edge's registry is matched against.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );

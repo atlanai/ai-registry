@@ -14,6 +14,7 @@ import { isSafePath } from "#adapter/paths.ts";
 import { satisfies } from "#adapter/semver.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import { materialize } from "#core/adapter/content.ts";
+import { reportedRegistryUrl } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
 import { loadAdapter } from "#core/adapter/registry.ts";
 import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
@@ -322,6 +323,7 @@ function fromRows(
       config: source.config,
       revision: source.revision,
       ...(layout !== undefined && isLayoutId(layout) ? { layout } : {}),
+      ...(source.url === undefined ? {} : { url: source.url }),
     },
     placements,
     catalog: { root: source.adapter, layouts: [], entries, warnings: [] },
@@ -473,6 +475,8 @@ async function acquireOne(
   // One placement per artifact however often it is asked for, so a command that
   // stages and then digests the same content pays for it once.
   const placed = new Map<string, Promise<Staged>>();
+  // Only an `https` root is a URL an edge can name, so anything else it reports is dropped here.
+  const url = reportedRegistryUrl(listing.registry?.url);
 
   return {
     alias,
@@ -484,7 +488,7 @@ async function acquireOne(
       config: declared.config,
       revision: listing.sourceRevision,
       ...(listing.layout === undefined ? {} : { layout: listing.layout }),
-      ...(listing.registry?.url === undefined ? {} : { url: listing.registry.url }),
+      ...(url === undefined ? {} : { url }),
     },
     placements,
     catalog: listing.catalog,

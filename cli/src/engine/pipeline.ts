@@ -36,6 +36,7 @@ import {
   formatNeed,
   type Undeclared,
   type Unresolved,
+  unknownUrls,
   unmet,
   wantOf,
 } from "#core/plan/depends.ts";
@@ -375,19 +376,20 @@ function undeclared(
 }
 
 /**
- * Asks the declared registries not read yet for the URL an edge names, since one of them may
- * report it. Once every one has been read, the edge names a registry this scope does not declare.
+ * Reads the declared registries whose URL is still unknown (`unknownUrls`), since one of them may
+ * report the URL an edge names. Once every URL is known, an edge no registry is at names one this
+ * scope does not declare.
  */
 function readForUrls(
   planned: Plan,
-  read: { aliases: readonly string[]; acquired: readonly Acquired[]; roots: Roots },
+  read: { manifest: Manifest; lock: Lock; sources: readonly Acquired[]; roots: Roots },
   needs: Map<string, Want[]>,
   needed: Set<string>,
 ): void {
   const [elsewhere] = planned.undeclared;
   if (elsewhere === undefined) return;
-  const { aliases, acquired, roots } = read;
-  const unread = aliases.filter((alias) => !acquired.some((source) => source.alias === alias));
+  const { manifest, lock, sources, roots } = read;
+  const unread = unknownUrls(manifest.registries, sources, lock);
   if (unread.length === 0) throw undeclared(elsewhere, roots.scope);
   for (const alias of unread) {
     needs.set(alias, needs.get(alias) ?? []);
@@ -575,6 +577,26 @@ function refuseUntrusted(untrusted: readonly Untrusted[]): void {
 }
 
 /**
+ * The registries a run that opens only some plans: those, and every declared one the lockfile
+ * found something they depend on in, transitively.
+ */
+function dependencyRegistries(lock: Lock, manifest: Manifest, opened: readonly string[]): string[] {
+  const reached = new Set(opened);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const row of Object.values(lock.artifacts)) {
+      if (reached.has(row.registry) || manifest.registries[row.registry] === undefined) continue;
+      const by = (row.neededBy ?? []).map((name) => lock.artifacts[name]?.registry);
+      if (by.some((alias) => alias !== undefined && reached.has(alias))) {
+        reached.add(row.registry);
+        grew = true;
+      }
+    }
+  }
+  return [...reached];
+}
+
+/**
  * The lock is the source of truth: a registry it fully answers is planned
  * from it, and its registry is opened only for what the lock cannot supply.
  */
@@ -589,19 +611,6 @@ async function plan(
 ): Promise<{ planned: Plan; acquired: Acquired[] }> {
   const { roots, manifest, lock, harnesses } = loaded;
   const aliases = Object.keys(manifest.registries);
-  // Carried rows are planned from the lock alone, so their copies are not hashed.
-  const opened = hooks.aliases === undefined ? undefined : new Set(hooks.aliases);
-  const surveyed =
-    opened === undefined
-      ? lock
-      : {
-          ...lock,
-          artifacts: dict(
-            Object.entries(lock.artifacts).filter(([, row]) => opened.has(row.registry)),
-          ),
-        };
-  const state = await survey(surveyed, roots);
-
   const moving = hooks.moving ?? new Set<string>();
   // What the manifest's artifacts depend on, asked of their registry once a plan finds it missing.
   const needs = new Map<string, Want[]>();
@@ -609,7 +618,9 @@ async function plan(
   const everAsked = new Set<string>();
   const settled = new Map<string, Acquired>();
   const view = lockView(lock);
-  for (const alias of hooks.aliases ?? aliases) {
+  const asked = hooks.aliases;
+  const reached = asked === undefined ? undefined : dependencyRegistries(lock, manifest, asked);
+  for (const alias of reached ?? aliases) {
     if (view.rows(alias).some(([name]) => moving.has(name))) continue;
     const source = view.source(alias);
     if (source === undefined || !answers(manifest, source, hooks.held)) continue;
@@ -621,6 +632,24 @@ async function plan(
       ));
     settled.set(alias, { ...source, namespacePlugins });
   }
+  // A registry only a dependency was found in is planned with the run when the lock answers it,
+  // so the edge is settled without reading it; otherwise its rows stay as the lock has them.
+  const planning = reached?.filter(
+    (alias) => asked?.includes(alias) === true || settled.has(alias),
+  );
+  // Carried rows are planned from the lock alone, so their copies are not hashed.
+  const opened = planning === undefined ? undefined : new Set(planning);
+  const surveyed =
+    opened === undefined
+      ? lock
+      : {
+          ...lock,
+          artifacts: dict(
+            Object.entries(lock.artifacts).filter(([, row]) => opened.has(row.registry)),
+          ),
+        };
+  const state = await survey(surveyed, roots);
+
   // Only a registry being opened needs its account, which may refresh a token.
   const open = async (only: readonly string[]) =>
     acquire(manifest, {
@@ -636,7 +665,7 @@ async function plan(
       locked: { lock, moving, held: hooks.held === true },
       needs,
     });
-  const acquired = await open((hooks.aliases ?? aliases).filter((alias) => !settled.has(alias)));
+  const acquired = await open((planning ?? aliases).filter((alias) => !settled.has(alias)));
   try {
     await runPipelineHooks("prePlan", { targets, aliases });
     const planFrom = (sources: readonly Acquired[]) =>
@@ -649,7 +678,7 @@ async function plan(
         refresh: hooks.refresh === true,
         cliVersion: VERSION,
         nameCollision,
-        ...(hooks.aliases === undefined ? {} : { opened: hooks.aliases }),
+        ...(planning === undefined ? {} : { opened: planning }),
         ...(hooks.discard === undefined ? {} : { discard: hooks.discard }),
         ...(hooks.adopt === undefined ? {} : { adopt: hooks.adopt }),
       });
@@ -669,7 +698,7 @@ async function plan(
         needs.set(missing.alias, [...asked, want]);
         needed.add(missing.alias);
       }
-      readForUrls(planned, { aliases, acquired, roots }, needs, needed);
+      readForUrls(planned, { manifest, lock, sources, roots }, needs, needed);
       if (needed.size === 0) break;
       for (const alias of needed) settled.delete(alias);
       // Asked again with more wants, a registry replaces what it listed before.

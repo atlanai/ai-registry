@@ -8,7 +8,12 @@ import {
   type Range,
   satisfies,
 } from "#adapter/semver.ts";
-import { canonicalRegistryUrl } from "#core/adapter/identity.ts";
+import { list, plural, quoted, sanitizeText } from "#adapter/text.ts";
+import {
+  canonicalRegistryUrl,
+  comparableLocation,
+  declaredRegistryUrl,
+} from "#core/adapter/identity.ts";
 import { entryFor } from "#core/catalog/model.ts";
 import { dict } from "#core/fields.ts";
 import { type ArtifactKind, isKind } from "#core/kinds.ts";
@@ -97,23 +102,58 @@ export function accepts(need: Need, version: string | undefined): boolean {
   return need.range === undefined ? version === need.version : satisfies(version, need.range);
 }
 
+/** The `https` URL the lockfile recorded for a registry, while it is declared where it was then. */
+function recordedUrl(lock: Lock | undefined, alias: string, location: string): string | undefined {
+  const locked = lock?.registries[alias];
+  return locked !== undefined &&
+    comparableLocation(locked.location) === comparableLocation(location)
+    ? locked.url
+    : undefined;
+}
+
 /**
- * By alias, the canonical URL each declared registry is known by: the `url` its `registry.json`
- * names when it was read this run, else its declared address's (`canonicalRegistryUrl`).
+ * By alias, the canonical URL an edge's `registry` reaches each declared registry by
+ * (`declaredRegistryUrl`): its declared address's, or for a folder the `https` URL it reported,
+ * when it was read this run, or when the lockfile recorded it for the same address. Undefined
+ * for a registry with neither.
  */
 export function registryUrls(
   registries: Manifest["registries"],
   acquired: readonly Acquired[],
+  lock?: Lock,
 ): Map<string, string | undefined> {
   const read = new Map(acquired.map((source) => [source.alias, source.origin.url]));
   return new Map(
     Object.keys(registries)
       .sort()
-      .map((alias) => [
-        alias,
-        read.get(alias) ?? canonicalRegistryUrl(registries[alias]?.location ?? ""),
-      ]),
+      .map((alias) => {
+        const location = registries[alias]?.location ?? "";
+        const reported = read.has(alias) ? read.get(alias) : recordedUrl(lock, alias, location);
+        return [alias, declaredRegistryUrl(location, reported)];
+      }),
   );
+}
+
+/**
+ * The declared registries whose URL only reading them can tell: at a folder or other address
+ * with no `https` form, not read this run, and with no URL the lockfile recorded.
+ */
+export function unknownUrls(
+  registries: Manifest["registries"],
+  acquired: readonly Acquired[],
+  lock?: Lock,
+): string[] {
+  const read = new Set(acquired.map((source) => source.alias));
+  return Object.keys(registries)
+    .sort()
+    .filter((alias) => {
+      const location = registries[alias]?.location ?? "";
+      return (
+        !read.has(alias) &&
+        canonicalRegistryUrl(location) === undefined &&
+        recordedUrl(lock, alias, location) === undefined
+      );
+    });
 }
 
 /** One artifact in one registry, whatever version and local name it has. */
@@ -240,6 +280,8 @@ interface Walk {
   byAlias: ReadonlyMap<string, Acquired>;
   /** By declared alias, its canonical URL, which is where an edge's `registry` resolves. */
   urls: ReadonlyMap<string, string | undefined>;
+  /** Declared registries whose URL is not known until they are read (`unknownUrls`). */
+  unknown: readonly string[];
   topById: ReadonlyMap<string, Selected>;
   chosen: Map<string, Chosen>;
   neededBy: Map<string, Set<string>>;
@@ -254,14 +296,16 @@ interface Walk {
 }
 
 /**
- * The registry a need resolves in: its dependent's own, unless its edge names another by URL,
- * when it is the declared one at that URL. Never one this scope does not declare.
+ * The registries a need may resolve in: its dependent's own, unless its edge names another by
+ * URL, when it is every declared one at that URL, or its dependent's own when that is one of
+ * them. Never one this scope does not declare; more than one is for the person to settle.
  */
-function homeOf(walk: Walk, from: Visit, need: Need): string | undefined {
-  if (need.alias !== undefined) return need.alias;
-  if (need.registry === undefined || walk.urls.get(from.alias) === need.registry) return from.alias;
-  for (const [alias, url] of walk.urls) if (url === need.registry) return alias;
-  return undefined;
+function homesOf(walk: Walk, from: Visit, need: Need): string[] {
+  if (need.alias !== undefined) return [need.alias];
+  if (need.registry === undefined) return [from.alias];
+  const at = [...walk.urls].filter(([, url]) => url === need.registry).map(([alias]) => alias);
+  // Its own registry could serve it under an edge with no `registry`, so naming it adds nothing.
+  return at.includes(from.alias) ? [from.alias] : at;
 }
 
 function edge(walk: Walk, to: string, from: string, need: Need): void {
@@ -286,10 +330,19 @@ function pathOf(walk: Walk, from: Visit): string | undefined {
 
 /** One edge of `from`, taken against what the manifest names and what other edges asked. */
 function reach(walk: Walk, from: Visit, need: Need): void {
-  const alias = homeOf(walk, from, need);
-  if (alias === undefined) {
+  const homes = homesOf(walk, from, need);
+  const [alias, ...others] = homes;
+  // Which registries are at the edge's URL is settled only once every declared one's URL is known,
+  // so the answer never turns on which of them this run happened to read.
+  const elsewhere = homes[0] !== from.alias && need.alias === undefined;
+  if (alias === undefined || (elsewhere && walk.unknown.length > 0)) {
     const undeclared = { url: need.registry as string, need, by: from.address };
     walk.elsewhere.push({ undeclared, from: from.id });
+    return;
+  }
+  if (others.length > 0) {
+    const conflict = ambiguous(need, from.address, [alias, ...others]);
+    walk.raised.push({ conflict, from: from.id });
     return;
   }
   const id = idOf(alias, need.namespace, need.kind, need.name);
@@ -345,16 +398,19 @@ function reach(walk: Walk, from: Visit, need: Need): void {
  * where it began, and reach is decided by the manifest's own artifacts so `remove` prunes it whole.
  * A dependency several edges reach is read at a version every one of them accepts; when the source
  * lists one they do not, it is unresolved, asked for at the range they all admit. An edge naming
- * another registry resolves in the one `urls` has at that URL, or is undeclared.
+ * another registry resolves in the one `urls` has at that URL; with none, or while a registry in
+ * `unknown` could be another, it is undeclared, and two or more are a conflict.
  */
 export function closure(
   top: readonly Selected[],
   acquired: readonly Acquired[],
   urls: ReadonlyMap<string, string | undefined> = new Map(),
+  unknown: readonly string[] = [],
 ): Closure {
   const walk: Walk = {
     byAlias: new Map(acquired.map((source) => [source.alias, source])),
     urls,
+    unknown,
     topById: new Map(top.map((item) => [selectedId(item), item])),
     chosen: new Map(),
     neededBy: new Map(),
@@ -585,6 +641,15 @@ function inheritTargets(
     const ref = chosen.get(id)?.ref;
     if (ref !== undefined && targets !== undefined) ref.targets = [...targets];
   }
+}
+
+/** An edge's URL that more than one declared registry is at, so which one it means is unknown. */
+function ambiguous(need: Need, by: string, aliases: readonly string[]): Conflict {
+  const wanted = `${need.namespace}/${need.kind}/${need.name}`;
+  return {
+    message: `${by} needs ${wanted} from ${sanitizeText(need.registry ?? "")}, and ${plural(aliases.length, "declared registry", "declared registries")} are at that URL: ${list(aliases.map(quoted))}.`,
+    hint: "Keep one of them, and remove the others with `aireg registry remove <name>`.",
+  };
 }
 
 function againstManifest(

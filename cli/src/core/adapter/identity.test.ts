@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { canonicalRegistryUrl, comparableLocation, sourceKey } from "./identity.ts";
+import {
+  canonicalRegistryUrl,
+  comparableLocation,
+  declaredRegistryUrl,
+  reportedRegistryUrl,
+  sourceKey,
+} from "./identity.ts";
 
 describe("a registry's identity", () => {
   it("is the same with or without a trailing slash", () => {
@@ -78,5 +84,23 @@ describe("a registry's config", () => {
         /cannot name a registry config key/,
       );
     }
+  });
+});
+
+describe("the URL a declared registry is matched by", () => {
+  it("is its declared address's, whatever the registry reports", () => {
+    expect(
+      declaredRegistryUrl("https://github.com/evil/registry", "https://github.com/acme/shared"),
+    ).toBe("https://github.com/evil/registry");
+  });
+
+  it("is the https URL a folder reports, and nothing it reports otherwise", () => {
+    expect(declaredRegistryUrl("./disk", "https://GitHub.com/acme/disk.git/")).toBe(
+      "https://github.com/acme/disk",
+    );
+    expect(declaredRegistryUrl("./disk", "http://github.com/acme/disk")).toBeUndefined();
+    expect(declaredRegistryUrl("./disk", "github.com/acme/disk")).toBeUndefined();
+    expect(declaredRegistryUrl("./disk", undefined)).toBeUndefined();
+    expect(reportedRegistryUrl(" https://example.com/x/ ")).toBe("https://example.com/x");
   });
 });
