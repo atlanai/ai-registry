@@ -26,26 +26,27 @@ import sys
 import unicodedata
 from pathlib import Path
 
-NAMESPACE_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$")
-KIND_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+# Each pattern ends in \Z, since $ also matches before a trailing newline.
+NAMESPACE_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?\Z")
+KIND_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}\Z")
 NAME_RE = NAMESPACE_RE
-VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$")
+VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}\Z")
 # Section 2.1: a folder Windows cannot create, in any case and with any extension.
-DEVICE_RE = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$", re.IGNORECASE)
+DEVICE_RE = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?\Z", re.IGNORECASE | re.DOTALL)
 REF_RE = re.compile(
     r"^(?P<ns>[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)/(?P<kind>[a-z][a-z0-9_]{0,31})/"
-    r"(?P<name>[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)@(?P<version>[A-Za-z0-9][A-Za-z0-9._+-]{0,127})$"
+    r"(?P<name>[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)@(?P<version>[A-Za-z0-9][A-Za-z0-9._+-]{0,127})\Z"
 )
-DIGEST_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
+DIGEST_RE = re.compile(r"^sha256:[a-f0-9]{64}\Z")
 # SemVer 2.0.0: no leading "v", and no leading zeros in a numeric identifier.
 _NUM = r"0|[1-9]\d*"
 _PRE = rf"(?:{_NUM}|\d*[A-Za-z-][0-9A-Za-z-]*)"
 SEMVER_RE = re.compile(
-    rf"^({_NUM})\.({_NUM})\.({_NUM})(?:-({_PRE}(?:\.{_PRE})*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+    rf"^({_NUM})\.({_NUM})\.({_NUM})(?:-({_PRE}(?:\.{_PRE})*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?\Z"
 )
 # Section 2.4: a number or a wildcard in a partial version.
-PART_RE = re.compile(rf"^(?:{_NUM}|[xX*])$")
-COMPARATOR_RE = re.compile(r"^(<=|>=|<|>|=|\^|~)?(.*)$")
+PART_RE = re.compile(rf"^(?:{_NUM}|[xX*])\Z")
+COMPARATOR_RE = re.compile(r"^(<=|>=|<|>|=|\^|~)?(.*)\Z", re.DOTALL)
 MAX_RANGE = 256
 CONTROL_RE = re.compile("[\x00-\x1f\x7f-\x9f]")
 # Code points HFS+ ignores in a name, so ".g\u200cit" is ".git" there.
