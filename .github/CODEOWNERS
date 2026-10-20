@@ -1,8 +1,5 @@
-# Code owners review pull requests that change their paths.
+# Code owners review pull requests that change their paths. Every path has two
+# owners, because GitHub never lets the author approve their own pull request.
 * @firecast @UdaySagar-Git
 /spec/ @firecast @UdaySagar-Git
-/cli/ @firecast @UdaySagar-Git
 /docs/ @benhuds @firecast @UdaySagar-Git
-/examples/ @firecast @UdaySagar-Git
-/tools/ @firecast @UdaySagar-Git
-/.github/ @firecast @UdaySagar-Git
