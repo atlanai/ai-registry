@@ -285,6 +285,7 @@ export const marketplaceLayout: Layout = {
         warnings.push(`Skipped a plugin in ${chosen.path} that has no name.`);
         continue;
       }
+      if (context.asked?.(name) === false) continue;
       const found = await entryPlugin(tree, chosen, { entry, name }, fetching, roots, warnings);
       const [plugin] = found ?? [];
       if (found === undefined || plugin === undefined) continue;

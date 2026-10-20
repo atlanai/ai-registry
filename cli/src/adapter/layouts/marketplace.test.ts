@@ -189,6 +189,22 @@ describe("the marketplace layout", () => {
     expect(found.warnings).toEqual(['In "far-kit": Skipped CLAUDE.md, which is a symlink.']);
   });
 
+  test("reads only the entries a run asks for, so it says nothing of the others", async ({
+    tmp,
+  }) => {
+    const root = await marketplace(join(tmp, "mkt"))
+      .file("plugins/deploy-kit/skills/ship/SKILL.md", "---\nname: shipping\n---\nShip.\n")
+      .write();
+    const asked = (name: string) => name === "docs-kit";
+    const found = await marketplaceLayout.enumerate(await openTree(root), { ...context, asked });
+    expect(found.artifacts.map((item) => item.envelope.metadata.name)).toEqual([
+      "docs-kit",
+      "pdf",
+      "xlsx",
+    ]);
+    expect(found.warnings).toEqual([]);
+  });
+
   test("fetches remote plugins side by side, eight at most, and one repository's in turn", async ({
     tmp,
   }) => {
