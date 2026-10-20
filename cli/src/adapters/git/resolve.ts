@@ -22,7 +22,7 @@ export interface RemoteRef {
  * Walks the same transport ladder as the clone. Resolving over HTTPS while
  * cloning over SSH would fail a private repository before the fallback ran.
  */
-async function lsRemote(
+export async function lsRemote(
   spec: SourceSpec,
   patterns: string[],
   limits: GitLimits,

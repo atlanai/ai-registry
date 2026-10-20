@@ -51,6 +51,7 @@ export async function scan(
     base: loaded.roots.base,
     also,
     needs,
+    recorded: loaded.lock,
     ...(options.aliases === undefined ? {} : { aliases: options.aliases }),
     ...(options.onStep === undefined ? {} : { onStep: options.onStep }),
     ...(options.credentials === undefined ? {} : { credentials: options.credentials }),

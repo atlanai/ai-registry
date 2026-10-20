@@ -30,6 +30,14 @@ export default defineConfig({
         },
       },
       { extends: true, test: { name: "contract", include: ["test/contract/**/*.test.ts"] } },
+      {
+        extends: true,
+        test: {
+          name: "conformance",
+          include: ["test/conformance/**/*.test.ts"],
+          globalSetup: ["test/kit/global-setup.ts"],
+        },
+      },
     ],
     coverage: {
       provider: "v8",

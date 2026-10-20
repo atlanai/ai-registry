@@ -3,7 +3,13 @@ import { isAbsolute, join } from "node:path";
 import { credentialFor, credentialForLocation } from "#accounts/credentials.ts";
 import { isAuthFailure } from "#adapter/errors.ts";
 import { type ArtifactPlace, artifactAt, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
-import { isAdapterError, type RegistryIdentity, type Want } from "#adapter/index.ts";
+import {
+  isAdapterError,
+  type RegistryIdentity,
+  type SourceAdapter,
+  type Want,
+} from "#adapter/index.ts";
+import { isLayoutId, isReadOnlyLayout, LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
 import { registryNameFromLocation } from "#adapter/location.ts";
 import { expandHome, isLocalPath } from "#adapter/paths.ts";
 import {
@@ -27,6 +33,8 @@ import { findRegistry } from "#core/filespec/write/init.ts";
 import { dotRelative, posixRelative } from "#core/fs/path.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { RegistrySource } from "#core/manifest.ts";
+import { manifestOf } from "#core/plan/acquire.ts";
+import { type Carried, carriedIn } from "#core/plan/carries.ts";
 import { wrapsNamespaces } from "#core/plan/namespaces.ts";
 import { unmatched } from "#core/plan/select.ts";
 import { parseRef, type Ref } from "#core/ref.ts";
@@ -38,6 +46,7 @@ export interface SourceFlags extends Record<string, unknown> {
   config?: string[] | undefined;
   ref?: string | undefined;
   path?: string | undefined;
+  layout?: string | undefined;
 }
 
 export interface Probed {
@@ -52,12 +61,16 @@ export interface Probed {
   catalog: Catalog;
   /** Set only when the source reports one revision covering everything. */
   revision: string | undefined;
+  /** How the source lays out what it holds, when its adapter says. */
+  layout: LayoutId | undefined;
   /** Its adapter declares each namespace a plugin, which the user scope installs as one. */
   namespacePlugins: boolean;
   /** The version the source serves an entry at, which `@<version>` can pin. */
   versionOf: (entry: Entry) => string | undefined;
   /** The spec's indexable string pairs on an entry, which a search reads as tags. */
   labelsOf: (entry: Entry) => Readonly<Record<string, string>> | undefined;
+  /** What a plugin from a source that is not a registry would have a harness start. */
+  carriesOf: (entry: Entry) => readonly Carried[];
   /** The bytes an entry names, fetched now if they are not already here. */
   content: (entry: Entry) => Promise<string>;
   close: () => Promise<void>;
@@ -77,6 +90,18 @@ export function sourceConfig(flags: SourceFlags) {
   }
   if (flags.ref !== undefined) config.ref = flags.ref;
   if (flags.path !== undefined) config.path = stripLeading(stripTrailing(flags.path, "/"), "/");
+  if (flags.layout !== undefined) {
+    if (!isLayoutId(flags.layout)) {
+      throw new AiregError(
+        `--layout takes ${list([...LAYOUT_IDS], "or")}, not ${quoted(flags.layout)}.`,
+        {
+          code: ErrorCode.Usage,
+          hint: "Leave it off to let aireg tell the layout from what the source holds.",
+        },
+      );
+    }
+    config.layout = flags.layout;
+  }
   return canonicalConfig(config);
 }
 
@@ -339,12 +364,8 @@ export async function insideRegistry(
   const folder = expandLocation(input, cwd);
   if (!existsSync(folder) || existsSync(join(folder, REGISTRY_DOCUMENT))) return undefined;
   const root = findRegistry(folder);
-  if (root === undefined) {
-    throw new AiregError(`No registry.json in ${input} or any folder above it.`, {
-      code: ErrorCode.Usage,
-      hint: "Name a folder inside a registry, such as <registry>/artifacts/<namespace>/<kind>/<name>.",
-    });
-  }
+  // A folder no registry holds is a source of its own, such as a folder of skills.
+  if (root === undefined) return undefined;
   const place = artifactAt(posixRelative(root, folder));
   if (place === undefined || place.root !== "") {
     throw new AiregError(`${input} is inside the registry at ${root}, but names no artifact.`, {
@@ -363,6 +384,22 @@ function addressOf(place: ArtifactPlace): string {
   return place.version === undefined ? address : `${address}@${place.version}`;
 }
 
+/**
+ * Detection runs once: a layout other than a registry is recorded with the source, so every later
+ * run reads it the same way. A registry is the default and is recorded only when forced.
+ */
+function withLayout(
+  config: Readonly<Record<string, string>>,
+  layout: LayoutId | undefined,
+  adapter: SourceAdapter,
+): Record<string, string> {
+  const takes = adapter.configSchema?.properties?.layout !== undefined;
+  if (!takes || layout === undefined || layout === "registry" || config.layout !== undefined) {
+    return { ...config };
+  }
+  return canonicalConfig({ ...config, layout });
+}
+
 /** Flags win over the manifest, so `--ref` can override a pinned registry. */
 function overlay(declared: RegistrySource, flags: SourceFlags): SourceFlags {
   const config = Object.entries(declared.config).map(([key, value]) => `${key}=${value}`);
@@ -371,6 +408,7 @@ function overlay(declared: RegistrySource, flags: SourceFlags): SourceFlags {
     config: [...config, ...(flags.config ?? [])],
     ref: flags.ref,
     path: flags.path,
+    layout: flags.layout,
   };
 }
 
@@ -437,6 +475,7 @@ export async function probe(
   }
 
   const own = ownName(listing.registry);
+  const recorded = withLayout(config, listing.layout, open.adapter);
   const listedAt = (entry: Entry) =>
     listing.listed.find((candidate) => candidate.path === entry.path);
   return {
@@ -444,12 +483,21 @@ export async function probe(
     named: declaredAlias === undefined && own !== undefined ? "registry" : "address",
     label: labelOf(listing.registry, declaredAlias ?? own ?? alias),
     location,
-    declared: { location, adapter, config },
+    declared: { location, adapter, config: recorded },
     catalog: listing.catalog,
     revision: listing.sourceRevision,
+    layout: listing.layout,
     namespacePlugins: wrapsNamespaces(open.adapter),
-    versionOf: (entry) => listedAt(entry)?.artifact.envelope.metadata.version,
+    versionOf: (entry) => {
+      const artifact = listedAt(entry)?.artifact;
+      return artifact?.version ?? artifact?.envelope.metadata.version;
+    },
     labelsOf: (entry) => listedAt(entry)?.artifact.envelope.metadata.labels,
+    carriesOf: (entry) => {
+      const artifact = listedAt(entry)?.artifact;
+      if (artifact?.kind !== "plugin" || !isReadOnlyLayout(listing.layout)) return [];
+      return carriedIn(artifact.envelope, manifestOf(artifact)).carries;
+    },
     content: async (entry) => {
       const item = listedAt(entry);
       if (item === undefined) {

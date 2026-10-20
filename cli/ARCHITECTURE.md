@@ -13,7 +13,7 @@ main.ts             parses argv and runs one command; nothing imports it
 cli/                commands, prompts, rendering, the console UI and onboarding
 daemon/             the background service: JSON-RPC server, jobs, scheduler, run history
 self/  engine/      installing, updating and removing aireg itself; what the CLI and the daemon both run
-accounts/ adapters/ sign-in and the registries an account reaches; the built-in adapters, git/ and local/
+accounts/ adapters/ sign-in and the registries an account reaches; the built-in adapters, git/, local/ and well-known/
 core/               everything else, with no knowledge of the layers above
 harnesses/          one typed definition per harness; imports only core/harness/contract.ts
 adapter/            the public adapter contract; imports nothing else
@@ -42,6 +42,7 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | The adapters built into aireg | `adapters/index.ts` |
 | What an adapter adds beside the contract: commands, job steps and console tabs | `core/host/` |
 | Reading a file spec registry from any `read(path)`, its name rules and document names | `adapter/filespec/` |
+| How a source on disk lays out what it holds, and reading one that is not a registry, such as a folder of skills | `adapter/layouts/` |
 | The merges a publish writes into `versions.json` and `index.json` | `adapter/filespec/write.ts` |
 | Registry authoring: init, index, validate, kinds and offers | `core/filespec/write/` |
 | SemVer ordering, digests, safe file reads and writes, and message text helpers | `adapter/semver.ts`, `adapter/spec/canonical.ts`, `adapter/files.ts`, `adapter/text.ts` |
@@ -65,15 +66,16 @@ Background jobs run the same engine from the daemon (`daemon/runner.ts`), so a s
 
 ## Extending aireg
 
-- **A harness:** copy the closest module in `src/harnesses/` to `<id>.ts` and edit it with `defineHarness`, typed by `core/harness/contract.ts`: its `roots`, the `detect` signals that it is installed, and under `kinds` where each kind goes. Use `reads` when it already loads another harness's folder, and `register` and `manifest` entries only when it needs a config edit to load a plugin. List it in `src/harnesses/index.ts`; a test checks every harness's ids, templates and paths. No code branches on a harness's name: extend the contract instead.
-- **An adapter:** implement the contract in `src/adapter/` with `defineAdapter`, and check it with `assertAdapterCompliance`. `aireg adapter init <id>` scaffolds one as a standalone package that imports the contract from `@atlanai/aireg`. Any other adapter installs from the release server with `aireg adapter install`. A store laid out as the file spec reads through `resolveFromRoot` and, on disk, `openFolderRegistry`. Built-in adapters live in `src/adapters/<id>/` with the same layout, and say through the contract what the CLI needs, such as `credentialsHint`, `readOnly` and the `fileSpec` capability, so no command branches on an adapter's id.
+- **A harness:** copy the closest module in `src/harnesses/` to `<id>.ts` and edit it with `defineHarness`, typed by `core/harness/contract.ts`: its `roots`, the `detect` signals that it is installed, and under `kinds` where each kind goes. Use `reads` when it already loads another harness's folder, and `register` and `manifest` entries only when it needs a config edit to load a plugin. List it in `src/harnesses/index.ts`; a test checks every harness's ids, templates and paths. No code branches on a harness's name: extend the contract instead. Record what each mapping rests on in `test/conformance/<id>/EVIDENCE.md` and prove it with a conformance test. A person can also define one as a JSON file, which `core/harness/load.ts` reads and checks.
+- **A codec:** a pure function in `core/harness/codecs/`, listed in the `Codec` type, `applyCodec` and `scripts/schema/harness.ts`. A definition only names a codec, so a harness file never carries code.
+- **An adapter:** implement the contract in `src/adapter/` with `defineAdapter`, and check it with `assertAdapterCompliance`. `aireg adapter init <id>` scaffolds one as a standalone package that imports the contract from `@atlanai/aireg`. Any other adapter installs from the release server with `aireg adapter install`. A store laid out as the file spec reads through `resolveFromRoot` and, on disk, `openFolderRegistry`; a built-in adapter whose source is a folder reads it through `openLayoutRoot` in `adapter/layouts/`, which tells a registry from a folder of skills and reads either. Built-in adapters live in `src/adapters/<id>/` with the same layout, and say through the contract what the CLI needs, such as `credentialsHint`, `readOnly` and the `fileSpec` capability, so no command branches on an adapter's id.
 - **A command:** add its entry to `cli/commands/index.ts`, with its options, examples and docs page, and its module at `cli/commands/<command>.ts`. A command with actions keeps each action's module beside it, in `cli/commands/<command>/<action>.ts`, such as `cli/commands/self/update.ts`. Help and the command map (`aireg --map`) read the table.
 - **An environment setting:** add it to `SETTINGS` in `core/env.ts`. A test fails until `docs/reference/environment.md` documents it.
 - **An error:** throw `AiregError` with an `ErrorCode`, or extend it for a domain error. A new code needs an exit status in `core/errors.ts` and a row in `docs/reference/output.md`.
 
 ## Tests
 
-Vitest runs four projects. `pnpm test` runs them all, and `pnpm run test:unit`, `test:integration`, `test:e2e` and `test:contract` run one each.
+Vitest runs five projects. `pnpm test` runs them all, and `pnpm run test:unit`, `test:integration`, `test:e2e`, `test:contract` and `test:conformance` run one each.
 
 | Project | Where | What |
 |---|---|---|
@@ -81,6 +83,7 @@ Vitest runs four projects. `pnpm test` runs them all, and `pnpm run test:unit`, 
 | integration | `test/integration/` | Several modules together, in process, such as a client driving the daemon. |
 | e2e | `test/e2e/`, `test/scenarios/` | The built CLI in an isolated home. Each built-in command's `--help` is snapshotted. |
 | contract | `test/contract/` | The JSON Schemas against the spec, and the generated schemas against their definitions. |
+| conformance | `test/conformance/` | Each harness against its evidence: what aireg places, and, with `AIREG_CONFORMANCE=1` and the harness installed, what the harness itself loads. |
 
 `test/kit/` holds what tests share: fixtures that give each test its own home, project, daemon and git identity and clean them up, builders for registries, manifests, locks and plans, and one redaction for paths, digests, times and versions. `test/fixtures/` holds static files only.
 

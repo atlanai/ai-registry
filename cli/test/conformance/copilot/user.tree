@@ -1,0 +1,13 @@
+.copilot/
+.copilot/agents/
+.copilot/agents/planner.agent.md -> ../../.registry/artifacts/kit/kit/agents/planner.md
+.copilot/agents/reviewer.agent.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+.copilot/skills/
+.copilot/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+.copilot/skills/ship -> ../../.registry/artifacts/kit/kit/skills/ship
+project/
+project/.github/
+project/.github/agents/
+project/.github/agents/reviewer.agent.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+project/.github/skills/
+project/.github/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint

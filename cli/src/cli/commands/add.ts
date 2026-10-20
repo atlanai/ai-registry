@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join, resolve } from "node:path";
+import { isReadOnlyLayout, type LayoutId } from "#adapter/layouts/ids.ts";
+import { expandHome } from "#adapter/paths.ts";
 import { list, plural, quoted, sanitizeName, withoutCredentials } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import {
@@ -9,6 +11,7 @@ import {
   chooseScope,
   chooseTargets,
   confirmPlan,
+  confirmTrust,
   equivalent,
   type Interaction,
   interaction,
@@ -29,6 +32,7 @@ import {
 import { settleCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, type Ran, summarize } from "#cli/render/plan.ts";
 import { noteUserScope } from "#cli/render/where.ts";
+import { type LockedSkill, readSkillLock } from "#cli/skill-locks.ts";
 import {
   among,
   atAddress,
@@ -52,6 +56,7 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import { coveredByWhole, type RegistrySource } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
 import { reached } from "#core/plan/acquire.ts";
+import { describeCarried } from "#core/plan/carries.ts";
 import type { Selected } from "#core/plan/model.ts";
 import {
   formatAddress,
@@ -95,7 +100,66 @@ interface Gathered {
 }
 
 export async function run(context: CommandContext): Promise<void> {
-  const { positionals, common, own } = parse<AddFlags>(context.argv, builtin("add"));
+  const parsed = parse<AddFlags>(context.argv, builtin("add"));
+  if (parsed.own.from !== undefined) return addFrom(context, parsed, parsed.own.from);
+  return addAddress(context, parsed);
+}
+
+/**
+ * Adds what another installer's lock file records, one source at a time, taking over each copy
+ * already on disk that holds exactly what aireg installs.
+ */
+async function addFrom(context: CommandContext, parsed: Parsed, from: string): Promise<void> {
+  const { positionals, common, own } = parsed;
+  if (positionals.length > 0 || own.registry !== undefined || common.select !== undefined) {
+    throw new AiregError("`aireg add --from` takes no address and no -s.", {
+      code: ErrorCode.Usage,
+      hint: "Run `aireg add --from <file>` on its own: the file says what to add.",
+    });
+  }
+  const lock = await readSkillLock(resolve(context.cwd, expandHome(from)));
+  for (const skipped of lock.skipped) context.printer.warning(skipped);
+  if (lock.skills.length === 0) {
+    throw new AiregError(`${from} records no skill aireg can add.`, { code: ErrorCode.NotFound });
+  }
+  const sources = new Map<string, LockedSkill[]>();
+  for (const skill of lock.skills) {
+    const key = `${skill.address}\u0000${skill.ref ?? ""}`;
+    sources.set(key, [...(sources.get(key) ?? []), skill]);
+  }
+  const scope = common.scope ?? (lock.user ? "user" : undefined);
+  for (const skills of sources.values()) {
+    const [first] = skills as [LockedSkill, ...LockedSkill[]];
+    for (const skill of skills) {
+      const folder = skill.folder === "." ? undefined : basename(skill.folder);
+      if (folder !== undefined && folder !== skill.name) {
+        context.printer.warning(
+          `${quoted(skill.name)} installs as ${quoted(folder)}, the name of its folder, so a copy under ${quoted(skill.name)} stays as it is.`,
+        );
+      }
+    }
+    const names = skills.map((skill) =>
+      skill.folder === "." ? skill.name : basename(skill.folder),
+    );
+    await addAddress(
+      context,
+      {
+        positionals: [first.address],
+        common: { ...common, scope, select: names },
+        own: { ...own, from: undefined, ...(first.ref === undefined ? {} : { ref: first.ref }) },
+      },
+      new Set(names),
+    );
+  }
+}
+
+type Parsed = ReturnType<typeof parse<AddFlags>>;
+
+async function addAddress(
+  context: CommandContext,
+  { positionals, common, own }: Parsed,
+  adopt?: ReadonlySet<string>,
+): Promise<void> {
   const step = interaction(context.printer, defaultIo(), common.yes);
 
   // An address may name a registry this scope declares, or one declared for
@@ -106,30 +170,16 @@ export async function run(context: CommandContext): Promise<void> {
     cancel(step);
     return;
   }
-  const {
-    input,
-    resolved,
-    inside: within,
-    exact,
-    picks,
-  } = await commandLineAddress(own, positionals, typed, known, common, context.cwd);
+  const address = await commandLineAddress(own, positionals, typed, known, common, context.cwd);
+  const { input, inside: within, exact, picks } = address;
+  let { resolved } = address;
   if (!resolved.declared) {
     const unknown = await undeclaredRegistry(input, known, common, context.cwd);
     if (unknown !== undefined) throw unknown;
   }
 
-  const namespace = selectScope(input, resolved, picks, within);
-
-  // The address carries the selection when it named one, so every later step
-  // reads it the same way `--select` would have been read.
-  const asked: CommonOptions =
-    picks.select !== undefined || resolved.name === undefined
-      ? picks
-      : { ...picks, select: [resolved.name] };
-  const named = asked.select?.includes("*") === true ? undefined : asked.select;
-  // Only one address is read on its own: a `--select` value may name a
-  // namespace, which the catalog has to be read to recognize.
-  const partial = resolved.name !== undefined && picks.select === undefined;
+  let namespace = selectScope(input, resolved, picks, within);
+  let { asked, named, partial } = selection(resolved, picks);
   // An address that says what to install is the whole answer; only a bare one is asked about.
   const complete = picks.select !== undefined || exact;
   const asking: Interaction = complete
@@ -138,6 +188,12 @@ export async function run(context: CommandContext): Promise<void> {
   preparing(asking);
 
   const { source } = await read(step, context, resolved, partial, named, namespace);
+  const short = shortForm(source, resolved, namespace, picks);
+  if (short !== undefined) {
+    resolved = short;
+    namespace = undefined;
+    ({ asked, named, partial } = selection(resolved, picks));
+  }
   const { catalogAlias, entries } = entriesFor(source, resolved, partial, namespace);
 
   const gathered = await gather(
@@ -161,6 +217,15 @@ export async function run(context: CommandContext): Promise<void> {
   const alias = resolved.declared
     ? aliasFor(input, true, known, source)
     : (own.as ?? aliasFor(input, false, known, source));
+  // Trust is asked on a terminal however exactly the address says what to install: naming a
+  // plugin is not agreeing to what it runs. Only `--yes` or no terminal leaves it to `--trust`.
+  const trust = await trustFor(
+    step,
+    source,
+    chosenEntries(choices.select, entries),
+    own.trust ?? [],
+    loaded.manifest.artifacts.flatMap((ref) => (ref.registry === alias ? (ref.trust ?? []) : [])),
+  );
 
   // Taking everything an address names is the address itself, not the whole
   // registry: `add acme/my-team --all` must not drag in every other team.
@@ -224,7 +289,7 @@ export async function run(context: CommandContext): Promise<void> {
 
       const narrowed = narrowedTargets(fresh, asked, choices.targets);
 
-      repinned = declare(manifest.artifacts, refs, narrowed, choices.copy, (ref) =>
+      repinned = declare(manifest.artifacts, refs, narrowed, choices.copy, trust, (ref) =>
         reached(fresh.lock, ref).at(0),
       );
       manifest.artifacts = manifest.artifacts.filter(
@@ -235,6 +300,7 @@ export async function run(context: CommandContext): Promise<void> {
         // Every other registry stays as the lock has it, so adding one skill
         // does not fetch and re-plan the whole scope.
         aliases: [alias],
+        ...(adopt === undefined ? {} : { adopt }),
         // Naming something already locked is asking for its newest version again.
         moving: new Set(refs.flatMap((text) => reached(fresh.lock, parseRef(text)))),
         // A whole namespace still installs the rest when one member's name is taken.
@@ -282,7 +348,12 @@ export async function run(context: CommandContext): Promise<void> {
     settleCollisions(context, result.plan);
   }
   if (context.printer.format === "json") {
-    printAdded(context, { registry: alias, artifacts: refs, jobId }, result, common.dryRun);
+    printAdded(
+      context,
+      { registry: alias, layout: source.layout, artifacts: refs, jobId },
+      result,
+      common.dryRun,
+    );
     return;
   }
   if (choices.scope === "user") noteUserScope(context.printer, common.scope, context.cwd);
@@ -297,15 +368,21 @@ export async function run(context: CommandContext): Promise<void> {
 
 function printAdded(
   context: CommandContext,
-  added: { registry: string; artifacts: readonly string[]; jobId: string | undefined },
+  added: {
+    registry: string;
+    layout: LayoutId | undefined;
+    artifacts: readonly string[];
+    jobId: string | undefined;
+  },
   result: RunResult,
   dryRun: boolean,
 ): void {
-  const { jobId, ...named } = added;
+  const { jobId, layout, ...named } = added;
   context.printer.json({
     ok: true,
     data: {
       ...named,
+      ...(isReadOnlyLayout(layout) ? { layout } : {}),
       dependencies: result.plan.neededBy,
       ...outcome(result, dryRun),
       ...(jobId === undefined ? {} : { jobId }),
@@ -361,7 +438,71 @@ async function reportAdded(
   return undefined;
 }
 
-type AddFlags = SourceFlags & { as?: string; registry?: string; "no-auto-update"?: boolean };
+type AddFlags = SourceFlags & {
+  as?: string;
+  registry?: string;
+  "no-auto-update"?: boolean;
+  trust?: string[];
+  from?: string | undefined;
+};
+
+/**
+ * Plugins this add may install although a harness that loads them runs what they carry as you:
+ * named with `--trust`, trusted by the manifest already, or agreed to here on a terminal.
+ */
+async function trustFor(
+  step: Interaction,
+  source: Probed,
+  chosen: readonly Entry[],
+  flagged: readonly string[],
+  already: readonly string[],
+): Promise<string[]> {
+  const trust = flagged.map(sanitizeName);
+  const held = new Set([...trust, ...already]);
+  for (const entry of chosen) {
+    if (entry.kind !== "plugin" || held.has(entry.name)) continue;
+    const carries = source.carriesOf(entry);
+    if (carries.length === 0) continue;
+    if (await confirmTrust(step, entry.name, describeCarried(carries))) trust.push(entry.name);
+  }
+  return trust;
+}
+
+/** What an address selects: the names it carries, read the way `--select` would be. */
+function selection(resolved: Resolved, picks: CommonOptions) {
+  const asked: CommonOptions =
+    picks.select !== undefined || resolved.name === undefined
+      ? picks
+      : { ...picks, select: [resolved.name] };
+  return {
+    asked,
+    named: asked.select?.includes("*") === true ? undefined : asked.select,
+    // Only one address is read on its own: a `--select` value may name a
+    // namespace, which the catalog has to be read to recognize.
+    partial: resolved.name !== undefined && picks.select === undefined,
+  };
+}
+
+/**
+ * `acme/pdf` names a namespace. When the registry has no namespace `pdf` but exactly one artifact
+ * of that name, it names that artifact instead; the manifest records its full name.
+ */
+function shortForm(
+  source: Probed,
+  resolved: Resolved,
+  namespace: string | undefined,
+  picks: CommonOptions,
+): Resolved | undefined {
+  if (namespace === undefined || resolved.name !== undefined || picks.select !== undefined) {
+    return undefined;
+  }
+  const entries = source.catalog.entries;
+  const plugin = (entry: Entry) => entry.kind === "plugin" && entry.name === namespace;
+  if (entries.some((entry) => entry.group === namespace || plugin(entry))) return undefined;
+  const [only] = among(entries, resolved.alias ?? source.alias, { name: namespace });
+  if (only === undefined) return undefined;
+  return { ...resolved, name: only.name, namespace: only.group, kind: only.kind };
+}
 
 /** What the command line names, with a link to one artifact read as that artifact. */
 async function commandLineAddress(
@@ -488,6 +629,8 @@ function declare(
   refs: readonly string[],
   narrowed: string[] | "scope" | undefined,
   copy: boolean,
+  /** Plugins the person trusts to run what they carry, recorded on each entry this adds. */
+  trust: readonly string[],
   /** The lockfile's name for what a ref already installs, if anything. */
   installedAs: (ref: Ref) => string | undefined,
 ): Repin[] {
@@ -496,11 +639,7 @@ function declare(
   for (const text of refs) {
     const already = declaredAt.get(formatAddress(parseRef(text)));
     const held = already === undefined ? undefined : artifacts[already];
-    const ref: Ref = {
-      ...parseRef(text),
-      targets: narrowed === "scope" ? undefined : (narrowed ?? held?.targets),
-      ...(copy || held?.copy === true ? { copy: true } : {}),
-    };
+    const ref = entryOf(text, held, { narrowed, copy, trust });
     readmit(artifacts, ref);
     const name = ref.name === undefined ? undefined : (installedAs(ref) ?? ref.name);
     if (already === undefined) {
@@ -516,16 +655,34 @@ function declare(
     if (name !== undefined && declared.version !== ref.version) {
       repinned.push({ name, version: ref.version });
     }
-    if (
-      formatRef(declared) !== formatRef(ref) ||
-      declared.exclude !== undefined ||
-      declared.targets?.join() !== ref.targets?.join() ||
-      declared.copy !== ref.copy
-    ) {
-      artifacts[already] = ref;
-    }
+    if (changed(declared, ref)) artifacts[already] = ref;
   }
   return repinned;
+}
+
+/** The entry an add writes, keeping what the entry it replaces already said. */
+function entryOf(
+  text: string,
+  held: Ref | undefined,
+  how: { narrowed: string[] | "scope" | undefined; copy: boolean; trust: readonly string[] },
+): Ref {
+  const trust = [...new Set([...(held?.trust ?? []), ...how.trust])].sort();
+  return {
+    ...parseRef(text),
+    targets: how.narrowed === "scope" ? undefined : (how.narrowed ?? held?.targets),
+    ...(how.copy || held?.copy === true ? { copy: true } : {}),
+    ...(trust.length === 0 ? {} : { trust }),
+  };
+}
+
+function changed(declared: Ref, ref: Ref): boolean {
+  return (
+    formatRef(declared) !== formatRef(ref) ||
+    declared.exclude !== undefined ||
+    declared.targets?.join() !== ref.targets?.join() ||
+    declared.trust?.join() !== ref.trust?.join() ||
+    declared.copy !== ref.copy
+  );
 }
 
 function readmit(artifacts: Ref[], added: Ref): void {
@@ -795,12 +952,24 @@ function addressOf(pick: string, all: readonly Entry[], alias: string): string |
       ? { name: word }
       : { name: ref.name, namespace: ref.namespace, kind: ref.kind },
   );
+  const plugin = all.some((candidate) => candidate.kind === "plugin" && candidate.name === word);
   if (entry !== undefined) {
     const address = [entry.group, entry.kind, entry.name].filter(Boolean).join("/");
+    if (plugin && ref.name === undefined) refuseShared(word, address, entry.kind, alias);
     return ref.version === undefined ? address : `${address}@${ref.version}`;
   }
-  const plugin = all.some((candidate) => candidate.kind === "plugin" && candidate.name === word);
   return ref.name === undefined && (namespaces.has(word) || plugin) ? word : undefined;
+}
+
+/** A plugin and an artifact of the same name: either is a fair reading, so neither is taken. */
+function refuseShared(word: string, address: string, kind: string, alias: string): never {
+  throw new AiregError(
+    `${quoted(word)} names both the plugin ${word} and the ${kind} ${address}.`,
+    {
+      code: ErrorCode.Usage,
+      hint: `Add the whole plugin with \`aireg add ${alias}/${word}\`, or only the ${kind} with \`-s ${address}\`.`,
+    },
+  );
 }
 
 /** One address per command; several artifacts are picked inside it with -s. */
@@ -900,9 +1069,15 @@ function selectScope(
   }
 }
 
-/** A namespace address narrows the catalog, so `-s` cannot reach past it. */
+/**
+ * A namespace address narrows the catalog, so `-s` cannot reach past it. A plugin's namespace
+ * holds its parts, and the plugin itself, which sits in none.
+ */
 function inside(entries: readonly Entry[], namespace: string | undefined): readonly Entry[] {
-  return namespace === undefined ? entries : entries.filter((entry) => entry.group === namespace);
+  if (namespace === undefined) return entries;
+  return entries.filter(
+    (entry) => entry.group === namespace || (entry.kind === "plugin" && entry.name === namespace),
+  );
 }
 
 /** The hint's addresses: the kind only where a namespace has two artifacts of one name. */

@@ -6,10 +6,12 @@ import { exists } from "#core/fs/tree.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
+import { describeCarried } from "#core/plan/carries.ts";
 import { closure } from "#core/plan/depends.ts";
 import type { Acquired, Fetch, Selected } from "#core/plan/model.ts";
 import { fetchFrom, listedAt } from "#core/plan/model.ts";
-import { select } from "#core/plan/select.ts";
+import { select, type Untrusted } from "#core/plan/select.ts";
+import { type Unlisted, unlistedReason, unlistedRows } from "#core/plan/unlisted.ts";
 import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
 import { classify } from "./classify.ts";
 import type { Digests, SyncItem } from "./model.ts";
@@ -124,6 +126,48 @@ function withheldRow(
 }
 
 /**
+ * Why the registry will not hand an installed row over, which leaves it for a person to settle:
+ * it withholds the version, or no longer lists the artifact. Neither is a deletion.
+ */
+function heldBack(
+  name: string,
+  previous: LockArtifact | undefined,
+  acquired: readonly Acquired[],
+  unlisted: ReadonlyMap<string, Unlisted>,
+  untrusted: readonly Untrusted[],
+): string | undefined {
+  const distrusted = untrusted.find(
+    (item) => item.registry === previous?.registry && item.name === previous?.name,
+  );
+  if (distrusted !== undefined) {
+    const { registry, name: plugin, carries } = distrusted;
+    return `it now carries ${describeCarried(carries)}, which no entry trusts; run \`aireg add ${registry}/${plugin} --trust ${plugin}\` to take it`;
+  }
+  const withheld = withheldRow(previous, acquired);
+  const gone = unlisted.get(name);
+  const why =
+    withheld !== undefined
+      ? withheldMessage(withheld)
+      : gone === undefined
+        ? undefined
+        : unlistedReason(gone);
+  return why === undefined ? undefined : `${why}; run \`aireg remove ${name}\` to take it out`;
+}
+
+/**
+ * A plugin whose new version adds or changes what a harness runs as you waits for a person,
+ * even trusted: a sync, and a background job above all, never applies that on its own.
+ */
+function carriesMoved(item: Selected, previous: LockArtifact | undefined): string | undefined {
+  const fingerprint = item.plugin?.fingerprint;
+  if (previous === undefined || fingerprint === undefined || fingerprint === previous.carried) {
+    return undefined;
+  }
+  const carries = describeCarried(item.plugin?.carries ?? []);
+  return `its new version adds or changes the ${carries} it runs; run \`aireg update ${item.name}\` to take it`;
+}
+
+/**
  * Read, never acted on. Every sync starts here and then decides what it is
  * willing to do, which is why `--dry-run` and a real run agree.
  */
@@ -135,11 +179,17 @@ export async function reconcile(
 ): Promise<SyncItem[]> {
   // What the manifest's artifacts depend on is theirs too, though it names none of it.
   const needs = closure(select(manifest, lock, acquired, []), acquired);
+  const untrusted: Untrusted[] = [];
   const selected = select(
     { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
     lock,
     acquired,
     [],
+    undefined,
+    [],
+    [],
+    new Map(),
+    untrusted,
   );
   const content = fetchFrom(acquired);
   const byName = new Map(selected.map((item) => [item.name, item]));
@@ -151,6 +201,7 @@ export async function reconcile(
       .map((copy) => [copy.name, copy]),
   );
   const names = new Set([...byName.keys(), ...Object.keys(lock.artifacts), ...unlocked.keys()]);
+  const unlisted = new Map(unlistedRows(manifest, lock, acquired).map((row) => [row.name, row]));
 
   const items: SyncItem[] = [];
   for (const name of [...names].sort()) {
@@ -174,9 +225,11 @@ export async function reconcile(
     );
 
     const watch = watchOf(previous, item);
-    const withheld = item === undefined ? withheldRow(previous, acquired) : undefined;
-    if (withheld !== undefined) {
-      // Kept for a person to settle: the registry still lists it, at a version it will not serve.
+    const held =
+      item === undefined
+        ? heldBack(name, previous, acquired, unlisted, untrusted)
+        : carriesMoved(item, previous);
+    if (held !== undefined) {
       items.push({
         name,
         kind,
@@ -184,7 +237,7 @@ export async function reconcile(
         path,
         disposition: "unavailable",
         digests: { base: undefined, local: undefined, upstream: undefined },
-        detail: `${withheldMessage(withheld)}; run \`aireg remove ${name}\` to take it out`,
+        detail: held,
       });
       continue;
     }

@@ -12,6 +12,7 @@ function printed(
   applied: Partial<ApplyResult>,
   before: Record<string, unknown> = {},
   targets: string[] = ["claude", "codex"],
+  harnesses = resolveHarnesses({ HOME: "/home/dev" }),
 ): string[] {
   const lines: string[] = [];
   const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
@@ -31,7 +32,8 @@ function printed(
     applied: result,
     before: { artifacts: before, registries: {} } as unknown as Lock,
     targets,
-    harnesses: resolveHarnesses({ HOME: "/home/dev" }),
+    harnesses,
+    scope: "project",
   });
   return lines;
 }
@@ -95,6 +97,75 @@ describe("summarize", () => {
       "✓ Installed tools for Claude Code and Codex.",
       "  runs   hooks and MCP servers from tools, in Claude Code and Codex",
     ]);
+  });
+
+  it("says once what a harness asks of a person before it loads what was placed", () => {
+    const harnesses = resolveHarnesses({ HOME: "/home/dev" });
+    harnesses.claude = {
+      ...harnesses.claude!,
+      trust: { skill: { run: "tool trust" }, agent: { run: "tool trust --agents", scope: "user" } },
+      reload: "Run `/reload` in Claude Code.",
+    };
+    const lock = {
+      artifacts: {
+        lint: { kind: "skill", links: [at("claude")] },
+        fmt: { kind: "skill", links: [at("claude")] },
+        reviewer: { kind: "agent", links: [at("claude")] },
+      },
+    };
+    const actions = [link("lint", "claude"), link("fmt", "claude"), link("reviewer", "claude")];
+    const applied = {
+      performed: { link: 3 } as never,
+      installed: ["lint", "fmt", "reviewer"],
+      added: ["lint", "fmt", "reviewer"],
+      lock: lock as never,
+    };
+    expect(printed(actions, applied, {}, ["claude"], harnesses)).toEqual([
+      "✓ Installed lint, fmt and reviewer for Claude Code.",
+      "hint: Claude Code loads skills here only once you trust them: run `tool trust`.",
+      "hint: Run `/reload` in Claude Code.",
+    ]);
+  });
+
+  it("names in one line every kind that waits on the same trust step", () => {
+    const lock = {
+      artifacts: {
+        lint: { kind: "skill", links: [at("gemini")] },
+        reviewer: { kind: "agent", links: [at("gemini")] },
+      },
+    };
+    const applied = {
+      performed: { link: 2 } as never,
+      installed: ["lint", "reviewer"],
+      added: ["lint", "reviewer"],
+      lock: lock as never,
+    };
+    const lines = printed([link("lint", "gemini"), link("reviewer", "gemini")], applied, {}, [
+      "gemini",
+    ]);
+    expect(lines.filter((line) => line.includes("trust"))).toEqual([
+      "hint: Gemini CLI loads skills and agents here only once you trust them: run `/permissions trust`.",
+    ]);
+  });
+
+  it("says a plugin's hooks run only where it installs whole, not where its skills went", () => {
+    const actions = [
+      { ...link("tools", "claude"), plugin: true } as Action,
+      link("tools", "agents"),
+    ];
+    const lock = {
+      artifacts: { tools: { kind: "plugin", links: [at("claude"), at("agents")] } },
+    };
+    const applied = {
+      performed: { link: 2 } as never,
+      installed: ["tools"],
+      added: ["tools"],
+      lock: lock as never,
+      carried: [{ name: "tools", carries: ["hooks"] }] as ApplyResult["carried"],
+    };
+    expect(printed(actions, applied, {}, ["claude", "agents"])).toContain(
+      "  runs   hooks from tools, in Claude Code",
+    );
   });
 
   it("calls a new version of an installed artifact an update", () => {

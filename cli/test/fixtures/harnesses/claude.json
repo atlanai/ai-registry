@@ -1,0 +1,18 @@
+{
+  "id": "claude",
+  "displayName": "Claude Code",
+  "overrides": true,
+  "roots": { "project": ".claude", "user": { "default": "~/.claude", "env": "CLAUDE_CONFIG_DIR" } },
+  "detect": { "env": ["CLAUDE_CONFIG_DIR"], "binary": ["claude"] },
+  "kinds": {
+    "plugin": {
+      "shape": "directory",
+      "subdir": "skills",
+      "manifest": [{ "path": ".claude-plugin/plugin.json" }]
+    },
+    "skill": { "shape": "directory", "subdir": "skills" },
+    "agent": { "shape": "file", "subdir": "agents", "extension": ".md" }
+  },
+  "trust": { "plugin": { "run": "claude", "scope": "project" } },
+  "verified": { "command": ["claude", "--version"], "range": "2.1.296" }
+}

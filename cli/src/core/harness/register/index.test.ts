@@ -15,17 +15,30 @@ test.beforeEach(async ({ tmp }) => {
   root = join(dir, ".tool");
   await mkdir(join(home, "artifacts"), { recursive: true });
 });
-function harness(register: RegisterEntry[]): Harnesses {
+function harness(register: RegisterEntry[], place?: "copy"): Harnesses {
   const target: Target = {
     name: "tool",
     displayName: "Tool",
     projectRoot: ".tool",
     userRoot: root,
     envHome: undefined,
+    envWithin: undefined,
     detect: { env: [], binary: [], paths: [] },
-    kinds: { plugin: { subdir: "plugins/{source}/{name}", shape: "directory", register } },
+    kinds: {
+      plugin: {
+        subdir: "plugins/{source}/{name}",
+        shape: "directory",
+        register,
+        ...(place === undefined ? {} : { place }),
+      },
+    },
     reads: {},
+    kind: "coding",
     shared: false,
+    verified: undefined,
+    trust: {},
+    reload: undefined,
+    origin: "built-in",
   };
   return { tool: target };
 }
@@ -55,6 +68,30 @@ const GROUP: RegisterEntry = {
   value: { path: "{root}/plugins/{source}" },
   remove: "entry",
 };
+
+const LIST: RegisterEntry = {
+  file: "config.yaml",
+  format: "yaml",
+  at: ["skills", "dirs"],
+  append: "{root}/plugins/{source}",
+};
+
+const config = () => join(root, "config.yaml");
+
+async function writeConfig(text: string): Promise<void> {
+  await mkdir(root, { recursive: true });
+  await writeFile(config(), text);
+}
+
+/** A copy of ours, a real folder the lockfile records. */
+async function copy(name: string): Promise<string> {
+  const path = placement("acme", name);
+  await mkdir(path, { recursive: true });
+  return path;
+}
+
+const placed = (...paths: string[]) => paths.map((path) => ({ path, harness: "tool" }));
+const gone = (...paths: string[]) => paths.map((path) => ({ path, harness: undefined }));
 
 describe("applyRegister", () => {
   test("merges a JSON key per placement and leaves a person's keys", async () => {
@@ -121,6 +158,69 @@ describe("applyRegister", () => {
     await rm(sales);
     await applyRegister([{ path: sales, harness: undefined }], harness([GROUP]), home);
     expect(await readFile(config, "utf8")).toBe("");
+  });
+
+  test("deletes a TOML file it made once its last entry goes, but not one of comments", async () => {
+    const made = { ...GROUP, init: {} };
+    const sales = await place("acme", "sales");
+    const config = join(root, "config.toml");
+    await applyRegister([{ path: sales, harness: "tool" }], harness([made]), home);
+    expect(await readFile(config, "utf8")).toContain("[sources.acme]");
+    await rm(sales);
+    await applyRegister([{ path: sales, harness: undefined }], harness([made]), home);
+    await expect(readFile(config, "utf8")).rejects.toThrow();
+
+    await writeFile(config, '# model = "big"\n');
+    const ops = await place("acme", "ops");
+    await applyRegister([{ path: ops, harness: "tool" }], harness([made]), home);
+    await rm(ops);
+    await applyRegister([{ path: ops, harness: undefined }], harness([made]), home);
+    expect(await readFile(config, "utf8")).toBe('# model = "big"\n');
+  });
+
+  test("lists a copy once in YAML, marked as aireg's, and restores the file with the last", async () => {
+    const before = "# mine\nmodel: x # pinned\n";
+    await writeConfig(before);
+    const sales = await copy("sales");
+    const ops = await copy("ops");
+    await applyRegister(placed(sales, ops), harness([LIST], "copy"), home, new Set([sales, ops]));
+    expect(await readFile(config(), "utf8")).toBe(
+      `${before}skills:\n  dirs:\n    - ${join(root, "plugins", "acme")} # aireg\n`,
+    );
+
+    await rm(ops, { recursive: true });
+    await applyRegister(gone(ops), harness([LIST], "copy"), home, new Set([sales]));
+    expect(await readFile(config(), "utf8")).toContain("dirs:");
+
+    await rm(sales, { recursive: true });
+    await applyRegister(gone(sales), harness([LIST], "copy"), home, new Set());
+    expect(await readFile(config(), "utf8")).toBe(before);
+  });
+
+  test("leaves a list item a person wrote, even once the last copy goes", async () => {
+    const before = `skills:\n  dirs:\n    - ${join(root, "plugins", "acme")} # mine too\n`;
+    await writeConfig(before);
+    const sales = await copy("sales");
+    await applyRegister(placed(sales), harness([LIST], "copy"), home, new Set([sales]));
+    expect(await readFile(config(), "utf8")).toBe(before);
+    await rm(sales, { recursive: true });
+    await applyRegister(gone(sales), harness([LIST], "copy"), home, new Set());
+    expect(await readFile(config(), "utf8")).toBe(before);
+  });
+
+  test("adds to a YAML file of comments alone, keeping them", async () => {
+    await writeConfig("# model: big\n");
+    const sales = await copy("sales");
+    await applyRegister(placed(sales), harness([LIST], "copy"), home, new Set([sales]));
+    const text = await readFile(config(), "utf8");
+    expect(text).toMatch(/^# model: big\n/);
+    expect(text).toContain(`- ${join(root, "plugins", "acme")} # aireg`);
+  });
+
+  test("registers no copy of a kind not placed as copies", async () => {
+    const sales = await copy("sales");
+    await applyRegister(placed(sales), harness([LIST]), home, new Set([sales]));
+    await expect(readFile(config(), "utf8")).rejects.toThrow();
   });
 
   test.skipIf(process.platform === "win32")(

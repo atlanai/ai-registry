@@ -1,0 +1,6 @@
+project/
+project/.gemini/
+project/.gemini/agents/
+project/.gemini/agents/reviewer.md ce14e241d21a
+project/.gemini/skills/
+project/.gemini/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint

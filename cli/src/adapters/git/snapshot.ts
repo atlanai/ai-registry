@@ -31,12 +31,29 @@ function snapshotPath(cache: string, spec: SourceSpec, commit: string): string {
 /** Checkouts kept per repository: the one just taken and the one before, which a run may still read. */
 const KEPT_PER_REPOSITORY = 2;
 
+/** Checkouts an open connection in this process still reads, which no prune removes. */
+const IN_USE = new Map<string, number>();
+
+/** Keeps a checkout from being pruned until the connection reading it lets go. */
+export function holdSnapshot(root: string): () => void {
+  IN_USE.set(root, (IN_USE.get(root) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const left = (IN_USE.get(root) ?? 1) - 1;
+    if (left <= 0) IN_USE.delete(root);
+    else IN_USE.set(root, left);
+  };
+}
+
 /** Every commit of a busy registry would otherwise stay checked out for good. */
 async function pruneOlder(repository: string, current: string): Promise<void> {
   const commits = await readdir(repository, { withFileTypes: true }).catch(() => []);
   const dated = await Promise.all(
     commits
       .filter((entry) => entry.isDirectory() && entry.name !== current)
+      .filter((entry) => !IN_USE.has(join(repository, entry.name)))
       .map(async (entry) => {
         const path = join(repository, entry.name);
         return { path, at: (await stat(path).catch(() => undefined))?.mtimeMs ?? 0 };

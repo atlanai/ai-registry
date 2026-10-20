@@ -52,4 +52,9 @@ describe("built-in reads", () => {
     expect(readsFor(table, "claude", "skill")).toEqual(["claude"]);
     expect(readsFor(table, "codex", "agent")).toEqual(["codex"]);
   });
+
+  it("reads Cursor's skills from the Codex folder too", () => {
+    const table = resolveHarnesses();
+    expect(readsFor(table, "cursor", "skill")).toEqual(["agents", "cursor", "claude", "codex"]);
+  });
 });

@@ -1,7 +1,2 @@
-# Code owners review pull requests that change their paths.
-/spec/ @firecast
-/cli/ @UdaySagar-Git
-/docs/ @benhuds
-/examples/ @firecast
-/tools/ @firecast
-/.github/ @firecast
+* @firecast @UdaySagar-Git
+/docs/ @benhuds @firecast @UdaySagar-Git

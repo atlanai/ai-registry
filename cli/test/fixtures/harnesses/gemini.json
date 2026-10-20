@@ -1,0 +1,45 @@
+{
+  "id": "gemini",
+  "displayName": "Gemini CLI",
+  "overrides": true,
+  "roots": {
+    "project": ".gemini",
+    "user": { "default": "~/.gemini", "env": "GEMINI_CLI_HOME", "within": ".gemini" }
+  },
+  "detect": { "env": ["GEMINI_CLI_HOME"], "binary": ["gemini"] },
+  "reads": { "skill": ["gemini", "agents"] },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": {
+      "shape": "directory",
+      "subdir": "skills",
+      "keys": { "disable-model-invocation": false }
+    },
+    "agent": {
+      "shape": "file",
+      "subdir": "agents",
+      "extension": ".md",
+      "codec": {
+        "id": "frontmatter-strict",
+        "keep": [
+          "kind",
+          "name",
+          "description",
+          "display_name",
+          "tools",
+          "mcp_servers",
+          "model",
+          "temperature",
+          "max_turns",
+          "timeout_mins"
+        ]
+      }
+    }
+  },
+  "verified": { "command": ["gemini", "--version"], "range": "0.63.0" },
+  "trust": {
+    "skill": { "run": "/permissions trust", "scope": "project" },
+    "agent": { "run": "/permissions trust", "scope": "project" }
+  },
+  "reload": "Run `/skills reload` and `/agents reload` in Gemini CLI, or start a new session, to load the change."
+}

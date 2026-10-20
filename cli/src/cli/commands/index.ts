@@ -319,6 +319,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       "aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options]",
       "aireg add <namespace>[/<name>]... --registry <registry> [options]",
       "aireg add <address> [-s <name>]... [--as <name>] [options]",
+      "aireg add --from <file> [options]",
       "aireg add",
     ],
     examples: [
@@ -341,6 +342,18 @@ export const COMMANDS: readonly CommandSpec[] = [
       AS,
       { ...REGISTRY, describe: "The registry to install from, by name or address" },
       ...SOURCE,
+      {
+        flag: "--from",
+        value: "<file>",
+        describe: "Add the skills another installer's lock file records, such as skills-lock.json",
+      },
+      {
+        flag: "--trust",
+        value: "<plugin>",
+        multiple: true,
+        describe:
+          "Install this plugin although it carries hooks, servers or executables that run as you",
+      },
       {
         flag: "--no-auto-update",
         describe: "Do not keep a user scope install up to date in the background",
@@ -475,9 +488,26 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: "harnesses",
     summary: "List the harnesses aireg can install into, and which this machine has",
     group: "Check",
-    usage: ["aireg harnesses"],
+    usage: ["aireg harnesses [--all]", "aireg harnesses show <id>", "aireg harnesses check <file>"],
     examples: [{ command: "aireg harnesses", what: "which coding agents this machine has" }],
     docs: "harnesses",
+    options: [{ ...ALL, describe: "List every harness aireg supports, not only those found" }],
+    actions: [
+      {
+        name: "show",
+        summary: "Print where a harness takes each kind, as aireg resolved it",
+        usage: ["aireg harnesses show <id>"],
+        maxArguments: 1,
+        examples: [{ command: "aireg harnesses show codex", what: "where Codex gets each kind" }],
+      },
+      {
+        name: "check",
+        summary: "Check a harness file before you use it",
+        usage: ["aireg harnesses check <file>"],
+        maxArguments: 1,
+        examples: [{ command: "aireg harnesses check tool.json", what: "is this file usable?" }],
+      },
+    ],
     load: () => import("./harnesses.ts"),
   },
 

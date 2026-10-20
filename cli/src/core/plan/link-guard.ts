@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { canonical } from "#core/fs/canonical.ts";
@@ -23,8 +23,8 @@ export async function guardLink(
   to: string,
   recorded: LinkMode | undefined,
   roots: RemovableRoots,
-  /** What a rendered placement would write, when that is known. */
-  rendered?: string,
+  /** What a written placement would hold, and the file it would hold it in. */
+  rendered?: { file: string; text: string },
 ): Promise<LinkGuard> {
   const state = await inspect(to);
   if (!state.exists) return "replace";
@@ -35,12 +35,17 @@ export async function guardLink(
       : recorded === "copy";
   if (ours) return "replace";
   // A file already holding what would be written is ours to take on.
-  if (rendered !== undefined && !state.isLink && (await sameText(to, rendered))) return "replace";
+  if (rendered !== undefined && !state.isLink && (await holdsOnly(to, rendered))) return "replace";
   return recorded === undefined ? "keep" : "backup";
 }
 
-async function sameText(path: string, text: string): Promise<boolean> {
-  return (await readFile(path, "utf8").catch(() => undefined)) === text;
+/** The written file and, for a folder, nothing else beside it. */
+async function holdsOnly(to: string, rendered: { file: string; text: string }): Promise<boolean> {
+  if (rendered.file !== to) {
+    const inside = await readdir(to).catch(() => []);
+    if (inside.length !== 1 || inside[0] !== basename(rendered.file)) return false;
+  }
+  return (await readFile(rendered.file, "utf8").catch(() => undefined)) === rendered.text;
 }
 
 /** Filed by harness and the directory it sat in, the layout a claimed folder uses too. */

@@ -5,7 +5,8 @@ import type { Manifest } from "#core/manifest.ts";
 import type { Closure } from "#core/plan/depends.ts";
 import type { Acquired, Kept, Selected } from "#core/plan/model.ts";
 import { type NamespaceWant, namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
-import { addressOf } from "#core/plan/select.ts";
+import { addressOf, type Untrusted } from "#core/plan/select.ts";
+import { type Unlisted, unlistedRows } from "#core/plan/unlisted.ts";
 import type { BuildState } from "./state.ts";
 
 /** Carries a row the plan does not reclaim, so no row that goes takes its links with it. */
@@ -113,6 +114,33 @@ export function carryWithheld(build: BuildState, acquired: readonly Acquired[]):
     }
   }
   return kept;
+}
+
+/** A row its registry stopped listing stays as the lock has it, until `aireg remove` takes it out. */
+export function carryUnlisted(
+  build: BuildState,
+  manifest: Manifest,
+  acquired: readonly Acquired[],
+): Unlisted[] {
+  const kept: Unlisted[] = [];
+  for (const item of unlistedRows(manifest, build.lock, acquired)) {
+    const row = build.lock.artifacts[item.name];
+    if (row === undefined || build.next.artifacts[item.name] !== undefined) continue;
+    keep(build, item.name, row);
+    kept.push(item);
+  }
+  return kept;
+}
+
+/** A plugin left out for want of trust stays as installed: what it carried was agreed to then. */
+export function carryUntrusted(build: BuildState, untrusted: readonly Untrusted[]): void {
+  for (const item of untrusted) {
+    for (const [name, row] of Object.entries(build.lock.artifacts)) {
+      if (row.registry !== item.registry || row.kind !== "plugin" || row.name !== item.name)
+        continue;
+      if (build.next.artifacts[name] === undefined) keep(build, name, row);
+    }
+  }
 }
 
 /**

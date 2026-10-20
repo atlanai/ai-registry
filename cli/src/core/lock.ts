@@ -86,6 +86,10 @@ export interface LockArtifact {
   content: string | undefined;
   /** What the source published, where it publishes versions. Display only. */
   version: string | undefined;
+  /** A digest of the hooks, servers and executables a plugin carries, when it carries any. */
+  carried?: string | undefined;
+  /** The commit this artifact was read at, where it is its own rather than its registry's. */
+  revision?: string | undefined;
   /** Where our copy lives, relative to the scope base. */
   path: string;
   /** Did you edit it? Digest of this scope's own copy, which is what a harness loads. */
@@ -140,6 +144,11 @@ function parseRegistry(entry: unknown): LockRegistry | undefined {
     config: canonicalConfig(textMapOf(entry.config) ?? {}),
     revision: textOf(entry.revision),
   };
+}
+
+/** A field only when it has a value, so a row without it reads back as it was written. */
+function optional<K extends string>(key: K, value: string | undefined): { [P in K]?: string } {
+  return (value === undefined ? {} : { [key]: value }) as { [P in K]?: string };
 }
 
 function parseBlocked(raw: unknown, scope: Scope): LockArtifact["blocked"] {
@@ -208,6 +217,8 @@ function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
     address: textOf(entry.address),
     content: textOf(entry.content),
     version: textOf(entry.version),
+    ...optional("carried", textOf(entry.carried)),
+    ...optional("revision", textOf(entry.revision)),
     path,
     digest: textOf(entry.digest) ?? "",
     origin,
@@ -313,6 +324,8 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
     address: artifact.address,
     content: artifact.content,
     version: artifact.version,
+    revision: artifact.revision,
+    carried: artifact.carried,
     path: artifact.path === "" ? undefined : artifact.path,
     digest: artifact.digest,
     origin:

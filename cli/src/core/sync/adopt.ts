@@ -164,7 +164,7 @@ function kindDirs(
       const mapping = target.kinds[kind];
       if (mapping?.subdir === undefined) continue;
       // A file in the harness's own format cannot be published as it is.
-      if (mapping.render !== undefined && !report) continue;
+      if (mapping.codec !== undefined && !report) continue;
       dirs.push({ target: name, root, kind, mapping: mapping as KindDir["mapping"] });
     }
   }

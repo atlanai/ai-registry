@@ -1,5 +1,6 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
+import { type Harnesses, trustFor } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
@@ -149,9 +150,51 @@ function unchanged(printer: Printer, plan: Plan): void {
 type Tools = (names: readonly string[], folders?: (name: string) => string[]) => string;
 
 /** An applied run: the plan, what apply did, and the lockfile it started from. */
-export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses"> & {
+export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses" | "scope"> & {
   applied: ApplyResult;
 };
+
+function harnessOf(action: Shown): string | undefined {
+  if (action.kind === "link") return action.harness;
+  return action.kind === "unlink" ? action.link?.harness : undefined;
+}
+
+/** What a harness asks of a person once it was given something; printed, never run. */
+function followUps(
+  printer: Printer,
+  shown: readonly Shown[],
+  kindOf: (name: string) => ArtifactKind | undefined,
+  harnesses: Harnesses,
+  scope: Ran["scope"],
+): void {
+  // One line per harness and command, naming every kind that waits on it.
+  const steps = new Map<string, { harness: string; run: string; kinds: Set<string> }>();
+  const reloads = new Set<string>();
+  for (const action of shown) {
+    const harness = harnessOf(action);
+    const target = harness === undefined ? undefined : harnesses[harness];
+    if (target === undefined) continue;
+    if (target.reload !== undefined) reloads.add(target.reload);
+    // A plugin a harness takes as its parts asks for each part's step, not the plugin's.
+    const placed =
+      action.kind !== "link" ? undefined : action.plugin === true ? "plugin" : action.part;
+    const kind = placed ?? kindOf(action.name);
+    const run =
+      action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
+    if (run !== undefined && kind !== undefined) {
+      const key = `${target.name}\0${run}`;
+      const step = steps.get(key) ?? { harness: target.displayName, run, kinds: new Set() };
+      step.kinds.add(`${kind}s`);
+      steps.set(key, step);
+    }
+  }
+  for (const { harness, run, kinds } of steps.values()) {
+    printer.hint(
+      `${harness} loads ${list([...kinds])} here only once you trust them: run \`${run}\`.`,
+    );
+  }
+  for (const reload of reloads) printer.hint(reload);
+}
 
 /**
  * Names what apply did, not what was planned: a link kept for a file of yours is not one.
@@ -159,7 +202,7 @@ export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses"> &
  */
 export function summarize(
   printer: Printer,
-  { plan, applied, before, targets, harnesses }: Ran,
+  { plan, applied, before, targets, harnesses, scope }: Ran,
   told: ReadonlySet<string> = new Set(),
 ): void {
   const shown = plan.actions.filter(
@@ -213,8 +256,23 @@ export function summarize(
   // Instructions wait for an agent to read them; these run as you once a harness loads them.
   for (const { name, carries } of applied.carried) {
     if (told.has(name) || harnessesOf(name).length === 0) continue;
-    printer.note("runs", `${describeCarried(carries)} from ${name}, in ${tools([name])}`);
+    // A harness given only the plugin's skills and agents starts none of what it carries.
+    const whole = plan.actions.flatMap((action) =>
+      action.kind === "link" && action.name === name && action.plugin === true
+        ? [action.harness]
+        : [],
+    );
+    const where = tools([name], whole.length > 0 ? () => whole : undefined);
+    printer.note("runs", `${describeCarried(carries)} from ${name}, in ${where}`);
   }
+  const kindOf = (name: string) => held?.[name]?.kind ?? before.artifacts[name]?.kind;
+  followUps(
+    printer,
+    shown.filter((action) => acted.has(action.name)),
+    kindOf,
+    harnesses,
+    scope,
+  );
 }
 
 /**

@@ -19,6 +19,7 @@ export {
   type Resolution,
   type ResolvedSource,
   type ResolveOptions,
+  type SiteClaim,
   type SourceAdapter,
   type SourceAuth,
   type SourceContext,
@@ -67,6 +68,7 @@ export {
 export { type RootResolveOptions, resolveFromRoot } from "./filespec/resolve.ts";
 export { mergedIndex, mergedVersions, type OfferedVersion, specJson } from "./filespec/write.ts";
 export { type ArtifactKind, isKind, KINDS } from "./kinds.ts";
+export type { LayoutId } from "./layouts/ids.ts";
 export { namesHost, registryNameFromLocation, SCP_LOCATION } from "./location.ts";
 export { expandHome, isLocalPath, isSafePath, onPath, withAbsolutePath } from "./paths.ts";
 export {

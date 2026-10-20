@@ -110,6 +110,23 @@ describe("resolveFromRoot", () => {
     ]);
   });
 
+  test("says which status a version installs with, and why", async () => {
+    const read = await root([OPS_GATE, OPS_DRAFT]);
+    const { artifacts } = await resolveFromRoot(read, {
+      blobUrl: "blobs",
+      wanted: [
+        { name: "gate", namespace: "ops", kind: "skill", version: "1.0.0" },
+        { name: "draft", namespace: "ops", kind: "skill", version: "0.1.0" },
+        { name: "add", namespace: "aireg", kind: "skill" },
+      ],
+    });
+    expect(artifacts.map((item) => [item.envelope.metadata.name, item.status])).toEqual([
+      ["add", undefined],
+      ["gate", { name: "deprecated", reason: undefined }],
+      ["draft", { name: "draft", reason: undefined }],
+    ]);
+  });
+
   test("resolves a yanked version a pin names, and says why it was yanked", async () => {
     const read = await root([OPS_ADD]);
     const { artifacts } = await resolveFromRoot(read, {

@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import type { ArtifactKind } from "#adapter/index.ts";
 import { subdirectories } from "#core/fs/tree.ts";
 import { KIND_SPECS, kindDir, SCANNED_KINDS } from "#core/kinds.ts";
@@ -31,9 +31,16 @@ export async function unlockedCopies(
     claimed.add(`${entry.registry}\u0000${entry.kind}:${name}`);
   }
 
+  // A plugin's copy, a folder named after it, holds its parts, which its own row accounts for.
+  const plugins = new Set(
+    Object.values(lock.artifacts).flatMap((entry) =>
+      entry.kind === "plugin" ? [`${entry.registry}\u0000${posix.basename(entry.path)}`] : [],
+    ),
+  );
   const found: UnlockedCopy[] = [];
   for (const registry of Object.keys(manifest.registries)) {
     for (const namespace of await subdirectories(registryDir(roots, registry))) {
+      if (plugins.has(`${registry}\u0000${namespace}`)) continue;
       const base = namespaceDir(roots, registry, namespace);
       for (const kind of SCANNED_KINDS) {
         const spec = KIND_SPECS[kind];

@@ -10,5 +10,7 @@
     "exports",
     "types"
   ],
-  "project": ["src/**/*.ts", "packaging/**/*.ts", "scripts/**/*.ts", "test/kit/**/*.ts"]
+  "project": ["src/**/*.ts", "packaging/**/*.ts", "scripts/**/*.ts", "test/kit/**/*.ts"],
+  // util-linux's, which a test runs to give aireg a terminal of its own.
+  "ignoreBinaries": ["script"]
 }

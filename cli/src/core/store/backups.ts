@@ -32,8 +32,10 @@ export async function moveToBackup(
   within: string,
 ): Promise<string> {
   const base = backupsDir(roots);
-  let to = join(base, stamp, within);
-  for (let next = 2; await taken(to); next += 1) to = join(base, `${stamp}-${next}`, within);
+  // A profile's harness id, such as `tool:work`, holds a colon a Windows path cannot.
+  const at = within.replaceAll(":", "-");
+  let to = join(base, stamp, at);
+  for (let next = 2; await taken(to); next += 1) to = join(base, `${stamp}-${next}`, at);
   await assertUnredirected(dirname(roots.artifacts), to);
   await mkdir(dirname(to), { recursive: true });
   await rename(from, to);

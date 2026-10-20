@@ -1,0 +1,7 @@
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+project/.codex/
+project/.codex/agents/
+project/.codex/agents/reviewer.toml 89d686d8a158

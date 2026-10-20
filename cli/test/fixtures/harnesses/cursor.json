@@ -1,0 +1,21 @@
+{
+  "id": "cursor",
+  "displayName": "Cursor",
+  "overrides": true,
+  "roots": { "project": ".cursor", "user": { "default": "~/.cursor" } },
+  "detect": { "binary": ["cursor", "cursor-agent"] },
+  "reads": { "skill": ["agents", "cursor", "claude", "codex"], "agent": ["cursor", "claude"] },
+  "kinds": {
+    "plugin": {
+      "shape": "directory",
+      "subdir": "plugins/local",
+      "scope": "user",
+      "place": "copy",
+      "manifest": [{ "path": ".cursor-plugin/plugin.json" }]
+    },
+    "skill": { "shape": "directory", "subdir": "skills" },
+    "agent": { "shape": "file", "subdir": "agents", "extension": ".md" }
+  },
+  "verified": { "command": ["agent", "--version"], "range": "2026.10.12-d47ca18" },
+  "reload": "Restart Cursor, or run Developer: Reload Window, to load the change."
+}

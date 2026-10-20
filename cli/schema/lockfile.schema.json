@@ -124,6 +124,16 @@
               "description": "What the registry published, where it has versions.",
               "type": "string"
             },
+            "revision": {
+              "pattern": "^[0-9a-f]{40}$",
+              "description": "The commit this artifact was read at, where it is its own, not its registry's.",
+              "type": "string"
+            },
+            "carried": {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "description": "A digest of what a plugin has a harness start, so a background job sees it change.",
+              "type": "string"
+            },
             "path": {
               "minLength": 1,
               "description": "Where this scope's copy is, relative to its base.",

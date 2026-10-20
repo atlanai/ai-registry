@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import { isAdapterError, type Want } from "#adapter/index.ts";
 import { list, quoted, sanitizeText } from "#adapter/text.ts";
@@ -14,6 +14,7 @@ import { writeAtomic } from "#core/fs/atomic.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { homeDir, readTextIfPresent } from "#core/fs/path.ts";
 import { DEFAULT_TARGETS, type Harnesses, names, resolveHarnesses } from "#core/harness/index.ts";
+import { loadHarnessFiles } from "#core/harness/load.ts";
 import { runPipelineHooks } from "#core/hook/run.ts";
 import { type LeaseHolder, withLease } from "#core/lease.ts";
 import { type Lock, lockChanges, readLock } from "#core/lock.ts";
@@ -23,11 +24,14 @@ import { acquire, answers, lockView, newlyYanked } from "#core/plan/acquire.ts";
 import { type ApplyResult, apply, guardsOf, type Recovered, recover } from "#core/plan/apply.ts";
 import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
 import { build, clashMessage } from "#core/plan/build.ts";
+import { describeCarried } from "#core/plan/carries.ts";
 import { formatNeed, type Unresolved, wantOf } from "#core/plan/depends.ts";
 import type { Acquired, Action, Kept, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
 import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
+import type { Untrusted } from "#core/plan/select.ts";
 import { survey } from "#core/plan/survey.ts";
+import { type Unlisted, unlistedMessage } from "#core/plan/unlisted.ts";
 import { blockedTargets } from "#core/plan/writable.ts";
 import { unmetEngine } from "#core/semver.ts";
 import {
@@ -153,9 +157,16 @@ export function resolveTargets(
   const unknown = wanted.filter((name) => !known.has(name));
   if (unknown.length > 0) {
     // From --for it is the command line; from the manifest it is file content.
+    // A file of yours that would define one, but was skipped, is the likelier story.
+    const skipped = loadHarnessFiles().skipped.filter((file) =>
+      unknown.some((name) => basename(file.path) === `${name}.json`),
+    );
     throw new AiregError(`No harness named ${list(unknown.map(quoted), "or")}.`, {
       code: common.targets === undefined ? ErrorCode.Invalid : ErrorCode.Usage,
-      hint: `Use ${list(names(harnesses), "or")}, or run \`aireg harnesses\` to see which this machine has.`,
+      hint:
+        skipped.length > 0
+          ? `aireg skipped ${list(skipped.map((file) => file.path))}: run \`aireg harnesses\` to see why.`
+          : `Use ${list(names(harnesses), "or")}, or run \`aireg harnesses\` to see which this machine has.`,
     });
   }
   return wanted;
@@ -170,6 +181,7 @@ export interface RunResult {
   /** The harnesses this run installed for, so a report names them as they were chosen. */
   targets: readonly string[];
   harnesses: Harnesses;
+  scope: Scope;
 }
 
 export interface RunHooks {
@@ -190,6 +202,8 @@ export interface RunHooks {
   discard?: ReadonlySet<string>;
   /** Artifacts this run names: one left out for another's name is refused, not skipped. */
   adding?: ReadonlySet<string>;
+  /** Installed names whose identical copy already on disk this run takes over in place. */
+  adopt?: ReadonlySet<string>;
 }
 
 /** The harnesses a run installs for, so a report can name them as they were chosen. */
@@ -410,10 +424,62 @@ function refuseWithheld(
     printer.warning(`${line}.`);
   }
   if (blocked.length === 0) return;
-  const commands = blocked.map(({ name }) => `\`aireg remove ${name}\``);
   throw new AiregError(`${list(keptLines(blocked))}.`, {
     code: ErrorCode.Invalid,
-    hint: `Run ${list(commands)} to take ${blocked.length === 1 ? "it" : "them"} out.`,
+    hint: removeHint(blocked.map(({ name }) => name)),
+  });
+}
+
+/** The commands that take each kept row out, said once for all of them. */
+function removeHint(names: readonly string[]): string {
+  const commands = names.map((name) => `\`aireg remove ${name}\``);
+  return `Run ${list(commands)} to take ${names.length === 1 ? "it" : "them"} out.`;
+}
+
+/**
+ * A copy its registry stopped listing stays installed, never removed by a short listing. One this
+ * run was moving fails it, once the rest is in; one it only held is a warning.
+ */
+function refuseUnlisted(
+  unlisted: readonly Unlisted[],
+  printer: Printer,
+  moving: ReadonlySet<string> | undefined,
+): void {
+  const moved = unlisted.filter((item) => moving?.has(item.name) === true);
+  const held = unlisted.filter((item) => !moved.includes(item));
+  for (const item of held) printer.warning(`${unlistedMessage(item)}.`);
+  if (held.length > 0) printer.hint(removeHint(held.map((item) => item.name)));
+  if (moved.length === 0) return;
+  throw new AiregError(`${list(moved.map(unlistedMessage))}.`, {
+    code: ErrorCode.NotFound,
+    hint: removeHint(moved.map((item) => item.name)),
+  });
+}
+
+/** `"deploy-kit", which carries hooks and MCP servers`, for what was left out for want of trust. */
+function untrustedLine(untrusted: readonly Untrusted[]): string {
+  const carries = [...new Set(untrusted.flatMap((item) => item.carries))];
+  const names = list(untrusted.map((item) => quoted(item.name)));
+  return `${names}, which ${untrusted.length === 1 ? "carries" : "carry"} ${describeCarried(carries)}`;
+}
+
+/** The command that trusts each plugin, by the address that installs it. */
+function trustHint(untrusted: readonly Untrusted[]): string {
+  const commands = untrusted.map(
+    ({ registry, name }) => `\`aireg add ${registry}/${name} --trust ${name}\``,
+  );
+  return `Read what ${untrusted.length === 1 ? "it runs" : "they run"}, then run ${list(commands)}.`;
+}
+
+/**
+ * A plugin from a source that is not a registry carrying what a harness runs as you installs only
+ * once trusted by name; one left out fails the run after the rest is in.
+ */
+function refuseUntrusted(untrusted: readonly Untrusted[]): void {
+  if (untrusted.length === 0) return;
+  throw new AiregError(`Did not install ${untrustedLine(untrusted)} that run as you.`, {
+    code: ErrorCode.Usage,
+    hint: trustHint(untrusted),
   });
 }
 
@@ -498,6 +564,7 @@ async function plan(
         nameCollision,
         ...(hooks.aliases === undefined ? {} : { opened: hooks.aliases }),
         ...(hooks.discard === undefined ? {} : { discard: hooks.discard }),
+        ...(hooks.adopt === undefined ? {} : { adopt: hooks.adopt }),
       });
     let planned = planFrom([...settled.values(), ...acquired]);
     while (planned.conflicts.length === 0) {
@@ -556,6 +623,11 @@ export function appliedNotices(
   const notices: ApplyNotice[] = applied.backedUp.map((moved) => ({
     message: `Moved your ${moved.what} ${displayPath(roots, moved.path)} to ${displayPath(roots, moved.to)}.`,
   }));
+  for (const { name, path } of applied.adopted) {
+    notices.push({
+      message: `Took over ${displayPath(roots, path)}, which already held ${name} as aireg installs it.`,
+    });
+  }
   if (applied.degraded.length > 0) {
     notices.push({
       message: `Copied into ${list(applied.degraded)} instead of linking, because this platform refused a symlink.`,
@@ -582,8 +654,11 @@ function keptMessage(roots: Roots, name: string, path: string, verb: string): st
   return `${verb} install ${name}, because ${displayPath(roots, path)} already holds something of yours.`;
 }
 
+/** A tool by its name, and a shared folder by its path, as the summary names them. */
 function displayName(harnesses: Harnesses, harness: string): string {
-  return harnesses[harness]?.displayName ?? harness;
+  const target = harnesses[harness];
+  if (target === undefined) return harness;
+  return target.shared ? target.projectRoot : target.displayName;
 }
 
 export function unstagedNotices(unstaged: Readonly<ApplyResult["unstaged"]>): ApplyNotice[] {
@@ -692,13 +767,32 @@ async function write(
       }
       report.plan(planned, roots, aside, { targets: named, harnesses });
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
-      return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
+      refuseUnlisted(planned.unlisted, printer, undefined);
+      if (planned.untrusted.length > 0) {
+        printer.warning(`Would not install ${untrustedLine(planned.untrusted)} that run as you.`);
+        printer.hint(trustHint(planned.untrusted));
+      }
+      return {
+        plan: planned,
+        applied: undefined,
+        before: lock,
+        targets: named,
+        harnesses,
+        scope: roots.scope,
+      };
     }
 
     await refuseBlocked(planned);
 
     if (hooks.approve !== undefined && !(await hooks.approve(planned, named))) {
-      return { plan: planned, applied: undefined, before: lock, targets: named, harnesses };
+      return {
+        plan: planned,
+        applied: undefined,
+        before: lock,
+        targets: named,
+        harnesses,
+        scope: roots.scope,
+      };
     }
 
     const edited = formatManifest(manifest) !== loaded.manifestAsRead;
@@ -721,12 +815,15 @@ async function write(
     warn(printer, appliedNotices(roots, applied, harnesses));
 
     const landed = applied.installed.length > 0;
-    // An edit none of whose artifacts landed must not leave the manifest asking for them.
-    if (edited && !landed && applied.unstaged.length > 0)
+    // An edit none of whose artifacts landed, whether unstaged or left out for want of trust,
+    // must not leave the manifest asking for them.
+    if (edited && !landed && (applied.unstaged.length > 0 || planned.untrusted.length > 0))
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
     refuseWithheld(planned, printer, hooks.moving);
-    return { plan: planned, applied, before: lock, targets: named, harnesses };
+    refuseUnlisted(planned.unlisted, printer, hooks.moving);
+    refuseUntrusted(planned.untrusted);
+    return { plan: planned, applied, before: lock, targets: named, harnesses, scope: roots.scope };
   } finally {
     await closeAll(acquired);
   }

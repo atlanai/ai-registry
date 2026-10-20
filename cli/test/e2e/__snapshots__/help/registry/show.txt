@@ -6,6 +6,7 @@ Options:
       --ref <ref>             For a git registry, the branch, tag or commit to read
       --path <folder>         For a git registry, the folder that holds it
       --adapter <id>          The adapter that reads the registry, when aireg cannot tell
+      --layout <layout>       How to read the source, instead of telling from what it holds: registry, marketplace, well-known or folder
       --config <key>=<value>  A setting for that adapter (repeatable)
   -g, --user                  Act on your user scope instead of this project
 

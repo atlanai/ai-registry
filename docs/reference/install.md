@@ -16,6 +16,10 @@ aireg install [-g] [--for <harness>[,<harness>...]] [--frozen] [--force] [--copy
 
 `install` never writes through a symlinked folder on the way to a harness folder, such as a committed `.claude/skills` that points outside the project: it leaves that link out and says why. A folder of yours already where a link would go is left alone too, and [`aireg status`](status.md) reports the link as missing until you move it. A file or folder of yours that replaced a link aireg made is different: `install` moves it to `.registry/backups/`, says where, and restores the link.
 
+A version's status in its registry decides whether it installs, as [Version status](kinds.md#version-status) describes: a `blocked` version never does, and a `deprecated` one installs with a warning.
+
+An installed artifact that its registry no longer lists stays installed, with a warning and the `aireg remove <name>` that takes it out: a listing cut short or emptied never removes anything.
+
 An installed copy that was edited after it was installed is kept, with a warning. Pass `--force` to restore the copy the lockfile records instead, or run [`aireg sync`](sync.md) to see how your edit compares with the registry.
 
 Pass `--frozen` to install exactly what the lockfile records: `install` then fails with exit status 3 if the lockfile or the manifest would change.

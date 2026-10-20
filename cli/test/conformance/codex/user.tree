@@ -1,0 +1,27 @@
+.agents/
+.agents/skills/
+.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+codex-home/
+codex-home/agents/
+codex-home/agents/planner.toml 4b8fade6e308
+codex-home/agents/reviewer.toml 89d686d8a158
+codex-home/config.toml 2e55c02d6357
+codex-home/plugins/
+codex-home/plugins/cache/
+codex-home/plugins/cache/kit/
+codex-home/plugins/cache/kit/.agents/
+codex-home/plugins/cache/kit/.agents/plugins/
+codex-home/plugins/cache/kit/.agents/plugins/marketplace.json 62221fb59288
+codex-home/plugins/cache/kit/kit/
+codex-home/plugins/cache/kit/kit/local/
+codex-home/plugins/cache/kit/kit/local/.codex-plugin/
+codex-home/plugins/cache/kit/kit/local/.codex-plugin/plugin.json 70a2bf75aa3b
+codex-home/plugins/cache/kit/kit/local/agents -> ../../../../../../.registry/artifacts/.projections/kit/kit/agents
+codex-home/plugins/cache/kit/kit/local/skills -> ../../../../../../.registry/artifacts/.projections/kit/kit/skills
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+project/.codex/
+project/.codex/agents/
+project/.codex/agents/reviewer.toml 89d686d8a158

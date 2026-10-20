@@ -1,5 +1,6 @@
 import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { Target } from "#core/harness/index.ts";
 import { emptyLock } from "#core/lock.ts";
 import { build } from "#core/plan/build.ts";
 import type { Action } from "#core/plan/model.ts";
@@ -107,8 +108,18 @@ describe("a namespaced skill, projected", () => {
     expect(links.some((link) => link.fan === true)).toBe(false);
   });
 
-  it("gives Cursor a folder it reads when Claude's holds plugins", () => {
-    const at = { ...OPTIONS, roots: roots("user", "/work"), targets: ["claude", "cursor"] };
+  it("gives a harness with no plugin folder a folder it reads when Claude's holds plugins", () => {
+    const cursor = PLAN_OPTIONS.harnesses.cursor as Target;
+    const harnesses = {
+      ...PLAN_OPTIONS.harnesses,
+      cursor: { ...cursor, kinds: { ...cursor.kinds, plugin: { shape: "contents" as const } } },
+    };
+    const at = {
+      ...OPTIONS,
+      harnesses,
+      roots: roots("user", "/work"),
+      targets: ["claude", "cursor"],
+    };
     const flat = linksOf(planned(ENTRIES.slice(0, 1), at, true).actions).filter(
       (link) => link.harness !== "claude",
     );

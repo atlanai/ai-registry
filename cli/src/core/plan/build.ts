@@ -1,9 +1,13 @@
+import { resolve } from "node:path";
+import { statusWarning } from "#core/catalog/withheld.ts";
 import { dict } from "#core/fields.ts";
-import { emptyLock, type Lock } from "#core/lock.ts";
+import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
 import {
+  carryUnlisted,
   carryUnopened,
   carryUnresolved,
+  carryUntrusted,
   carryWithheld,
   heldElsewhere,
   keep,
@@ -20,7 +24,7 @@ import { closure, dependentsByName, nameClashes } from "./depends.ts";
 import type { Acquired, Clash, Incompatible, Plan, Selected, Survey, Warning } from "./model.ts";
 import { dropUnusedSources, lockSourceOf } from "./model.ts";
 import { crowdedContainers } from "./projection.ts";
-import { addressOf, select } from "./select.ts";
+import { addressOf, select, type Untrusted } from "./select.ts";
 
 export type { BuildOptions } from "#core/plan/build/state.ts";
 
@@ -62,6 +66,7 @@ function planWith(
   const clashes: Clash[] = [];
   const top = select(manifest, lock, acquired, [], options.cliVersion, [], [], renames);
   const needs = closure(top, acquired);
+  const untrusted: Untrusted[] = [];
   const selected = select(
     { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
     lock,
@@ -71,6 +76,7 @@ function planWith(
     incompatible,
     clashes,
     renames,
+    untrusted,
   );
   const next = emptyLock();
   for (const source of acquired) {
@@ -87,9 +93,13 @@ function planWith(
     warnings,
     rewritten: [],
     claimed: new Map(),
+    recorded: new Map(),
     linked: new Set(),
+    // Namespaces wrap only at user scope, as the adapter contract says, whoever loads plugins.
     wrapping: new Set(
-      acquired.filter((source) => source.namespacePlugins).map((source) => source.alias),
+      options.roots.scope === "user"
+        ? acquired.filter((source) => source.namespacePlugins).map((source) => source.alias)
+        : [],
     ),
     crowded: new Set(),
     unlinks: [],
@@ -99,6 +109,13 @@ function planWith(
     clashes,
   };
 
+  for (const item of selected) {
+    // Known before any item claims a path, so a collision names its holder however late it comes.
+    state.addresses.set(item.name, addressOf({ ...item, name: item.upstreamName }, item.source));
+    for (const link of lock.artifacts[item.name]?.links ?? []) {
+      state.recorded.set(resolve(options.roots.base, link.path), item.name);
+    }
+  }
   const carried = carryUnopened(state);
   const held = heldElsewhere(state, manifest, acquired, carried);
   state.crowded = crowdedContainers(namespaceWants(selected, carried, held, state), options);
@@ -114,6 +131,8 @@ function planWith(
     else planItem(item, state);
   }
   const withheld = carryWithheld(state, acquired);
+  const unlisted = carryUnlisted(state, manifest, acquired);
+  carryUntrusted(state, untrusted);
   carryUnresolved(state, needs);
   removeStale(state);
   flushUnlinks(state, held);
@@ -139,6 +158,8 @@ function planWith(
     unresolved: needs.unresolved,
     conflicts: [...needs.conflicts, ...nameClashes(needs, selected)],
     withheld,
+    unlisted,
+    untrusted,
   };
   return { plan, selected };
 }
@@ -151,6 +172,7 @@ function planItem(item: Selected, build: BuildState): void {
     keep(build, item.name, previous);
     return;
   }
+  warnStatus(item, previous, build);
   const state = build.survey.artifacts[item.name];
   const copy = artifactPath(
     build.options.roots,
@@ -181,6 +203,25 @@ function planItem(item: Selected, build: BuildState): void {
     }),
     ...(blocked.length === 0 ? {} : { blocked }),
   };
+}
+
+/** A version installing with a status, such as deprecated, says so when this run moves to it. */
+function warnStatus(item: Selected, previous: LockArtifact | undefined, build: BuildState): void {
+  const status = build.byAlias.get(item.source)?.placements.get(item.path)?.status;
+  if (status === undefined || item.version === undefined) return;
+  if (previous !== undefined && previous.version === item.version) return;
+  const { upstreamName: name, group, kind, version } = item;
+  build.warnings.push({
+    name: item.name,
+    message: statusWarning({
+      name,
+      group,
+      kind,
+      version,
+      status: status.name,
+      reason: status.reason,
+    }),
+  });
 }
 
 function isLinked(lock: Lock, item: Selected): boolean {

@@ -1,6 +1,8 @@
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { readRegular } from "#adapter/files.ts";
+import type { Envelope } from "#adapter/index.ts";
+import { sha256 } from "#adapter/spec/canonical.ts";
 import { list } from "#adapter/text.ts";
 import { isRecord } from "#core/fields.ts";
 import { isDirectory } from "#core/fs/tree.ts";
@@ -12,16 +14,20 @@ import type { Plan } from "./model.ts";
  * What a harness starts on its own from a plugin it loads: commands that run as you, not
  * instructions an agent reads. Named by the plugin manifest key that declares each.
  */
-export type Carried = "hooks" | "mcpServers" | "lspServers" | "monitors";
+export type Carried = "hooks" | "mcpServers" | "lspServers" | "monitors" | "bin";
 
-const ORDER: readonly Carried[] = ["hooks", "mcpServers", "lspServers", "monitors"];
+const ORDER: readonly Carried[] = ["hooks", "mcpServers", "lspServers", "monitors", "bin"];
 
 const WORDS: Record<Carried, string> = {
   hooks: "hooks",
   mcpServers: "MCP servers",
   lspServers: "LSP servers",
   monitors: "monitors",
+  bin: "executables in bin/",
 };
+
+/** Claude Code puts a plugin's `bin/` on the agent's PATH, so what is in it runs by name. */
+const BIN = "bin";
 
 /** The default files Claude Code, Codex and the Agent Plugins layout read each from. */
 const FILES: readonly [string, Carried][] = [
@@ -53,6 +59,7 @@ export async function carries(root: string): Promise<Carried[]> {
       found.add(what);
     }
   }
+  if (await isDirectory(join(dir, BIN))) found.add("bin");
   for (const path of MANIFESTS) {
     const file = await readRegular(dir, path, verified);
     if (file.kind !== "file") continue;
@@ -64,6 +71,41 @@ export async function carries(root: string): Promise<Carried[]> {
     }
   }
   return ORDER.filter((what) => found.has(what));
+}
+
+/** Whether a plugin file is one a harness starts or puts on the PATH, which a fingerprint covers. */
+function carrying(path: string): Carried | undefined {
+  const named = FILES.find(([file]) => file === path)?.[1];
+  if (named !== undefined) return named;
+  if (path.startsWith(`${BIN}/`)) return "bin";
+  if (path.startsWith("hooks/")) return "hooks";
+  if (path.startsWith("monitors/")) return "monitors";
+  return undefined;
+}
+
+/**
+ * What a plugin would have a harness start, read from its envelope and the manifest it is
+ * placed by, before any of it is fetched; and a digest of those parts, which moves when they do.
+ */
+export function carriedIn(
+  envelope: Envelope,
+  manifest: Record<string, unknown> | undefined,
+): { carries: Carried[]; fingerprint: string | undefined } {
+  const found = new Set<Carried>(manifest === undefined ? [] : declared(manifest));
+  const files: [string, string][] = [];
+  for (const file of envelope.files) {
+    const what = carrying(file.path);
+    if (what === undefined) continue;
+    found.add(what);
+    files.push([file.path, file.digest]);
+  }
+  const carries = ORDER.filter((what) => found.has(what));
+  if (carries.length === 0) return { carries, fingerprint: undefined };
+  const declaredBy = Object.fromEntries(
+    carries.flatMap((key) => (manifest?.[key] === undefined ? [] : [[key, manifest[key]]])),
+  );
+  const parts = { files: files.sort(), manifest: JSON.stringify(declaredBy) };
+  return { carries, fingerprint: sha256(JSON.stringify(parts)) };
 }
 
 /** `hooks and MCP servers`. */

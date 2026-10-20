@@ -14,8 +14,9 @@ import {
   type SourceHandle,
   type Want,
 } from "#adapter/index.ts";
+import { isLayoutId, type LayoutId } from "#adapter/layouts/ids.ts";
 import { collidingPaths } from "#adapter/paths.ts";
-import { isDigest } from "#adapter/spec/ref.ts";
+import { isDigest, isVersion } from "#adapter/spec/ref.ts";
 import { ENVELOPE_API_VERSION } from "#adapter/spec/types.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import type { Catalog, Entry } from "#core/catalog/model.ts";
@@ -93,6 +94,13 @@ export interface Listing {
   listed: Listed[];
   sourceRevision: string | undefined;
   registry: RegistryIdentity | undefined;
+  /** How the source lays out what it holds, when its adapter says. */
+  layout: LayoutId | undefined;
+}
+
+/** Text from an adapter, one line, without escapes; anything else is dropped. */
+function line(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? sanitizeText(value) : undefined;
 }
 
 /**
@@ -187,6 +195,10 @@ function check(adapter: SourceAdapter, artifact: Artifact, index: number): void 
   if (name === "") fail("has no name");
   if (!Array.isArray(envelope.files) || envelope.files.length === 0) fail("describes no files");
   if (!Array.isArray(artifact.files) || artifact.files.length === 0) fail("publishes no files");
+  const { version } = artifact;
+  if (version !== undefined && (typeof version !== "string" || !isVersion(version))) {
+    fail(`is served at ${quoted(String(version))}, which is not a version`);
+  }
 
   checkFiles(envelope, artifact, fail);
 }
@@ -243,11 +255,15 @@ export async function resolveArtifacts(
   merge(catalog, adapter.id, entries);
   const withheld = withheldFrom(resolution.withheld);
   if (withheld.length > 0) catalog.withheld = withheld;
+  const said = Array.isArray(resolution.warnings) ? resolution.warnings : [];
+  catalog.warnings.push(...said.flatMap((warning) => line(warning) ?? []));
+  const layout = typeof resolution.layout === "string" && isLayoutId(resolution.layout);
   return {
     catalog: finalize(catalog),
     listed,
     sourceRevision: adapter.capabilities.pinsSource ? resolution.sourceRevision : undefined,
     registry: identity(resolution.registry),
+    layout: layout ? resolution.layout : undefined,
   };
 }
 

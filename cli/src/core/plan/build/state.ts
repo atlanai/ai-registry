@@ -30,6 +30,8 @@ export interface BuildOptions {
   opened?: readonly string[];
   /** What an artifact whose name another holds gets. Absent, it is left out, never renamed. */
   nameCollision?: NameCollision;
+  /** Installed names whose copy already on disk, byte for byte what aireg installs, it takes over. */
+  adopt?: ReadonlySet<string>;
 }
 
 /** What planning one run accumulates, shared by every step that plans part of it. */
@@ -45,6 +47,8 @@ export interface BuildState {
   rewritten: Rewritten[];
   /** Plugin parts can collide in one harness path: the first writer wins, loudly. */
   claimed: Map<string, string>;
+  /** Harness paths the lockfile records for this run's artifacts, by the one that holds each. */
+  recorded: Map<string, string>;
   /** One link action per destination: a plugin is shared by its whole namespace. */
   linked: Set<string>;
   /** Registries read this run whose adapter declares each namespace a plugin. */

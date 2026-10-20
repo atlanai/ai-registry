@@ -178,6 +178,8 @@ export function emptyPlan(): Plan {
     pruned: [],
     unresolved: [],
     withheld: [],
+    unlisted: [],
+    untrusted: [],
     conflicts: [],
   };
 }

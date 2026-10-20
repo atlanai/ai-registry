@@ -45,22 +45,27 @@ aireg installs into one of two scopes:
 
 ## Harnesses
 
-A harness is a coding agent that aireg installs into. aireg knows four:
+A harness is a coding agent that aireg installs into. aireg knows seven:
 
 | Name | Harness |
 |---|---|
 | `claude` | Claude Code |
 | `codex` | Codex |
 | `cursor` | Cursor |
+| `copilot` | GitHub Copilot |
+| `gemini` | Gemini CLI |
+| `opencode` | OpenCode |
 | `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
 
 aireg links each artifact into the folder its harness reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`.
 
 Codex reads agents only as TOML, so aireg writes each one as a file, never a link: `.codex/agents/<name>.toml`, or `$CODEX_HOME/agents/` (default `~/.codex/agents/`) in your user scope. It holds the agent's `name`, `description` and body, as `developer_instructions`; other front matter is left out. Codex loads a project's agents only in a project it trusts.
 
-A plugin installs as one plugin in your user scope: Claude Code in `~/.claude/skills/<plugin>/`, and Codex in `~/.codex/plugins/cache/<registry>/<plugin>/local`, which aireg turns on in `~/.codex/config.toml`. The same goes for each namespace of a registry whose adapter declares its namespaces plugins (`namespacePlugins` in the [adapter contract](adapter.md#the-adapter-contract)). Cursor and the shared `.agents` folder get a link for each artifact in a folder they read.
+A plugin installs as one plugin where a harness loads plugins: Claude Code in `.claude/skills/<plugin>/` in a project and `~/.claude/skills/<plugin>/` in your user scope, Codex, in your user scope only, in `~/.codex/plugins/cache/<registry>/<plugin>/local`, which aireg turns on in `~/.codex/config.toml`, and Cursor, in your user scope only, in `~/.cursor/plugins/local/<plugin>/`, as a copy. The same goes, in your user scope, for each namespace of a registry whose adapter declares its namespaces plugins (`namespacePlugins` in the [adapter contract](adapter.md#the-adapter-contract)). Every other harness, and Codex and Cursor in a project, get each skill and agent where they read it, and each command a plugin holds as a skill named `<plugin>-<command>` that only a person invokes.
 
 aireg installs into the harnesses named by `--for`. Without it, aireg uses the `harnesses:` list in the scope's manifest, and without that, `claude` and `codex`. Run [`aireg harnesses`](harnesses.md) to see which ones this machine has.
+
+`--for` also takes the id of a harness you define in a [harness file](harnesses.md#harness-files).
 
 ## When aireg asks questions
 

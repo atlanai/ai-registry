@@ -1,13 +1,17 @@
 import type { AdapterError, Envelope } from "#adapter/index.ts";
+import type { LayoutId } from "#adapter/layouts/ids.ts";
 import { quoted } from "#adapter/text.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import type { Render } from "#core/harness/contract.ts";
+import type { Codec, KeyFile } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
+import type { Carried } from "./carries.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
+import type { Untrusted } from "./select.ts";
+import type { Unlisted } from "./unlisted.ts";
 
 /** One resolved registry, in the shape the lock stores. */
 export interface Origin {
@@ -23,6 +27,8 @@ export interface Origin {
   config: SourceConfig;
   /** What the source was at, when it has one revision covering everything. */
   revision: string | undefined;
+  /** How the source lays out what it holds, when its adapter says. */
+  layout?: LayoutId | undefined;
 }
 
 /** Upstream identity known before content is fetched. */
@@ -37,6 +43,12 @@ export interface Placement {
   needs?: readonly Need[] | undefined;
   /** Withdrawn by the registry, and served only because something pinned it. */
   yanked?: { reason: string | undefined } | undefined;
+  /** Its status where it installs with a warning, such as `deprecated`. */
+  status?: { name: string; reason: string | undefined } | undefined;
+  /** For a plugin read from a source that is not a registry, what places it. */
+  plugin?: PluginDocument | undefined;
+  /** The commit it was read at, where that is its own rather than the registry's. */
+  revision?: string | undefined;
 }
 
 /** A resolved registry with lazy access to artifact content. */
@@ -48,6 +60,8 @@ export interface Acquired {
   catalog: Catalog;
   /** Its adapter declares each namespace a plugin. Absent is off. */
   namespacePlugins?: boolean;
+  /** Read whole this run, so its catalog is everything it lists, not only what was asked for. */
+  whole?: boolean;
   /** An entry's content on disk, and the identity the store keyed it by. */
   content: (entryPath: string) => Promise<Staged>;
   /** Releases whatever the adapter opened. */
@@ -106,6 +120,12 @@ export function dropUnusedSources(lock: Lock): void {
   }
 }
 
+/** For one front-matter key: the files its readers take it from, and who cannot keep it. */
+export interface KeyRule {
+  files: KeyFile[];
+  refusedBy: string[];
+}
+
 export type Action =
   /** Fetch and stage content only when this action is applied. */
   | { kind: "stage"; name: string; source: string; path: string; to: string }
@@ -126,12 +146,24 @@ export type Action =
       plugin?: boolean;
       /** The content this projection links to. Present with `plugin`. */
       content?: string;
+      /** The plugin's own account of itself, for the manifests its projection gets. */
+      document?: PluginDocument;
+      /** A real copy already at `to`, holding exactly these bytes, is taken over rather than rewritten. */
+      adopt?: boolean;
       /** How the lock recorded a link at this path, when aireg made one before. */
       recorded?: LinkMode;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
       /** Written in the harness's own format. */
-      render?: Render;
+      codec?: Codec;
+      /** A plugin's command, written as a skill a person invokes under this name. */
+      command?: string;
+      /** Front-matter keys a harness reading this folder does not read as written. */
+      keys?: Record<string, KeyRule>;
+      /** The kind of the plugin part this places, where a harness takes the plugin as its parts. */
+      part?: ArtifactKind;
+      /** Written as a real folder holding this file. */
+      entry?: string;
       /** The name the copy's front matter takes: it installs under a name not its own. */
       rename?: string;
     }
@@ -176,6 +208,10 @@ export interface Plan {
   conflicts: Conflict[];
   /** Installed artifacts kept as they are, because the registry withholds the version it reached. */
   withheld: Kept[];
+  /** Installed artifacts kept as they are, because their registry no longer lists them. */
+  unlisted: Unlisted[];
+  /** Plugins left out because they carry what runs on its own, and no entry trusts them. */
+  untrusted: Untrusted[];
 }
 
 /** An installed artifact the plan keeps, by its installed name, at the version it has. */
@@ -199,6 +235,8 @@ export function emptyPlan(): Plan {
     unresolved: [],
     conflicts: [],
     withheld: [],
+    unlisted: [],
+    untrusted: [],
   };
 }
 
@@ -266,6 +304,22 @@ export interface Contained {
   kind: ArtifactKind;
   /** Path within the plugin directory, POSIX separators. */
   within: string;
+  /** A command file, which a harness without plugins gets as a skill rendered from it. */
+  command?: boolean;
+}
+
+/** What a plugin read from a source that is not a registry says about itself, for placing it. */
+export interface PluginDocument {
+  name: string;
+  description?: string | undefined;
+  /** The manifest a harness loads it by, which a plugin without its own gets written for it. */
+  manifest?: Record<string, unknown> | undefined;
+  /** Its command files, by command name, relative to the plugin. */
+  commands: readonly { name: string; path: string }[];
+  /** What a harness that loads it would start on its own, which needs a person's yes. */
+  carries: readonly Carried[];
+  /** A digest of those parts, so a change to what runs is seen without fetching. */
+  fingerprint?: string | undefined;
 }
 
 export interface Selected {
@@ -283,6 +337,10 @@ export interface Selected {
   contentId: string | undefined;
   /** The version the source published, where it publishes versions. */
   version: string | undefined;
+  /** For a plugin read from a source that is not a registry, what places it. */
+  plugin?: PluginDocument | undefined;
+  /** The commit it was read at, where that is its own rather than the registry's. */
+  revision?: string | undefined;
   /**
    * What a plugin holds, so a harness with no plugin directory can be given
    * its parts. Empty for every other kind.

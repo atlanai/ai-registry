@@ -342,7 +342,7 @@ describe("chooseTargets", () => {
     expect((await pick([], [KEY.down])).shown).toMatch(
       /Codex\s+\.agents[\\/]skills, \.codex[\\/]agents$/m,
     );
-    expect((await pick([], [KEY.down, KEY.down])).shown).toMatch(
+    expect((await pick([], [KEY.down, KEY.down, KEY.down])).shown).toMatch(
       /Cursor\s+\.agents[\\/]skills, \.claude[\\/]agents$/m,
     );
   });

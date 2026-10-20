@@ -1,0 +1,23 @@
+.agents/
+.agents/skills/
+.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+.cursor/
+.cursor/agents/
+.cursor/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+.cursor/plugins/
+.cursor/plugins/local/
+.cursor/plugins/local/kit/
+.cursor/plugins/local/kit/.cursor-plugin/
+.cursor/plugins/local/kit/.cursor-plugin/plugin.json c448b30df656
+.cursor/plugins/local/kit/agents/
+.cursor/plugins/local/kit/agents/planner.md 732bc56aaeab
+.cursor/plugins/local/kit/skills/
+.cursor/plugins/local/kit/skills/ship/
+.cursor/plugins/local/kit/skills/ship/SKILL.md 68d1965a1d18
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+project/.cursor/
+project/.cursor/agents/
+project/.cursor/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md

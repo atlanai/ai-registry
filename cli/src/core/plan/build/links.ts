@@ -19,6 +19,9 @@ interface Claimed {
   blocked: Blocked[];
 }
 
+/** `.agents/skills/pdf` or `.claude/agents/review.md`: the name a part is installed under. */
+const partName = (path: string) => (path.split(/[\\/]/).at(-1) ?? path).replace(/\.(md|toml)$/, "");
+
 /** The links this item may take, first come first served, recording what another holds. */
 function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const skipped = new Set<string>();
@@ -29,13 +32,25 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (harness) => {
     skipped.add(build.options.harnesses[harness]?.displayName ?? harness);
   });
-  const links = claim(planned, item.name, build.claimed, (owner, link) => {
+  const collided = (owner: string, link: PlannedLink) => {
     const kept = build.addresses.get(owner) ?? owner;
     blocked.push({ harness: link.harness, path: link.relative, by: kept });
     if (!build.clashes.some((clash) => clash.dropped === address && clash.kept === kept)) {
-      build.clashes.push({ name: item.name, kept, dropped: address, at: link.relative });
+      // A plugin's parts each land under a name of their own, which is the one that collided.
+      const name = item.kind === "plugin" ? partName(link.relative) : item.name;
+      build.clashes.push({ name, kept, dropped: address, at: link.relative });
     }
+  };
+  // A path the lockfile gives another artifact stays its own, though this one comes first, as a
+  // plugin linked beside it may. A plugin's own folder is shared, so it is never held this way.
+  const open = planned.filter((link) => {
+    if (link.shared === true || build.claimed.has(link.absolute)) return true;
+    const holder = build.recorded.get(link.absolute);
+    if (holder === undefined || holder === item.name) return true;
+    collided(holder, link);
+    return false;
   });
+  const links = claim(open, item.name, build.claimed, collided);
   return { links, skipped, blocked };
 }
 
@@ -100,14 +115,25 @@ export function updateLinks(
   let touched = restage;
   for (const link of links) {
     const rename = link.shared === true ? undefined : renamedTo(item);
-    const copying =
-      link.render !== undefined || rename !== undefined || build.options.copy || item.copy === true;
-    const correct = inPlace(state?.links[link.relative], copying, link.from);
     const prior = previous?.links.find((old) => old.path === link.relative);
+    // A copy the lockfile records, such as one taken over in place, stays a copy.
+    const kept = prior?.mode === "copy" && link.shared !== true;
+    const copying =
+      link.codec !== undefined ||
+      link.entry !== undefined ||
+      link.copy === true ||
+      rename !== undefined ||
+      build.options.copy ||
+      item.copy === true ||
+      kept;
+    const correct = inPlace(state?.links[link.relative], copying, link.from);
     if (keepsEditedCopy(prior, state, build)) continue;
     if ((restage || !correct) && !build.linked.has(link.absolute)) {
       build.linked.add(link.absolute);
-      build.actions.push(linkAction(item, link, { copy: copying, rename, recorded: prior?.mode }));
+      const adopt = build.options.adopt?.has(item.name) === true;
+      build.actions.push(
+        linkAction(item, link, { copy: copying, rename, recorded: prior?.mode, adopt }),
+      );
       touched = true;
       noteRenamed(item, link, prior?.mode, build);
     }
@@ -122,7 +148,12 @@ export function updateLinks(
 function linkAction(
   item: Selected,
   link: PlannedLink,
-  how: { copy: boolean; rename: string | undefined; recorded: LinkMode | undefined },
+  how: {
+    copy: boolean;
+    rename: string | undefined;
+    recorded: LinkMode | undefined;
+    adopt: boolean;
+  },
 ): Extract<Action, { kind: "link" }> {
   return {
     kind: "link",
@@ -133,10 +164,18 @@ function linkAction(
     copy: how.copy,
     plugin: link.shared === true,
     ...(link.content === undefined ? {} : { content: link.content }),
+    ...(link.document === undefined ? {} : { document: link.document }),
     ...(link.fan === true ? { fan: true } : {}),
-    ...(link.render === undefined ? {} : { render: link.render }),
+    ...(link.codec === undefined ? {} : { codec: link.codec }),
+    ...(link.command === undefined ? {} : { command: link.command }),
+    ...(link.keys === undefined ? {} : { keys: link.keys }),
+    ...(link.part === undefined ? {} : { part: link.part }),
+    ...(link.entry === undefined ? {} : { entry: link.entry }),
     ...(how.rename === undefined ? {} : { rename: how.rename }),
     ...(how.recorded === undefined ? {} : { recorded: how.recorded }),
+    ...(how.adopt && link.codec === undefined && link.entry === undefined && link.shared !== true
+      ? { adopt: true }
+      : {}),
   };
 }
 

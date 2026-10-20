@@ -1,0 +1,137 @@
+{
+  "id": "codex",
+  "displayName": "Codex",
+  "roots": {
+    "project": ".codex",
+    "user": {
+      "default": "~/.codex",
+      "env": "CODEX_HOME"
+    }
+  },
+  "detect": {
+    "env": [
+      "CODEX_HOME"
+    ],
+    "binary": [
+      "codex"
+    ]
+  },
+  "reads": {
+    "skill": [
+      "agents"
+    ]
+  },
+  "kinds": {
+    "plugin": {
+      "shape": "directory",
+      "subdir": "plugins/cache/{source}/{name}/local",
+      "scope": "user",
+      "place": "fan",
+      "manifest": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "body": {
+            "interface": {
+              "displayName": "{name}",
+              "shortDescription": "{description}"
+            },
+            "skills": "./skills/"
+          }
+        }
+      ],
+      "register": [
+        {
+          "file": "config.toml",
+          "format": "toml",
+          "at": [
+            "plugins",
+            "{name}@{source}"
+          ],
+          "value": {
+            "enabled": true
+          },
+          "off": {
+            "enabled": false
+          },
+          "init": {}
+        },
+        {
+          "file": "config.toml",
+          "format": "toml",
+          "at": [
+            "marketplaces",
+            "{source}"
+          ],
+          "value": {
+            "source_type": "local",
+            "source": "{root}/plugins/cache/{source}"
+          },
+          "init": {},
+          "conflict": "keep",
+          "remove": "entry"
+        },
+        {
+          "file": "plugins/cache/{source}/.agents/plugins/marketplace.json",
+          "format": "json",
+          "at": [
+            "plugins"
+          ],
+          "upsert": {
+            "key": "name",
+            "item": {
+              "name": "{name}",
+              "source": {
+                "path": "./{name}/local",
+                "source": "local"
+              }
+            }
+          },
+          "init": {
+            "name": "{source}",
+            "plugins": []
+          }
+        }
+      ]
+    },
+    "skill": {
+      "shape": "directory",
+      "subdir": "skills",
+      "keys": {
+        "disable-model-invocation": {
+          "path": "agents/openai.yaml",
+          "body": {
+            "policy": {
+              "allow_implicit_invocation": false
+            }
+          }
+        }
+      }
+    },
+    "agent": {
+      "shape": "file",
+      "subdir": "agents",
+      "extension": ".toml",
+      "codec": {
+        "id": "frontmatter-toml",
+        "fields": [
+          "name",
+          "description"
+        ],
+        "body": "developer_instructions"
+      }
+    }
+  },
+  "verified": {
+    "command": [
+      "codex",
+      "--version"
+    ],
+    "range": "0.162.1"
+  },
+  "trust": {
+    "agent": {
+      "run": "codex",
+      "scope": "project"
+    }
+  }
+}

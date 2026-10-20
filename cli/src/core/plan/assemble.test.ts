@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -52,20 +52,35 @@ describe("assembling a projection", () => {
     expect(await readdir(projection())).not.toContain("agents");
   });
 
-  test("writes one manifest per harness that reads it, and a portable root", async () => {
+  test("copies a file on Windows, where a junction reaches only a folder", async () => {
+    await publish("skills", "lint");
+    await writeFile(join(content(), ".mcp.json"), '{"mcpServers":{}}\n');
+    const platform = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      await assemble(projection(), content(), ["claude"]);
+    } finally {
+      Object.defineProperty(process, "platform", platform);
+    }
+    const mcp = join(projection(), ".mcp.json");
+    expect((await lstat(mcp)).isSymbolicLink()).toBe(false);
+    expect(await readFile(mcp, "utf8")).toBe('{"mcpServers":{}}\n');
+  });
+
+  test("writes one manifest per harness that reads it, and no portable root", async () => {
     await publish("skills", "lint");
     await assemble(projection(), content(), ["claude", "codex"]);
 
     const inside = await readdir(projection());
     expect(inside).toContain(".claude-plugin");
     expect(inside).toContain(".codex-plugin");
-    expect(inside).toContain("plugin.json");
+    expect(inside).not.toContain("plugin.json");
     const manifest = JSON.parse(
       await readFile(join(projection(), ".claude-plugin", "plugin.json"), "utf8"),
     ) as { name: string };
     expect(manifest.name).toBe("projection");
-    expect(JSON.parse(await readFile(join(projection(), "plugin.json"), "utf8"))).toEqual({
-      $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+    const codex = join(projection(), ".codex-plugin", "plugin.json");
+    expect(JSON.parse(await readFile(codex, "utf8"))).toEqual({
       name: "projection",
       description: "Artifacts the projection namespace publishes.",
       interface: {

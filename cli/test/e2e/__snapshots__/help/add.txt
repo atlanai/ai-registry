@@ -3,6 +3,7 @@ Install artifacts from a registry
 Usage: aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options]
        aireg add <namespace>[/<name>]... --registry <registry> [options]
        aireg add <address> [-s <name>]... [--as <name>] [options]
+       aireg add --from <file> [options]
        aireg add
 
 Options:
@@ -15,7 +16,10 @@ Options:
       --ref <ref>             For a git registry, the branch, tag or commit to read
       --path <folder>         For a git registry, the folder that holds it
       --adapter <id>          The adapter that reads the registry, when aireg cannot tell
+      --layout <layout>       How to read the source, instead of telling from what it holds: registry, marketplace, well-known or folder
       --config <key>=<value>  A setting for that adapter (repeatable)
+      --from <file>           Add the skills another installer's lock file records, such as skills-lock.json
+      --trust <plugin>        Install this plugin although it carries hooks, servers or executables that run as you
       --no-auto-update        Do not keep a user scope install up to date in the background
   -g, --user                  Act on your user scope instead of this project
       --dry-run               Print what would change without changing it

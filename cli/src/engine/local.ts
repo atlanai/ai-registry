@@ -30,8 +30,8 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
   const next = cloneLock(previous);
   for (const name of names) {
     const artifact = generated.artifacts[name];
-    // Absent from the fresh plan means the registry no longer offers it, so
-    // the row goes. A name that was never locked has nothing to remove.
+    // Absent from the fresh plan means nothing asks for it any more, so the row
+    // goes. A name that was never locked has nothing to remove.
     if (artifact === undefined) delete next.artifacts[name];
     else next.artifacts[name] = artifact;
   }
@@ -60,6 +60,8 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
     unresolved: plan.unresolved,
     conflicts: plan.conflicts,
     withheld: plan.withheld.filter((item) => names.has(item.name)),
+    unlisted: plan.unlisted.filter((item) => names.has(item.name)),
+    untrusted: plan.untrusted,
   };
 }
 
@@ -133,6 +135,11 @@ export async function applyLocal(
   );
   await refuseBlocked(narrowed);
   const result = await commit(loaded, narrowed, scan.acquired, targets, onStep);
+  // What the plan said about a row this run wrote, such as a deprecated version it pulled.
+  for (const { name, message, hint } of plan.warnings) {
+    if (name === undefined || !recording.has(name)) continue;
+    notices.push({ message, ...(hint === undefined ? {} : { hint }) });
+  }
   notices.push(
     ...appliedNotices(loaded.roots, result, loaded.harnesses),
     ...unstagedNotices(result.unstaged),

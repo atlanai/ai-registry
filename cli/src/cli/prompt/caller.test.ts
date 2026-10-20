@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { CALLER_SIGNALS } from "#core/harness/index.ts";
 import { blocker, callingAgent, explain, SIGNALS } from "./caller.ts";
 
 const DOCS = readFileSync(
@@ -22,7 +23,29 @@ describe("callingAgent", () => {
     expect(callingAgent({ CLAUDECODE: "1" })).toBe("claude");
     expect(callingAgent({ CURSOR_AGENT: "1" })).toBe("cursor");
     expect(callingAgent({ CODEX_THREAD_ID: "abc" })).toBe("codex");
+    expect(callingAgent({ COPILOT_CLI: "1" })).toBe("copilot");
     expect(callingAgent({ REPL_ID: "abc" })).toBe("replit");
+  });
+
+  it("takes no variable the agent does not set", () => {
+    expect(callingAgent({ CLAUDE_CODE: "1" })).toBeUndefined();
+    expect(callingAgent({ CURSOR_TRACE_ID: "abc" })).toBeUndefined();
+  });
+
+  it("takes no setting a person exports for an agent as a sign of it", () => {
+    expect(callingAgent({ COPILOT_MODEL: "auto", COPILOT_ALLOW_ALL: "true" })).toBeUndefined();
+  });
+
+  it("takes Gemini CLI's variable from its harness definition alone", () => {
+    expect(CALLER_SIGNALS).toContainEqual({ agent: "gemini", env: ["GEMINI_CLI"] });
+    expect(SIGNALS.filter((signal) => signal.agent === "gemini")).toHaveLength(1);
+    expect(callingAgent({ GEMINI_CLI: "1" })).toBe("gemini");
+  });
+
+  it("takes OpenCode's variable from its harness definition alone", () => {
+    expect(CALLER_SIGNALS).toContainEqual({ agent: "opencode", env: ["OPENCODE"] });
+    expect(SIGNALS.filter((signal) => signal.agent === "opencode")).toHaveLength(1);
+    expect(callingAgent({ OPENCODE: "1" })).toBe("opencode");
   });
 
   it("ignores a variable that is set but empty", () => {

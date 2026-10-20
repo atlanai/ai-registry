@@ -44,14 +44,14 @@ $ aireg list
   lint      skill  1.0.0 pinned  kit   Claude Code, Codex
 ```
 
-A folder no registry holds, or one that names no artifact, is refused.
+A folder that holds nothing aireg reads, or a folder inside a registry that names no artifact, is refused.
 
 ```console
 $ aireg add [ROOT]/lone
-? 2
-error: No registry.json in [ROOT]/lone or any folder above it.
-  code: usage
-hint: Name a folder inside a registry, such as <registry>/artifacts/<namespace>/<kind>/<name>.
+? 1
+error: This source holds nothing aireg reads: no registry.json, marketplace.json, plugin.json, SKILL.md or agents/*.md.
+  code: invalid
+hint: Check the address, or create a registry with `aireg registry init`.
 $ aireg add ../kit/artifacts/kit
 ? 2
 error: ../kit/artifacts/kit is inside the registry at [ROOT]/kit, but names no artifact.

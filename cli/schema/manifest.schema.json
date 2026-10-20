@@ -75,6 +75,31 @@
                   "description": "The folder inside the source that holds the registry, when it is not the root.",
                   "type": "string"
                 },
+                "layout": {
+                  "description": "How the source lays out what it holds, which aireg records the first time it reads one that is not a registry.",
+                  "anyOf": [
+                    {
+                      "description": "A registry laid out as the file spec describes, with a `registry.json` at its root.",
+                      "const": "registry",
+                      "type": "string"
+                    },
+                    {
+                      "description": "A plugin marketplace, `.claude-plugin/marketplace.json` or else `.agents/plugins/marketplace.json`, or one plugin with its own manifest: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` or an Agent Plugins `plugin.json`.",
+                      "const": "marketplace",
+                      "type": "string"
+                    },
+                    {
+                      "description": "A site's Agent Skills discovery index, `/.well-known/agent-skills/index.json` in the 0.2.0 format, whose skills are `SKILL.md` files or `.tar.gz` and `.zip` archives.",
+                      "const": "well-known",
+                      "type": "string"
+                    },
+                    {
+                      "description": "Skills as folders holding a `SKILL.md`, up to three levels down, and agents as `*.md` files in `agents/` or `.claude/agents/`.",
+                      "const": "folder",
+                      "type": "string"
+                    }
+                  ]
+                },
                 "config": {
                   "description": "Adapter-defined scope selection, such as a workspace.",
                   "type": "object",
@@ -92,7 +117,7 @@
       }
     },
     "artifacts": {
-      "description": "A string reference, or `{ ref, as, exclude, harnesses, copy }` to rename it, leave members out, narrow where it lands, or copy it rather than link it.",
+      "description": "A string reference, or `{ ref, as, exclude, harnesses, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
       "type": "array",
       "items": {
         "anyOf": [
@@ -142,6 +167,15 @@
               "copy": {
                 "description": "Copy into each harness folder rather than linking, as `aireg add --copy` records.",
                 "type": "boolean"
+              },
+              "trust": {
+                "minItems": 1,
+                "description": "Plugins, by name, allowed to install with the hooks, servers or executables they carry, as `aireg add --trust` records.",
+                "type": "array",
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                }
               }
             }
           }

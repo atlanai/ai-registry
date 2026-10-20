@@ -1,0 +1,12 @@
+.claude/
+.claude/agents/
+.claude/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+.claude/skills/
+.claude/skills/kit -> ../../.registry/artifacts/.projections/kit/kit
+.claude/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+project/
+project/.claude/
+project/.claude/agents/
+project/.claude/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+project/.claude/skills/
+project/.claude/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint

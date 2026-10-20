@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
-import { carries, describeCarried } from "./carries.ts";
+import { carriedIn, carries, describeCarried } from "./carries.ts";
 
 async function put(root: string, path: string, body: string): Promise<void> {
   await mkdir(join(root, path, ".."), { recursive: true });
@@ -53,5 +53,41 @@ describe("carries", () => {
 describe("describeCarried", () => {
   test("names each in words", () => {
     expect(describeCarried(["hooks", "mcpServers"])).toBe("hooks and MCP servers");
+  });
+});
+
+describe("carriedIn", () => {
+  const file = (path: string, digest = "a") => ({
+    path,
+    digest: `sha256:${digest.repeat(64)}`,
+    size: 1,
+  });
+  const envelope = (files: ReturnType<typeof file>[]) => ({
+    apiVersion: "aireg.sh/v1",
+    kind: "plugin",
+    metadata: { name: "kit" },
+    files,
+  });
+
+  it("finds a bin folder, and a digest that moves with what runs and nothing else", () => {
+    const plain = carriedIn(envelope([file("skills/a/SKILL.md")]), undefined);
+    expect(plain).toEqual({ carries: [], fingerprint: undefined });
+
+    const before = carriedIn(envelope([file("bin/tool"), file("skills/a/SKILL.md")]), undefined);
+    expect(before.carries).toEqual(["bin"]);
+    const skillMoved = carriedIn(
+      envelope([file("bin/tool"), file("skills/a/SKILL.md", "b")]),
+      undefined,
+    );
+    expect(skillMoved.fingerprint).toBe(before.fingerprint);
+    const toolMoved = carriedIn(envelope([file("bin/tool", "b")]), undefined);
+    expect(toolMoved.fingerprint).not.toBe(before.fingerprint);
+  });
+
+  it("counts what the placing manifest declares inline", () => {
+    const declared = carriedIn(envelope([file("skills/a/SKILL.md")]), { mcpServers: { a: {} } });
+    expect(declared.carries).toEqual(["mcpServers"]);
+    const changed = carriedIn(envelope([file("skills/a/SKILL.md")]), { mcpServers: { b: {} } });
+    expect(changed.fingerprint).not.toBe(declared.fingerprint);
   });
 });

@@ -107,9 +107,8 @@ describe("codex plugins as a local marketplace", () => {
 
     await apply(plan([unlinkOf("acme-prod", "sales")]), roots, noFetch);
     await expect(lstat(join(cache("acme-prod"), ".agents"))).rejects.toThrow();
-    const text = await readFile(config, "utf8");
-    expect(text).not.toContain("[marketplaces.acme-prod]");
-    expect(text).not.toContain("sales@acme-prod");
+    // aireg made config.toml, so it goes with the last entry it held.
+    await expect(lstat(config)).rejects.toThrow();
   });
 
   test("leaves a marketplace of the same name a person added alone", async () => {

@@ -1,13 +1,15 @@
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { onPath } from "#adapter/paths.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { present } from "#core/env.ts";
 import { expandUserPath } from "#core/fs/path.ts";
+import { codecOf } from "#core/harness/codecs/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
-import type { Harnesses, Target } from "./contract.ts";
+import type { HarnessDefinition, Harnesses, KindMapping, Target } from "./contract.ts";
+import { BUILT_IN, loadHarnessFiles } from "./load.ts";
 
 export type { Harnesses, KindMapping, Target } from "./contract.ts";
 
@@ -31,25 +33,110 @@ export const CALLER_SIGNALS: readonly { agent: string; env: readonly string[] }[
       : [{ agent: harness.id, env: harness.detect.caller }],
   );
 
-/** The built-in harnesses, the only ones aireg knows, as data that crosses the daemon RPC. */
+/** Every mapping as the rest of aireg reads it: a `render` becomes the codec it names. */
+function kindsOf(definition: HarnessDefinition): Target["kinds"] {
+  const kinds: Target["kinds"] = {};
+  for (const [kind, mapping] of Object.entries(definition.kinds) as [ArtifactKind, KindMapping][]) {
+    if (mapping.shape !== "file" || mapping.render === undefined) {
+      kinds[kind] = structuredClone(mapping);
+      continue;
+    }
+    const { render: _, ...rest } = mapping;
+    kinds[kind] = { ...structuredClone(rest), codec: codecOf(mapping) };
+  }
+  return kinds;
+}
+
+/** A definition as data that crosses the daemon RPC, with every default filled in. */
+function toTarget(
+  definition: HarnessDefinition,
+  env: NodeJS.ProcessEnv,
+  origin: string = BUILT_IN,
+): Target {
+  const detect = definition.detect ?? {};
+  const kind = definition.kind ?? "coding";
+  return {
+    name: definition.id,
+    displayName: definition.displayName,
+    projectRoot: definition.roots.project,
+    userRoot: expandUserPath(definition.roots.user.default, env),
+    envHome: definition.roots.user.env,
+    envWithin: definition.roots.user.within,
+    detect:
+      detect === "never"
+        ? "never"
+        : {
+            env: detect.env ?? [],
+            binary: detect.binary ?? [],
+            paths: detect.paths ?? [],
+            ...(detect.projectRoot === false ? { projectRoot: false as const } : {}),
+          },
+    kinds: kindsOf(definition),
+    reads: { ...definition.reads },
+    kind,
+    shared: kind === "shared",
+    verified: definition.verified === undefined ? undefined : structuredClone(definition.verified),
+    trust: { ...definition.trust },
+    reload: definition.reload,
+    origin,
+  };
+}
+
+/** A profile name as both its folder and a harness id can carry it. */
+const PROFILE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+/** Each profile folder its `instances` root finds, as a harness of its own. */
+function instancesOf(definition: HarnessDefinition, env: NodeJS.ProcessEnv, origin: string) {
+  const root = definition.instances?.root;
+  if (root === undefined) return [];
+  const pattern = expandUserPath(root, env);
+  const [prefix, suffix] = basename(pattern).split("{profile}") as [string, string];
+  let found: string[];
+  try {
+    found = readdirSync(dirname(pattern), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+  return found.flatMap((folder): Target[] => {
+    if (!folder.startsWith(prefix) || !folder.endsWith(suffix)) return [];
+    const profile = folder.slice(prefix.length, folder.length - suffix.length);
+    if (!PROFILE.test(profile)) return [];
+    const base = toTarget(definition, env, origin);
+    return [
+      {
+        ...base,
+        // A profile is this machine's alone, so a project never installs into it.
+        kinds: Object.fromEntries(
+          Object.entries(base.kinds).map(([kind, mapping]) => [
+            kind,
+            mapping.shape === "contents" ? mapping : { ...mapping, scope: "user" },
+          ]),
+        ),
+        name: `${definition.id}:${profile}`,
+        displayName: `${definition.displayName} (${profile})`,
+        userRoot: join(dirname(pattern), folder),
+        envHome: undefined,
+        envWithin: undefined,
+      },
+    ];
+  });
+}
+
+/** The built-in harnesses and the ones your user scope defines, as data that crosses the daemon RPC. */
 export function resolveHarnesses(env: NodeJS.ProcessEnv = process.env): Harnesses {
+  const definitions = new Map<string, { definition: HarnessDefinition; origin: string }>();
+  for (const definition of BUILTIN_HARNESSES) {
+    definitions.set(definition.id, { definition, origin: BUILT_IN });
+  }
+  for (const file of loadHarnessFiles(env).files) {
+    definitions.set(file.definition.id, { definition: file.definition, origin: file.path });
+  }
   const out: Harnesses = {};
-  for (const input of BUILTIN_HARNESSES) {
-    const detect = input.detect ?? {};
-    out[input.id] = {
-      name: input.id,
-      displayName: input.displayName,
-      projectRoot: input.roots.project,
-      userRoot: expandUserPath(input.roots.user.default, env),
-      envHome: input.roots.user.env,
-      detect:
-        detect === "never"
-          ? "never"
-          : { env: detect.env ?? [], binary: detect.binary ?? [], paths: detect.paths ?? [] },
-      kinds: structuredClone(input.kinds),
-      reads: { ...input.reads },
-      shared: input.shared ?? false,
-    };
+  for (const { definition, origin } of definitions.values()) {
+    out[definition.id] = toTarget(definition, env, origin);
+    for (const instance of instancesOf(definition, env, origin)) out[instance.name] = instance;
   }
   return out;
 }
@@ -179,7 +266,10 @@ function detect(target: Target, cwd: string, env: NodeJS.ProcessEnv = process.en
   if (signals.binary.some((binary) => onPath(binary, env))) {
     return { target, detected: true, by: "binary" };
   }
-  const project = [target.projectRoot, ...signals.paths.filter((path) => !path.startsWith("~/"))];
+  const project = [
+    ...(signals.projectRoot === false ? [] : [target.projectRoot]),
+    ...signals.paths.filter((path) => !path.startsWith("~/")),
+  ];
   if (project.some((path) => existsSync(join(cwd, path)))) {
     return { target, detected: true, by: "project" };
   }
@@ -207,7 +297,8 @@ export function targetRoot(
 ): string {
   if (scope !== "user") return join(cwd, target.projectRoot);
   const override = target.envHome === undefined ? undefined : env[target.envHome]?.trim();
-  return override !== undefined && override !== "" ? resolve(override) : target.userRoot;
+  if (override === undefined || override === "") return target.userRoot;
+  return resolve(override, target.envWithin ?? "");
 }
 
 /** Undefined when the harness does not load that kind. */
@@ -227,6 +318,12 @@ export function projectionPath(
   const base = name.split("/").at(-1) ?? name;
   const leaf = mapping.shape === "file" ? `${base}${mapping.extension ?? ""}` : base;
   return join(targetRoot(target, scope, cwd, env), mapping.subdir, leaf);
+}
+
+/** The command a person runs before this harness loads a kind placed at `scope`, if any. */
+export function trustFor(target: Target, kind: ArtifactKind, scope: Scope): string | undefined {
+  const trust = target.trust[kind];
+  return trust === undefined || (trust.scope ?? scope) !== scope ? undefined : trust.run;
 }
 
 /** True when this harness loads a directory of artifacts as one plugin. */

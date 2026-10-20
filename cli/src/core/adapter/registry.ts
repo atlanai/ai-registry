@@ -162,18 +162,31 @@ export async function loadAdapters(): Promise<{
   return { loaded, broken };
 }
 
+const onHost = (host: string | undefined, candidates: readonly string[] | undefined) =>
+  candidates?.some(
+    (candidate) => host === candidate || host?.endsWith(`.${candidate}`) === true,
+  ) === true;
+
+/** A site claim takes a URL of its scheme unless its host or the end of its path is left out. */
+function onSite(dispatch: Dispatch, spec: string, scheme: string | undefined): boolean {
+  const sites = dispatch.sites;
+  if (sites === undefined || scheme === undefined || !sites.schemes.includes(scheme)) return false;
+  const { host } = urlParts(spec);
+  if (onHost(host, sites.exceptHosts)) return false;
+  const path = spec.replace(/[?#].*$/, "").replace(/\/+$/, "");
+  return !(sites.exceptSuffixes ?? []).some((suffix) => path.endsWith(suffix));
+}
+
 /**
- * Lower is more specific. A host claim beats a scheme claim, so a registry on
- * https wins over the general-purpose adapter that also speaks https.
+ * Lower is more specific. A host claim beats a site claim, which beats a scheme claim, so a
+ * registry on https wins over the general-purpose adapter that also speaks https.
  */
 function tier(dispatch: Dispatch, spec: string): number | undefined {
   if (isLocalPath(spec)) return dispatch.paths === true ? 0 : undefined;
   const { scheme, host } = urlParts(spec);
-  const claimed = dispatch.hosts?.some(
-    (candidate) => host === candidate || host?.endsWith(`.${candidate}`) === true,
-  );
-  if (host !== undefined && claimed === true) return 0;
-  if (scheme !== undefined && dispatch.schemes?.includes(scheme) === true) return 1;
+  if (host !== undefined && onHost(host, dispatch.hosts)) return 0;
+  if (onSite(dispatch, spec, scheme)) return 1;
+  if (scheme !== undefined && dispatch.schemes?.includes(scheme) === true) return 2;
   return undefined;
 }
 

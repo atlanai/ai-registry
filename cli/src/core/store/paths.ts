@@ -74,6 +74,11 @@ export function adaptersDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), "adapters");
 }
 
+/** Harness definitions of your own, one JSON file each. */
+export function harnessesDir(env: NodeJS.ProcessEnv = process.env): string {
+  return join(toolHome(env), "harnesses");
+}
+
 /**
  * Sibling of `adapters/<id>/<version>/`, never inside it: unpin deletes the
  * version directories only, and these files must survive a version swap.

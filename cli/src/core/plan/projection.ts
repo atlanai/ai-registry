@@ -1,7 +1,7 @@
 import { dirname, join, posix, resolve } from "node:path";
 import { sanitizeName } from "#adapter/text.ts";
 import { posixRelative } from "#core/fs/path.ts";
-import type { Render } from "#core/harness/contract.ts";
+import type { Codec } from "#core/harness/contract.ts";
 import {
   type Harnesses,
   placementFor,
@@ -11,9 +11,10 @@ import {
   takesPlugin,
 } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
+import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
-import type { Selected } from "./model.ts";
+import type { KeyRule, PluginDocument, Selected } from "./model.ts";
 
 export interface ProjectionOptions {
   roots: {
@@ -41,7 +42,40 @@ export interface PlannedLink {
   /** The plugin name, when it had to differ from the namespace it holds. */
   renamed?: { namespace: string; name: string };
   /** Written in the harness's own format. */
-  render?: Render;
+  codec?: Codec;
+  /** Written as a real folder holding this file. */
+  entry?: string;
+  /** Written as a real copy, for a harness that rewrites or refuses links. */
+  copy?: boolean;
+  /** A plugin's command, written as a skill a person invokes under this name. */
+  command?: string;
+  /** The plugin's own account of itself, for the manifests its projection gets. */
+  document?: PluginDocument;
+  /** The kind of the plugin part this places, where a harness takes the plugin as its parts. */
+  part?: ArtifactKind;
+  /** Front-matter keys a harness reading this folder does not read as written. */
+  keys?: Record<string, KeyRule>;
+}
+
+/** The key rules of every selected harness that reads `folder`. */
+function keysAt(
+  folder: string,
+  kind: ArtifactKind,
+  selected: readonly string[],
+  harnesses: Harnesses,
+): { keys?: Record<string, KeyRule> } {
+  const keys: Record<string, KeyRule> = {};
+  for (const reader of new Set(selected)) {
+    if (!readsFor(harnesses, reader, kind).includes(folder)) continue;
+    const target = harnesses[reader];
+    for (const [key, how] of Object.entries(target?.kinds[kind]?.keys ?? {})) {
+      const rule = keys[key] ?? { files: [], refusedBy: [] };
+      keys[key] = rule;
+      if (how === false) rule.refusedBy.push(target?.displayName ?? reader);
+      else if (!rule.files.some((file) => file.path === how.path)) rule.files.push(how);
+    }
+  }
+  return Object.keys(keys).length === 0 ? {} : { keys };
 }
 
 function plannedLink(
@@ -51,13 +85,15 @@ function plannedLink(
   options: ProjectionOptions,
   kind?: ArtifactKind,
 ): PlannedLink {
-  const render = kind === undefined ? undefined : options.harnesses[name]?.kinds[kind]?.render;
+  const mapping = kind === undefined ? undefined : options.harnesses[name]?.kinds[kind];
   return {
     harness: name,
     absolute: path,
     relative: posixRelative(options.roots.base, path),
     from,
-    ...(render === undefined ? {} : { render }),
+    ...(mapping?.codec === undefined ? {} : { codec: mapping.codec }),
+    ...(mapping?.entry === undefined ? {} : { entry: mapping.entry }),
+    ...(mapping?.place === "copy" ? { copy: true } : {}),
   };
 }
 
@@ -228,7 +264,9 @@ function pluginLink(
     ...plannedLink(name, container, dir, options),
     shared: true,
     content: namespaceDir(options.roots, item.source, namespace),
+    ...(item.plugin === undefined ? {} : { document: item.plugin }),
     ...(target.kinds.plugin?.place === "fan" ? { fan: true } : {}),
+    ...(target.kinds.plugin?.place === "copy" ? { copy: true } : {}),
     ...(plugin === namespace ? {} : { renamed: { namespace, name: plugin } }),
   };
 }
@@ -264,7 +302,15 @@ function pluginLinks(
         const path = projectionPath(target, leaf.kind, leaf.name, scope, cwd);
         if (path === undefined) continue;
         const from = join(copy, ...leaf.within.split(posix.sep));
-        links.push(plannedLink(name, path, from, options, leaf.kind));
+        const link = {
+          ...plannedLink(name, path, from, options, leaf.kind),
+          ...keysAt(name, leaf.kind, selected, options.harnesses),
+          part: leaf.kind,
+        };
+        links.push(
+          // A skill is a folder, so the command is written as one holding its SKILL.md.
+          leaf.command === true ? { ...link, entry: SKILL_ENTRY, command: leaf.name } : link,
+        );
       }
     }
   }
@@ -294,9 +340,10 @@ export function linksFor(
   for (const name of new Set(selected)) {
     const target = options.harnesses[name];
     if (target === undefined) continue;
-    // Its plugins carry only kinds it maps unrendered; the rest are placed flat or not at all.
+    // Its plugins carry only kinds it places as they are; the rest are placed flat or not at all.
     const mapping = target.kinds[item.kind];
-    if (!wrapped || !takesPlugin(target, scope) || mapping === undefined || mapping.render) {
+    const written = mapping?.codec !== undefined || mapping?.entry !== undefined;
+    if (!wrapped || !takesPlugin(target, scope) || mapping === undefined || written) {
       rest.push(name);
       continue;
     }
@@ -308,7 +355,11 @@ export function linksFor(
   for (const name of placed.targets) {
     const target = options.harnesses[name] as Harnesses[string];
     const own = projectionPath(target, item.kind, item.name, scope, cwd);
-    if (own !== undefined) links.push(plannedLink(name, own, copy, options, item.kind));
+    if (own === undefined) continue;
+    links.push({
+      ...plannedLink(name, own, copy, options, item.kind),
+      ...keysAt(name, item.kind, selected, options.harnesses),
+    });
   }
   return links;
 }

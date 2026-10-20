@@ -2,6 +2,7 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import type { PublishInput, SourceContext } from "#adapter/index.ts";
+import { skillsFolder } from "#test/kit/builders/layouts.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { connect } from "./connect.ts";
 
@@ -131,5 +132,34 @@ describe("local connect", () => {
       failure: "not_found",
       message: expect.stringContaining("does not exist"),
     });
+  });
+});
+
+describe("a local folder of skills", () => {
+  test("is read, named after the folder, with no versions", async ({ tmp }) => {
+    const kit = await skillsFolder(join(tmp, "kit")).skill("skills/pdf").write();
+    const handle = await connect(context(kit));
+    const resolution = await handle.resolve([]);
+    expect(resolution.layout).toBe("folder");
+    expect(resolution.artifacts.map((item) => [item.group, item.id, item.version])).toEqual([
+      ["kit", "skills/pdf", undefined],
+    ]);
+    await expect(handle.resolve([{ name: "pdf", version: "1.0.0" }])).rejects.toMatchObject({
+      adapter: "local",
+      failure: "invalid",
+      message:
+        "mine is a folder of skills, which has no versions, so pdf@1.0.0 cannot be installed.",
+    });
+  });
+
+  test("refuses a publish before writing anything", async ({ tmp }) => {
+    const kit = await skillsFolder(join(tmp, "kit")).skill("skills/pdf").write();
+    const handle = await connect(context(kit));
+    await expect(handle.publish?.([scout()], {})).rejects.toMatchObject({
+      adapter: "local",
+      message:
+        "mine is a folder of skills, not a registry, so aireg reads it but does not publish to it.",
+    });
+    await expect(readFile(join(kit, "index.json"))).rejects.toThrow(/ENOENT/);
   });
 });

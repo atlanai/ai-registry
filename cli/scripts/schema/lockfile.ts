@@ -98,6 +98,20 @@ const Artifact = Type.Object(
     version: Type.Optional(
       Type.String({ description: "What the registry published, where it has versions." }),
     ),
+    revision: Type.Optional(
+      Type.String({
+        pattern: "^[0-9a-f]{40}$",
+        description:
+          "The commit this artifact was read at, where it is its own, not its registry's.",
+      }),
+    ),
+    carried: Type.Optional(
+      Type.String({
+        pattern: "^sha256:[0-9a-f]{64}$",
+        description:
+          "A digest of what a plugin has a harness start, so a background job sees it change.",
+      }),
+    ),
     path: Type.Optional(
       Type.String({
         minLength: 1,

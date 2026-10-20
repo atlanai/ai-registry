@@ -42,14 +42,14 @@ In a project, `status` also warns about an artifact installed in both the projec
 ```json
 {"ok": true, "data": {
   "scope": "project",
-  "artifacts": [{"name": "engineering/pr-review", "state": "ok", "harnesses": {"agents": "linked", "claude": "linked"}}],
+  "artifacts": [{"name": "engineering/pr-review", "state": "ok", "harnesses": {"agents": "linked", "claude": "linked"}, "needsApproval": [{"harness": "tool", "run": "tool trust"}]}],
   "shadowed": [],
   "unmanaged": [{"name": "lint", "kind": "skill", "harnesses": ["claude"], "path": "/home/me/project/.claude/skills/lint"}],
   "dangling": [{"path": "/home/me/project/.claude/agents/old.md", "target": "/home/me/agents/old.md", "harness": "claude"}]
 }}
 ```
 
-In JSON, `harnesses` is keyed by folder, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's path, the target it names, as written, and its harness.
+In JSON, `harnesses` is keyed by folder, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's path, the target it names, as written, and its harness. `needsApproval` lists each harness that loads the artifact only after a [trust step](harnesses.md#trust-and-reload-steps), with the command to run; aireg never runs it.
 
 ## Exit status
 

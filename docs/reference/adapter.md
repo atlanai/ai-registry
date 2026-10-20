@@ -13,7 +13,7 @@ aireg adapter init <id> [--dir <folder>] [--dry-run] [--force]
 
 ## Description
 
-An adapter is how aireg reads a kind of registry. Two are built in: `git` reads a registry in a git repository, and `local` reads one in a folder. Any other adapter is a module aireg loads from `~/.aireg/config.yml`, never from a project's manifest; a manifest names an adapter only by its id.
+An adapter is how aireg reads a kind of registry. Three are built in: `git` reads a registry in a git repository, `local` reads one in a folder, and `well-known` reads a site's Agent Skills index. Any other adapter is a module aireg loads from `~/.aireg/config.yml`, never from a project's manifest; a manifest names an adapter only by its id.
 
 aireg installs adapters as signed releases that it verifies against its release server's keys. `aireg adapter init` writes a new adapter package to develop, test and contribute.
 
@@ -65,11 +65,11 @@ The package imports the adapter contract from `@atlanai/aireg`: `defineAdapter`,
 | `--dry-run` | Print what would be written without writing it. |
 | `--force` | Overwrite the folder if it exists. |
 
-An id that is built in, `git` or `local`, is refused.
+An id that is built in, `git`, `local` or `well-known`, is refused.
 
 ### Writing an adapter
 
-- `dispatch` in `src/index.ts` names the hosts, URL schemes or local paths whose addresses aireg would send to the adapter.
+- `dispatch` in `src/index.ts` names the hosts, URL schemes, sites or local paths whose addresses aireg would send to the adapter.
 - `connect` in `src/connect.ts` returns a handle. `resolve` lists each artifact with the file list that describes it, and `fetch` returns one file's bytes, which must match the digest that list gives.
 - `capabilities` turns on publishing and sign-in.
 
@@ -82,7 +82,7 @@ Everything `@atlanai/aireg` exports is the contract, and every export carries it
 | `id`, `displayName` | The id a manifest names the adapter by, and what messages call it. |
 | `protocol` | The contract version, `ADAPTER_PROTOCOL`. `defineAdapter` fills it in. |
 | `artifactKinds`, `publishKinds` | The kinds it serves, and the narrower set it publishes, if any. |
-| `dispatch` | The URL schemes, hosts and local paths whose addresses aireg sends to it. |
+| `dispatch` | The URL schemes, hosts and local paths whose addresses aireg sends to it, and `sites`: URLs of some schemes on any host but those it leaves out. A host claim wins over a site claim, which wins over a scheme claim. |
 | `capabilities` | `pinsSource`, `publish`, `auth`, `messages`, `fileSpec` and `namespacePlugins`. Anything left out is off. With `namespacePlugins`, each namespace the source lists installs as one plugin in your user scope, named after it, while each artifact keeps a lockfile row of its own. |
 | `configSchema` | The keys a registry's `config:` may carry for it. |
 | `auth` | `login`, and optionally `refresh` and `revoke`. `login` returns a `Credential` and, when the registry says who signed in, an `Identity`: a `name` and an optional `account`. |

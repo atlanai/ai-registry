@@ -1,10 +1,5 @@
 import { defineHarness } from "#core/harness/contract.ts";
 
-const PLUGIN_BODY = {
-  interface: { displayName: "{name}", shortDescription: "{description}" },
-  skills: "./skills/",
-};
-
 export const codex = defineHarness({
   id: "codex",
   displayName: "Codex",
@@ -25,14 +20,13 @@ export const codex = defineHarness({
       subdir: "plugins/cache/{source}/{name}/local",
       scope: "user",
       place: "fan",
+      // Only this manifest: under a portable root `plugin.json`, Codex skips linked skills.
       manifest: [
-        { path: ".codex-plugin/plugin.json", body: PLUGIN_BODY },
-        // The portable manifest, which Codex reads only under this schema.
         {
-          path: "plugin.json",
+          path: ".codex-plugin/plugin.json",
           body: {
-            $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-            ...PLUGIN_BODY,
+            interface: { displayName: "{name}", shortDescription: "{description}" },
+            skills: "./skills/",
           },
         },
       ],
@@ -43,6 +37,7 @@ export const codex = defineHarness({
           at: ["plugins", "{name}@{source}"],
           value: { enabled: true },
           off: { enabled: false },
+          init: {},
         },
         // A plugin loads only through a marketplace, so each source is one,
         // pointed at its own cache.
@@ -51,6 +46,7 @@ export const codex = defineHarness({
           format: "toml",
           at: ["marketplaces", "{source}"],
           value: { source_type: "local", source: "{root}/plugins/cache/{source}" },
+          init: {},
           conflict: "keep",
           remove: "entry",
         },
@@ -67,13 +63,30 @@ export const codex = defineHarness({
       ],
     },
     // What its plugins carry; outside a plugin Codex reads skills from `.agents/skills`.
-    skill: { shape: "directory", subdir: "skills" },
-    // Codex reads an agent only as TOML, and refuses to run a linked one.
+    skill: {
+      shape: "directory",
+      subdir: "skills",
+      // Codex reads this policy, not the front-matter key, to wait for a person.
+      keys: {
+        "disable-model-invocation": {
+          path: "agents/openai.yaml",
+          body: { policy: { allow_implicit_invocation: false } },
+        },
+      },
+    },
+    // Codex reads an agent only as TOML, so each is written in its format.
     agent: {
       shape: "file",
       subdir: "agents",
       extension: ".toml",
-      render: { format: "toml", fields: ["name", "description"], body: "developer_instructions" },
+      codec: {
+        id: "frontmatter-toml",
+        fields: ["name", "description"],
+        body: "developer_instructions",
+      },
     },
   },
+  verified: { command: ["codex", "--version"], range: "0.162.1" },
+  // A project's `.codex` folder, agents included, loads only once Codex trusts the project.
+  trust: { agent: { run: "codex", scope: "project" } },
 });

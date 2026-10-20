@@ -10,7 +10,7 @@ import { ExitCode } from "#core/errors.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import { type Manifest, pinOf } from "#core/manifest.ts";
 import { abbreviate, type Printer, sentence } from "#core/output.ts";
-import { type Request, wanted } from "#core/plan/acquire.ts";
+import { type Request, recordedAdapter, wanted } from "#core/plan/acquire.ts";
 import { listedAt } from "#core/plan/model.ts";
 import { excluded } from "#core/plan/select.ts";
 import type { Ref } from "#core/ref.ts";
@@ -84,7 +84,7 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
   try {
     const credential = await credentialFor(alias, declared, location);
     const open = await connectSource(
-      { alias, location, adapter: declared.adapter, config: declared.config },
+      { alias, location, adapter: recordedAdapter(declared, lock, alias), config: declared.config },
       credential === undefined ? {} : { credential },
     );
     try {
@@ -96,7 +96,7 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
             item.path,
             {
               contentId: contentDigest(item.artifact.envelope),
-              version: item.artifact.envelope.metadata.version,
+              version: item.artifact.version ?? item.artifact.envelope.metadata.version,
               name: item.artifact.envelope.metadata.name,
               namespace: item.artifact.envelope.metadata.namespace,
             },
@@ -187,10 +187,17 @@ function additions(manifest: Manifest, lock: Lock, heads: Map<string, Head>): Ro
         .filter((entry) => entry.registry === alias)
         .map((entry) => listedAt(entry, found.entries)),
     );
+    // A plugin's skills and agents install with it, so only the plugin can be new.
+    const plugins = new Set(
+      found.entries.filter((item) => item.kind === "plugin").map((item) => item.name),
+    );
     for (const [address, upstream] of found.byAddress) {
       if (locked.has(address)) continue;
       const namespace = upstream.namespace;
       const entry = found.entries.find((item) => item.path === address);
+      if (entry?.kind !== "plugin" && entry?.group !== undefined && plugins.has(entry.group)) {
+        continue;
+      }
       // Covered as install reads it: by a whole entry that doesn't leave it out.
       const covered = refs.some(
         (ref) =>

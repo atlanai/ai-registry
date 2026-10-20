@@ -124,6 +124,17 @@ describe("wanted", () => {
     });
   });
 
+  it("asks a marketplace for a plugin by name, since its parts come with it", () => {
+    const plugins = parseManifest(
+      "registries:\n  acme: { source: github.com/acme/plugins, layout: marketplace }\nartifacts:\n  - acme/docs-kit\n",
+    );
+    expect(wanted(plugins, "acme")).toEqual({
+      want: [{ name: "docs-kit", kind: "plugin" }],
+      all: false,
+    });
+    expect(wanted(manifest(["acme/platform"]), "acme")?.all).toBe(true);
+  });
+
   it("is undefined for a registry the manifest takes nothing from", () => {
     expect(wanted(manifest(["acme/platform"]), "other")).toBeUndefined();
   });
@@ -163,6 +174,26 @@ describe("acquire, held to the lock", () => {
       want: [exact("lint", "1.0.0"), exact("test", "2.0.0")],
       all: false,
     });
+  });
+
+  it("moves a marketplace plugin by name, never by reading the whole marketplace", async () => {
+    const lock = locked({});
+    lock.registries.acme = {
+      ...(lock.registries.acme as Lock["registries"][string]),
+      config: { layout: "marketplace" },
+    };
+    lock.artifacts["docs-kit"] = {
+      ...(locked({ x: "1.0.0" }).artifacts["platform/x"] as Lock["artifacts"][string]),
+      id: "plugins/docs-kit",
+      name: "docs-kit",
+      kind: "plugin",
+      namespace: undefined,
+    };
+    const plugins = parseManifest(
+      "registries:\n  acme: { source: github.com/acme/registry, layout: marketplace }\nartifacts:\n  - acme/docs-kit\n",
+    );
+    const request = await requested(plugins, lock, new Set(["docs-kit"]));
+    expect(request).toEqual({ want: [{ name: "docs-kit", kind: "plugin" }], all: false });
   });
 
   it("asks again for the rows a run moves, and for the whole namespace once all of it moves", async () => {

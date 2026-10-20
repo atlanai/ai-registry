@@ -5,7 +5,7 @@ Declare the registries you install from, or create and check one of your own.
 ## Synopsis
 
 ```text
-aireg registry add <address> [--as <name>] [--ref <ref>] [--path <folder>] [--adapter <id>] [--config <key>=<value>]... [-g] [--dry-run]
+aireg registry add <address> [--as <name>] [--ref <ref>] [--path <folder>] [--adapter <id>] [--layout <layout>] [--config <key>=<value>]... [-g] [--dry-run]
 aireg registry list [-g]
 aireg registry show [<registry>] [-g]
 aireg registry remove <registry> [-g] [--dry-run]
@@ -28,9 +28,12 @@ The last three actions work on a registry you publish: a folder, usually a git r
 A registry's address is where it lives. It can be:
 
 - a GitHub repository, such as `github.com/acme/ai-registry`
-- a git URL, such as `https://github.com/acme/ai-registry.git` or `ssh://git@github.com/acme/ai-registry.git`, over `https`, `ssh` or `file`. A `git://` or plain `http://` address is refused, since neither has transport security; `http://` is allowed only on this machine, such as `http://localhost:8080/acme`.
+- a git URL, such as `https://github.com/acme/ai-registry.git` or `ssh://git@github.com/acme/ai-registry.git`, over `https`, `ssh` or `file`. On a host other than GitHub, GitLab or Bitbucket, an `https` address that doesn't end in `.git` is read as a site instead; pass `--adapter git` to read it as a repository. A `git://` or plain `http://` address is refused, since neither has transport security; `http://` is allowed only on this machine, such as `http://localhost:8080/acme`.
+- a site's web address, such as `https://example.com`, read as its Agent Skills index; see [Sources that are not registries](add.md#sources-that-are-not-registries)
 - a link to a folder in a GitHub repository, such as `https://github.com/acme/ai-registry/tree/main/registries/platform`, which sets the branch and folder for you
 - a folder on this machine, such as `../acme-registry` or `~/registries/acme`. A relative path is recorded relative to the project.
+
+Any of them can also be a plugin marketplace, or a folder or repository of skills and agents, with no `registry.json`, which aireg reads but never publishes to; see [Sources that are not registries](add.md#sources-that-are-not-registries).
 
 ## Options
 
@@ -46,6 +49,7 @@ Declares a registry. aireg reads it first, to check it can, then records it in t
 | `--ref <ref>` | For a git registry, the branch, tag or commit to read. |
 | `--path <folder>` | For a git registry, the folder in the repository that holds the registry. |
 | `--adapter <id>` | The adapter that reads the registry, when aireg can't tell from the address. Recorded in the manifest. |
+| `--layout <layout>` | How to read the source, `registry`, `marketplace`, `well-known` or `folder`, instead of telling from what it holds. Recorded in the manifest. |
 | `--config <key>=<value>` | A setting for that adapter, recorded with the registry in the manifest. Repeat it for more than one. A setting the adapter doesn't take is refused: git takes `ref` and `path`, and a local folder takes none. |
 | `-g` | Declare it in your user scope. Outside a project, the user scope is used anyway, and aireg says so. |
 | `--dry-run` | Print what would be declared, and change nothing. |
@@ -66,9 +70,9 @@ JSON output: `{"ok": true, "data": {"scope": "project", "registries": [{"registr
 
 Prints what a registry publishes, without installing anything: its name, with the commit for a git registry, its address, its layout and how many artifacts it holds, then each artifact with its kind and description.
 
-The argument is an address or a declared name. With no argument, `show` describes the only registry declared, or the registry you are in when none is declared. The `--ref`, `--path`, `--adapter` and `--config` options of `registry add` also work here, to look at another branch or folder or read through another adapter.
+The argument is an address or a declared name. With no argument, `show` describes the only registry declared, or the registry you are in when none is declared. The `--ref`, `--path`, `--adapter`, `--layout` and `--config` options of `registry add` also work here, to look at another branch or folder or read through another adapter.
 
-JSON output: `{"ok": true, "data": {"registry": "acme", "address": "...", "revision": "...", "layouts": ["git"], "entries": [...], "warnings": [...]}}`. `revision` is the commit read, for a git registry only. `layouts` names how the registry was read, such as `git` or `local` for a folder. Each entry has its `name`, `kind`, `namespace`, `path` and `description`, the `version` the registry serves, which `@<version>` pins, and `engine` when the artifact names the oldest aireg that can install it, in `engines.aireg` in its front matter.
+JSON output: `{"ok": true, "data": {"registry": "acme", "address": "...", "revision": "...", "layouts": ["git"], "entries": [...], "warnings": [...]}}`. `revision` is the commit read, for a git registry only. `layouts` names how the registry was read, such as `git` or `local` for a folder, and `layout` is `marketplace`, `well-known` or `folder` for a source that is not a registry. Each entry has its `name`, `kind`, `namespace`, `path` and `description`, the `version` the registry serves, which `@<version>` pins, and `engine` when the artifact names the oldest aireg that can install it, in `engines.aireg` in its front matter.
 
 ## aireg registry remove
 

@@ -12,6 +12,7 @@ vi.mock("./resolve.ts", () => ({
 }));
 vi.mock("./snapshot.ts", () => ({
   snapshot: async () => ({ root: snapshotRoot.root, commit: "a".repeat(40) }),
+  holdSnapshot: () => () => {},
 }));
 
 let home: string;

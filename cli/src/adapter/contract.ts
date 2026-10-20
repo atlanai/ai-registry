@@ -1,6 +1,7 @@
 import type { AdapterConfigSchema } from "./config.ts";
 import type { Credential } from "./credential.ts";
 import type { ArtifactKind } from "./kinds.ts";
+import type { LayoutId } from "./layouts/ids.ts";
 import type { Envelope } from "./spec/types.ts";
 
 /** The contract version this package defines; aireg loads only an adapter that declares it. */
@@ -39,8 +40,20 @@ export interface Artifact {
   engines?: { aireg?: string } | undefined;
   /** One per `envelope.files` entry, by path. */
   files: readonly FileRef[];
+  /**
+   * The version the source serves this at, where the envelope cannot say it: a git source's
+   * tag or pseudo-version. Outside the envelope, so it never changes the content digest.
+   */
+  version?: string | undefined;
+  /** The commit this one artifact was read at, where it is not the source's own, as for a plugin a marketplace fetches. */
+  revision?: string | undefined;
   /** Set when the version was withdrawn, which only a pin still resolves. */
   yanked?: { reason: string | undefined } | undefined;
+  /**
+   * The version's status where it installs with a warning, such as `deprecated`, or a `draft`
+   * only a pin reaches, with the registry's reason. Absent is `active`.
+   */
+  status?: { name: string; reason: string | undefined } | undefined;
 }
 
 /** How a registry names and describes itself, from its discovery document. */
@@ -63,6 +76,10 @@ export interface Resolution {
   registry?: RegistryIdentity | undefined;
   /** Artifacts a want reached that the registry's status rules kept back, rather than unpublished. */
   withheld?: readonly Withheld[] | undefined;
+  /** What a person should know about how the source was read, one sentence each. */
+  warnings?: readonly string[] | undefined;
+  /** How the source lays out what it holds, where the adapter reads more than one way. */
+  layout?: LayoutId | undefined;
 }
 
 /** An artifact whose version is not installable as asked, such as a blocked one or an unpinned draft. */
@@ -88,6 +105,8 @@ export interface Want {
   namespace?: string | undefined;
   /** Narrows the want to one kind, as `namespace` narrows it to one namespace. */
   kind?: ArtifactKind | undefined;
+  /** The commit a lockfile recorded for this artifact alone, which reads it again there. */
+  revision?: string | undefined;
 }
 
 /** Whether a want reaches an artifact: by name, narrowed by the namespace and kind it gives. */
@@ -157,6 +176,18 @@ export interface Dispatch {
   hosts?: readonly string[];
   /** Whether the adapter reads a folder on this machine. */
   paths?: boolean;
+  /**
+   * Web addresses on any host but those listed, such as a site's own: narrower than a scheme
+   * claim, so it wins over an adapter that takes the scheme alone.
+   */
+  sites?: SiteClaim;
+}
+
+/** A claim on URLs by scheme, leaving out hosts, with their subdomains, and path endings. */
+export interface SiteClaim {
+  schemes: readonly string[];
+  exceptHosts?: readonly string[];
+  exceptSuffixes?: readonly string[];
 }
 
 /** The registry a connection is for, as the manifest declares it. */

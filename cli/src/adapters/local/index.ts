@@ -10,7 +10,7 @@ export default defineAdapter({
   // of a namespace rather than a kind a root stores.
   publishKinds: ["skill", "agent"],
   dispatch: { paths: true },
-  configSchema: { properties: {} },
+  configSchema: { properties: { layout: { type: "string" } } },
   capabilities: { pinsSource: false, publish: true, auth: false, fileSpec: true },
   connect,
 });

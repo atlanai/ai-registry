@@ -57,8 +57,13 @@ class RegistryBuilder {
 
   /** Blocks a version already published here, which nothing then installs. */
   block(ref: string, reason?: string): this {
+    return this.status(ref, "blocked", reason);
+  }
+
+  /** Sets a version's status in `versions.json`, as a status change in a pull request does. */
+  status(ref: string, status: string, reason?: string): this {
     const version = this.#version(ref);
-    version.status = "blocked";
+    version.status = status;
     if (reason !== undefined) version.reason = reason;
     return this;
   }

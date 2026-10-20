@@ -18,6 +18,8 @@ An artifact pinned to a version, such as `acme/engineering/pr-review@1.2.0`, sta
 
 When the manifest takes a whole namespace, `update` also installs the artifacts the namespace has published since.
 
+An installed artifact that its registry no longer lists stays installed: `update` takes everything else, then fails, naming it and the `aireg remove <name>` that takes it out.
+
 `update` doesn't overwrite your edits. To take the registry's copy over your edit, run [`aireg sync resolve <name> --theirs`](sync.md#aireg-sync-resolve). To discard edits made here, run [`aireg install --force`](install.md).
 
 ## Options
@@ -43,7 +45,7 @@ The fields are those of [`aireg add`](add.md#json-output).
 ## Exit status
 
 - `0`: updated, or already up to date.
-- `1`: a name isn't installed, a registry can't be read, or a file doesn't match what its version describes.
+- `1`: a name isn't installed, a registry can't be read, a registry no longer lists an installed artifact, or a file doesn't match what its version describes.
 - `2`: `--force` was passed, run outside a project without `-g`, or an artifact's name is taken and `defaults.name-collision` is `fail`.
 - `3`: `--frozen` was passed and the update would change the lockfile or the manifest, or an artifact wasn't installed because its name is taken and `defaults.name-collision` is `report`.
 

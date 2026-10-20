@@ -1,138 +1,7 @@
-import { isAbsolute } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type ArtifactKind, KINDS } from "#core/kinds.ts";
 import { BUILTIN_HARNESSES } from "#harnesses/index.ts";
-import type { ConfigValue, HarnessDefinition, KindMapping, RegisterEntry } from "./contract.ts";
-import { templateVars } from "./template.ts";
-
-/** Every `{var}` a definition may use, by where it is used. */
-const TEMPLATE_VARS = {
-  /** A kind's `subdir`. */
-  placement: ["name", "source"],
-  /** A plugin manifest's body. */
-  manifest: ["name", "description"],
-  /** A register entry: what its placement's path carries, and the harness root. */
-  register: ["name", "source", "root"],
-} as const;
-
-/**
- * What types cannot say: ids that resolve, templates that use only the
- * variables their place fills, and paths that stay inside their root.
- */
-function harnessProblems(definitions: readonly HarnessDefinition[]): string[] {
-  const problems: string[] = [];
-  const byId = new Map<string, HarnessDefinition>();
-  for (const definition of definitions) {
-    if (byId.has(definition.id)) problems.push(`${definition.id} is defined twice.`);
-    byId.set(definition.id, definition);
-  }
-  for (const definition of definitions) {
-    const report = (problem: string) => problems.push(`${definition.id}: ${problem}`);
-    if (!/^[a-z][a-z0-9-]{0,63}$/.test(definition.id)) report("the id is not a lowercase name.");
-    if (!definition.roots.user.default.startsWith("~/")) report("the user root is not under ~/.");
-    for (const path of [definition.roots.project, definition.roots.user.default.slice(2)]) {
-      pathProblem(path, [], report);
-    }
-    for (const kind of KINDS) {
-      const mapping = definition.kinds[kind];
-      if (mapping !== undefined) mappingProblems(kind, mapping, report);
-      for (const read of definition.reads?.[kind] ?? [])
-        readProblem(kind, byId.get(read), read, report);
-    }
-  }
-  return problems;
-}
-
-function readProblem(
-  kind: ArtifactKind,
-  found: HarnessDefinition | undefined,
-  read: string,
-  report: (problem: string) => void,
-) {
-  if (found === undefined) report(`reads.${kind} names ${read}, which is not a harness.`);
-  else if (found.kinds[kind] === undefined) {
-    report(`reads.${kind} names ${read}, which places no ${kind}.`);
-  }
-}
-
-function mappingProblems(kind: string, mapping: KindMapping, report: (problem: string) => void) {
-  if (mapping.shape === "contents") return;
-  pathProblem(mapping.subdir, TEMPLATE_VARS.placement, report);
-  for (const entry of mapping.manifest ?? []) {
-    pathProblem(entry.path, [], report);
-    valueProblems(entry.body ?? {}, TEMPLATE_VARS.manifest, report);
-  }
-  // A register entry can use only what its placement path carries, and the root.
-  const carried = templateVars(mapping.subdir);
-  if (!mapping.subdir.includes("{")) carried.push("name");
-  const usable = TEMPLATE_VARS.register.filter((name) => name === "root" || carried.includes(name));
-  for (const entry of mapping.register ?? []) {
-    registerProblems(kind, entry, usable, report);
-  }
-  // Written unquoted, so each key must be a bare one.
-  for (const key of [...(mapping.render?.fields ?? []), mapping.render?.body ?? "body"]) {
-    if (!/^[A-Za-z0-9_-]+$/.test(key)) report(`${kind} renders ${key}, which is not a bare key.`);
-  }
-}
-
-function registerProblems(
-  kind: string,
-  entry: RegisterEntry,
-  vars: readonly string[],
-  report: (problem: string) => void,
-) {
-  pathProblem(
-    entry.file,
-    vars.filter((name) => name !== "root"),
-    report,
-  );
-  if (entry.at.length === 0) report(`kinds.${kind}: a register entry names no table.`);
-  for (const key of entry.at) templateProblems(key, vars, report);
-  for (const value of [entry.value, entry.off, entry.init])
-    valueProblems(value ?? {}, vars, report);
-  if (entry.upsert !== undefined) {
-    if (entry.format !== "json") report(`kinds.${kind}: upsert needs a JSON file.`);
-    if (entry.upsert.item[entry.upsert.key] === undefined) {
-      report(`kinds.${kind}: an upsert item must set ${entry.upsert.key}.`);
-    }
-    valueProblems(entry.upsert.item, vars, report);
-  }
-  if (entry.init !== undefined && entry.format !== "json") {
-    report(`kinds.${kind}: init is for JSON files.`);
-  }
-}
-
-function pathProblem(path: string, vars: readonly string[], report: (problem: string) => void) {
-  if (path === "" || isAbsolute(path) || path.split("/").includes("..")) {
-    report(`${path} is not a path inside its root.`);
-  }
-  templateProblems(path, vars, report);
-}
-
-function templateProblems(
-  text: string,
-  vars: readonly string[],
-  report: (problem: string) => void,
-) {
-  for (const name of templateVars(text)) {
-    if (!vars.includes(name)) report(`${text} uses {${name}}, which nothing fills there.`);
-  }
-}
-
-function valueProblems(
-  value: ConfigValue,
-  vars: readonly string[],
-  report: (problem: string) => void,
-) {
-  if (typeof value === "string") templateProblems(value, vars, report);
-  else if (Array.isArray(value)) for (const item of value) valueProblems(item, vars, report);
-  else if (typeof value === "object") {
-    for (const [key, item] of Object.entries(value)) {
-      templateProblems(key, vars, report);
-      valueProblems(item, vars, report);
-    }
-  }
-}
+import { harnessProblems } from "./check.ts";
+import type { HarnessDefinition, KindMapping } from "./contract.ts";
 
 describe("built-in harnesses", () => {
   it("resolve every id they name, fill every template, and stay in their roots", () => {
@@ -178,7 +47,64 @@ describe("harnessProblems", () => {
       [harness({ roots: { project: "../tool", user: { default: "~/.tool" } } })],
       /inside its root/,
     ],
+    [
+      "a key's file outside the artifact's folder, or in a format aireg does not write",
+      [
+        harness({
+          kinds: {
+            skill: {
+              shape: "directory",
+              subdir: "skills",
+              keys: { a: { path: "../a.yaml", body: {} }, b: { path: "b.toml", body: {} } },
+            },
+          },
+        }),
+      ],
+      /inside its root[\s\S]*not a \.json or \.yaml file/,
+    ],
     ["a variable a placement does not fill", [plugin({ subdir: "plugins/{owner}" })], /\{owner\}/],
+    [
+      "a codec on a folder with no entry file",
+      [plugin({ codec: { id: "frontmatter-strict", keep: ["name"] } })],
+      /needs an entry file/,
+    ],
+    [
+      "an entry for a kind that is a folder",
+      [harness({ kinds: { skill: { shape: "directory", subdir: "skills", entry: "SKILL.md" } } })],
+      /entry is for a kind that is one file/,
+    ],
+    [
+      "a shared folder that is detected",
+      [harness({ kind: "shared", detect: { binary: ["tool"] } })],
+      /never detected/,
+    ],
+    [
+      "both a render and a codec",
+      [
+        harness({
+          kinds: {
+            agent: {
+              shape: "file",
+              subdir: "agents",
+              extension: ".toml",
+              codec: { id: "frontmatter-toml", fields: ["name"], body: "body" },
+              render: { format: "toml", fields: ["name"], body: "body" },
+            },
+          },
+        }),
+      ],
+      /set codec alone/,
+    ],
+    [
+      "profiles that are every folder in the home folder",
+      [harness({ instances: { root: "~/{profile}" } })],
+      /every folder in your home folder/,
+    ],
+    [
+      "profiles named outside the last segment",
+      [harness({ instances: { root: "~/.tool/{profile}/home" } })],
+      /only in its last segment/,
+    ],
     [
       "a register variable its placement does not carry",
       [
@@ -216,7 +142,7 @@ describe("harnessProblems", () => {
           ],
         }),
       ],
-      /init is for JSON/,
+      /its init is \{\}/,
     ],
   ])("reports %s", (_, definitions, problem) => {
     expect(harnessProblems(definitions).join("\n")).toMatch(problem);

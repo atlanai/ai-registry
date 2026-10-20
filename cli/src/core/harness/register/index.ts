@@ -17,7 +17,7 @@ import {
   placementTemplate,
   type Vars,
 } from "#core/harness/template.ts";
-import { type ConfigDocument, jsonDocument, tomlDocument } from "./document.ts";
+import { type ConfigDocument, jsonDocument, tomlDocument, yamlDocument } from "./document.ts";
 
 /** A path an apply linked or unlinked. A link names its harness; a removal does not know it. */
 export interface Touched {
@@ -55,7 +55,9 @@ class Files {
     const doc =
       entry.format === "toml"
         ? tomlDocument(before ?? "", path)
-        : jsonDocument(before, init ?? {}, path);
+        : entry.format === "yaml"
+          ? yamlDocument(before, init ?? {}, path)
+          : jsonDocument(before, init ?? {}, path);
     this.#open.set(path, { doc, before, baseline: doc.render(), init, stop });
     return doc;
   }
@@ -81,6 +83,33 @@ interface Group {
   absent: Map<string, Vars>;
 }
 
+/**
+ * One shared list item, marked as aireg's: there while any placement needs it, and gone with
+ * the last. An item a person wrote is theirs, and stays.
+ */
+function append(
+  entry: RegisterEntry & { append: string },
+  doc: ConfigDocument,
+  group: Group,
+): void {
+  const vars = first(group);
+  const at = entry.at.map((key) => expand(key, vars));
+  const value = expand(entry.append, vars);
+  if (group.present.size > 0) {
+    doc.addMarked(at, value);
+    return;
+  }
+  if (!doc.dropMarked(at, value) || (doc.list(at) ?? []).length > 0) return;
+  // A list this emptied goes, with any table it left empty.
+  doc.drop(at);
+  for (let depth = at.length - 1; depth > 0; depth--) {
+    const parent = at.slice(0, depth);
+    const table = doc.table(parent);
+    if (table === undefined || Object.keys(table).length > 0) break;
+    doc.drop(parent);
+  }
+}
+
 function identity(entry: RegisterEntry, vars: Vars): string {
   const { upsert: _, ...shared } = entry;
   return JSON.stringify(expandValue(shared as unknown as ConfigValue, vars));
@@ -90,29 +119,42 @@ function first(group: Group): Vars {
   return ([...group.present.values()][0] ?? [...group.absent.values()][0]) as Vars;
 }
 
+/** One item per placement in a list, matched on `key`; a person's other items stay. */
+function upsert(
+  { key, item }: NonNullable<RegisterEntry["upsert"]>,
+  doc: ConfigDocument,
+  group: Group,
+  at: string[],
+): void {
+  const before = doc.list(at);
+  const items = [...(before ?? [])];
+  const keyOf = (each: unknown) => (each as Record<string, unknown> | null)?.[key];
+  for (const each of group.absent.values()) {
+    const gone = expandValue(item, each)[key];
+    const index = items.findIndex((found) => keyOf(found) === gone);
+    if (index >= 0) items.splice(index, 1);
+  }
+  const wanted = [...group.present.values()]
+    .map((each) => expandValue(item, each))
+    .sort((a, b) => String(a[key]).localeCompare(String(b[key])));
+  for (const want of wanted) {
+    const index = items.findIndex((found) => keyOf(found) === want[key]);
+    if (index >= 0) items[index] = want;
+    else items.push(want);
+  }
+  if (before !== undefined || items.length > 0) doc.setList(at, items);
+}
+
 /** Brings one entry in line with its placements; true when it is left to a person. */
 function edit(entry: RegisterEntry, doc: ConfigDocument, group: Group): boolean {
+  if (entry.append !== undefined) {
+    append(entry, doc, group);
+    return false;
+  }
   const vars = first(group);
   const at = entry.at.map((key) => expand(key, vars));
   if (entry.upsert !== undefined) {
-    const { key, item } = entry.upsert;
-    const before = doc.list(at);
-    const items = [...(before ?? [])];
-    const keyOf = (each: unknown) => (each as Record<string, unknown> | null)?.[key];
-    for (const each of group.absent.values()) {
-      const gone = expandValue(item, each)[key];
-      const index = items.findIndex((found) => keyOf(found) === gone);
-      if (index >= 0) items.splice(index, 1);
-    }
-    const wanted = [...group.present.values()]
-      .map((each) => expandValue(item, each))
-      .sort((a, b) => String(a[key]).localeCompare(String(b[key])));
-    for (const want of wanted) {
-      const index = items.findIndex((found) => keyOf(found) === want[key]);
-      if (index >= 0) items[index] = want;
-      else items.push(want);
-    }
-    if (before !== undefined || items.length > 0) doc.setList(at, items);
+    upsert(entry.upsert, doc, group, at);
     return false;
   }
 
@@ -137,11 +179,14 @@ function edit(entry: RegisterEntry, doc: ConfigDocument, group: Group): boolean 
 async function ours(
   placements: readonly PlacedPath[],
   scopeDir: string,
+  copies: ReadonlySet<string>,
 ): Promise<Map<string, Vars>> {
   const out = new Map<string, Vars>();
   for (const placement of placements) {
     const state = await inspect(placement.path);
-    if (state.isLink && state.target !== undefined && isWithin(scopeDir, resolve(state.target))) {
+    const linked =
+      state.isLink && state.target !== undefined && isWithin(scopeDir, resolve(state.target));
+    if (linked || (state.exists && !state.isLink && copies.has(placement.path))) {
       out.set(placement.path, { ...placement.vars, root: placement.root });
     }
   }
@@ -215,7 +260,7 @@ async function registerMapping(
   harness: string,
   mapping: KindMapping,
   touched: readonly Touched[],
-  scopeDir: string,
+  owned: { scopeDir: string; copies: ReadonlySet<string> },
   files: Files,
 ): Promise<Kept[]> {
   const template = placementTemplate(mapping);
@@ -224,7 +269,9 @@ async function registerMapping(
   const pattern = placementPattern(template);
   const kept: Kept[] = [];
   for (const [root, paths] of touchedByRoot(touched, harness, pattern)) {
-    const members = await ours(await pattern.scan(root), scopeDir);
+    // Only a kind placed as copies by design: a `--copy` install is not registered.
+    const copies = mapping.place === "copy" ? owned.copies : new Set<string>();
+    const members = await ours(await pattern.scan(root), owned.scopeDir, copies);
     // A link kept back for a person's own folder is theirs to register.
     for (const touch of touched) {
       if (touch.harness !== undefined && !members.has(touch.path)) paths.delete(touch.path);
@@ -239,19 +286,22 @@ async function registerMapping(
 
 /**
  * Writes a harness's config entry while a placement of ours needs it and removes it with the
- * last one. Only a link into `scopeDir`, the scope's `.registry` folder, counts as ours.
+ * last one. Only a link into `scopeDir`, the scope's `.registry` folder, or one of `copies`, the
+ * copies the lockfile records, counts as ours.
  */
 export async function applyRegister(
   touched: readonly Touched[],
   harnesses: Harnesses,
   scopeDir: string,
+  copies: ReadonlySet<string> = new Set(),
 ): Promise<Kept[]> {
   const files = new Files();
   const kept: Kept[] = [];
+  const owned = { scopeDir, copies };
   for (const target of Object.values(harnesses)) {
     for (const mapping of Object.values(target.kinds)) {
       if (mapping === undefined) continue;
-      kept.push(...(await registerMapping(target.name, mapping, touched, scopeDir, files)));
+      kept.push(...(await registerMapping(target.name, mapping, touched, owned, files)));
     }
   }
   await files.flush();
