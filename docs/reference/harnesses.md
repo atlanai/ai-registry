@@ -47,6 +47,8 @@ This harness reads skills from the shared `.agents` folder and agents from `.too
 
 A kind placed with `place: "copy"` is written as real files, for a harness that edits or refuses links; an edit then shows in `aireg status`. A `codec` rewrites an agent in the harness's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
 
+A kind's `keys` say how the harness takes a front-matter key it doesn't read as written, such as `disable-model-invocation`: a `.json` or `.yaml` file it reads instead, which aireg writes into a copy of the artifact, or `false`, which leaves out an artifact that sets the key rather than install it without that limit.
+
 aireg skips a file, with a warning, when it isn't valid against the schema, names a codec aireg doesn't have, reaches outside its folders, gives a shell command where a program and its arguments belong, or isn't named `<id>.json`. The built-in harnesses keep working. Run `aireg harnesses check <file>` to see what is wrong with one.
 
 ### Trust and reload steps

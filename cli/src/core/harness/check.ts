@@ -35,15 +35,7 @@ export function harnessProblems(
   for (const definition of definitions) {
     const report = (problem: string) => problems.push(`${definition.id}: ${problem}`);
     if (!/^[a-z][a-z0-9-]{0,63}$/.test(definition.id)) report("the id is not a lowercase name.");
-    if (!definition.roots.user.default.startsWith("~/")) report("the user root is not under ~/.");
-    for (const path of [definition.roots.project, definition.roots.user.default.slice(2)]) {
-      pathProblem(path, [], report);
-    }
-    const within = definition.roots.user.within;
-    if (within !== undefined) {
-      pathProblem(within, [], report);
-      if (definition.roots.user.env === undefined) report("roots.user.within needs an env.");
-    }
+    rootProblems(definition, report);
     if (
       definition.kind === "shared" &&
       definition.detect !== undefined &&
@@ -87,6 +79,28 @@ function readProblem(
   }
 }
 
+function keyProblems(mapping: KindMapping, report: Report) {
+  for (const file of Object.values(mapping.keys ?? {})) {
+    if (file === false) continue;
+    pathProblem(file.path, [], report);
+    if (!/\.(json|ya?ml)$/.test(file.path)) {
+      report(`${quoted(file.path)} is not a .json or .yaml file.`);
+    }
+  }
+}
+
+function rootProblems(definition: HarnessDefinition, report: Report) {
+  if (!definition.roots.user.default.startsWith("~/")) report("the user root is not under ~/.");
+  for (const path of [definition.roots.project, definition.roots.user.default.slice(2)]) {
+    pathProblem(path, [], report);
+  }
+  const within = definition.roots.user.within;
+  if (within !== undefined) {
+    pathProblem(within, [], report);
+    if (definition.roots.user.env === undefined) report("roots.user.within needs an env.");
+  }
+}
+
 function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Report) {
   if (mapping.shape === "contents") return;
   pathProblem(mapping.subdir, TEMPLATE_VARS.placement, report);
@@ -94,6 +108,7 @@ function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Repor
     pathProblem(entry.path, [], report);
     valueProblems(entry.body ?? {}, TEMPLATE_VARS.manifest, report);
   }
+  keyProblems(mapping, report);
   // A register entry can use only what its placement path carries, and the root.
   const carried = templateVars(mapping.subdir);
   if (!mapping.subdir.includes("{")) carried.push("name");

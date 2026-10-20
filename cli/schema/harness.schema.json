@@ -90,6 +90,44 @@
             },
             "codec": {
               "$ref": "#/$defs/codec"
+            },
+            "keys": {
+              "description": "Front-matter keys the harness does not read as written, for an artifact that sets one.",
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "anyOf": [
+                    {
+                      "description": "Leave out an artifact that sets the key, rather than drop its limit.",
+                      "const": false,
+                      "type": "boolean"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "path",
+                        "body"
+                      ],
+                      "properties": {
+                        "path": {
+                          "pattern": "\\.(json|ya?ml)$",
+                          "description": "Relative to the artifact's folder.",
+                          "type": "string"
+                        },
+                        "body": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "$ref": "#/$defs/value"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
             }
           }
         },

@@ -168,6 +168,7 @@ function linkAction(
     ...(link.fan === true ? { fan: true } : {}),
     ...(link.codec === undefined ? {} : { codec: link.codec }),
     ...(link.command === undefined ? {} : { command: link.command }),
+    ...(link.keys === undefined ? {} : { keys: link.keys }),
     ...(link.entry === undefined ? {} : { entry: link.entry }),
     ...(how.rename === undefined ? {} : { rename: how.rename }),
     ...(how.recorded === undefined ? {} : { recorded: how.recorded }),

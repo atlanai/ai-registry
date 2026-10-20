@@ -67,7 +67,17 @@ export const codex = defineHarness({
       ],
     },
     // What its plugins carry; outside a plugin Codex reads skills from `.agents/skills`.
-    skill: { shape: "directory", subdir: "skills" },
+    skill: {
+      shape: "directory",
+      subdir: "skills",
+      // Codex reads this policy, not the front-matter key, to wait for a person.
+      keys: {
+        "disable-model-invocation": {
+          path: "agents/openai.yaml",
+          body: { policy: { allow_implicit_invocation: false } },
+        },
+      },
+    },
     // Codex reads an agent only as TOML, and refuses to run a linked one.
     agent: {
       shape: "file",

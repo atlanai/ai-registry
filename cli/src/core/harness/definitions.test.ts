@@ -47,6 +47,21 @@ describe("harnessProblems", () => {
       [harness({ roots: { project: "../tool", user: { default: "~/.tool" } } })],
       /inside its root/,
     ],
+    [
+      "a key's file outside the artifact's folder, or in a format aireg does not write",
+      [
+        harness({
+          kinds: {
+            skill: {
+              shape: "directory",
+              subdir: "skills",
+              keys: { a: { path: "../a.yaml", body: {} }, b: { path: "b.toml", body: {} } },
+            },
+          },
+        }),
+      ],
+      /inside its root[\s\S]*not a \.json or \.yaml file/,
+    ],
     ["a variable a placement does not fill", [plugin({ subdir: "plugins/{owner}" })], /\{owner\}/],
     [
       "a codec on a folder with no entry file",

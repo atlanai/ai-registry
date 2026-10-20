@@ -14,7 +14,7 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
-import type { PluginDocument, Selected } from "./model.ts";
+import type { KeyRule, PluginDocument, Selected } from "./model.ts";
 
 export interface ProjectionOptions {
   roots: {
@@ -51,6 +51,29 @@ export interface PlannedLink {
   command?: string;
   /** The plugin's own account of itself, for the manifests its projection gets. */
   document?: PluginDocument;
+  /** Front-matter keys a harness reading this folder does not read as written. */
+  keys?: Record<string, KeyRule>;
+}
+
+/** The key rules of every selected harness that reads `folder`. */
+function keysAt(
+  folder: string,
+  kind: ArtifactKind,
+  selected: readonly string[],
+  harnesses: Harnesses,
+): { keys?: Record<string, KeyRule> } {
+  const keys: Record<string, KeyRule> = {};
+  for (const reader of new Set(selected)) {
+    if (!readsFor(harnesses, reader, kind).includes(folder)) continue;
+    const target = harnesses[reader];
+    for (const [key, how] of Object.entries(target?.kinds[kind]?.keys ?? {})) {
+      const rule = keys[key] ?? { files: [], refusedBy: [] };
+      keys[key] = rule;
+      if (how === false) rule.refusedBy.push(target?.displayName ?? reader);
+      else if (!rule.files.some((file) => file.path === how.path)) rule.files.push(how);
+    }
+  }
+  return Object.keys(keys).length === 0 ? {} : { keys };
 }
 
 function plannedLink(
@@ -277,7 +300,10 @@ function pluginLinks(
         const path = projectionPath(target, leaf.kind, leaf.name, scope, cwd);
         if (path === undefined) continue;
         const from = join(copy, ...leaf.within.split(posix.sep));
-        const link = plannedLink(name, path, from, options, leaf.kind);
+        const link = {
+          ...plannedLink(name, path, from, options, leaf.kind),
+          ...keysAt(name, leaf.kind, selected, options.harnesses),
+        };
         links.push(
           // A skill is a folder, so the command is written as one holding its SKILL.md.
           leaf.command === true ? { ...link, entry: SKILL_ENTRY, command: leaf.name } : link,
@@ -326,7 +352,11 @@ export function linksFor(
   for (const name of placed.targets) {
     const target = options.harnesses[name] as Harnesses[string];
     const own = projectionPath(target, item.kind, item.name, scope, cwd);
-    if (own !== undefined) links.push(plannedLink(name, own, copy, options, item.kind));
+    if (own === undefined) continue;
+    links.push({
+      ...plannedLink(name, own, copy, options, item.kind),
+      ...keysAt(name, item.kind, selected, options.harnesses),
+    });
   }
   return links;
 }

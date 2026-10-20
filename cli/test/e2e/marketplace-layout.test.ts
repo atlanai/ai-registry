@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
@@ -60,8 +60,43 @@ describe("a plugin marketplace", () => {
     expect(await read(join(agents, "docs-kit-summarize", "SKILL.md"))).toBe(
       '---\nname: docs-kit-summarize\ndescription: "Summarize the open file."\ndisable-model-invocation: true\n---\nSummarize $ARGUMENTS.\n',
     );
+    expect(await read(join(agents, "docs-kit-summarize", "agents", "openai.yaml"))).toBe(
+      "policy:\n  allow_implicit_invocation: false\n",
+    );
     expect(await locked(project)).toEqual(["deploy-kit", "docs-kit"]);
     expect(await read(manifestPath(project))).toContain("layout: marketplace");
+  }, 60_000);
+
+  test("leaves a command out for a harness that would run it on its own, and says so", async ({
+    aireg,
+    home,
+    project,
+    tmp,
+  }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await mkdir(join(home.aireg, "harnesses"), { recursive: true });
+    const tool = {
+      id: "tool",
+      displayName: "Tool",
+      roots: { project: ".tool", user: { default: "~/.tool" } },
+      kinds: {
+        plugin: { shape: "contents" },
+        skill: {
+          shape: "directory",
+          subdir: "skills",
+          keys: { "disable-model-invocation": false },
+        },
+      },
+    };
+    await writeFile(join(home.aireg, "harnesses", "tool.json"), JSON.stringify(tool));
+    await init(aireg, "tool");
+    const added = await aireg(["add", root, "--all", "--trust", "deploy-kit"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect(existsSync(join(project, ".tool", "skills", "pdf", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(project, ".tool", "skills", "docs-kit-summarize"))).toBe(false);
+    expect(added.stderr).toContain(
+      "Did not install docs-kit-summarize for Tool: it sets disable-model-invocation, which Tool cannot read.",
+    );
   }, 60_000);
 
   test("asks for trust before a plugin that runs things as you, and records it", async ({

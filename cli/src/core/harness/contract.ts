@@ -11,6 +11,7 @@ interface ContentsMapping {
   manifest?: undefined;
   register?: undefined;
   codec?: undefined;
+  keys?: undefined;
   render?: undefined;
 }
 
@@ -34,7 +35,15 @@ interface DirectoryMapping {
   register?: RegisterEntry[] | undefined;
   /** Rewrites the `entry` file in the harness's own format. */
   codec?: Codec | undefined;
+  /** Front-matter keys it reads elsewhere (a file it reads instead) or not at all (false). */
+  keys?: Record<string, KeyFile | false> | undefined;
   render?: undefined;
+}
+
+export interface KeyFile {
+  /** Relative to the artifact's folder; `.json`, `.yaml` or `.yml`. */
+  path: string;
+  body: Record<string, ConfigValue>;
 }
 
 /** One file per artifact, `<subdir>/<name><extension>`. */
@@ -50,6 +59,7 @@ interface FileMapping {
   register?: undefined;
   /** Written as a real file in the harness's own format. */
   codec?: Codec | undefined;
+  keys?: undefined;
   /** @deprecated Read as the `frontmatter-toml` codec; use `codec`. */
   render?: Render | undefined;
 }

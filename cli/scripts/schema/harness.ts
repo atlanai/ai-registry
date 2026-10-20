@@ -112,6 +112,30 @@ const KindMapping = tagged(
         manifest: Type.Optional(Type.Array(Manifest)),
         register: Type.Optional(Type.Array(ref("register"))),
         codec: Type.Optional(ref("codec")),
+        keys: Type.Optional(
+          Type.Record(
+            Type.String({ minLength: 1 }),
+            Type.Union([
+              Type.Literal(false, {
+                description: "Leave out an artifact that sets the key, rather than drop its limit.",
+              }),
+              Type.Object(
+                {
+                  path: Type.String({
+                    pattern: "\\.(json|ya?ml)$",
+                    description: "Relative to the artifact's folder.",
+                  }),
+                  body: ConfigTable,
+                },
+                { additionalProperties: false },
+              ),
+            ]),
+            {
+              description:
+                "Front-matter keys the harness does not read as written, for an artifact that sets one.",
+            },
+          ),
+        ),
       },
       { additionalProperties: false },
     ),

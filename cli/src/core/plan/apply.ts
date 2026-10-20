@@ -11,6 +11,7 @@ import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { entries, exists, present, pruneEmptyParent, remove, unseal } from "#core/fs/tree.ts";
 import { applyCodec, type Rendered } from "#core/harness/codecs/index.ts";
+import type { KeyFile } from "#core/harness/contract.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import { assertLeasesHeld } from "#core/lease.ts";
 import { type LinkMode, type Lock, readLock, writeLock } from "#core/lock.ts";
@@ -21,6 +22,7 @@ import { PROJECTIONS_DIR, type Roots } from "#core/store/paths.ts";
 import { assemble } from "./assemble.ts";
 import { type Carried, carriedBy } from "./carries.ts";
 import { commandSkill } from "./command-skill.ts";
+import { keyNeeds, writeKeyFiles } from "./keys.ts";
 import { backUp, guardLink, type LinkGuard } from "./link-guard.ts";
 import type { Action, Fetch, Plan, PluginDocument, Staged } from "./model.ts";
 import { projectionsOf } from "./projection.ts";
@@ -395,6 +397,42 @@ async function writeRendered(
   return "copy";
 }
 
+/** The files its keys add; undefined once it is left out for a harness that cannot keep one. */
+async function keyFiles(
+  run: Run,
+  action: ActionOf<"link">,
+  rendered: Rendered | undefined,
+  key: string,
+): Promise<KeyFile[] | undefined> {
+  const needs = await keyNeeds(
+    action,
+    rendered !== undefined && "text" in rendered ? rendered.text : undefined,
+  );
+  if ("files" in needs) return needs.files;
+  run.unrendered.push({
+    name: action.command ?? action.name,
+    harness: action.harness,
+    reason: needs.refused,
+  });
+  run.skipped.add(key);
+  return undefined;
+}
+
+async function place(
+  run: Run,
+  action: ActionOf<"link">,
+  rendered: Rendered | undefined,
+  how: { fan: boolean; copy: boolean; files: readonly KeyFile[] },
+): Promise<LinkMode | undefined> {
+  const mode = writes(action)
+    ? await writeRendered(run, action, rendered)
+    : how.fan
+      ? await fanOut(action.from, action.to)
+      : await link(action.from, action.to, how.copy);
+  if (mode === "copy") await writeKeyFiles(action.to, how.files);
+  return mode;
+}
+
 async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   const { roots } = run;
   const key = linkKey(action.name, action.to);
@@ -423,6 +461,8 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
     run.skipped.add(key);
     return;
   }
+  const files = await keyFiles(run, action, rendered, key);
+  if (files === undefined) return;
   // A committed symlink can appear on the way after planning; the write would follow it.
   const verdict = removal(action.to, roots);
   if (roots.scope === "project" && verdict.how === "refuse") {
@@ -438,11 +478,9 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   }
   // A harness that will not load a linked plugin gets a real directory of links instead.
   const fan = action.fan === true && !action.copy;
-  const mode = writes(action)
-    ? await writeRendered(run, action, rendered)
-    : fan
-      ? await fanOut(action.from, action.to)
-      : await link(action.from, action.to, action.copy);
+  // A file a key adds goes into a copy, never into the store a link would lead to.
+  const copy = action.copy || files.length > 0;
+  const mode = await place(run, action, rendered, { fan, copy, files });
   if (mode === undefined) {
     run.skipped.add(key);
     return;
@@ -455,7 +493,7 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   run.modes.set(key, mode);
   run.pathModes.set(action.to, mode);
   if (mode === "copy") run.copies.set(action.to, await digest(action.to));
-  if (!action.copy && mode === "copy") run.degraded.add(action.harness);
+  if (!copy && mode === "copy") run.degraded.add(action.harness);
   run.performed.link += 1;
   run.installed.add(action.name);
 }

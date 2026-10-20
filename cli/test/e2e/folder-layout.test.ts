@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { cp, readFile, writeFile } from "node:fs/promises";
+import { cp, lstat, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect } from "vitest";
@@ -69,6 +69,30 @@ describe("a folder of skills on this machine", () => {
       release: undefined,
       reviewer: undefined,
     });
+  }, 60_000);
+
+  test("copies a skill a person must run for Codex, with the policy file Codex reads", async ({
+    aireg,
+    project,
+    tmp,
+  }) => {
+    const root = await skillsFolder(join(tmp, "release-kit"))
+      .skill("skills/notes")
+      .file(
+        "skills/release/SKILL.md",
+        "---\nname: release\ndescription: Cuts a release.\ndisable-model-invocation: true\n---\nTag it.\n",
+      )
+      .write();
+    expect((await aireg(["init", "--for", "codex"])).code).toBe(0);
+    expect((await aireg(["add", root, "--all"])).code).toBe(0);
+    const skills = join(project, ".agents", "skills");
+    expect((await lstat(join(skills, "notes"))).isSymbolicLink()).toBe(true);
+    expect((await lstat(join(skills, "release"))).isSymbolicLink()).toBe(false);
+    expect(await readFile(join(skills, "release", "agents", "openai.yaml"), "utf8")).toBe(
+      "policy:\n  allow_implicit_invocation: false\n",
+    );
+    // The file it added is part of the copy, so the copy still matches the lockfile.
+    expect((await aireg(["status"])).code).toBe(0);
   }, 60_000);
 
   test("installs a folder that is one skill, named after the folder", async ({

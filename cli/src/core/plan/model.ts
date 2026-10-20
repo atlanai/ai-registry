@@ -5,7 +5,7 @@ import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import type { Codec } from "#core/harness/contract.ts";
+import type { Codec, KeyFile } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Carried } from "./carries.ts";
@@ -120,6 +120,12 @@ export function dropUnusedSources(lock: Lock): void {
   }
 }
 
+/** For one front-matter key: the files its readers take it from, and who cannot keep it. */
+export interface KeyRule {
+  files: KeyFile[];
+  refusedBy: string[];
+}
+
 export type Action =
   /** Fetch and stage content only when this action is applied. */
   | { kind: "stage"; name: string; source: string; path: string; to: string }
@@ -152,6 +158,8 @@ export type Action =
       codec?: Codec;
       /** A plugin's command, written as a skill a person invokes under this name. */
       command?: string;
+      /** Front-matter keys a harness reading this folder does not read as written. */
+      keys?: Record<string, KeyRule>;
       /** Written as a real folder holding this file. */
       entry?: string;
       /** The name the copy's front matter takes: it installs under a name not its own. */
