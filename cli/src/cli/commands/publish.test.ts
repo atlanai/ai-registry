@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { Planned } from "#cli/publish/target.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Placement } from "#core/plan/model.ts";
 import type { Scan } from "#engine/scan.ts";
-import { moved } from "./publish.ts";
+import { bumped, moved } from "./publish.ts";
 
 const row = {
   registry: "team",
@@ -64,5 +65,25 @@ describe("moved", () => {
     const listed = [{ kind: "skill", name: "probe", group: "team", path: row.address }];
     expect(moved(serving([at("sha256:after", "4")], listed), yours)).toBe(true);
     expect(moved(serving([at("sha256:after", "4")]), yours)).toBe(false);
+  });
+});
+
+describe("bumped", () => {
+  const planned = (from: string | undefined, same: boolean, version?: string) =>
+    ({
+      from,
+      same,
+      work: version === undefined ? {} : { exported: { path: "lint", version } },
+    }) as unknown as Planned;
+
+  it("is true when an artifact published before changed, so its next version is a question", () => {
+    expect(bumped([planned("0.1.0", false)])).toBe(true);
+  });
+
+  // An export's own `version` is what it publishes at, so how big a change it is changes nothing.
+  it("is false for a new artifact, an unchanged one, or an export that fixes its version", () => {
+    expect(bumped([planned(undefined, false), planned("0.1.0", true)])).toBe(false);
+    expect(bumped([planned("0.1.0", false, "2.0.0")])).toBe(false);
+    expect(bumped([planned("0.1.0", false, "2.0.0"), planned("0.3.0", false)])).toBe(true);
   });
 });

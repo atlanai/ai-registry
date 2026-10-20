@@ -40,7 +40,7 @@ The registry must be declared in the project or your user scope. See [`aireg reg
 
 A first publish is version `0.1.0`. After that, `publish` takes the next patch version, or the version `--bump` names, counting from the newest published version, even one the registry holds back, such as a blocked one. To publish an exact version, add it to `--to`, such as `--to acme/engineering/pr-review@2.0.0`. A published version is never rewritten, whatever its status, so `publish` refuses a version that is already published, and never sends the work as another version instead. After a version that isn't SemVer, such as `1`, there is no next version to work out, so `publish` asks you to name one.
 
-An artifact whose files match the newest published version is listed as `same` and not sent. On a terminal, when an artifact changed and you didn't pass `--bump`, `publish` asks how big a change it is.
+An artifact whose files match the newest published version is listed as `same` and not sent. On a terminal, when an artifact changed and you didn't pass `--bump`, `publish` asks how big a change it is. An export with its own `version` is published at that version, so `publish` never asks about it.
 
 Before sending, `publish` lists each artifact as `add`, `update` with its old and new version, or `same`, and asks to confirm. It refuses a skill that [`aireg registry validate`](registry.md#aireg-registry-validate) would reject.
 

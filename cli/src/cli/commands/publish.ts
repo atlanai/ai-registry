@@ -231,6 +231,16 @@ type EdgesFor = (
   planned: (path: string) => Promise<Planned | undefined>,
 ) => Promise<PublishRelationship[] | undefined>;
 
+/**
+ * Whether any artifact takes its version from how big a change it is: published before, changed
+ * since, and with no version of its own, as an export's `version` is.
+ */
+export function bumped(items: readonly Planned[]): boolean {
+  return items.some(
+    (item) => item.from !== undefined && !item.same && item.work.exported?.version === undefined,
+  );
+}
+
 /** Planned at a patch first; asked how big only when something already published moved. */
 async function planAll(
   step: Interaction,
@@ -269,7 +279,7 @@ async function planAll(
     return Promise.all(pending.values());
   };
   const planned = await at(bump ?? "patch");
-  const moved = planned.some(({ item }) => item.from !== undefined && !item.same);
+  const moved = bumped(planned.map(({ item }) => item));
   if (bump !== undefined || exact !== undefined || !moved || !interactive(step)) return planned;
   const picked = await select<Bump>(
     {
