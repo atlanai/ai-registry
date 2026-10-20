@@ -1,0 +1,14 @@
+{
+  "id": "openclaw",
+  "displayName": "OpenClaw",
+  "overrides": true,
+  "kind": "personal",
+  "roots": { "project": ".openclaw", "user": { "default": "~/.openclaw", "env": "OPENCLAW_STATE_DIR" } },
+  "detect": { "env": ["OPENCLAW_STATE_DIR"], "binary": ["openclaw"], "projectRoot": false },
+  "instances": { "root": "~/.openclaw-{profile}" },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": { "shape": "directory", "subdir": "skills", "scope": "user", "place": "copy" }
+  },
+  "verified": { "command": ["openclaw", "--version"], "range": "2026.10.1" }
+}
