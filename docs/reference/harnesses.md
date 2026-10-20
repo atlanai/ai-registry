@@ -25,6 +25,14 @@ Each row names a coding agent and the id `--for` takes. Once a [harness file](#h
 | `show <id>` | Print a harness as aireg resolved it. |
 | `check <file>` | Check a harness file before you use it. |
 
+## Supported harnesses
+
+Each path is in a project, then in your user scope.
+
+| Harness | `--for` | Skills | Agents | Moves the user folder |
+|---|---|---|---|---|
+| Muse Code | `muse` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | None | None |
+
 ## Harness files
 
 A harness file adds a harness aireg doesn't ship, or replaces one it does with `"overrides": true`. aireg reads one JSON file per harness from `~/.aireg/harnesses/<id>.json` (`$AIREG_HOME/harnesses/` when `AIREG_HOME` is set). Only your user scope defines harnesses: a project can select one by id, in `--for` or its manifest, but never define one.
