@@ -51,6 +51,10 @@
         }
       },
       "style": {
+        "noExcessiveLinesPerFile": {
+          "level": "error",
+          "options": { "maxLines": 1000, "skipBlankLines": true }
+        },
         "noNonNullAssertion": "error",
         "noParameterAssign": "error",
         "useConsistentArrayType": { "level": "error", "options": { "syntax": "shorthand" } },
@@ -78,7 +82,7 @@
         "rules": {
           "complexity": { "noExcessiveLinesPerFunction": "off" },
           "suspicious": { "noConsole": "off" },
-          "style": { "noNonNullAssertion": "off" }
+          "style": { "noExcessiveLinesPerFile": "off", "noNonNullAssertion": "off" }
         }
       }
     },
@@ -99,6 +103,10 @@
     {
       "includes": ["src/adapter/filespec/resolve.test.ts"],
       "linter": { "rules": { "style": { "noParameterAssign": "off" } } }
+    },
+    {
+      "includes": ["src/cli/commands/index.ts"],
+      "linter": { "rules": { "style": { "noExcessiveLinesPerFile": "off" } } }
     }
   ]
 }
