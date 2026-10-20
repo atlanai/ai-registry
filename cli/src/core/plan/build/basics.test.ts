@@ -554,6 +554,23 @@ describe("build", () => {
     expect(plan.warnings.some((w) => /Codex cannot load agents/.test(w.message))).toBe(true);
   });
 
+  test("says a harness takes the kind in your user scope alone, rather than not at all", () => {
+    const plan = build(
+      kitManifest(),
+      emptyLock(),
+      acquired([entry()]),
+      { artifacts: {} },
+      {
+        ...PLAN_OPTIONS,
+        targets: ["openclaw"],
+      },
+    );
+    expect(plan.actions.filter((a) => a.kind === "link")).toHaveLength(0);
+    expect(plan.warnings.map((w) => w.message)).toContain(
+      '"lint" was fetched but installed into no harness: OpenClaw takes skills only in your user scope.',
+    );
+  });
+
   test("reports a reference that matches nothing", () => {
     const plan = build(
       kitManifest(["kit/skill/ghost"]),

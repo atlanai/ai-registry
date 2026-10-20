@@ -15,6 +15,8 @@ interface Claimed {
   links: PlannedLink[];
   /** Harnesses, by display name, that cannot load this kind. */
   skipped: Set<string>;
+  /** Harnesses, by display name, that load this kind from your user scope alone. */
+  userOnly: Set<string>;
   /** Paths another artifact already holds. */
   blocked: Blocked[];
 }
@@ -25,12 +27,14 @@ const partName = (path: string) => (path.split(/[\\/]/).at(-1) ?? path).replace(
 /** The links this item may take, first come first served, recording what another holds. */
 function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const skipped = new Set<string>();
+  const userOnly = new Set<string>();
   const blocked: Blocked[] = [];
   const address = addressOf({ ...item, name: item.upstreamName }, item.source);
   build.addresses.set(item.name, address);
   const wrapped = build.wrapping.has(item.source);
-  const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (harness) => {
-    skipped.add(build.options.harnesses[harness]?.displayName ?? harness);
+  const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (harness, kind) => {
+    const target = build.options.harnesses[harness];
+    (target?.kinds[kind] === undefined ? skipped : userOnly).add(target?.displayName ?? harness);
   });
   const collided = (owner: string, link: PlannedLink) => {
     const kept = build.addresses.get(owner) ?? owner;
@@ -51,7 +55,7 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
     return false;
   });
   const links = claim(open, item.name, build.claimed, collided);
-  return { links, skipped, blocked };
+  return { links, skipped, userOnly, blocked };
 }
 
 /**
@@ -87,10 +91,19 @@ export function placeLinks(
   // Said only when it lands nowhere: a tool skipping a kind another tool reads is
   // expected, and a clash or a refusal has already said where it went instead.
   if (links.length === 0 && claimed.blocked.length === 0 && !refused && !yours) {
+    const userOnly = [...claimed.userOnly];
+    const reasons = [
+      ...(claimed.skipped.size === 0
+        ? []
+        : [`${list([...claimed.skipped])} cannot load ${item.kind}s`]),
+      ...(userOnly.length === 0
+        ? []
+        : [
+            `${list(userOnly)} take${userOnly.length === 1 ? "s" : ""} ${item.kind}s only in your user scope`,
+          ]),
+    ];
     const why =
-      claimed.skipped.size === 0
-        ? `no selected harness accepts a ${item.kind}`
-        : `${list([...claimed.skipped])} cannot load ${item.kind}s`;
+      reasons.length === 0 ? `no selected harness accepts a ${item.kind}` : reasons.join(", and ");
     build.warnings.push({
       name: item.name,
       message: `${quoted(item.name)} was fetched but installed into no harness: ${why}.`,
