@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { MANIFEST_FILE, SCOPE_DIR } from "#adapter/layouts/project.ts";
 import { digestHex } from "#adapter/spec/ref.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { setting } from "#core/env.ts";
@@ -14,9 +15,10 @@ import { HOME_DIR } from "#core/product.ts";
 export const SCOPES = ["user", "project"] as const;
 export type Scope = (typeof SCOPES)[number];
 
-/** The one folder each scope keeps its manifest, lock and installed copies in. */
-export const SCOPE_DIR = ".registry";
-export const MANIFEST_FILE = "manifest.yml";
+// The one folder each scope keeps its manifest, lock and installed copies in, defined beside
+// the layouts, which read a project's manifest from a source that is not a registry.
+export { MANIFEST_FILE, SCOPE_DIR } from "#adapter/layouts/project.ts";
+
 const LOCK_FILE = "manifest.lock.yml";
 
 export interface Roots {

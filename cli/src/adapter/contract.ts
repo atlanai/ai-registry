@@ -85,6 +85,33 @@ export interface Resolution {
   warnings?: readonly string[] | undefined;
   /** How the source lays out what it holds, where the adapter reads more than one way. */
   layout?: LayoutId | undefined;
+  /**
+   * The project manifest a source that is not a registry holds, whose `exports` give what it
+   * lists their `depends_on` edges. Untrusted: the client ignores one it cannot read.
+   */
+  manifest?: SourceManifest | undefined;
+}
+
+/** A project's `.registry/manifest.yml`, as a source that is not a registry holds it. */
+export interface SourceManifest {
+  /** The file's text, read within a bound. */
+  text: string;
+  /**
+   * Everything the source holds, whatever the request reached, at the path in the source an
+   * `exports` entry names it by: a skill's folder, or an agent's file.
+   */
+  artifacts: readonly SourceArtifact[];
+}
+
+/** One artifact a source holds, by where it sits and what it is listed as. */
+export interface SourceArtifact {
+  /** POSIX, relative to the source's root. */
+  path: string;
+  /** The `id` the artifact is listed with. */
+  id: string;
+  kind: ArtifactKind;
+  name: string;
+  namespace?: string | undefined;
 }
 
 /** An artifact whose version is not installable as asked, such as a blocked one or an unpinned draft. */

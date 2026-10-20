@@ -115,6 +115,9 @@ export const EXPORT_KEYS = ["path", "version", "depends_on", "publish"] as const
 /** Every transport's keys; which are legal together is checked below. */
 export const REGISTRY_KEYS = ["source", "adapter", "ref", "path", "layout", "config"] as const;
 
+/** Every key a mapping in `artifacts:` takes. */
+const ARTIFACT_KEYS = ["ref", "as", "exclude", "harnesses", "copy", "trust"] as const;
+
 export class ManifestError extends AiregError {
   constructor(message: string, hint?: string) {
     super(message, { code: ErrorCode.Invalid, hint });
@@ -280,7 +283,7 @@ function artifactRef(raw: unknown): Ref {
     throw new ManifestError("`artifacts:` entries must be references or `{ ref, ... }` mappings.");
   }
   const entry = raw;
-  onlyKnown(entry, ["ref", "as", "exclude", "harnesses", "copy", "trust"], "An `artifacts:` entry");
+  onlyKnown(entry, ARTIFACT_KEYS, "An `artifacts:` entry");
   const text = optionalString(entry, "ref");
   if (text === undefined) throw new ManifestError("An `artifacts:` entry has no `ref`.");
   const localName = optionalString(entry, "as");
@@ -599,6 +602,53 @@ export function parseManifest(text: string, filename = "manifest.yml"): Manifest
     // Each check names a field; only here is the file it came from known.
     if (!(error instanceof ManifestError)) throw error;
     throw new ManifestError(`${filename}: ${error.message}`, error.hint);
+  }
+}
+
+/** What of another project's manifest says what it exports, and each of its mappings' keys. */
+const SOURCE_KEYS = {
+  registries: REGISTRY_KEYS,
+  artifacts: ARTIFACT_KEYS,
+  exports: EXPORT_KEYS,
+  publish: ["to"],
+} as const;
+
+/** A mapping with only the keys given; anything else passes through as it is. */
+function knownOnly(value: unknown, keys: readonly string[]): unknown {
+  return isRecord(value)
+    ? dict(keys.flatMap((key) => (key in value ? [[key, value[key]]] : [])))
+    : value;
+}
+
+/**
+ * The manifest a source that is not a registry holds, read only for what it exports. A key this
+ * aireg does not know, and `engines`, are left out rather than refused, as a newer aireg may have
+ * written them; a file that still does not read gives why, never a failure.
+ */
+export function readSourceManifest(text: string): Manifest | { problem: string } {
+  try {
+    const doc = parseYaml(text);
+    if (doc === null || doc === undefined) return emptyManifest();
+    if (!isRecord(doc)) return { problem: "it is not a mapping at the top level" };
+    const { registries, artifacts, exports, publish } = doc;
+    const listed = (raw: unknown, keys: readonly string[]) =>
+      Array.isArray(raw) ? raw.map((item) => knownOnly(item, keys)) : raw;
+    return parseKnownFields({
+      registries: isRecord(registries)
+        ? dict(
+            Object.entries(registries).map(([alias, raw]) => [
+              alias,
+              knownOnly(raw, SOURCE_KEYS.registries),
+            ]),
+          )
+        : registries,
+      artifacts: listed(artifacts, SOURCE_KEYS.artifacts),
+      exports: listed(exports, SOURCE_KEYS.exports),
+      publish: knownOnly(publish, SOURCE_KEYS.publish),
+    });
+  } catch (error) {
+    const first = (error as Error).message.split("\n")[0] ?? "";
+    return { problem: first.replace(/[.:]$/, "") };
   }
 }
 

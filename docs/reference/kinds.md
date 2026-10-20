@@ -72,7 +72,7 @@ aireg installs it from the registry the project declares at that address, under 
 
 [`aireg add`](add.md) installs them. An edge without a range installs the version it names. An edge with one installs the newest version in the range that installs without a pin. Where several artifacts need one dependency, it installs once, at the newest version every edge accepts; when no version could satisfy them all, the registry publishes none that does, or what they all accept takes more than the 256 characters a range may have, `add` installs nothing and names each range and the artifact it came from. A prerelease counts as accepted only when every range admits it. The lockfile records each range, and [`aireg update`](update.md) moves the dependency to the newest version that every range still accepts. `bump` carries the last version's dependencies into the new one, so move the versions they name when you release new ones.
 
-To write these edges from the project where the artifacts are made, rather than by hand in the registry, list them as `depends_on` in the project's `exports:`, and [`aireg publish`](publish.md#dependencies) writes each one into the version it publishes.
+To write these edges from the project where the artifacts are made, rather than by hand in the registry, list them as `depends_on` in the project's `exports:`, and [`aireg publish`](publish.md#dependencies) writes each one into the version it publishes. A project that installs that repository itself, rather than a registry it publishes to, gets the same dependencies from its manifest; see [Sources that are not registries](add.md#sources-that-are-not-registries).
 
 ### Version status
 

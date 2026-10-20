@@ -12,6 +12,7 @@ import {
   needsOf,
   registryUrls,
   unknownUrls,
+  wantOf,
 } from "./depends.ts";
 import type { Acquired, Placement, Selected } from "./model.ts";
 
@@ -20,16 +21,19 @@ type Published = [kind: ArtifactKind, name: string, version: string, ...needs: s
 
 const path = (kind: ArtifactKind, name: string) => `artifacts/eng/${kind}/${name}`;
 
-/** `eng/skill/lint@1.0.0`, or with a range after a space: `eng/skill/lint@1.0.0 ^1.0.0`. */
+/**
+ * `eng/skill/lint@1.0.0`, or with a range after a space: `eng/skill/lint@1.0.0 ^1.0.0`. Without
+ * an `@`, the edge names no version, as one export of a source does another.
+ */
 function need(ref: string): Need {
   const [to, ...range] = ref.split(" ");
-  const [address, version] = (to as string).split("@") as [string, string];
+  const [address, version] = (to as string).split("@") as [string, string | undefined];
   const [namespace, kind, name] = address.split("/") as [string, ArtifactKind, string];
   return {
     namespace,
     kind,
     name,
-    version,
+    ...(version === undefined ? {} : { version }),
     ...(range.length === 0 ? {} : { range: range.join(" ") }),
   };
 }
@@ -631,5 +635,50 @@ describe("movesWithin", () => {
     expect(needing("^0.3.2", "0.3.4")).toBeUndefined();
     expect(needing("^0.3.2", undefined)).toBeUndefined();
     expect(needing("^0.3.2", "^0.4.0")).toBeUndefined();
+  });
+});
+
+describe("an edge that names no version", () => {
+  it("takes the version its registry lists, and records none", () => {
+    const result = closure(
+      [selected("agent", "reviewer", "0.3.0")],
+      registry(
+        ["agent", "reviewer", "0.3.0", "eng/skill/review", "eng/skill/lint@1.0.0 ^1.0.0"],
+        ["skill", "review", "0.5.0"],
+        ["skill", "lint", "1.0.0"],
+      ),
+    );
+    expect(result.unresolved).toEqual([]);
+    expect(result.neededBy.get(id("skill", "review"))).toEqual(new Set([id("agent", "reviewer")]));
+    expect(result.dependsOn.get(id("agent", "reviewer"))).toEqual(
+      new Map([[id("skill", "lint"), "^1.0.0"]]),
+    );
+  });
+
+  it("is asked for without a version when its registry did not list it", () => {
+    const result = closure(
+      [selected("agent", "reviewer", "0.3.0")],
+      registry(["agent", "reviewer", "0.3.0", "eng/skill/review"]),
+    );
+    const [missing] = result.unresolved;
+    expect(missing?.need).toEqual(need("eng/skill/review"));
+    expect(wantOf(missing?.need as Need)).toEqual({
+      name: "review",
+      namespace: "eng",
+      kind: "skill",
+    });
+  });
+
+  it("gives way to the range another edge asks for", () => {
+    const result = closure(
+      [selected("agent", "reviewer", "0.3.0"), selected("agent", "helper", "1.0.0")],
+      registry(
+        ["agent", "reviewer", "0.3.0", "eng/skill/review"],
+        ["agent", "helper", "1.0.0", "eng/skill/review@1.0.0 ^1.0.0"],
+        ["skill", "review", "0.5.0"],
+      ),
+    );
+    expect(result.conflicts).toEqual([]);
+    expect(result.unresolved.map(({ need }) => need.range)).toEqual(["^1.0.0"]);
   });
 });

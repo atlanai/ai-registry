@@ -42,7 +42,8 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | The adapters built into aireg | `adapters/index.ts` |
 | What an adapter adds beside the contract: commands, job steps and console tabs | `core/host/` |
 | Reading a file spec registry from any `read(path)`, its name rules and document names | `adapter/filespec/` |
-| How a source on disk lays out what it holds, and reading one that is not a registry, such as a folder of skills | `adapter/layouts/` |
+| How a source on disk lays out what it holds, and reading one that is not a registry, such as a folder of skills, with the project manifest it holds | `adapter/layouts/` |
+| The `depends_on` edges a source's project manifest gives what it exports | `core/plan/exported.ts` |
 | The merges a publish writes into `versions.json` and `index.json` | `adapter/filespec/write.ts` |
 | Registry authoring: init, index, validate, kinds and offers | `core/filespec/write/` |
 | SemVer ordering and ranges (`parseRange`, `satisfies`, `maxSatisfying`), digests, safe file reads and writes, and message text helpers | `adapter/semver.ts`, `adapter/spec/canonical.ts`, `adapter/files.ts`, `adapter/text.ts` |

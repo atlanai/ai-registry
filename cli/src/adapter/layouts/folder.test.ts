@@ -1,9 +1,11 @@
+import { symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { skillFile, skillsFolder } from "#test/kit/builders/layouts.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { contentDigest } from "../spec/canonical.ts";
 import { folderLayout } from "./folder.ts";
+import { MAX_SOURCE_MANIFEST } from "./project.ts";
 import { openTree } from "./tree.ts";
 
 const context = { namespace: "kit", rootName: "kit" };
@@ -153,6 +155,65 @@ describe("the folder layout", () => {
     expect(one?.files.find((file) => file.path === "scripts/fill.sh")?.executable).toBe(
       process.platform !== "win32",
     );
+  });
+
+  test("brings the project manifest it holds, with where each artifact sits", async ({ tmp }) => {
+    const text = "exports:\n  - .claude/skills/*\n";
+    const root = await skillsFolder(join(tmp, "kit"))
+      .skill(".claude/skills/review")
+      .agent(".claude/agents/reviewer.md")
+      .file(".registry/manifest.yml", text)
+      .write();
+    const found = await read(root);
+    expect(found.warnings).toEqual([]);
+    expect(found.manifest).toEqual({
+      text,
+      artifacts: [
+        {
+          path: ".claude/agents/reviewer.md",
+          id: ".claude/agents/reviewer.md",
+          kind: "agent",
+          name: "reviewer",
+          namespace: "kit",
+        },
+        {
+          path: ".claude/skills/review",
+          id: ".claude/skills/review",
+          kind: "skill",
+          name: "review",
+          namespace: "kit",
+        },
+      ],
+    });
+    const none = await read(await skillsFolder(join(tmp, "none")).skill("pdf").write());
+    expect(none).not.toHaveProperty("manifest");
+  });
+
+  test("leaves out, with a warning, a manifest that is a link or too large", async ({ tmp }) => {
+    const linked = await skillsFolder(join(tmp, "linked"))
+      .skill("pdf")
+      .link(".registry/manifest.yml", "/etc/hosts")
+      .write();
+    const large = await skillsFolder(join(tmp, "large"))
+      .skill("pdf")
+      .file(".registry/manifest.yml", `# ${"x".repeat(MAX_SOURCE_MANIFEST)}\n`)
+      .write();
+    const folder = await skillsFolder(join(tmp, "folder")).skill("pdf").write();
+    await symlink(tmp, join(folder, ".registry"));
+    const skipped = "so what it exports installs without its dependencies.";
+    for (const [root, why] of [
+      [linked, "is a symlink"],
+      [large, "is larger than 256 KB"],
+      [folder, "is reached through a symlink"],
+    ] as const) {
+      const found = await read(root);
+      expect(found.manifest).toBeUndefined();
+      expect(found.artifacts).toHaveLength(1);
+      expect(found.warnings).toEqual([
+        expect.stringMatching(new RegExp(`^Skipped \\.registry/manifest\\.yml, which ${why}`)),
+      ]);
+      expect(found.warnings[0]).toContain(skipped);
+    }
   });
 
   test("does not match a source with neither skills nor agents", async ({ tmp }) => {

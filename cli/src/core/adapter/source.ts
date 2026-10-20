@@ -1,4 +1,5 @@
 import { extname, join } from "node:path";
+import { isArtifactName, isNamespace } from "#adapter/filespec/names.ts";
 import {
   AdapterError,
   type Artifact,
@@ -10,11 +11,14 @@ import {
   type RegistryIdentity,
   type ResolveOptions,
   type SourceAdapter,
+  type SourceArtifact,
   type SourceContext,
   type SourceHandle,
+  type SourceManifest,
   type Want,
 } from "#adapter/index.ts";
 import { isLayoutId, type LayoutId } from "#adapter/layouts/ids.ts";
+import { MAX_SOURCE_MANIFEST } from "#adapter/layouts/project.ts";
 import { collidingPaths } from "#adapter/paths.ts";
 import { isDigest, isVersion } from "#adapter/spec/ref.ts";
 import { ENVELOPE_API_VERSION } from "#adapter/spec/types.ts";
@@ -23,7 +27,7 @@ import type { Catalog, Entry } from "#core/catalog/model.ts";
 import { emptyCatalog, finalize, merge } from "#core/catalog/model.ts";
 import { withheldFrom } from "#core/catalog/withheld.ts";
 import { bindAdapter } from "#core/hook/bind.ts";
-import { KIND_SPECS, specKindDir } from "#core/kinds.ts";
+import { type ArtifactKind, isKind, KIND_SPECS, specKindDir } from "#core/kinds.ts";
 import { withLease } from "#core/lease.ts";
 import { engineFromUnknown } from "#core/semver.ts";
 import { cacheDir, ensureHome } from "#core/store/paths.ts";
@@ -96,6 +100,8 @@ export interface Listing {
   registry: RegistryIdentity | undefined;
   /** How the source lays out what it holds, when its adapter says. */
   layout: LayoutId | undefined;
+  /** The project manifest a source that is not a registry holds, as far as it is well formed. */
+  manifest?: SourceManifest | undefined;
 }
 
 /** Text from an adapter, one line, without escapes; anything else is dropped. */
@@ -264,7 +270,39 @@ export async function resolveArtifacts(
     sourceRevision: adapter.capabilities.pinsSource ? resolution.sourceRevision : undefined,
     registry: identity(resolution.registry),
     layout: layout ? resolution.layout : undefined,
+    ...withManifest(resolution.manifest),
   };
+}
+
+/**
+ * Only the shape a source manifest has: text within the bound, and artifacts named by strings.
+ * What the text says is read, as untrusted, where the edges it gives are needed.
+ */
+function withManifest(raw: unknown): Pick<Listing, "manifest"> {
+  if (typeof raw !== "object" || raw === null) return {};
+  const { text, artifacts } = raw as { text?: unknown; artifacts?: unknown };
+  if (typeof text !== "string" || text.length > MAX_SOURCE_MANIFEST || !Array.isArray(artifacts)) {
+    return {};
+  }
+  const listed = artifacts.flatMap((item: unknown): SourceArtifact[] => {
+    const { path, id, kind, name, namespace } = (item ?? {}) as Record<string, unknown>;
+    const fields = [path, id, kind, name];
+    if (!fields.every((field) => typeof field === "string") || !isKind(kind as string)) return [];
+    if (!isArtifactName(name as string)) return [];
+    if (namespace !== undefined && (typeof namespace !== "string" || !isNamespace(namespace))) {
+      return [];
+    }
+    return [
+      {
+        path: path as string,
+        id: id as string,
+        kind: kind as ArtifactKind,
+        name: name as string,
+        ...(namespace === undefined ? {} : { namespace }),
+      },
+    ];
+  });
+  return { manifest: { text, artifacts: listed } };
 }
 
 /** Only what could be a name or a label; a backend's other fields are not read. */

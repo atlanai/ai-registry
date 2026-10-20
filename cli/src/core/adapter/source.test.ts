@@ -5,6 +5,7 @@ import {
   type RegistryIdentity,
   type SourceAdapter,
 } from "#adapter/index.ts";
+import { MAX_SOURCE_MANIFEST } from "#adapter/layouts/project.ts";
 import { ENVELOPE_API_VERSION } from "#adapter/spec/types.ts";
 import { resolveArtifacts } from "./source.ts";
 
@@ -12,6 +13,7 @@ import { resolveArtifacts } from "./source.ts";
 function serving(
   files: { path: string; locator?: string }[],
   registry?: RegistryIdentity,
+  more: Record<string, unknown> = {},
 ): SourceAdapter {
   const envelope: Envelope = {
     apiVersion: ENVELOPE_API_VERSION,
@@ -41,6 +43,7 @@ function serving(
           },
         ],
         ...(registry === undefined ? {} : { registry }),
+        ...more,
       }),
       fetch: async () => new Uint8Array(),
       close: async () => {},
@@ -72,6 +75,30 @@ describe("the identity an adapter reports", () => {
     expect(await at("https://GitHub.com/acme/kit.git/")).toBe("https://github.com/acme/kit");
     expect(await at("http://github.com/acme/kit")).toBeUndefined();
     expect(await at("file:///srv/kit")).toBeUndefined();
+  });
+});
+
+describe("the project manifest a source holds", () => {
+  const serve = async (manifest: unknown) =>
+    (await resolveWith(serving([{ path: "SKILL.md" }], undefined, { manifest }))).manifest;
+  const artifact = { path: "skills/lint", id: "a1", kind: "skill", name: "lint" };
+
+  it("keeps its text, and only the artifacts given in their shape", async () => {
+    expect(
+      await serve({
+        text: "exports: []\n",
+        artifacts: [artifact, { ...artifact, kind: "x" }, { ...artifact, name: "Bad" }, 3],
+      }),
+    ).toEqual({ text: "exports: []\n", artifacts: [artifact] });
+  });
+
+  it("drops one that is not text within the bound", async () => {
+    expect(await serve({ text: 3, artifacts: [] })).toBeUndefined();
+    expect(
+      await serve({ text: "x".repeat(MAX_SOURCE_MANIFEST + 1), artifacts: [] }),
+    ).toBeUndefined();
+    expect(await serve({ text: "", artifacts: {} })).toBeUndefined();
+    expect(await serve("exports: []")).toBeUndefined();
   });
 });
 

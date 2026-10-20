@@ -1,3 +1,4 @@
+import { isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import { satisfies } from "#adapter/semver.ts";
 import { list } from "#adapter/text.ts";
 import { rowsNamed } from "#cli/names.ts";
@@ -105,6 +106,8 @@ export async function run(context: CommandContext): Promise<void> {
     const row = lock.artifacts[name];
     if (row?.neededBy === undefined || asksFor(loaded.manifest, row)) continue;
     if (movesWithin(lock, name) !== undefined) continue;
+    // Read at one commit, a source that is not a registry moves it with its dependents.
+    if (isReadOnlyLayout(lock.registries[row.registry]?.config.layout)) continue;
     context.printer.warning(
       `${name} stays at ${row.version}, because ${whoNeeds(row.neededBy)} that version.`,
     );

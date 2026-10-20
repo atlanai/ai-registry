@@ -1,4 +1,4 @@
-import type { Artifact } from "../contract.ts";
+import type { Artifact, SourceManifest } from "../contract.ts";
 import type { LayoutId } from "./ids.ts";
 import type { Tree } from "./tree.ts";
 
@@ -48,6 +48,8 @@ export interface Found {
   name?: string | undefined;
   /** By artifact id, the folder it is read from, where that is not the source's root. */
   roots?: Map<string, string> | undefined;
+  /** The project manifest the source holds, for what it exports. */
+  manifest?: SourceManifest | undefined;
 }
 
 /** One way a source can lay out what it holds. */

@@ -29,6 +29,7 @@ import { formatAddress, type Ref } from "#core/ref.ts";
 import { ensureHome, stagingPath, toolHome } from "#core/store/paths.ts";
 import { carriedIn } from "./carries.ts";
 import { movesWithin, type Need, needsOf, type Unusable } from "./depends.ts";
+import { exportedNeeds } from "./exported.ts";
 import type { Acquired, Placement, Staged } from "./model.ts";
 import { wrapsNamespaces } from "./namespaces.ts";
 import { candidates } from "./select.ts";
@@ -169,13 +170,29 @@ function lockedRequest(
       asked.set(name, rowWant(ref, row, pins, moving.has(name) || whole || redeclared));
     }
   }
-  // A dependency is held at the version its dependents needed; the closure moves it when they do,
-  // and a run that moves it takes the newest version their ranges admit.
-  for (const [name, row] of view.rows(alias)) {
-    if (row.neededBy === undefined || named.has(name)) continue;
-    asked.set(name, dependencyWant(row, moving.has(name) ? movesWithin(lock, name) : undefined));
+  // In a source read at one commit, a dependency moves with everything else there.
+  const free = whole || (redeclared && isReadOnlyLayout(source?.config.layout));
+  for (const [name, want] of dependencyWants(view.rows(alias), named, { lock, moving }, free)) {
+    asked.set(name, want);
   }
   return { want: [...request.want, ...asked.values()], all };
+}
+
+/**
+ * A dependency is held at the version its dependents needed; the closure moves it when they do,
+ * and a run that moves it takes the newest version their ranges admit. `free`, it moves.
+ */
+function dependencyWants(
+  rows: readonly (readonly [string, LockArtifact])[],
+  named: ReadonlySet<string>,
+  { lock, moving }: Pick<Locked, "lock" | "moving">,
+  free: boolean,
+): [string, Want][] {
+  return rows.flatMap(([name, row]): [string, Want][] => {
+    if (row.neededBy === undefined || named.has(name)) return [];
+    if (free) return [[name, lockedWant(row, true, undefined)]];
+    return [[name, dependencyWant(row, moving.has(name) ? movesWithin(lock, name) : undefined)]];
+  });
 }
 
 function dependencyWant(row: LockArtifact, range: string | undefined): Want {
@@ -276,14 +293,13 @@ function fromRows(
   const needs = new Map<string, Need[]>();
   // What this registry's rows need may sit in another registry, which the row says.
   for (const [name, row] of Object.entries(lock.artifacts)) {
-    if (row.namespace === undefined || row.version === undefined) {
-      continue;
-    }
+    if (row.namespace === undefined) continue;
+    // A row with no version, as a folder of skills has, was needed at whatever its source held.
     const need = {
       namespace: row.namespace,
       kind: row.kind,
       name: row.name,
-      version: row.version,
+      ...(row.version === undefined ? {} : { version: row.version }),
       ...(row.registry === alias ? {} : { alias: row.registry }),
     };
     for (const by of row.neededBy ?? []) {
@@ -453,6 +469,18 @@ async function acquireOne(
     );
   }
 
+  // A source that is not a registry gives what it exports the edges its own manifest lists.
+  const exported =
+    listing.manifest === undefined
+      ? undefined
+      : exportedNeeds(
+          listing.manifest,
+          listing.listed.map(({ artifact }) => ({
+            id: artifact.id,
+            name: artifact.envelope.metadata.name,
+          })),
+        );
+  listing.catalog.warnings.push(...(exported?.warnings ?? []));
   const placements = new Map<string, Placement>();
   for (const { path, artifact } of listing.listed) {
     const { needs, unusable } = needsOf(artifact.envelope);
@@ -464,7 +492,7 @@ async function acquireOne(
       name,
       contentId: contentDigest(artifact.envelope),
       version,
-      needs,
+      needs: [...needs, ...(exported?.needs.get(artifact.id) ?? [])],
       ...(artifact.yanked === undefined ? {} : { yanked: artifact.yanked }),
       ...statusOf(artifact),
       ...(isReadOnlyLayout(listing.layout) ? pluginOf(artifact) : {}),

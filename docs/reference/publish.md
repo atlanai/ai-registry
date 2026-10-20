@@ -128,6 +128,8 @@ A `version` below the target's newest is published as that older version, and th
 - **Another export**, `./<path>`, becomes an edge to the version this run publishes it at, or to the target's newest version when it is unchanged, accepting that version's compatible releases (`^0.3.2`). It must go to the same target, in this run or before it. When it doesn't, `publish` refuses, as in `reviewer depends on review, which is not published to acme/engineering.`
 - **An installed artifact**, `<registry>/<namespace>/<kind>/<name>`, must be listed under `artifacts:` by that address, as an entry of its own, and installed, so the lockfile has its version; `publish` refuses one that isn't installed and says to run `aireg install`, and [`aireg remove`](remove.md) refuses to remove it while an export depends on it. The edge names the locked version and accepts what the `artifacts:` entry accepts: its range, only the version it pins, or, with neither, the locked version's compatible releases. When the artifact comes from a registry other than the target, the edge names that registry by its https address, so a project installing the export resolves it in the same registry, when it declares it. That is the address the registry is declared at, or for a folder the https `url` its `registry.json` gives. A registry with neither, such as a folder whose `registry.json` names no `url`, can't be named, and `publish` refuses the dependency.
 
+A project that adds the repository itself, as a folder of skills rather than from a registry, gets these dependencies from the manifest too; see [Sources that are not registries](add.md#sources-that-are-not-registries).
+
 Each `add`, `update` and `same` line shows the dependencies it carries:
 
 ```text

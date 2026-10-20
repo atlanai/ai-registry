@@ -32,8 +32,11 @@ export interface Need {
   namespace: string;
   kind: ArtifactKind;
   name: string;
-  /** The version `to` names, which `range` admits. */
-  version: string;
+  /**
+   * The version `to` names, which `range` admits. With neither, the edge takes the version its
+   * registry lists, as one export of a source has for another read at the same commit.
+   */
+  version?: string | undefined;
   /** The versions the edge accepts. Absent, it accepts `version` only. */
   range?: string | undefined;
   /** The canonical URL of the registry `to` resolves in, when the edge names one. */
@@ -86,19 +89,28 @@ export interface Closure {
   conflicts: Conflict[];
 }
 
+/** The range or version a need asks for, or undefined when it takes whichever is listed. */
+const askedAt = (need: Need): string | undefined => need.range ?? need.version;
+
 export function formatNeed(need: Need): string {
-  return `${need.namespace}/${need.kind}/${need.name}@${need.range ?? need.version}`;
+  const at = askedAt(need);
+  return `${need.namespace}/${need.kind}/${need.name}${at === undefined ? "" : `@${at}`}`;
 }
 
 export function wantOf(need: Need): Want {
   const { name, namespace, kind } = need;
-  return need.range === undefined
-    ? { name, namespace, kind, version: need.version }
-    : { name, namespace, kind, range: need.range };
+  if (need.range !== undefined) return { name, namespace, kind, range: need.range };
+  return need.version === undefined
+    ? { name, namespace, kind }
+    : { name, namespace, kind, version: need.version };
 }
 
-/** Whether a version is one the need accepts: in its range, or the very version it names. */
+/**
+ * Whether a version is one the need accepts: in its range, or the very version it names. One
+ * that names neither accepts whatever its registry lists, with a version or without.
+ */
 export function accepts(need: Need, version: string | undefined): boolean {
+  if (need.range === undefined && need.version === undefined) return true;
   if (version === undefined) return false;
   return need.range === undefined ? version === need.version : satisfies(version, need.range);
 }
@@ -171,7 +183,7 @@ const rowId = (row: LockArtifact): string => idOf(row.registry, row.namespace, r
 const placeOf = (item: Selected): string =>
   addressOf({ group: item.group, kind: item.kind, name: item.upstreamName });
 
-function parseNeed(to: string): Need | undefined {
+function parseNeed(to: string): (Need & { version: string }) | undefined {
   const at = to.lastIndexOf("@");
   if (at === -1) return undefined;
   const version = to.slice(at + 1);
@@ -314,7 +326,9 @@ function edge(walk: Walk, to: string, from: string, need: Need): void {
   set.add(from);
   walk.neededBy.set(to, set);
   const asks = walk.dependsOn.get(from) ?? new Map<string, string>();
-  if (!asks.has(to)) asks.set(to, need.range ?? need.version);
+  // An edge that names no version has none to record: it takes the one its sibling is read at.
+  const at = askedAt(need);
+  if (!asks.has(to) && at !== undefined) asks.set(to, at);
   walk.dependsOn.set(from, asks);
   if (need.range !== undefined) walk.ranged.add(from);
 }
@@ -363,10 +377,15 @@ function reach(walk: Walk, from: Visit, need: Need): void {
   const constraint = { need, by: from.address, from: from.id };
   const before = walk.chosen.get(id);
   if (before !== undefined) {
-    const [first] = before.constraints as [Constraint];
+    const first = before.constraints.find((c) => c.need.version !== undefined);
     const exact = need.range === undefined && before.constraints.every((c) => !c.need.range);
     // Two edges without a range name one version each, and only one can install.
-    if (exact && first.need.version !== need.version) {
+    if (
+      exact &&
+      first?.need.version !== undefined &&
+      need.version !== undefined &&
+      first.need.version !== need.version
+    ) {
       const conflict = betweenTwo(
         wanted,
         { version: first.need.version, by: first.by },
@@ -386,7 +405,7 @@ function reach(walk: Walk, from: Visit, need: Need): void {
     namespace,
     kind,
     name,
-    version,
+    ...(version === undefined ? {} : { version }),
     ...(range === undefined ? {} : { range }),
   };
   const chosen = { alias, wanted, ref, constraints: [constraint], parent: from.id };
@@ -458,8 +477,9 @@ function settle({ chosen, byAlias, raised, elsewhere }: Walk): {
   undeclared: Undeclared[];
   conflicts: Conflict[];
 } {
-  const versionOf = (item: Chosen) =>
-    listedAt(byAlias.get(item.alias), item.constraints[0]?.need as Need)?.version;
+  const listedOf = (item: Chosen) =>
+    listedAt(byAlias.get(item.alias), item.constraints[0]?.need as Need);
+  const versionOf = (item: Chosen) => listedOf(item)?.version;
   const stale = new Set(
     [...chosen]
       .filter(([, item]) => item.read && !acceptedBy(item.constraints, versionOf(item)))
@@ -476,12 +496,14 @@ function settle({ chosen, byAlias, raised, elsewhere }: Walk): {
   const conflicts = raised.filter(({ from }) => fresh(from)).map(({ conflict }) => conflict);
   const undeclared = elsewhere.filter(({ from }) => fresh(from)).map((item) => item.undeclared);
   for (const item of chosen.values()) {
+    const listed = listedOf(item) !== undefined;
     const version = versionOf(item);
-    if (acceptedBy(item.constraints, version)) continue;
+    // Listed is not enough for an edge that takes any version, but it has to be listed at all.
+    if (listed && acceptedBy(item.constraints, version)) continue;
     const kept = item.constraints.filter(({ from }) => fresh(from));
     if (kept.length === 0) continue;
     // What its fresh edges accept may be the stale version; asking again for that would loop.
-    const asked = acceptedBy(kept, version) ? item.constraints : kept;
+    const asked = listed && acceptedBy(kept, version) ? item.constraints : kept;
     const met = meeting(item.wanted, asked);
     if ("message" in met) {
       conflicts.push(met);
@@ -492,16 +514,25 @@ function settle({ chosen, byAlias, raised, elsewhere }: Walk): {
       alias: item.alias,
       need: met,
       by: asked[0]?.by as string,
-      ...(withRanges
-        ? { needed: asked.map(({ need, by }) => ({ at: need.range ?? need.version, by })) }
-        : {}),
+      ...(withRanges ? { needed: askedOf(asked) } : {}),
     });
   }
   return { unresolved, undeclared, conflicts };
 }
 
+/** Each range or version asked for and who asked, leaving out an edge that takes any version. */
+function askedOf(constraints: readonly Constraint[]): { at: string; by: string }[] {
+  return constraints.flatMap(({ need, by }) => {
+    const at = askedAt(need);
+    return at === undefined ? [] : [{ at, by }];
+  });
+}
+
 /** The one need every constraint's version meets, or the conflict that says none can. */
-function meeting(wanted: string, constraints: readonly Constraint[]): Need | Conflict {
+function meeting(wanted: string, all: readonly Constraint[]): Need | Conflict {
+  // An edge that takes any version agrees with every other, so only the rest can disagree.
+  const constraints = all.filter(({ need }) => askedAt(need) !== undefined);
+  if (constraints.length === 0) return all[0]?.need as Need;
   const first = constraints[0]?.need as Need;
   const exact = [...new Set(constraints.flatMap(({ need }) => (need.range ? [] : [need.version])))];
   const ranges = [
@@ -682,7 +713,7 @@ const AGREE_HINT =
   "Only one version can be installed here. Remove one of them, or ask the registry's owner to publish versions that agree.";
 
 function noOverlap(wanted: string, constraints: readonly Constraint[]): Conflict {
-  const asked = constraints.map(({ need, by }) => ({ at: need.range ?? need.version, by }));
+  const asked = askedOf(constraints);
   return {
     message: `${wanted} is needed at versions that do not overlap: ${askedBy(asked)}.`,
     hint: AGREE_HINT,
@@ -691,7 +722,7 @@ function noOverlap(wanted: string, constraints: readonly Constraint[]): Conflict
 
 /** Ranges that overlap, but only as a range longer than a registry reads (section 2.4). */
 function tooLong(wanted: string, constraints: readonly Constraint[]): Conflict {
-  const asked = constraints.map(({ need, by }) => ({ at: need.range ?? need.version, by }));
+  const asked = askedOf(constraints);
   return {
     message: `${wanted} is needed at ${askedBy(asked)}, which combine into a range longer than ${MAX_RANGE} characters.`,
     hint: "Remove one of them, or ask the registry's owner to publish versions whose ranges agree more simply.",
