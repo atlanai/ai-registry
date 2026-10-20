@@ -1,0 +1,8 @@
+.agents/
+.agents/skills/
+.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+.agents/skills/ship -> ../../.registry/artifacts/kit/kit/skills/ship
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
