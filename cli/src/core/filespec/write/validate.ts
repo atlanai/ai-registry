@@ -296,7 +296,7 @@ async function dependsOn(root: string, at: string): Promise<Edge[]> {
 }
 
 /** Whether `to` is the `<namespace>/<kind>/<name>@<version>` an edge names, and its version. */
-function edgeVersion(to: string): string | undefined {
+export function edgeVersion(to: string): string | undefined {
   const at = to.lastIndexOf("@");
   const [namespace, kind, name, ...rest] = to.slice(0, Math.max(at, 0)).split("/");
   const version = to.slice(at + 1);

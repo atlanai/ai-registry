@@ -83,12 +83,14 @@ Everything `@atlanai/aireg` exports is the contract, and every export carries it
 | `protocol` | The contract version, `ADAPTER_PROTOCOL`. `defineAdapter` fills it in. |
 | `artifactKinds`, `publishKinds` | The kinds it serves, and the narrower set it publishes, if any. |
 | `dispatch` | The URL schemes, hosts and local paths whose addresses aireg sends to it, and `sites`: URLs of some schemes on any host but those it leaves out. A host claim wins over a site claim, which wins over a scheme claim. |
-| `capabilities` | `pinsSource`, `publish`, `auth`, `messages`, `fileSpec` and `namespacePlugins`. Anything left out is off. With `namespacePlugins`, each namespace the source lists installs as one plugin in your user scope, named after it, while each artifact keeps a lockfile row of its own. |
+| `capabilities` | `pinsSource`, `publish`, `auth`, `messages`, `fileSpec`, `namespacePlugins` and `relationships`. Anything left out is off. With `namespacePlugins`, each namespace the source lists installs as one plugin in your user scope, named after it, while each artifact keeps a lockfile row of its own. With `relationships`, `publish` stores each version's `relationships` with it, as `artifact.json` does, and `resolve` returns them in its envelope. |
 | `configSchema` | The keys a registry's `config:` may carry for it. |
 | `auth` | `login`, and optionally `refresh` and `revoke`. `login` returns a `Credential` and, when the registry says who signed in, an `Identity`: a `name` and an optional `account`. |
 | `credentialsHint`, `readOnly` | What aireg says when a person needs to set up credentials, or publishes to a registry the adapter only reads. |
 | `ready` | The prerequisites it needs on this machine, which `aireg doctor` reports. |
 | `connect` | Opens a `SourceHandle` for one registry: `resolve`, `fetch` and `close`, and `publish`, `unpublish` and `localRoot` where it has them. |
+
+`publish` takes a list of `PublishInput`: each artifact's name, kind, namespace, version, files and `contentId`, the content digest of the envelope they make. Its optional `relationships` are the edges the version carries, such as its [dependencies](kinds.md#dependencies): each a `rel_type`, a `to` and an optional `range` and `registry`, as the file spec's `relationships[]` spells them. aireg checks them against the spec before sending, and `contentId` covers them, so a version whose only change is an edge is a new version. It sends them only to an adapter that declares `relationships`: it refuses to publish an artifact that has them anywhere else, before anything is sent.
 
 A failure is an `AdapterError` with one of six `Failure` classes, which decide whether aireg retries it and what it tells the person. `assertAdapterCompliance` checks an adapter against a registry it can read.
 
@@ -102,7 +104,7 @@ npm test         # the compliance test, run on src/ by Node
 npm run build    # compiles src/ to dist/
 ```
 
-`npm test` runs `assertAdapterCompliance`, which connects to the registry the test names and checks that the adapter implements every capability it turns on, lists only the kinds it declares, and serves bytes that match each file's digest. Point the test at a registry the adapter can read, so every file is fetched and checked.
+`npm test` runs `assertAdapterCompliance`, which connects to the registry the test names and checks that the adapter implements every capability it turns on, lists only the kinds it declares, and serves bytes that match each file's digest. Point the test at a registry the adapter can read, so every file is fetched and checked. An adapter that declares `relationships` also publishes a skill, or an agent, named `aireg-compliance` there with one `depends_on` edge and reads it back, so point its test at a registry it may write to.
 
 ## JSON output
 

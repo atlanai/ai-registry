@@ -13,6 +13,7 @@ export {
   type PublishInput,
   type PublishOptions,
   type PublishRefusal,
+  type PublishRelationship,
   type PublishResult,
   type Readiness,
   type RegistryIdentity,

@@ -198,4 +198,37 @@ describe("the envelope a publish writes", () => {
     ]);
     expect(written.files[0]).toMatchObject({ media_type: "text/markdown" });
   });
+
+  test("carries the version's relationships, and an edge alone makes the next version", async () => {
+    const edge = { rel_type: "depends_on", to: "house/skill/style@1.2.0", range: "^1.2.0" };
+    await writeOffer(root, [offer({ relationships: [edge] })], "2026-01-02T00:00:00Z", alone);
+    const envelope = (version: string) =>
+      readFile(join(root, `artifacts/house/skill/lint/${version}/artifact.json`), "utf8").then(
+        (text) => JSON.parse(text) as { relationships?: unknown },
+      );
+    expect((await envelope("1.0.0")).relationships).toEqual([edge]);
+    const versions = await readVersions(read(root), "house", "skill", "lint");
+    expect(versions.versions[0]?.digest).toBe(await pinned("1.0.0"));
+
+    const moved = { ...edge, to: "house/skill/style@1.3.0", range: "^1.3.0" };
+    const written = await writeOffer(
+      root,
+      [offer({ relationships: [moved] })],
+      "2026-01-03T00:00:00Z",
+      alone,
+    );
+
+    expect(written.unchanged).toBe(false);
+    expect((await readVersions(read(root), "house", "skill", "lint")).latest).toBe("1.0.1");
+    expect((await envelope("1.0.0")).relationships).toEqual([edge]);
+    expect((await envelope("1.0.1")).relationships).toEqual([moved]);
+  });
+
+  test("writes no relationships for a version offered without any", async () => {
+    await writeOffer(root, [offer({ relationships: [] })], "2026-01-02T00:00:00Z", alone);
+    const written = JSON.parse(
+      await readFile(join(root, "artifacts/house/skill/lint/1.0.0/artifact.json"), "utf8"),
+    );
+    expect(written).not.toHaveProperty("relationships");
+  });
 });
