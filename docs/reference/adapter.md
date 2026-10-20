@@ -70,7 +70,7 @@ An id that is built in, `git`, `local` or `well-known`, is refused.
 ### Writing an adapter
 
 - `dispatch` in `src/index.ts` names the hosts, URL schemes, sites or local paths whose addresses aireg would send to the adapter.
-- `connect` in `src/connect.ts` returns a handle. `resolve` lists each artifact with the file list that describes it, and `fetch` returns one file's bytes, which must match the digest that list gives. `resolve` may also return `registry`, what the registry calls itself, with its canonical `https` address as `url` where it has one: a [dependency](kinds.md#dependencies) in another registry names it by that address.
+- `connect` in `src/connect.ts` returns a handle. `resolve` lists each artifact with the file list that describes it, and `fetch` returns one file's bytes, which must match the digest that list gives. A request to `resolve` may carry a `range`, a version range as the file spec defines it, for which `resolve` returns the newest version in the range that installs without a pin. An adapter may ignore it and return what it would without one; aireg then refuses a version outside the range. `resolve` may also return `registry`, what the registry calls itself, with its canonical `https` address as `url` where it has one: a [dependency](kinds.md#dependencies) in another registry names it by that address.
 - `capabilities` turns on publishing and sign-in.
 
 ### The adapter contract
@@ -92,9 +92,9 @@ Everything `@atlanai/aireg` exports is the contract, and every export carries it
 
 `publish` takes a list of `PublishInput`: each artifact's name, kind, namespace, version, files and `contentId`, the content digest of the envelope they make. Its optional `relationships` are the edges the version carries, such as its [dependencies](kinds.md#dependencies): each a `rel_type`, a `to` and an optional `range` and `registry`, as the file spec's `relationships[]` spells them. aireg checks them against the spec before sending, and `contentId` covers them, so a version whose only change is an edge is a new version. It sends them only to an adapter that declares `relationships`: it refuses to publish an artifact that has them anywhere else, before anything is sent. aireg reports each artifact at the version it sent, so `publish` writes that version or fails: a version the registry already holds with other content is a `conflict`, and is never written as another version instead.
 
-A failure is an `AdapterError` with one of six `Failure` classes, which decide whether aireg retries it and what it tells the person. `assertAdapterCompliance` checks an adapter against a registry it can read.
+A failure is an `AdapterError` with one of six `Failure` classes, which decide whether aireg retries it and what it tells the person. `assertAdapterCompliance` checks an adapter against a registry it can read, and publishes to it when the adapter declares `relationships`, as [Testing an adapter](#testing-an-adapter) warns.
 
-The package also exports what the built-in adapters use: readers and writers for a registry laid out as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) (`resolveFromRoot`, `openFolderRegistry`, `readIndex`, `readVersions`, `mergedIndex`, `mergedVersions`), envelope and digest helpers (`buildEnvelope`, `describeFile`, `contentDigest`, `sha256`), RFC 9457 problem helpers for an adapter that speaks HTTP (`readProblem`, `failureFromStatus`, `retryAfterMs`), SemVer ordering, and the text helpers aireg's messages are written with.
+The package also exports what the built-in adapters use: readers and writers for a registry laid out as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) (`resolveFromRoot`, `openFolderRegistry`, `readIndex`, `readVersions`, `mergedIndex`, `mergedVersions`), envelope and digest helpers (`buildEnvelope`, `describeFile`, `contentDigest`, `sha256`), RFC 9457 problem helpers for an adapter that speaks HTTP (`readProblem`, `failureFromStatus`, `retryAfterMs`), SemVer ordering and ranges (`parseRange`, `satisfies`, `maxSatisfying`), and the text helpers aireg's messages are written with.
 
 ### Testing an adapter
 
@@ -104,7 +104,10 @@ npm test         # the compliance test, run on src/ by Node
 npm run build    # compiles src/ to dist/
 ```
 
-`npm test` runs `assertAdapterCompliance`, which connects to the registry the test names and checks that the adapter implements every capability it turns on, lists only the kinds it declares, and serves bytes that match each file's digest. Point the test at a registry the adapter can read, so every file is fetched and checked. An adapter that declares `relationships` also publishes a skill, or an agent, named `aireg-compliance` there with one `depends_on` edge and reads it back, so point its test at a registry it may write to.
+`npm test` runs `assertAdapterCompliance`, which connects to the registry the test names and checks that the adapter implements every capability it turns on, lists only the kinds it declares, and serves bytes that match each file's digest. Point the test at a registry the adapter can read, so every file is fetched and checked. An adapter that declares `relationships` also publishes a skill, or an agent, named `aireg-compliance` there, at version `1.0.0` with one `depends_on` edge, and reads it back.
+
+!!! warning "The compliance test publishes to the registry it checks"
+    For an adapter that declares `relationships`, point the test at a test registry, never at one people install from. The `aireg-compliance` version it publishes is a published version like any other, so it is never rewritten, and stays in that registry after the test.
 
 ## JSON output
 

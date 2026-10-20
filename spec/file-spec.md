@@ -340,5 +340,5 @@ A root conforms when its documents satisfy the schemas and the requirements this
 
 A breaking change MUST come with a version bump:
 
-- `format_version` covers the documents, the layout, and the digests. A change that a format 1 reader cannot handle needs a new format version.
+- `format_version` covers the documents, the layout, and the digests. A change that a format 1 reader cannot handle needs a new format version. An optional field that a format 1 reader may ignore by rule 4, such as `range` and `registry` on a relationship, needs none.
 - A kind manifest's `x-registry-schema-version` covers that kind's `spec` schema. A change after which the schema rejects content it accepted before needs a new schema version.

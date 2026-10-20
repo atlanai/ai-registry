@@ -85,6 +85,20 @@ jobs:
 
 The quoted `'.claude/skills/*'` lets the CLI find every skill folder itself. `--to ./registry/engineering` names the registry checkout and the namespace to publish into, and `--yes` skips prompts. aireg writes the new versions and the index into the checkout; git and the pull request action take them from there, as aireg doesn't push to git registries. `ACME_REGISTRY_TOKEN` needs write access to the registry repository's contents and pull requests; the workflow's own token only reads.
 
+A repository that also makes agents, or whose skills and agents depend on each other, can list what it publishes, and where, in its manifest instead, so the workflow publishes it with no paths. Add `exports:` and `publish.to` to `.registry/manifest.yml`:
+
+```yaml
+exports:
+  - .claude/skills/*
+  - path: .claude/agents/reviewer.md
+    depends_on:
+      - ./.claude/skills/pr-review
+publish:
+  to: [./registry/engineering]
+```
+
+The workflow's publish step becomes `aireg publish --yes`, and `paths:` takes in the agents and the manifest too: `paths: [".claude/skills/**", ".claude/agents/**", ".registry/manifest.yml"]`. aireg publishes the agent with a dependency on `pr-review`, at the version the same run publishes or the newest one already in the registry, so a project that adds the agent gets the skill too. A dependency on an artifact the project installs, listed under `artifacts:`, takes its version from the committed lockfile, so the workflow doesn't install anything first. See [Publishing a repository's exports](../reference/publish.md#publishing-a-repositorys-exports).
+
 ### 4. Review every change
 
 Check every pull request to the registry, so a change that edits a released version or leaves the index out of date cannot merge.
