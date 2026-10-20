@@ -1,0 +1,15 @@
+{
+  "id": "muse",
+  "displayName": "Muse Code",
+  "overrides": true,
+  "roots": {
+    "project": ".muse",
+    "user": { "default": "~/.config/muse", "env": "XDG_CONFIG_HOME", "within": "muse" }
+  },
+  "detect": { "binary": ["muse"] },
+  "reads": { "skill": ["agents", "muse", "claude", "codex"] },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": { "shape": "directory", "subdir": "skills", "scope": "user" }
+  }
+}
