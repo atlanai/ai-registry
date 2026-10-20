@@ -227,6 +227,37 @@ describe("plan with an export's version", () => {
     ).rejects.toMatchObject({ code: "conflict" });
   });
 
+  test("is the same while the edges it holds still take what they reach now", async () => {
+    const { work, digests } = await exported("1.0.0");
+    const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0", range: "^1.2.0" };
+    const stored = {
+      alias: "acme",
+      source: { adapter: { id: "probe", capabilities: { relationships: true } } },
+      latest: new Map([
+        ["eng/skill/lint", { id: "lint", version: "1.0.0", digests, relationships: [edge] }],
+      ]),
+      withheld: new Map(),
+    } as unknown as Published;
+    const at = (
+      relationships: { rel_type: string; to: string; range?: string; registry?: string }[],
+    ) => plan(work, stored, "eng", "patch", undefined, false, relationships);
+
+    const patched = await at([{ ...edge, to: "eng/skill/style@1.3.0", range: "^1.3.0" }]);
+    expect(patched).toMatchObject({ same: true, version: "1.0.0" });
+    // Shown with the edge it was published with.
+    expect(patched.input.relationships).toEqual([edge]);
+
+    for (const moved of [
+      [{ ...edge, to: "eng/skill/style@2.0.0", range: "^2.0.0" }],
+      [{ ...edge, to: "eng/skill/other@1.2.0" }],
+      [{ ...edge, registry: "https://example.com/r" }],
+      [edge, { rel_type: "depends_on", to: "eng/skill/format@1.0.0" }],
+      [],
+    ]) {
+      await expect(at(moved)).rejects.toMatchObject({ code: "conflict" });
+    }
+  });
+
   test("says when that version is below the newest", async () => {
     const { work } = await exported("0.9.5");
     const planned = await plan(work, holding(["sha256:newer"]), "eng", "patch", undefined, false);

@@ -275,3 +275,72 @@ describe("an export's own version", () => {
     expect(await written()).toEqual(["0.1.5", "0.2.0", "0.2.1"]);
   });
 });
+
+describe("a dependent whose export fixes its version", () => {
+  let repo: string;
+  const send = (...args: string[]) => aireg(["publish", "-y", ...args], { cwd: repo });
+
+  test.beforeAll(async ({ tmp, git }) => {
+    repo = join(tmp, "pinned");
+    await git.init(repo);
+    await mkdir(join(repo, ".claude", "skills", "review"), { recursive: true });
+    await writeFile(
+      join(repo, ".claude", "skills", "review", "SKILL.md"),
+      skillBody("review", "The review checklist."),
+    );
+    await mkdir(join(repo, ".claude", "agents"), { recursive: true });
+    await writeFile(
+      join(repo, ".claude", "agents", "reviewer.md"),
+      "---\nname: reviewer\ndescription: Reviews a pull request.\n---\nReview it.\n",
+    );
+    await writeManifestIn(
+      repo,
+      `exports:
+  - .claude/skills/review
+  - path: .claude/agents/reviewer.md
+    version: 0.0.5
+    depends_on:
+      - ./.claude/skills/review
+publish:
+  to: [./registry/eng]
+`,
+    );
+    await git(repo, "add", ".");
+    await git(repo, "commit", "-qm", "exports");
+    const made = await aireg(["registry", "init", "registry", "--name", "pinned", "-y"], {
+      cwd: repo,
+    });
+    expect(made.code, made.stderr).toBe(0);
+    const first = await send();
+    expect(first.code, first.stderr).toBe(0);
+  }, 60_000);
+
+  test("stays the same when its dependency's next release is still in its range", async () => {
+    await appendFile(join(repo, ".claude", "skills", "review", "SKILL.md"), "Check tests.\n");
+    const sent = await send("--json");
+    expect(sent.code, sent.stderr).toBe(0);
+    expect(JSON.parse(sent.stdout).data.artifacts).toEqual([
+      expect.objectContaining({ name: "review", from: "0.1.0", version: "0.1.1", published: true }),
+      expect.objectContaining({
+        name: "reviewer",
+        version: "0.0.5",
+        published: false,
+        dependsOn: [{ to: "eng/skill/review@0.1.0", range: "^0.1.0" }],
+      }),
+    ]);
+    const shown = await send("--dry-run");
+    expect(shown.stdout).toMatch(
+      /same {4}eng\/agent\/reviewer {2}0\.0\.5, already published, depends on review \^0\.1\.0/,
+    );
+  });
+
+  test("is refused once its dependency moves past the range it was published with", async () => {
+    await writeFile(
+      join(repo, ".claude", "skills", "review", "SKILL.md"),
+      skillBody("review", "The review checklist.", "Rewritten.\n"),
+    );
+    const sent = await send("--bump", "minor");
+    expect(sent.code).toBe(1);
+    expect(sent.stderr).toContain("eng/reviewer@0.0.5 is already published.");
+  });
+});

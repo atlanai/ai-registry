@@ -9,7 +9,13 @@ import type {
   Relationship,
   SourceAdapter,
 } from "#adapter/index.ts";
-import { type Bump, bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
+import {
+  type Bump,
+  bumpVersion,
+  compareVersion,
+  parseVersion,
+  satisfies,
+} from "#adapter/semver.ts";
 import { canonicalize } from "#adapter/spec/canonical.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { ID as LOCAL } from "#adapters/local/api.ts";
@@ -406,6 +412,44 @@ function sameEdges(
   return canonicalize(current ?? []) === canonicalize(offered ?? []);
 }
 
+/** `eng/skill/review@0.1.1` as the artifact it names, and the version. */
+function named(to: string): { artifact: string; version: string } {
+  const at = to.lastIndexOf("@");
+  return { artifact: to.slice(0, at), version: to.slice(at + 1) };
+}
+
+/**
+ * Whether the edges a fixed version was published with still take what this run plans: the same
+ * artifacts, by the same kind of edge in the same registry, each at a version the held edge's
+ * range accepts, or its exact version when it has none. A dependency's next patch release then
+ * leaves its dependent as it is, rather than asking to rewrite a version that cannot change.
+ */
+function edgesHold(
+  held: readonly Relationship[] | undefined,
+  offered: readonly PublishRelationship[] | undefined,
+): boolean {
+  const order = (edges: readonly Relationship[]) =>
+    [...edges]
+      .map((edge) => ({
+        edge,
+        key: `${edge.rel_type} ${edge.registry ?? ""} ${named(edge.to).artifact}`,
+      }))
+      .sort((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0));
+  const before = order(held ?? []);
+  const after = order(offered ?? []);
+  return (
+    before.length === after.length &&
+    before.every(({ edge, key }, at) => {
+      const next = after[at];
+      if (next === undefined || next.key !== key) return false;
+      const version = named(next.edge.to).version;
+      return edge.range === undefined
+        ? named(edge.to).version === version
+        : satisfies(version, edge.range);
+    })
+  );
+}
+
 export async function plan(
   work: Work,
   published: Published,
@@ -440,11 +484,13 @@ export async function plan(
   const asked = exact ?? fixed;
   // The files and the edges decide sameness: the digest covers the version, so it always moves.
   const probe = await offerFrom(work.path, target(asked ?? "0.1.0"));
-  // A version held back gives no files to compare, so it is never the same.
+  // A version held back gives no files to compare, so it is never the same. An export's own
+  // version cannot move, so its edges need only still take what they reach now.
+  const sameAs = fixed === undefined ? sameEdges : edgesHold;
   const matches = (held: Current) =>
     held.withheld === undefined &&
     held.digests.join() === probe.digests.join() &&
-    (relationships === undefined || sameEdges(held.relationships, probe.input.relationships));
+    (relationships === undefined || sameAs(held.relationships, probe.input.relationships));
   // A version is looked up by itself, whatever its status, so one held back is never taken for new;
   // a pin reaches a draft's files, which a listing withholds.
   const held =
@@ -479,7 +525,12 @@ export async function plan(
     ? (asked ?? (current?.version as string))
     : (asked ?? bumpVersion(current?.version, how));
   // The version is not part of the content identity, so the files read once serve it.
-  const input = version === probe.input.version ? probe.input : { ...probe.input, version };
+  const moved = version === probe.input.version ? probe.input : { ...probe.input, version };
+  // What is already published is shown with the edges it carries, not those it was compared with.
+  const input =
+    same && relationships !== undefined && held !== undefined
+      ? { ...moved, relationships: [...(held.relationships ?? [])] }
+      : moved;
   return {
     work,
     namespace,

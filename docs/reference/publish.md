@@ -111,6 +111,8 @@ acme  github.com/acme/agent-registry
 
 An export with a `version` is published at that version. When the target already holds that version with the same files and dependencies, it is `same`; when it holds it with others, `publish` refuses, since a published version is never rewritten. A version the registry holds back by its status counts as published too: a draft or a version pending review is compared as any other, and `publish` refuses a blocked one, whose files the registry doesn't give, as in `engineering/review@0.2.0 is already published, and is blocked (leaks tokens).` An export without a `version` takes the next one, as any other artifact does.
 
+An export's `version` is never published again with other dependencies, so its dependencies are compared by what they accept: it stays `same` while each edge it was published with still accepts the version this run plans for that dependency. An agent published at `0.0.5` depending on `review ^0.1.0` stays as it is when `review` moves to `0.1.1`. When `review` moves to `0.2.0`, or the agent gains or loses a dependency, `publish` refuses it, and you change its `version`.
+
 A `version` below the target's newest is published as that older version, and the `update` line says so:
 
 ```text
@@ -132,7 +134,7 @@ acme  github.com/acme/agent-registry
   add     engineering/agent/reviewer  0.1.0, depends on review ^0.1.0, sql-style ^1.2
 ```
 
-A version whose only change is a dependency is a new version. A registry that does not store dependencies with a version is refused before anything is sent; a registry folder stores them.
+For an artifact without a fixed `version`, a version whose only change is a dependency is a new version. A registry that does not store dependencies with a version is refused before anything is sent; a registry folder stores them.
 
 ## Options
 
