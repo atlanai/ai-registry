@@ -23,6 +23,7 @@ describe("callingAgent", () => {
     expect(callingAgent({ CURSOR_AGENT: "1" })).toBe("cursor");
     expect(callingAgent({ CODEX_THREAD_ID: "abc" })).toBe("codex");
     expect(callingAgent({ REPL_ID: "abc" })).toBe("replit");
+    expect(callingAgent({ OPENCLAW_SHELL: "exec" })).toBe("openclaw");
   });
 
   it("ignores a variable that is set but empty", () => {

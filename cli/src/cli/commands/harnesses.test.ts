@@ -51,6 +51,7 @@ describe("harnesses", () => {
     vi.stubEnv("PATH", "");
     vi.stubEnv("CLAUDE_CONFIG_DIR", join(cwd, ".claude"));
     vi.stubEnv("CODEX_HOME", "");
+    vi.stubEnv("OPENCLAW_STATE_DIR", "");
   });
 
   afterEach(async () => {
@@ -69,6 +70,7 @@ describe("harnesses", () => {
       { name: "claude", displayName: "Claude Code", ...builtIn, detected: true, by: "env" },
       { name: "codex", displayName: "Codex", ...builtIn, detected: false },
       { name: "cursor", displayName: "Cursor", ...builtIn, detected: false },
+      { name: "openclaw", displayName: "OpenClaw", ...builtIn, kind: "personal", detected: false },
       {
         name: "agents",
         displayName: "Shared .agents folder",
@@ -87,7 +89,7 @@ describe("harnesses", () => {
     expect(lines).toContain("  harness      id      status  where");
     expect(lines).toContain("  Claude Code  claude  found   from its environment variables");
     expect(lines.some((line) => /^ +(Codex|Cursor|agents|Shared)/.test(line))).toBe(false);
-    expect(lines).toContain("Found 1 of 3 supported harnesses on this machine.");
+    expect(lines).toContain("Found 1 of 4 supported harnesses on this machine.");
     expect(lines).toContain("hint: Run `aireg harnesses --all` to see every one.");
 
     const every: string[] = [];
