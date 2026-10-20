@@ -885,11 +885,25 @@ export interface Pinnable {
  * a namespace install names the row `platform/lint`, the pin says `lint@1.0.0`.
  */
 export function pinOf(manifest: Manifest, row: Pinnable): string | undefined {
+  return heldBy(manifest, row, (ref) => ref.version);
+}
+
+/** The version range the manifest asks for an installed artifact in, matched as `pinOf` matches. */
+export function rangeOf(manifest: Manifest, row: Pinnable): string | undefined {
+  return heldBy(manifest, row, (ref) => ref.range);
+}
+
+function heldBy(
+  manifest: Manifest,
+  row: Pinnable,
+  field: (ref: Ref) => string | undefined,
+): string | undefined {
   for (const ref of manifest.artifacts) {
-    if (ref.version === undefined || ref.registry !== row.registry) continue;
+    const value = field(ref);
+    if (value === undefined || ref.registry !== row.registry) continue;
     if (ref.name !== row.name || (ref.kind !== undefined && ref.kind !== row.kind)) continue;
     if (ref.namespace !== undefined && ref.namespace !== row.namespace) continue;
-    return ref.version;
+    return value;
   }
   return undefined;
 }

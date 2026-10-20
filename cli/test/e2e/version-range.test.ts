@@ -78,4 +78,33 @@ describe("a version range a project asks for", () => {
     expect(await manifest()).toBe(before);
     expect(await lockedVersion()).toBe("2.0.0");
   }, 60_000);
+
+  test("is outdated only by a newer version in the range, and shows the newest outside it", async () => {
+    // At 2.0.0 in ~2.0, with 2.1.0 published outside it.
+    const held = await aireg(["outdated"]);
+    expect(held.code, held.stderr).toBe(0);
+    expect(held.stdout).toMatch(/ lint\s+acme\s+2\.0\.0 ~2\.0\s+2\.0\.0\s+2\.1\.0/);
+    expect(held.stdout).not.toContain("aireg update");
+
+    await publish("2.0.0", "2.0.1", "2.1.0");
+    const behind = await aireg(["outdated"]);
+    expect(behind.code, behind.stderr).toBe(3);
+    expect(behind.stdout).toMatch(/ lint\s+acme\s+2\.0\.0 ~2\.0\s+2\.0\.1\s+2\.1\.0/);
+    expect(behind.stdout).toContain("aireg update");
+    const json = await aireg(["outdated", "--json"]);
+    expect(JSON.parse(json.stdout).data.artifacts).toEqual([
+      expect.objectContaining({
+        name: "lint",
+        current: "2.0.0",
+        range: "~2.0",
+        inRange: "2.0.1",
+        latest: "2.1.0",
+        moved: true,
+      }),
+    ]);
+
+    expect((await aireg(["update", "-y"])).code).toBe(0);
+    expect(await lockedVersion()).toBe("2.0.1");
+    expect((await aireg(["outdated"])).code).toBe(0);
+  }, 60_000);
 });

@@ -1,5 +1,6 @@
 import { credentialFor } from "#accounts/credentials.ts";
 import { contentDigest, type ResolveOptions, type Want } from "#adapter/index.ts";
+import { satisfies } from "#adapter/semver.ts";
 import { shownNames } from "#cli/names.ts";
 import { noArguments, parse } from "#cli/options.ts";
 import { type Watched, watchedFrom } from "#cli/render/installed.ts";
@@ -8,7 +9,7 @@ import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import { ExitCode } from "#core/errors.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
-import { type Manifest, pinOf } from "#core/manifest.ts";
+import { type Manifest, pinOf, rangeOf } from "#core/manifest.ts";
 import { abbreviate, type Printer, sentence } from "#core/output.ts";
 import { type Request, recordedAdapter, wanted } from "#core/plan/acquire.ts";
 import { listedAt } from "#core/plan/model.ts";
@@ -28,6 +29,12 @@ interface Row {
   moved: boolean;
   /** The version the manifest pinned, when it pinned one. */
   pinned: string | undefined;
+  /** The version range the manifest asks for, when it gives one. */
+  range?: string | undefined;
+  /** The newest version in `range`, which `aireg update` moves to. */
+  inRange?: string | undefined;
+  /** Newer than installed past anything that holds it: no pin, and inside its range. Not in JSON. */
+  behind?: boolean;
   /** Set when the answer is unknown, rather than known to be unchanged. */
   unchecked: string | undefined;
   /** Published since the last install, under a registry or namespace the manifest takes whole. */
@@ -44,6 +51,8 @@ interface Head {
    * matches across the very bump this command exists to report.
    */
   byAddress: Map<string, Upstream>;
+  /** The newest version in the manifest's range, by address, for each artifact asked for in one. */
+  inRange: Map<string, Upstream>;
   entries: readonly Entry[];
   why: string | undefined;
 }
@@ -68,7 +77,6 @@ function asked(request: Request | undefined, lock: Lock, alias: string): [Want[]
   return [[...names].map((name) => ({ name })), {}];
 }
 
-/** The namespaces a manifest takes whole from one registry; `*` for all of it. */
 /** The manifest's whole-registry and whole-namespace entries for one registry. */
 function wholes(manifest: Manifest, alias: string): Ref[] {
   return manifest.artifacts.filter((ref) => ref.registry === alias && ref.name === undefined);
@@ -77,7 +85,12 @@ function wholes(manifest: Manifest, alias: string): Ref[] {
 async function head(alias: string, manifest: Manifest, lock: Lock, base: string): Promise<Head> {
   const declared = manifest.registries[alias];
   if (declared === undefined) {
-    return { byAddress: new Map(), entries: [], why: "it is no longer declared" };
+    return {
+      byAddress: new Map(),
+      inRange: new Map(),
+      entries: [],
+      why: "it is no longer declared",
+    };
   }
 
   const location = expandLocation(declared.location, base);
@@ -88,20 +101,15 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
       credential === undefined ? {} : { credential },
     );
     try {
-      const [want, options] = asked(wanted(manifest, alias), lock, alias);
+      const request = wanted(manifest, alias);
+      const [want, options] = asked(request, lock, alias);
       const listing = await resolveArtifacts(open, want, options);
+      // Asked again in their ranges, which is where `aireg update` moves them.
+      const ranged = (request?.want ?? []).filter((item) => item.range !== undefined);
+      const within = ranged.length === 0 ? [] : (await resolveArtifacts(open, ranged)).listed;
       return {
-        byAddress: new Map(
-          listing.listed.map((item) => [
-            item.path,
-            {
-              contentId: contentDigest(item.artifact.envelope),
-              version: item.artifact.version ?? item.artifact.envelope.metadata.version,
-              name: item.artifact.envelope.metadata.name,
-              namespace: item.artifact.envelope.metadata.namespace,
-            },
-          ]),
-        ),
+        byAddress: upstreams(listing.listed),
+        inRange: upstreams(within),
         entries: listing.catalog.entries,
         why: undefined,
       };
@@ -109,12 +117,45 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
       await open.handle.close();
     }
   } catch (error) {
-    return { byAddress: new Map(), entries: [], why: (error as Error).message };
+    return { byAddress: new Map(), inRange: new Map(), entries: [], why: (error as Error).message };
   }
 }
 
-function row(name: string, entry: LockArtifact, found: Head, pinned: string | undefined): Row {
-  const base = { name, registry: entry.registry, pinned, watched: watchedFrom(entry) };
+function upstreams(listed: Awaited<ReturnType<typeof resolveArtifacts>>["listed"]) {
+  return new Map<string, Upstream>(
+    listed.map((item) => [
+      item.path,
+      {
+        contentId: contentDigest(item.artifact.envelope),
+        version: item.artifact.version ?? item.artifact.envelope.metadata.version,
+        name: item.artifact.envelope.metadata.name,
+        namespace: item.artifact.envelope.metadata.namespace,
+      },
+    ]),
+  );
+}
+
+/**
+ * A source that attests content answers without a download; one that does not can only be
+ * compared on the version it publishes. A version that a yank moved below what is installed is
+ * older, so it is not offered as an update.
+ */
+function newer(upstream: Upstream, entry: LockArtifact): boolean {
+  return (
+    !olderThan(upstream.version, entry.version) &&
+    (upstream.contentId !== undefined && entry.content !== ""
+      ? upstream.contentId !== entry.content
+      : upstream.version !== entry.version)
+  );
+}
+
+function row(
+  name: string,
+  entry: LockArtifact,
+  found: Head,
+  held: { pinned: string | undefined; range: string | undefined },
+): Row {
+  const base = { name, registry: entry.registry, ...held, watched: watchedFrom(entry) };
   if (found.why !== undefined) {
     return { ...base, current: "", latest: "", moved: false, unchecked: found.why };
   }
@@ -154,17 +195,23 @@ function row(name: string, entry: LockArtifact, found: Head, pinned: string | un
     };
   }
 
-  // A source that attests content answers without a download; one that does not
-  // can only be compared on the version it publishes. A latest that a yank moved
-  // below what is installed is older, so it is not offered as an update.
-  const moved =
-    !olderThan(upstream.version, entry.version) &&
-    (upstream.contentId !== undefined && entry.content !== ""
-      ? upstream.contentId !== entry.content
-      : upstream.version !== entry.version);
+  const moved = newer(upstream, entry);
+  // A range holds back what is outside it, as a pin holds back everything. An adapter that
+  // ignored the range answered outside it, which says nothing about what is inside.
+  const within =
+    held.range === undefined || address === undefined ? undefined : found.inRange.get(address);
+  const inRange =
+    within?.version !== undefined && satisfies(within.version, held.range as string)
+      ? within
+      : undefined;
+  const behind =
+    held.pinned === undefined &&
+    (held.range === undefined ? moved : inRange !== undefined && newer(inRange, entry));
 
   return {
     ...base,
+    ...(held.range === undefined ? {} : { inRange: inRange?.version }),
+    behind,
     // Mirrors `latest`: the version when there is one, the content digest otherwise.
     current: entry.version ?? (entry.content === undefined ? "?" : abbreviate(entry.content)),
     latest,
@@ -214,6 +261,7 @@ function additions(manifest: Manifest, lock: Lock, heads: Map<string, Head>): Ro
           (upstream.contentId === undefined ? "?" : abbreviate(upstream.contentId)),
         moved: true,
         pinned: undefined,
+        behind: true,
         unchecked: undefined,
         added: true,
       });
@@ -224,8 +272,9 @@ function additions(manifest: Manifest, lock: Lock, heads: Map<string, Head>): Ro
 
 function next(printer: Printer, moved: readonly Row[], scope: string): void {
   const flag = scope === "user" ? " -g" : "";
-  // A pin that is holding is not something to act on, and `update` never moves a watched row.
-  if (moved.some((entry) => entry.pinned === undefined && entry.watched === undefined)) {
+  // A pin or range that is holding is not something to act on, and `update` never moves a
+  // watched row.
+  if (moved.some((entry) => entry.behind === true && entry.watched === undefined)) {
     printer.note("next", `aireg update${flag}`);
   }
   if (moved.some((entry) => entry.watched !== undefined)) {
@@ -254,17 +303,19 @@ export async function run(context: CommandContext): Promise<void> {
         entry,
         heads.get(entry.registry) ?? {
           byAddress: new Map(),
+          inRange: new Map(),
           entries: [],
           why: "its registry could not be read",
         },
-        pinOf(manifest, entry),
+        { pinned: pinOf(manifest, entry), range: rangeOf(manifest, entry) },
       ),
     );
   }
   rows.push(...additions(manifest, lock, heads));
 
   if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { scope: roots.scope, artifacts: rows } });
+    const artifacts = rows.map(({ behind: _, ...entry }) => entry);
+    context.printer.json({ ok: true, data: { scope: roots.scope, artifacts } });
   } else if (rows.length === 0) {
     context.printer.info(
       context.printer.style.dim(`Nothing is installed in ${scopeName(roots.scope)}.`),
@@ -307,8 +358,18 @@ export async function run(context: CommandContext): Promise<void> {
             value: (entry: Row) => {
               const current = entry.added === true ? style.dim("new") : entry.current;
               if (entry.watched !== undefined) return `${current} ${style.cyan("watched")}`;
+              if (entry.range !== undefined) return `${current} ${style.yellow(entry.range)}`;
               return entry.pinned === undefined ? current : `${current} ${style.yellow("pinned")}`;
             },
+          },
+          {
+            header: "in range",
+            value: (entry: Row) => {
+              if (entry.range === undefined) return "";
+              const version = entry.inRange ?? entry.current;
+              return entry.behind === true ? style.green(version) : version;
+            },
+            optional: true,
           },
           { header: "latest", value: (entry: Row) => style.green(entry.latest) },
         ],
@@ -319,7 +380,7 @@ export async function run(context: CommandContext): Promise<void> {
     }
   }
 
-  if (rows.some((entry) => (entry.moved && entry.pinned === undefined) || entry.unchecked)) {
+  if (rows.some((entry) => (entry.moved && entry.behind === true) || entry.unchecked)) {
     context.exit = ExitCode.Changed;
   }
 }
