@@ -1,4 +1,4 @@
 # Code owners review pull requests that change their paths. Every path has two
 # owners, because GitHub never lets the author approve their own pull request.
 * @firecast @UdaySagar-Git
-/docs/ @benhuds @firecast
+/docs/ @benhuds @firecast @UdaySagar-Git
