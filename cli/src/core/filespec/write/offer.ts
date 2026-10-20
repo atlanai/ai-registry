@@ -18,7 +18,7 @@ import { authored, isDirectory, refusal } from "#core/fs/tree.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { CONCURRENCY, limiter } from "#core/limit.ts";
 import { envelopeSpec } from "./kinds.ts";
-import { edgeVersion } from "./validate.ts";
+import { edgeVersion, ROOT_URL } from "./validate.ts";
 
 const reading = limiter(CONCURRENCY);
 
@@ -39,8 +39,6 @@ export interface OfferTarget {
 
 /** Relationship schema: `rel_type` is a lowercase word, as `depends_on` is. */
 const REL_TYPE = /^[a-z][a-z0-9_]*$/;
-/** Common schema `root_url`: an `https` origin and path, with no trailing slash. */
-const ROOT_URL = /^https:\/\/\S*[^/\s]$/;
 
 /** What is wrong with one edge, by the relationship schema, or undefined when nothing is. */
 function edgeProblem(edge: PublishRelationship): string | undefined {

@@ -310,6 +310,9 @@ export function edgeVersion(to: string): string | undefined {
   return named ? version : undefined;
 }
 
+/** Common schema `root_url`: an `https` origin and path, with no trailing slash. */
+export const ROOT_URL = /^https:\/\/\S*[^/\s]$/;
+
 /**
  * What is wrong with one edge. One naming another registry is resolved there, so only its own
  * fields are checked; one without resolves in this registry, which must hold `to`.
@@ -318,8 +321,10 @@ function edgeProblems({ to, range, registry }: Edge, held: ReadonlySet<string>):
   const version = edgeVersion(to);
   const problems: string[] = [];
   if (registry !== undefined) {
-    if (typeof registry !== "string" || !/^https:\/\/./i.test(registry)) {
-      problems.push(`depends on ${to} in ${quoted(String(registry))}, which is not an https URL`);
+    if (typeof registry !== "string" || !ROOT_URL.test(registry)) {
+      problems.push(
+        `depends on ${to} in ${quoted(String(registry))}, which is not an https URL without a trailing slash`,
+      );
     }
     if (version === undefined) {
       problems.push(`depends on ${to}, which is not a namespace/kind/name@version`);

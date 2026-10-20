@@ -119,7 +119,18 @@ const CASES: Case[] = [
       }),
     path: "artifacts/eng/agent/helper/1.0.0",
     message:
-      'depends on platform/skill/sql-style@1.2.0 in "http://example.com/r", which is not an https URL',
+      'depends on platform/skill/sql-style@1.2.0 in "http://example.com/r", which is not an https URL without a trailing slash',
+  },
+  {
+    name: "a dependency in a registry named with a trailing slash, which no root URL has",
+    build: (registry) =>
+      registry.agent("eng/helper@1.0.0", {
+        dependsOn: [{ to: "platform/skill/sql-style@1.2.0", registry: "https://example.com/r/" }],
+        files: { "AGENT.md": AGENT.replace("name: reviewer", "name: helper") },
+      }),
+    path: "artifacts/eng/agent/helper/1.0.0",
+    message:
+      'depends on platform/skill/sql-style@1.2.0 in "https://example.com/r/", which is not an https URL without a trailing slash',
   },
   {
     name: "a dependency in another registry that is not a namespace/kind/name@version",
