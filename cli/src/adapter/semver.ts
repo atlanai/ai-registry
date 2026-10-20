@@ -272,25 +272,130 @@ function tightened(set: readonly Comparator[]): Comparator[] | undefined {
   return [lower, upper].filter((bound) => bound !== undefined);
 }
 
+/** Whether a set names a prerelease of `release`, which lets it admit that release's prereleases. */
+function namesPrereleaseOf(set: readonly Comparator[], release: Version): boolean {
+  return set.some(({ version }) => version.prerelease.length > 0 && sameRelease(version, release));
+}
+
 /**
- * The versions every one of the ranges admits, as one range, or undefined when no version can
- * satisfy them all. Each set keeps its tightest bounds, so a prerelease the merged set admits may
- * still be refused by one of the ranges on its own; check each before taking a version.
+ * A set, ANDed with `other`, as bounds that keep the prerelease rule: a prerelease bound of a
+ * release `other` names no prerelease of admits none of that release's prereleases, so it
+ * becomes the release's own bound, which admits the same releases. Undefined when it admits
+ * only such a prerelease.
  */
-export function intersect(ranges: readonly Range[]): Range | undefined {
-  let sets: Comparator[][] = [[]];
-  for (const range of ranges) {
-    const next = new Map<string, Comparator[]>();
-    for (const left of sets) {
-      for (const right of range.sets) {
-        const merged = tightened([...left, ...right]);
-        if (merged !== undefined) next.set(formatSet(merged), merged);
+function sharingPrereleases(
+  set: readonly Comparator[],
+  other: readonly Comparator[],
+): Comparator[] | undefined {
+  const kept: Comparator[] = [];
+  for (const comparator of set) {
+    const { operator, version } = comparator;
+    if (version.prerelease.length === 0 || namesPrereleaseOf(other, version)) {
+      kept.push(comparator);
+      continue;
+    }
+    if (operator === "=") return undefined;
+    const bare = { ...version, prerelease: [] };
+    kept.push({ operator: operator === "<" || operator === "<=" ? "<" : ">=", version: bare });
+  }
+  return kept;
+}
+
+/** A tightened set's lower and upper bounds, an exact version being both. */
+function boundsOf(set: readonly Comparator[]): { lower?: Comparator; upper?: Comparator } {
+  const [only] = set;
+  if (set.length === 1 && only?.operator === "=") {
+    return { lower: { ...only, operator: ">=" }, upper: { ...only, operator: "<=" } };
+  }
+  const lower = set.find(({ operator }) => operator === ">" || operator === ">=");
+  const upper = set.find(({ operator }) => operator === "<" || operator === "<=");
+  return { ...(lower === undefined ? {} : { lower }), ...(upper === undefined ? {} : { upper }) };
+}
+
+/** Whether what is below `upper` and what is above `lower` overlap, or meet at a version one of them admits. */
+function meets(upper: Comparator | undefined, lower: Comparator | undefined): boolean {
+  if (upper === undefined || lower === undefined) return true;
+  const cmp = compareVersion(upper.version, lower.version);
+  return cmp > 0 || (cmp === 0 && (upper.operator === "<=" || lower.operator === ">="));
+}
+
+/** The looser of two bounds on one side: further out, by `outward`, or as far and inclusive. */
+function looser(left: Comparator, right: Comparator, outward: 1 | -1): Comparator {
+  const cmp = compareVersion(left.version, right.version) * outward;
+  if (cmp !== 0) return cmp > 0 ? left : right;
+  return left.operator === ">=" || left.operator === "<=" ? left : right;
+}
+
+/**
+ * Two tightened sets as the one set that admits what either does, when they overlap or touch and
+ * neither names a prerelease, whose admission a wider set would change; else undefined.
+ */
+function joined(
+  left: readonly Comparator[],
+  right: readonly Comparator[],
+): Comparator[] | undefined {
+  const named = (set: readonly Comparator[]) =>
+    set.some(({ version }) => version.prerelease.length > 0);
+  if (named(left) || named(right)) return undefined;
+  const a = boundsOf(left);
+  const b = boundsOf(right);
+  if (!meets(a.upper, b.lower) || !meets(b.upper, a.lower)) return undefined;
+  const lower =
+    a.lower === undefined || b.lower === undefined ? undefined : looser(a.lower, b.lower, -1);
+  const upper =
+    a.upper === undefined || b.upper === undefined ? undefined : looser(a.upper, b.upper, 1);
+  return tightened([lower, upper].filter((bound) => bound !== undefined));
+}
+
+/** The sets with every two that overlap or touch made one, so a combined range stays short. */
+function merged(sets: readonly Comparator[][]): Comparator[][] {
+  const out = [...sets];
+  // What a joined set admits may reach one already passed, so each join starts over.
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (let i = 0; i < out.length && !changed; i++) {
+      for (let j = i + 1; j < out.length && !changed; j++) {
+        const one = joined(out[i] as Comparator[], out[j] as Comparator[]);
+        if (one === undefined) continue;
+        out.splice(j, 1);
+        out[i] = one;
+        changed = true;
       }
     }
-    if (next.size === 0) return undefined;
-    sets = [...next.values()];
   }
-  return { sets };
+  return out;
+}
+
+/**
+ * The versions every one of the ranges admits, as one range, or undefined when no version can
+ * satisfy them all. A prerelease is admitted only where every range admits it, and sets that
+ * overlap or touch are made one.
+ */
+export function intersect(ranges: readonly Range[]): Range | undefined {
+  const [first, ...rest] = ranges;
+  if (first === undefined) return { sets: [[]] };
+  const once = (sets: readonly (readonly Comparator[])[]): Comparator[][] => {
+    const next = new Map<string, Comparator[]>();
+    for (const set of sets) {
+      const tight = tightened(set);
+      if (tight !== undefined) next.set(formatSet(tight), tight);
+    }
+    return merged([...next.values()]);
+  };
+  let sets = once(first.sets);
+  for (const range of rest) {
+    const pairs: Comparator[][] = [];
+    for (const left of sets) {
+      for (const right of range.sets) {
+        const ours = sharingPrereleases(left, right);
+        const theirs = sharingPrereleases(right, left);
+        if (ours !== undefined && theirs !== undefined) pairs.push([...ours, ...theirs]);
+      }
+    }
+    sets = once(pairs);
+    if (sets.length === 0) return undefined;
+  }
+  return sets.length === 0 ? undefined : { sets };
 }
 
 function formatSet(set: readonly Comparator[]): string {

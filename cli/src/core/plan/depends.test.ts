@@ -258,6 +258,31 @@ describe("closure, with ranges", () => {
     ]);
   });
 
+  it("combines two long ranges that collapse, and refuses one too long to ask for", () => {
+    const minors = (step: number) =>
+      Array.from({ length: 12 }, (_, at) => `~10.${100 + at * step}`).join(" || ");
+    const two = (left: string, right: string) =>
+      closure(
+        [selected("agent", "reviewer", "0.3.0"), selected("agent", "triage", "1.0.0")],
+        registry(
+          ["agent", "reviewer", "0.3.0", `eng/skill/review@10.100.0 ${left}`],
+          ["agent", "triage", "1.0.0", `eng/skill/review@10.100.0 ${right}`],
+          review("9.0.0"),
+        ),
+      );
+
+    const collapsed = two(minors(1), minors(1).replaceAll("~", ""));
+    expect(collapsed.conflicts).toEqual([]);
+    expect(collapsed.unresolved.map((item) => item.need.range)).toEqual([">=10.100.0 <10.112.0"]);
+
+    // With gaps between them, the twelve sets stay apart and make more than a registry reads.
+    const apart = two(minors(2), ">=10.0.0");
+    expect(apart.unresolved).toEqual([]);
+    expect(apart.conflicts.map((conflict) => conflict.message)).toEqual([
+      `eng/skill/review is needed at ${minors(2)} by eng/agent/reviewer, and >=10.0.0 by eng/agent/triage, which combine into a range longer than 256 characters.`,
+    ]);
+  });
+
   it("holds an edge without a range to its version, which every range must accept", () => {
     const exact = closure(
       [selected("agent", "reviewer", "0.3.0"), selected("agent", "triage", "1.0.0")],

@@ -3,6 +3,7 @@ import type { Envelope, Want } from "#adapter/index.ts";
 import {
   formatRange,
   intersect,
+  MAX_RANGE,
   parseRange,
   parseVersion,
   type Range,
@@ -516,7 +517,9 @@ function meeting(wanted: string, constraints: readonly Constraint[]): Need | Con
   if (exact.length > 1) return noOverlap(wanted, constraints);
   if (ranges.length === 1) return first;
   const met = intersect(ranges.map((range) => parseRange(range) as Range));
-  return met === undefined ? noOverlap(wanted, constraints) : { ...first, range: formatRange(met) };
+  if (met === undefined) return noOverlap(wanted, constraints);
+  const range = formatRange(met);
+  return range.length > MAX_RANGE ? tooLong(wanted, constraints) : { ...first, range };
 }
 
 /**
@@ -533,7 +536,9 @@ export function movesWithin(lock: Lock, name: string): string | undefined {
   if (ranges.some((range) => range === undefined)) return undefined;
   if (asked.length === 1) return asked[0];
   const met = intersect(ranges as Range[]);
-  return met === undefined ? undefined : formatRange(met);
+  const range = met === undefined ? undefined : formatRange(met);
+  // One no registry would read holds it, as ranges that no longer meet do.
+  return range === undefined || range.length > MAX_RANGE ? undefined : range;
 }
 
 /** By installed name, what needs each artifact, read from the closure's ids. */
@@ -681,6 +686,15 @@ function noOverlap(wanted: string, constraints: readonly Constraint[]): Conflict
   return {
     message: `${wanted} is needed at versions that do not overlap: ${askedBy(asked)}.`,
     hint: AGREE_HINT,
+  };
+}
+
+/** Ranges that overlap, but only as a range longer than a registry reads (section 2.4). */
+function tooLong(wanted: string, constraints: readonly Constraint[]): Conflict {
+  const asked = constraints.map(({ need, by }) => ({ at: need.range ?? need.version, by }));
+  return {
+    message: `${wanted} is needed at ${askedBy(asked)}, which combine into a range longer than ${MAX_RANGE} characters.`,
+    hint: "Remove one of them, or ask the registry's owner to publish versions whose ranges agree more simply.",
   };
 }
 

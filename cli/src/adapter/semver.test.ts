@@ -253,9 +253,74 @@ describe("intersect", () => {
 
   it("writes a range that reads back as the same versions", () => {
     const met = intersect([parseRange("^1.2.3-rc.1")!, parseRange("<1.5.0")!])!;
-    expect(formatRange(met)).toBe(">=1.2.3-rc.1 <1.5.0");
+    // `<1.5.0` admits no prerelease of 1.2.3, so neither does what both admit.
+    expect(formatRange(met)).toBe(">=1.2.3 <1.5.0");
     for (const version of ["1.2.3-rc.2", "1.2.3", "1.4.9", "1.5.0", "1.3.0-rc.1"]) {
       expect(satisfies(version, formatRange(met)), version).toBe(satisfies(version, met));
     }
+  });
+
+  it("admits a prerelease only where every range does", () => {
+    expect(both(">=0.9.0 <=1.0.0-rc.5", ">=0.9.0 <1.0.0")).toBe(">=0.9.0 <1.0.0");
+    const met = intersect([parseRange(">=0.9.0 <=1.0.0-rc.5")!, parseRange(">=0.9.0 <1.0.0")!])!;
+    expect(maxSatisfying(["0.9.0", "1.0.0-rc.2"], met)).toBe("0.9.0");
+    expect(both(">=1.0.0-rc.1 <2.0.0", ">=1.0.0-rc.3")).toBe(">=1.0.0-rc.3 <2.0.0");
+    expect(both("=1.0.0-rc.1", ">=0.9.0")).toBeUndefined();
+    expect(both(">1.0.0-rc.1 <1.0.0-rc.9", "^1.0.0-rc.0 || ^0.9.0")).toBe(
+      ">1.0.0-rc.1 <1.0.0-rc.9",
+    );
+
+    const ranges = [
+      [">=0.9.0 <=1.0.0-rc.5", ">=0.9.0 <1.0.0"],
+      ["^1.2.3-rc.1", "<1.5.0", ">=1.2.3-rc.2 || ^2.0.0-beta.1"],
+      [">1.0.0-alpha <2.0.0-rc.1", ">=1.0.0-beta <=2.0.0"],
+      ["~1.4.0-rc.1 || 2.x", "^1.4.0-rc.3 || >=2.0.0-rc.1"],
+    ];
+    const versions = [
+      "0.9.0",
+      "1.0.0-alpha.1",
+      "1.0.0-beta.2",
+      "1.0.0-rc.2",
+      "1.0.0-rc.6",
+      "1.0.0",
+      "1.2.3-rc.1",
+      "1.2.3-rc.3",
+      "1.2.3",
+      "1.4.0-rc.2",
+      "1.4.0-rc.4",
+      "1.4.2",
+      "1.9.9",
+      "2.0.0-beta.2",
+      "2.0.0-rc.1",
+      "2.0.0-rc.2",
+      "2.0.0",
+      "2.1.0",
+    ];
+    for (const texts of ranges) {
+      const parsed = texts.map((text) => parseRange(text)!);
+      const met = intersect(parsed);
+      for (const version of versions) {
+        const all = parsed.every((range) => satisfies(version, range));
+        expect(
+          met !== undefined && satisfies(version, met),
+          `${version} in ${texts.join(" & ")}`,
+        ).toBe(all);
+      }
+    }
+  });
+
+  it("makes sets that overlap or touch one, so a combined range stays short", () => {
+    expect(both("^1.0.0 || ^2.0.0", ">=1.0.0")).toBe(">=1.0.0 <3.0.0");
+    expect(both("1.2.x || 1.3.x || =1.4.0", "*")).toBe(">=1.2.0 <=1.4.0");
+    // A gap, or a prerelease bound, keeps them apart.
+    expect(both("~1.2.0 || ~1.4.0", "*")).toBe(">=1.2.0 <1.3.0 || >=1.4.0 <1.5.0");
+    expect(both("^1.0.0-rc.1 || ^2.0.0", ">=1.0.0-rc.0")).toBe(
+      ">=1.0.0-rc.1 <2.0.0 || >=2.0.0 <3.0.0",
+    );
+
+    const minors = (from: number) =>
+      Array.from({ length: 12 }, (_, at) => `~10.${from + at}`).join(" || ");
+    const met = both(minors(100), minors(100).replaceAll("~", ""));
+    expect(met).toBe(">=10.100.0 <10.112.0");
   });
 });
