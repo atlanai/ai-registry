@@ -150,6 +150,11 @@ describe("a local folder of skills", () => {
       message:
         "mine is a folder of skills, which has no versions, so pdf@1.0.0 cannot be installed.",
     });
+    await expect(handle.resolve([{ name: "pdf", range: "^1.0.0" }])).rejects.toMatchObject({
+      failure: "invalid",
+      message:
+        "mine is a folder of skills, which has no versions, so pdf@^1.0.0 cannot be installed.",
+    });
   });
 
   test("refuses a publish before writing anything", async ({ tmp }) => {

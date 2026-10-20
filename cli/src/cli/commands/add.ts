@@ -235,9 +235,8 @@ async function addAddress(
   function pin(registry: string, qualified: string): string {
     const address = `${registry}/${qualified}`;
     const leaf = qualified.split("/").at(-1);
-    return resolved.version !== undefined && leaf === resolved.name
-      ? `${address}@${resolved.version}`
-      : address;
+    const at = resolved.version ?? resolved.range;
+    return at !== undefined && leaf === resolved.name ? `${address}@${at}` : address;
   }
 
   const effective: CommonOptions = {
@@ -422,8 +421,14 @@ async function reportAdded(
     }
   }
   if (added.copied) printer.success(`Added registry ${alias} to this project's manifest.`);
-  for (const { name, version } of added.repinned) {
-    printer.success(version === undefined ? `Unpinned ${name}.` : `Pinned ${name} at ${version}.`);
+  for (const { name, version, range } of added.repinned) {
+    printer.success(
+      range !== undefined
+        ? `Pinned ${name} to versions ${range}.`
+        : version === undefined
+          ? `Unpinned ${name}.`
+          : `Pinned ${name} at ${version}.`,
+    );
   }
   // A pin that moved nothing is said once, by the line above, rather than as "Already up to date".
   const acted = new Set(
@@ -614,10 +619,15 @@ function narrowedTargets(
   return same ? "scope" : wanted;
 }
 
-/** An artifact the manifest already asked for, now asked for at another version, or at none. */
+/** An artifact the manifest already asked for, now asked for at another version or range, or at none. */
 interface Repin {
   name: string;
   version: string | undefined;
+  range?: string | undefined;
+}
+
+function repinOf(name: string, ref: Ref): Repin {
+  return { name, version: ref.version, ...(ref.range === undefined ? {} : { range: ref.range }) };
 }
 
 /**
@@ -646,14 +656,15 @@ function declare(
       declaredAt.set(formatAddress(ref), artifacts.length);
       artifacts.push(ref);
       // A pin on something a whole namespace installed is a pin all the same.
-      if (name !== undefined && ref.version !== undefined && installedAs(ref) !== undefined) {
-        repinned.push({ name, version: ref.version });
+      const pinned = ref.version !== undefined || ref.range !== undefined;
+      if (name !== undefined && pinned && installedAs(ref) !== undefined) {
+        repinned.push(repinOf(name, ref));
       }
       continue;
     }
     const declared = artifacts[already] as Ref;
-    if (name !== undefined && declared.version !== ref.version) {
-      repinned.push({ name, version: ref.version });
+    if (name !== undefined && (declared.version !== ref.version || declared.range !== ref.range)) {
+      repinned.push(repinOf(name, ref));
     }
     if (changed(declared, ref)) artifacts[already] = ref;
   }
@@ -956,7 +967,8 @@ function addressOf(pick: string, all: readonly Entry[], alias: string): string |
   if (entry !== undefined) {
     const address = [entry.group, entry.kind, entry.name].filter(Boolean).join("/");
     if (plugin && ref.name === undefined) refuseShared(word, address, entry.kind, alias);
-    return ref.version === undefined ? address : `${address}@${ref.version}`;
+    const at = ref.version ?? ref.range;
+    return at === undefined ? address : `${address}@${at}`;
   }
   return ref.name === undefined && (namespaces.has(word) || plugin) ? word : undefined;
 }

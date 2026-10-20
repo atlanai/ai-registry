@@ -142,6 +142,9 @@ describe("a site's Agent Skills index", () => {
       const pinned = await aireg(["add", "site/localhost/greet@1.0.0", "-y"]);
       expect(pinned.code).toBe(1);
       expect(pinned.stderr).toContain("site is a site's skills index, which has no versions");
+      const ranged = await aireg(["add", "site/localhost/greet@^1.0.0", "-y"]);
+      expect(ranged.code).toBe(1);
+      expect(ranged.stderr).toContain("which has no versions, so greet@^1.0.0 cannot be installed");
     });
   }, 60_000);
 });

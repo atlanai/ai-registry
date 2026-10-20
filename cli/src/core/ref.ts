@@ -1,4 +1,5 @@
 import { isArtifactName, isDeviceName, isVersion } from "#adapter/filespec/names.ts";
+import { parseRange } from "#adapter/semver.ts";
 import { list, quoted, withoutCredentials } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import { type ArtifactKind, isKind, KINDS } from "./kinds.ts";
@@ -19,6 +20,11 @@ export interface Ref {
    * which is what makes the presence of this field the whole definition of a pin.
    */
   version?: string | undefined;
+  /**
+   * The versions asked for, as a range (file spec section 2.4) that is not one exact version:
+   * the newest of them installs, and `update` moves within them. Absent when `version` is set.
+   */
+  range?: string | undefined;
   /** Explicit local name, when two artifacts would otherwise collide. */
   localName?: string | undefined;
   /** Members a whole registry or namespace leaves out, as addresses relative to it. */
@@ -78,8 +84,18 @@ function kindOf(input: string, segment: string, registry: string, name: string):
   );
 }
 
-/** Splits a trailing `@<version>` off, leaving the address to be segmented. */
-function splitVersion(input: string, trimmed: string): { address: string; version?: string } {
+/** A part of a partial version that stands for any number, as in `1.x`. */
+const WILDCARD = /^[xX*]$/;
+
+/**
+ * Splits a trailing `@<version>` or `@<range>` off, leaving the address to be segmented. What
+ * reads as a version is one, so `@1.2` still pins a registry that publishes `1.2`; a range is
+ * what is not a version, or a version with a wildcard in it, such as `1.x`.
+ */
+function splitVersion(
+  input: string,
+  trimmed: string,
+): { address: string; version?: string; range?: string } {
   const at = trimmed.indexOf("@");
   if (at === -1) return { address: trimmed };
   if (trimmed.indexOf("@", at + 1) !== -1) {
@@ -87,22 +103,26 @@ function splitVersion(input: string, trimmed: string): { address: string; versio
   }
 
   const version = trimmed.slice(at + 1);
+  const address = trimmed.slice(0, at);
   if (version === "") throw new RefParseError(input, "no version follows the @");
   // `latest` is what absence already means, so it normalizes away rather than
   // becoming a pin that can never match a published version.
-  if (version === LATEST) return { address: trimmed.slice(0, at) };
-  if (!isVersion(version)) throw new RefParseError(input, `${quoted(version)} is not a version`);
-  return { address: trimmed.slice(0, at), version };
+  if (version === LATEST) return { address };
+  if (isVersion(version) && !version.split(".").some((part) => WILDCARD.test(part))) {
+    return { address, version };
+  }
+  if (parseRange(version) !== undefined) return { address, range: version };
+  throw new RefParseError(input, `${quoted(version)} is not a version or a version range`);
 }
 
 export function parseRef(input: string): Ref {
   const trimmed = input.trim();
   if (trimmed === "") throw new RefParseError(input, "it is empty");
 
-  const { address, version } = splitVersion(input, trimmed);
+  const { address, version, range } = splitVersion(input, trimmed);
   const parts = segments(input, address);
   const registry = parts[0] as string;
-  const pinned = version === undefined ? {} : { version };
+  const pinned = version !== undefined ? { version } : range !== undefined ? { range } : {};
 
   if (parts.length > 4) {
     throw new RefParseError(
@@ -112,7 +132,7 @@ export function parseRef(input: string): Ref {
   }
   // Pinning anything broader than one artifact has no meaning: a namespace's
   // members are versioned one by one, so there is no version to hold them at.
-  if (version !== undefined && parts.length < 3) {
+  if ((version !== undefined || range !== undefined) && parts.length < 3) {
     throw new RefParseError(input, "only one artifact can be pinned to a version");
   }
 
@@ -185,7 +205,8 @@ export function formatAddress(ref: Ref): string {
 
 export function formatRef(ref: Ref): string {
   const address = formatAddress(ref);
-  return ref.version === undefined ? address : `${address}@${ref.version}`;
+  const at = ref.version ?? ref.range;
+  return at === undefined ? address : `${address}@${at}`;
 }
 
 /** The name the artifact is installed under. */

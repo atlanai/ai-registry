@@ -1,0 +1,4 @@
+registries:
+  kit: acme/agent-kit
+artifacts:
+  - kit/skill/lint@>= 1.2.0

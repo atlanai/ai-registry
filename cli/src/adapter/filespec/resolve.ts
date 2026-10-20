@@ -21,6 +21,9 @@ import {
   readVersions,
   resolveVersion,
   SpecError,
+  type VersionRow,
+  type VersionsDocument,
+  versionsIn,
 } from "./documents.ts";
 import {
   ENVELOPE,
@@ -163,17 +166,43 @@ export interface RootResolveOptions {
   all?: boolean | undefined;
 }
 
+const narrowness = (want: Want) =>
+  Number(want.namespace !== undefined) + Number(want.kind !== undefined);
+
 /** Where two wants reach one artifact, the one that names it more narrowly sets its version. */
 function pinOf(reaching: readonly Want[]): string | undefined {
-  const narrowness = (want: Want) =>
-    Number(want.namespace !== undefined) + Number(want.kind !== undefined);
   return [...reaching]
     .filter((want) => want.version !== undefined)
     .sort((a, b) => narrowness(b) - narrowness(a))[0]?.version;
 }
 
+/** The range that sets an artifact's version when no want pins one, chosen as a pin is. */
+function rangeOf(reaching: readonly Want[]): string | undefined {
+  if (pinOf(reaching) !== undefined) return undefined;
+  return [...reaching]
+    .filter((want) => want.range !== undefined)
+    .sort((a, b) => narrowness(b) - narrowness(a))[0]?.range;
+}
+
 /** Statuses that install only when a request pins the version exactly. */
 const UNRELEASED = new Set(["draft", "pending_review"]);
+
+/**
+ * The version a request resolves to: the one it pins, the newest in its range that installs
+ * without a pin, or `latest`. A range whose every version is withheld gives the newest of them,
+ * which the caller is told about.
+ */
+function versionFor(
+  versions: VersionsDocument,
+  pinned: string | undefined,
+  range: string | undefined,
+): VersionRow {
+  if (pinned !== undefined || range === undefined) return resolveVersion(versions, pinned);
+  const admitted = versionsIn(versions, range);
+  const installs = (row: VersionRow) =>
+    row.status !== "blocked" && !UNRELEASED.has(row.status ?? "");
+  return admitted.find(installs) ?? (admitted[0] as VersionRow);
+}
 
 /** Statuses that install, but with a warning the client gives from `Artifact.status`. */
 const CAUTIONED = new Set([...UNRELEASED, "deprecated", "archived"]);
@@ -197,10 +226,10 @@ export async function resolveFromRoot(
     const reaching = options.wanted.filter((want) => covers(want, entry));
     const asked = reaching.length > 0;
     if (options.all !== true && options.wanted.length > 0 && !asked) return [];
-    return [{ entry, asked, pinned: pinOf(reaching) }];
+    return [{ entry, asked, pinned: pinOf(reaching), range: rangeOf(reaching) }];
   });
   const withheld: Withheld[] = [];
-  const artifacts = await inOrder(chosen, async ({ entry, asked, pinned }) => {
+  const artifacts = await inOrder(chosen, async ({ entry, asked, pinned, range }) => {
     // A malformed path segment is the indexer's mistake, and installing from
     // it would write that mistake into somebody's tree.
     if (!usable(entry)) {
@@ -211,7 +240,7 @@ export async function resolveFromRoot(
     }
 
     const versions = await readVersions(read, entry.namespace, entry.kind, entry.name);
-    const version = resolveVersion(versions, pinned);
+    const version = versionFor(versions, pinned, range);
     // Section 5 rule 7: a yanked version stays resolvable by name, because a
     // lockfile pinning one must keep resolving, but `latest` must not hand it out.
     if (version.yanked && pinned === undefined) return undefined;

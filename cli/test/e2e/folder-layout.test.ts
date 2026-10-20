@@ -174,6 +174,33 @@ describe("a git repository of skills", () => {
     expect(await versions(project)).toMatchObject({ "pr-review": "1.1.0", reviewer: "1.1.0" });
   }, 60_000);
 
+  test("reads a range at the newest release tag it admits", async ({
+    aireg,
+    git,
+    project,
+    tmp,
+  }) => {
+    const repo = await kit(join(tmp, "skills-repo")).write();
+    await git.init(repo);
+    await git.commit(repo, "one");
+    await git.tag(repo, "v1.0.0");
+    await skillsFolder(repo).skill("skills/pr-review", { body: "Review it twice.\n" }).write();
+    const second = await git.commit(repo, "two");
+    await git.tag(repo, "v1.1.0");
+    await skillsFolder(repo).skill("skills/pr-review", { body: "Review it again.\n" }).write();
+    await git.commit(repo, "three");
+    await git.tag(repo, "v2.0.0");
+    await init(aireg);
+
+    const added = await aireg(["add", pathToFileURL(repo).href, "-s", "pr-review"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect((await versions(project))["pr-review"]).toBe("2.0.0");
+    const ranged = await aireg(["add", "skills-repo/skills-repo/skill/pr-review@^1", "-y"]);
+    expect(ranged.code, ranged.stderr).toBe(0);
+    expect((await versions(project))["pr-review"]).toBe("1.1.0");
+    expect((await lockOf(project)).registries["skills-repo"]?.revision).toBe(second);
+  }, 60_000);
+
   test("reads a branch at a pseudo-version, which pins its commit", async ({
     aireg,
     git,

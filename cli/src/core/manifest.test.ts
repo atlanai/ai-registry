@@ -3,7 +3,13 @@ import { dirname, join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { roots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { formatManifest, parseManifest, readManifest, writeManifest } from "./manifest.ts";
+import {
+  coveredByWhole,
+  formatManifest,
+  parseManifest,
+  readManifest,
+  writeManifest,
+} from "./manifest.ts";
 import { parseRef } from "./ref.ts";
 
 // A release's version, so a manifest can ask for one older or newer than this CLI.
@@ -41,6 +47,34 @@ describe("manifest keys", () => {
         "registries: { kit: acme/kit }\nartifacts:\n  - { ref: kit/lint, copy: yes please }\n",
       ),
     ).toThrow('manifest.yml: `copy` of artifact "kit/lint" must be true or false.');
+  });
+});
+
+describe("a version range", () => {
+  test("is read from `@<range>` and written back as it was written", () => {
+    const text = [
+      "registries:",
+      "  kit: acme/kit",
+      "artifacts:",
+      "  - kit/skill/lint@^1.2",
+      "  - kit/skill/format@>=1.0.0 <2.0.0",
+      "  - kit/skill/sort@1.2",
+      "",
+    ].join("\n");
+    const manifest = parseManifest(text);
+    expect(manifest.artifacts.map((ref) => [ref.version, ref.range])).toEqual([
+      [undefined, "^1.2"],
+      [undefined, ">=1.0.0 <2.0.0"],
+      ["1.2", undefined],
+    ]);
+    expect(parseManifest(formatManifest(manifest))).toEqual(manifest);
+    expect(formatManifest(manifest)).toContain("  - kit/skill/lint@^1.2\n");
+  });
+
+  test("keeps its own entry beside a whole namespace that takes the same artifact", () => {
+    const whole = [parseRef("kit/eng")];
+    expect(coveredByWhole(parseRef("kit/eng/skill/lint"), whole)).toBe(true);
+    expect(coveredByWhole(parseRef("kit/eng/skill/lint@^1"), whole)).toBe(false);
   });
 });
 

@@ -135,6 +135,13 @@ describe("wanted", () => {
     expect(wanted(manifest(["acme/platform"]), "acme")?.all).toBe(true);
   });
 
+  it("asks for a range as written, beside a whole namespace", () => {
+    expect(wanted(manifest(["acme/platform", "acme/platform/skill/lint@^1.2"]), "acme")).toEqual({
+      want: [{ name: "lint", namespace: "platform", kind: "skill", range: "^1.2" }],
+      all: true,
+    });
+  });
+
   it("is undefined for a registry the manifest takes nothing from", () => {
     expect(wanted(manifest(["acme/platform"]), "other")).toBeUndefined();
   });
@@ -223,6 +230,26 @@ describe("acquire, held to the lock", () => {
     expect(answers(emptied, source, true)).toBe(true);
   });
 
+  it("holds a locked version inside the manifest's range, and moves it within the range", async () => {
+    const asked = manifest(["acme/platform/skill/lint@^1.0.0"]);
+    const lock = locked({ lint: "1.2.0" });
+    const ranged = { ...exact("lint"), range: "^1.0.0" };
+    const held = await requested(asked, lock);
+    expect(held?.want).toContainEqual(exact("lint", "1.2.0"));
+    const moved = await requested(asked, lock, new Set(["platform/lint"]));
+    expect(moved?.want).toContainEqual(ranged);
+    expect(moved?.want).not.toContainEqual(exact("lint", "1.2.0"));
+  });
+
+  it("frees a locked version the manifest's range no longer takes", async () => {
+    const request = await requested(
+      manifest(["acme/platform/skill/lint@^2.0.0"]),
+      locked({ lint: "1.2.0" }),
+    );
+    expect(request?.want).toContainEqual({ ...exact("lint"), range: "^2.0.0" });
+    expect(request?.want).not.toContainEqual(exact("lint", "1.2.0"));
+  });
+
   it("lets a version the manifest pins win over the lock's", async () => {
     const request = await requested(
       manifest(["acme/platform/skill/lint@2.0.0"]),
@@ -239,6 +266,8 @@ describe("answers", () => {
     if (source === undefined) throw new Error("no locked source");
     expect(answers(manifest(["acme/platform/skill/lint"]), source)).toBe(true);
     expect(answers(manifest(["acme/platform/skill/lint@2.0.0"]), source)).toBe(false);
+    expect(answers(manifest(["acme/platform/skill/lint@^1.0.0"]), source)).toBe(true);
+    expect(answers(manifest(["acme/platform/skill/lint@^2.0.0"]), source)).toBe(false);
     expect(answers(manifest(["acme/platform/skill/test"]), source)).toBe(false);
     const moved = manifest(["acme/platform/skill/lint"]);
     moved.registries.acme = { location: "github.com/acme/other", adapter: undefined, config: {} };
@@ -273,6 +302,35 @@ describe("newlyYanked", () => {
 });
 
 describe("acquire", () => {
+  /** An artifact the fake adapter lists at `version`, whatever it was asked for. */
+  const listedAt = (version: string): Artifact => ({
+    id: `artifacts/platform/skill/lint/${version}`,
+    kind: "skill",
+    group: "platform",
+    envelope: buildEnvelope({
+      kind: "skill",
+      metadata: { name: "lint", namespace: "platform", version },
+      files: [{ path: "SKILL.md", digest: `sha256:${"0".repeat(64)}`, size: 42 }],
+    }),
+    files: [{ path: "SKILL.md", locator: "SKILL.md", executable: false }],
+  });
+
+  test("refuses a version outside the range asked for, and closes the registry", async ({
+    tmp,
+  }) => {
+    fake.listed = [{ path: "artifacts/platform/skill/lint", artifact: listedAt("2.0.0") }];
+    await expect(
+      acquire(manifest(["acme/platform/skill/lint@^1.0.0"]), { base: tmp }),
+    ).rejects.toMatchObject({
+      code: "invalid",
+      message: "acme returned lint 2.0.0, which is outside ^1.0.0.",
+    });
+    expect([...fake.closed]).toEqual(["acme"]);
+    fake.listed = [{ path: "artifacts/platform/skill/lint", artifact: listedAt("1.4.0") }];
+    const [acme] = await acquire(manifest(["acme/platform/skill/lint@^1.0.0"]), { base: tmp });
+    expect(acme?.placements.get("artifacts/platform/skill/lint")?.version).toBe("1.4.0");
+  });
+
   test("closes every registry it opened when one cannot be listed", async ({ tmp }) => {
     const both = parseManifest(
       [

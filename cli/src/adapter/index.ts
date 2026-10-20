@@ -83,7 +83,11 @@ export {
   bumpVersion,
   compareVersion,
   formatVersion,
+  maxSatisfying,
+  parseRange,
   parseVersion,
+  type Range,
+  satisfies,
   type Version,
 } from "./semver.ts";
 export { contentDigest, sha256 } from "./spec/canonical.ts";

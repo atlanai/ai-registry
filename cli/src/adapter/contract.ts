@@ -101,6 +101,13 @@ export interface Want {
   name: string;
   /** An exact version, which pins it. */
   version?: string | undefined;
+  /**
+   * A version range (file spec section 2.4): the highest version satisfying it that the status
+   * rules allow for a request that names no version. Ignored when `version` is set. An adapter
+   * that cannot read it serves what it would serve without it, and aireg refuses that version
+   * when it is outside the range.
+   */
+  range?: string | undefined;
   /** Each narrows the want, so a pin reaches only the artifact it was written on. */
   namespace?: string | undefined;
   /** Narrows the want to one kind, as `namespace` narrows it to one namespace. */

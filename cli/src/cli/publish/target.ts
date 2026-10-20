@@ -37,6 +37,15 @@ function refuseName(name: string | undefined): void {
   });
 }
 
+/** A publish makes one version, so a range has nothing to say about which. */
+function refuseRange(to: string, ref: Ref): void {
+  if (ref.range === undefined) return;
+  throw new AiregError(`--to ${quoted(to)} names a version range, not a version.`, {
+    code: ErrorCode.Usage,
+    hint: "Name one version, such as @1.2.0, or leave it off to take the next one.",
+  });
+}
+
 export function parseTo(to: string): Destination {
   const ref = parseRef(to);
   if (ref.namespace === undefined) {
@@ -46,6 +55,7 @@ export function parseTo(to: string): Destination {
     });
   }
   refuseName(ref.name);
+  refuseRange(to, ref);
   return {
     registry: ref.registry,
     namespace: ref.namespace,
@@ -163,6 +173,7 @@ export async function folderTo(
   }
   if (ref.namespace === undefined) throw noNamespace(to);
   refuseName(ref.name);
+  refuseRange(to, ref);
   return {
     declared: { location: root, adapter: LOCAL, config: {} },
     destination: { registry, namespace: ref.namespace, name: ref.name, version: ref.version },

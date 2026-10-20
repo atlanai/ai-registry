@@ -592,7 +592,9 @@ export function reaches(ref: Ref, row: Pinnable): boolean {
 /** One artifact named on its own adds nothing when a whole namespace or registry entry already takes it. */
 export function coveredByWhole(ref: Ref, artifacts: readonly Ref[]): boolean {
   if (ref.name === undefined || ref.kind === undefined) return false;
-  if (ref.version !== undefined || ref.localName !== undefined) return false;
+  if (ref.version !== undefined || ref.range !== undefined || ref.localName !== undefined) {
+    return false;
+  }
   if (ref.targets !== undefined || ref.copy === true) return false;
   return artifacts.some(
     (whole) =>

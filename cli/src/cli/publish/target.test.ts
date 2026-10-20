@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { offerFrom } from "#core/filespec/write/offer.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { commitAndPush, type Published, plan } from "./target.ts";
+import { commitAndPush, folderTo, type Published, parseTo, plan } from "./target.ts";
 import type { Work } from "./work.ts";
 
 vi.mock("#core/filespec/write/offer.ts", async (importOriginal) => {
@@ -55,6 +55,20 @@ describe("commitAndPush", () => {
     );
     expect(commitAndPush("fix $HOME's `id`", "../my registry")).toBe(
       `cd "../my registry" && git add . && git commit -m 'fix $HOME'\\''s \`id\`' && git push`,
+    );
+  });
+});
+
+describe("--to", () => {
+  test("takes one version, never a range", async () => {
+    expect(parseTo("acme/eng/skill/lint@1.2.0").version).toBe("1.2.0");
+    expect(() => parseTo("acme/eng/skill/lint@^1.2")).toThrow(
+      '--to "acme/eng/skill/lint@^1.2" names a version range, not a version.',
+    );
+    await mkdir(join(root, "registry"), { recursive: true });
+    await writeFile(join(root, "registry", "registry.json"), "{}");
+    await expect(folderTo(join(root, "registry", "eng", "skill", "lint@~1"), root)).rejects.toThrow(
+      "names a version range, not a version.",
     );
   });
 });
