@@ -1067,9 +1067,15 @@ function selectScope(
   }
 }
 
-/** A namespace address narrows the catalog, so `-s` cannot reach past it. */
+/**
+ * A namespace address narrows the catalog, so `-s` cannot reach past it. A plugin's namespace
+ * holds its parts, and the plugin itself, which sits in none.
+ */
 function inside(entries: readonly Entry[], namespace: string | undefined): readonly Entry[] {
-  return namespace === undefined ? entries : entries.filter((entry) => entry.group === namespace);
+  if (namespace === undefined) return entries;
+  return entries.filter(
+    (entry) => entry.group === namespace || (entry.kind === "plugin" && entry.name === namespace),
+  );
 }
 
 /** The hint's addresses: the kind only where a namespace has two artifacts of one name. */

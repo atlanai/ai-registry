@@ -196,7 +196,22 @@ describe("-s on a plugin", () => {
     const added = await aireg(["add", "acme-tools/docs-kit", "-s", "nope"]);
     expect(added.code).toBe(1);
     expect(added.stderr).toContain('acme-tools publishes nothing named "nope".');
-    expect(added.stderr).toContain("Use pdf or xlsx.");
+    expect(added.stderr).toContain("Use docs-kit, pdf or xlsx.");
+  }, 60_000);
+
+  test("adds a plugin of many skills by its name without asking, as one artifact", async ({
+    aireg,
+    project,
+    tmp,
+  }) => {
+    const kit = marketplace(join(tmp, "mkt"));
+    for (let at = 0; at < 11; at += 1) kit.skill(`plugins/docs-kit/skills/tip-${at}`);
+    const root = await kit.write();
+    await init(aireg, "claude");
+    expect((await aireg(["registry", "add", root])).code).toBe(0);
+    const added = await aireg(["add", "acme-tools/docs-kit", "-y"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect(await locked(project)).toEqual(["docs-kit"]);
   }, 60_000);
 
   test("refuses a name that is both a plugin and a skill, naming how to take each", async ({
