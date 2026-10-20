@@ -8,7 +8,6 @@ import { CALLER_SIGNALS } from "#core/harness/index.ts";
 const OTHER_SIGNALS: readonly { agent: string; env: readonly string[] }[] = [
   { agent: "antigravity", env: ["ANTIGRAVITY_AGENT"] },
   { agent: "augment", env: ["AUGMENT_AGENT"] },
-  { agent: "opencode", env: ["OPENCODE_CLIENT"] },
   { agent: "replit", env: ["REPL_ID"] },
 ];
 

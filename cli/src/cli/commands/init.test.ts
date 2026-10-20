@@ -52,6 +52,7 @@ describe("init", () => {
       "copilot",
       "cursor",
       "gemini",
+      "opencode",
     ]);
   });
 

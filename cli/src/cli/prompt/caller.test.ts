@@ -42,6 +42,12 @@ describe("callingAgent", () => {
     expect(callingAgent({ GEMINI_CLI: "1" })).toBe("gemini");
   });
 
+  it("takes OpenCode's variable from its harness definition alone", () => {
+    expect(CALLER_SIGNALS).toContainEqual({ agent: "opencode", env: ["OPENCODE"] });
+    expect(SIGNALS.filter((signal) => signal.agent === "opencode")).toHaveLength(1);
+    expect(callingAgent({ OPENCODE: "1" })).toBe("opencode");
+  });
+
   it("ignores a variable that is set but empty", () => {
     expect(callingAgent({ CLAUDECODE: "  " })).toBeUndefined();
   });

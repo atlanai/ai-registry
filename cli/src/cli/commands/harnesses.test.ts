@@ -53,6 +53,7 @@ describe("harnesses", () => {
     vi.stubEnv("CODEX_HOME", "");
     vi.stubEnv("COPILOT_HOME", "");
     vi.stubEnv("GEMINI_CLI_HOME", "");
+    vi.stubEnv("OPENCODE_CONFIG_DIR", "");
   });
 
   afterEach(async () => {
@@ -73,6 +74,7 @@ describe("harnesses", () => {
       { name: "copilot", displayName: "GitHub Copilot", ...builtIn, detected: false },
       { name: "cursor", displayName: "Cursor", ...builtIn, detected: false },
       { name: "gemini", displayName: "Gemini CLI", ...builtIn, detected: false },
+      { name: "opencode", displayName: "OpenCode", ...builtIn, detected: false },
       {
         name: "agents",
         displayName: "Shared .agents folder",
@@ -91,7 +93,7 @@ describe("harnesses", () => {
     expect(lines).toContain("  harness      id      status  where");
     expect(lines).toContain("  Claude Code  claude  found   from its environment variables");
     expect(lines.some((line) => /^ +(Codex|Cursor|agents|Shared)/.test(line))).toBe(false);
-    expect(lines).toContain("Found 1 of 5 supported harnesses on this machine.");
+    expect(lines).toContain("Found 1 of 6 supported harnesses on this machine.");
     expect(lines).toContain("hint: Run `aireg harnesses --all` to see every one.");
 
     const every: string[] = [];
