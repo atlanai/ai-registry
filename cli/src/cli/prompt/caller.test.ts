@@ -22,12 +22,17 @@ describe("callingAgent", () => {
     expect(callingAgent({ CLAUDECODE: "1" })).toBe("claude");
     expect(callingAgent({ CURSOR_AGENT: "1" })).toBe("cursor");
     expect(callingAgent({ CODEX_THREAD_ID: "abc" })).toBe("codex");
+    expect(callingAgent({ COPILOT_CLI: "1" })).toBe("copilot");
     expect(callingAgent({ REPL_ID: "abc" })).toBe("replit");
   });
 
   it("takes no variable the agent does not set", () => {
     expect(callingAgent({ CLAUDE_CODE: "1" })).toBeUndefined();
     expect(callingAgent({ CURSOR_TRACE_ID: "abc" })).toBeUndefined();
+  });
+
+  it("takes no setting a person exports for an agent as a sign of it", () => {
+    expect(callingAgent({ COPILOT_MODEL: "auto", COPILOT_ALLOW_ALL: "true" })).toBeUndefined();
   });
 
   it("ignores a variable that is set but empty", () => {

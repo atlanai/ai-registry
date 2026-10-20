@@ -45,7 +45,7 @@ describe("init", () => {
     const writes: string[] = [];
     await run(context(cwd, ["--for", "*"], writes));
     const payload = JSON.parse(writes.join("")) as { data: { targets: string[] } };
-    expect(payload.data.targets).toEqual(["agents", "claude", "codex", "cursor"]);
+    expect(payload.data.targets).toEqual(["agents", "claude", "codex", "copilot", "cursor"]);
   });
 
   test("names the folders it installs into, as list and status name them", async () => {

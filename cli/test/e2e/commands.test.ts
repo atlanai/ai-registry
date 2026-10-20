@@ -55,7 +55,7 @@ describe("a first-run mistake", () => {
     const refused = await aireg(["install"]);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('No harness named "myagent".');
-    expect(refused.stderr).toContain("Use agents, claude, codex or cursor");
+    expect(refused.stderr).toContain("Use agents, claude, codex, copilot or cursor");
 
     await manifest("claude");
     const installed = await aireg(["install"]);
