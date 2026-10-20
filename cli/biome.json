@@ -44,6 +44,10 @@
         "noExcessiveCognitiveComplexity": {
           "level": "warn",
           "options": { "maxAllowedComplexity": 25 }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "error",
+          "options": { "maxLines": 100, "skipBlankLines": true }
         }
       },
       "style": {
@@ -71,10 +75,21 @@
       "includes": ["**/*.test.ts", "test/**"],
       "linter": {
         "rules": {
+          "complexity": { "noExcessiveLinesPerFunction": "off" },
           "suspicious": { "noConsole": "off" },
           "style": { "noNonNullAssertion": "off" }
         }
       }
+    },
+    {
+      "includes": [
+        "src/cli/commands/add.ts",
+        "src/cli/commands/remove.ts",
+        "src/cli/console/ui/app.ts",
+        "src/cli/render/status.ts",
+        "src/engine/execute.ts"
+      ],
+      "linter": { "rules": { "complexity": { "noExcessiveLinesPerFunction": "off" } } }
     }
   ]
 }
