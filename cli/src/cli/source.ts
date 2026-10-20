@@ -12,6 +12,7 @@ import {
 import { isLayoutId, isReadOnlyLayout, LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
 import { registryNameFromLocation } from "#adapter/location.ts";
 import { expandHome, isLocalPath } from "#adapter/paths.ts";
+import { contentDigest } from "#adapter/spec/canonical.ts";
 import {
   list,
   plural,
@@ -73,6 +74,10 @@ export interface Probed {
   carriesOf: (entry: Entry) => readonly Carried[];
   /** The bytes an entry names, fetched now if they are not already here. */
   content: (entry: Entry) => Promise<string>;
+  /** The adapter that read it, as a lockfile records it. */
+  adapter: string;
+  /** The content digest the source serves for one want, or undefined when it serves none. */
+  digestOf: (want: Want) => Promise<string | undefined>;
   close: () => Promise<void>;
 }
 
@@ -526,6 +531,17 @@ export async function probe(
           into: (content) => stagingPath(content),
         })
       ).path;
+    },
+    adapter: open.adapter.id,
+    // Asked one at a time, so a version this source lacks does not hide the rest.
+    digestOf: async (wanted) => {
+      try {
+        const [item] = (await resolveArtifacts(open, [wanted])).listed;
+        return item === undefined ? undefined : contentDigest(item.artifact.envelope);
+      } catch (cause) {
+        if (adapterOf(cause)?.failure === "not_found") return undefined;
+        throw cause;
+      }
     },
     close: () => open.handle.close(),
   };
