@@ -812,8 +812,9 @@ async function write(
     warn(printer, appliedNotices(roots, applied, harnesses));
 
     const landed = applied.installed.length > 0;
-    // An edit none of whose artifacts landed must not leave the manifest asking for them.
-    if (edited && !landed && applied.unstaged.length > 0)
+    // An edit none of whose artifacts landed, whether unstaged or left out for want of trust,
+    // must not leave the manifest asking for them.
+    if (edited && !landed && (applied.unstaged.length > 0 || planned.untrusted.length > 0))
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
     refuseWithheld(planned, printer, hooks.moving);

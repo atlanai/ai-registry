@@ -85,6 +85,21 @@ describe("a plugin marketplace", () => {
     expect((await aireg(["install"])).code).toBe(0);
   }, 60_000);
 
+  test("leaves the manifest as it was when the one plugin an add names is refused", async ({
+    aireg,
+    project,
+    tmp,
+  }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await init(aireg, "claude");
+    expect((await aireg(["registry", "add", root])).code).toBe(0);
+    const before = await read(manifestPath(project));
+    const refused = await aireg(["add", "acme-tools/deploy-kit"], { input: "" });
+    expect(refused.code).toBe(2);
+    expect(await read(manifestPath(project))).toBe(before);
+    expect((await aireg(["install"])).code).toBe(0);
+  }, 60_000);
+
   test("lets a sync take no change to what a plugin runs, trusted or not", async ({
     aireg,
     project,
