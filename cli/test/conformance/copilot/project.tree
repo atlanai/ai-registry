@@ -1,0 +1,6 @@
+project/
+project/.github/
+project/.github/agents/
+project/.github/agents/reviewer.agent.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+project/.github/skills/
+project/.github/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
