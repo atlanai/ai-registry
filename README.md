@@ -24,6 +24,20 @@ An agent registry stores your organization's AI artifacts and manages their life
 
 In a plain repository of skills or a marketplace, everyone gets whatever copy is there when they install, so teammates end up running different copies, and nobody can tell which. A registry can live in a git repository too, but it pins and verifies every version, gives every machine identical bytes, rolls back or yanks a version for everyone, and keeps all your harnesses in sync from one record.
 
+## See it work
+
+**1. Ensure skills are consistent across harnesses.** Alice asks Claude Code to put her pr-review skill in a team registry. Her agent creates the registry, releases pr-review as 0.1.0, and installs that version for both Claude Code and Codex.
+
+![Alice asks Claude Code to put pr-review in a team registry; the agent releases it as 0.1.0 and installs it for Claude Code and Codex](docs/assets/demo/1-sync-harnesses.gif)
+
+**2. Easily share artifacts across teams and ensure everyone uses the same workflows.** Bob gives Codex the ai-registry link and his team's registry. aireg installs pr-review, and Bob reviews his next pull request with it.
+
+![Bob gives Codex the registry link; aireg installs pr-review 0.1.0 and Bob reviews PR #42 with it](docs/assets/demo/2-teammate-joins.gif)
+
+**3. Instantly roll out changes to artifacts.** Alice adds a Tests section to pr-review and releases 0.2.0. Bob's Codex picks up the new version in the background, and his next review flags a changed file with no test.
+
+![Alice releases pr-review 0.2.0 from Claude Code; Bob's Codex syncs to 0.2.0 and its next review flags an untested file](docs/assets/demo/3-updates-flow.gif)
+
 ## Get started
 
 The easiest way to get started is to follow the [Quickstart](https://atlanai.github.io/ai-registry/quickstart/).
