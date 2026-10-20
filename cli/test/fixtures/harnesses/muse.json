@@ -11,5 +11,6 @@
   "kinds": {
     "plugin": { "shape": "contents" },
     "skill": { "shape": "directory", "subdir": "skills", "scope": "user" }
-  }
+  },
+  "verified": { "command": ["muse", "--version"], "range": "1.4.11" }
 }

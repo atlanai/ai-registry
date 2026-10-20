@@ -15,4 +15,5 @@ export const muse = defineHarness({
     // In a project it reads skills from other tools' folders alone.
     skill: { shape: "directory", subdir: "skills", scope: "user" },
   },
+  verified: { command: ["muse", "--version"], range: "1.4.11" },
 });
