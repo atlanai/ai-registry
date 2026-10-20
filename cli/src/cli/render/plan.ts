@@ -178,7 +178,9 @@ function followUps(
     const run =
       action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
     if (run !== undefined) {
-      steps.add(`${target.displayName} loads ${kind}s here only after you run \`${run}\`.`);
+      steps.add(
+        `${target.displayName} loads ${kind}s here only once you trust them: run \`${run}\`.`,
+      );
     }
   }
   for (const step of steps) printer.hint(step);

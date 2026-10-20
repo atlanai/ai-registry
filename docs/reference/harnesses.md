@@ -81,7 +81,7 @@ Reading `~/.aireg/harnesses/`, aireg also refuses a file named other than `<id>.
 aireg never takes a trust step for you. After it places a kind whose harness names a `trust` command for that scope, it prints the command once. For a harness named Tool whose file sets `"trust": {"skill": {"run": "tool trust"}}`:
 
 ```text
-hint: Tool loads skills here only after you run `tool trust`.
+hint: Tool loads skills here only once you trust them: run `tool trust`.
 ```
 
 [`aireg status --json`](status.md#json-output) lists the same commands under each artifact's `needsApproval`. A harness's `reload` is printed after any change to it.

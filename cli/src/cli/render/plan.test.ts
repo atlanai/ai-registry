@@ -122,7 +122,7 @@ describe("summarize", () => {
     };
     expect(printed(actions, applied, {}, ["claude"], harnesses)).toEqual([
       "✓ Installed lint, fmt and reviewer for Claude Code.",
-      "hint: Claude Code loads skills here only after you run `tool trust`.",
+      "hint: Claude Code loads skills here only once you trust them: run `tool trust`.",
       "hint: Run `/reload` in Claude Code.",
     ]);
   });
