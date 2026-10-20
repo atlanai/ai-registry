@@ -16,9 +16,10 @@ import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { isMissing } from "#core/fs/path.ts";
-import { parseEngine } from "#core/semver.ts";
+import { parseEngine, unmetEngine } from "#core/semver.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { type Roots, type Scope, scopeName } from "#core/store/paths.ts";
+import { VERSION } from "#core/version.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import {
   dict,
@@ -119,6 +120,19 @@ export function emptyManifest(): Manifest {
     registries: dict(),
     artifacts: [],
   };
+}
+
+/** A file that names a newer aireg than this one is refused for that, before anything in it is. */
+export function refuseOldCli(engine: string | undefined): void {
+  const why = unmetEngine(VERSION, engine);
+  if (why === undefined) return;
+  throw new AiregError(`This project ${why}.`, { hint: "Run `aireg self update`." });
+}
+
+/** Read without judging the rest of the file, which a newer aireg may have written. */
+function engineOf(raw: unknown): string | undefined {
+  const value = isRecord(raw) ? raw[NAME] : undefined;
+  return typeof value === "string" ? parseEngine(value) : undefined;
 }
 
 function parseEnginesField(raw: unknown): string | undefined {
@@ -295,6 +309,17 @@ export function parseManifest(text: string, filename = "manifest.yml"): Manifest
 }
 
 function parseFields(root: Record<string, unknown>): Manifest {
+  try {
+    return parseKnownFields(root);
+  } catch (error) {
+    // A key or form this aireg does not know is most likely one the newer
+    // aireg the file asks for added, so that is the failure worth reporting.
+    if (error instanceof ManifestError) refuseOldCli(engineOf(root.engines));
+    throw error;
+  }
+}
+
+function parseKnownFields(root: Record<string, unknown>): Manifest {
   onlyKnown(root, MANIFEST_KEYS, "The manifest");
   const registries = parseRegistries(root);
   const targets = parseSelection(root.harnesses, "harnesses");

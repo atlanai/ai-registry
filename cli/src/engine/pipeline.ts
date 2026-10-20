@@ -18,7 +18,13 @@ import { loadHarnessFiles } from "#core/harness/load.ts";
 import { runPipelineHooks } from "#core/hook/run.ts";
 import { type LeaseHolder, withLease } from "#core/lease.ts";
 import { type Lock, lockChanges, readLock } from "#core/lock.ts";
-import { formatManifest, type Manifest, readManifest, writeManifest } from "#core/manifest.ts";
+import {
+  formatManifest,
+  type Manifest,
+  readManifest,
+  refuseOldCli,
+  writeManifest,
+} from "#core/manifest.ts";
 import type { Printer } from "#core/output.ts";
 import { acquire, answers, lockView, newlyYanked } from "#core/plan/acquire.ts";
 import { type ApplyResult, apply, guardsOf, type Recovered, recover } from "#core/plan/apply.ts";
@@ -33,7 +39,6 @@ import type { Untrusted } from "#core/plan/select.ts";
 import { survey } from "#core/plan/survey.ts";
 import { type Unlisted, unlistedMessage } from "#core/plan/unlisted.ts";
 import { blockedTargets } from "#core/plan/writable.ts";
-import { unmetEngine } from "#core/semver.ts";
 import {
   MANIFEST_FILE,
   roots as makeRoots,
@@ -481,12 +486,6 @@ function refuseUntrusted(untrusted: readonly Untrusted[]): void {
     code: ErrorCode.Usage,
     hint: trustHint(untrusted),
   });
-}
-
-function refuseOldCli(engine: string | undefined): void {
-  const why = unmetEngine(VERSION, engine);
-  if (why === undefined) return;
-  throw new AiregError(`This project ${why}.`, { hint: "Run `aireg self update`." });
 }
 
 /**
