@@ -98,4 +98,32 @@ describe("renderStatus", () => {
     );
     expect(both.join("\n")).toContain("Run `aireg sync` to compare the edits with the registry.");
   });
+
+  it("points an edit to a skill a harness takes as a copy at install --force", () => {
+    const claude = chosen.harnesses.claude;
+    const skill = claude?.kinds.skill;
+    if (claude === undefined || skill?.shape !== "directory") throw new Error("no claude skill");
+    const harnesses = {
+      ...chosen.harnesses,
+      claude: {
+        ...claude,
+        kinds: { ...claude.kinds, skill: { ...skill, place: "copy" as const } },
+      },
+    };
+    const lines = rendered(
+      [
+        {
+          name: "lint",
+          state: "edited",
+          detail: "claude: its copy was edited after installation",
+          harnesses: { claude: "linked" },
+        },
+      ],
+      [row("lint", "skill")],
+      harnesses,
+    );
+    expect(lines).toContain(
+      "hint: Claude Code reads a copy aireg writes from the skill: run `aireg install --force` to write it again, and change the skill in its registry.",
+    );
+  });
 });
