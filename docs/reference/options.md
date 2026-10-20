@@ -62,7 +62,7 @@ A plugin installs as one plugin in your user scope: Claude Code in `~/.claude/sk
 
 aireg installs into the harnesses named by `--for`. Without it, aireg uses the `harnesses:` list in the scope's manifest, and without that, `claude` and `codex`. Run [`aireg harnesses`](harnesses.md) to see which ones this machine has.
 
-A [harness file](harnesses.md#harness-files) in `~/.aireg/harnesses/` adds a harness, or replaces a built-in one, and `--for` then takes its id too. [Add a harness](add-a-harness.md) shows how.
+`--for` also takes the id of a harness you define in a [harness file](harnesses.md#harness-files).
 
 ## When aireg asks questions
 
