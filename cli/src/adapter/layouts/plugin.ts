@@ -184,7 +184,7 @@ export interface PluginInput {
   dir: string;
   /** Its marketplace entry, when a marketplace lists it. */
   entry?: Json | undefined;
-  /** The name to fall back on when its manifest has none. */
+  /** Its entry's name, which it installs under; alone, the name to use when its manifest has none. */
   name: string;
   /** Listed by a marketplace whose source is its own root, so only the skills it names count. */
   rootSource: boolean;
@@ -225,6 +225,13 @@ async function filesOf(tree: Tree, input: PluginInput, named: readonly string[])
   return { files: [...files.values()], warnings };
 }
 
+/** Listed, a plugin installs under its entry's name, as Claude Code does; its own still namespaces. */
+function namesOf(manifest: Json, input: PluginInput): { name: string; manifestName?: string } {
+  const manifestName = textOf(manifest.name);
+  const name = input.entry === undefined ? (manifestName ?? input.name) : input.name;
+  return manifestName === undefined ? { name } : { name, manifestName };
+}
+
 /**
  * One plugin, whole, as a `plugin` artifact, followed by its skills and agents on their own, so
  * a harness without plugins gets its parts and `-s` can take one. Undefined when it is skipped.
@@ -242,7 +249,7 @@ export async function readPlugin(
     );
     return undefined;
   }
-  const name = textOf(manifest.name) ?? input.name;
+  const { name, manifestName } = namesOf(manifest, input);
   if (!isArtifactName(name)) {
     warnings.push(
       `Skipped ${quoted(name)}: it is not a name aireg installs, which takes lowercase letters, digits and hyphens.`,
@@ -286,7 +293,7 @@ export async function readPlugin(
       name,
       ...(description === undefined ? {} : { description }),
       // As text, since a manifest may hold numbers an envelope cannot.
-      manifest: JSON.stringify({ ...manifest, name }),
+      manifest: JSON.stringify({ ...manifest, name: manifestName ?? name }),
       commands: commands.map((command) => ({
         name: command.name,
         path: command.path.slice(prefix.length),

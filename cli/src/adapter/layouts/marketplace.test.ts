@@ -46,6 +46,28 @@ describe("the marketplace layout", () => {
     ]);
   });
 
+  test("names a plugin by its entry, and keeps its manifest's name for what it namespaces", async ({
+    tmp,
+  }) => {
+    const root = await marketplace(join(tmp, "mkt"))
+      .json(
+        ".claude-plugin/marketplace.json",
+        entries([
+          { name: "docs", source: "./plugins/docs-kit" },
+          { name: "documents", source: "./plugins/docs-kit" },
+        ]),
+      )
+      .write();
+    const found = await read(root);
+    expect(found.warnings).toEqual([]);
+    expect(listed(found).filter(([kind]) => kind === "plugin")).toEqual([
+      ["plugin", undefined, "docs", "plugins/docs-kit"],
+      ["plugin", undefined, "documents", "plugins/docs-kit"],
+    ]);
+    expect(listed(found)).toContainEqual(["skill", "docs", "pdf", "plugins/docs-kit/skills/pdf"]);
+    expect(JSON.parse(specOf(found, "docs")?.manifest as string).name).toBe("docs-kit");
+  });
+
   test("resolves bare names under pluginRoot, and a Codex local source", async ({ tmp }) => {
     const root = await skillsFolder(join(tmp, "mkt"))
       .json(
