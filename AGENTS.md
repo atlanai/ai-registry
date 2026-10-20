@@ -51,7 +51,7 @@ Do not hand-edit these. Change the source, then regenerate:
 
 Run the checks for what you changed, and report any that could not run and any warnings or failures:
 
-- CLI: `pnpm run verify` in `cli/` (typecheck, lint, dead-code check, third-party notices check, build, package check, tests).
+- CLI: `pnpm run verify` in `cli/` (typecheck, lint, dead-code check, third-party notices check, build, package check, tests). A clone opted in to `.githooks/` also runs the typecheck and `pnpm run lint:changed` on every push; when it stops a push, fix what it reports rather than pushing with `--no-verify`.
 - Spec, schemas, or examples: `python3 tools/check.py examples/<name>` for each example registry and `python3 tools/check_schemas.py`; both use the standard library, and the second skips its instance tier unless `jsonschema` is installed (`python3 -m pip install -r tools/requirements.txt`); CI passes `--require-jsonschema`, so it fails there instead. After building the CLI, also run `node dist/main.mjs registry validate ../examples/<name>` from `cli/` for each example registry you changed.
 - Docs: `python3 tools/build_figures.py --check`, `python3 tools/check_pins.py` and `mkdocs build --strict`.
 - Always: Check local Markdown links, the `CLAUDE.md` symlink and ignored local workspace files, and run `git diff --check`.

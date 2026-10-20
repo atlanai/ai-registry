@@ -61,6 +61,8 @@ The schemas in `cli/schema/` are generated. Edit the definitions under `cli/scri
 
 Add a test that fails without your change and passes with it, written against the public interface.
 
+To run the typecheck and the lint on your changed files before each push, as CI does first, opt in once per clone with `git config core.hooksPath .githooks`. It replaces any hooks you keep in `.git/hooks`. `git push --no-verify` skips it.
+
 ### Spec and schemas
 
 ```sh

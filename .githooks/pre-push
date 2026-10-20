@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Runs CI's first checks before a push leaves this machine: the typecheck, and lint on the files
+# this branch changed. Opt in once per clone with `git config core.hooksPath .githooks`.
+set -euo pipefail
+
+# Deleting a remote branch sends no commits, so there is nothing to check.
+sending=false
+while read -r _ local_sha _ _; do
+  [[ "$local_sha" =~ ^0+$ ]] || sending=true
+done
+[ "$sending" = true ] || exit 0
+
+trap 'echo "pre-push: push stopped. Fix the problems above, then push again." >&2' ERR
+
+base="${LINT_BASE:-origin/main}"
+if ! git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+  echo "pre-push: no $base to compare with. Fetch it, or set LINT_BASE to the branch you will merge into." >&2
+  exit 1
+fi
+
+cd "$(git rev-parse --show-toplevel)/cli"
+pnpm run --silent typecheck
+pnpm run --silent lint:changed --since="$base"
