@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { CALLER_SIGNALS } from "#core/harness/index.ts";
 import { blocker, callingAgent, explain, SIGNALS } from "./caller.ts";
 
 const DOCS = readFileSync(
@@ -33,6 +34,12 @@ describe("callingAgent", () => {
 
   it("takes no setting a person exports for an agent as a sign of it", () => {
     expect(callingAgent({ COPILOT_MODEL: "auto", COPILOT_ALLOW_ALL: "true" })).toBeUndefined();
+  });
+
+  it("takes Gemini CLI's variable from its harness definition alone", () => {
+    expect(CALLER_SIGNALS).toContainEqual({ agent: "gemini", env: ["GEMINI_CLI"] });
+    expect(SIGNALS.filter((signal) => signal.agent === "gemini")).toHaveLength(1);
+    expect(callingAgent({ GEMINI_CLI: "1" })).toBe("gemini");
   });
 
   it("ignores a variable that is set but empty", () => {
