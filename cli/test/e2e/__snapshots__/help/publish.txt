@@ -3,7 +3,7 @@ Publish artifacts to a registry, as new versions
 Usage: aireg publish [<path> | <glob> | <name>]... [options]
 
 Options:
-      --to <registry>/<namespace>  Where to publish: a declared registry or a registry folder, and a namespace
+      --to <registry>/<namespace>  Where to publish: a declared registry or a registry folder, and a namespace; for exports, one of publish.to
       --bump <level>               How far to move the version: patch, minor or major
   -m, --message <message>          The change message, for a registry that records one
       --changed-since <commit>     Only the artifacts whose files changed since this commit

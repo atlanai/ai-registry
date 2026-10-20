@@ -1,6 +1,6 @@
 Install artifacts from a registry
 
-Usage: aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options]
+Usage: aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version> | @<range>]]] [options]
        aireg add <namespace>[/<name>]... --registry <registry> [options]
        aireg add <address> [-s <name>]... [--as <name>] [options]
        aireg add --from <file> [options]
@@ -29,6 +29,7 @@ Options:
 Examples:
   $ aireg add acme/engineering                                        a namespace, in this project
   $ aireg add -g acme/engineering/pr-review@1.2.0                     one artifact, pinned, for you in every project
+  $ aireg add acme/engineering/pr-review@^1.2                         one artifact, at the newest version in a range
   $ aireg add ../acme-registry/artifacts/engineering/skill/pr-review  one artifact, from its folder in a registry
 
 Learn more:

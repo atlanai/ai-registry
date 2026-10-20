@@ -5,7 +5,7 @@ Install artifacts from a registry.
 ## Synopsis
 
 ```text
-aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options]
+aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version> | @<range>]]] [options]
 aireg add <namespace>[/<name>]... --registry <registry> [options]
 aireg add <address> [-s <name>]... [--as <name>] [options]
 aireg add --from <file> [options]
@@ -151,6 +151,12 @@ Install one artifact, pinned to a version:
 
 ```bash
 aireg add acme/engineering/pr-review@1.2.0
+```
+
+Install one artifact at the newest version in a range, which `aireg update` moves within:
+
+```bash
+aireg add acme/engineering/pr-review@^1.2
 ```
 
 Install a namespace for yourself, in every project:

@@ -316,7 +316,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: "Install artifacts from a registry",
     group: "Install",
     usage: [
-      "aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options]",
+      "aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version> | @<range>]]] [options]",
       "aireg add <namespace>[/<name>]... --registry <registry> [options]",
       "aireg add <address> [-s <name>]... [--as <name>] [options]",
       "aireg add --from <file> [options]",
@@ -327,6 +327,10 @@ export const COMMANDS: readonly CommandSpec[] = [
       {
         command: "aireg add -g acme/engineering/pr-review@1.2.0",
         what: "one artifact, pinned, for you in every project",
+      },
+      {
+        command: "aireg add acme/engineering/pr-review@^1.2",
+        what: "one artifact, at the newest version in a range",
       },
       {
         command: "aireg add ../acme-registry/artifacts/engineering/skill/pr-review",
@@ -569,7 +573,8 @@ export const COMMANDS: readonly CommandSpec[] = [
       {
         flag: "--to",
         value: "<registry>/<namespace>",
-        describe: "Where to publish: a declared registry or a registry folder, and a namespace",
+        describe:
+          "Where to publish: a declared registry or a registry folder, and a namespace; for exports, one of publish.to",
       },
       {
         flag: "--bump",

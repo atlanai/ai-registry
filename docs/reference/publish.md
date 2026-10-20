@@ -10,7 +10,7 @@ aireg publish [<path> | <glob> | <name>]... [--to <registry>/<namespace>[/<name>
               [--bump patch | minor | major] [-m <message>] [--changed-since <commit>]
               [-g] [-y] [--dry-run] [--force]
 aireg publish [--to <publish target>] [--bump patch | minor | major] [-m <message>]
-              [--changed-since <commit>] [-y] [--dry-run]
+              [--changed-since <commit>] [-y] [--dry-run] [--force]
 ```
 
 The second form publishes the manifest's `exports:`; see [Publishing a repository's exports](#publishing-a-repositorys-exports).
