@@ -199,6 +199,30 @@ describe("-s on a plugin", () => {
     expect(added.stderr).toContain("Use pdf or xlsx.");
   }, 60_000);
 
+  test("refuses a name that is both a plugin and a skill, naming how to take each", async ({
+    aireg,
+    project,
+    tmp,
+  }) => {
+    const root = await marketplace(join(tmp, "mkt"))
+      .skill("plugins/docs-kit/skills/docs-kit")
+      .write();
+    await init(aireg, "claude");
+    expect((await aireg(["registry", "add", root])).code).toBe(0);
+    const refused = await aireg(["add", "acme-tools", "-s", "docs-kit"]);
+    expect(refused.code).toBe(2);
+    expect(refused.stderr).toContain(
+      '"docs-kit" names both the plugin docs-kit and the skill docs-kit/skill/docs-kit.',
+    );
+    expect(refused.stderr).toContain(
+      "Add the whole plugin with `aireg add acme-tools/docs-kit`, or only the skill with `-s docs-kit/skill/docs-kit`.",
+    );
+    const skill = await aireg(["add", "acme-tools", "-s", "docs-kit/skill/docs-kit"]);
+    expect(skill.code, skill.stderr).toBe(0);
+    expect(await locked(project)).toEqual(["docs-kit"]);
+    expect(existsSync(join(project, ".claude", "skills", "docs-kit", "SKILL.md"))).toBe(true);
+  }, 60_000);
+
   test("leaves a whole-plugin install as it was", async ({ aireg, project, tmp }) => {
     const root = await marketplace(join(tmp, "mkt")).write();
     await init(aireg, "claude");

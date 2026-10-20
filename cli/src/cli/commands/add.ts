@@ -950,12 +950,24 @@ function addressOf(pick: string, all: readonly Entry[], alias: string): string |
       ? { name: word }
       : { name: ref.name, namespace: ref.namespace, kind: ref.kind },
   );
+  const plugin = all.some((candidate) => candidate.kind === "plugin" && candidate.name === word);
   if (entry !== undefined) {
     const address = [entry.group, entry.kind, entry.name].filter(Boolean).join("/");
+    if (plugin && ref.name === undefined) refuseShared(word, address, entry.kind, alias);
     return ref.version === undefined ? address : `${address}@${ref.version}`;
   }
-  const plugin = all.some((candidate) => candidate.kind === "plugin" && candidate.name === word);
   return ref.name === undefined && (namespaces.has(word) || plugin) ? word : undefined;
+}
+
+/** A plugin and an artifact of the same name: either is a fair reading, so neither is taken. */
+function refuseShared(word: string, address: string, kind: string, alias: string): never {
+  throw new AiregError(
+    `${quoted(word)} names both the plugin ${word} and the ${kind} ${address}.`,
+    {
+      code: ErrorCode.Usage,
+      hint: `Add the whole plugin with \`aireg add ${alias}/${word}\`, or only the ${kind} with \`-s ${address}\`.`,
+    },
+  );
 }
 
 /** One address per command; several artifacts are picked inside it with -s. */
