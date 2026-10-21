@@ -274,6 +274,23 @@ describe("resolveFromRoot", () => {
     ]);
   });
 
+  test("lists what it withholds in index order, however the reads finish", async () => {
+    const read = await root([OPS_GATE, OPS_DRAFT]);
+    // The first artifact's versions arrive last, so finishing order is the reverse of index order.
+    const slow = async (path: string) => {
+      if (path.includes("/gate/")) await new Promise((done) => setTimeout(done, 20));
+      return read(path);
+    };
+    const resolved = await resolveFromRoot(slow, {
+      blobUrl: "blobs",
+      wanted: [
+        { name: "gate", namespace: "ops", range: ">1.0.0" },
+        { name: "draft", namespace: "ops", range: "^0.1.0" },
+      ],
+    });
+    expect(resolved.withheld?.map((item) => item.name)).toEqual(["gate", "draft"]);
+  });
+
   test("refuses a range no version satisfies, as a version never released", async () => {
     const read = await root([OPS_ADD]);
     const asked = (range: string) =>

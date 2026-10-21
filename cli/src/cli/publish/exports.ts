@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { readRegistry } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import type { ArtifactKind, PublishRelationship } from "#adapter/index.ts";
@@ -255,11 +255,12 @@ function sameRegistry(context: EdgeContext, alias: string): boolean {
   if (alias === context.target.registry) return true;
   const one = context.known[alias]?.location;
   const other = context.known[context.target.registry]?.location;
-  return (
-    one !== undefined &&
-    other !== undefined &&
-    comparableLocation(one) === comparableLocation(other)
-  );
+  return one !== undefined && other !== undefined && placeOf(one) === placeOf(other);
+}
+
+/** A folder by its resolved path, which a trailing separator or a drive letter cannot split; any other address as compared. */
+function placeOf(location: string): string {
+  return isAbsolute(location) ? resolve(location) : comparableLocation(location);
 }
 
 /**

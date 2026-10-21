@@ -230,9 +230,9 @@ export async function resolveFromRoot(
     if (options.all !== true && options.wanted.length > 0 && !asked) return [];
     return [{ entry, asked, pinned: pinOf(reaching), range: rangeOf(reaching) }];
   });
-  const withheld: Withheld[] = [];
-  const newest: Newest[] = [];
-  const artifacts = await inOrder(chosen, async ({ entry, asked, pinned, range }) => {
+  // Each artifact keeps what it withholds and how far it goes in its own row, so the lists come
+  // out in index order however the reads interleave.
+  const rows = await inOrder(chosen, async ({ entry, asked, pinned, range }) => {
     // A malformed path segment is the indexer's mistake, and installing from
     // it would write that mistake into somebody's tree.
     if (!usable(entry)) {
@@ -244,21 +244,23 @@ export async function resolveFromRoot(
 
     const versions = await readVersions(read, entry.namespace, entry.kind, entry.name);
     const version = versionFor(versions, pinned, range);
-    const served = await serve(read, { entry, version, asked, pinned }, withheld, options.blobUrl);
+    const held: Withheld[] = [];
+    const served = await serve(read, { entry, version, asked, pinned }, held, options.blobUrl);
     // A version above what was served or withheld, such as a yanked one, is still held: a publish
     // goes past it.
     const reported =
       served !== undefined || heldBack(version, pinned) ? version.version : undefined;
     const top = newestListed(versions);
-    if (reported !== top) {
-      const { namespace, kind, name } = entry;
-      newest.push({ namespace, kind, name, version: top });
-    }
-    return served;
+    const { namespace, kind, name } = entry;
+    const newest: Newest | undefined =
+      reported === top ? undefined : { namespace, kind, name, version: top };
+    return { served, held, newest };
   });
+  const withheld = rows.flatMap((row) => row.held);
+  const newest = rows.flatMap((row) => (row.newest === undefined ? [] : [row.newest]));
 
   return {
-    artifacts: artifacts.filter((artifact) => artifact !== undefined),
+    artifacts: rows.flatMap((row) => (row.served === undefined ? [] : [row.served])),
     ...(withheld.length === 0 ? {} : { withheld }),
     ...(newest.length === 0 ? {} : { newest }),
   };
