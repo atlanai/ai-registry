@@ -89,7 +89,7 @@ publish:
   to: [acme/engineering, ./registry/engineering]
 ```
 
-The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-spec.md) defines each field. With no arguments, `publish` takes every export. A glob such as `.claude/skills/*` reaches only the files git tracks, in a git repository, and never an artifact aireg installed there. An export is published from where it really is, so `publish` refuses one that a link, or a glob, takes outside the project, such as a tracked link `.claude/skills/shared` to a folder elsewhere on your machine. An entry with `publish: false` is left out. A path you name on the command line that is an export follows its entry's rules too; other paths behave as described above.
+The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-spec.md) defines each field. With no arguments, `publish` takes every export. A glob such as `.claude/skills/*` reaches only the files git tracks, in a git repository, and never an artifact aireg installed there. An export is published from where it really is, so `publish` refuses one that a link, or a glob, takes outside the project, such as a tracked link `.claude/skills/shared` to a folder elsewhere on your machine. Every entry that reaches an artifact applies to it: their `depends_on` lists are combined, and an entry naming the artifact, such as `.claude/skills/review` or `.claude/skills/review/SKILL.md`, sets its `version` and `publish` over a glob that only matches it. Two entries that set one of these differently for the same artifact are refused, naming both. An entry with `publish: false` is left out. A path you name on the command line that is an export follows its entry's rules too; other paths behave as described above.
 
 ### Targets
 

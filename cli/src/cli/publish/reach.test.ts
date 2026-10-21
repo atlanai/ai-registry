@@ -43,6 +43,46 @@ describe("exportsOn", () => {
     expect(found.get(join(base, "skills", "style"))?.publish).toBe(false);
   });
 
+  test("merges every entry that reaches an artifact, combining their dependencies", async () => {
+    const found = await exportsOn(
+      manifestWith(
+        [
+          "  - skills/*",
+          "  - path: skills/review",
+          "    version: 1.0.0",
+          "    depends_on: [./skills/style]",
+          "  - path: skills/review/SKILL.md",
+          "    depends_on: [./agents/reviewer.md, ./skills/style/SKILL.md]",
+          "",
+        ].join("\n"),
+      ),
+      base,
+    );
+    expect(found.get(join(base, "skills", "review"))).toEqual({
+      path: "skills/review",
+      version: "1.0.0",
+      dependsOn: [
+        { type: "local", path: "skills/style" },
+        { type: "local", path: "agents/reviewer.md" },
+      ],
+      publish: undefined,
+    });
+    // The glob alone reaches style, which keeps no rules of its own.
+    expect(found.get(join(base, "skills", "style"))).toMatchObject({ path: "skills/*" });
+  });
+
+  test("refuses two entries naming one artifact that set it differently, naming both", async () => {
+    const manifest = manifestWith(
+      "  - path: skills/review\n    version: 1.0.0\n  - path: skills/review/SKILL.md\n    version: 2.0.0\n",
+    );
+    await expect(exportsOn(manifest, base)).rejects.toMatchObject({
+      message:
+        'Exports "skills/review" and "skills/review/SKILL.md" set a different `version` for skills/review.',
+      hint: "Set `version` in one of them.",
+      code: "invalid",
+    });
+  });
+
   test("refuses an export that a tracked link takes outside the project", async ({
     git,
     fileTmp,

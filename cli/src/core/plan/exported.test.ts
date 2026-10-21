@@ -63,6 +63,23 @@ exports:
     );
   });
 
+  it("combines what every entry naming one export gives it", () => {
+    const { needs } = read(`registries:
+  shared: https://github.com/acme/shared.git
+artifacts:
+  - shared/platform/skill/sql-style@^1.2
+exports:
+  - path: .claude/skills/review
+    depends_on: [./.claude/agents/triage.md]
+  - path: .claude/skills/review/SKILL.md
+    depends_on: [shared/platform/skill/sql-style, ./.claude/agents/triage.md]
+`);
+    expect(needs.get(".claude/skills/review")).toEqual([
+      { namespace: "tools", kind: "agent", name: "triage" },
+      expect.objectContaining({ name: "sql-style", range: "^1.2" }),
+    ]);
+  });
+
   it("takes a pinned artifact at its version, and one with neither at any", () => {
     const { needs } = read(`registries:
   shared: github.com/acme/shared

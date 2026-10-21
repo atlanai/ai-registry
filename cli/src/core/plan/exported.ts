@@ -34,16 +34,23 @@ function artifactRoot(path: string): string {
 }
 
 /**
- * The entries that give a path its edges. Only a mapping has `depends_on`, and a mapping names one
- * path, never a glob, so no glob of the source's is ever matched: one written to be slow to match
- * costs nothing here.
+ * The dependencies each path's entries give it, combined, since every entry naming a path applies
+ * to it. Only a mapping has `depends_on`, and a mapping names one path, never a glob, so no glob of
+ * the source's is ever matched: one written to be slow to match costs nothing here.
  */
-function exportsAt(entries: readonly Export[]): Map<string, Export> {
-  return new Map(
-    entries
-      .filter((entry) => !isGlob(entry.path) && entry.dependsOn.length > 0)
-      .map((entry) => [artifactRoot(entry.path), entry]),
-  );
+function exportsAt(entries: readonly Export[]): Map<string, ExportDependency[]> {
+  const at = new Map<string, Map<string, ExportDependency>>();
+  for (const entry of entries) {
+    if (isGlob(entry.path)) continue;
+    const root = artifactRoot(entry.path);
+    const needs = at.get(root) ?? new Map<string, ExportDependency>();
+    for (const need of entry.dependsOn) {
+      const key = need.type === "local" ? `./${artifactRoot(need.path)}` : formatAddress(need.ref);
+      if (!needs.has(key)) needs.set(key, need);
+    }
+    if (needs.size > 0) at.set(root, needs);
+  }
+  return new Map([...at].map(([root, needs]) => [root, [...needs.values()]]));
 }
 
 function leftOut(name: string, to: string, why: string): string {
@@ -104,10 +111,10 @@ export function exportedNeeds(
   const at = exportsAt(manifest.exports);
   for (const { id, name } of listed) {
     const path = byId.get(id)?.path;
-    const entry = path === undefined ? undefined : at.get(path);
-    if (entry === undefined) continue;
+    const dependencies = path === undefined ? undefined : at.get(path);
+    if (dependencies === undefined) continue;
     const edges: Need[] = [];
-    for (const dependency of entry.dependsOn) {
+    for (const dependency of dependencies) {
       const need = needOf(dependency, manifest, byPath);
       if (typeof need !== "string") edges.push(need);
       else {

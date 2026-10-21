@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { isWithin } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -8,7 +9,8 @@ import { posixRelative } from "#core/fs/path.ts";
 import { gitIn } from "#core/git.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
-import { type Export, isGlob, type Manifest } from "#core/manifest.ts";
+import { type Export, type ExportDependency, isGlob, type Manifest } from "#core/manifest.ts";
+import { formatAddress } from "#core/ref.ts";
 import { expand } from "./work.ts";
 
 // Which artifacts `exports:` reaches in this project, and the entry whose rules apply to each.
@@ -56,11 +58,101 @@ async function refuseOutside(entry: Export, path: string, base: string): Promise
   );
 }
 
+/** One entry's say over an artifact. */
+interface Reach {
+  entry: Export;
+  /** It names the artifact itself, rather than reaching it through a glob. */
+  named: boolean;
+}
+
+/** What an entry sets once for each artifact it reaches, where two entries can disagree. */
+const SINGLE = ["version", "publish"] as const;
+
+/** The same dependency, however an entry spells its path. */
+function dependencyKey(need: ExportDependency): string {
+  return need.type === "local" ? `./${artifactRoot(need.path)}` : formatAddress(need.ref);
+}
+
 /**
- * Every path `exports:` names, by its absolute path, with the entry whose rules apply to it.
- * In a git repository a glob reaches only what git tracks, so scratch work beside an export
- * is not published, and never what aireg installed there; a mapping for one of its paths
- * refines what the glob says.
+ * One value for the artifact: an entry naming it decides over one that only reaches it, and two
+ * entries that decide alike must agree, so no entry quietly undoes another.
+ */
+function decide<K extends (typeof SINGLE)[number]>(
+  key: K,
+  reaches: readonly Reach[],
+  shown: string,
+): Export[K] {
+  for (const named of [true, false]) {
+    const setting = reaches.filter((each) => each.named === named && each.entry[key] !== undefined);
+    const [first] = setting;
+    if (first === undefined) continue;
+    const other = setting.find((each) => !isDeepStrictEqual(each.entry[key], first.entry[key]));
+    if (other !== undefined) {
+      throw new AiregError(
+        `Exports ${quoted(first.entry.path)} and ${quoted(other.entry.path)} set a different \`${key}\` for ${shown}.`,
+        { code: ErrorCode.Invalid, hint: `Set \`${key}\` in one of them.` },
+      );
+    }
+    return first.entry[key];
+  }
+  return undefined;
+}
+
+/** Every entry that reaches one artifact, as one: their lists combined, each single value decided. */
+function merged(reaches: readonly Reach[], shown: string): Export {
+  const [first] = reaches;
+  const deciding = reaches.find((each) => each.named) ?? (first as Reach);
+  const needs = new Map<string, ExportDependency>();
+  for (const { entry } of reaches) {
+    for (const need of entry.dependsOn) {
+      const key = dependencyKey(need);
+      if (!needs.has(key)) needs.set(key, need);
+    }
+  }
+  return {
+    path: deciding.entry.path,
+    version: decide("version", reaches, shown),
+    dependsOn: [...needs.values()],
+    publish: decide("publish", reaches, shown),
+  };
+}
+
+/** The artifacts one entry reaches, by their roots. */
+async function reachedBy(
+  entry: Export,
+  base: string,
+  tracked: readonly string[] | undefined,
+  installed: ReadonlySet<string>,
+): Promise<Set<string>> {
+  if (!isGlob(entry.path)) {
+    const path = resolve(base, entry.path);
+    if (!existsSync(path)) {
+      throw new AiregError(`Export ${quoted(entry.path)} names nothing in this project.`, {
+        code: ErrorCode.NotFound,
+        hint: "Check its path under `exports:`, or remove the entry.",
+      });
+    }
+    await refuseOutside(entry, artifactRoot(path), base);
+    return new Set([artifactRoot(path)]);
+  }
+  const roots = new Set<string>();
+  for (const path of await expand(entry.path, base)) {
+    const root = artifactRoot(path);
+    if (!isWithin(base, root)) await refuseOutside(entry, root, base);
+    if (installed.has(root)) continue;
+    if (tracked !== undefined && !tracked.some((file) => isWithin(path, file))) continue;
+    await refuseOutside(entry, root, base);
+    roots.add(root);
+  }
+  return roots;
+}
+
+/**
+ * Every artifact `exports:` reaches, by its absolute path, with the entries that reach it merged.
+ * In a git repository a glob reaches only what git tracks, so scratch work beside an export is
+ * not published, and never what aireg installed there. Every entry reaching an artifact applies
+ * to it: their `depends_on` lists are combined, and an entry naming the artifact sets its
+ * `version` and `publish` over a glob that only matches it.
  */
 export async function exportsOn(
   manifest: Manifest,
@@ -70,29 +162,14 @@ export async function exportsOn(
   const tracked = manifest.exports.some((entry) => isGlob(entry.path))
     ? await trackedFiles(base)
     : undefined;
-  const found = new Map<string, Export>();
+  const reached = new Map<string, Reach[]>();
   for (const entry of manifest.exports) {
-    if (!isGlob(entry.path)) continue;
-    for (const path of await expand(entry.path, base)) {
-      const root = artifactRoot(path);
-      if (!isWithin(base, root)) await refuseOutside(entry, root, base);
-      if (installed.has(root)) continue;
-      if (tracked !== undefined && !tracked.some((file) => isWithin(path, file))) continue;
-      await refuseOutside(entry, root, base);
-      found.set(root, entry);
+    for (const root of await reachedBy(entry, base, tracked, installed)) {
+      const reach = { entry, named: !isGlob(entry.path) };
+      reached.set(root, [...(reached.get(root) ?? []), reach]);
     }
   }
-  for (const entry of manifest.exports) {
-    if (isGlob(entry.path)) continue;
-    const path = resolve(base, entry.path);
-    if (!existsSync(path)) {
-      throw new AiregError(`Export ${quoted(entry.path)} names nothing in this project.`, {
-        code: ErrorCode.NotFound,
-        hint: "Check its path under `exports:`, or remove the entry.",
-      });
-    }
-    await refuseOutside(entry, artifactRoot(path), base);
-    found.set(artifactRoot(path), entry);
-  }
-  return found;
+  return new Map(
+    [...reached].map(([root, reaches]) => [root, merged(reaches, posixRelative(base, root))]),
+  );
 }
