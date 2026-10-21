@@ -2,8 +2,9 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import { gitRegistry } from "#test/kit/builders/registry.ts";
 import { type Aireg, test } from "#test/kit/fixtures.ts";
-import { lockPath, manifestPath } from "#test/kit/scope.ts";
+import { lockPath, manifestPath, writeManifestIn } from "#test/kit/scope.ts";
 import { serveFolder, tarGz, wellKnownSite } from "#test/kit/site.ts";
 
 const fill = tarGz([
@@ -120,6 +121,37 @@ describe("a site's Agent Skills index", () => {
       const added = await aireg(["add", url, "--all"]);
       expect(added.code).toBe(1);
       expect(added.stderr).toContain("which is another host without https.");
+    });
+  }, 60_000);
+
+  test("leaves a declared registry on another git server to git", async ({
+    aireg,
+    git,
+    project,
+    tmp,
+  }) => {
+    const served = join(tmp, "served");
+    await mkdir(served, { recursive: true });
+    await git(
+      tmp,
+      "clone",
+      "-q",
+      "--bare",
+      await gitRegistry(git, join(tmp, "kit")),
+      "served/kit.git",
+    );
+    await git(join(served, "kit.git"), "update-server-info");
+    await serving(served, async (url) => {
+      await writeManifestIn(
+        project,
+        `harnesses: [claude]\nregistries:\n  kit: ${url}/kit\nartifacts: []\n`,
+      );
+      const shown = await aireg(["registry", "show", "kit"]);
+      expect(shown.code, shown.stderr).toBe(0);
+      expect(shown.stdout).toContain("acme/lint");
+      const found = await aireg(["search", "lint"]);
+      expect(found.code, found.stderr).toBe(0);
+      expect(found.stdout).toContain("acme/lint");
     });
   }, 60_000);
 

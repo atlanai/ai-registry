@@ -16,6 +16,7 @@ import {
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { toolHome } from "#core/store/paths.ts";
+import type { SourceConfig } from "./identity.ts";
 
 type Loader = () => Promise<unknown>;
 
@@ -177,15 +178,21 @@ function onSite(dispatch: Dispatch, spec: string, scheme: string | undefined): b
   return !(sites.exceptSuffixes ?? []).some((suffix) => path.endsWith(suffix));
 }
 
+/** The layout a declared registry is read as. */
+export function declaredLayout(config: SourceConfig): string {
+  return config.layout ?? "registry";
+}
+
 /**
  * Lower is more specific. A host claim beats a site claim, which beats a scheme claim, so a
  * registry on https wins over the general-purpose adapter that also speaks https.
  */
-function tier(dispatch: Dispatch, spec: string): number | undefined {
+function tier(dispatch: Dispatch, spec: string, layout: string | undefined): number | undefined {
   if (isLocalPath(spec)) return dispatch.paths === true ? 0 : undefined;
   const { scheme, host } = urlParts(spec);
   if (host !== undefined && onHost(host, dispatch.hosts)) return 0;
-  if (onSite(dispatch, spec, scheme)) return 1;
+  const site = layout === undefined || layout === "well-known";
+  if (site && onSite(dispatch, spec, scheme)) return 1;
   if (scheme !== undefined && dispatch.schemes?.includes(scheme) === true) return 2;
   return undefined;
 }
@@ -236,7 +243,11 @@ export function refuseInsecure(spec: string): void {
  * Named wins, then a declared match, then the fallback. Matching is data, so a
  * configured adapter with an install record is scored without importing it.
  */
-export async function adapterFor(spec: string, named: string | undefined): Promise<SourceAdapter> {
+export async function adapterFor(
+  spec: string,
+  named: string | undefined,
+  layout?: string,
+): Promise<SourceAdapter> {
   refuseInsecure(spec);
   if (named !== undefined) return loadAdapter(named);
 
@@ -251,7 +262,7 @@ export async function adapterFor(spec: string, named: string | undefined): Promi
       broken ??= { id, error };
       continue;
     }
-    const rank = tier(dispatch, spec);
+    const rank = tier(dispatch, spec, layout);
     if (rank !== undefined) scored.push({ id, tier: rank });
   }
   // A broken adapter might claim this source, so another adapter must not quietly take it.

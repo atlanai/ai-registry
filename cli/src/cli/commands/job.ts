@@ -9,7 +9,7 @@ import { cannotPublish } from "#cli/publish/target.ts";
 import { underHome } from "#cli/render/home.ts";
 import { probeAddress, throughManifest } from "#cli/source.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { adapterFor } from "#core/adapter/registry.ts";
+import { adapterFor, declaredLayout } from "#core/adapter/registry.ts";
 import { readOnlyLayout } from "#core/adapter/writable.ts";
 import { MINIMUM_INTERVAL_SECONDS } from "#core/config/job.ts";
 import {
@@ -220,7 +220,11 @@ async function plannedJob(
   if (origins !== undefined) {
     const laidOut = readOnlyLayout(alias, source.config);
     if (laidOut !== undefined) throw laidOut;
-    const adapter = await adapterFor(expandLocation(source.location, jobRoot), source.adapter);
+    const adapter = await adapterFor(
+      expandLocation(source.location, jobRoot),
+      source.adapter,
+      declaredLayout(source.config),
+    );
     if (!adapter.capabilities.publish) throw cannotPublish(adapter, alias);
   }
   const refs = await refsFrom(common, alias, source, jobRoot);

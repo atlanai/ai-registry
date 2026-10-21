@@ -1,11 +1,11 @@
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import type { Artifact } from "#adapter/index.ts";
-import { adapterFor } from "#core/adapter/registry.ts";
+import { adapterFor, declaredLayout } from "#core/adapter/registry.ts";
 import { readOnlyLayout } from "#core/adapter/writable.ts";
 import type { Account } from "#core/config/model.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import { withLease } from "#core/lease.ts";
-import type { Action } from "#core/plan/model.ts";
+import type { RegistrySource } from "#core/manifest.ts";
 import { movedPluginLinks } from "#core/plan/projection.ts";
 import { type RunMode, WARNING_EVENT } from "#core/run/model.ts";
 import { backupStamp } from "#core/store/backups.ts";
@@ -25,8 +25,9 @@ import {
 } from "./decide.ts";
 import { type RunScope, registryOf, syncOptions } from "./inspect.ts";
 import { applyLocal } from "./local.ts";
+import type { CommonOptions } from "./options.ts";
 import { applyOrigins, originKey, takeIntoOrigins } from "./origins.ts";
-import { load } from "./pipeline.ts";
+import { type Loaded, load } from "./pipeline.ts";
 import { settlePublished } from "./publish-settle.ts";
 import {
   mutateRemote,
@@ -78,16 +79,7 @@ async function executeScanned(
   let loaded = await load(common, job.root);
   const source = registryOf(loaded, account);
 
-  // An adapter that cannot publish a kind reports those candidates and settles, rather than
-  // failing the whole run at write time every interval.
-  const adapter = await adapterFor(source.location, source.adapter).catch(() => undefined);
-  // A source read by its layout, such as a folder of skills, takes no publishes whatever its adapter.
-  const laidOut = readOnlyLayout(account.registry, source.config) !== undefined;
-  const publishable: Publishable = (kind: ArtifactKind) =>
-    !laidOut &&
-    (adapter === undefined ||
-      (adapter.capabilities.publish !== false &&
-        (adapter.publishKinds === undefined || adapter.publishKinds.includes(kind))));
+  const publishable = await publishableTo(account, source);
 
   const credentials = await credentialsForManifest(
     { [account.registry]: source },
@@ -151,11 +143,7 @@ async function executeScanned(
       // After the pull: a name the registry already publishes is claimed by
       // the lock by now, so a colliding import is reported, not sent as a rival.
       const imported = await applyOrigins(pending, loaded.lock, loaded.roots);
-      for (const { name, reason } of imported.refused) {
-        hooks.event(WARNING_EVENT, "importing", name, {
-          message: `Kept the previous copy of ${name}: ${reason}.`,
-        });
-      }
+      warnRefused(imported.refused, hooks);
       // The copies moved, so a push has to reread. Not the lock: the rows just
       // written live in it, and rereading would discard them.
       let operations: ReadonlyMap<string, SyncOperation> = initialOperations;
@@ -197,34 +185,66 @@ async function executeScanned(
       for (const claim of claimed) for (const key of claim.keys) names.add(key);
       signal.throwIfAborted();
       hooks.event("run.phase", "applying");
-      // An override is a person overruling the edit that caused the conflict, so
-      // the guard against an unasked-for overwrite has nothing left to protect.
-      const forced = [...overrides.values()].some(
-        (item) => item === "pull" || item === "remove-local",
-      );
-      const applied = await applyLocal(
-        loaded,
-        common,
-        current,
-        names,
-        remote.published,
-        forced,
-        (action: Action) => {
-          if (action.kind !== "record") {
-            hooks.event("artifact.progress", "applying", action.name, { step: action.kind });
-          }
-        },
-      );
-      // What it did to a person's files, said wherever the run is followed.
-      for (const notice of applied.notices) {
-        hooks.event(WARNING_EVENT, "applying", undefined, notice);
-      }
+      await applyReported(loaded, common, current, names, remote.published, overrides, hooks);
       await takeTheirs(overrides, loaded.roots, account.registry, hooks);
       if (remoteError !== undefined) throw remoteError;
     });
   }
   hooks.event("run.phase", "finalizing");
   return execution(outcomes);
+}
+
+/**
+ * An adapter that cannot publish a kind reports those candidates and settles, rather than
+ * failing the whole run at write time every interval.
+ */
+async function publishableTo(account: Account, source: RegistrySource): Promise<Publishable> {
+  const adapter = await adapterFor(
+    source.location,
+    source.adapter,
+    declaredLayout(source.config),
+  ).catch(() => undefined);
+  // A source read by its layout, such as a folder of skills, takes no publishes whatever its adapter.
+  const laidOut = readOnlyLayout(account.registry, source.config) !== undefined;
+  return (kind: ArtifactKind) =>
+    !laidOut &&
+    (adapter === undefined ||
+      (adapter.capabilities.publish !== false &&
+        (adapter.publishKinds === undefined || adapter.publishKinds.includes(kind))));
+}
+
+function warnRefused(
+  refused: readonly { name: string; reason: string }[],
+  hooks: SyncExecutionHooks,
+): void {
+  for (const { name, reason } of refused) {
+    hooks.event(WARNING_EVENT, "importing", name, {
+      message: `Kept the previous copy of ${name}: ${reason}.`,
+    });
+  }
+}
+
+async function applyReported(
+  loaded: Loaded,
+  common: CommonOptions,
+  current: Scan,
+  names: ReadonlySet<string>,
+  published: ReadonlySet<string>,
+  overrides: Overrides,
+  hooks: SyncExecutionHooks,
+): Promise<void> {
+  // An override is a person overruling the edit that caused the conflict, so
+  // the guard against an unasked-for overwrite has nothing left to protect.
+  const forced = [...overrides.values()].some((item) => item === "pull" || item === "remove-local");
+  const applied = await applyLocal(loaded, common, current, names, published, forced, (action) => {
+    if (action.kind !== "record") {
+      hooks.event("artifact.progress", "applying", action.name, { step: action.kind });
+    }
+  });
+  // What it did to a person's files, said wherever the run is followed.
+  for (const notice of applied.notices) {
+    hooks.event(WARNING_EVENT, "applying", undefined, notice);
+  }
 }
 
 function sends(outcome: SyncOutcome): boolean {

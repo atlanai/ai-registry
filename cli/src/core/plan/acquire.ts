@@ -14,7 +14,7 @@ import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import { materialize } from "#core/adapter/content.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { loadAdapter } from "#core/adapter/registry.ts";
+import { declaredLayout, loadAdapter } from "#core/adapter/registry.ts";
 import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import { tokenVariable } from "#core/env.ts";
@@ -382,6 +382,7 @@ async function acquireOne(
       declared: declared.location,
       adapter: recordedAdapter(declared, options.recorded ?? options.locked?.lock, alias),
       config: declared.config,
+      layout: declaredLayout(declared.config),
     },
     { credential: options.credentials?.[alias], signal: options.signal, onBytes: options.onBytes },
   ).catch(async (error: unknown) => {

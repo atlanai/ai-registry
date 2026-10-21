@@ -40,6 +40,7 @@ export interface DeclaredSource {
    * from this, so a committed lock records the same identity on every machine.
    */
   declared?: string | undefined;
+  layout?: string | undefined;
 }
 
 /** What the host does for an adapter: a cache folder and one writer per key, across processes. */
@@ -71,7 +72,7 @@ export async function connectSource(
   spec: DeclaredSource,
   options: ConnectOptions = {},
 ): Promise<ConnectedSource> {
-  const adapter = await adapterFor(spec.location, spec.adapter);
+  const adapter = await adapterFor(spec.location, spec.adapter, spec.layout);
   const key = sourceKey(spec.declared ?? spec.location, spec.config);
   const handle = await bindAdapter(adapter, spec.alias).connect({
     source: { registry: spec.alias, location: spec.location, config: spec.config, key },

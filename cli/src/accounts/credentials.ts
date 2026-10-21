@@ -3,7 +3,7 @@ import type { Credential } from "#adapter/index.ts";
 import { withoutCredentials } from "#adapter/text.ts";
 import { comparableLocation } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { adapterFor } from "#core/adapter/registry.ts";
+import { adapterFor, declaredLayout } from "#core/adapter/registry.ts";
 import type { Account } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { CredentialStoreError } from "#core/credentials/store.ts";
@@ -32,9 +32,12 @@ function declaredAt(found: Bindings, alias: string): string | undefined {
   return declared === undefined ? undefined : expandLocation(declared.location, process.cwd());
 }
 
+type Source = Pick<RegistrySource, "adapter"> & Partial<Pick<RegistrySource, "config">>;
+
 /** Git and folder sources take none: git brings its own credentials, and a folder needs none. */
-async function signsIn(source: Pick<RegistrySource, "adapter">, location: string) {
-  const adapter = await adapterFor(location, source.adapter).catch(() => undefined);
+async function signsIn(source: Source, location: string) {
+  const layout = source.config === undefined ? undefined : declaredLayout(source.config);
+  const adapter = await adapterFor(location, source.adapter, layout).catch(() => undefined);
   return adapter !== undefined && canSignIn(adapter);
 }
 
@@ -98,7 +101,7 @@ function fromEnvironment(
  */
 async function release(
   alias: string,
-  source: Pick<RegistrySource, "adapter">,
+  source: Source,
   location: string,
   declared: boolean,
   { found, aliases, service, signal }: Lookup,
@@ -118,7 +121,7 @@ async function release(
  */
 export async function credentialFor(
   alias: string,
-  source: Pick<RegistrySource, "adapter">,
+  source: Source,
   location: string,
   signal: AbortSignal = new AbortController().signal,
 ): Promise<Credential | undefined> {
@@ -156,7 +159,7 @@ export async function credentialsForManifest(
 export async function credentialForLocation(
   location: string,
   alias: string,
-  source: Pick<RegistrySource, "adapter">,
+  source: Source,
 ): Promise<Credential | undefined> {
   const signal = new AbortController().signal;
   const shared = await lookup(signal, [alias]);

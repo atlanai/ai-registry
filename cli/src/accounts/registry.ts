@@ -2,7 +2,7 @@ import type { SourceAdapter } from "#adapter/index.ts";
 import { withoutCredentials } from "#adapter/text.ts";
 import { comparableLocation, sourceKey } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { adapterFor } from "#core/adapter/registry.ts";
+import { adapterFor, declaredLayout } from "#core/adapter/registry.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import {
   type Manifest,
@@ -47,7 +47,7 @@ export async function resolveRegistry(
     alias,
     source,
     location,
-    adapter: await adapterFor(location, source.adapter),
+    adapter: await adapterFor(location, source.adapter, declaredLayout(source.config)),
     key: sourceKey(location, source.config),
   };
 }
