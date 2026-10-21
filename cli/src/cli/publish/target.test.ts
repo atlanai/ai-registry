@@ -58,6 +58,69 @@ describe("plan", () => {
   });
 });
 
+describe("plan's changes", () => {
+  test("compares the files and edges it sends with the latest version's", async () => {
+    const path = join(root, "lint");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "SKILL.md"), "---\nname: lint\ndescription: Lints code.\n---\n");
+    await writeFile(join(path, "rules.md"), "Rules.\n");
+    const work: Work = {
+      name: "lint",
+      kind: "skill",
+      path,
+      description: undefined,
+      home: undefined,
+      row: undefined,
+      base: undefined,
+    };
+    const { files } = await offerFrom(path, { name: "lint", kind: "skill", version: "1.0.0" });
+    const skill = files.find((file) => file.path === "SKILL.md");
+    const holding = (current: Record<string, unknown> | undefined, withheld = false) =>
+      ({
+        alias: "acme",
+        source: { adapter: { id: "probe", capabilities: { relationships: true } } },
+        latest: new Map(current === undefined || withheld ? [] : [["eng/skill/lint", current]]),
+        withheld: new Map(withheld ? [["eng/skill/lint", current]] : []),
+      }) as unknown as Published;
+    const edge = { rel_type: "depends_on", to: "eng/skill/style@1.3.0", range: "^1.3.0" };
+    const latest = {
+      id: "lint",
+      version: "1.0.0",
+      digests: ["sha256:old", skill?.digest],
+      files: [skill, { path: "old.md", digest: "sha256:old" }],
+      relationships: [{ ...edge, to: "eng/skill/style@1.2.0" }],
+    };
+
+    const update = await plan(work, holding(latest), "eng", "patch", undefined, false, [edge]);
+    expect(update.changes).toEqual({
+      files: { added: ["rules.md"], changed: [], removed: ["old.md"] },
+      dependsOn: { added: ["eng/skill/style@1.3.0"], removed: ["eng/skill/style@1.2.0"] },
+    });
+    const add = await plan(work, holding(undefined), "eng", "patch", undefined, false, [edge]);
+    expect(add.changes).toEqual({
+      files: { added: ["SKILL.md", "rules.md"], changed: [], removed: [] },
+      dependsOn: { added: ["eng/skill/style@1.3.0"], removed: [] },
+    });
+    // A version held back gives no files, so what changes against it is unknown.
+    const blocked = { id: undefined, version: "1.0.0", digests: [], withheld: {} };
+    expect(
+      (await plan(work, holding(blocked, true), "eng", "patch", undefined, false)).changes,
+    ).toBeUndefined();
+    // Nor does a newest version the listing does not show, such as a yanked one.
+    const yanked = {
+      ...holding(undefined),
+      newest: [{ name: "lint", group: "eng", kind: "skill", version: "1.0.0" }],
+    } as Published;
+    const past = await plan(work, yanked, "eng", "patch", undefined, false);
+    expect(past).toMatchObject({ from: "1.0.0", version: "1.0.1" });
+    expect(past.changes).toBeUndefined();
+    const same = { ...latest, digests: files.map((file) => file.digest).sort(), files };
+    const unchanged = await plan(work, holding(same), "eng", "patch", undefined, false);
+    expect(unchanged).toMatchObject({ same: true });
+    expect(unchanged.changes).toBeUndefined();
+  });
+});
+
 describe("plan for a folder agent", () => {
   test("refuses one with files beyond AGENT.md to a registry that keeps only AGENT.md", async () => {
     const path = join(root, "helper");

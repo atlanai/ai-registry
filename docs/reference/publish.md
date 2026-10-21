@@ -42,7 +42,21 @@ A first publish is version `0.1.0`. After that, `publish` takes the next patch v
 
 An artifact whose files match the newest published version is listed as `same` and not sent. On a terminal, when an artifact changed and you didn't pass `--bump`, `publish` asks how big a change it is. An export with its own `version` is published at that version, so `publish` never asks about it.
 
-Before sending, `publish` lists each artifact as `add`, `update` with its old and new version, or `same`, and asks to confirm. It refuses a skill that [`aireg registry validate`](registry.md#aireg-registry-validate) would reject.
+Before sending, `publish` lists each artifact as `add`, `update` with its old and new version, or `same`, and asks to confirm; `--dry-run` prints the same list and sends nothing. It refuses a skill that [`aireg registry validate`](registry.md#aireg-registry-validate) would reject.
+
+Under each `update`, it lists what the new version changes against the registry's newest one, so you see before sending which files the registry replaces, archives or gains, and which dependencies move:
+
+```text
+./registry  /home/me/website/registry
+  update  marketing/agent/websiteclaw  0.1.0 → 0.1.1, depends on pr-approval ^0.1.1
+    changed  identity/SOUL.md
+    removed  identity/MEMORY.md
+    added    workspace/NEW.md
+    removed  depends on marketing/skill/pr-approval@0.1.0
+    added    depends on marketing/skill/pr-approval@0.1.1
+```
+
+Files are compared by the path each is stored at: `changed` is one whose content differs, `removed` one the newest version holds that this one doesn't send. Dependencies are compared by the version each `depends_on` edge names, so an edge that moves to another version is listed as the old one removed and the new one added; a change to an edge's range alone isn't listed. After ten lines, the last says how many more there are. A newest version the registry holds back by its status, such as a blocked one, or doesn't list, such as a yanked one, gives no files to compare, so nothing is listed under it.
 
 ### What it sends
 
@@ -232,7 +246,7 @@ For an artifact without a fixed `version`, a version whose only change is a depe
 | `--changed-since <commit>` | Publish only the artifacts whose files changed since this git commit. The commit must be in the repository's history. |
 | `--force` | Publish an edit made on an older version over a newer one published since. |
 | `-y`, `--yes` | Publish without asking. With no arguments, publish everything edited here. |
-| `--dry-run` | Print what would be published, and send nothing. |
+| `--dry-run` | Print what would be published, with the files and dependencies each update changes, and send nothing. |
 
 `publish` also takes `-g`. Outside a project it uses your user scope and says so. See [Command options](options.md#command-options).
 
@@ -241,10 +255,10 @@ For an artifact without a fixed `version`, a version whose only change is a depe
 With `--json`, `publish` asks no questions and prints each artifact with its old and new version, and where it went:
 
 ```json
-{"ok": true, "data": {"dryRun": false, "target": {"registry": "acme", "namespace": "engineering"}, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "belowLatest": false, "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}]}, {"name": "websiteclaw", "kind": "agent", "registry": "acme", "namespace": "engineering", "from": null, "version": "0.1.0", "belowLatest": false, "published": true, "dependsOn": [], "files": ["AGENT.md", "identity/SOUL.md", "workspace/AGENTS.md"]}], "skipped": [{"name": "reviewer", "kind": "agent", "path": ".claude/agents/reviewer.md", "reason": "acme does not take agents"}]}}
+{"ok": true, "data": {"dryRun": false, "target": {"registry": "acme", "namespace": "engineering"}, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "belowLatest": false, "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}], "filesChanged": {"added": [], "changed": ["SKILL.md"], "removed": ["notes.md"]}, "dependsOnChanged": {"added": ["engineering/skill/review@0.3.2"], "removed": ["engineering/skill/review@0.3.1"]}}, {"name": "websiteclaw", "kind": "agent", "registry": "acme", "namespace": "engineering", "from": null, "version": "0.1.0", "belowLatest": false, "published": true, "dependsOn": [], "files": ["AGENT.md", "identity/SOUL.md", "workspace/AGENTS.md"], "filesChanged": {"added": ["AGENT.md", "identity/SOUL.md", "workspace/AGENTS.md"], "changed": [], "removed": []}}], "skipped": [{"name": "reviewer", "kind": "agent", "path": ".claude/agents/reviewer.md", "reason": "acme does not take agents"}]}}
 ```
 
-`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and otherwise the registry's newest version. `belowLatest` is `true` when `version` sorts below `from`, as an export's own `version` can. `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `files` is there only for an agent with more files than its `AGENT.md`: the path each is stored at, `AGENT.md` first. `target` is where this run sends its work, from `--to` or `publish.to`, its `registry` written as each artifact's is; it is `null` when each artifact goes where it was installed from. `skipped` lists the exports left out, each with its `name`, `kind`, `path` in the project and `reason`: one the registry doesn't take, a folder agent whose other files it doesn't keep, or one named on the command line whose own `publish: false` keeps it in the repository.
+`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and otherwise the registry's newest version. `belowLatest` is `true` when `version` sorts below `from`, as an export's own `version` can. `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `files` is there only for an agent with more files than its `AGENT.md`: the path each is stored at, `AGENT.md` first. `filesChanged` and `dependsOnChanged` say what the version changes against the registry's newest one, as the lines under an `update` do: `filesChanged` lists the stored paths `added`, `changed` and `removed`, and `dependsOnChanged` the `to` of each `depends_on` edge `added` and `removed`, each list sorted. For a new artifact, everything it sends is added. Each is left out when it has nothing to list, for an artifact that is `same`, and when the registry holds the newest version back or doesn't list it, giving no files to compare. `target` is where this run sends its work, from `--to` or `publish.to`, its `registry` written as each artifact's is; it is `null` when each artifact goes where it was installed from. `skipped` lists the exports left out, each with its `name`, `kind`, `path` in the project and `reason`: one the registry doesn't take, a folder agent whose other files it doesn't keep, or one named on the command line whose own `publish: false` keeps it in the repository.
 
 ## Exit status
 

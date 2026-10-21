@@ -256,6 +256,8 @@ describe("creating a registry and publishing into it", () => {
           belowLatest: false,
           published: true,
           dependsOn: [],
+          // A first version adds every file it sends.
+          filesChanged: { added: ["AGENT.md"], changed: [], removed: [] },
         },
       ],
       skipped: [],

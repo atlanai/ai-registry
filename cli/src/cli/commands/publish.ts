@@ -8,6 +8,7 @@ import { parse } from "#cli/options.ts";
 import { type Interaction, interaction, interactive } from "#cli/prompt/flow.ts";
 import { canceled, confirm, defaultIo, select, text } from "#cli/prompt/index.ts";
 import { multiselect } from "#cli/prompt/multiselect.ts";
+import { changeLines, changesJson } from "#cli/publish/changes.ts";
 import {
   chooseTarget,
   dependsOnFor,
@@ -178,14 +179,18 @@ function dependencyOf(edge: PublishRelationship): string {
   return `${name} ${edge.range ?? edge.to.slice(at + 1)}`;
 }
 
-function describe(item: Planned): string {
+/** One artifact's line in the plan; under an `update`, the files and dependencies it changes. */
+function describe(item: Planned): string[] {
   const address = `${item.namespace}/${item.work.kind}/${item.work.name}`;
   const edges = item.input.relationships ?? [];
   const needs = edges.length === 0 ? "" : `, depends on ${edges.map(dependencyOf).join(", ")}`;
-  if (item.same) return `  same    ${address}  ${item.version}, already published${needs}`;
-  if (item.from === undefined) return `  add     ${address}  ${item.version}${needs}`;
+  if (item.same) return [`  same    ${address}  ${item.version}, already published${needs}`];
+  if (item.from === undefined) return [`  add     ${address}  ${item.version}${needs}`];
   const below = item.belowLatest ? " (below latest)" : "";
-  return `  update  ${address}  ${item.from} → ${item.version}${below}${needs}`;
+  return [
+    `  update  ${address}  ${item.from} → ${item.version}${below}${needs}`,
+    ...(item.changes === undefined ? [] : changeLines(item.changes)),
+  ];
 }
 
 function describeSkip(skip: Skipped, namespace: string): string {
@@ -237,6 +242,7 @@ function report(
         ...(registry === undefined ? {} : { registry }),
       })),
       ...filesOf(item),
+      ...changesJson(item.changes),
     };
   });
   printer.json({ ok: true, data: { dryRun, target, artifacts, skipped } });
@@ -330,7 +336,7 @@ async function review(
       location === alias ? underHome(alias) : `${alias}  ${printer.style.dim(underHome(location))}`,
     );
     for (const { item } of planned.filter((entry) => entry.alias === alias))
-      lines.push(describe(item));
+      lines.push(...describe(item));
     if (alias === skipped?.into)
       for (const skip of skipped.skipped) lines.push(describeSkip(skip, skipped.namespace));
   }
@@ -358,7 +364,8 @@ async function review(
     {
       message: `Publish ${plural(sending.length, "artifact")}?`,
       style: printer.errStyle,
-      body: lines.map((line) => line.trimStart()),
+      // One level less, so what an `update` changes stays under it.
+      body: lines.map((line) => line.replace(/^ {2}/, "")),
     },
     step.io,
   );

@@ -1,0 +1,94 @@
+import type { PublishRelationship, Relationship } from "#adapter/index.ts";
+import { sanitizeText } from "#adapter/text.ts";
+
+// What a publish changes against the version a registry holds now, so a reviewer sees before it
+// is sent which files the registry replaces, archives or gains, and which dependencies move.
+
+/** One file as a version stores it: its path in the artifact, and its digest. */
+export interface StoredFile {
+  path: string;
+  digest: string;
+}
+
+/** One version's side of the comparison: its files, and the edges it carries. */
+export interface Side {
+  files: readonly StoredFile[];
+  relationships?: readonly (Relationship | PublishRelationship)[] | undefined;
+}
+
+/**
+ * What a publish changes, each list sorted: files by the path they are stored at, a changed one
+ * being one whose digest differs, and `depends_on` edges by their `to`, so an edge that moves to
+ * another version is the old `to` removed and the new one added.
+ */
+export interface Changes {
+  files: { added: string[]; changed: string[]; removed: string[] };
+  dependsOn: { added: string[]; removed: string[] };
+}
+
+const sorted = (items: Iterable<string>) => [...items].sort();
+
+function dependsOn(side: Side | undefined): Set<string> {
+  const edges = side?.relationships ?? [];
+  return new Set(edges.filter((edge) => edge.rel_type === "depends_on").map((edge) => edge.to));
+}
+
+/** What `sent` changes against `held`; with no version held, everything it sends is added. */
+export function changesFrom(held: Side | undefined, sent: Side): Changes {
+  const before = new Map((held?.files ?? []).map((file) => [file.path, file.digest]));
+  const after = new Map(sent.files.map((file) => [file.path, file.digest]));
+  const was = dependsOn(held);
+  const now = dependsOn(sent);
+  return {
+    files: {
+      added: sorted([...after.keys()].filter((path) => !before.has(path))),
+      changed: sorted(
+        [...after]
+          .filter(([path, digest]) => before.has(path) && before.get(path) !== digest)
+          .map(([path]) => path),
+      ),
+      removed: sorted([...before.keys()].filter((path) => !after.has(path))),
+    },
+    dependsOn: {
+      added: sorted([...now].filter((to) => !was.has(to))),
+      removed: sorted([...was].filter((to) => !now.has(to))),
+    },
+  };
+}
+
+/** The most lines listed under one artifact; past it, the last says how many more there are. */
+const SHOWN = 10;
+
+/**
+ * The lines under an `update` line, replaced and archived files first. The registry's paths and
+ * edges are its own to write, so each is made safe to print.
+ */
+export function changeLines(changes: Changes): string[] {
+  const { files, dependsOn: edges } = changes;
+  const line = (label: string, what: string) => `    ${label.padEnd(9)}${sanitizeText(what)}`;
+  const all = [
+    ...files.changed.map((path) => line("changed", path)),
+    ...files.removed.map((path) => line("removed", path)),
+    ...files.added.map((path) => line("added", path)),
+    ...edges.removed.map((to) => line("removed", `depends on ${to}`)),
+    ...edges.added.map((to) => line("added", `depends on ${to}`)),
+  ];
+  if (all.length <= SHOWN) return all;
+  const kept = all.slice(0, SHOWN - 1);
+  return [...kept, `    and ${all.length - kept.length} more`];
+}
+
+/** `filesChanged` and `dependsOnChanged` under `--json`, each left out when it has nothing. */
+export function changesJson(changes: Changes | undefined): {
+  filesChanged?: Changes["files"];
+  dependsOnChanged?: Changes["dependsOn"];
+} {
+  if (changes === undefined) return {};
+  const { files, dependsOn: edges } = changes;
+  const anyFile = files.added.length + files.changed.length + files.removed.length > 0;
+  const anyEdge = edges.added.length + edges.removed.length > 0;
+  return {
+    ...(anyFile ? { filesChanged: files } : {}),
+    ...(anyEdge ? { dependsOnChanged: edges } : {}),
+  };
+}

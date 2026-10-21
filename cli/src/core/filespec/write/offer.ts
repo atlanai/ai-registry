@@ -149,7 +149,12 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
 export async function offerFrom(
   path: string,
   target: OfferTarget,
-): Promise<{ input: PublishInput; digests: string[] }> {
+): Promise<{
+  input: PublishInput;
+  digests: string[];
+  /** Each file by the path it is stored at, with its digest, in the order it is sent. */
+  files: { path: string; digest: string }[];
+}> {
   const relationships = edgesOf(target);
   const files = await uploadFiles(path, target);
   const bytes = new Map(files.map((file) => [file.path, file.content]));
@@ -188,5 +193,9 @@ export async function offerFrom(
     files,
     ...(relationships.length === 0 ? {} : { relationships }),
   };
-  return { input, digests: descriptors.map((file) => file.digest).sort() };
+  return {
+    input,
+    digests: descriptors.map((file) => file.digest).sort(),
+    files: descriptors.map(({ path, digest }) => ({ path, digest })),
+  };
 }

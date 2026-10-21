@@ -40,6 +40,7 @@ import { posixRelative } from "#core/fs/path.ts";
 import type { RegistrySource } from "#core/manifest.ts";
 import { parseRef, type Ref, RefParseError } from "#core/ref.ts";
 import { readOnly } from "#engine/remote.ts";
+import { type Changes, changesFrom, type Side, type StoredFile } from "./changes.ts";
 import type { Work } from "./work.ts";
 
 /** Where `--to` sends work: a registry and namespace, or one artifact at a version. */
@@ -208,6 +209,8 @@ interface Current {
   id: string | undefined;
   version: string | undefined;
   digests: string[];
+  /** Each file by the path it is stored at; absent when the registry gives none, as for one held back. */
+  files?: readonly StoredFile[] | undefined;
   relationships?: readonly Relationship[] | undefined;
   /** Published, but held back by its status, such as blocked: the registry gives no files for it. */
   withheld?: Withheld | undefined;
@@ -228,8 +231,16 @@ export interface Published {
 
 const keyOf = (namespace: string, kind: string, name: string) => `${namespace}/${kind}/${name}`;
 
-function digestsOf(artifact: Artifact): string[] {
-  return artifact.envelope.files.map((file) => file.digest).sort();
+/** One version the registry gives the files of, as a publish compares it. */
+function heldOf(artifact: Artifact, version: string | undefined): Current {
+  const { files, relationships } = artifact.envelope;
+  return {
+    id: artifact.id,
+    version,
+    digests: files.map((file) => file.digest).sort(),
+    files: files.map(({ path, digest }) => ({ path, digest })),
+    relationships,
+  };
 }
 
 export async function readPublished(
@@ -265,12 +276,7 @@ export async function readPublished(
     const { namespace, name, version } = artifact.envelope.metadata;
     if (namespace === undefined) continue;
     namespaces.add(namespace);
-    latest.set(keyOf(namespace, artifact.kind, name), {
-      id: artifact.id,
-      version,
-      digests: digestsOf(artifact),
-      relationships: artifact.envelope.relationships,
-    });
+    latest.set(keyOf(namespace, artifact.kind, name), heldOf(artifact, version));
   }
   // Held back is still published: the next version goes past it, never back over it.
   const withheld = new Map<string, Current>();
@@ -304,6 +310,11 @@ export interface Planned {
   /** The version sorts below the registry's newest, as an export's own older `version` can. */
   belowLatest: boolean;
   input: PublishInput;
+  /**
+   * What it changes against the registry's latest version, when it is sent; absent for one
+   * already published, and when the registry gives no files to compare, as for one held back.
+   */
+  changes?: Changes | undefined;
 }
 
 /** What the registry holds at one version of this artifact, when it holds that version. */
@@ -320,14 +331,7 @@ async function heldAt(
   const artifact = found?.artifacts.find(
     (each) => each.envelope.metadata.version === version && each.kind === kind,
   );
-  if (artifact !== undefined) {
-    return {
-      id: artifact.id,
-      version,
-      digests: digestsOf(artifact),
-      relationships: artifact.envelope.relationships,
-    };
-  }
+  if (artifact !== undefined) return heldOf(artifact, version);
   // A resolve hides a version its status holds back, such as a blocked one, but still names it.
   const kept = withheldFrom(found?.withheld).find(
     (item) =>
@@ -606,7 +610,28 @@ export async function plan(
     same,
     belowLatest: below(version, current?.version),
     input,
+    ...changesAgainst(
+      { same, current, from },
+      { files: probe.files, relationships: input.relationships },
+    ),
   };
+}
+
+/**
+ * What a version sent changes against the latest one: nothing for one already published, and
+ * nothing known when the registry gives none of the newest one's files, as for one held back, or
+ * one the listing does not show, such as a yanked one.
+ */
+function changesAgainst(
+  at: { same: boolean; current: Current | undefined; from: string | undefined },
+  sent: Side,
+): { changes?: Changes } {
+  const { same, current, from } = at;
+  if (same) return {};
+  if (current === undefined)
+    return from === undefined ? { changes: changesFrom(undefined, sent) } : {};
+  const { files, relationships } = current;
+  return files === undefined ? {} : { changes: changesFrom({ files, relationships }, sent) };
 }
 
 function below(version: string, latest: string | undefined): boolean {
