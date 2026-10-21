@@ -168,7 +168,7 @@ Its version folder in the registry then holds `AGENT.md`, `identity/SOUL.md`, `w
 
 A registry keeps an agent's other files only when its adapter says it does: a registry folder does. One whose adapter doesn't keep them takes the other exports, and lists such an agent as `skip`, as in `skip    marketing/agent/websiteclaw  acme keeps no agent's files beyond its AGENT.md, and it has 3 more files`; one named on the command line is refused. A folder agent with no file but its `AGENT.md` goes to any registry that takes agents.
 
-A project installs a folder agent as its `AGENT.md` alone, since each coding agent takes an agent as one file.
+A project installs a folder agent as its `AGENT.md` alone, since each coding agent takes an agent as one file, and the install says which files it left out, as in `marketing/websiteclaw 0.1.0 installs as its AGENT.md alone, since a harness takes an agent as one file, so identity/SOUL.md, workspace/AGENTS.md and workspace/TOOLS.md are left out.`
 
 ### Entries that reach one artifact
 

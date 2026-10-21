@@ -7,11 +7,14 @@ import { skillBody } from "#test/kit/spec-root.ts";
 
 // A repository makes a skill and a folder agent: an AGENT.md with the files it works from, a
 // skill kept inside its folder that is exported on its own, a runtime folder it never publishes,
-// and one file stored at another path. A bare `aireg publish` sends both into a registry folder.
+// and one file stored at another path. A bare `aireg publish` sends both into a registry folder,
+// and another project installs the agent from there as its AGENT.md.
 
 let aireg: Aireg;
 /** The repository that makes the agent, with its registry folder inside it. */
 let maker: string;
+/** Another project, which installs from that registry folder. */
+let project: string;
 
 const MANIFEST = `exports:
   - skills
@@ -44,8 +47,8 @@ async function filesIn(dir: string): Promise<string[]> {
 
 const publish = (...args: string[]) => aireg(["publish", ...args], { cwd: maker });
 
-test.beforeAll(async ({ aireg: run, tmp, git }) => {
-  [aireg, maker] = [run, join(tmp, "maker")];
+test.beforeAll(async ({ aireg: run, tmp, project: dir, git }) => {
+  [aireg, maker, project] = [run, join(tmp, "maker"), dir];
   await git.init(maker);
   await mkdir(join(maker, "skills", "pr-approval"), { recursive: true });
   await writeFile(
@@ -148,4 +151,23 @@ describe("publishing a folder agent", () => {
       ),
     ).toBe("The tools it uses, and one more.\n");
   });
+
+  test("installs into a project as its AGENT.md alone, saying which files it left out", async () => {
+    await mkdir(join(project, ".claude"), { recursive: true });
+    expect((await aireg(["init", "-y"])).code).toBe(0);
+    const declared = await aireg(["registry", "add", join(maker, "registry"), "--as", "maker"]);
+    expect(declared.code, declared.stderr).toBe(0);
+    const added = await aireg(["add", "maker/marketing/agent/websiteclaw", "-y"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect(added.stderr).toContain(
+      "marketing/websiteclaw 0.1.1 installs as its AGENT.md alone, since a harness takes an agent as one file, so identity/SOUL.md, workspace/AGENTS.md and workspace/TOOLS.md are left out.",
+    );
+    expect(await readFile(join(project, ".claude", "agents", "websiteclaw.md"), "utf8")).toBe(
+      await readFile(agent("AGENT.md"), "utf8"),
+    );
+    // Installed once, it says so no more.
+    const again = await aireg(["install"]);
+    expect(again.code, again.stderr).toBe(0);
+    expect(again.stderr).not.toContain("left out");
+  }, 60_000);
 });

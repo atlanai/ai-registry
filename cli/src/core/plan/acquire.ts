@@ -482,7 +482,7 @@ async function acquireOne(
         );
   listing.catalog.warnings.push(...(exported?.warnings ?? []));
   const placements = new Map<string, Placement>();
-  for (const { path, artifact } of listing.listed) {
+  for (const { path, artifact, leftOut } of listing.listed) {
     const { needs, unusable } = needsOf(artifact.envelope);
     const { name } = artifact.envelope.metadata;
     const version = artifact.version ?? artifact.envelope.metadata.version;
@@ -497,6 +497,7 @@ async function acquireOne(
       ...statusOf(artifact),
       ...(isReadOnlyLayout(listing.layout) ? pluginOf(artifact) : {}),
       ...revisionOf(artifact),
+      ...leftOutOf(artifact, leftOut),
     });
   }
 
@@ -592,6 +593,15 @@ function refuseOutside(
 }
 
 /** A commit an adapter reports for one artifact, which the lockfile records and hands back. */
+/** The files a version holds beyond the one file it installs as, beside that file's name. */
+function leftOutOf(
+  artifact: Artifact,
+  leftOut: readonly string[] | undefined,
+): Pick<Placement, "leftOut"> {
+  const entry = artifact.files[0]?.path;
+  return leftOut === undefined || entry === undefined ? {} : { leftOut: { entry, files: leftOut } };
+}
+
 function revisionOf(artifact: Artifact): Pick<Placement, "revision"> {
   const { revision } = artifact;
   return typeof revision === "string" && /^[0-9a-f]{40}$/.test(revision) ? { revision } : {};

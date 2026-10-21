@@ -54,6 +54,11 @@ export interface Placement {
   plugin?: PluginDocument | undefined;
   /** The commit it was read at, where that is its own rather than the registry's. */
   revision?: string | undefined;
+  /**
+   * For a kind a harness takes as one file, a version holding more: the file it installs as,
+   * and the others, which no harness is given.
+   */
+  leftOut?: { entry: string; files: readonly string[] } | undefined;
 }
 
 /** A resolved registry with lazy access to artifact content. */
