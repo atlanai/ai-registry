@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": "2026-10-21T10:31:38.707Z",
+  "generated_at": "2026-10-21T13:00:26.202Z",
   "entries": [
     {
       "namespace": "aireg",
@@ -52,7 +52,7 @@
       "kind": "skill",
       "name": "aireg-publish",
       "latest": "0.2.0",
-      "digest": "sha256:3a0b096d3e8574ac66d062d85f563866003d9fe0fab866e253e890514d542943",
+      "digest": "sha256:5f0e78b4939414d97ac6c3fc607645cc5cd7ddcca5e84b0c5ca9041ae221e823",
       "status": "active",
       "description": "Publish a skill or agent to a registry, or release a new version of one, including an edit made to an installed copy. Use when asked to publish, share, contribute or release a skill or agent, send an edit to an installed skill back to its registry, update one that is already in a registry, publish the skills and agents a project's manifest exports, publish a project's skills from CI, or fix what registry validation reports."
     }

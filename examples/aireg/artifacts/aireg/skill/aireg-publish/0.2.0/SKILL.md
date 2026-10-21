@@ -91,13 +91,14 @@ exports:
   - .claude/skills                              # a folder: each skill or agent directly inside
   - path: .claude/agents/reviewer.md            # one artifact
     depends_on:
-      - ./.claude/skills/review                 # another export
+      - ./.claude/skills/review                 # a skill or agent here, published with it
       - <registry>/<namespace>/skill/<name>     # an artifacts: entry, without a version
   - path: agents/<agent>                        # a folder agent: AGENT.md and its files
     ignore: [runtime/]                          # gitignore patterns, files left out
     include:                                    # the only files sent beside AGENT.md
       - workspace
       - { from: notes/SOUL.md, as: identity/SOUL.md }
+    depends_on: [./agents/<agent>/skills]       # a folder: each skill or agent directly inside
 publish:
   to: ../<clone>/<namespace>
 ```
@@ -107,7 +108,10 @@ are each exported, the rest skipped with a note. A glob also works, but a path n
 quoting. A mapping can add `kind` (`skill` or `agent`, which everything it reaches must be),
 `exclude` (names in a folder entry to leave out), `include` and `ignore`, with paths relative
 to each artifact. In a git repository only what git tracks is published, and the entry file
-always goes. A skill inside an agent's folder that another entry reaches is published on its
+always goes. A `./` dependency names a skill or agent, or a folder of them, as an entry does,
+and each one it names is published with what depends on it, with no entry of its own needed;
+one an entry keeps with `publish: false` or leaves out with `exclude` exits 1. A skill inside
+an agent's folder that an entry reaches, or that the agent depends on, is published on its
 own, not with the agent.
 
 ```sh
