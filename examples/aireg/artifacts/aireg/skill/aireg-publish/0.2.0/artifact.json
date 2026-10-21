@@ -6,13 +6,13 @@
     "namespace": "aireg",
     "version": "0.2.0",
     "description": "Publish a skill or agent to a registry, or release a new version of one, including an edit made to an installed copy. Use when asked to publish, share, contribute or release a skill or agent, send an edit to an installed skill back to its registry, update one that is already in a registry, publish the skills and agents a project's manifest exports, publish a project's skills from CI, or fix what registry validation reports.",
-    "digest": "sha256:6b22c1185a7ca1217917aaa3d5294610397cb87111fd16013324bab41a20a4be"
+    "digest": "sha256:3ddf5b4913bcd0e7ffd640cfee94a85346d5eca00f0fadc3a63895800a0b9e9c"
   },
   "files": [
     {
       "path": "SKILL.md",
-      "digest": "sha256:8ef6b6b1d8d5092703390d4c4272c273ace7cad26739326d28e44eea01ac8d7c",
-      "size": 10237,
+      "digest": "sha256:41f361258da639252cc25c38142d42c826d5d78d5556ad0b6bbab7c6053fb19a",
+      "size": 10162,
       "media_type": "text/markdown",
       "urls": [
         "SKILL.md"

@@ -51,7 +51,7 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir, git }) => {
   );
   // A README beside the skills is no agent, so the glob skips it.
   await writeFile(join(maker, ".claude", "skills", "README.md"), "# Our skills\n");
-  await writeManifestIn(maker, `${EXPORTS}publish:\n  to: [./registry/eng]\n`);
+  await writeManifestIn(maker, `${EXPORTS}publish:\n  to: ./registry/eng\n`);
   // The scratch skill is never committed, so the glob leaves it out.
   await git(maker, "add", ".claude/skills/review", ".claude/skills/README.md", ".claude/agents");
   await git(maker, "add", ".registry");
@@ -139,58 +139,57 @@ describe("publishing a repository's exports", () => {
   }, 60_000);
 });
 
-describe("choosing a target", () => {
-  const targets = "publish:\n  to: [./registry/eng, ./registry/ops]\n";
-
-  test("needs --to among several, and only one the manifest lists", async () => {
-    await writeManifestIn(maker, `${EXPORTS}${targets}`);
-    const unnamed = await publish("-y");
-    expect(unnamed.code).toBe(2);
-    expect(unnamed.stderr).toContain("The manifest lists 2 publish targets.");
-    expect(unnamed.stderr).toContain("Pass `--to ./registry/eng` or `--to ./registry/ops`.");
-    const other = await publish("--to", "./registry/other", "-y");
+describe("the publish target", () => {
+  test("is the manifest's one target, which --to may only repeat", async () => {
+    await writeManifestIn(maker, `${EXPORTS}publish:\n  to: ./registry/eng\n`);
+    const same = await publish("--to", "./registry/eng", "--dry-run");
+    expect(same.code, same.stderr).toBe(0);
+    const other = await publish("--to", "./registry/ops", "-y");
     expect(other.code).toBe(2);
     expect(other.stderr).toContain(
-      '--to "./registry/other" is not one of the manifest\'s publish targets.',
+      '--to "./registry/ops" is not the manifest\'s publish target, ./registry/eng.',
     );
     expect(other.stderr).toContain(
-      "Pass `--to ./registry/eng` or `--to ./registry/ops`, or add it to `publish.to`.",
+      "Leave `--to` off to publish to ./registry/eng, or change `publish.to`.",
     );
   });
 
-  test("leaves out an export whose own targets do not include it, and says so", async () => {
-    await writeManifestIn(maker, `${EXPORTS}    publish:\n      to: [./registry/eng]\n${targets}`);
-    const sent = await publish("--to", "./registry/ops", "-y", "--json");
-    expect(sent.code, sent.stderr).toBe(0);
-    const { data } = JSON.parse(sent.stdout);
-    expect(data.artifacts.map((each: { name: string }) => each.name)).toEqual(["review"]);
-    expect(data.skipped).toEqual([
-      { name: "reviewer", kind: "agent", reason: "its publish.to does not list ./registry/ops" },
-    ]);
+  test("refuses a list of targets, naming one to keep", async () => {
+    await writeManifestIn(maker, `${EXPORTS}publish:\n  to: [./registry/eng, ./registry/ops]\n`);
+    const listed = await publish("-y");
+    expect(listed.code).toBe(1);
+    expect(listed.stderr).toContain("`publish.to` names one target, not a list.");
+    expect(listed.stderr).toContain(
+      "Keep the one this project publishes to, such as `to: ./registry/eng`.",
+    );
   });
 
-  test("refuses an export whose dependency is not published to the target", async () => {
+  test("leaves out an export that sets publish: false, and refuses one depending on it", async () => {
     await writeManifestIn(
       maker,
       `exports:
   - path: .claude/skills/review
-    publish:
-      to: [./registry/eng]
+    publish: false
   - path: .claude/agents/reviewer.md
     depends_on:
       - ./.claude/skills/review
 publish:
-  to: [./registry/eng, ./registry/qa]
+  to: ./registry/qa
 `,
     );
-    const sent = await publish("--to", "./registry/qa", "-y");
+    const sent = await publish("-y");
     expect(sent.code).toBe(1);
     expect(sent.stderr).toContain(
       "reviewer depends on review, which is not published to ./registry/qa.",
     );
     expect(sent.stderr).toContain(
-      'Add ./registry/qa to the `publish.to` of export ".claude/skills/review"',
+      'Remove `publish: false` from export ".claude/skills/review", so review is published with it.',
     );
+    const named = await publish(".claude/skills/review", "--dry-run", "--json");
+    expect(named.code, named.stderr).toBe(0);
+    expect(JSON.parse(named.stdout).data.skipped).toEqual([
+      { name: "review", kind: "skill", reason: "its export sets publish: false" },
+    ]);
   });
 });
 
@@ -209,7 +208,7 @@ describe("an export's own version", () => {
   const fixAt = (version: string | undefined) =>
     writeManifestIn(
       repo,
-      `exports:\n  - path: .claude/skills/lint${version === undefined ? "" : `\n    version: ${version}`}\npublish:\n  to: [./registry/eng]\n`,
+      `exports:\n  - path: .claude/skills/lint${version === undefined ? "" : `\n    version: ${version}`}\npublish:\n  to: ./registry/eng\n`,
     );
   /** Sets a version's status in `versions.json`, as a registry's maintainers do. */
   const mark = async (version: string, status: string, reason?: string) => {
@@ -336,7 +335,7 @@ describe("a dependent whose export fixes its version", () => {
     depends_on:
       - ./.claude/skills/review
 publish:
-  to: [./registry/eng]
+  to: ./registry/eng
 `,
     );
     await git(repo, "add", ".");

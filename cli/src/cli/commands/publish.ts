@@ -466,13 +466,13 @@ interface Bound {
   skipped: Skipped[];
   to: Destination | undefined;
   checkout: Checkout | undefined;
-  /** The `publish.to` target chosen, as the manifest writes it. */
+  /** The `publish.to` target, as the manifest writes it. */
   target: string | undefined;
 }
 
 /**
- * Exports go to one of the manifest's `publish.to` targets: the only one, else the one `--to`
- * names. A folder target is the manifest's, so it is read against the project, not where you are.
+ * Exports go to the manifest's one `publish.to` target, which `--to` may only repeat. A folder
+ * target is the manifest's, so it is read against the project, not where you are.
  */
 async function boundFor(
   works: Work[],
@@ -482,8 +482,7 @@ async function boundFor(
   known: Record<string, RegistrySource>,
   dirs: { base: string; cwd: string },
 ): Promise<Bound> {
-  if (manifest.publish === undefined)
-    return { ...forTarget(works, manifest, undefined), ...given, target: undefined };
+  if (manifest.publish === undefined) return { ...forTarget(works), ...given, target: undefined };
   if (!works.some((work) => work.exported !== undefined))
     return { works, skipped: [], ...given, target: undefined };
   const { to } = given;
@@ -498,7 +497,7 @@ async function boundFor(
     to === undefined
       ? await destinationFrom(target, isLocalPath(target) ? dirs.base : dirs.cwd, known)
       : given;
-  return { ...forTarget(works, manifest, target), ...chosen, target };
+  return { ...forTarget(works), ...chosen, target };
 }
 
 /** Each export's edges for the target it goes to; other work's are left as they are. */

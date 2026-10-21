@@ -9,7 +9,6 @@ import {
   formatManifest,
   parseManifest,
   readManifest,
-  targetsOf,
   writeManifest,
 } from "./manifest.ts";
 import { parseRef } from "./ref.ts";
@@ -101,15 +100,10 @@ describe("exports and publish", () => {
     "    depends_on:",
     "      - ./.claude/skills/review",
     "      - public/platform/skill/sql-style",
-    "    publish:",
-    "      to:",
-    "        - acme/engineering",
     "  - path: .claude/skills/scratch",
     "    publish: false",
     "publish:",
-    "  to:",
-    "    - acme/engineering",
-    "    - ./registry/engineering",
+    "  to: acme/engineering",
     "",
   ].join("\n");
 
@@ -124,30 +118,17 @@ describe("exports and publish", () => {
           { type: "local", path: ".claude/skills/review" },
           { type: "remote", ref: parseRef("public/platform/skill/sql-style") },
         ],
-        publish: { to: ["acme/engineering"] },
+        publish: undefined,
       },
       { path: ".claude/skills/scratch", version: undefined, dependsOn: [], publish: false },
     ]);
-    expect(manifest.publish).toEqual({ to: ["acme/engineering", "./registry/engineering"] });
+    expect(manifest.publish).toEqual({ to: "acme/engineering" });
   });
 
   test("writes both back after `artifacts:`, as they were written", () => {
     const manifest = read(full);
     expect(formatManifest(manifest)).toBe(`${declared}${full}`);
     expect(parseManifest(formatManifest(manifest))).toEqual(manifest);
-  });
-
-  test("names the targets each export goes to", () => {
-    const manifest = read(full);
-    const [glob, reviewer, scratch] = manifest.exports;
-    expect(glob && targetsOf(manifest, glob)).toEqual([
-      "acme/engineering",
-      "./registry/engineering",
-    ]);
-    expect(reviewer && targetsOf(manifest, reviewer)).toEqual(["acme/engineering"]);
-    expect(scratch && targetsOf(manifest, scratch)).toEqual([]);
-    const bare = read("exports: [skills/lint]\n");
-    expect(bare.exports[0] && targetsOf(bare, bare.exports[0])).toEqual([]);
   });
 
   test("finds a remote dependency's `artifacts:` entry by address, whatever its version", () => {
@@ -284,53 +265,45 @@ describe("exports and publish", () => {
     ).toThrow("which is not listed under `artifacts:`.");
   });
 
-  test("reads an entry's `publish` as false or some of the top-level targets", () => {
-    const top = "publish:\n  to: [acme/engineering, acme/platform]\n";
+  test("reads an entry's `publish` as false alone", () => {
     const where = '`publish` of export ".claude/agents/reviewer.md"';
-    expect(refused(`${entry("    publish: true\n")}${top}`)).toThrow(
-      `${where} must be false or \`{ to: [...] }\`.`,
-    );
-    expect(refused(`${entry("    publish: {}\n")}${top}`)).toThrow(`${where} has no \`to\`.`);
-    expect(refused(`${entry("    publish: { to: [acme/platform], at: 1 }\n")}${top}`)).toThrow(
-      `${where} does not take "at"; it takes to.`,
-    );
-    expect(refused(`${entry("    publish: { to: [] }\n")}${top}`)).toThrow(
-      '`publish.to` of export ".claude/agents/reviewer.md" must be a list of targets',
-    );
-    expect(refused(`${entry("    publish: { to: [acme/security] }\n")}${top}`)).toThrow(
-      expect.objectContaining({
-        message:
-          'manifest.yml: `publish.to` of export ".claude/agents/reviewer.md" names "acme/security", which the top-level `publish.to` does not list.',
-        hint: "Add it to the top-level `publish.to`, or leave it out here.",
-      }),
-    );
-    expect(refused(entry("    publish: { to: [acme/platform] }\n"))).toThrow(
-      "which the top-level `publish.to` does not list.",
-    );
+    for (const value of ["true", "{ to: acme/engineering }", "[acme/engineering]"]) {
+      expect(
+        refused(`${entry(`    publish: ${value}\n`)}publish:\n  to: acme/engineering\n`),
+      ).toThrow(
+        expect.objectContaining({
+          message: `manifest.yml: ${where} takes only false.`,
+          hint: "Remove it to publish the export to `publish.to`, or write `publish: false` to keep it here.",
+        }),
+      );
+    }
     expect(read(entry("    publish: false\n")).exports[0]?.publish).toBe(false);
-    expect(
-      read(`${entry("    publish: { to: [acme/platform] }\n")}${top}`).exports[0]?.publish,
-    ).toEqual({
-      to: ["acme/platform"],
-    });
   });
 
-  test("reads the top-level `publish.to` as unique targets in a declared registry or a folder", () => {
+  test("reads the top-level `publish.to` as one target in a declared registry or a folder", () => {
     expect(refused("publish: [acme/engineering]\n")).toThrow(
       "`publish:` must be a mapping with `to`.",
     );
     expect(refused("publish: {}\n")).toThrow("`publish:` has no `to`.");
-    expect(refused("publish: { to: [acme/engineering], from: x }\n")).toThrow(
+    expect(refused("publish: { to: acme/engineering, from: x }\n")).toThrow(
       '`publish:` does not take "from"; it takes to.',
     );
-    expect(refused("publish: { to: [] }\n")).toThrow(
-      "`publish.to` must be a list of targets, such as acme/engineering or ./registry/engineering.",
+    expect(refused("publish: { to: '' }\n")).toThrow(
+      "`publish.to` must be one target, such as acme/engineering or ./registry/engineering.",
     );
-    expect(refused("publish: { to: acme/engineering }\n")).toThrow("must be a list of targets");
-    expect(refused("publish: { to: [acme/eng, acme/eng] }\n")).toThrow(
-      '`publish.to` lists "acme/eng" twice.',
+    // A list was only ever unreleased, so it is refused with the one entry to write instead.
+    expect(refused("publish: { to: [acme/engineering] }\n")).toThrow(
+      expect.objectContaining({
+        message: "manifest.yml: `publish.to` names one target, not a list.",
+        hint: "Write it as `to: acme/engineering`.",
+      }),
     );
-    expect(refused("publish: { to: [kit/eng] }\n")).toThrow(
+    expect(refused("publish: { to: [acme/engineering, ./registry/eng] }\n")).toThrow(
+      expect.objectContaining({
+        hint: "Keep the one this project publishes to, such as `to: acme/engineering`.",
+      }),
+    );
+    expect(refused("publish: { to: kit/eng }\n")).toThrow(
       expect.objectContaining({
         message:
           'manifest.yml: `publish.to` names registry "kit", which is not declared under `registries:`.',
@@ -338,20 +311,20 @@ describe("exports and publish", () => {
       }),
     );
     for (const to of ["acme", "acme/eng/skill", "/eng/", "~/registry/eng"]) {
-      expect(refused(`publish: { to: ['${to}'] }\n`)).toThrow(`\`publish.to\` names "${to}"`);
+      expect(refused(`publish: { to: '${to}' }\n`)).toThrow(`\`publish.to\` names "${to}"`);
     }
-    expect(refused("publish: { to: [acme/Eng] }\n")).toThrow(
+    expect(refused("publish: { to: acme/Eng }\n")).toThrow(
       '`publish.to` names "acme/Eng", whose namespace is not valid.',
     );
-    expect(refused("publish: { to: [./registry/Eng] }\n")).toThrow(
+    expect(refused("publish: { to: ./registry/Eng }\n")).toThrow(
       '`publish.to` names "./registry/Eng", a folder that does not end in a namespace.',
     );
-    expect(refused("publish: { to: [.eng] }\n")).toThrow(
+    expect(refused("publish: { to: .eng }\n")).toThrow(
       "a folder that does not end in a namespace.",
     );
-    expect(read("publish: { to: [../registry/eng, /srv/registry/eng, ./eng] }\n").publish).toEqual({
-      to: ["../registry/eng", "/srv/registry/eng", "./eng"],
-    });
+    for (const to of ["../registry/eng", "/srv/registry/eng", "./eng"]) {
+      expect(read(`publish: { to: ${to} }\n`).publish).toEqual({ to });
+    }
   });
 });
 
@@ -474,7 +447,7 @@ describe("writeManifest", () => {
       "",
       "# Where it goes.",
       "publish:",
-      "  to: [kit/eng]",
+      "  to: kit/eng",
       "",
     ].join("\n");
     await mkdir(dirname(path), { recursive: true });

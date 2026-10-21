@@ -98,7 +98,7 @@ exports:
     depends_on:
       - ./.claude/skills/pr-review
 publish:
-  to: [./registry/engineering]
+  to: ./registry/engineering
 ```
 
 The workflow's publish step becomes `aireg publish --yes`, and `paths:` takes in the agents and the manifest too: `paths: [".claude/skills/**", ".claude/agents/**", ".registry/manifest.yml"]`. aireg publishes the agent with a dependency on `pr-review`, at the version the same run publishes or the newest one already in the registry, so a project that adds the agent gets the skill too. A dependency on an artifact the project installs, listed under `artifacts:`, takes its version from the committed lockfile, so the workflow doesn't install anything first. See [Publishing a repository's exports](../reference/publish.md#publishing-a-repositorys-exports).

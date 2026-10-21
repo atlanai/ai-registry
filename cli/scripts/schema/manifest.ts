@@ -139,7 +139,7 @@ const NAMESPACE = "[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?";
 const Target = Type.String({
   pattern: `^[^./][^/]*/${NAMESPACE}$|^(\\.[^/]*)?(/.*)?/${NAMESPACE}$`,
   description:
-    "A declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
+    "Where exports are published, as `aireg publish --to` takes it: a declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
 });
 
 const SEMVER_IDENT = String.raw`(0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
@@ -167,22 +167,9 @@ const DetailedExport = Type.Object(
       ),
     ),
     publish: Type.Optional(
-      Type.Union(
-        [
-          Type.Literal(false, { description: "Never publish it." }),
-          Type.Object(
-            {
-              to: Type.Array(Target, {
-                minItems: 1,
-                uniqueItems: true,
-                description: "The top-level targets it goes to, when not all of them.",
-              }),
-            },
-            { additionalProperties: false },
-          ),
-        ],
-        { description: "`false`, or `{ to }` naming some of the top-level `publish.to`." },
-      ),
+      Type.Literal(false, {
+        description: "`false` keeps it in this repository; absent, it goes to `publish.to`.",
+      }),
     ),
   },
   { additionalProperties: false },
@@ -242,17 +229,13 @@ export const Manifest = Type.Object(
     exports: Type.Optional(
       Type.Array(AnyExport, {
         description:
-          "What this project makes for others to install: a path or glob, or `{ path, version, depends_on, publish }` to give one path an exact version, dependencies or its own targets.",
+          "What this project makes for others to install: a path or glob, or `{ path, version, depends_on, publish }` to give one path an exact version, dependencies, or `publish: false` to keep it here.",
       }),
     ),
     publish: Type.Optional(
       Type.Object(
         {
-          to: Type.Array(Target, {
-            minItems: 1,
-            uniqueItems: true,
-            description: "Where exports are published, each as `aireg publish --to` takes it.",
-          }),
+          to: Target,
         },
         { additionalProperties: false },
       ),

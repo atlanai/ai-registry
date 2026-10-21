@@ -26,7 +26,7 @@ test.beforeEach(async ({ tmp }) => {
 
 function manifestWith(exports: string): Manifest {
   return parseManifest(
-    `registries:\n  acme: github.com/acme/agent-registry\nexports:\n${exports}publish:\n  to: [acme/engineering]\n`,
+    `registries:\n  acme: github.com/acme/agent-registry\nexports:\n${exports}publish:\n  to: acme/engineering\n`,
   );
 }
 

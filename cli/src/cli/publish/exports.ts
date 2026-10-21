@@ -4,7 +4,7 @@ import { rootReader } from "#adapter/filespec/folder.ts";
 import type { ArtifactKind, PublishRelationship } from "#adapter/index.ts";
 import { expandHome, isLocalPath } from "#adapter/paths.ts";
 import { parseVersion } from "#adapter/semver.ts";
-import { list, plural, quoted } from "#adapter/text.ts";
+import { quoted } from "#adapter/text.ts";
 import {
   comparableLocation,
   declaredRegistryUrl,
@@ -20,7 +20,6 @@ import {
   type ExportDependency,
   type Manifest,
   type RegistrySource,
-  targetsOf,
 } from "#core/manifest.ts";
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { artifactRoot } from "./reach.ts";
@@ -50,29 +49,16 @@ export function namesTarget(
   return canonical(resolve(base, listed)) === canonical(join(folder, to.namespace));
 }
 
-/** The one `publish.to` target this run sends exports to: the only one, else the one `--to` names. */
+/** Exports go to the manifest's one `publish.to` target, so a `--to` naming another is refused. */
 export function chooseTarget(
-  listed: readonly string[],
+  target: string,
   to: string | undefined,
   names: (target: string) => boolean,
 ): string {
-  const options = list(
-    listed.map((target) => `\`--to ${target}\``),
-    "or",
-  );
-  const [only] = listed;
-  if (to === undefined) {
-    if (listed.length === 1 && only !== undefined) return only;
-    throw new AiregError(`The manifest lists ${plural(listed.length, "publish target")}.`, {
-      code: ErrorCode.Usage,
-      hint: `Pass ${options}.`,
-    });
-  }
-  const chosen = listed.find(names);
-  if (chosen !== undefined) return chosen;
-  throw new AiregError(`--to ${quoted(to)} is not one of the manifest's publish targets.`, {
+  if (to === undefined || names(target)) return target;
+  throw new AiregError(`--to ${quoted(to)} is not the manifest's publish target, ${target}.`, {
     code: ErrorCode.Usage,
-    hint: `Pass ${options}, or add it to \`publish.to\`.`,
+    hint: `Leave \`--to\` off to publish to ${target}, or change \`publish.to\`.`,
   });
 }
 
@@ -83,27 +69,14 @@ export interface Skipped {
   reason: string;
 }
 
-/** The work that goes to `target`, and the exports whose own rules keep them from it. */
-export function forTarget(
-  works: readonly Work[],
-  manifest: Manifest,
-  /** Absent when the manifest lists no `publish.to`, so only `publish: false` keeps one back. */
-  target: string | undefined,
-): { works: Work[]; skipped: Skipped[] } {
+/** The work that goes to the target, and the exports that set `publish: false` to stay here. */
+export function forTarget(works: readonly Work[]): { works: Work[]; skipped: Skipped[] } {
   const kept: Work[] = [];
   const skipped: Skipped[] = [];
   for (const work of works) {
-    const entry = work.exported;
-    const reason =
-      entry === undefined
-        ? undefined
-        : entry.publish === false
-          ? "its export sets publish: false"
-          : target === undefined || targetsOf(manifest, entry).includes(target)
-            ? undefined
-            : `its publish.to does not list ${target}`;
-    if (reason === undefined) kept.push(work);
-    else skipped.push({ name: work.name, kind: work.kind, reason });
+    if (work.exported?.publish !== false) kept.push(work);
+    else
+      skipped.push({ name: work.name, kind: work.kind, reason: "its export sets publish: false" });
   }
   return { works: kept, skipped };
 }
@@ -225,9 +198,7 @@ async function localEdge(
       hint:
         other.publish === false
           ? `Remove \`publish: false\` from export ${shown}, so ${name} is published with it.`
-          : other.publish !== undefined
-            ? `Add ${where} to the \`publish.to\` of export ${shown}, so ${name} is published with it.`
-            : `Publish ${name} to ${where} in the same run, or before it.`,
+          : `Publish ${name} to ${where} in the same run, or before it.`,
     });
   }
   const range = parseVersion(version) === undefined ? {} : { range: `^${version}` };

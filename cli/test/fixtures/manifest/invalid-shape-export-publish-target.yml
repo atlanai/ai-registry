@@ -1,0 +1,8 @@
+registries:
+  acme: github.com/acme/agent-registry
+exports:
+  - path: .claude/agents/reviewer.md
+    publish:
+      to: acme/engineering
+publish:
+  to: acme/engineering

@@ -93,7 +93,7 @@ exports:
       - ./.claude/skills/review                 # another export
       - <registry>/<namespace>/skill/<name>     # an artifacts: entry, without a version
 publish:
-  to: [../<clone>/<namespace>]
+  to: ../<clone>/<namespace>
 ```
 
 ```sh
@@ -101,11 +101,10 @@ aireg publish --dry-run --yes --json   # data.artifacts and data.skipped: what i
 aireg publish --yes --json
 ```
 
-- With several `publish.to` targets, it exits 2 and the hint names each `--to`. Ask which
-  one, or run once per target with `--to <target>`. A `--to` the manifest doesn't list is
-  refused.
-- `data.skipped` lists the exports whose own `publish.to` leaves this target out, each with
-  its `reason`. That is the manifest working, not a failure.
+- `publish.to` is one target, not a list. Exports go only there: a `--to` naming another
+  exits 2. An export with `publish: false` stays in the repository.
+- `data.skipped` lists the exports left out, each with its `reason`. That is the manifest
+  working, not a failure.
 - Each of `data.artifacts` has `dependsOn`, the edges its version carries: each a `to`, a
   `range` unless the edge takes only that version, and a `registry` when the dependency is
   in another registry. Show them to the user with the versions before publishing.
@@ -164,7 +163,7 @@ registry repository only; `GITHUB_TOKEN` cannot reach another repository. Tell t
 to create the token and add the secret; never ask for its value.
 
 For a project that lists `exports:`, set `publish.to` to the checkout,
-`[./registry/engineering]`, and make the publish step `aireg publish --yes`. Add the agents
+`./registry/engineering`, and make the publish step `aireg publish --yes`. Add the agents
 and the manifest to `paths:`:
 `paths: [".claude/skills/**", ".claude/agents/**", ".registry/manifest.yml"]`. Dependencies
 on installed artifacts are read from the committed lockfile, so the workflow installs

@@ -26,7 +26,7 @@ exports:
       - ./.claude/skills/review
       - shared/platform/skill/sql-style
 publish:
-  to: [shared/engineering]
+  to: shared/engineering
 `;
 
 function tools(root: string, manifest = MANIFEST) {

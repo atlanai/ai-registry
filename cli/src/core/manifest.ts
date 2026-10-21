@@ -69,14 +69,14 @@ export interface Manifest {
   artifacts: Ref[];
   /** `exports:`, what this project makes for others to install. */
   exports: Export[];
-  /** `publish:`, where exports go unless an entry narrows it. */
-  publish: PublishTargets | undefined;
+  /** `publish:`, where exports go. */
+  publish: PublishTarget | undefined;
 }
 
-/** Where exports are published: each target as `--to` takes it. */
-interface PublishTargets {
+/** Where exports are published, as `--to` takes it. */
+interface PublishTarget {
   /** `<registry>/<namespace>` with the registry declared, or a folder ending in `/<namespace>`. */
-  to: string[];
+  to: string;
 }
 
 /** One `exports:` entry. A plain string is an entry with a path and nothing else. */
@@ -86,8 +86,8 @@ export interface Export {
   /** The exact version to publish it at, instead of the next one. */
   version: string | undefined;
   dependsOn: ExportDependency[];
-  /** `false` leaves it unpublished; `to` narrows the top-level targets; absent takes them all. */
-  publish: false | PublishTargets | undefined;
+  /** `false` keeps it in this repository; absent, it goes to `publish.to`. */
+  publish: false | undefined;
 }
 
 /**
@@ -361,30 +361,26 @@ function isFolderTarget(to: string): boolean {
   return to.startsWith(".") || to.startsWith("/");
 }
 
-/** The targets an export goes to: its own, else every top-level one. */
-export function targetsOf(manifest: Manifest, entry: Export): string[] {
-  if (entry.publish === false) return [];
-  return (entry.publish ?? manifest.publish)?.to ?? [];
-}
-
-function publishTo(
-  raw: unknown,
-  where: string,
-  registries: Record<string, RegistrySource>,
-): string[] {
-  const targets = namesOf(raw);
-  if (targets === undefined) {
+function publishTo(raw: unknown, registries: Record<string, RegistrySource>): string {
+  const where = "`publish.to`";
+  if (Array.isArray(raw)) {
+    const [first] = raw;
+    const only = typeof first === "string" ? first : "acme/engineering";
     throw new ManifestError(
-      `${where} must be a list of targets, such as acme/engineering or ./registry/engineering.`,
+      `${where} names one target, not a list.`,
+      raw.length === 1
+        ? `Write it as \`to: ${only}\`.`
+        : `Keep the one this project publishes to, such as \`to: ${only}\`.`,
     );
   }
-  const seen = new Set<string>();
-  for (const to of targets) {
-    if (seen.has(to)) throw new ManifestError(`${where} lists ${quoted(to)} twice.`);
-    seen.add(to);
-    checkTarget(to, where, registries);
+  const to = textOf(raw);
+  if (to === undefined) {
+    throw new ManifestError(
+      `${where} must be one target, such as acme/engineering or ./registry/engineering.`,
+    );
   }
-  return targets;
+  checkTarget(to, where, registries);
+  return to;
 }
 
 function checkTarget(to: string, where: string, registries: Record<string, RegistrySource>): void {
@@ -423,12 +419,12 @@ function checkTarget(to: string, where: string, registries: Record<string, Regis
 function parsePublish(
   raw: unknown,
   registries: Record<string, RegistrySource>,
-): PublishTargets | undefined {
+): PublishTarget | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (!isRecord(raw)) throw new ManifestError("`publish:` must be a mapping with `to`.");
   onlyKnown(raw, ["to"], "`publish:`");
   if (raw.to === undefined || raw.to === null) throw new ManifestError("`publish:` has no `to`.");
-  return { to: publishTo(raw.to, "`publish.to`", registries) };
+  return { to: publishTo(raw.to, registries) };
 }
 
 function exportVersion(raw: unknown, path: string): string | undefined {
@@ -502,36 +498,17 @@ function dependencies(raw: unknown, path: string, artifacts: readonly Ref[]): Ex
   });
 }
 
-function exportPublish(
-  raw: unknown,
-  path: string,
-  top: PublishTargets | undefined,
-  registries: Record<string, RegistrySource>,
-): false | PublishTargets | undefined {
+function exportPublish(raw: unknown, path: string): false | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (raw === false) return false;
-  const where = `\`publish\` of export ${quoted(path)}`;
-  if (!isRecord(raw)) throw new ManifestError(`${where} must be false or \`{ to: [...] }\`.`);
-  onlyKnown(raw, ["to"], where);
-  if (raw.to === undefined || raw.to === null) throw new ManifestError(`${where} has no \`to\`.`);
-  const to = publishTo(raw.to, `\`publish.to\` of export ${quoted(path)}`, registries);
-  // Narrowing only, so the top level stays the one list of where this project publishes.
-  const outside = to.find((target) => !(top?.to ?? []).includes(target));
-  if (outside !== undefined) {
-    throw new ManifestError(
-      `\`publish.to\` of export ${quoted(path)} names ${quoted(outside)}, which the top-level \`publish.to\` does not list.`,
-      "Add it to the top-level `publish.to`, or leave it out here.",
-    );
-  }
-  return { to };
+  // One target for the whole project, so an entry can only keep itself out of it.
+  throw new ManifestError(
+    `\`publish\` of export ${quoted(path)} takes only false.`,
+    "Remove it to publish the export to `publish.to`, or write `publish: false` to keep it here.",
+  );
 }
 
-function exportEntry(
-  raw: unknown,
-  artifacts: readonly Ref[],
-  top: PublishTargets | undefined,
-  registries: Record<string, RegistrySource>,
-): Export {
+function exportEntry(raw: unknown, artifacts: readonly Ref[]): Export {
   if (typeof raw === "string") {
     return { path: exportPath(raw), version: undefined, dependsOn: [], publish: undefined };
   }
@@ -553,7 +530,7 @@ function exportEntry(
     path,
     version: exportVersion(raw.version, path),
     dependsOn: dependencies(raw.depends_on, path, artifacts),
-    publish: exportPublish(raw.publish, path, top, registries),
+    publish: exportPublish(raw.publish, path),
   };
 }
 
@@ -566,17 +543,12 @@ function exportPath(text: string): string {
   return text;
 }
 
-function parseExports(
-  raw: unknown,
-  artifacts: readonly Ref[],
-  top: PublishTargets | undefined,
-  registries: Record<string, RegistrySource>,
-): Export[] {
+function parseExports(raw: unknown, artifacts: readonly Ref[]): Export[] {
   if (raw === undefined || raw === null) return [];
   if (!Array.isArray(raw)) throw new ManifestError("`exports:` must be a list of paths.");
   const seen = new Set<string>();
   return raw.map((item) => {
-    const entry = exportEntry(item, artifacts, top, registries);
+    const entry = exportEntry(item, artifacts);
     if (seen.has(entry.path)) {
       throw new ManifestError(`Export ${quoted(entry.path)} is listed more than once.`);
     }
@@ -696,8 +668,6 @@ function parseKnownFields(root: Record<string, unknown>): Manifest {
     }
     seen.add(address);
   }
-  const publish = parsePublish(root.publish, registries);
-
   return {
     schema: optionalString(root, "$schema"),
     name: optionalString(root, "name"),
@@ -706,8 +676,8 @@ function parseKnownFields(root: Record<string, unknown>): Manifest {
     targets,
     registries,
     artifacts,
-    exports: parseExports(root.exports, artifacts, publish, registries),
-    publish,
+    exports: parseExports(root.exports, artifacts),
+    publish: parsePublish(root.publish, registries),
   };
 }
 
@@ -769,7 +739,7 @@ function exportData(entry: Export): unknown {
         : entry.dependsOn.map((need) =>
             need.type === "local" ? `./${need.path}` : formatAddress(need.ref),
           ),
-    publish: entry.publish === false ? false : entry.publish && { to: entry.publish.to },
+    publish: entry.publish,
   });
   return Object.keys(written).length === 1 ? entry.path : written;
 }

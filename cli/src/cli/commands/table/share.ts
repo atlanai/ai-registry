@@ -53,8 +53,8 @@ export const SHARE: readonly CommandSpec[] = [
         what: "a new minor version of an edited skill",
       },
       {
-        command: "aireg publish --to acme/engineering",
-        what: "the manifest's exports, with their dependencies",
+        command: "aireg publish --yes",
+        what: "the manifest's exports, to its publish.to, with their dependencies",
       },
     ],
     docs: "publish",
@@ -63,7 +63,7 @@ export const SHARE: readonly CommandSpec[] = [
         flag: "--to",
         value: "<registry>/<namespace>",
         describe:
-          "Where to publish: a declared registry or a registry folder, and a namespace; for exports, one of publish.to",
+          "Where to publish: a declared registry or a registry folder, and a namespace; for exports, only publish.to",
       },
       {
         flag: "--bump",

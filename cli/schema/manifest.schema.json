@@ -183,7 +183,7 @@
       }
     },
     "exports": {
-      "description": "What this project makes for others to install: a path or glob, or `{ path, version, depends_on, publish }` to give one path an exact version, dependencies or its own targets.",
+      "description": "What this project makes for others to install: a path or glob, or `{ path, version, depends_on, publish }` to give one path an exact version, dependencies, or `publish: false` to keep it here.",
       "type": "array",
       "items": {
         "description": "One path, or one path and what to publish it with.",
@@ -221,34 +221,9 @@
                 }
               },
               "publish": {
-                "description": "`false`, or `{ to }` naming some of the top-level `publish.to`.",
-                "anyOf": [
-                  {
-                    "description": "Never publish it.",
-                    "const": false,
-                    "type": "boolean"
-                  },
-                  {
-                    "additionalProperties": false,
-                    "type": "object",
-                    "required": [
-                      "to"
-                    ],
-                    "properties": {
-                      "to": {
-                        "minItems": 1,
-                        "uniqueItems": true,
-                        "description": "The top-level targets it goes to, when not all of them.",
-                        "type": "array",
-                        "items": {
-                          "pattern": "^[^./][^/]*/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$|^(\\.[^/]*)?(/.*)?/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$",
-                          "description": "A declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                ]
+                "description": "`false` keeps it in this repository; absent, it goes to `publish.to`.",
+                "const": false,
+                "type": "boolean"
               }
             }
           }
@@ -263,15 +238,9 @@
       ],
       "properties": {
         "to": {
-          "minItems": 1,
-          "uniqueItems": true,
-          "description": "Where exports are published, each as `aireg publish --to` takes it.",
-          "type": "array",
-          "items": {
-            "pattern": "^[^./][^/]*/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$|^(\\.[^/]*)?(/.*)?/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$",
-            "description": "A declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
-            "type": "string"
-          }
+          "pattern": "^[^./][^/]*/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$|^(\\.[^/]*)?(/.*)?/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$",
+          "description": "Where exports are published, as `aireg publish --to` takes it: a declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
+          "type": "string"
         }
       }
     }

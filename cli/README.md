@@ -104,7 +104,7 @@ exports:
     depends_on:
       - ./.claude/skills/triage
 publish:
-  to: [../ai-registry/engineering]
+  to: ../ai-registry/engineering
 ```
 
 This project and your user scope each keep what they install in one folder. In a project that

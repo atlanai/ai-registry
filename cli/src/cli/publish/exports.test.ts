@@ -46,7 +46,7 @@ artifacts:
   - vendor/platform/skill/notes
 `;
 
-function manifestWith(exports: string, to = "[acme/engineering, ./registry/eng]"): Manifest {
+function manifestWith(exports: string, to = "acme/engineering"): Manifest {
   return parseManifest(`${REGISTRIES}exports:\n${exports}publish:\n  to: ${to}\n`);
 }
 
@@ -104,27 +104,15 @@ function context(
 }
 
 describe("chooseTarget", () => {
-  const listed = ["acme/engineering", "public/acme"];
-
-  test("takes the only target, or the one --to names", () => {
-    expect(chooseTarget(["acme/engineering"], undefined, () => false)).toBe("acme/engineering");
-    expect(chooseTarget(listed, "public/acme", (each) => each === "public/acme")).toBe(
-      "public/acme",
+  test("takes the manifest's target, and refuses a --to naming another", () => {
+    expect(chooseTarget("acme/engineering", undefined, () => false)).toBe("acme/engineering");
+    expect(chooseTarget("acme/engineering", "acme/engineering", () => true)).toBe(
+      "acme/engineering",
     );
-  });
-
-  test("needs --to among several, and refuses one the manifest does not list", () => {
-    expect(() => chooseTarget(listed, undefined, () => false)).toThrow(
+    expect(() => chooseTarget("acme/engineering", "acme/other", () => false)).toThrow(
       expect.objectContaining({
-        message: "The manifest lists 2 publish targets.",
-        hint: "Pass `--to acme/engineering` or `--to public/acme`.",
-        code: "usage",
-      }),
-    );
-    expect(() => chooseTarget(listed, "acme/other", () => false)).toThrow(
-      expect.objectContaining({
-        message: '--to "acme/other" is not one of the manifest\'s publish targets.',
-        hint: "Pass `--to acme/engineering` or `--to public/acme`, or add it to `publish.to`.",
+        message: '--to "acme/other" is not the manifest\'s publish target, acme/engineering.',
+        hint: "Leave `--to` off to publish to acme/engineering, or change `publish.to`.",
         code: "usage",
       }),
     );
@@ -142,23 +130,13 @@ describe("chooseTarget", () => {
 });
 
 describe("forTarget", () => {
-  test("skips an export whose own targets leave this one out, with the reason", async () => {
-    const { manifest, works } = await exported([], "    publish:\n      to: [./registry/eng]\n");
-    const kept = forTarget(works, manifest, "acme/engineering");
-    expect(kept.works.map((work) => work.name)).toEqual(["review", "style"]);
-    expect(kept.skipped).toEqual([
-      { name: "reviewer", kind: "agent", reason: "its publish.to does not list acme/engineering" },
-    ]);
-    expect(forTarget(works, manifest, "./registry/eng").skipped).toEqual([]);
-  });
-
   test("skips an export named by its path that is never published", async () => {
     const manifest = manifestWith("  - path: skills/style\n    publish: false\n");
     const { found } = await exportsOn(manifest, base);
     expect(await exportWork(found)).toEqual([]);
     const path = join(base, "skills", "style");
     const style = { ...(await fromPath(path)), exported: found.get(path) };
-    expect(forTarget([style], manifest, undefined).skipped).toEqual([
+    expect(forTarget([style]).skipped).toEqual([
       { name: "style", kind: "skill", reason: "its export sets publish: false" },
     ]);
   });
@@ -214,15 +192,15 @@ describe("dependsOnFor", () => {
       message: "reviewer depends on review, which is not published to acme/engineering.",
       hint: "Publish review to acme/engineering in the same run, or before it.",
     });
-    // An export that narrows its own targets is told where to add this one.
-    const narrowed = await exported(
+    // An export kept here is told what keeps it.
+    const kept = await exported(
       ["./skills/review"],
-      "  - path: skills/review\n    publish:\n      to: [./registry/eng]\n",
+      "  - path: skills/review\n    publish: false\n",
     );
     await expect(
-      dependsOnFor(named(narrowed.works, "reviewer"), context(narrowed.found, narrowed.manifest)),
+      dependsOnFor(named(kept.works, "reviewer"), context(kept.found, kept.manifest)),
     ).rejects.toMatchObject({
-      hint: 'Add acme/engineering to the `publish.to` of export "skills/review", so review is published with it.',
+      hint: 'Remove `publish: false` from export "skills/review", so review is published with it.',
     });
   });
 

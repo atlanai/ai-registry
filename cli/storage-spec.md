@@ -78,7 +78,7 @@ A project that publishes what it makes lists it under `exports:`, and where it g
 
 - An `exports:` entry is a path relative to the project, written with `/`, or a glob over paths. Neither may climb out with `..`, in a brace alternative such as `{..,skills}` either. In a git repository, only files git tracks count, inside an export's folder too, though a skill's `SKILL.md` is always published. An export is a skill folder holding `SKILL.md`, or an agent's `.md` file whose front matter has a `name` and a `description`: a glob skips anything else it matches, with a note, and an entry naming one is refused. A mapping gives one path, never a glob, an exact `version`, a `depends_on` list and its own `publish`. Every entry that reaches an artifact applies to it: their `depends_on` lists are combined, an entry naming the artifact sets `version` and `publish` over a glob that only matches it, and two entries that set one of them differently for the same artifact are refused, naming both.
 - A `depends_on` entry is `./` and the path of another export, or the address `<registry>/<namespace>/<kind>/<name>` of an `artifacts:` entry, without a version: the entry's pin or range says which versions it takes.
-- `publish.to` lists targets as `aireg publish --to` takes them: `<registry>/<namespace>` in a declared registry, or a registry folder ending in a namespace. An export's `publish` is `false`, to leave it out, or a `to` naming some of those targets.
+- `publish.to` is the one target, as `aireg publish --to` takes it: `<registry>/<namespace>` in a declared registry, or a registry folder ending in a namespace. A list is refused. An export's `publish` takes only `false`, which keeps it in this repository.
 
 ```yaml
 artifacts:
@@ -91,8 +91,7 @@ exports:
       - ./.claude/skills/review
       - acme/platform/skill/sql-style
 publish:
-  to:
-    - acme/engineering
+  to: acme/engineering
 ```
 
 An `@<range>` entry, `exports:` and `publish:` need an aireg release that reads them; an older one refuses the manifest. `engines.aireg` names the oldest aireg a manifest needs, as a plain version. aireg keeps it when it edits the manifest, and never writes it on its own:
