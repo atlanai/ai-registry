@@ -96,7 +96,7 @@ With `--json`, `publish` asks no questions and prints each artifact with its old
 
 ## Repository exports
 
-Declare what this repository publishes in `aireg.yml`, then run `aireg publish`
+Declare what this repository publishes in `.registry/manifest.yml`, then run `aireg publish`
 (or `aireg publish --dry-run --json` to preview):
 
 ```yaml

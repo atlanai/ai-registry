@@ -102,7 +102,6 @@ describe("indexRoot", () => {
     const edge = {
       rel_type: "depends_on",
       to: "engineering/skill/pr-review@1.2.0",
-      range: "^1.2.0",
     };
     const version = join(root, "artifacts", "engineering", "skill", "pr-review", "1.3.0");
     await mkdir(version, { recursive: true });
