@@ -22,7 +22,7 @@ import { canonicalize } from "#adapter/spec/canonical.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { ID as LOCAL } from "#adapters/local/api.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { adapterFor } from "#core/adapter/registry.ts";
+import { adapterFor, declaredLayout } from "#core/adapter/registry.ts";
 import { type ConnectedSource, connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import { readOnlyLayout } from "#core/adapter/writable.ts";
 import {
@@ -123,6 +123,7 @@ export async function writableRegistries(
     const adapter = await adapterFor(
       expandLocation(declared.location, cwd),
       declared.adapter,
+      declaredLayout(declared.config),
     ).catch(() => undefined);
     const laidOut = readOnlyLayout(alias, declared.config);
     if (laidOut !== undefined) layouts.push(laidOut);
@@ -249,6 +250,7 @@ export async function readPublished(
       declared: declared.location,
       adapter: declared.adapter,
       config: declared.config,
+      layout: declaredLayout(declared.config),
     },
     credential === undefined ? {} : { credential },
   );

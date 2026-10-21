@@ -2,6 +2,7 @@ import { credentialFor } from "#accounts/credentials.ts";
 import { AccountService } from "#accounts/service.ts";
 import type { PublishInput, SourceHandle, UnpublishInput } from "#adapter/index.ts";
 import { bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
+import { declaredLayout } from "#core/adapter/registry.ts";
 import { connectSource } from "#core/adapter/source.ts";
 import { readOnlyLayout } from "#core/adapter/writable.ts";
 import { countPast } from "#core/catalog/withheld.ts";
@@ -100,6 +101,7 @@ async function openForMutation(
       declared: resolved.source.location,
       adapter: resolved.source.adapter,
       config: source.config,
+      layout: declaredLayout(source.config),
     },
     { signal, credential },
   );

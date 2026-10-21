@@ -110,7 +110,8 @@ export function carryWithheld(build: BuildState, acquired: readonly Acquired[]):
       const withheld = withheldAt(source.catalog.withheld, at);
       if (withheld === undefined) continue;
       keep(build, name, row);
-      kept.push({ name, installed: row.version, withheld });
+      const absent = build.survey.artifacts[name]?.staged !== true;
+      kept.push({ name, installed: row.version, withheld, absent });
     }
   }
   return kept;

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
@@ -82,5 +82,21 @@ describe("adding an artifact its registry withholds", () => {
     const pinned = await aireg(["add", "acme/skill/sketch@0.1.0", "-y"]);
     expect(pinned.code, pinned.stderr).toBe(0);
     expect(await lockedVersion("sketch")).toBe("0.1.0");
+  }, 60_000);
+});
+
+describe("a clone whose lockfile holds a blocked version", () => {
+  test("fails install, after the rest installed, rather than report it up to date", async () => {
+    for (const folder of [".registry/artifacts", ".claude", ".agents", ".codex"]) {
+      await rm(join(project, folder), { recursive: true, force: true });
+    }
+    const installedNow = await aireg(["install", "--frozen"]);
+    expect(installedNow.code).toBe(1);
+    expect(installedNow.stderr).toContain(
+      'acme/lint 1.0.0 is blocked (leaks tokens), so "lint" is not installed.',
+    );
+    expect(installedNow.stderr).toContain("Run `aireg remove lint` to take it out.");
+    expect(await installed("format")).toContain("1.1.0");
+    expect(await lockedVersion("lint")).toBe("1.0.0");
   }, 60_000);
 });

@@ -7,7 +7,7 @@ import { cancel, interaction, interactive } from "#cli/prompt/flow.ts";
 import { canceled, confirm, defaultIo } from "#cli/prompt/index.ts";
 import { comparableLocation } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { adapterFor } from "#core/adapter/registry.ts";
+import { adapterFor, declaredLayout } from "#core/adapter/registry.ts";
 import type { Account } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { signedInAccounts } from "#core/credentials/store.ts";
@@ -246,7 +246,11 @@ async function login(
 
   const found = flags.address === undefined ? await declared(registry, context.cwd) : undefined;
   if (found !== undefined) {
-    const adapter = await adapterFor(found.location, found.source.adapter);
+    const adapter = await adapterFor(
+      found.location,
+      found.source.adapter,
+      declaredLayout(found.source.config),
+    );
     if (adapter.auth?.login === undefined) {
       throw new AiregError(noSignIn(registry, adapter.credentialsHint !== undefined), {
         code: ErrorCode.Usage,

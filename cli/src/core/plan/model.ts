@@ -236,6 +236,7 @@ export interface Kept {
   name: string;
   installed: string | undefined;
   withheld: Withheld;
+  absent: boolean;
 }
 
 export function emptyPlan(): Plan {

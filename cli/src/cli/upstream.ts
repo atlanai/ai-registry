@@ -1,6 +1,7 @@
 import { credentialFor } from "#accounts/credentials.ts";
 import { contentDigest, type ResolveOptions, type Want } from "#adapter/index.ts";
 import { expandLocation } from "#core/adapter/location.ts";
+import { declaredLayout } from "#core/adapter/registry.ts";
 import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
@@ -66,7 +67,13 @@ export async function head(
   try {
     const credential = await credentialFor(alias, declared, location);
     const open = await connectSource(
-      { alias, location, adapter: recordedAdapter(declared, lock, alias), config: declared.config },
+      {
+        alias,
+        location,
+        adapter: recordedAdapter(declared, lock, alias),
+        config: declared.config,
+        layout: declaredLayout(declared.config),
+      },
       credential === undefined ? {} : { credential },
     );
     try {
