@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { glob, readFile, stat } from "node:fs/promises";
+import { glob, readFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import type { ArtifactKind } from "#adapter/index.ts";
@@ -8,6 +8,7 @@ import { quoted, sanitizeName } from "#adapter/text.ts";
 import { matchInstalled, rowsNamed } from "#cli/names.ts";
 import { descriptionText, frontmatter } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { isAbsent } from "#core/fs/path.ts";
 import { gitIn } from "#core/git.ts";
 import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
@@ -66,42 +67,59 @@ function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
   };
 }
 
-/** The entry file a folder holds, which says its kind; a folder with both is no one artifact. */
-function folderKind(root: string): ArtifactKind | undefined {
-  const skill = existsSync(join(root, SKILL_ENTRY));
-  const agent = existsSync(join(root, AGENT_ENTRY));
-  if (skill && agent) {
+/** A file's text, or undefined when nothing, or a folder, is there. */
+async function textAt(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if (isAbsent(error) || (error as NodeJS.ErrnoException).code === "EISDIR") return undefined;
+    throw error;
+  }
+}
+
+/** The entry file a folder holds, read once, which says its kind; a folder with both is no one artifact. */
+async function folderEntry(
+  root: string,
+): Promise<{ kind: ArtifactKind; text: string } | undefined> {
+  const [skill, agent] = await Promise.all([
+    textAt(join(root, SKILL_ENTRY)),
+    textAt(join(root, AGENT_ENTRY)),
+  ]);
+  if (skill !== undefined && agent !== undefined) {
     throw new AiregError(`${root} holds both SKILL.md and AGENT.md.`, {
       code: ErrorCode.Invalid,
       hint: "A folder is one artifact: keep SKILL.md for a skill, or AGENT.md for an agent.",
     });
   }
-  return skill ? "skill" : agent ? "agent" : undefined;
+  if (skill !== undefined) return { kind: "skill", text: skill };
+  return agent === undefined ? undefined : { kind: "agent", text: agent };
 }
 
 /**
  * A skill is a directory with SKILL.md, and a folder agent one with AGENT.md, reached by either;
- * any other .md is an agent.
+ * any other .md is an agent. Each file is read once and judged by what was read, so nothing can
+ * change between a check and the read it guards.
  */
 export async function fromPath(path: string): Promise<Work> {
-  const isDir = (await stat(path)).isDirectory();
   const entry = basename(path) === SKILL_ENTRY || basename(path) === AGENT_ENTRY;
-  const root = !isDir && entry ? dirname(path) : path;
-  const folder = isDir || root !== path;
-  const kind = folder ? folderKind(root) : "agent";
-  if (kind === undefined || (!folder && extname(path) !== ".md")) {
+  const root = entry ? dirname(path) : path;
+  const inside = await folderEntry(root);
+  const text =
+    inside === undefined && !entry && extname(path) === ".md" ? await textAt(path) : undefined;
+  const kind = inside?.kind ?? (text === undefined ? undefined : "agent");
+  if (kind === undefined) {
     throw new AiregError(`${path} is not an artifact.`, {
       code: ErrorCode.Invalid,
       hint: SHAPE_HINT,
     });
   }
-  const file = !folder ? path : join(root, kind === "skill" ? SKILL_ENTRY : AGENT_ENTRY);
-  const meta = frontmatter(await readFile(file, "utf8"));
+  const folder = inside !== undefined;
+  const meta = frontmatter(inside?.text ?? (text as string));
   const fallback = folder ? basename(root) : basename(path, ".md");
   return {
     name: sanitizeName(meta.name ?? fallback),
     kind,
-    path: root,
+    path: folder ? root : path,
     description: meta.description === undefined ? undefined : descriptionText(meta.description),
     home: undefined,
     row: undefined,
