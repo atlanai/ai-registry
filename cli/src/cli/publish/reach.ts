@@ -278,6 +278,51 @@ async function reachInside(
   return roots;
 }
 
+/** The artifact a local dependency names, by its root and kind. */
+async function neededAt(
+  entry: Export,
+  need: string,
+  reading: Reading,
+): Promise<Map<string, ArtifactKind>> {
+  const path = resolve(reading.base, need);
+  if (!existsSync(path)) {
+    throw new AiregError(
+      `Export ${quoted(entry.path)} depends on ./${need}, which names nothing in this project.`,
+      { code: ErrorCode.NotFound, hint: "Check the path under its `depends_on`." },
+    );
+  }
+  await refuseOutside(entry, artifactRoot(path), reading.base);
+  const held = await heldAt(path, reading.base);
+  if ("root" in held) return new Map([[held.root, held.kind]]);
+  throw new AiregError(
+    `Export ${quoted(entry.path)} depends on ./${need}, which is not an artifact: it ${held.stray}.`,
+    { code: ErrorCode.Invalid, hint: NAME_HINT },
+  );
+}
+
+/**
+ * An entry's local dependencies, each as the path of the artifact it names, however it is
+ * spelled; the kind of each is kept in `kinds`, for one that no entry reaches.
+ */
+async function neededBy(
+  entry: Export,
+  reading: Reading,
+  kinds: Map<string, ArtifactKind>,
+): Promise<ExportDependency[]> {
+  const needs: ExportDependency[] = [];
+  for (const need of entry.dependsOn) {
+    if (need.type !== "local") {
+      needs.push(need);
+      continue;
+    }
+    for (const [root, kind] of await neededAt(entry, need.path, reading)) {
+      kinds.set(root, kind);
+      needs.push({ type: "local", path: posixRelative(reading.base, root) });
+    }
+  }
+  return needs;
+}
+
 /** The one artifact an entry names, or the folder of them it names. */
 async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
   const path = resolve(reading.base, entry.path);
@@ -362,14 +407,104 @@ export interface Reached {
   warnings: string[];
 }
 
+/** An artifact `exports:` publishes, by its kind and its entries merged. */
+interface Exporting {
+  kind: ArtifactKind;
+  exported: Export;
+}
+
+/** A dependency and the export that lists it, as shown in a refusal. */
+interface Needing {
+  /** The dependent, relative to the project. */
+  dependent: string;
+  /** The dependency, relative to the project. */
+  needed: string;
+  /** The dependent's export, by its path in `exports:`. */
+  entry: string;
+}
+
+const orDrop = ({ needed, entry }: Needing) =>
+  `or ./${needed} from the \`depends_on\` of export ${quoted(entry)}`;
+
+/** An export depending on one that an entry keeps here would publish an edge to nothing. */
+function keptHere(needing: Needing, kept: Export): AiregError {
+  const { dependent, needed } = needing;
+  return new AiregError(
+    `${dependent} depends on ${needed}, which export ${quoted(kept.path)} keeps here with \`publish: false\`.`,
+    {
+      code: ErrorCode.Invalid,
+      hint: `Remove \`publish: false\` from export ${quoted(kept.path)}, ${orDrop(needing)}.`,
+    },
+  );
+}
+
+/**
+ * Why a dependency that no entry reaches cannot be exported for it: an entry leaves it out of its
+ * folder with `exclude`, or aireg installed it here, so it is no one's to publish.
+ */
+function refuseUnreached(
+  needing: Needing,
+  path: string,
+  entries: readonly Export[],
+  reading: Reading,
+): void {
+  const { dependent, needed } = needing;
+  const excluding = entries.find((entry) =>
+    (entry.exclude ?? []).some((name) => resolve(reading.base, entry.path, name) === path),
+  );
+  if (excluding !== undefined) {
+    throw new AiregError(
+      `${dependent} depends on ${needed}, which export ${quoted(excluding.path)} leaves out with \`exclude\`.`,
+      { code: ErrorCode.Invalid, hint: `Remove it from that \`exclude\`, ${orDrop(needing)}.` },
+    );
+  }
+  if (!reading.installed.has(path)) return;
+  throw new AiregError(`${dependent} depends on ${needed}, which aireg installed here.`, {
+    code: ErrorCode.Invalid,
+    hint: "Depend on it by the address of its `artifacts:` entry instead, <registry>/<namespace>/<kind>/<name>.",
+  });
+}
+
+/**
+ * A dependency that no entry reaches is exported as if an entry named it with its path alone:
+ * all its files, at the next version, with no dependencies of its own. An export kept here
+ * publishes no edge, so nothing is exported for it.
+ */
+function exportNeeded(
+  exports: Map<string, Exporting>,
+  kinds: ReadonlyMap<string, ArtifactKind>,
+  entries: readonly Export[],
+  reading: Reading,
+): void {
+  const { base } = reading;
+  for (const [root, { exported }] of [...exports]) {
+    if (exported.publish === false) continue;
+    for (const need of exported.dependsOn) {
+      if (need.type !== "local") continue;
+      const path = resolve(base, need.path);
+      const needing = { dependent: shownAt(root, base), needed: need.path, entry: exported.path };
+      const other = exports.get(path)?.exported;
+      if (other?.publish === false) throw keptHere(needing, other);
+      if (other !== undefined) continue;
+      refuseUnreached(needing, path, entries, reading);
+      exports.set(path, {
+        // `neededBy` read every local dependency, and kept its kind.
+        kind: kinds.get(path) as ArtifactKind,
+        exported: { path: need.path, version: undefined, dependsOn: [], publish: undefined },
+      });
+    }
+  }
+}
+
 /**
  * Every artifact `exports:` reaches, by its absolute path, with the entries that reach it merged.
  * In a git repository an entry reaching through a glob or a folder reaches only what git tracks,
  * so scratch work beside an export is not published, and never what aireg installed there;
- * inside a folder, too, only what git tracks is published, and never an artifact inside it that an
- * entry also reaches, which is published on its own. Every entry reaching an artifact
- * applies to it: their lists are combined, and an entry naming the artifact sets its `version`,
- * `publish` and `kind` over one that only reaches it.
+ * inside a folder, too, only what git tracks is published, and never an artifact inside it that is
+ * exported too, which is published on its own. Every entry reaching an artifact applies to it:
+ * their lists are combined, and an entry naming the artifact sets its `version`, `publish` and
+ * `kind` over one that only reaches it. An artifact in the project that an export depends on is
+ * exported too, as if an entry named it.
  */
 export async function exportsOn(
   manifest: Manifest,
@@ -379,34 +514,35 @@ export async function exportsOn(
   const tracked = manifest.exports.length > 0 ? await trackedFiles(base) : undefined;
   const reading: Reading = { base, tracked, installed, notes: [] };
   const reached = new Map<string, { kind: ArtifactKind; reaches: Reach[] }>();
-  for (const entry of manifest.exports) {
-    const { roots, named } = await reachedBy(entry, reading);
+  const kinds = new Map<string, ArtifactKind>();
+  for (const listed of manifest.exports) {
+    const { roots, named } = await reachedBy(listed, reading);
+    const entry = { ...listed, dependsOn: await neededBy(listed, reading, kinds) };
     for (const [root, kind] of roots) {
       const at = reached.get(root) ?? { kind, reaches: [] };
       at.reaches.push({ entry, named });
       reached.set(root, at);
     }
   }
+  const exports = new Map<string, Exporting>();
+  for (const [root, { kind, reaches }] of reached) {
+    exports.set(root, { kind, exported: merged(reaches, shownAt(root, base)) });
+  }
+  exportNeeded(exports, kinds, manifest.exports, reading);
   const found = new Map<string, Exported>();
   const matched = new Set<string>();
-  for (const [root, { kind, reaches }] of reached) {
-    const exported = merged(reaches, shownAt(root, base));
+  for (const [root, { kind, exported }] of exports) {
+    const entries = reached.get(root)?.reaches.map((each) => each.entry) ?? [exported];
     const files = (await isDirectory(root))
-      ? await chooseFiles(
-          {
-            root,
-            kind,
-            entries: reaches.map((each) => each.entry),
-            tracked,
-            exported: reached.keys(),
-            matched,
-          },
-          base,
-        )
+      ? await chooseFiles({ root, kind, entries, tracked, exported: exports.keys(), matched }, base)
       : undefined;
     found.set(root, { ...exported, files });
   }
-  return { found, notes: reading.notes, warnings: unmatchedPatterns(manifest.exports, matched) };
+  return {
+    found,
+    notes: [...new Set(reading.notes)],
+    warnings: unmatchedPatterns(manifest.exports, matched),
+  };
 }
 
 /** A warning on each `ignore` pattern that left nothing out of anything its entry reaches. */

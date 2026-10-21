@@ -229,7 +229,7 @@
                 "type": "array",
                 "items": {
                   "pattern": "^\\./(?![^*?[\\]{}]*[*?[\\]{}])(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){3}$",
-                  "description": "Another export, as ./ and its path, or an artifact listed under `artifacts:`, as <registry>/<namespace>/<kind>/<name> with no version.",
+                  "description": "An artifact in the project, as ./ and its path, which is exported with it, or an artifact listed under `artifacts:`, as <registry>/<namespace>/<kind>/<name> with no version.",
                   "type": "string"
                 }
               },

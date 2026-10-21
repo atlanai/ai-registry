@@ -548,3 +548,128 @@ describe("exportsOn, for a folder agent", () => {
     });
   });
 });
+
+describe("exportsOn, for a dependency no entry reaches", () => {
+  test("exports it as if an entry named it, with all its files and no dependencies", async () => {
+    await writeFile(join(base, "skills", "style", "guide.md"), "Guide.\n");
+    const { found } = await exportsOn(
+      manifestWith("  - path: agents/reviewer.md\n    depends_on: [./skills/style/SKILL.md]\n"),
+      base,
+    );
+    expect([...found.keys()]).toEqual([
+      join(base, "agents", "reviewer.md"),
+      join(base, "skills", "style"),
+    ]);
+    // However the dependency is spelled, it names the artifact by its path.
+    expect(found.get(join(base, "agents", "reviewer.md"))?.dependsOn).toEqual([
+      { type: "local", path: "skills/style" },
+    ]);
+    expect(found.get(join(base, "skills", "style"))).toEqual({
+      path: "skills/style",
+      version: undefined,
+      dependsOn: [],
+      publish: undefined,
+      files: [
+        { from: "SKILL.md", as: "SKILL.md" },
+        { from: "guide.md", as: "guide.md" },
+      ],
+    });
+  });
+
+  test("leaves it out of the files of an export it sits in", async () => {
+    const review = join(base, "skills", "review");
+    await mkdir(join(review, "helpers", "lint"), { recursive: true });
+    await writeFile(
+      join(review, "helpers", "lint", "SKILL.md"),
+      "---\nname: lint\ndescription: Lints.\n---\n",
+    );
+    const { found } = await exportsOn(
+      manifestWith("  - path: skills/review\n    depends_on: [./skills/review/helpers/lint]\n"),
+      base,
+    );
+    expect(found.get(review)?.files?.map((file) => file.as)).toEqual(["SKILL.md"]);
+    expect(found.get(join(review, "helpers", "lint"))?.files?.map((file) => file.as)).toEqual([
+      "SKILL.md",
+    ]);
+  });
+
+  test("exports nothing for an export kept here", async () => {
+    const { found } = await exportsOn(
+      manifestWith(
+        "  - path: agents/reviewer.md\n    publish: false\n    depends_on: [./skills/style]\n",
+      ),
+      base,
+    );
+    expect([...found.keys()]).toEqual([join(base, "agents", "reviewer.md")]);
+  });
+
+  test("refuses one an entry keeps here, or leaves out with `exclude`, naming both", async () => {
+    await expect(
+      exportsOn(
+        manifestWith(
+          "  - path: agents/reviewer.md\n    depends_on: [./skills/style]\n  - path: skills/style\n    publish: false\n",
+        ),
+        base,
+      ),
+    ).rejects.toMatchObject({
+      message:
+        'agents/reviewer.md depends on skills/style, which export "skills/style" keeps here with `publish: false`.',
+      hint: 'Remove `publish: false` from export "skills/style", or ./skills/style from the `depends_on` of export "agents/reviewer.md".',
+      code: "invalid",
+    });
+    await expect(
+      exportsOn(
+        manifestWith(
+          "  - path: agents/reviewer.md\n    depends_on: [./skills/style]\n  - path: skills\n    exclude: [style]\n",
+        ),
+        base,
+      ),
+    ).rejects.toMatchObject({
+      message:
+        'agents/reviewer.md depends on skills/style, which export "skills" leaves out with `exclude`.',
+      hint: 'Remove it from that `exclude`, or ./skills/style from the `depends_on` of export "agents/reviewer.md".',
+      code: "invalid",
+    });
+  });
+
+  test("refuses one aireg installed here", async () => {
+    const installed = lock()
+      .registry("acme", { location: "github.com/acme/agent-registry" })
+      .artifact("style", { links: [{ harness: "claude", path: "skills/style", mode: "symlink" }] })
+      .build();
+    await expect(
+      exportsOn(
+        manifestWith("  - path: agents/reviewer.md\n    depends_on: [./skills/style]\n"),
+        base,
+        installedPaths(installed, base),
+      ),
+    ).rejects.toMatchObject({
+      message: "agents/reviewer.md depends on skills/style, which aireg installed here.",
+      code: "invalid",
+    });
+  });
+
+  test("refuses a path that names nothing, or no artifact", async () => {
+    await expect(
+      exportsOn(
+        manifestWith("  - path: agents/reviewer.md\n    depends_on: [./skills/gone]\n"),
+        base,
+      ),
+    ).rejects.toMatchObject({
+      message:
+        'Export "agents/reviewer.md" depends on ./skills/gone, which names nothing in this project.',
+      code: "not_found",
+    });
+    await writeFile(join(base, "skills", "review", "notes.txt"), "Ideas.\n");
+    await expect(
+      exportsOn(
+        manifestWith("  - path: agents/reviewer.md\n    depends_on: [./skills/review/notes.txt]\n"),
+        base,
+      ),
+    ).rejects.toMatchObject({
+      message:
+        'Export "agents/reviewer.md" depends on ./skills/review/notes.txt, which is not an artifact: it is neither a skill or agent folder nor an agent\'s .md file.',
+      code: "invalid",
+    });
+  });
+});

@@ -533,7 +533,6 @@ function edgesOf(
       ? undefined
       : dependsOnFor(work, {
           base: loaded.roots.base,
-          found,
           left,
           manifest: loaded.manifest,
           lock: loaded.lock,

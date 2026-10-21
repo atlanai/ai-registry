@@ -181,10 +181,14 @@ publish:
     const sent = await publish("-y");
     expect(sent.code).toBe(1);
     expect(sent.stderr).toContain(
-      "reviewer depends on review, which is not published to ./registry/qa.",
+      '.claude/agents/reviewer.md depends on .claude/skills/review, which export ".claude/skills/review" keeps here with `publish: false`.',
     );
     expect(sent.stderr).toContain(
-      'Remove `publish: false` from export ".claude/skills/review", so review is published with it.',
+      'Remove `publish: false` from export ".claude/skills/review", or ./.claude/skills/review from the `depends_on` of export ".claude/agents/reviewer.md".',
+    );
+    await writeManifestIn(
+      maker,
+      "exports:\n  - path: .claude/skills/review\n    publish: false\npublish:\n  to: ./registry/qa\n",
     );
     const named = await publish(".claude/skills/review", "--dry-run", "--json");
     expect(named.code, named.stderr).toBe(0);

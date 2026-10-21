@@ -71,14 +71,9 @@ const published = (latest: Record<string, string> = {}) =>
     latest: new Map(Object.entries(latest).map(([key, version]) => [key, { version }])),
   }) as unknown as Published;
 
-function context(
-  found: EdgeContext["found"],
-  manifest: Manifest,
-  over: Partial<EdgeContext> = {},
-): EdgeContext {
+function context(manifest: Manifest, over: Partial<EdgeContext> = {}): EdgeContext {
   return {
     base,
-    found,
     manifest,
     lock: lock()
       .registry("public", { location: "https://github.com/acme/public-registry.git" })
@@ -202,7 +197,7 @@ describe("takenBy", () => {
       "Left out the dependency of review on reviewer, since acme does not take agents.",
     ]);
     const review = named(taken.works, "review");
-    expect(await dependsOnFor(review, context(found, manifest, { left: taken.left }))).toEqual([]);
+    expect(await dependsOnFor(review, context(manifest, { left: taken.left }))).toEqual([]);
     // A registry that names no narrower kinds takes every kind it serves.
     const every = await takenBy(
       works,
@@ -287,61 +282,53 @@ describe("inDependencyOrder", () => {
 
 describe("dependsOnFor", () => {
   test("names another export at the version this run publishes", async () => {
-    const { manifest, found, works } = await exported(["./skills/review"]);
+    const { manifest, works } = await exported(["./skills/review"]);
     const review = named(works, "review");
     const planned = async (path: string) =>
       path === review.path ? ({ work: review, version: "0.3.2" } as Planned) : undefined;
-    expect(
-      await dependsOnFor(named(works, "reviewer"), context(found, manifest, { planned })),
-    ).toEqual([{ rel_type: "depends_on", to: "engineering/skill/review@0.3.2", range: "^0.3.2" }]);
+    expect(await dependsOnFor(named(works, "reviewer"), context(manifest, { planned }))).toEqual([
+      { rel_type: "depends_on", to: "engineering/skill/review@0.3.2", range: "^0.3.2" },
+    ]);
   });
 
   test("names another export at the target's newest when this run leaves it out", async () => {
-    const { manifest, found, works } = await exported(["./skills/review"]);
+    const { manifest, works } = await exported(["./skills/review"]);
     const at = published({ "engineering/skill/review": "1.4.0" });
     expect(
-      await dependsOnFor(named(works, "reviewer"), context(found, manifest, { published: at })),
+      await dependsOnFor(named(works, "reviewer"), context(manifest, { published: at })),
     ).toEqual([{ rel_type: "depends_on", to: "engineering/skill/review@1.4.0", range: "^1.4.0" }]);
   });
 
   test("refuses another export that is not published to the target", async () => {
-    const { manifest, found, works } = await exported(["./skills/review"]);
-    await expect(
-      dependsOnFor(named(works, "reviewer"), context(found, manifest)),
-    ).rejects.toMatchObject({
+    const { manifest, works } = await exported(["./skills/review"]);
+    await expect(dependsOnFor(named(works, "reviewer"), context(manifest))).rejects.toMatchObject({
       message: "reviewer depends on review, which is not published to acme/engineering.",
       hint: "Publish review to acme/engineering in the same run, or before it.",
     });
-    // An export kept here is told what keeps it.
-    const kept = await exported(
-      ["./skills/review"],
-      "  - path: skills/review\n    publish: false\n",
-    );
-    await expect(
-      dependsOnFor(named(kept.works, "reviewer"), context(kept.found, kept.manifest)),
-    ).rejects.toMatchObject({
-      hint: 'Remove `publish: false` from export "skills/review", so review is published with it.',
-    });
   });
 
-  test("refuses a path that is no export", async () => {
+  test("names a dependency no entry reaches, which is exported with it", async () => {
     const manifest = manifestWith(
       "  - path: agents/reviewer.md\n    depends_on: [./skills/review]\n",
     );
     const { found } = await exportsOn(manifest, base);
-    const [reviewer] = await exportWork(found, base);
-    await expect(dependsOnFor(reviewer as Work, context(found, manifest))).rejects.toThrow(
-      "reviewer depends on ./skills/review, which is not an export.",
-    );
+    const works = await exportWork(found, base);
+    expect(works.map((work) => work.name)).toEqual(["reviewer", "review"]);
+    const review = named(works, "review");
+    const planned = async (path: string) =>
+      path === review.path ? ({ work: review, version: "0.1.0" } as Planned) : undefined;
+    expect(await dependsOnFor(named(works, "reviewer"), context(manifest, { planned }))).toEqual([
+      { rel_type: "depends_on", to: "engineering/skill/review@0.1.0", range: "^0.1.0" },
+    ]);
   });
 
   test("names an installed artifact at its locked version, taking what its entry takes", async () => {
-    const { manifest, found, works } = await exported([
+    const { manifest, works } = await exported([
       "public/platform/skill/sql-style",
       "public/platform/skill/lint",
       "acme/platform/skill/format",
     ]);
-    expect(await dependsOnFor(named(works, "reviewer"), context(found, manifest))).toEqual([
+    expect(await dependsOnFor(named(works, "reviewer"), context(manifest))).toEqual([
       {
         rel_type: "depends_on",
         to: "platform/skill/sql-style@1.4.0",
@@ -359,8 +346,8 @@ describe("dependsOnFor", () => {
   });
 
   test("leaves out `registry` for a folder that is the same registry as the target", async () => {
-    const { manifest, found, works } = await exported(["vendor/platform/skill/notes"]);
-    const edges = context(found, manifest, {
+    const { manifest, works } = await exported(["vendor/platform/skill/notes"]);
+    const edges = context(manifest, {
       target: { registry: "./vendor", namespace: "eng" },
     });
     edges.known = {
@@ -382,8 +369,8 @@ describe("dependsOnFor", () => {
   test("names a folder registry by the https url its registry.json names", async () => {
     // The URL a project declaring this folder matches the edge by.
     await writeVendor("https://GitHub.com/acme/vendor-registry.git/");
-    const { manifest, found, works } = await exported(["vendor/platform/skill/notes"]);
-    expect(await dependsOnFor(named(works, "reviewer"), context(found, manifest))).toEqual([
+    const { manifest, works } = await exported(["vendor/platform/skill/notes"]);
+    expect(await dependsOnFor(named(works, "reviewer"), context(manifest))).toEqual([
       {
         rel_type: "depends_on",
         to: "platform/skill/notes@1.0.0",
@@ -394,19 +381,19 @@ describe("dependsOnFor", () => {
   });
 
   test("refuses a registry with no https address, and an artifact not installed", async () => {
-    const { manifest, found, works } = await exported(["vendor/platform/skill/notes"]);
+    const { manifest, works } = await exported(["vendor/platform/skill/notes"]);
     const reviewer = named(works, "reviewer");
-    await expect(dependsOnFor(reviewer, context(found, manifest))).rejects.toMatchObject({
+    await expect(dependsOnFor(reviewer, context(manifest))).rejects.toMatchObject({
       message:
         "reviewer depends on notes from vendor, which has no https address, so a published artifact cannot name it.",
       code: "invalid",
     });
     // A folder whose registry.json names a URL that is not https is refused all the same.
     await writeVendor("http://github.com/acme/vendor-registry");
-    await expect(dependsOnFor(reviewer, context(found, manifest))).rejects.toMatchObject({
+    await expect(dependsOnFor(reviewer, context(manifest))).rejects.toMatchObject({
       code: "invalid",
     });
-    const bare = context(found, manifest, { lock: lock().build() });
+    const bare = context(manifest, { lock: lock().build() });
     await expect(dependsOnFor(reviewer, bare)).rejects.toMatchObject({
       message: "reviewer depends on vendor/platform/skill/notes, which is not installed.",
       hint: "Run `aireg install` to install it, then publish again.",

@@ -114,8 +114,9 @@ export interface Export {
 }
 
 /**
- * What an export needs installed beside it: another export, by the path after its `./`,
- * or an artifact this project installs, by the address of its `artifacts:` entry.
+ * What an export needs installed beside it: an artifact in this project, by the path after its
+ * `./`, which is exported with it, or an artifact this project installs, by the address of its
+ * `artifacts:` entry.
  */
 export type ExportDependency = { type: "local"; path: string } | { type: "remote"; ref: Ref };
 
@@ -465,7 +466,7 @@ function dependency(text: string, path: string, artifacts: readonly Ref[]): Expo
   if (ref === undefined || ref.namespace === undefined || ref.kind === undefined) {
     throw new ManifestError(
       `${of}, which is neither ./<path> nor <registry>/<namespace>/<kind>/<name>.`,
-      "Start another export's path with ./, such as ./.claude/skills/review.",
+      "Start a path in this project with ./, such as ./.claude/skills/review.",
     );
   }
   const address = formatAddress(ref);

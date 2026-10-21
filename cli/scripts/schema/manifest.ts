@@ -167,7 +167,7 @@ const DetailedExport = Type.Object(
         Type.String({
           pattern: String.raw`^\./${ONE_PATH}$|^[^@\\/]+(/[^@\\/]+){3}$`,
           description:
-            "Another export, as ./ and its path, or an artifact listed under `artifacts:`, as <registry>/<namespace>/<kind>/<name> with no version.",
+            "An artifact in the project, as ./ and its path, which is exported with it, or an artifact listed under `artifacts:`, as <registry>/<namespace>/<kind>/<name> with no version.",
         }),
         { uniqueItems: true, description: "What it needs installed beside it." },
       ),

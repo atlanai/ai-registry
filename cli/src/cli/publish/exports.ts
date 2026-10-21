@@ -215,7 +215,6 @@ export function inDependencyOrder(
 /** What a dependency edge is written against: this run's target, and what it holds now. */
 export interface EdgeContext {
   base: string;
-  found: ReadonlyMap<string, Export>;
   /** The exports this run leaves out because their registry does not take them, by path. */
   left?: ReadonlySet<string> | undefined;
   manifest: Manifest;
@@ -257,7 +256,7 @@ export async function dependsOnFor(
   for (const need of entry.dependsOn) {
     const edge =
       need.type === "local"
-        ? await localEdge(work, entry, need.path, context)
+        ? await localEdge(work, need.path, context)
         : await remoteEdge(work, need.ref, context);
     if (edge !== undefined) edges.push(edge);
   }
@@ -266,19 +265,12 @@ export async function dependsOnFor(
 
 async function localEdge(
   work: Work,
-  entry: Export,
   needed: string,
   context: EdgeContext,
 ): Promise<PublishRelationship | undefined> {
   const { namespace, registry } = context.target;
+  // `exportsOn` exports every artifact a local dependency names, so each one is an export.
   const path = artifactRoot(resolve(context.base, needed));
-  const other = context.found.get(path);
-  if (other === undefined) {
-    throw new AiregError(`${work.name} depends on ./${needed}, which is not an export.`, {
-      code: ErrorCode.Invalid,
-      hint: `List it under \`exports:\`, or remove it from the \`depends_on\` of export ${quoted(entry.path)}.`,
-    });
-  }
   // Left out because its registry does not take it, so its dependents go without the edge.
   if (context.left?.has(path) === true) return undefined;
   const sent = await context.planned(path);
@@ -287,13 +279,9 @@ async function localEdge(
     sent?.version ?? context.published.latest.get(`${namespace}/${kind}/${name}`)?.version;
   if (version === undefined) {
     const where = `${registry}/${namespace}`;
-    const shown = quoted(other.path);
     throw new AiregError(`${work.name} depends on ${name}, which is not published to ${where}.`, {
       code: ErrorCode.Invalid,
-      hint:
-        other.publish === false
-          ? `Remove \`publish: false\` from export ${shown}, so ${name} is published with it.`
-          : `Publish ${name} to ${where} in the same run, or before it.`,
+      hint: `Publish ${name} to ${where} in the same run, or before it.`,
     });
   }
   const range = parseVersion(version) === undefined ? {} : { range: `^${version}` };
