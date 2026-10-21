@@ -21,14 +21,7 @@ import { planCopy, restages } from "#core/plan/build/restage.ts";
 import type { BuildOptions, BuildState } from "#core/plan/build/state.ts";
 import { flushUnlinks, removeStale } from "#core/plan/build/unlink.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
-import {
-  closure,
-  dependenciesByName,
-  dependentsByName,
-  nameClashes,
-  registryUrls,
-  unknownUrls,
-} from "./depends.ts";
+import { closure, dependentsByName, nameClashes } from "./depends.ts";
 import type { Acquired, Clash, Incompatible, Plan, Selected, Survey, Warning } from "./model.ts";
 import { dropUnusedSources, lockSourceOf } from "./model.ts";
 import { crowdedContainers } from "./projection.ts";
@@ -73,12 +66,7 @@ function planWith(
   const incompatible: Incompatible[] = [];
   const clashes: Clash[] = [];
   const top = select(manifest, lock, acquired, [], options.cliVersion, [], [], renames);
-  const needs = closure(
-    top,
-    acquired,
-    registryUrls(manifest.registries, acquired, lock),
-    unknownUrls(manifest.registries, acquired, lock),
-  );
+  const needs = closure(top, acquired);
   const untrusted: Untrusted[] = [];
   const selected = select(
     { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
@@ -117,7 +105,6 @@ function planWith(
     crowded: new Set(),
     unlinks: [],
     neededBy: dependentsByName(needs, selected, lock),
-    dependsOn: dependenciesByName(needs, selected, lock),
     pruned: [],
     addresses: new Map(),
     clashes,
@@ -170,7 +157,6 @@ function planWith(
     ),
     pruned: state.pruned.sort(),
     unresolved: needs.unresolved,
-    undeclared: needs.undeclared,
     conflicts: [...needs.conflicts, ...nameClashes(needs, selected)],
     withheld,
     unlisted,
@@ -216,7 +202,6 @@ function planItem(item: Selected, build: BuildState): void {
       copy,
       base: build.options.roots.base,
       neededBy: build.neededBy.get(item.name),
-      dependsOn: build.dependsOn.get(item.name),
     }),
     ...(blocked.length === 0 ? {} : { blocked }),
   };
@@ -241,6 +226,27 @@ function warnStatus(item: Selected, previous: LockArtifact | undefined, build: B
   });
 }
 
+function isLinked(lock: Lock, item: Selected): boolean {
+  return (lock.artifacts[item.name]?.links.length ?? 0) > 0;
+}
+
+/** What a row of a registry this run did not open keeps from one it did. */
+function heldClash(item: Selected, holder: Lock["artifacts"][string]): Clash {
+  const { registry, namespace, kind, name } = holder;
+  return {
+    name: item.name,
+    kept: addressOf({ group: namespace, kind, name }, registry),
+    dropped: addressOf({ ...item, name: item.upstreamName }, item.source),
+  };
+}
+
+/** Two artifacts that would take one installed name, or one path in a harness folder. */
+export function clashMessage({ name, kept, dropped, at }: Clash): string {
+  return at === undefined
+    ? `${dropped} and ${kept} would both install as "${name}"`
+    : `${dropped} and ${kept} would both install at ${at}`;
+}
+
 /** At most this many files are named; the rest are counted. */
 const NAMED_FILES = 5;
 
@@ -261,25 +267,4 @@ function warnLeftOut(item: Selected, previous: LockArtifact | undefined, build: 
     name: item.name,
     message: `${shown}${at} installs as its ${sanitizeText(leftOut.entry)} alone, since a harness takes ${item.kind === "agent" ? "an" : "a"} ${item.kind} as one file, so ${files} ${leftOut.files.length === 1 ? "is" : "are"} left out.`,
   });
-}
-
-function isLinked(lock: Lock, item: Selected): boolean {
-  return (lock.artifacts[item.name]?.links.length ?? 0) > 0;
-}
-
-/** What a row of a registry this run did not open keeps from one it did. */
-function heldClash(item: Selected, holder: Lock["artifacts"][string]): Clash {
-  const { registry, namespace, kind, name } = holder;
-  return {
-    name: item.name,
-    kept: addressOf({ group: namespace, kind, name }, registry),
-    dropped: addressOf({ ...item, name: item.upstreamName }, item.source),
-  };
-}
-
-/** Two artifacts that would take one installed name, or one path in a harness folder. */
-export function clashMessage({ name, kept, dropped, at }: Clash): string {
-  return at === undefined
-    ? `${dropped} and ${kept} would both install as "${name}"`
-    : `${dropped} and ${kept} would both install at ${at}`;
 }

@@ -1,7 +1,0 @@
-registries:
-  kit: acme/agent-kit
-artifacts:
-  - kit/skill/lint@^1.2
-  - kit/skill/format@1.x
-  - ref: kit/agent/triage@>=0.3.0 <0.5.0 || ~1.0
-    harnesses: [claude]

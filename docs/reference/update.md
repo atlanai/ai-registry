@@ -14,7 +14,7 @@ aireg update [<name> | <registry>]... [-g] [--for <harness>,...] [--frozen] [--c
 
 `aireg update` reads each registry again and installs the newest version of every artifact the scope takes from it. Name installed artifacts, as [`aireg list`](list.md) shows them, or registries, to update only those.
 
-An artifact asked for by a version range, such as `acme/engineering/pr-review@^1.2`, moves to the newest version in the range, and never outside it: a range is not a pin. When a newer version is published outside the range, `update` warns, as in `pr-review stays in ^1.2, set by acme/engineering/skill/pr-review@^1.2, though 2.0.0 is published.` Move the range with `aireg add acme/engineering/pr-review@<range>`, or remove it with `aireg add acme/engineering/pr-review`. An artifact pinned to a version, such as `acme/engineering/pr-review@1.2.0`, stays at that version, with a warning. Move the pin with `aireg add acme/engineering/pr-review@<version>`, or remove it with `aireg add acme/engineering/pr-review`. A dependency stays at the version the artifacts that need it name, and moves when they do. One their edges give a range for moves to the newest version every range accepts. One from the same git repository as the artifacts that need it, which a repository's [exports](add.md#sources-that-are-not-registries) give, moves with the whole repository.
+An artifact pinned to a version, such as `acme/engineering/pr-review@1.2.0`, stays at that version, with a warning. Move the pin with `aireg add acme/engineering/pr-review@<version>`, or remove it with `aireg add acme/engineering/pr-review`. A dependency stays at the version the artifacts that need it name, and moves when they do.
 
 When the manifest takes a whole namespace, `update` also installs the artifacts the namespace has published since.
 
@@ -45,7 +45,7 @@ The fields are those of [`aireg add`](add.md#json-output).
 ## Exit status
 
 - `0`: updated, or already up to date.
-- `1`: a name isn't installed, a registry can't be read, a dependency is in a registry the scope doesn't declare, a registry no longer lists an installed artifact, or a file doesn't match what its version describes.
+- `1`: a name isn't installed, a registry can't be read, a registry no longer lists an installed artifact, or a file doesn't match what its version describes.
 - `2`: `--force` was passed, run outside a project without `-g`, or an artifact's name is taken and `defaults.name-collision` is `fail`.
 - `3`: `--frozen` was passed and the update would change the lockfile or the manifest, or an artifact wasn't installed because its name is taken and `defaults.name-collision` is `report`.
 

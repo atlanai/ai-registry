@@ -174,11 +174,11 @@ async function destinationOf(
   return where;
 }
 
-/** `review ^0.3.2`: the name an edge reaches, and the versions it takes. */
+/** The dependency name and its exact release label. */
 function dependencyOf(edge: PublishRelationship): string {
   const at = edge.to.lastIndexOf("@");
   const name = edge.to.slice(0, at).split("/").at(-1);
-  return `${name} ${edge.range ?? edge.to.slice(at + 1)}`;
+  return `${name} ${edge.to.slice(at + 1)}`;
 }
 
 /** One artifact's line in the plan; under an `update`, the files and dependencies it changes. */
@@ -238,11 +238,7 @@ function report(
       version: item.version,
       belowLatest: item.belowLatest,
       published: !item.same && results.has(alias) && result?.unchanged !== true,
-      dependsOn: (item.input.relationships ?? []).map(({ to, range, registry }) => ({
-        to,
-        ...(range === undefined ? {} : { range }),
-        ...(registry === undefined ? {} : { registry }),
-      })),
+      dependsOn: (item.input.relationships ?? []).map(({ to }) => ({ to })),
       ...filesOf(item),
       ...changesJson(item.changes),
     };

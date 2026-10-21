@@ -5,7 +5,6 @@ import { quoted } from "../text.ts";
 import { type ContentFile, contentArtifact } from "./envelope.ts";
 import { type Frontmatter, readFrontmatter, textField } from "./frontmatter.ts";
 import type { Found, Layout, LayoutContext } from "./layout.ts";
-import { projectManifest } from "./project.ts";
 import { type Skip, type Tree, walksInto } from "./tree.ts";
 
 /** The file that makes a folder a skill. */
@@ -179,10 +178,7 @@ export async function artifactOf(
   });
 }
 
-/**
- * A plain folder of skills: `SKILL.md` folders and `agents/*.md` files, as a repository holds them,
- * with the project manifest beside them that says what of it a project exports.
- */
+/** A plain folder of skills: `SKILL.md` folders and `agents/*.md` files, as a repository holds them. */
 export const folderLayout: Layout = {
   id: "folder",
   looksFor: [SKILL_FILE, "agents/*.md"],
@@ -195,8 +191,6 @@ export const folderLayout: Layout = {
     const kept = deduplicated(await candidates(tree, context, warnings), warnings);
     const artifacts: Artifact[] = [];
     for (const candidate of kept) artifacts.push(await artifactOf(tree, candidate, warnings));
-    // A project's own repository says what it exports, which is what gives an artifact its edges.
-    const manifest = await projectManifest(tree, artifacts, warnings);
-    return { artifacts, warnings, ...(manifest === undefined ? {} : { manifest }) };
+    return { artifacts, warnings };
   },
 };

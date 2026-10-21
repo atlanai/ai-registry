@@ -21,9 +21,9 @@ aireg has one command for each kind of artifact. `skill` and `agent` are always 
 `new` creates an artifact with every field its kind requires. On a terminal, aireg asks for the fields it can't fill in, such as the description. Any it doesn't get are set to `TODO`, and `new` lists them, so you know what to write.
 
 - **In a registry**, it creates version `0.1.0` in `artifacts/<namespace>/<kind>/<name>/0.1.0/`. The namespace is `--namespace`, or the `artifacts/<namespace>/` folder you're in, or on a terminal aireg asks. Without `<name>`, aireg asks for it on a terminal.
-- **Outside a registry**, it creates `./<name>/`, ready to publish with [`aireg publish`](publish.md). Publish a skill by its folder, and an agent by its folder or the path to its `AGENT.md`. An agent's folder may hold other files beside its `AGENT.md`, which `publish` sends with it as a [folder agent](publish.md#folder-agents).
+- **Outside a registry**, it creates `./<name>/`, ready to publish with [`aireg publish`](publish.md). Publish a skill by its folder, and an agent by the path to its `AGENT.md`, since `publish` takes an agent as a single file.
 
-A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. Exactly one agent entry file must be present. Other files may sit beside it, such as the files a folder agent works from; a registry folder keeps them in the version folder, and a project installs the agent as its entry file alone, since each coding agent takes an agent as one file, with a warning naming the files it left out. The card keeps its human-readable `name`; the registry folder supplies the slug in the envelope's `spec.name`. `spec.card` preserves the card and `spec.description` copies its description. Card content is otherwise opaque to this kind schema; this is not full A2A protocol validation. Which coding agents install an agent is up to each project, so aireg never asks for it.
+A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` with `--file agent-card.json`. Exactly one agent entry file must be present. The card keeps its human-readable `name`; the registry folder supplies the slug in the envelope's `spec.name`. `spec.card` preserves the card and `spec.description` copies its description. Card content is otherwise opaque to this kind schema; this is not full A2A protocol validation. Which coding agents install an agent is up to each project, so aireg never asks for it.
 
 Native `AGENT.md` front matter can include fields such as `tools`, `model` and tool-specific
 extensions. These fields are preserved. Skill front matter remains limited to the Agent Skills
@@ -50,29 +50,13 @@ The normal artifact-name and collision checks apply.
 
 ### Dependencies
 
-An artifact names what has to be installed with it as `depends_on` relationships in its version's `artifact.json`, each a `<namespace>/<kind>/<name>@<version>` in the same registry unless the edge names another, as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) describes. Write the file in the new version folder before [`aireg registry index`](registry.md#aireg-registry-index), which keeps what it says:
+An artifact names what has to be installed with it as `depends_on` relationships in its version's `artifact.json`, each a `<namespace>/<kind>/<name>@<version>` in the same registry, as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) describes. Write the file in the new version folder before [`aireg registry index`](registry.md#aireg-registry-index), which keeps what it says:
 
 ```json
 { "relationships": [{ "rel_type": "depends_on", "to": "engineering/skill/pr-review@0.2.0" }] }
 ```
 
-An edge may also carry `range`, the versions of that artifact it accepts, as a version range the file spec defines, such as `^0.2.0` or `>=0.2.0 <0.4.0`. The version `to` names has to be in its own range, or aireg leaves the edge out with a warning:
-
-```json
-{ "relationships": [{ "rel_type": "depends_on", "to": "engineering/skill/pr-review@0.2.0", "range": "^0.2.0" }] }
-```
-
-An edge may name another registry by its canonical address, the `url` in that registry's `registry.json`, in `registry`:
-
-```json
-{ "relationships": [{ "rel_type": "depends_on", "to": "platform/skill/sql-style@1.2.0", "range": "^1.2.0", "registry": "https://github.com/acme/agent-registry" }] }
-```
-
-aireg installs it from the registry the project declares at that address, under that registry's name in the lockfile. A declared registry has the address it was declared at, written as `https://<host>/<path>` with no trailing `/` or `.git`, so `github.com/acme/agent-registry` matches. What a registry's own `registry.json` says it is counts only for a registry declared at an address with no such form, such as a folder: there its `https` `url` is its address, and the lockfile records it, so the next run need not read the folder to know it. aireg never declares a registry because an edge names it: when no declared registry has that address, `add` installs nothing and names the [`aireg registry add`](registry.md#aireg-registry-add) that would allow it. When two or more have it, `add` installs nothing and names them, so you can keep one. An aireg older than this field looks for `to` in the artifact's own registry, so don't publish an edge with `registry` whose `to` that registry also holds.
-
-[`aireg add`](add.md) installs them. An edge without a range installs the version it names. An edge with one installs the newest version in the range that installs without a pin. Where several artifacts need one dependency, it installs once, at the newest version every edge accepts; when no version could satisfy them all, the registry publishes none that does, or what they all accept takes more than the 256 characters a range may have, `add` installs nothing and names each range and the artifact it came from. A prerelease counts as accepted only when every range admits it. The lockfile records each range, and [`aireg update`](update.md) moves the dependency to the newest version that every range still accepts. `bump` carries the last version's dependencies into the new one, so move the versions they name when you release new ones.
-
-To write these edges from the project where the artifacts are made, rather than by hand in the registry, list them as `depends_on` in the project's `exports:`, and [`aireg publish`](publish.md#dependencies) writes each one into the version it publishes. A project that installs that repository itself, rather than a registry it publishes to, gets the same dependencies from its manifest; see [Sources that are not registries](add.md#sources-that-are-not-registries).
+[`aireg add`](add.md) installs them. `bump` carries the last version's dependencies into the new one, so move the versions they name when you release new ones.
 
 ### Version status
 

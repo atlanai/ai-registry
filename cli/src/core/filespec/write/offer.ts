@@ -1,12 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { isArtifactName, isKindSegment, isNamespace, isVersion } from "#adapter/filespec/names.ts";
 import {
   type ArtifactKind,
   buildEnvelope,
   contentDigest,
   type PublishInput,
   type PublishRelationship,
-  satisfies,
   sha256,
   type UploadFile,
 } from "#adapter/index.ts";
@@ -18,7 +18,6 @@ import { authored, isDirectory, refusal } from "#core/fs/tree.ts";
 import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import { CONCURRENCY, limiter } from "#core/limit.ts";
 import { envelopeSpec } from "./kinds.ts";
-import { edgeVersion, ROOT_URL } from "./validate.ts";
 
 const reading = limiter(CONCURRENCY);
 
@@ -47,19 +46,21 @@ const REL_TYPE = /^[a-z][a-z0-9_]*$/;
 
 /** What is wrong with one edge, by the relationship schema, or undefined when nothing is. */
 function edgeProblem(edge: PublishRelationship): string | undefined {
-  const { rel_type: type, to, range, registry } = edge;
+  const { rel_type: type, to } = edge;
   if (!REL_TYPE.test(type)) {
     return `has a relationship of type ${quoted(type)}, which is not lowercase letters, digits and underscores`;
   }
-  const version = edgeVersion(to);
-  if (version === undefined) {
+  const at = to.lastIndexOf("@");
+  const [namespace, kind, name, ...rest] = to.slice(0, Math.max(0, at)).split("/");
+  if (
+    at < 1 ||
+    rest.length > 0 ||
+    !isNamespace(namespace ?? "") ||
+    !isKindSegment(kind ?? "") ||
+    !isArtifactName(name ?? "") ||
+    !isVersion(to.slice(at + 1))
+  ) {
     return `has a ${type} edge to ${quoted(to)}, which is not a namespace/kind/name@version`;
-  }
-  if (range !== undefined && !satisfies(version, range)) {
-    return `has a ${type} edge to ${to} at ${quoted(range)}, which is not a version range that version satisfies`;
-  }
-  if (registry !== undefined && !ROOT_URL.test(registry)) {
-    return `has a ${type} edge to ${to} in ${quoted(registry)}, which is not an https URL without a trailing slash`;
   }
   return undefined;
 }
@@ -77,8 +78,6 @@ function edgesOf(target: OfferTarget): PublishRelationship[] {
     return {
       rel_type: edge.rel_type,
       to: edge.to,
-      ...(edge.range === undefined ? {} : { range: edge.range }),
-      ...(edge.registry === undefined ? {} : { registry: edge.registry }),
     };
   });
 }

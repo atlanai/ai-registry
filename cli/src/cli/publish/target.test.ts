@@ -6,7 +6,6 @@ import { offerFrom } from "#core/filespec/write/offer.ts";
 import { test } from "#test/kit/fixtures.ts";
 import {
   commitAndPush,
-  folderTo,
   heldUnlisted,
   type Planned,
   type Published,
@@ -82,7 +81,7 @@ describe("plan's changes", () => {
         latest: new Map(current === undefined || withheld ? [] : [["eng/skill/lint", current]]),
         withheld: new Map(withheld ? [["eng/skill/lint", current]] : []),
       }) as unknown as Published;
-    const edge = { rel_type: "depends_on", to: "eng/skill/style@1.3.0", range: "^1.3.0" };
+    const edge = { rel_type: "depends_on", to: "eng/skill/style@1.3.0" };
     const latest = {
       id: "lint",
       version: "1.0.0",
@@ -157,7 +156,7 @@ describe("plan for a folder agent", () => {
 });
 
 describe("plan with relationships", () => {
-  const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0", range: "^1.2.0" };
+  const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0" };
 
   async function lint(): Promise<{ work: Work; digests: string[] }> {
     const path = join(root, "lint");
@@ -215,7 +214,7 @@ describe("plan with relationships", () => {
     const same = await plan(work, stored, "eng", "patch", undefined, false, [edge]);
     expect(same.same).toBe(true);
 
-    const moved = { ...edge, to: "eng/skill/style@1.3.0", range: "^1.3.0" };
+    const moved = { ...edge, to: "eng/skill/style@1.3.0" };
     const next = await plan(work, stored, "eng", "patch", undefined, false, [moved]);
     expect(next).toMatchObject({ same: false, version: "1.0.1" });
     expect(next.input.relationships).toEqual([moved]);
@@ -334,9 +333,9 @@ describe("plan with an export's version", () => {
     ).rejects.toMatchObject({ code: "conflict" });
   });
 
-  test("is the same while the edges it holds still take what they reach now", async () => {
+  test("refuses a fixed version when its exact dependency changes", async () => {
     const { work, digests } = await exported("1.0.0");
-    const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0", range: "^1.2.0" };
+    const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0" };
     const stored = {
       alias: "acme",
       source: { adapter: { id: "probe", capabilities: { relationships: true } } },
@@ -345,19 +344,14 @@ describe("plan with an export's version", () => {
       ]),
       withheld: new Map(),
     } as unknown as Published;
-    const at = (
-      relationships: { rel_type: string; to: string; range?: string; registry?: string }[],
-    ) => plan(work, stored, "eng", "patch", undefined, false, relationships);
+    const at = (relationships: { rel_type: string; to: string }[]) =>
+      plan(work, stored, "eng", "patch", undefined, false, relationships);
 
-    const patched = await at([{ ...edge, to: "eng/skill/style@1.3.0", range: "^1.3.0" }]);
-    expect(patched).toMatchObject({ same: true, version: "1.0.0" });
-    // Shown with the edge it was published with.
-    expect(patched.input.relationships).toEqual([edge]);
+    expect(await at([edge])).toMatchObject({ same: true, version: "1.0.0" });
 
     for (const moved of [
-      [{ ...edge, to: "eng/skill/style@2.0.0", range: "^2.0.0" }],
+      [{ ...edge, to: "eng/skill/style@2.0.0" }],
       [{ ...edge, to: "eng/skill/other@1.2.0" }],
-      [{ ...edge, registry: "https://example.com/r" }],
       [edge, { rel_type: "depends_on", to: "eng/skill/format@1.0.0" }],
       [],
     ]) {
@@ -482,15 +476,8 @@ describe("commitAndPush", () => {
 });
 
 describe("--to", () => {
-  test("takes one version, never a range", async () => {
+  test("takes an exact version and rejects range syntax", () => {
     expect(parseTo("acme/eng/skill/lint@1.2.0").version).toBe("1.2.0");
-    expect(() => parseTo("acme/eng/skill/lint@^1.2")).toThrow(
-      '--to "acme/eng/skill/lint@^1.2" names a version range, not a version.',
-    );
-    await mkdir(join(root, "registry"), { recursive: true });
-    await writeFile(join(root, "registry", "registry.json"), "{}");
-    await expect(folderTo(join(root, "registry", "eng", "skill", "lint@~1"), root)).rejects.toThrow(
-      "names a version range, not a version.",
-    );
+    expect(() => parseTo("acme/eng/skill/lint@^1.2")).toThrow();
   });
 });

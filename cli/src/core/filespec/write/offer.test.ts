@@ -34,7 +34,7 @@ test.beforeEach(async ({ tmp }) => {
 });
 
 describe("offerFrom", () => {
-  const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0", range: "^1.2.0" };
+  const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0" };
 
   async function lint(): Promise<string> {
     const skill = join(root, "lint");
@@ -136,20 +136,7 @@ describe("offerFrom", () => {
     await expect(refused([{ rel_type: "depends_on", to: "style@1.2.0" }])).rejects.toThrow(
       'lint has a depends_on edge to "style@1.2.0", which is not a namespace/kind/name@version.',
     );
-    await expect(refused([{ ...edge, range: "^2.0.0" }])).rejects.toThrow(
-      'lint has a depends_on edge to eng/skill/style@1.2.0 at "^2.0.0", which is not a version range that version satisfies.',
-    );
-    await expect(refused([{ ...edge, range: "not a range" }])).rejects.toMatchObject({
-      code: "invalid",
-    });
-    await expect(refused([{ ...edge, registry: "http://acme.example" }])).rejects.toThrow(
-      'lint has a depends_on edge to eng/skill/style@1.2.0 in "http://acme.example", which is not an https URL without a trailing slash.',
-    );
-    await expect(refused([{ ...edge, registry: "https://acme.example/" }])).rejects.toThrow(
-      'lint has a depends_on edge to eng/skill/style@1.2.0 in "https://acme.example/", which is not an https URL without a trailing slash.',
-    );
   });
-
   test("reads a large tree a bounded number of files at a time", async () => {
     const skill = join(root, "lint");
     await mkdir(join(skill, "assets"), { recursive: true });

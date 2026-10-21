@@ -79,7 +79,6 @@ describe("an export depending on a folder", () => {
       SKILLS.map((name) => ({
         rel_type: "depends_on",
         to: `team/skill/${name}@0.1.0`,
-        range: "^0.1.0",
       })),
     );
     expect((await envelope("skill", "lint")).relationships).toBeUndefined();

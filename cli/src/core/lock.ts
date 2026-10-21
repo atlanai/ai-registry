@@ -3,7 +3,7 @@ import { stringify } from "yaml";
 import { type ArtifactKind, isKind } from "#adapter/index.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
-import { canonicalConfig, reportedRegistryUrl, type SourceConfig } from "#core/adapter/identity.ts";
+import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
@@ -47,11 +47,6 @@ export interface LockRegistry {
   key: string;
   config: SourceConfig;
   revision: string | undefined;
-  /**
-   * The `https` URL a registry declared by a folder or other address with no such form reported,
-   * so an edge naming it is matched on the next run without reading the registry again.
-   */
-  url?: string | undefined;
 }
 
 interface LockLink {
@@ -106,11 +101,6 @@ export interface LockArtifact {
   /** Installed names whose `depends_on` edges name this version. Absent when nothing needs it. */
   neededBy?: string[] | undefined;
   /**
-   * What this version's `depends_on` edges ask of each artifact they reach, by its installed name:
-   * the edge's range, or the version an edge without one names. Absent unless an edge has a range.
-   */
-  dependsOn?: Record<string, string> | undefined;
-  /**
    * Links asked for but not made, because something of yours is at the path.
    * Read by status, never by prune: nothing listed here is ours to remove.
    */
@@ -153,14 +143,7 @@ function parseRegistry(entry: unknown): LockRegistry | undefined {
     key,
     config: canonicalConfig(textMapOf(entry.config) ?? {}),
     revision: textOf(entry.revision),
-    ...urlOf(textOf(entry.url)),
   };
-}
-
-/** A recorded `url` that is not an `https` root is dropped, not fatal. */
-function urlOf(text: string | undefined): { url?: string } {
-  const url = reportedRegistryUrl(text);
-  return url === undefined ? {} : { url };
 }
 
 /** A field only when it has a value, so a row without it reads back as it was written. */
@@ -204,20 +187,6 @@ function parseNames(raw: unknown): string[] | undefined {
   return names.length === 0 ? undefined : [...new Set(names)].sort();
 }
 
-/** Entries that cannot be read are dropped, not refused: an update writes them again. */
-function parseDependsOn(raw: unknown): Record<string, string> | undefined {
-  if (!isRecord(raw)) return undefined;
-  const entries = Object.entries(raw).flatMap(([name, at]) => {
-    const value = textOf(at);
-    return value === undefined || !isSafePath(name) ? [] : [[name, value] as const];
-  });
-  return entries.length === 0 ? undefined : sortedDict(entries);
-}
-
-function sortedDict(entries: readonly (readonly [string, string])[]): Record<string, string> {
-  return dict([...entries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-}
-
 function parseOrigin(entry: unknown, scope: Scope): LockOrigin | undefined {
   if (!isRecord(entry)) return undefined;
   const harness = textOf(entry.harness);
@@ -255,15 +224,8 @@ function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
     origin,
     links,
     neededBy: parseNames(entry.needed_by),
-    ...withDependsOn(parseDependsOn(entry.depends_on)),
     blocked: parseBlocked(entry.blocked, scope),
   };
-}
-
-function withDependsOn(
-  dependsOn: Record<string, string> | undefined,
-): Pick<LockArtifact, "dependsOn"> {
-  return dependsOn === undefined ? {} : { dependsOn };
 }
 
 /** A lockfile that is there but cannot be read. */
@@ -349,7 +311,6 @@ function registryDoc(source: LockRegistry): Record<string, unknown> {
     key: source.key,
     config: Object.keys(source.config).length === 0 ? undefined : source.config,
     revision: source.revision,
-    url: source.url,
   });
 }
 
@@ -383,10 +344,6 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
         mode: link.mode,
         digest: link.mode === "copy" ? link.digest : undefined,
       })),
-    depends_on:
-      artifact.dependsOn === undefined || Object.keys(artifact.dependsOn).length === 0
-        ? undefined
-        : sortedDict(Object.entries(artifact.dependsOn)),
     needed_by: artifact.neededBy?.length ? [...artifact.neededBy].sort() : undefined,
     blocked: artifact.blocked?.length
       ? [...artifact.blocked].sort((a, b) => a.path.localeCompare(b.path))
@@ -408,10 +365,7 @@ export function lockChanges(before: Lock, after: Lock): string[] {
   ])) {
     const was = before.registries[name];
     const now = after.registries[name];
-    // A `url` is what the registry says of itself, kept for the next run; it changes nothing installed.
-    const doc = (source: LockRegistry | undefined) =>
-      source && registryDoc({ ...source, url: undefined });
-    if (differ(doc(was), doc(now))) changed.add(name);
+    if (differ(was && registryDoc(was), now && registryDoc(now))) changed.add(name);
   }
   for (const name of new Set([...Object.keys(before.artifacts), ...Object.keys(after.artifacts)])) {
     const was = before.artifacts[name];

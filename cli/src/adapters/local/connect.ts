@@ -27,11 +27,11 @@ function layoutOf(context: SourceContext): LayoutId | undefined {
 
 /** A folder of skills has no versions: what it holds now is all there is, named by its content. */
 function refuseVersions(registry: string, want: readonly Want[]): void {
-  const pinned = want.find((item) => item.version !== undefined || item.range !== undefined);
+  const pinned = want.find((item) => item.version !== undefined);
   if (pinned === undefined) return;
   throw fail(
     "invalid",
-    `${registry} is a folder of skills, which has no versions, so ${pinned.name}@${pinned.version ?? pinned.range} cannot be installed.`,
+    `${registry} is a folder of skills, which has no versions, so ${pinned.name}@${pinned.version} cannot be installed.`,
     pinned.name,
     "Leave off the `@<version>`: aireg installs what the folder holds now.",
   );

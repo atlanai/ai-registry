@@ -68,7 +68,7 @@ describe("a dry run of an update", () => {
     const plan = shown.stdout.split("\n").slice(1).join("\n");
     expect(plan).toBe(`  update  marketing/skill/pr-approval  0.1.0 → 0.1.1
     changed  SKILL.md
-  update  marketing/agent/websiteclaw  0.1.0 → 0.1.1, depends on pr-approval ^0.1.1
+  update  marketing/agent/websiteclaw  0.1.0 → 0.1.1, depends on pr-approval 0.1.1
     changed  identity/SOUL.md
     removed  identity/MEMORY.md
     added    workspace/NEW.md

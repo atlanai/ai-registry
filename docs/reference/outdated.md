@@ -12,11 +12,11 @@ aireg outdated [-g]
 
 `aireg outdated` asks each registry the scope installs from what it publishes now, and compares that with the lockfile. It changes nothing. Outside a project it checks your user scope.
 
-The table lists each artifact with a newer version: its registry, the version installed and the newest one. An artifact pinned in the manifest is marked `pinned`. An artifact the manifest asks for in a version range, such as `@^1`, is marked with the range, and an `in range` column gives the newest version the range admits, which is the one [`aireg update`](update.md) moves it to. The newest version outside the range is still shown under `latest`, as it is for a pinned artifact, but only a newer version in the range counts as something to update. When the manifest takes a whole namespace, artifacts the namespace has published since are listed as `new`, except ones you removed from it with [`aireg remove`](remove.md). An artifact a watched folder publishes is marked `watched`. A registry's latest version that is older than the one installed, as after the installed one is yanked, isn't newer, so it isn't listed.
+The table lists each artifact with a newer version: its registry, the version installed and the newest one. An artifact pinned in the manifest is marked `pinned`. When the manifest takes a whole namespace, artifacts the namespace has published since are listed as `new`, except ones you removed from it with [`aireg remove`](remove.md). An artifact a watched folder publishes is marked `watched`. A registry's latest version that is older than the one installed, as after the installed one is yanked, isn't newer, so it isn't listed.
 
 From a git repository that is not a registry, the newest version is the one at its newest release tag, or with `--ref`, at the newest commit on that branch. An artifact is listed only when its files changed, though every artifact from the repository moves to the new version when you update.
 
-`outdated` warns about each artifact it couldn't check, for example because its registry couldn't be read or no longer publishes it. It ends with `aireg update` when something can move: an artifact that is not pinned, and is in a range only when the range admits a newer version.
+`outdated` warns about each artifact it couldn't check, for example because its registry couldn't be read or no longer publishes it. It ends with `aireg update` when something unpinned can move.
 
 ## Options
 
@@ -28,13 +28,13 @@ From a git repository that is not a registry, the newest version is the one at i
 {"ok": true, "data": {"scope": "project", "artifacts": [{"name": "engineering/pr-review", "registry": "acme", "current": "1.2.0", "latest": "1.3.0", "moved": true}]}}
 ```
 
-A pinned artifact also has `pinned`, the version the manifest pins, such as `"1.2.0"`. One the manifest asks for in a range has `range`, such as `"^1.2"`, and `inRange`, the newest version the range admits; `latest` is the newest version whatever the range. One that couldn't be checked has `unchecked`, with the reason. One published since the last install, under a namespace or registry the manifest takes whole, has `"added": true` and an empty `current`.
+A pinned artifact also has `pinned`, the version the manifest pins, such as `"1.2.0"`. One that couldn't be checked has `unchecked`, with the reason. One published since the last install, under a namespace or registry the manifest takes whole, has `"added": true` and an empty `current`.
 
 ## Exit status
 
-- `0`: everything is current, only pinned artifacts or versions outside a range are newer, or the rest isn't published yet.
+- `0`: everything is current, only pinned artifacts are behind, or the rest isn't published yet.
 - `2`: an argument was given.
-- `3`: something unpinned has a newer version, inside its range when it has one, or something couldn't be checked.
+- `3`: something unpinned has a newer version, or something couldn't be checked.
 
 ## Examples
 

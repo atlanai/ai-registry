@@ -1,5 +1,3 @@
-import { namesHost, SCP_LOCATION } from "#adapter/location.ts";
-import { isLocalPath } from "#adapter/paths.ts";
 import { sha256 } from "#adapter/spec/canonical.ts";
 import { quoted, stripTrailing } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -64,61 +62,6 @@ export function comparableLocation(location: string): string {
   } catch {
     return location;
   }
-}
-
-/** The schemes a registry's address may use that name a host an `https` root could be at. */
-const HOSTED = new Set(["https:", "http:", "ssh:", "git:"]);
-
-/**
- * The `https://host/path` a `registry` edge names a registry by (file spec section 3.1's `url`),
- * from a declared address or a `url` a registry reports: no credentials, port of another
- * scheme, `@ref`, trailing slash or `.git`, so `github.com/acme/x` and
- * `https://github.com/acme/x.git` are one registry. Undefined for a path on disk, or any
- * address that names no host.
- */
-export function canonicalRegistryUrl(location: string): string | undefined {
-  const typed = location.trim();
-  if (typed === "" || isLocalPath(typed) || !namesHost(typed)) return undefined;
-  const scp = typed.includes("://") ? null : SCP_LOCATION.exec(typed);
-  let url: URL;
-  try {
-    url = new URL(
-      scp === null
-        ? typed.includes("://")
-          ? typed
-          : `https://${typed}`
-        : `ssh://${scp[2]}/${scp[3]}`,
-    );
-  } catch {
-    return undefined;
-  }
-  if (!HOSTED.has(url.protocol) || url.hostname === "" || url.search !== "" || url.hash !== "") {
-    return undefined;
-  }
-  const at = url.pathname.lastIndexOf("@");
-  const path = at > url.pathname.lastIndexOf("/") ? url.pathname.slice(0, at) : url.pathname;
-  const bare = stripTrailing(stripTrailing(path, "/").replace(/\.git$/, ""), "/");
-  const host = url.protocol === "https:" || url.protocol === "http:" ? url.host : url.hostname;
-  return `https://${host}${bare}`;
-}
-
-/** A `url` a registry reports, as `canonicalRegistryUrl` writes it, when it is an `https` root. */
-export function reportedRegistryUrl(url: string | undefined): string | undefined {
-  return url !== undefined && /^https:\/\//i.test(url.trim())
-    ? canonicalRegistryUrl(url)
-    : undefined;
-}
-
-/**
- * The URL a `registry` edge reaches a declared registry by: its declared address's `https` form.
- * What the registry says of itself is not the person's to have checked, so the `url` it reports
- * stands in only where the declared address has no such form, such as a folder on disk.
- */
-export function declaredRegistryUrl(
-  location: string,
-  reported: string | undefined,
-): string | undefined {
-  return canonicalRegistryUrl(location) ?? reportedRegistryUrl(reported);
 }
 
 /**

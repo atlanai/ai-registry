@@ -1,15 +1,8 @@
 import { isAbsolute, join, resolve } from "node:path";
-import { readRegistry } from "#adapter/filespec/documents.ts";
-import { rootReader } from "#adapter/filespec/folder.ts";
 import type { ArtifactKind, PublishRelationship, SourceAdapter, Want } from "#adapter/index.ts";
-import { expandHome, isLocalPath } from "#adapter/paths.ts";
-import { parseVersion } from "#adapter/semver.ts";
+import { isLocalPath } from "#adapter/paths.ts";
 import { plural, quoted } from "#adapter/text.ts";
-import {
-  comparableLocation,
-  declaredRegistryUrl,
-  reportedRegistryUrl,
-} from "#core/adapter/identity.ts";
+import { comparableLocation, sourceKey } from "#core/adapter/identity.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { posixRelative } from "#core/fs/path.ts";
@@ -230,9 +223,15 @@ export interface EdgeContext {
 /** Whether two registries are one, by name or by where they are. */
 function sameRegistry(context: EdgeContext, alias: string): boolean {
   if (alias === context.target.registry) return true;
-  const one = context.known[alias]?.location;
-  const other = context.known[context.target.registry]?.location;
-  return one !== undefined && other !== undefined && placeOf(one) === placeOf(other);
+  const one = context.known[alias];
+  const other = context.known[context.target.registry];
+  return (
+    one !== undefined &&
+    other !== undefined &&
+    one.adapter === other.adapter &&
+    sourceKey(placeOf(one.location), one.config) ===
+      sourceKey(placeOf(other.location), other.config)
+  );
 }
 
 /** A folder by its resolved path, which a trailing separator or a drive letter cannot split; any other address as compared. */
@@ -242,8 +241,7 @@ function placeOf(location: string): string {
 
 /**
  * The `depends_on` edges an export carries into this target: another export at the version this
- * run publishes, or the target's newest, accepting that version's minor and patch releases; an
- * installed artifact at its locked version, accepting what its `artifacts:` entry does. None to an
+ * run publishes, or the target's newest; an installed artifact at its exact locked version. None to an
  * export this run leaves out because its registry does not take it.
  */
 export async function dependsOnFor(
@@ -314,22 +312,7 @@ async function localEdge(
       hint: `Publish ${name} to ${where} in the same run, or before it.`,
     });
   }
-  const range = parseVersion(version) === undefined ? {} : { range: `^${version}` };
-  return { rel_type: "depends_on", to: `${namespace}/${kind}/${name}@${version}`, ...range };
-}
-
-/**
- * The `https` URL its `registry.json` names, for a registry in a folder: what a consumer that
- * declares the folder matches an edge by, read from disk so publishing reaches no other host.
- * Undefined for any other address, or a folder that is no registry.
- */
-async function folderUrl(location: string): Promise<string | undefined> {
-  if (!isLocalPath(location)) return undefined;
-  try {
-    return reportedRegistryUrl((await readRegistry(rootReader(expandHome(location)))).url);
-  } catch {
-    return undefined;
-  }
+  return { rel_type: "depends_on", to: `${namespace}/${kind}/${name}@${version}` };
 }
 
 async function remoteEdge(
@@ -358,32 +341,21 @@ async function remoteEdge(
       { code: ErrorCode.Invalid },
     );
   }
-  // Which versions it takes is the `artifacts:` entry's to say: its range, its pin, or this one's releases.
-  const listed = artifactFor(context.manifest.artifacts, ref);
-  const range =
-    listed?.range ??
-    (listed?.version !== undefined || parseVersion(locked) === undefined
-      ? undefined
-      : `^${locked}`);
-  let registry: string | undefined;
-  if (!sameRegistry(context, ref.registry)) {
-    // The URL a consumer matches the edge by (`declaredRegistryUrl`), so the two never disagree.
-    const location = context.known[ref.registry]?.location ?? "";
-    registry = declaredRegistryUrl(location, await folderUrl(location));
-    if (registry === undefined) {
-      throw new AiregError(
-        `${work.name} depends on ${row.name} from ${ref.registry}, which has no https address, so a published artifact cannot name it.`,
-        {
-          code: ErrorCode.Invalid,
-          hint: `Give ${ref.registry}'s registry.json an https \`url\`, install ${row.name} from a registry with an https address, or publish ${work.name} to ${ref.registry}.`,
-        },
-      );
-    }
+  const pinned = artifactFor(context.manifest.artifacts, ref)?.version;
+  if (pinned !== undefined && pinned !== locked) {
+    throw new AiregError(
+      `${work.name} depends on ${address}@${pinned}, but ${locked} is installed.`,
+      {
+        code: ErrorCode.Changed,
+        hint: "Run `aireg install` to install the declared version, then publish again.",
+      },
+    );
   }
-  return {
-    rel_type: "depends_on",
-    to: `${ref.namespace}/${ref.kind}/${ref.name}@${locked}`,
-    ...(range === undefined ? {} : { range }),
-    ...(registry === undefined ? {} : { registry }),
-  };
+  if (!sameRegistry(context, ref.registry)) {
+    throw new AiregError(`${work.name} depends on ${address} from another registry.`, {
+      code: ErrorCode.Invalid,
+      hint: "Publish the dependency to this registry and install it from there first.",
+    });
+  }
+  return { rel_type: "depends_on", to: `${ref.namespace}/${ref.kind}/${ref.name}@${locked}` };
 }

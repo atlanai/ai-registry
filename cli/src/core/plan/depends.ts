@@ -1,65 +1,26 @@
 import { isArtifactName, isNamespace, isVersion } from "#adapter/filespec/names.ts";
 import type { Envelope, Want } from "#adapter/index.ts";
-import {
-  formatRange,
-  intersect,
-  MAX_RANGE,
-  parseRange,
-  parseVersion,
-  type Range,
-  satisfies,
-} from "#adapter/semver.ts";
-import { list, plural, quoted, sanitizeText } from "#adapter/text.ts";
-import {
-  canonicalRegistryUrl,
-  comparableLocation,
-  declaredRegistryUrl,
-} from "#core/adapter/identity.ts";
 import { entryFor } from "#core/catalog/model.ts";
-import { dict } from "#core/fields.ts";
 import { type ArtifactKind, isKind } from "#core/kinds.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
-import type { Manifest } from "#core/manifest.ts";
 import type { Ref } from "#core/ref.ts";
 import type { Acquired, Selected } from "./model.ts";
 import { addressOf } from "./select.ts";
 
 /**
- * One `depends_on` edge. The file spec makes `to` a fully qualified ref resolved within the same
- * root, unless the edge's `registry` names another one by its canonical URL.
+ * One `depends_on` edge. The file spec makes `to` a fully qualified ref resolved
+ * within the same root, so it names one version and never another registry.
  */
 export interface Need {
   namespace: string;
   kind: ArtifactKind;
   name: string;
-  /**
-   * The version `to` names, which `range` admits. With neither, the edge takes the version its
-   * registry lists, as one export of a source has for another read at the same commit.
-   */
-  version?: string | undefined;
-  /** The versions the edge accepts. Absent, it accepts `version` only. */
-  range?: string | undefined;
-  /** The canonical URL of the registry `to` resolves in, when the edge names one. */
-  registry?: string | undefined;
-  /** The registry the lockfile found it in, when that is not its dependent's. */
-  alias?: string | undefined;
+  version: string;
 }
 
-/** A need no source listed at a version it accepts. */
+/** A need no source listed at the version asked for. */
 export interface Unresolved {
   alias: string;
-  /** What to ask for: every dependent's range ANDed, or the one version they all accept. */
-  need: Need;
-  /** The address of the artifact that needs it. */
-  by: string;
-  /** Each range or version asked for and who asked, when more than one edge with a range did. */
-  needed?: { at: string; by: string }[] | undefined;
-}
-
-/** A need in a registry this scope does not declare, which is never declared for it. */
-export interface Undeclared {
-  /** The canonical URL the edge names. */
-  url: string;
   need: Need;
   /** The address of the artifact that needs it. */
   by: string;
@@ -76,97 +37,18 @@ export interface Closure {
   refs: Ref[];
   /** By the id of what is needed, the ids of what needs it. */
   neededBy: Map<string, Set<string>>;
-  /**
-   * By the id of an artifact with an edge that carries a range, what each edge asks of the id it
-   * needs: the range, or the version an edge without one names.
-   */
-  dependsOn: Map<string, Map<string, string>>;
   /** By the id of what is needed, the address of the first artifact that needs it. */
   firstBy: Map<string, string>;
   unresolved: Unresolved[];
-  /** Needs whose edge names a registry no declared one is at. */
-  undeclared: Undeclared[];
   conflicts: Conflict[];
 }
 
-/** The range or version a need asks for, or undefined when it takes whichever is listed. */
-const askedAt = (need: Need): string | undefined => need.range ?? need.version;
-
 export function formatNeed(need: Need): string {
-  const at = askedAt(need);
-  return `${need.namespace}/${need.kind}/${need.name}${at === undefined ? "" : `@${at}`}`;
+  return `${need.namespace}/${need.kind}/${need.name}@${need.version}`;
 }
 
 export function wantOf(need: Need): Want {
-  const { name, namespace, kind } = need;
-  if (need.range !== undefined) return { name, namespace, kind, range: need.range };
-  return need.version === undefined
-    ? { name, namespace, kind }
-    : { name, namespace, kind, version: need.version };
-}
-
-/**
- * Whether a version is one the need accepts: in its range, or the very version it names. One
- * that names neither accepts whatever its registry lists, with a version or without.
- */
-export function accepts(need: Need, version: string | undefined): boolean {
-  if (need.range === undefined && need.version === undefined) return true;
-  if (version === undefined) return false;
-  return need.range === undefined ? version === need.version : satisfies(version, need.range);
-}
-
-/** The `https` URL the lockfile recorded for a registry, while it is declared where it was then. */
-function recordedUrl(lock: Lock | undefined, alias: string, location: string): string | undefined {
-  const locked = lock?.registries[alias];
-  return locked !== undefined &&
-    comparableLocation(locked.location) === comparableLocation(location)
-    ? locked.url
-    : undefined;
-}
-
-/**
- * By alias, the canonical URL an edge's `registry` reaches each declared registry by
- * (`declaredRegistryUrl`): its declared address's, or for a folder the `https` URL it reported,
- * when it was read this run, or when the lockfile recorded it for the same address. Undefined
- * for a registry with neither.
- */
-export function registryUrls(
-  registries: Manifest["registries"],
-  acquired: readonly Acquired[],
-  lock?: Lock,
-): Map<string, string | undefined> {
-  const read = new Map(acquired.map((source) => [source.alias, source.origin.url]));
-  return new Map(
-    Object.keys(registries)
-      .sort()
-      .map((alias) => {
-        const location = registries[alias]?.location ?? "";
-        const reported = read.has(alias) ? read.get(alias) : recordedUrl(lock, alias, location);
-        return [alias, declaredRegistryUrl(location, reported)];
-      }),
-  );
-}
-
-/**
- * The declared registries whose URL only reading them can tell: at a folder or other address
- * with no `https` form, not read this run, and with no URL the lockfile recorded.
- */
-export function unknownUrls(
-  registries: Manifest["registries"],
-  acquired: readonly Acquired[],
-  lock?: Lock,
-): string[] {
-  const read = new Set(acquired.map((source) => source.alias));
-  return Object.keys(registries)
-    .sort()
-    .filter((alias) => {
-      const location = registries[alias]?.location ?? "";
-      return (
-        !read.has(alias) &&
-        canonicalRegistryUrl(location) === undefined &&
-        recordedUrl(lock, alias, location) === undefined
-      );
-    });
+  return { name: need.name, namespace: need.namespace, kind: need.kind, version: need.version };
 }
 
 /** One artifact in one registry, whatever version and local name it has. */
@@ -183,7 +65,7 @@ const rowId = (row: LockArtifact): string => idOf(row.registry, row.namespace, r
 const placeOf = (item: Selected): string =>
   addressOf({ group: item.group, kind: item.kind, name: item.upstreamName });
 
-function parseNeed(to: string): (Need & { version: string }) | undefined {
+function parseNeed(to: string): Need | undefined {
   const at = to.lastIndexOf("@");
   if (at === -1) return undefined;
   const version = to.slice(at + 1);
@@ -196,50 +78,18 @@ function parseNeed(to: string): (Need & { version: string }) | undefined {
   return { namespace, kind, name, version };
 }
 
-/** An edge aireg cannot follow: its `to`, and the range or registry it carries when that is what is wrong. */
-export interface Unusable {
-  to: string;
-  range?: string | undefined;
-  registry?: string | undefined;
-}
-
-/** An edge's `registry` as one URL to compare, when it is the `https` root the file spec asks for. */
-function registryOf(registry: unknown): string | undefined {
-  return typeof registry === "string" && /^https:\/\//i.test(registry)
-    ? canonicalRegistryUrl(registry)
-    : undefined;
-}
-
 /** The `depends_on` edges a version declares, and the ones aireg cannot follow. */
-export function needsOf(envelope: Envelope): { needs: Need[]; unusable: Unusable[] } {
+export function needsOf(envelope: Envelope): { needs: Need[]; unusable: string[] } {
   const needs: Need[] = [];
-  const unusable: Unusable[] = [];
+  const unusable: string[] = [];
   const edges: unknown[] = Array.isArray(envelope.relationships) ? envelope.relationships : [];
   for (const edge of edges) {
     if (typeof edge !== "object" || edge === null) continue;
-    const {
-      rel_type: type,
-      to,
-      range,
-      registry,
-    } = edge as { rel_type?: unknown; to?: unknown; range?: unknown; registry?: unknown };
+    const { rel_type: type, to } = edge as { rel_type?: unknown; to?: unknown };
     if (type !== "depends_on") continue;
-    const parsed = typeof to === "string" ? parseNeed(to) : undefined;
-    const elsewhere = registry === undefined ? undefined : registryOf(registry);
-    const need =
-      parsed === undefined || elsewhere === undefined ? parsed : { ...parsed, registry: elsewhere };
-    if (need === undefined) {
-      unusable.push({ to: String(to) });
-    } else if (registry !== undefined && elsewhere === undefined) {
-      unusable.push({ to: String(to), registry: String(registry) });
-    } else if (range === undefined) {
-      needs.push(need);
-    } else if (typeof range === "string" && satisfies(need.version, range)) {
-      // A range its own `to` is outside of says nothing a reader can trust (section 3.4).
-      needs.push({ ...need, range });
-    } else {
-      unusable.push({ to: String(to), range: String(range) });
-    }
+    const need = typeof to === "string" ? parseNeed(to) : undefined;
+    if (need === undefined) unusable.push(String(to));
+    else needs.push(need);
   }
   return { needs, unusable };
 }
@@ -247,329 +97,80 @@ export function needsOf(envelope: Envelope): { needs: Need[]; unusable: Unusable
 interface Visit {
   alias: string;
   id: string;
-  /** Where the source lists it; undefined for a dependency until it is read, when its version is known. */
-  path: string | undefined;
+  path: string;
   address: string;
 }
 
-/** What one dependent's edge asks of what it needs, and who that dependent is. */
-interface Constraint {
-  need: Need;
-  /** The dependent's address. */
-  by: string;
-  /** The dependent's id. */
-  from: string;
-}
-
-/** A dependency the closure takes, with every edge that asks for it. */
-interface Chosen {
-  alias: string;
-  /** Its `<namespace>/<kind>/<name>`. */
-  wanted: string;
-  ref: Ref;
-  constraints: Constraint[];
-  /** The id of the artifact whose edge first reached it. */
-  parent: string;
-  /** Whether its own edges were followed, at the version the source lists. */
-  read: boolean;
-}
-
-/** The version the source lists a dependency at, and where. */
-function listedAt(
-  source: Acquired | undefined,
-  need: Pick<Need, "namespace" | "kind" | "name">,
-): { path: string; version: string | undefined } | undefined {
+/** Where the source publishes a need at exactly the version asked for. */
+function publishedAt(source: Acquired | undefined, need: Need): string | undefined {
   if (source === undefined) return undefined;
   const entry = entryFor(source.catalog.entries, need.namespace, need.kind, need.name);
   if (entry === undefined) return undefined;
-  return { path: entry.path, version: source.placements.get(entry.path)?.version };
-}
-
-const acceptedBy = (constraints: readonly Constraint[], version: string | undefined) =>
-  constraints.every(({ need }) => accepts(need, version));
-
-/** What a closure has gathered so far, as it reads one artifact's edges after another. */
-interface Walk {
-  byAlias: ReadonlyMap<string, Acquired>;
-  /** By declared alias, its canonical URL, which is where an edge's `registry` resolves. */
-  urls: ReadonlyMap<string, string | undefined>;
-  /** Declared registries whose URL is not known until they are read (`unknownUrls`). */
-  unknown: readonly string[];
-  topById: ReadonlyMap<string, Selected>;
-  chosen: Map<string, Chosen>;
-  neededBy: Map<string, Set<string>>;
-  dependsOn: Map<string, Map<string, string>>;
-  /** The ids with an edge that carries a range, whose edges the lockfile records. */
-  ranged: Set<string>;
-  /** Each with the id whose edges raised it, so one raised by edges read at a stale version is dropped. */
-  raised: { conflict: Conflict; from: string }[];
-  /** Needs in a registry not declared here, each with the id whose edges raised it. */
-  elsewhere: { undeclared: Undeclared; from: string }[];
-  queue: Visit[];
-}
-
-/**
- * The registries a need may resolve in: its dependent's own, unless its edge names another by
- * URL, when it is every declared one at that URL, or its dependent's own when that is one of
- * them. Never one this scope does not declare; more than one is for the person to settle.
- */
-function homesOf(walk: Walk, from: Visit, need: Need): string[] {
-  if (need.alias !== undefined) return [need.alias];
-  if (need.registry === undefined) return [from.alias];
-  const at = [...walk.urls].filter(([, url]) => url === need.registry).map(([alias]) => alias);
-  // Its own registry could serve it under an edge with no `registry`, so naming it adds nothing.
-  return at.includes(from.alias) ? [from.alias] : at;
-}
-
-function edge(walk: Walk, to: string, from: string, need: Need): void {
-  const set = walk.neededBy.get(to) ?? new Set<string>();
-  set.add(from);
-  walk.neededBy.set(to, set);
-  const asks = walk.dependsOn.get(from) ?? new Map<string, string>();
-  // An edge that names no version has none to record: it takes the one its sibling is read at.
-  const at = askedAt(need);
-  if (!asks.has(to) && at !== undefined) asks.set(to, at);
-  walk.dependsOn.set(from, asks);
-  if (need.range !== undefined) walk.ranged.add(from);
-}
-
-/** Where to read a visit's edges: a dependency only at a version every edge seen so far accepts. */
-function pathOf(walk: Walk, from: Visit): string | undefined {
-  if (from.path !== undefined) return from.path;
-  const item = walk.chosen.get(from.id) as Chosen;
-  const listed = listedAt(walk.byAlias.get(from.alias), item.constraints[0]?.need as Need);
-  if (listed === undefined || !acceptedBy(item.constraints, listed.version)) return undefined;
-  item.read = true;
-  return listed.path;
-}
-
-/** One edge of `from`, taken against what the manifest names and what other edges asked. */
-function reach(walk: Walk, from: Visit, need: Need): void {
-  const homes = homesOf(walk, from, need);
-  const [alias, ...others] = homes;
-  // Which registries are at the edge's URL is settled only once every declared one's URL is known,
-  // so the answer never turns on which of them this run happened to read.
-  const elsewhere = homes[0] !== from.alias && need.alias === undefined;
-  if (alias === undefined || (elsewhere && walk.unknown.length > 0)) {
-    const undeclared = { url: need.registry as string, need, by: from.address };
-    walk.elsewhere.push({ undeclared, from: from.id });
-    return;
-  }
-  if (others.length > 0) {
-    const conflict = ambiguous(need, from.address, [alias, ...others]);
-    walk.raised.push({ conflict, from: from.id });
-    return;
-  }
-  const id = idOf(alias, need.namespace, need.kind, need.name);
-  if (id === from.id) return;
-  const wanted = `${need.namespace}/${need.kind}/${need.name}`;
-  const held = walk.topById.get(id);
-  // Only an artifact the manifest names holds its version against a dependent;
-  // one taken with its namespace is installed at the version it is needed at.
-  if (held !== undefined && (accepts(need, held.version) || held.named === true)) {
-    if (accepts(need, held.version)) edge(walk, id, from.id, need);
-    else {
-      const conflict = againstManifest(alias, wanted, need, from.address, held);
-      walk.raised.push({ conflict, from: from.id });
-    }
-    return;
-  }
-  const constraint = { need, by: from.address, from: from.id };
-  const before = walk.chosen.get(id);
-  if (before !== undefined) {
-    const first = before.constraints.find((c) => c.need.version !== undefined);
-    const exact = need.range === undefined && before.constraints.every((c) => !c.need.range);
-    // Two edges without a range name one version each, and only one can install.
-    if (
-      exact &&
-      first?.need.version !== undefined &&
-      need.version !== undefined &&
-      first.need.version !== need.version
-    ) {
-      const conflict = betweenTwo(
-        wanted,
-        { version: first.need.version, by: first.by },
-        { version: need.version, by: from.address },
-      );
-      walk.raised.push({ conflict, from: from.id });
-      return;
-    }
-    edge(walk, id, from.id, need);
-    before.constraints.push(constraint);
-    return;
-  }
-  edge(walk, id, from.id, need);
-  const { namespace, kind, name, version, range } = need;
-  const ref: Ref = {
-    registry: alias,
-    namespace,
-    kind,
-    name,
-    ...(version === undefined ? {} : { version }),
-    ...(range === undefined ? {} : { range }),
-  };
-  const chosen = { alias, wanted, ref, constraints: [constraint], parent: from.id };
-  walk.chosen.set(id, { ...chosen, read: false });
-  walk.queue.push({ alias, id, path: undefined, address: wanted });
+  return source.placements.get(entry.path)?.version === need.version ? entry.path : undefined;
 }
 
 /**
  * Every version the selected artifacts need, transitively. Each is visited once, so a cycle ends
  * where it began, and reach is decided by the manifest's own artifacts so `remove` prunes it whole.
- * A dependency several edges reach is read at a version every one of them accepts; when the source
- * lists one they do not, it is unresolved, asked for at the range they all admit. An edge naming
- * another registry resolves in the one `urls` has at that URL; with none, or while a registry in
- * `unknown` could be another, it is undeclared, and two or more are a conflict.
  */
-export function closure(
-  top: readonly Selected[],
-  acquired: readonly Acquired[],
-  urls: ReadonlyMap<string, string | undefined> = new Map(),
-  unknown: readonly string[] = [],
-): Closure {
-  const walk: Walk = {
-    byAlias: new Map(acquired.map((source) => [source.alias, source])),
-    urls,
-    unknown,
-    topById: new Map(top.map((item) => [selectedId(item), item])),
-    chosen: new Map(),
-    neededBy: new Map(),
-    dependsOn: new Map(),
-    ranged: new Set(),
-    raised: [],
-    elsewhere: [],
-    queue: top.map((item) => ({
-      alias: item.source,
-      id: selectedId(item),
-      path: item.path,
-      address: placeOf(item),
-    })),
+export function closure(top: readonly Selected[], acquired: readonly Acquired[]): Closure {
+  const byAlias = new Map(acquired.map((source) => [source.alias, source]));
+  const topById = new Map(top.map((item) => [selectedId(item), item]));
+  const chosen = new Map<string, { version: string; by: string; ref: Ref }>();
+  const neededBy = new Map<string, Set<string>>();
+  const unresolved: Unresolved[] = [];
+  const conflicts: Conflict[] = [];
+  const edge = (to: string, from: string) => {
+    const set = neededBy.get(to) ?? new Set<string>();
+    set.add(from);
+    neededBy.set(to, set);
   };
-  for (let next = 0; next < walk.queue.length; next++) {
-    const from = walk.queue[next] as Visit;
-    const path = pathOf(walk, from);
-    if (path === undefined) continue;
-    const source = walk.byAlias.get(from.alias);
-    for (const need of source?.placements.get(path)?.needs ?? []) reach(walk, from, need);
+
+  const queue: Visit[] = top.map((item) => ({
+    alias: item.source,
+    id: selectedId(item),
+    path: item.path,
+    address: placeOf(item),
+  }));
+  for (let next = 0; next < queue.length; next++) {
+    const from = queue[next] as Visit;
+    const source = byAlias.get(from.alias);
+    for (const need of source?.placements.get(from.path)?.needs ?? []) {
+      const id = idOf(from.alias, need.namespace, need.kind, need.name);
+      if (id === from.id) continue;
+      const wanted = `${need.namespace}/${need.kind}/${need.name}`;
+      const held = topById.get(id);
+      // Only an artifact the manifest names holds its version against a dependent;
+      // one taken with its namespace is installed at the version it is needed at.
+      if (held !== undefined && (held.version === need.version || held.named === true)) {
+        if (held.version === need.version) edge(id, from.id);
+        else conflicts.push(againstManifest(from.alias, wanted, need.version, from.address, held));
+        continue;
+      }
+      const before = chosen.get(id);
+      if (before !== undefined) {
+        if (before.version === need.version) edge(id, from.id);
+        else
+          conflicts.push(betweenTwo(wanted, before, { version: need.version, by: from.address }));
+        continue;
+      }
+      edge(id, from.id);
+      const ref: Ref = { registry: from.alias, ...need };
+      chosen.set(id, { version: need.version, by: from.address, ref });
+      const path = publishedAt(source, need);
+      if (path === undefined) unresolved.push({ alias: from.alias, need, by: from.address });
+      else queue.push({ alias: from.alias, id, path, address: wanted });
+    }
   }
 
-  const { chosen, neededBy, dependsOn } = walk;
-  const { unresolved, undeclared, conflicts } = settle(walk);
   inheritTargets(top, neededBy, chosen);
   return {
     refs: [...chosen.values()].map((item) => item.ref),
     neededBy,
-    dependsOn: new Map([...dependsOn].filter(([from]) => walk.ranged.has(from))),
-    firstBy: new Map([...chosen].map(([id, item]) => [id, item.constraints[0]?.by as string])),
+    firstBy: new Map([...chosen].map(([id, item]) => [id, item.by])),
     unresolved,
-    undeclared,
     conflicts,
   };
-}
-
-/**
- * What the closure could not settle from what the sources listed. A dependency read at a version
- * an edge found later does not accept is stale, and so is everything its edges raised: those are
- * dropped, as the next read, at a version every edge accepts, raises them again if they hold.
- */
-function settle({ chosen, byAlias, raised, elsewhere }: Walk): {
-  unresolved: Unresolved[];
-  undeclared: Undeclared[];
-  conflicts: Conflict[];
-} {
-  const listedOf = (item: Chosen) =>
-    listedAt(byAlias.get(item.alias), item.constraints[0]?.need as Need);
-  const versionOf = (item: Chosen) => listedOf(item)?.version;
-  const stale = new Set(
-    [...chosen]
-      .filter(([, item]) => item.read && !acceptedBy(item.constraints, versionOf(item)))
-      .map(([id]) => id),
-  );
-  const fresh = (id: string): boolean => {
-    for (let at: string | undefined = id; at !== undefined; at = chosen.get(at)?.parent) {
-      if (stale.has(at)) return false;
-    }
-    return true;
-  };
-
-  const unresolved: Unresolved[] = [];
-  const conflicts = raised.filter(({ from }) => fresh(from)).map(({ conflict }) => conflict);
-  const undeclared = elsewhere.filter(({ from }) => fresh(from)).map((item) => item.undeclared);
-  for (const item of chosen.values()) {
-    const listed = listedOf(item) !== undefined;
-    const version = versionOf(item);
-    // Listed is not enough for an edge that takes any version, but it has to be listed at all.
-    if (listed && acceptedBy(item.constraints, version)) continue;
-    const kept = item.constraints.filter(({ from }) => fresh(from));
-    if (kept.length === 0) continue;
-    // What its fresh edges accept may be the stale version; asking again for that would loop.
-    const asked = listed && acceptedBy(kept, version) ? item.constraints : kept;
-    const met = meeting(item.wanted, asked);
-    if ("message" in met) {
-      conflicts.push(met);
-      continue;
-    }
-    const withRanges = asked.length > 1 && asked.some(({ need }) => need.range !== undefined);
-    unresolved.push({
-      alias: item.alias,
-      need: met,
-      by: asked[0]?.by as string,
-      ...(withRanges ? { needed: askedOf(asked) } : {}),
-    });
-  }
-  return { unresolved, undeclared, conflicts };
-}
-
-/** Each range or version asked for and who asked, leaving out an edge that takes any version. */
-function askedOf(constraints: readonly Constraint[]): { at: string; by: string }[] {
-  return constraints.flatMap(({ need, by }) => {
-    const at = askedAt(need);
-    return at === undefined ? [] : [{ at, by }];
-  });
-}
-
-/** The one need every constraint's version meets, or the conflict that says none can. */
-function meeting(wanted: string, all: readonly Constraint[]): Need | Conflict {
-  // An edge that takes any version agrees with every other, so only the rest can disagree.
-  const constraints = all.filter(({ need }) => askedAt(need) !== undefined);
-  if (constraints.length === 0) return all[0]?.need as Need;
-  const first = constraints[0]?.need as Need;
-  const exact = [...new Set(constraints.flatMap(({ need }) => (need.range ? [] : [need.version])))];
-  const ranges = [
-    ...new Set(constraints.flatMap(({ need }) => (need.range === undefined ? [] : [need.range]))),
-  ];
-  if (exact.length === 1) {
-    const version = exact[0] as string;
-    const { namespace, kind, name } = first;
-    return ranges.every((range) => satisfies(version, range))
-      ? { namespace, kind, name, version }
-      : noOverlap(wanted, constraints);
-  }
-  if (exact.length > 1) return noOverlap(wanted, constraints);
-  if (ranges.length === 1) return first;
-  const met = intersect(ranges.map((range) => parseRange(range) as Range));
-  if (met === undefined) return noOverlap(wanted, constraints);
-  const range = formatRange(met);
-  return range.length > MAX_RANGE ? tooLong(wanted, constraints) : { ...first, range };
-}
-
-/**
- * The range a dependency moves within when an update moves it: what every dependent's recorded
- * edge admits, when each recorded one and none named a version alone. Undefined holds it.
- */
-export function movesWithin(lock: Lock, name: string): string | undefined {
-  const row = lock.artifacts[name];
-  if (row?.neededBy === undefined) return undefined;
-  const asked = row.neededBy.map((by) => lock.artifacts[by]?.dependsOn?.[name]);
-  const ranges = asked.map((at) =>
-    at === undefined || parseVersion(at) !== undefined ? undefined : parseRange(at),
-  );
-  if (ranges.some((range) => range === undefined)) return undefined;
-  if (asked.length === 1) return asked[0];
-  const met = intersect(ranges as Range[]);
-  const range = met === undefined ? undefined : formatRange(met);
-  // One no registry would read holds it, as ranges that no longer meet do.
-  return range === undefined || range.length > MAX_RANGE ? undefined : range;
 }
 
 /** By installed name, what needs each artifact, read from the closure's ids. */
@@ -587,28 +188,6 @@ export function dependentsByName(
     if (name === undefined) continue;
     const dependents = [...from].flatMap((by) => names.get(by) ?? []);
     if (dependents.length > 0) byName.set(name, [...new Set(dependents)].sort());
-  }
-  return byName;
-}
-
-/** By installed name, what each artifact with a ranged edge asks of what it needs, by that one's installed name. */
-export function dependenciesByName(
-  needs: Closure,
-  selected: readonly Selected[],
-  lock: Lock,
-): Map<string, Record<string, string>> {
-  const names = new Map<string, string>();
-  for (const [name, row] of Object.entries(lock.artifacts)) names.set(rowId(row), name);
-  for (const item of selected) names.set(selectedId(item), item.name);
-  const byName = new Map<string, Record<string, string>>();
-  for (const [from, asks] of needs.dependsOn) {
-    const name = names.get(from);
-    if (name === undefined) continue;
-    const named = [...asks].flatMap(([to, at]) => {
-      const dependency = names.get(to);
-      return dependency === undefined ? [] : [[dependency, at] as const];
-    });
-    if (named.length > 0) byName.set(name, dict(named.sort(([a], [b]) => (a < b ? -1 : 1))));
   }
   return byName;
 }
@@ -679,63 +258,16 @@ function inheritTargets(
   }
 }
 
-/** An edge's URL that more than one declared registry is at, so which one it means is unknown. */
-function ambiguous(need: Need, by: string, aliases: readonly string[]): Conflict {
-  const wanted = `${need.namespace}/${need.kind}/${need.name}`;
-  return {
-    message: `${by} needs ${wanted} from ${sanitizeText(need.registry ?? "")}, and ${plural(aliases.length, "declared registry", "declared registries")} are at that URL: ${list(aliases.map(quoted))}.`,
-    hint: "Keep one of them, and remove the others with `aireg registry remove <name>`.",
-  };
-}
-
 function againstManifest(
   alias: string,
   wanted: string,
-  need: Need,
+  version: string,
   by: string,
   held: Selected,
 ): Conflict {
   return {
-    message: `${by} needs ${wanted} ${need.range ?? need.version}, but the manifest installs ${held.version ?? "another version"}.`,
-    hint: `Only one version can be installed here. Pin the one it needs with \`aireg add ${alias}/${wanted}@${need.version}\`, or remove one of them.`,
-  };
-}
-
-/** `a by x, b by y, and c by z`, each once, in the order the edges were read. */
-function askedBy(constraints: readonly { at: string; by: string }[]): string {
-  const items = [...new Set(constraints.map(({ at, by }) => `${at} by ${by}`))];
-  return items.length <= 1
-    ? (items[0] ?? "")
-    : `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
-}
-
-const AGREE_HINT =
-  "Only one version can be installed here. Remove one of them, or ask the registry's owner to publish versions that agree.";
-
-function noOverlap(wanted: string, constraints: readonly Constraint[]): Conflict {
-  const asked = askedOf(constraints);
-  return {
-    message: `${wanted} is needed at versions that do not overlap: ${askedBy(asked)}.`,
-    hint: AGREE_HINT,
-  };
-}
-
-/** Ranges that overlap, but only as a range longer than a registry reads (section 2.4). */
-function tooLong(wanted: string, constraints: readonly Constraint[]): Conflict {
-  const asked = askedOf(constraints);
-  return {
-    message: `${wanted} is needed at ${askedBy(asked)}, which combine into a range longer than ${MAX_RANGE} characters.`,
-    hint: "Remove one of them, or ask the registry's owner to publish versions whose ranges agree more simply.",
-  };
-}
-
-/** Edges whose ranges overlap, where the registry publishes no version in all of them. */
-export function unmet(alias: string, missing: Unresolved): Conflict | undefined {
-  if (missing.needed === undefined) return undefined;
-  const { namespace, kind, name } = missing.need;
-  return {
-    message: `${namespace}/${kind}/${name} is needed at ${askedBy(missing.needed)}, and ${alias} publishes no version that satisfies all of them.`,
-    hint: "Ask the registry's owner to publish one, or remove one of them.",
+    message: `${by} needs ${wanted} ${version}, but the manifest installs ${held.version ?? "another version"}.`,
+    hint: `Only one version can be installed here. Pin the one it needs with \`aireg add ${alias}/${wanted}@${version}\`, or remove one of them.`,
   };
 }
 
@@ -746,6 +278,6 @@ function betweenTwo(
 ): Conflict {
   return {
     message: `${wanted} is needed at two versions: ${first.version} by ${first.by}, and ${second.version} by ${second.by}.`,
-    hint: AGREE_HINT,
+    hint: "Only one version can be installed here. Remove one of them, or ask the registry's owner to publish versions that agree.",
   };
 }

@@ -118,8 +118,8 @@ describe("publishing a folder agent", () => {
       await readFile(join(versionDir("agent", "websiteclaw", "0.1.0"), "artifact.json"), "utf8"),
     );
     expect(envelope.relationships).toEqual([
-      { rel_type: "depends_on", to: "marketing/skill/pr-approval@0.1.0", range: "^0.1.0" },
-      { rel_type: "depends_on", to: "marketing/skill/site-health@0.1.0", range: "^0.1.0" },
+      { rel_type: "depends_on", to: "marketing/skill/pr-approval@0.1.0" },
+      { rel_type: "depends_on", to: "marketing/skill/site-health@0.1.0" },
     ]);
     // The skill inside its folder is published on its own.
     expect(await filesIn(versionDir("skill", "site-health", "0.1.0"))).toEqual([

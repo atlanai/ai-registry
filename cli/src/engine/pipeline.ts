@@ -18,28 +18,14 @@ import { loadHarnessFiles } from "#core/harness/load.ts";
 import { runPipelineHooks } from "#core/hook/run.ts";
 import { type LeaseHolder, withLease } from "#core/lease.ts";
 import { type Lock, lockChanges, readLock } from "#core/lock.ts";
-import {
-  formatManifest,
-  type Manifest,
-  readManifest,
-  refuseOldCli,
-  writeManifest,
-} from "#core/manifest.ts";
+import { formatManifest, type Manifest, readManifest, writeManifest } from "#core/manifest.ts";
 import type { Printer } from "#core/output.ts";
 import { acquire, answers, lockView, newlyYanked } from "#core/plan/acquire.ts";
 import { type ApplyResult, apply, guardsOf, type Recovered, recover } from "#core/plan/apply.ts";
 import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
 import { build, clashMessage } from "#core/plan/build.ts";
 import { describeCarried } from "#core/plan/carries.ts";
-import {
-  accepts,
-  formatNeed,
-  type Undeclared,
-  type Unresolved,
-  unknownUrls,
-  unmet,
-  wantOf,
-} from "#core/plan/depends.ts";
+import { formatNeed, type Unresolved, wantOf } from "#core/plan/depends.ts";
 import type { Acquired, Action, Kept, Plan } from "#core/plan/model.ts";
 import { fetchFrom } from "#core/plan/model.ts";
 import { wrappedInLock, wrapsNamespaces } from "#core/plan/namespaces.ts";
@@ -47,6 +33,7 @@ import type { Untrusted } from "#core/plan/select.ts";
 import { survey } from "#core/plan/survey.ts";
 import { type Unlisted, unlistedMessage } from "#core/plan/unlisted.ts";
 import { blockedTargets } from "#core/plan/writable.ts";
+import { unmetEngine } from "#core/semver.ts";
 import {
   MANIFEST_FILE,
   roots as makeRoots,
@@ -335,7 +322,7 @@ function keptWithheld(missing: Unresolved, sources: readonly Acquired[], lock: L
       row.namespace === need.namespace &&
       row.kind === need.kind &&
       row.name === need.name &&
-      accepts(need, row.version),
+      row.version === need.version,
   );
   if (held) return true;
   throw new AiregError(`${by} needs ${withheldMessage(withheld)}, so nothing was installed.`, {
@@ -344,91 +331,11 @@ function keptWithheld(missing: Unresolved, sources: readonly Acquired[], lock: L
   });
 }
 
-/** Asked for and still not listed: ranges that overlap with no version in all of them conflict. */
-function unpublished(missing: Unresolved): AiregError {
-  const { alias, need, by } = missing;
-  const conflict = unmet(alias, missing);
-  if (conflict !== undefined) {
-    return new AiregError(conflict.message, { code: ErrorCode.Conflict, hint: conflict.hint });
-  }
+function unpublished({ alias, need, by }: Unresolved): AiregError {
   return new AiregError(
     `${by} needs ${formatNeed(need)}, which ${alias} does not publish, so nothing was installed.`,
     { code: ErrorCode.NotFound, hint: `Ask the registry's owner to publish it, or remove ${by}.` },
   );
-}
-
-/**
- * A need in a registry this scope does not declare. Only the person declares a registry, so an
- * edge naming one is never a reason to read or trust it.
- */
-function undeclared(
-  { url, need, by }: Undeclared,
-  scope: Roots["scope"],
-  alias?: string,
-): AiregError {
-  const here = scope === "user" ? "your user scope" : "this project";
-  const where = sanitizeText(url);
-  const add = `aireg registry add ${where}${alias === undefined ? "" : ` --as ${alias}`}${scope === "user" ? " -g" : ""}`;
-  return new AiregError(
-    `${by} needs ${need.namespace}/${need.kind}/${need.name} from ${where}, which ${here} does not declare.`,
-    { code: ErrorCode.NotFound, hint: `Run \`${add}\` to allow it.` },
-  );
-}
-
-/**
- * Reads the declared registries whose URL is still unknown (`unknownUrls`), since one of them may
- * report the URL an edge names. Once every URL is known, an edge no registry is at names one this
- * scope does not declare.
- */
-function readForUrls(
-  planned: Plan,
-  read: { manifest: Manifest; lock: Lock; sources: readonly Acquired[]; roots: Roots },
-  needs: Map<string, Want[]>,
-  needed: Set<string>,
-): void {
-  const [elsewhere] = planned.undeclared;
-  if (elsewhere === undefined) return;
-  const { manifest, lock, sources, roots } = read;
-  const unread = unknownUrls(manifest.registries, sources, lock);
-  if (unread.length === 0) throw undeclared(elsewhere, roots.scope);
-  for (const alias of unread) {
-    needs.set(alias, needs.get(alias) ?? []);
-    needed.add(alias);
-  }
-}
-
-/** A dependency the lockfile found in a registry the manifest no longer declares. */
-function refuseUndeclared(
-  missed: readonly Unresolved[],
-  manifest: Manifest,
-  lock: Lock,
-  roots: Roots,
-): void {
-  const missing = missed.find(({ alias }) => manifest.registries[alias] === undefined);
-  if (missing === undefined) return;
-  const { alias, need, by } = missing;
-  const url = lock.registries[alias]?.location ?? alias;
-  throw undeclared({ url, need, by }, roots.scope, alias);
-}
-
-function sameArtifact(left: Want, right: Want): boolean {
-  return left.name === right.name && left.namespace === right.namespace && left.kind === right.kind;
-}
-
-/**
- * A registry that has no version in the range several edges agree on says so as a missing
- * version of that artifact, which is their conflict, not the registry's failure.
- */
-function unlisted(error: unknown, missed: readonly Unresolved[]): never {
-  if (isAdapterError(error) && error.failure === "not_found") {
-    const missing = missed.find(
-      ({ need, needed }) =>
-        needed !== undefined &&
-        (error.artifact === `${need.namespace}/${need.name}` || error.artifact === need.name),
-    );
-    if (missing !== undefined) throw unpublished(missing);
-  }
-  throw error;
 }
 
 export function recordOf(plan: Plan): Lock {
@@ -585,24 +492,10 @@ function refuseUntrusted(untrusted: readonly Untrusted[]): void {
   });
 }
 
-/**
- * The registries a run that opens only some plans: those, and every declared one the lockfile
- * found something they depend on in, transitively.
- */
-function dependencyRegistries(lock: Lock, manifest: Manifest, opened: readonly string[]): string[] {
-  const reached = new Set(opened);
-  for (let grew = true; grew; ) {
-    grew = false;
-    for (const row of Object.values(lock.artifacts)) {
-      if (reached.has(row.registry) || manifest.registries[row.registry] === undefined) continue;
-      const by = (row.neededBy ?? []).map((name) => lock.artifacts[name]?.registry);
-      if (by.some((alias) => alias !== undefined && reached.has(alias))) {
-        reached.add(row.registry);
-        grew = true;
-      }
-    }
-  }
-  return [...reached];
+function refuseOldCli(engine: string | undefined): void {
+  const why = unmetEngine(VERSION, engine);
+  if (why === undefined) return;
+  throw new AiregError(`This project ${why}.`, { hint: "Run `aireg self update`." });
 }
 
 /**
@@ -620,34 +513,8 @@ async function plan(
 ): Promise<{ planned: Plan; acquired: Acquired[] }> {
   const { roots, manifest, lock, harnesses } = loaded;
   const aliases = Object.keys(manifest.registries);
-  const moving = hooks.moving ?? new Set<string>();
-  // What the manifest's artifacts depend on, asked of their registry once a plan finds it missing.
-  const needs = new Map<string, Want[]>();
-  // Every need ever asked for, so one asked for twice is known to be unpublished.
-  const everAsked = new Set<string>();
-  const settled = new Map<string, Acquired>();
-  const view = lockView(lock);
-  const asked = hooks.aliases;
-  const reached = asked === undefined ? undefined : dependencyRegistries(lock, manifest, asked);
-  for (const alias of reached ?? aliases) {
-    if (view.rows(alias).some(([name]) => moving.has(name))) continue;
-    const source = view.source(alias);
-    if (source === undefined || !answers(manifest, source, hooks.held)) continue;
-    // Only user scope wraps; an adapter that will not load leaves its rows as the lock has them.
-    const namespacePlugins =
-      roots.scope === "user" &&
-      (await loadAdapter(source.origin.adapter).then(wrapsNamespaces, () =>
-        wrappedInLock(view.rows(alias), { roots, harnesses }),
-      ));
-    settled.set(alias, { ...source, namespacePlugins });
-  }
-  // A registry only a dependency was found in is planned with the run when the lock answers it,
-  // so the edge is settled without reading it; otherwise its rows stay as the lock has them.
-  const planning = reached?.filter(
-    (alias) => asked?.includes(alias) === true || settled.has(alias),
-  );
   // Carried rows are planned from the lock alone, so their copies are not hashed.
-  const opened = planning === undefined ? undefined : new Set(planning);
+  const opened = hooks.aliases === undefined ? undefined : new Set(hooks.aliases);
   const surveyed =
     opened === undefined
       ? lock
@@ -659,6 +526,23 @@ async function plan(
         };
   const state = await survey(surveyed, roots);
 
+  const moving = hooks.moving ?? new Set<string>();
+  // What the manifest's artifacts depend on, asked of their registry once a plan finds it missing.
+  const needs = new Map<string, Want[]>();
+  const settled = new Map<string, Acquired>();
+  const view = lockView(lock);
+  for (const alias of hooks.aliases ?? aliases) {
+    if (view.rows(alias).some(([name]) => moving.has(name))) continue;
+    const source = view.source(alias);
+    if (source === undefined || !answers(manifest, source, hooks.held)) continue;
+    // Only user scope wraps; an adapter that will not load leaves its rows as the lock has them.
+    const namespacePlugins =
+      roots.scope === "user" &&
+      (await loadAdapter(source.origin.adapter).then(wrapsNamespaces, () =>
+        wrappedInLock(view.rows(alias), { roots, harnesses }),
+      ));
+    settled.set(alias, { ...source, namespacePlugins });
+  }
   // Only a registry being opened needs its account, which may refresh a token.
   const open = async (only: readonly string[]) =>
     acquire(manifest, {
@@ -674,7 +558,7 @@ async function plan(
       locked: { lock, moving, held: hooks.held === true },
       needs,
     });
-  const acquired = await open((planning ?? aliases).filter((alias) => !settled.has(alias)));
+  const acquired = await open((hooks.aliases ?? aliases).filter((alias) => !settled.has(alias)));
   try {
     await runPipelineHooks("prePlan", { targets, aliases });
     const planFrom = (sources: readonly Acquired[]) =>
@@ -687,7 +571,7 @@ async function plan(
         refresh: hooks.refresh === true,
         cliVersion: VERSION,
         nameCollision,
-        ...(planning === undefined ? {} : { opened: planning }),
+        ...(hooks.aliases === undefined ? {} : { opened: hooks.aliases }),
         ...(hooks.discard === undefined ? {} : { discard: hooks.discard }),
         ...(hooks.adopt === undefined ? {} : { adopt: hooks.adopt }),
       });
@@ -695,28 +579,24 @@ async function plan(
     while (planned.conflicts.length === 0) {
       const needed = new Set(needsRegistry(planned, lock, settled));
       const sources = [...settled.values(), ...acquired];
-      const missed = planned.unresolved.filter((item) => !keptWithheld(item, sources, lock));
-      refuseUndeclared(missed, manifest, lock, roots);
-      for (const missing of missed) {
+      for (const missing of planned.unresolved.filter(
+        (item) => !keptWithheld(item, sources, lock),
+      )) {
+        const asked = needs.get(missing.alias) ?? [];
         const want = wantOf(missing.need);
-        const key = `${missing.alias}\u0000${JSON.stringify(want)}`;
-        if (everAsked.has(key)) throw unpublished(missing);
-        everAsked.add(key);
-        // A need asked for again, at a range more edges agree on, replaces what it asked before.
-        const asked = (needs.get(missing.alias) ?? []).filter((item) => !sameArtifact(item, want));
+        if (asked.some((item) => JSON.stringify(item) === JSON.stringify(want))) {
+          throw unpublished(missing);
+        }
         needs.set(missing.alias, [...asked, want]);
         needed.add(missing.alias);
       }
-      readForUrls(planned, { manifest, lock, sources, roots }, needs, needed);
       if (needed.size === 0) break;
       for (const alias of needed) settled.delete(alias);
       // Asked again with more wants, a registry replaces what it listed before.
       const kept = acquired.filter((source) => !needed.has(source.alias));
       await closeAll(acquired.filter((source) => needed.has(source.alias)));
       acquired.splice(0, acquired.length, ...kept);
-      acquired.push(
-        ...(await open([...needed]).catch((error: unknown) => unlisted(error, missed))),
-      );
+      acquired.push(...(await open([...needed])));
       planned = planFrom([...settled.values(), ...acquired]);
     }
     await runPipelineHooks("postPlan", { targets, aliases });

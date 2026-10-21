@@ -81,32 +81,4 @@ describe("GitVersions over a repository", () => {
     );
     await expect(versions.commitOf("4.0.0", "pdf")).rejects.toThrow(/has no tag for pdf 4\.0\.0/);
   }, 30_000);
-
-  test("takes a range to the newest tag it admits, an artifact's own tags first", async ({
-    git,
-    tmp,
-  }) => {
-    const repo = await skillsFolder(join(tmp, "repo")).skill("skills/pdf").write();
-    await git.init(repo);
-    const first = await git.commit(repo, "one");
-    await git.tag(repo, "v1.0.0");
-    await skillsFolder(repo).skill("skills/xlsx").write();
-    const second = await git.commit(repo, "two");
-    await git.tag(repo, "v1.4.0");
-    await git.tag(repo, "pdf/v2.1.0");
-    await skillsFolder(repo).skill("skills/docx").write();
-    await git.commit(repo, "three");
-    await git.tag(repo, "v2.0.0-rc.1");
-
-    const versions = new GitVersions({
-      spec: parseSource(pathToFileURL(repo).href),
-      limits,
-      cacheDir: () => join(tmp, "cache"),
-      exclusive: (_key, run) => run(),
-    });
-    expect(await versions.commitIn("^1.0.0", "xlsx")).toBe(second);
-    expect(await versions.commitIn("~1.0", "xlsx")).toBe(first);
-    expect(await versions.commitIn("^2", "pdf")).toBe(second);
-    await expect(versions.commitIn("^1", "pdf")).rejects.toThrow(/has no tag for pdf in \^1\./);
-  }, 30_000);
 });

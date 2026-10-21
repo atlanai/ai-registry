@@ -12,13 +12,7 @@ import {
   type SourceAdapter,
   type Want,
 } from "#adapter/index.ts";
-import {
-  type Bump,
-  bumpVersion,
-  compareVersion,
-  parseVersion,
-  satisfies,
-} from "#adapter/semver.ts";
+import { type Bump, bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { canonicalize } from "#adapter/spec/canonical.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { ID as LOCAL } from "#adapters/local/api.ts";
@@ -61,15 +55,6 @@ function refuseName(name: string | undefined): void {
   });
 }
 
-/** A publish makes one version, so a range has nothing to say about which. */
-function refuseRange(to: string, ref: Ref): void {
-  if (ref.range === undefined) return;
-  throw new AiregError(`--to ${quoted(to)} names a version range, not a version.`, {
-    code: ErrorCode.Usage,
-    hint: "Name one version, such as @1.2.0, or leave it off to take the next one.",
-  });
-}
-
 export function parseTo(to: string): Destination {
   const ref = parseRef(to);
   if (ref.namespace === undefined) {
@@ -79,7 +64,6 @@ export function parseTo(to: string): Destination {
     });
   }
   refuseName(ref.name);
-  refuseRange(to, ref);
   return {
     registry: ref.registry,
     namespace: ref.namespace,
@@ -198,7 +182,6 @@ export async function folderTo(
   }
   if (ref.namespace === undefined) throw noNamespace(to);
   refuseName(ref.name);
-  refuseRange(to, ref);
   return {
     declared: { location: root, adapter: LOCAL, config: {} },
     destination: { registry, namespace: ref.namespace, name: ref.name, version: ref.version },
@@ -526,44 +509,6 @@ function sameEdges(
   return canonicalize(current ?? []) === canonicalize(offered ?? []);
 }
 
-/** `eng/skill/review@0.1.1` as the artifact it names, and the version. */
-function named(to: string): { artifact: string; version: string } {
-  const at = to.lastIndexOf("@");
-  return { artifact: to.slice(0, at), version: to.slice(at + 1) };
-}
-
-/**
- * Whether the edges a fixed version was published with still take what this run plans: the same
- * artifacts, by the same kind of edge in the same registry, each at a version the held edge's
- * range accepts, or its exact version when it has none. A dependency's next patch release then
- * leaves its dependent as it is, rather than asking to rewrite a version that cannot change.
- */
-function edgesHold(
-  held: readonly Relationship[] | undefined,
-  offered: readonly PublishRelationship[] | undefined,
-): boolean {
-  const order = (edges: readonly Relationship[]) =>
-    [...edges]
-      .map((edge) => ({
-        edge,
-        key: `${edge.rel_type} ${edge.registry ?? ""} ${named(edge.to).artifact}`,
-      }))
-      .sort((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0));
-  const before = order(held ?? []);
-  const after = order(offered ?? []);
-  return (
-    before.length === after.length &&
-    before.every(({ edge, key }, at) => {
-      const next = after[at];
-      if (next === undefined || next.key !== key) return false;
-      const version = named(next.edge.to).version;
-      return edge.range === undefined
-        ? named(edge.to).version === version
-        : satisfies(version, edge.range);
-    })
-  );
-}
-
 export async function plan(
   work: Work,
   published: Published,
@@ -600,13 +545,10 @@ export async function plan(
   // The files and the edges decide sameness: the digest covers the version, so it always moves.
   const probe = await offerFrom(work.path, target(asked ?? "0.1.0"));
   refuseAgentFolder(work, published, probe.input);
-  // A version held back gives no files to compare, so it is never the same. An export's own
-  // version cannot move, so its edges need only still take what they reach now.
-  const sameAs = fixed === undefined ? sameEdges : edgesHold;
   const matches = (held: Current) =>
     held.withheld === undefined &&
     sameFiles(held, probe) &&
-    (relationships === undefined || sameAs(held.relationships, probe.input.relationships));
+    (relationships === undefined || sameEdges(held.relationships, probe.input.relationships));
   // A version is looked up by itself, whatever its status, so one held back is never taken for new;
   // a pin reaches a draft's files, which a listing withholds.
   const held =

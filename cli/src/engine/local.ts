@@ -58,7 +58,6 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
     neededBy: plan.neededBy,
     pruned: plan.pruned.filter((name) => names.has(name)),
     unresolved: plan.unresolved,
-    undeclared: plan.undeclared,
     conflicts: plan.conflicts,
     withheld: plan.withheld.filter((item) => names.has(item.name)),
     unlisted: plan.unlisted.filter((item) => names.has(item.name)),

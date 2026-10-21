@@ -193,7 +193,7 @@ export function emptyManifest(): Manifest {
 }
 
 /** A file that names a newer aireg than this one is refused for that, before anything in it is. */
-export function refuseOldCli(engine: string | undefined): void {
+function refuseOldCli(engine: string | undefined): void {
   const why = unmetEngine(VERSION, engine);
   if (why === undefined) return;
   throw new AiregError(`This project ${why}.`, { hint: "Run `aireg self update`." });
@@ -358,7 +358,7 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
   return out;
 }
 
-/** The `artifacts:` entry a remote dependency names: the same address, at any version or range. */
+/** The `artifacts:` entry a remote dependency names: the same address, at any exact version. */
 export function artifactFor(artifacts: readonly Ref[], ref: Ref): Ref | undefined {
   const address = formatAddress(ref);
   return artifacts.find((entry) => formatAddress(entry) === address);
@@ -476,7 +476,7 @@ function dependency(text: string, path: string, artifacts: readonly Ref[]): Expo
   }
   const address = formatAddress(ref);
   // Which versions it takes is the install's to say, so it is said once.
-  if (ref.version !== undefined || ref.range !== undefined) {
+  if (ref.version !== undefined) {
     throw new ManifestError(
       `${of}, but its version belongs on its \`artifacts:\` entry.`,
       `Write ${address} here, and ${formatRef(ref)} under \`artifacts:\`.`,
@@ -594,53 +594,6 @@ export function parseManifest(text: string, filename = "manifest.yml"): Manifest
     // Each check names a field; only here is the file it came from known.
     if (!(error instanceof ManifestError)) throw error;
     throw new ManifestError(`${filename}: ${error.message}`, error.hint);
-  }
-}
-
-/** What of another project's manifest says what it exports, and each of its mappings' keys. */
-const SOURCE_KEYS = {
-  registries: REGISTRY_KEYS,
-  artifacts: ARTIFACT_KEYS,
-  exports: EXPORT_KEYS,
-  publish: ["to"],
-} as const;
-
-/** A mapping with only the keys given; anything else passes through as it is. */
-function knownOnly(value: unknown, keys: readonly string[]): unknown {
-  return isRecord(value)
-    ? dict(keys.flatMap((key) => (key in value ? [[key, value[key]]] : [])))
-    : value;
-}
-
-/**
- * The manifest a source that is not a registry holds, read only for what it exports. A key this
- * aireg does not know, and `engines`, are left out rather than refused, as a newer aireg may have
- * written them; a file that still does not read gives why, never a failure.
- */
-export function readSourceManifest(text: string): Manifest | { problem: string } {
-  try {
-    const doc = parseYaml(text);
-    if (doc === null || doc === undefined) return emptyManifest();
-    if (!isRecord(doc)) return { problem: "it is not a mapping at the top level" };
-    const { registries, artifacts, exports, publish } = doc;
-    const listed = (raw: unknown, keys: readonly string[]) =>
-      Array.isArray(raw) ? raw.map((item) => knownOnly(item, keys)) : raw;
-    return parseKnownFields({
-      registries: isRecord(registries)
-        ? dict(
-            Object.entries(registries).map(([alias, raw]) => [
-              alias,
-              knownOnly(raw, SOURCE_KEYS.registries),
-            ]),
-          )
-        : registries,
-      artifacts: listed(artifacts, SOURCE_KEYS.artifacts),
-      exports: listed(exports, SOURCE_KEYS.exports),
-      publish: knownOnly(publish, SOURCE_KEYS.publish),
-    });
-  } catch (error) {
-    const first = (error as Error).message.split("\n")[0] ?? "";
-    return { problem: first.replace(/[.:]$/, "") };
   }
 }
 
@@ -930,25 +883,11 @@ export interface Pinnable {
  * a namespace install names the row `platform/lint`, the pin says `lint@1.0.0`.
  */
 export function pinOf(manifest: Manifest, row: Pinnable): string | undefined {
-  return heldBy(manifest, row, (ref) => ref.version);
-}
-
-/** The version range the manifest asks for an installed artifact in, matched as `pinOf` matches. */
-export function rangeOf(manifest: Manifest, row: Pinnable): string | undefined {
-  return heldBy(manifest, row, (ref) => ref.range);
-}
-
-function heldBy(
-  manifest: Manifest,
-  row: Pinnable,
-  field: (ref: Ref) => string | undefined,
-): string | undefined {
   for (const ref of manifest.artifacts) {
-    const value = field(ref);
-    if (value === undefined || ref.registry !== row.registry) continue;
+    if (ref.version === undefined || ref.registry !== row.registry) continue;
     if (ref.name !== row.name || (ref.kind !== undefined && ref.kind !== row.kind)) continue;
     if (ref.namespace !== undefined && ref.namespace !== row.namespace) continue;
-    return value;
+    return ref.version;
   }
   return undefined;
 }
@@ -964,7 +903,7 @@ export function reaches(ref: Ref, row: Pinnable): boolean {
 /** One artifact named on its own adds nothing when a whole namespace or registry entry already takes it. */
 export function coveredByWhole(ref: Ref, artifacts: readonly Ref[]): boolean {
   if (ref.name === undefined || ref.kind === undefined) return false;
-  if (ref.version !== undefined || ref.range !== undefined || ref.localName !== undefined) {
+  if (ref.version !== undefined || ref.localName !== undefined) {
     return false;
   }
   if (ref.targets !== undefined || ref.copy === true) return false;

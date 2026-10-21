@@ -69,7 +69,7 @@ describe("publishing a repository's exports", () => {
     const shown = await publish("--dry-run");
     expect(shown.code, shown.stderr).toBe(0);
     expect(shown.stdout).toMatch(
-      /add {5}eng\/skill\/review {2}0\.1\.0\n {2}add {5}eng\/agent\/reviewer {2}0\.1\.0, depends on review \^0\.1\.0/,
+      /add {5}eng\/skill\/review {2}0\.1\.0\n {2}add {5}eng\/agent\/reviewer {2}0\.1\.0, depends on review 0\.1\.0/,
     );
     expect(shown.stdout).not.toContain("scratch");
     expect(shown.stdout).toContain(
@@ -90,7 +90,7 @@ describe("publishing a repository's exports", () => {
           namespace: "eng",
           version: "0.1.0",
           published: false,
-          dependsOn: [{ to: "eng/skill/review@0.1.0", range: "^0.1.0" }],
+          dependsOn: [{ to: "eng/skill/review@0.1.0" }],
         }),
       ],
       skipped: [],
@@ -101,7 +101,7 @@ describe("publishing a repository's exports", () => {
     const sent = await publish("-y");
     expect(sent.code, sent.stderr).toBe(0);
     expect((await envelope("agent", "reviewer", "0.1.0")).relationships).toEqual([
-      { rel_type: "depends_on", to: "eng/skill/review@0.1.0", range: "^0.1.0" },
+      { rel_type: "depends_on", to: "eng/skill/review@0.1.0" },
     ]);
     const files = (await envelope("skill", "review", "0.1.0")).files as { path: string }[];
     expect(files.map((file) => file.path)).toEqual(["SKILL.md"]);
@@ -116,7 +116,7 @@ describe("publishing a repository's exports", () => {
     expect(sent.code, sent.stderr).toBe(0);
     expect(sent.stdout).toMatch(/update {2}eng\/skill\/review {2}0\.1\.0 → 0\.1\.1/);
     expect(sent.stdout).toMatch(
-      /update {2}eng\/agent\/reviewer {2}0\.1\.0 → 0\.1\.1, depends on review \^0\.1\.1/,
+      /update {2}eng\/agent\/reviewer {2}0\.1\.0 → 0\.1\.1, depends on review 0\.1\.1/,
     );
   });
 
@@ -125,7 +125,7 @@ describe("publishing a repository's exports", () => {
     expect((await aireg(["init", "-y"])).code).toBe(0);
     const declared = await aireg(["registry", "add", join(maker, "registry"), "--as", "maker"]);
     expect(declared.code, declared.stderr).toBe(0);
-    const added = await aireg(["add", "maker/eng/agent/reviewer@^0.1", "-y"]);
+    const added = await aireg(["add", "maker/eng/agent/reviewer@0.1.1", "-y"]);
     expect(added.code, added.stderr).toBe(0);
     expect(
       await readFile(join(project, ".claude", "skills", "review", "SKILL.md"), "utf8"),
@@ -135,7 +135,7 @@ describe("publishing a repository's exports", () => {
         artifacts: Record<string, { version?: string; needed_by?: string[]; depends_on?: object }>;
       }
     ).artifacts;
-    expect(rows.reviewer).toMatchObject({ version: "0.1.1", depends_on: { review: "^0.1.1" } });
+    expect(rows.reviewer).toMatchObject({ version: "0.1.1" });
     expect(rows.review).toMatchObject({ version: "0.1.1", needed_by: ["reviewer"] });
   }, 60_000);
 });
@@ -358,33 +358,24 @@ publish:
     expect(first.code, first.stderr).toBe(0);
   }, 60_000);
 
-  test("stays the same when its dependency's next release is still in its range", async () => {
+  test("refuses a dependency's changed label until the dependent gets its own new version", async () => {
     await appendFile(join(repo, ".claude", "skills", "review", "SKILL.md"), "Check tests.\n");
+    const refused = await send();
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("eng/reviewer@0.0.5 is already published.");
+    const text = await readFile(manifestPath(repo), "utf8");
+    await writeFile(manifestPath(repo), text.replace("version: 0.0.5", "version: 0.0.6"));
     const sent = await send("--json");
     expect(sent.code, sent.stderr).toBe(0);
     expect(JSON.parse(sent.stdout).data.artifacts).toEqual([
-      expect.objectContaining({ name: "review", from: "0.1.0", version: "0.1.1", published: true }),
+      expect.objectContaining({ name: "review", version: "0.1.1", published: true }),
       expect.objectContaining({
         name: "reviewer",
-        version: "0.0.5",
-        published: false,
-        dependsOn: [{ to: "eng/skill/review@0.1.0", range: "^0.1.0" }],
+        version: "0.0.6",
+        published: true,
+        dependsOn: [{ to: "eng/skill/review@0.1.1" }],
       }),
     ]);
-    const shown = await send("--dry-run");
-    expect(shown.stdout).toMatch(
-      /same {4}eng\/agent\/reviewer {2}0\.0\.5, already published, depends on review \^0\.1\.0/,
-    );
-  });
-
-  test("is refused once its dependency moves past the range it was published with", async () => {
-    await writeFile(
-      join(repo, ".claude", "skills", "review", "SKILL.md"),
-      skillBody("review", "The review checklist.", "Rewritten.\n"),
-    );
-    const sent = await send("--bump", "minor");
-    expect(sent.code).toBe(1);
-    expect(sent.stderr).toContain("eng/reviewer@0.0.5 is already published.");
   });
 });
 
@@ -420,9 +411,8 @@ describe("removing an artifact an export depends on", () => {
       const removed = await run("remove", ...args, "-y");
       expect(removed.code).toBe(1);
       expect(removed.stderr).toContain(
-        'lint is a dependency of export ".claude/agents/reviewer.md".',
+        'depends on "acme/acme/skill/lint", which is not listed under `artifacts:`.',
       );
-      expect(removed.stderr).toContain("Remove it from that export's `depends_on` first.");
     }
     expect(await manifest()).toBe(before);
     expect((await run("list")).stdout).toMatch(/ lint\s+skill/);

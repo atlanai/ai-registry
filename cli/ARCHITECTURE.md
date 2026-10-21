@@ -42,17 +42,16 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | The adapters built into aireg | `adapters/index.ts` |
 | What an adapter adds beside the contract: commands, job steps and console tabs | `core/host/` |
 | Reading a file spec registry from any `read(path)`, its name rules and document names | `adapter/filespec/` |
-| How a source on disk lays out what it holds, and reading one that is not a registry, such as a folder of skills, with the project manifest it holds | `adapter/layouts/` |
-| The `depends_on` edges a source's project manifest gives what it exports | `core/plan/exported.ts` |
+| How a source on disk lays out what it holds, and reading one that is not a registry, such as a folder of skills | `adapter/layouts/` |
 | The merges a publish writes into `versions.json` and `index.json` | `adapter/filespec/write.ts` |
 | Registry authoring: init, index, validate, kinds and offers | `core/filespec/write/` |
-| SemVer ordering and ranges (`parseRange`, `satisfies`, `maxSatisfying`), digests, safe file reads and writes, and message text helpers | `adapter/semver.ts`, `adapter/spec/canonical.ts`, `adapter/files.ts`, `adapter/text.ts` |
+| SemVer ordering, digests, safe file reads and writes, and message text helpers | `adapter/semver.ts`, `adapter/spec/canonical.ts`, `adapter/files.ts`, `adapter/text.ts` |
 | Paths, the home folder, hashing, file modes and processes | `adapter/paths.ts`, `core/fs/path.ts`, `core/fs/hash.ts`, `core/fs/mode.ts`, `core/process.ts` |
 | The lockfile, `.registry/manifest.lock.yml` | `core/lock.ts` |
 | Running git | `adapters/git/exec.ts`, reached through `adapters/git/api.ts` |
 | The scope a command installs into, and where it places artifacts | `core/store/paths.ts` |
 | Edits to a harness's own config file, such as registering a plugin | `core/harness/register/` |
-| The command table: names, options, help and docs links | `cli/commands/index.ts`, which assembles it from one module per help group in `cli/commands/table/` |
+| The command table: names, options, help and docs links | `cli/commands/index.ts` |
 | The values a release build stamps in, for tsup and `bun build --compile` | `packaging/defines.ts` |
 
 ## How a command runs
@@ -70,7 +69,7 @@ Background jobs run the same engine from the daemon (`daemon/runner.ts`), so a s
 - **A harness:** copy the closest module in `src/harnesses/` to `<id>.ts` and edit it with `defineHarness`, typed by `core/harness/contract.ts`: its `roots`, the `detect` signals that it is installed, and under `kinds` where each kind goes. Use `reads` when it already loads another harness's folder, and `register` and `manifest` entries only when it needs a config edit to load a plugin. List it in `src/harnesses/index.ts`; a test checks every harness's ids, templates and paths. No code branches on a harness's name: extend the contract instead. Record what each mapping rests on in `test/conformance/<id>/EVIDENCE.md` and prove it with a conformance test. A person can also define one as a JSON file, which `core/harness/load.ts` reads and checks.
 - **A codec:** a pure function in `core/harness/codecs/`, listed in the `Codec` type, `applyCodec` and `scripts/schema/harness.ts`. A definition only names a codec, so a harness file never carries code.
 - **An adapter:** implement the contract in `src/adapter/` with `defineAdapter`, and check it with `assertAdapterCompliance`. `aireg adapter init <id>` scaffolds one as a standalone package that imports the contract from `@atlanai/aireg`. Any other adapter installs from the release server with `aireg adapter install`. A store laid out as the file spec reads through `resolveFromRoot` and, on disk, `openFolderRegistry`; a built-in adapter whose source is a folder reads it through `openLayoutRoot` in `adapter/layouts/`, which tells a registry from a folder of skills and reads either. Built-in adapters live in `src/adapters/<id>/` with the same layout, and say through the contract what the CLI needs, such as `credentialsHint`, `readOnly` and the `fileSpec` capability, so no command branches on an adapter's id.
-- **A command:** add its entry to its help group's module in `cli/commands/table/`, such as `table/install.ts`, with its options, examples and docs page, and its module at `cli/commands/<command>.ts`. A command with actions keeps each action's module beside it, in `cli/commands/<command>/<action>.ts`, such as `cli/commands/self/update.ts`. Help and the command map (`aireg --map`) read the table.
+- **A command:** add its entry to `cli/commands/index.ts`, with its options, examples and docs page, and its module at `cli/commands/<command>.ts`. A command with actions keeps each action's module beside it, in `cli/commands/<command>/<action>.ts`, such as `cli/commands/self/update.ts`. Help and the command map (`aireg --map`) read the table.
 - **An environment setting:** add it to `SETTINGS` in `core/env.ts`. A test fails until `docs/reference/environment.md` documents it.
 - **An error:** throw `AiregError` with an `ErrorCode`, or extend it for a domain error. A new code needs an exit status in `core/errors.ts` and a row in `docs/reference/output.md`.
 

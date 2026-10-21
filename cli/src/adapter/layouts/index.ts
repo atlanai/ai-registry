@@ -188,7 +188,6 @@ export function openLayoutRoot(options: { immutable?: boolean } = {}): LayoutRoo
         artifacts,
         registry: { name: found.name ?? resolveOptions.context.namespace },
         ...(found.warnings.length === 0 ? {} : { warnings: found.warnings }),
-        ...(found.manifest === undefined ? {} : { manifest: found.manifest }),
         layout,
       };
     },

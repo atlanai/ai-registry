@@ -1,4 +1,0 @@
-registries:
-  kit: acme/agent-kit
-artifacts:
-  - kit/platform@^1.2

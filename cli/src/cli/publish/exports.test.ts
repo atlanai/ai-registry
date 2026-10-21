@@ -39,11 +39,11 @@ test.beforeEach(async ({ tmp }) => {
 });
 
 const REGISTRIES = `registries:
-  acme: github.com/acme/agent-registry
-  public: https://github.com/acme/public-registry.git
+  acme: https://registry.example.com
+  public: https://registry.example.com/
   vendor: ./vendor
 artifacts:
-  - public/platform/skill/sql-style@^1.2
+  - public/platform/skill/sql-style@0.1.2
   - public/platform/skill/lint@2.0.0
   - acme/platform/skill/format
   - vendor/platform/skill/notes
@@ -77,18 +77,18 @@ function context(manifest: Manifest, over: Partial<EdgeContext> = {}): EdgeConte
     base,
     manifest,
     lock: lock()
-      .registry("public", { location: "https://github.com/acme/public-registry.git" })
-      .artifact("sql-style", { namespace: "platform", version: "1.4.0" })
+      .registry("public", { location: "https://registry.example.com/" })
+      .artifact("sql-style", { namespace: "platform", version: "0.1.2" })
       .artifact("lint", { namespace: "platform", version: "2.0.0" })
-      .registry("acme", { location: "github.com/acme/agent-registry" })
+      .registry("acme", { location: "https://registry.example.com" })
       .artifact("format", { namespace: "platform", version: "0.3.2" })
       .registry("vendor", { location: "./vendor" })
       .artifact("notes", { namespace: "platform", version: "1.0.0" })
       .build(),
     known: {
-      acme: { location: "github.com/acme/agent-registry", adapter: undefined, config: {} },
+      acme: { location: "https://registry.example.com", adapter: undefined, config: {} },
       public: {
-        location: "https://github.com/acme/public-registry.git",
+        location: "https://registry.example.com/",
         adapter: undefined,
         config: {},
       },
@@ -316,7 +316,7 @@ describe("dependsOnFor", () => {
     const planned = async (path: string) =>
       path === review.path ? ({ work: review, version: "0.3.2" } as Planned) : undefined;
     expect(await dependsOnFor(named(works, "reviewer"), context(manifest, { planned }))).toEqual([
-      { rel_type: "depends_on", to: "engineering/skill/review@0.3.2", range: "^0.3.2" },
+      { rel_type: "depends_on", to: "engineering/skill/review@0.3.2" },
     ]);
   });
 
@@ -325,7 +325,7 @@ describe("dependsOnFor", () => {
     const at = published({ "engineering/skill/review": "1.4.0" });
     expect(
       await dependsOnFor(named(works, "reviewer"), context(manifest, { published: at })),
-    ).toEqual([{ rel_type: "depends_on", to: "engineering/skill/review@1.4.0", range: "^1.4.0" }]);
+    ).toEqual([{ rel_type: "depends_on", to: "engineering/skill/review@1.4.0" }]);
   });
 
   test("refuses another export that is not published to the target", async () => {
@@ -347,86 +347,52 @@ describe("dependsOnFor", () => {
     const planned = async (path: string) =>
       path === review.path ? ({ work: review, version: "0.1.0" } as Planned) : undefined;
     expect(await dependsOnFor(named(works, "reviewer"), context(manifest, { planned }))).toEqual([
-      { rel_type: "depends_on", to: "engineering/skill/review@0.1.0", range: "^0.1.0" },
+      { rel_type: "depends_on", to: "engineering/skill/review@0.1.0" },
     ]);
   });
 
-  test("names an installed artifact at its locked version, taking what its entry takes", async () => {
-    const { manifest, works } = await exported([
-      "public/platform/skill/sql-style",
-      "public/platform/skill/lint",
-      "acme/platform/skill/format",
-    ]);
+  test("names the exact installed label through another alias for the same registry", async () => {
+    const { manifest, works } = await exported(["public/platform/skill/sql-style"]);
     expect(await dependsOnFor(named(works, "reviewer"), context(manifest))).toEqual([
-      {
-        rel_type: "depends_on",
-        to: "platform/skill/sql-style@1.4.0",
-        range: "^1.2",
-        registry: "https://github.com/acme/public-registry",
-      },
-      {
-        rel_type: "depends_on",
-        to: "platform/skill/lint@2.0.0",
-        registry: "https://github.com/acme/public-registry",
-      },
-      // In the registry it is published to, so no `registry`; unpinned, so its releases.
-      { rel_type: "depends_on", to: "platform/skill/format@0.3.2", range: "^0.3.2" },
+      { rel_type: "depends_on", to: "platform/skill/sql-style@0.1.2" },
     ]);
   });
 
-  test("leaves out `registry` for a folder that is the same registry as the target", async () => {
-    const { manifest, works } = await exported(["vendor/platform/skill/notes"]);
-    const edges = context(manifest, {
-      target: { registry: "./vendor", namespace: "eng" },
-    });
-    edges.known = {
-      ...edges.known,
-      "./vendor": { location: join(base, "vendor/"), adapter: "local", config: {} },
+  test("refuses an alias selecting a different configured registry scope", async () => {
+    const { manifest, works } = await exported(["public/platform/skill/sql-style"]);
+    const scoped = context(manifest);
+    scoped.known = {
+      ...scoped.known,
+      public: { ...scoped.known.public!, config: { namespace: "other" } },
     };
-    expect(await dependsOnFor(named(works, "reviewer"), edges)).toEqual([
-      { rel_type: "depends_on", to: "platform/skill/notes@1.0.0", range: "^1.0.0" },
-    ]);
-  });
-
-  /** The `vendor` folder as a registry whose registry.json names `url`. */
-  const writeVendor = async (url: string) => {
-    await mkdir(join(base, "vendor"), { recursive: true });
-    const document = { kind: "registry", format_version: 1, name: "vendor", url };
-    await writeFile(join(base, "vendor", "registry.json"), JSON.stringify(document));
-  };
-
-  test("names a folder registry by the https url its registry.json names", async () => {
-    // The URL a project declaring this folder matches the edge by.
-    await writeVendor("https://GitHub.com/acme/vendor-registry.git/");
-    const { manifest, works } = await exported(["vendor/platform/skill/notes"]);
-    expect(await dependsOnFor(named(works, "reviewer"), context(manifest))).toEqual([
-      {
-        rel_type: "depends_on",
-        to: "platform/skill/notes@1.0.0",
-        range: "^1.0.0",
-        registry: "https://github.com/acme/vendor-registry",
-      },
-    ]);
-  });
-
-  test("refuses a registry with no https address, and an artifact not installed", async () => {
-    const { manifest, works } = await exported(["vendor/platform/skill/notes"]);
-    const reviewer = named(works, "reviewer");
-    await expect(dependsOnFor(reviewer, context(manifest))).rejects.toMatchObject({
-      message:
-        "reviewer depends on notes from vendor, which has no https address, so a published artifact cannot name it.",
+    await expect(dependsOnFor(named(works, "reviewer"), scoped)).rejects.toMatchObject({
       code: "invalid",
     });
-    // A folder whose registry.json names a URL that is not https is refused all the same.
-    await writeVendor("http://github.com/acme/vendor-registry");
-    await expect(dependsOnFor(reviewer, context(manifest))).rejects.toMatchObject({
+  });
+
+  test("refuses a manifest pin that no longer matches the installed label", async () => {
+    const { manifest, works } = await exported(["public/platform/skill/sql-style"]);
+    manifest.artifacts = manifest.artifacts.map((ref) =>
+      ref.name === "sql-style" ? { ...ref, version: "0.1.3" } : ref,
+    );
+    await expect(dependsOnFor(named(works, "reviewer"), context(manifest))).rejects.toMatchObject({
+      code: "changed",
+      hint: "Run `aireg install` to install the declared version, then publish again.",
+    });
+  });
+
+  test("refuses a dependency from another registry and one that is not installed", async () => {
+    const { manifest, works } = await exported(["public/platform/skill/sql-style"]);
+    const other = context(manifest);
+    other.known = {
+      ...other.known,
+      public: { location: "https://example.com/other", adapter: undefined, config: {} },
+    };
+    await expect(dependsOnFor(named(works, "reviewer"), other)).rejects.toMatchObject({
       code: "invalid",
     });
-    const bare = context(manifest, { lock: lock().build() });
-    await expect(dependsOnFor(reviewer, bare)).rejects.toMatchObject({
-      message: "reviewer depends on vendor/platform/skill/notes, which is not installed.",
-      hint: "Run `aireg install` to install it, then publish again.",
-      code: "not_found",
-    });
+    await expect(
+      dependsOnFor(named(works, "reviewer"), context(manifest, { lock: lock().build() })),
+    ).rejects.toMatchObject({ code: "not_found" });
   });
 });

@@ -7,7 +7,6 @@ import {
   parseVersion,
   quoted,
   sanitizeName,
-  satisfies,
   sha256,
   type Version,
 } from "#adapter/index.ts";
@@ -148,29 +147,6 @@ export class GitVersions {
       throw new GitError(
         "not_found",
         `${this.#context.spec.location} has no tag for ${name} ${version}.`,
-        "",
-        offered.length === 0
-          ? "Leave off the version to install what the repository holds now."
-          : `Use ${offered.slice(0, 5).join(", ")}, or leave off the version for the newest.`,
-      );
-    }
-    return found.tag.commit;
-  }
-
-  /**
-   * The commit of the newest version a range admits, among the tags that version the artifact:
-   * its own when it has any, else the repository's, as `versionsAt` reads them.
-   */
-  async commitIn(range: string, name: string): Promise<string> {
-    const tagged = (await this.tags()).map(taggedOf).filter((item) => item !== undefined);
-    const found = newest(
-      forArtifact(tagged, name).filter((item) => satisfies(formatVersion(item.version), range)),
-    );
-    if (found === undefined) {
-      const offered = releasesFor(tagged, name);
-      throw new GitError(
-        "not_found",
-        `${this.#context.spec.location} has no tag for ${name} in ${range}.`,
         "",
         offered.length === 0
           ? "Leave off the version to install what the repository holds now."

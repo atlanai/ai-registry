@@ -2,7 +2,7 @@ registries:
   acme: github.com/acme/agent-registry
   public: github.com/acme/public-registry
 artifacts:
-  - public/platform/skill/sql-style@^1.2
+  - public/platform/skill/sql-style@0.1.2
 exports:
   - .claude/skills/*
   - path: .claude/agents/reviewer.md

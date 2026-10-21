@@ -58,7 +58,7 @@ After `aireg add acme/engineering/hello-registry` in a project:
 .agents/skills/hello-registry -> ../../.registry/artifacts/acme/engineering/skills/hello-registry
 ```
 
-**`manifest.yml`** is what the scope asks for: the harnesses to install into, the registries it reads, and the artifacts it wants. aireg edits it on `registry add`, `add` and `remove`; after editing it by hand, `aireg install` makes the scope match. An unknown key is refused. Without `harnesses:`, aireg installs into Claude Code and Codex. One artifact's entry may end in `@<version>`, which pins it, or `@<range>`, a version range such as `^1.2` that the newest admitted version installs from and that `update` moves within.
+**`manifest.yml`** is what the scope asks for: the harnesses to install into, the registries it reads, and the artifacts it wants. aireg edits it on `registry add`, `add` and `remove`; after editing it by hand, `aireg install` makes the scope match. An unknown key is refused. Without `harnesses:`, aireg installs into Claude Code and Codex.
 
 ```yaml
 harnesses:
@@ -68,44 +68,12 @@ registries:
   acme: github.com/acme/ai-registry
 artifacts:
   - acme/engineering/skill/lint
-  - acme/engineering/skill/review-style@^0.3
   - ref: acme/engineering/skill/pr-review@1.2.0
     harnesses:
       - claude
 ```
 
-A project that publishes what it makes lists it under `exports:`, and where it goes under `publish:`. aireg checks both when it reads the manifest and keeps them when it edits it, and `aireg publish` with no paths publishes the exports, writing each `depends_on` entry as a registry edge. Another project that adds the repository itself, as a folder of skills, gets the same edges from this manifest, read only for `registries:`, `artifacts:`, `exports:` and `publish:`, from a file of at most 256 KB, and ignored with a warning when it doesn't read.
-
-- An `exports:` entry is a path relative to the project, written with `/`, or a glob over paths. Neither may climb out with `..`, in a brace alternative such as `{..,skills}` either. A path to an artifact exports it: a skill folder holding `SKILL.md`, an agent's folder holding `AGENT.md`, which publishes with its other files, or an agent's `.md` file whose front matter has a `name` and a `description`. A folder holding both entry files is refused, and so is an agent's `x.md` beside an agent's folder `x/`. A path to any other folder exports each artifact directly inside it. A glob, or a folder, skips anything else it reaches, with a note; an entry naming something else is refused. In a git repository, only files git tracks count, inside an export's folder too, though its entry file, such as a skill's `SKILL.md`, is always published. An artifact inside another export's folder that an entry also reaches, or that an export depends on, is published on its own and left out of that folder's files.
-- A mapping gives one path, never a glob, and any of: `kind` (`skill` or `agent`: everything the entry reaches must be one, or it is refused, naming the path), an exact `version`, a `depends_on` list, its own `publish`, `exclude` (for a folder of artifacts, the names directly inside it that it does not export; a name not there is refused), `ignore` (gitignore patterns, relative to each artifact, for files left out; a pattern that leaves nothing out is a warning) and `include` (the only files each artifact publishes besides its entry file, relative to it: a path, stored as it is, or `{from, as}`, stored at `as`; a path the artifact does not hold is refused, and so is an `as` that is an entry file or that two files share).
-- Every entry that reaches an artifact applies to it: their `depends_on`, `include` and `ignore` lists are combined, an entry naming the artifact sets `kind`, `version` and `publish` over one reaching it through a glob or its folder, and two entries that set one of them differently for the same artifact are refused, naming both. Two exports of the same kind and name are refused, naming both paths.
-- A `depends_on` entry is `./` and the path of an artifact in the project, or the address `<registry>/<namespace>/<kind>/<name>` of an `artifacts:` entry, without a version: the entry's pin or range says which versions it takes. A path names an artifact as an entry's path does, or a folder that is none, which names each artifact directly inside it but the export itself and is refused when it holds none; each is exported with what depends on it: one no entry reaches is exported as if an entry named its path alone, and one an entry keeps here with `publish: false`, leaves out with `exclude`, or that aireg installed, is refused.
-- `publish.to` is the one target, as `aireg publish --to` takes it: `<registry>/<namespace>` in a declared registry, or a registry folder ending in a namespace. A list is refused. An export's `publish` takes only `false`, which keeps it in this repository.
-
-```yaml
-artifacts:
-  - acme/platform/skill/sql-style@^1.2
-exports:
-  - .claude/skills
-  - path: .claude/agents/reviewer.md
-    version: 2.0.0
-    depends_on:
-      - ./.claude/skills/review
-      - acme/platform/skill/sql-style
-publish:
-  to: acme/engineering
-```
-
-An `@<range>` entry, `exports:` and `publish:` need an aireg release that reads them; an older one refuses the manifest. `engines.aireg` names the oldest aireg a manifest needs, as a plain version. aireg keeps it when it edits the manifest, and never writes it on its own:
-
-```yaml
-engines:
-  aireg: 0.2.0
-```
-
-An aireg older than that refuses the manifest with `This project needs aireg 0.2.0 or later` and the hint `` Run `aireg self update`. ``, checked before any other key, so a manifest that uses a key the older aireg doesn't know says what it needs rather than which key it refused. An aireg from before that check reports the unknown key instead.
-
-**`manifest.lock.yml`** is what the scope resolved to. aireg writes it on every install and reads it back on the next one. It records each registry once, with the adapter that read it, a key for what was read and, for a git registry, the commit. A registry declared at an address with no https form, such as a folder, also records as `url` the https address its `registry.json` gives, which a `depends_on` edge naming that address is matched against without reading the registry again; an older aireg ignores it, and a run with `--frozen` does not count it as a change. Each artifact records its registry, version and the content digest that registry published, where the copy lives, a digest of that copy, and every link aireg made for it. A plugin fetched from a repository of its own also records that repository's commit as `revision`, and one that carries hooks, servers or executables records a digest of them as `carried`. A dependency records `needed_by`, the installed names whose `depends_on` edges reached it, and its own registry, which is another one than theirs when the edge named one by its address. An artifact with an edge that carries a version range records `depends_on`, by the installed name of each artifact its edges reach, the range, or the version an edge without one names, leaving out an edge to another export of the same source, which names no version since both are read at one commit; an older aireg ignores it. Paths are relative to the project, or to your home folder for the user scope, and there are no timestamps, so two branches that add different artifacts merge without a conflict.
+**`manifest.lock.yml`** is what the scope resolved to. aireg writes it on every install and reads it back on the next one. It records each registry once, with the adapter that read it, a key for what was read and, for a git registry, the commit. Each artifact records its registry, version and the content digest that registry published, where the copy lives, a digest of that copy, and every link aireg made for it. A plugin fetched from a repository of its own also records that repository's commit as `revision`, and one that carries hooks, servers or executables records a digest of them as `carried`. Paths are relative to the project, or to your home folder for the user scope, and there are no timestamps, so two branches that add different artifacts merge without a conflict.
 
 ```yaml
 # Generated by aireg. Do not edit.

@@ -71,7 +71,6 @@ Run the hook regression tests with `python3 -m unittest discover -s tools -p tes
 python3 tools/check.py examples/acme-registry    # verify a registry against the spec, recomputing every digest
 python3 tools/check.py examples/aireg
 python3 tools/check_schemas.py                   # check spec/schemas/ and validate the examples against them
-python3 -m unittest discover -s tools            # the checks' own tests
 ```
 
 Both use only the standard library, but the second validates the examples only when `jsonschema` is installed. Install the pinned version with `python3 -m pip install -r tools/requirements.txt`; CI passes `--require-jsonschema`, so a missing `jsonschema` fails there instead of skipping. Run both when you change the specification, the schemas, or an example.

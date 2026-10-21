@@ -2,7 +2,6 @@ import { type KindManifest, kindsOf, primaryFiles } from "#core/filespec/write/k
 import type { Git } from "#test/kit/fixtures.ts";
 import {
   type SpecArtifact,
-  type SpecEdge,
   type SpecVersion,
   skillBody,
   writeSpecRoot,
@@ -14,11 +13,8 @@ interface VersionOptions {
   files?: Record<string, string>;
   /** What follows the default entry file's front matter. */
   body?: string;
-  /**
-   * This version's `depends_on` edges: a fully qualified ref, with its range after a space, or
-   * the edge as written.
-   */
-  dependsOn?: readonly (string | SpecEdge)[];
+  /** Fully qualified refs this version's `depends_on` edges name. */
+  dependsOn?: readonly string[];
   status?: string;
 }
 
@@ -33,12 +29,12 @@ function parse(ref: string): { namespace: string; name: string; version: string 
 /** A file spec registry, built up one published version at a time. */
 class RegistryBuilder {
   readonly #root: string;
-  readonly #options: { name?: string; slug?: string; url?: string };
+  readonly #options: { name?: string; slug?: string };
   readonly #artifacts: SpecArtifact[] = [];
   /** Versions given no files, filled with their kind's entry file when written. */
   readonly #bare = new Map<SpecVersion, string>();
 
-  constructor(root: string, options: { name?: string; slug?: string; url?: string }) {
+  constructor(root: string, options: { name?: string; slug?: string }) {
     this.#root = root;
     this.#options = options;
   }
@@ -120,10 +116,7 @@ class RegistryBuilder {
   }
 }
 
-export function registry(
-  root: string,
-  options: { name?: string; slug?: string; url?: string } = {},
-) {
+export function registry(root: string, options: { name?: string; slug?: string } = {}) {
   return new RegistryBuilder(root, options);
 }
 

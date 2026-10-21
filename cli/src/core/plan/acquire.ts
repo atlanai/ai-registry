@@ -11,10 +11,8 @@ import {
 } from "#adapter/index.ts";
 import { isLayoutId, isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import { isSafePath } from "#adapter/paths.ts";
-import { satisfies } from "#adapter/semver.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import { materialize } from "#core/adapter/content.ts";
-import { reportedRegistryUrl } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
 import { declaredLayout, loadAdapter } from "#core/adapter/registry.ts";
 import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
@@ -28,8 +26,7 @@ import { abbreviate } from "#core/output.ts";
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { ensureHome, stagingPath, toolHome } from "#core/store/paths.ts";
 import { carriedIn } from "./carries.ts";
-import { movesWithin, type Need, needsOf, type Unusable } from "./depends.ts";
-import { exportedNeeds } from "./exported.ts";
+import { type Need, needsOf } from "./depends.ts";
 import type { Acquired, Placement, Staged } from "./model.ts";
 import { wrapsNamespaces } from "./namespaces.ts";
 import { candidates } from "./select.ts";
@@ -103,15 +100,12 @@ export function wanted(manifest: Manifest, alias: string): Request | undefined {
       continue;
     }
     const address = formatAddress(ref);
-    const before = byAddress.get(address);
-    const version = ref.version ?? before?.version;
-    const range = version === undefined ? (ref.range ?? before?.range) : undefined;
+    const version = ref.version ?? byAddress.get(address)?.version;
     byAddress.set(address, {
       name: ref.name,
       ...(ref.namespace === undefined ? {} : { namespace: ref.namespace }),
       ...(ref.kind === undefined ? {} : { kind: ref.kind }),
       ...(version === undefined ? {} : { version }),
-      ...(range === undefined ? {} : { range }),
     });
   }
   if (!asked) return undefined;
@@ -132,9 +126,8 @@ function namespacePlugin(manifest: Manifest, alias: string, ref: Ref): Want | un
 }
 
 /**
- * Locked rows are asked for at their locked version unless moved, pinned, or outside the range the
- * manifest asks for, so later publishes wait for `update`; a whole reference reaching no row is new
- * and asks for everything, unless `held`.
+ * Locked rows are asked for at their locked version unless moved or pinned, so later publishes wait
+ * for `update`; a whole reference reaching no row is new and asks for everything, unless `held`.
  */
 function lockedRequest(
   manifest: Manifest,
@@ -142,9 +135,7 @@ function lockedRequest(
   { lock, moving, held = false }: Locked,
   view: LockView,
 ): Request | undefined {
-  // A registry the manifest names nothing from may still hold what another registry's rows need.
-  const needed = view.rows(alias).some(([, row]) => row.neededBy !== undefined);
-  const request = wanted(manifest, alias) ?? (needed ? { want: [], all: false } : undefined);
+  const request = wanted(manifest, alias);
   if (request === undefined) return undefined;
   const pins = request.want.filter((want) => want.version !== undefined);
   const asked = new Map<string, Want>();
@@ -167,60 +158,31 @@ function lockedRequest(
     }
     for (const name of rows) {
       const row = lock.artifacts[name] as LockArtifact;
-      asked.set(name, rowWant(ref, row, pins, moving.has(name) || whole || redeclared));
+      const pinned = pins.some((want) => covers(want, row));
+      const free = moving.has(name) || pinned || row.version === undefined || whole || redeclared;
+      asked.set(name, lockedWant(row, free));
     }
   }
-  // In a source read at one commit, a dependency moves with everything else there.
-  const free = whole || (redeclared && isReadOnlyLayout(source?.config.layout));
-  for (const [name, want] of dependencyWants(view.rows(alias), named, { lock, moving }, free)) {
-    asked.set(name, want);
+  // A dependency is held at the version its dependents needed; the closure moves it when they do.
+  for (const [name, row] of view.rows(alias)) {
+    if (row.neededBy === undefined || named.has(name)) continue;
+    asked.set(name, {
+      name: row.name,
+      namespace: row.namespace,
+      kind: row.kind,
+      ...(row.version === undefined ? {} : { version: row.version }),
+    });
   }
   return { want: [...request.want, ...asked.values()], all };
 }
 
-/**
- * A dependency is held at the version its dependents needed; the closure moves it when they do,
- * and a run that moves it takes the newest version their ranges admit. `free`, it moves.
- */
-function dependencyWants(
-  rows: readonly (readonly [string, LockArtifact])[],
-  named: ReadonlySet<string>,
-  { lock, moving }: Pick<Locked, "lock" | "moving">,
-  free: boolean,
-): [string, Want][] {
-  return rows.flatMap(([name, row]): [string, Want][] => {
-    if (row.neededBy === undefined || named.has(name)) return [];
-    if (free) return [[name, lockedWant(row, true, undefined)]];
-    return [[name, dependencyWant(row, moving.has(name) ? movesWithin(lock, name) : undefined)]];
-  });
-}
-
-function dependencyWant(row: LockArtifact, range: string | undefined): Want {
-  const at =
-    range !== undefined ? { range } : row.version === undefined ? {} : { version: row.version };
-  return { name: row.name, namespace: row.namespace, kind: row.kind, ...at };
-}
-
-/** A locked row a manifest reference reaches, asked for again; `free` moves it whatever it asks. */
-function rowWant(ref: Ref, row: LockArtifact, pins: readonly Want[], free: boolean): Want {
-  const pinned = pins.some((want) => covers(want, row));
-  // A range the manifest moved away from the locked version frees it, as a new pin would.
-  const outside = ref.range !== undefined && !satisfies(row.version ?? "", ref.range);
-  const moves = free || pinned || outside || row.version === undefined;
-  return lockedWant(row, moves, pinned ? undefined : ref.range);
-}
-
-/**
- * A locked row asked for again: at its version and commit, unless it is free to move, when it
- * moves within the range the manifest asks for, if any.
- */
-function lockedWant(row: LockArtifact, free: boolean, range: string | undefined): Want {
+/** A locked row asked for again: at its version and commit, unless it is free to move. */
+function lockedWant(row: LockArtifact, free: boolean): Want {
   return {
     name: row.name,
     namespace: row.namespace,
     kind: row.kind,
     ...(free ? {} : { version: row.version }),
-    ...(free && range !== undefined ? { range } : {}),
     ...(free || row.revision === undefined ? {} : { revision: row.revision }),
   };
 }
@@ -291,23 +253,12 @@ function fromRows(
   const entries: Entry[] = [];
   const placements = new Map<string, Placement>();
   const needs = new Map<string, Need[]>();
-  // What this registry's rows need may sit in another registry, which the row says.
-  for (const [name, row] of Object.entries(lock.artifacts)) {
-    if (row.namespace === undefined) continue;
-    // A row with no version, as a folder of skills has, was needed at whatever its source held.
-    const need = {
-      namespace: row.namespace,
-      kind: row.kind,
-      name: row.name,
-      ...(row.version === undefined ? {} : { version: row.version }),
-      ...(row.registry === alias ? {} : { alias: row.registry }),
-    };
-    for (const by of row.neededBy ?? []) {
-      // The range the dependent's edge carried, so a plan from the lock records it again.
-      const range = lock.artifacts[by]?.dependsOn?.[name];
-      const asked = range === undefined || range === row.version ? need : { ...need, range };
-      needs.set(by, [...(needs.get(by) ?? []), asked]);
+  for (const [, row] of rows) {
+    if (row.namespace === undefined || row.version === undefined) {
+      continue;
     }
+    const need = { namespace: row.namespace, kind: row.kind, name: row.name, version: row.version };
+    for (const by of row.neededBy ?? []) needs.set(by, [...(needs.get(by) ?? []), need]);
   }
   for (const [name, row] of rows) {
     if (row.id === undefined || row.address === undefined) continue;
@@ -339,7 +290,6 @@ function fromRows(
       config: source.config,
       revision: source.revision,
       ...(layout !== undefined && isLayoutId(layout) ? { layout } : {}),
-      ...(source.url === undefined ? {} : { url: source.url }),
     },
     placements,
     catalog: { root: source.adapter, layouts: [], entries, warnings: [] },
@@ -367,11 +317,9 @@ export function answers(manifest: Manifest, source: Acquired, held = false): boo
     .every((ref) => {
       const found = candidates(ref, source);
       if (found.length === 0) return held && ref.exclude !== undefined;
-      const at = (entry: Entry) => source.placements.get(entry.path)?.version;
       return (
-        (ref.version === undefined || found.every((entry) => at(entry) === ref.version)) &&
-        (ref.range === undefined ||
-          found.every((entry) => satisfies(at(entry) ?? "", ref.range as string)))
+        ref.version === undefined ||
+        found.every((entry) => source.placements.get(entry.path)?.version === ref.version)
       );
     });
 }
@@ -385,16 +333,12 @@ function withAlso(
   return { want: request?.want ?? [], all: true };
 }
 
-/**
- * A need's version replaces the one the lock held its dependency at. A registry asked only for
- * needs, as one another registry's edges name, is read for those alone.
- */
+/** A need's version replaces the one the lock held its dependency at. */
 function withNeeds(
   request: Request | undefined,
   needs: readonly Want[] | undefined,
 ): Request | undefined {
-  if (needs === undefined) return request;
-  if (request === undefined) return { want: [...needs], all: false };
+  if (request === undefined || needs === undefined) return request;
   const same = (a: Want, b: Want) =>
     a.name === b.name && a.namespace === b.namespace && a.kind === b.kind;
   const held = request.want.filter((want) => !needs.some((need) => same(want, need)));
@@ -448,7 +392,6 @@ async function acquireOne(
   let listing: Awaited<ReturnType<typeof resolveArtifacts>>;
   try {
     listing = await resolveArtifacts(open, request.want, { all: request.all });
-    refuseOutside(alias, request.want, listing.listed);
   } catch (error) {
     await open.handle.close();
     throw await withSignInHint(error, alias);
@@ -470,30 +413,22 @@ async function acquireOne(
     );
   }
 
-  // A source that is not a registry gives what it exports the edges its own manifest lists.
-  const exported =
-    listing.manifest === undefined
-      ? undefined
-      : exportedNeeds(
-          listing.manifest,
-          listing.listed.map(({ artifact }) => ({
-            id: artifact.id,
-            name: artifact.envelope.metadata.name,
-          })),
-        );
-  listing.catalog.warnings.push(...(exported?.warnings ?? []));
   const placements = new Map<string, Placement>();
   for (const { path, artifact, leftOut } of listing.listed) {
     const { needs, unusable } = needsOf(artifact.envelope);
     const { name } = artifact.envelope.metadata;
     const version = artifact.version ?? artifact.envelope.metadata.version;
-    for (const edge of unusable) listing.catalog.warnings.push(unusableWarning(name, edge));
+    for (const to of unusable) {
+      listing.catalog.warnings.push(
+        `"${name}" depends on "${sanitizeText(to)}", which is not a namespace/kind/name@version aireg installs; it was left out.`,
+      );
+    }
     placements.set(path, {
       id: artifact.id,
       name,
       contentId: contentDigest(artifact.envelope),
       version,
-      needs: [...needs, ...(exported?.needs.get(artifact.id) ?? [])],
+      needs,
       ...(artifact.yanked === undefined ? {} : { yanked: artifact.yanked }),
       ...statusOf(artifact),
       ...(isReadOnlyLayout(listing.layout) ? pluginOf(artifact) : {}),
@@ -505,8 +440,6 @@ async function acquireOne(
   // One placement per artifact however often it is asked for, so a command that
   // stages and then digests the same content pays for it once.
   const placed = new Map<string, Promise<Staged>>();
-  // Only an `https` root is a URL an edge can name, so anything else it reports is dropped here.
-  const url = reportedRegistryUrl(listing.registry?.url);
 
   return {
     alias,
@@ -518,7 +451,6 @@ async function acquireOne(
       config: declared.config,
       revision: listing.sourceRevision,
       ...(listing.layout === undefined ? {} : { layout: listing.layout }),
-      ...(url === undefined ? {} : { url }),
     },
     placements,
     catalog: listing.catalog,
@@ -550,47 +482,6 @@ async function acquireOne(
     },
     close: () => open.handle.close(),
   };
-}
-
-/** Why an edge was left out, by what about it is wrong. */
-function unusableWarning(name: string, { to, range, registry }: Unusable): string {
-  const edge = `"${name}" depends on "${sanitizeText(to)}"`;
-  if (registry !== undefined) {
-    return `${edge} in ${quoted(registry)}, which is not the https address of a registry; it was left out.`;
-  }
-  return range === undefined
-    ? `${edge}, which is not a namespace/kind/name@version aireg installs; it was left out.`
-    : `${edge} at ${quoted(range)}, which is not a version range that version satisfies; it was left out.`;
-}
-
-/**
- * An adapter that does not read a want's range serves what it would serve without one, so a
- * version outside the range is refused here rather than installed.
- */
-function refuseOutside(
-  alias: string,
-  want: readonly Want[],
-  listed: readonly { artifact: Artifact }[],
-): void {
-  for (const { artifact } of listed) {
-    const { name } = artifact.envelope.metadata;
-    const reaching = want.filter((item) =>
-      covers(item, { name, namespace: artifact.group, kind: artifact.kind }),
-    );
-    if (reaching.some((item) => item.version !== undefined)) continue;
-    const version = artifact.version ?? artifact.envelope.metadata.version ?? "";
-    const range = reaching.find(
-      (item) => item.range !== undefined && !satisfies(version, item.range),
-    )?.range;
-    if (range === undefined) continue;
-    throw new AiregError(
-      `${alias} returned ${sanitizeText(name)} ${sanitizeText(version || "with no version")}, which is outside ${sanitizeText(range)}.`,
-      {
-        code: ErrorCode.Invalid,
-        hint: "Pin a version with `@<version>` instead, or ask the registry's owner about it.",
-      },
-    );
-  }
 }
 
 /** A commit an adapter reports for one artifact, which the lockfile records and hands back. */

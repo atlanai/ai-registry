@@ -1,11 +1,10 @@
-import { list, quoted, sanitizeName } from "#adapter/text.ts";
+import { list, sanitizeName } from "#adapter/text.ts";
 import { matchInstalled, rowsNamed, shownNames } from "#cli/names.ts";
 import { parse } from "#cli/options.ts";
 import {
   cancel,
   chooseRemovals,
   confirmPlan,
-  type Interaction,
   interaction,
   interactive,
   preparing,
@@ -18,13 +17,12 @@ import { loadedBy, toolName } from "#cli/render/tools.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import type { Lock } from "#core/lock.ts";
-import { artifactFor, type Manifest, reaches } from "#core/manifest.ts";
+import { reaches } from "#core/manifest.ts";
 import { editedAnywhere } from "#core/plan/model.ts";
 import { survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
-import type { CommonOptions } from "#engine/options.ts";
-import { type Loaded, load, resolveTargets, run as runPipeline } from "#engine/pipeline.ts";
+import { load, resolveTargets, run as runPipeline } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
 /**
@@ -65,36 +63,6 @@ async function editedAmong(lock: Lock, names: readonly string[], roots: Roots): 
   return names.filter((name) => editedAnywhere(lock.artifacts[name], found.artifacts[name]));
 }
 
-/**
- * An export's `depends_on` names its `artifacts:` entry, which says the versions the export
- * takes, so a manifest without the entry would not be read again. Refused before anything is
- * written, rather than as that manifest.
- */
-function refuseExportDependency(manifest: Manifest, lock: Lock, dropped: readonly string[]): void {
-  const shown = shownNames(lock);
-  for (const name of dropped) {
-    const row = lock.artifacts[name];
-    if (row === undefined) continue;
-    const exports = manifest.exports.filter((entry) =>
-      entry.dependsOn.some(
-        (dependency) =>
-          dependency.type === "remote" &&
-          reaches(dependency.ref, row) &&
-          artifactFor(manifest.artifacts, dependency.ref) === undefined,
-      ),
-    );
-    if (exports.length === 0) continue;
-    const one = exports.length === 1;
-    throw new AiregError(
-      `${shown.get(name) ?? name} is a dependency of ${one ? "export" : "exports"} ${list(exports.map((entry) => quoted(entry.path)))}.`,
-      {
-        code: ErrorCode.Conflict,
-        hint: `Remove it from ${one ? "that export's" : "those exports'"} \`depends_on\` first.`,
-      },
-    );
-  }
-}
-
 /** Said whenever a removal leaves a row a job publishes, so it is never kept silently. */
 function keptWatched(context: CommandContext, lock: Lock, watched: readonly string[]): void {
   if (watched.length === 0) return;
@@ -107,50 +75,6 @@ function keptWatched(context: CommandContext, lock: Lock, watched: readonly stri
   );
 }
 
-/** Asks which installed artifacts to remove, when the command line names none. */
-async function pickRemovals(
-  step: Interaction,
-  loaded: Loaded,
-  common: CommonOptions,
-): Promise<string[] | undefined> {
-  const installed = new Set(Object.keys(loaded.lock.artifacts));
-  if (installed.size === 0) {
-    throw new AiregError(`Nothing is installed in ${scopeName(loaded.roots.scope)}.`, {
-      code: ErrorCode.NotFound,
-      hint:
-        loaded.roots.scope === "user"
-          ? "Run `aireg list` in a project to see what it installs."
-          : "Run `aireg list -g` to see your user scope.",
-    });
-  }
-  if (!interactive(step)) {
-    // Name the reason: on a terminal this command would have offered a list,
-    // and "nothing to remove" alone reads as though nothing is installed.
-    throw new AiregError("`aireg remove` needs an artifact name.", {
-      code: ErrorCode.Usage,
-      hint: `Name one: \`aireg remove <name>\`, or pass \`--all\`. No list was offered because ${silence(step)}.`,
-    });
-  }
-  const picked = await chooseRemovals(
-    step,
-    [...installed].sort().map((name) => {
-      const entry = loaded.lock.artifacts[name];
-      return {
-        name,
-        kind: entry?.kind ?? "",
-        source: entry?.registry ?? "",
-        targets: loadedBy(
-          loaded.harnesses,
-          resolveTargets(loaded.manifest, loaded.harnesses, common),
-          entry?.kind,
-          (entry?.links ?? []).map((linked) => linked.harness),
-        ).map((name) => toolName(loaded.harnesses, name)),
-      };
-    }),
-  );
-  return canceled(picked) ? undefined : picked;
-}
-
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common } = parse(context.argv, builtin("remove"));
   const named = [...positionals, ...(common.select ?? [])].filter((name) => name !== "*");
@@ -160,11 +84,45 @@ export async function run(context: CommandContext): Promise<void> {
   if (named.length === 0 && !removeAll) preparing(step);
   const loaded = await load(common, context.cwd);
   const lock = loaded.lock;
+  const installed = new Set(Object.keys(lock.artifacts));
 
   let names = named;
   if (names.length === 0 && !removeAll) {
-    const picked = await pickRemovals(step, loaded, common);
-    if (picked === undefined) {
+    if (installed.size === 0) {
+      throw new AiregError(`Nothing is installed in ${scopeName(loaded.roots.scope)}.`, {
+        code: ErrorCode.NotFound,
+        hint:
+          loaded.roots.scope === "user"
+            ? "Run `aireg list` in a project to see what it installs."
+            : "Run `aireg list -g` to see your user scope.",
+      });
+    }
+    if (!interactive(step)) {
+      // Name the reason: on a terminal this command would have offered a list,
+      // and "nothing to remove" alone reads as though nothing is installed.
+      throw new AiregError("`aireg remove` needs an artifact name.", {
+        code: ErrorCode.Usage,
+        hint: `Name one: \`aireg remove <name>\`, or pass \`--all\`. No list was offered because ${silence(step)}.`,
+      });
+    }
+    const picked = await chooseRemovals(
+      step,
+      [...installed].sort().map((name) => {
+        const entry = loaded.lock.artifacts[name];
+        return {
+          name,
+          kind: entry?.kind ?? "",
+          source: entry?.registry ?? "",
+          targets: loadedBy(
+            loaded.harnesses,
+            resolveTargets(loaded.manifest, loaded.harnesses, common),
+            entry?.kind,
+            (entry?.links ?? []).map((linked) => linked.harness),
+          ).map((name) => toolName(loaded.harnesses, name)),
+        };
+      }),
+    );
+    if (canceled(picked)) {
       cancel(step);
       return;
     }
@@ -206,7 +164,6 @@ export async function run(context: CommandContext): Promise<void> {
       fresh.manifest.artifacts = fresh.manifest.artifacts.flatMap((ref) =>
         without(ref, drop, lock, removeAll || wholes.has(formatAddress(ref))),
       );
-      refuseExportDependency(fresh.manifest, lock, dropped);
 
       const touched = [...new Set(dropped.map((key) => lock.artifacts[key]?.registry ?? ""))];
       return {

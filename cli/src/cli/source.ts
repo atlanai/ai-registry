@@ -139,8 +139,6 @@ export interface Resolved {
   kind?: ArtifactKind | undefined;
   /** The version that address pinned, when it carried one. */
   version: string | undefined;
-  /** The version range the address asked for instead, when it carried one. */
-  range?: string | undefined;
   /** Whether the address named a registry this scope already declares. */
   declared: boolean;
   /** The declared alias, whose account is the one to read with. */
@@ -187,7 +185,6 @@ export function throughManifest(
     name: ref.name,
     ...(ref.name === undefined ? {} : { namespace: ref.namespace, kind: ref.kind }),
     version: ref.version,
-    ...(ref.range === undefined ? {} : { range: ref.range }),
     declared: true,
     alias,
   };
@@ -229,7 +226,6 @@ export function throughRegistry(
     name: ref.name,
     ...(ref.name === undefined ? {} : { namespace: ref.namespace, kind: ref.kind }),
     version: ref.version,
-    ...(ref.range === undefined ? {} : { range: ref.range }),
     declared: false,
     alias: undefined,
   };
@@ -276,10 +272,9 @@ export function among(
 export function wantOf(resolved: Resolved): Want[] {
   if (resolved.name === undefined) return [];
   const named = { name: resolved.name };
-  const { namespace, kind, version, range } = resolved;
-  if (version !== undefined) return [named, { ...named, namespace, kind, version }];
-  if (range !== undefined) return [named, { ...named, namespace, kind, range }];
-  return [named];
+  if (resolved.version === undefined) return [named];
+  const { namespace, kind, version } = resolved;
+  return [named, { ...named, namespace, kind, version }];
 }
 
 /**
@@ -295,7 +290,7 @@ export async function probeAddress(
     return await probe(resolved.input, resolved.flags, cwd, want, resolved.alias);
   } catch (error) {
     const { name, namespace, kind } = resolved;
-    const versioned = want.some((item) => item.version !== undefined || item.range !== undefined);
+    const versioned = want.some((item) => item.version !== undefined);
     if (!versioned || kind !== undefined || name === undefined) throw error;
     const failure = adapterOf(error)?.failure;
     if (failure !== "invalid" && failure !== "not_found") throw error;
@@ -319,11 +314,11 @@ export async function probeAddress(
  */
 export function atAddress(resolved: Resolved, entries: readonly Entry[], alias: string): Entry[] {
   if (resolved.name === undefined) return [...entries];
-  const { name, namespace, kind, version, range } = resolved;
+  const { name, namespace, kind, version } = resolved;
   const found = among(entries, alias, { name, namespace, kind });
   if (found.length > 0) return found;
   const { message, guess } = unmatched(
-    { registry: alias, namespace, kind, name, version, range },
+    { registry: alias, namespace, kind, name, version },
     entries,
   );
   const show = `Run \`aireg registry show ${alias}\` to see what it publishes.`;

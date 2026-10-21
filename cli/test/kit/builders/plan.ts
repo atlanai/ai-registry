@@ -177,7 +177,6 @@ export function emptyPlan(): Plan {
     neededBy: {},
     pruned: [],
     unresolved: [],
-    undeclared: [],
     withheld: [],
     unlisted: [],
     untrusted: [],

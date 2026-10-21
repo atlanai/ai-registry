@@ -41,30 +41,6 @@ describe("the file spec schemas", () => {
     expect(check(compiler, "artifact.schema.json", read("artifact.json"))).toEqual([]);
   });
 
-  it("accept an edge that takes a range of versions from another registry, and refuse ones out of grammar", () => {
-    const edge = (extra: Record<string, unknown>) => ({
-      rel_type: "depends_on",
-      to: "platform/skill/sql-style@1.2.0",
-      ...extra,
-    });
-    for (const range of ["^1.2.0", "~1.2", "1.x", "*", ">=1.2.0 <2.0.0", "^0.3.2 || ^1.2.0"]) {
-      expect(check(compiler, "relationship.schema.json", edge({ range })), range).toEqual([]);
-    }
-    const remote = edge({ range: "^1.2", registry: "https://github.com/acme/agent-registry" });
-    expect(check(compiler, "relationship.schema.json", remote)).toEqual([]);
-
-    for (const range of ["", "latest", "v1.2.0", ">= 1.2.0", "^1.2 ||", "1.2.3 - 2.0.0"]) {
-      expect(check(compiler, "relationship.schema.json", edge({ range })), range).toEqual([
-        expect.stringMatching(/^\/range must match pattern/),
-      ]);
-    }
-    for (const registry of ["http://github.com/acme/agent-registry", "https://github.com/acme/"]) {
-      expect(check(compiler, "relationship.schema.json", edge({ registry })), registry).toEqual([
-        expect.stringMatching(/^\/registry must match pattern/),
-      ]);
-    }
-  });
-
   /**
    * The client normalizes what it reads and publishes nothing, so these are the
    * deliberate differences, asserted so none of them changes by accident.

@@ -24,8 +24,6 @@ import {
   resolveVersion,
   SpecError,
   type VersionRow,
-  type VersionsDocument,
-  versionsIn,
 } from "./documents.ts";
 import {
   ENVELOPE,
@@ -178,33 +176,7 @@ function pinOf(reaching: readonly Want[]): string | undefined {
     .sort((a, b) => narrowness(b) - narrowness(a))[0]?.version;
 }
 
-/** The range that sets an artifact's version when no want pins one, chosen as a pin is. */
-function rangeOf(reaching: readonly Want[]): string | undefined {
-  if (pinOf(reaching) !== undefined) return undefined;
-  return [...reaching]
-    .filter((want) => want.range !== undefined)
-    .sort((a, b) => narrowness(b) - narrowness(a))[0]?.range;
-}
-
-/** Statuses that install only when a request pins the version exactly. */
 const UNRELEASED = new Set(["draft", "pending_review"]);
-
-/**
- * The version a request resolves to: the one it pins, the newest in its range that installs
- * without a pin, or `latest`. A range whose every version is withheld gives the newest of them,
- * which the caller is told about.
- */
-function versionFor(
-  versions: VersionsDocument,
-  pinned: string | undefined,
-  range: string | undefined,
-): VersionRow {
-  if (pinned !== undefined || range === undefined) return resolveVersion(versions, pinned);
-  const admitted = versionsIn(versions, range);
-  const installs = (row: VersionRow) =>
-    row.status !== "blocked" && !UNRELEASED.has(row.status ?? "");
-  return admitted.find(installs) ?? (admitted[0] as VersionRow);
-}
 
 /** Statuses that install, but with a warning the client gives from `Artifact.status`. */
 const CAUTIONED = new Set([...UNRELEASED, "deprecated", "archived"]);
@@ -228,11 +200,11 @@ export async function resolveFromRoot(
     const reaching = options.wanted.filter((want) => covers(want, entry));
     const asked = reaching.length > 0;
     if (options.all !== true && options.wanted.length > 0 && !asked) return [];
-    return [{ entry, asked, pinned: pinOf(reaching), range: rangeOf(reaching) }];
+    return [{ entry, asked, pinned: pinOf(reaching) }];
   });
   // Each artifact keeps what it withholds and how far it goes in its own row, so the lists come
   // out in index order however the reads interleave.
-  const rows = await inOrder(chosen, async ({ entry, asked, pinned, range }) => {
+  const rows = await inOrder(chosen, async ({ entry, asked, pinned }) => {
     // A malformed path segment is the indexer's mistake, and installing from
     // it would write that mistake into somebody's tree.
     if (!usable(entry)) {
@@ -243,7 +215,7 @@ export async function resolveFromRoot(
     }
 
     const versions = await readVersions(read, entry.namespace, entry.kind, entry.name);
-    const version = versionFor(versions, pinned, range);
+    const version = resolveVersion(versions, pinned);
     const held: Withheld[] = [];
     const served = await serve(read, { entry, version, asked, pinned }, held, options.blobUrl);
     // A version above what was served or withheld, such as a yanked one, is still held: a publish

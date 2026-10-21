@@ -5,7 +5,7 @@ Install artifacts from a registry.
 ## Synopsis
 
 ```text
-aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version> | @<range>]]] [options]
+aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options]
 aireg add <namespace>[/<name>]... --registry <registry> [options]
 aireg add <address> [-s <name>]... [--as <name>] [options]
 aireg add --from <file> [options]
@@ -14,7 +14,7 @@ aireg add
 
 ## Description
 
-`aireg add` installs artifacts into the current project, or with `-g` into your user scope, and records them in the scope's manifest and lockfile. It also installs the versions each artifact's [dependencies](kinds.md#dependencies) name, or the newest in the ranges they give, which only the lockfile records. A dependency that a whole namespace or registry also takes installs at the version its dependents need; one you name yourself has to agree with them, or `add` stops and says which needs what. Each artifact is stored once in the scope and linked into every harness folder, such as `.claude/skills/`.
+`aireg add` installs artifacts into the current project, or with `-g` into your user scope, and records them in the scope's manifest and lockfile. It also installs the versions each artifact's [dependencies](kinds.md#dependencies) name, which only the lockfile records. A dependency that a whole namespace or registry also takes installs at the version its dependents need; one you name yourself has to agree with them, or `add` stops and says which needs what. Each artifact is stored once in the scope and linked into every harness folder, such as `.claude/skills/`.
 
 What you name says what to install: a registry, a namespace in it, or one artifact by its full name.
 
@@ -25,7 +25,6 @@ What you name says what to install: a registry, a namespace in it, or one artifa
 | `acme/pr-review` | The one artifact named `pr-review`, when `acme` has no namespace of that name. A name two namespaces share is refused, with the full names that tell them apart. The manifest records the full name. |
 | `acme/engineering/pr-review` | One artifact. |
 | `acme/engineering/pr-review@1.2.0` | One artifact, pinned to version 1.2.0. |
-| `acme/engineering/pr-review@^1.2` | One artifact, at the newest version from 1.2.0 up to, but not including, 2.0.0. |
 | `acme/engineering/skill/pr-review` | One artifact, when a skill and an agent share the name. |
 
 `acme` here is a registry you declared with [`aireg registry add`](registry.md#aireg-registry-add). You can also name a registry by its address, such as `github.com/acme/ai-registry` or `../acme-registry`. aireg declares it for you, under the name in its `registry.json` or `--as`.
@@ -45,9 +44,7 @@ To install from a registry without declaring it first, give its address with `--
 
 Each version has a status in its registry. A `blocked` version never installs, even pinned, a `draft` installs only pinned, and a `deprecated` one installs with a warning; see [Version status](kinds.md#version-status).
 
-After the `@` you can write a version range instead of a version, as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) defines it: `^1.2`, `~1.2.3`, `1.x`, `>=1.0.0 <2.0.0`, or several joined by `||`. aireg installs the newest version in the range that installs without a pin, so never a `draft` or `blocked` one, nor a prerelease unless the range names one, and the lockfile holds it there. [`aireg update`](update.md) moves it to the newest version in the range, and never outside it. What reads as a version is one, so `@1.2` pins a version named `1.2`; write `@1.2.x` or `@~1.2` for the range. A folder of skills or a site has no versions, so a range there is refused as a version is. Quote a range with spaces or `>` in it, so the shell does not split it or read it as a redirect.
-
-A version or range goes only on a single artifact's full name. A range is not a pin: a version pins the artifact, and a range gives the versions it moves among. Adding an artifact that is already installed, at another version, pins it there, and at a range sets the range. Adding it without either removes the pin or range and installs the newest version straight away. Giving one artifact of a whole registry or namespace you installed a version or range works the same way. Either way `add` says what it did, such as `Pinned pr-review at 1.2.0.`, `Set pr-review to versions ^1.2.` or `Unpinned pr-review.`, even when the version installed stays the same, and says `Rolled back` rather than `Updated` when that moves it to an older version.
+A version goes only on a single artifact's full name. Adding an artifact that is already installed, at another version, moves its pin. Adding it without a version removes the pin and installs the newest version straight away. Pinning one artifact of a whole registry or namespace you installed works the same way. Either way `add` says it pinned or unpinned the artifact, even when the version installed stays the same, and says `Rolled back` rather than `Updated` when the pin moves it to an older version.
 
 A coding agent finds each skill and agent by its name, so two can't install under one. When an artifact you add would take a name another one already has, aireg installs it under its namespace and name instead, such as `ops-review`, and says so. The one you already had keeps its name. Set [`defaults.name-collision`](config.md#settings) to `report` to leave the new one out, or to `fail` to install nothing.
 
@@ -71,9 +68,7 @@ A folder, or a git repository, that holds skills and agents but no `registry.jso
 
 A skill is named after its folder and an agent after its file; front matter gives the description. Each is filed under a namespace named after the source, such as `skills-repo` for `github.com/acme/skills-repo`, except that `skills/<group>/<name>` is filed under `<group>`. When two skills, or two agents, in one namespace share a name, the first in path order installs, with a warning. A symlink is never followed: aireg skips it, and says so. Installed from a whole source, each keeps its plain name, such as `pdf`.
 
-A folder or git repository that is a project of its own, with a `.registry/manifest.yml` that lists [`exports:`](publish.md#publishing-a-repositorys-exports), gives each artifact it exports the dependencies that entry's `depends_on` lists, as a registry's [dependencies](kinds.md#dependencies) are given, so `aireg add github.com/acme/tools -s reviewer` installs what `reviewer` needs too, and the lockfile records it as `needed_by`. A dependency on another export, `./.claude/skills/review`, installs that artifact from the same source, read at the same commit, and one on a folder, `./.claude/skills`, each artifact the source holds directly inside it. One on an artifact the project lists under `artifacts:`, such as `shared/platform/skill/sql-style`, installs at that entry's pin, at the newest version in its range, or with neither at the newest version, from the registry this project declares at the address the source's manifest gives `shared`, in its `https` form: `github.com/acme/shared` is `https://github.com/acme/shared`. aireg never declares that registry for you; when this project doesn't, `add` installs nothing and names the `aireg registry add` that would allow it. A registry the source's manifest declares as a folder has no such address, so a dependency on it is left out, with a warning. aireg reads the source's manifest for nothing else, and as untrusted: keys and an `engines.aireg` it doesn't know are ignored, and a manifest larger than 256 KB, behind a symlink, or that doesn't read is skipped with a warning, so what it exports installs without dependencies. A source with no `exports:` installs as described above.
-
-A git repository is read at one commit, recorded in the lockfile. Without `--ref`, that is the newest release tag, such as `v1.2.0`, or the default branch when there is none. Each artifact's version is the tag on that commit, an artifact's own tag such as `pdf/v1.2.0` winning over the repository's, or else a pseudo-version such as `1.2.1-0.20261019120000-4e1d2c9a8b7f`, made from the newest tag before it, the commit's time and its first 12 characters. `@<version>` takes either, so a pseudo-version pins its commit, and `@<range>` takes the commit of the newest tag the range admits. Everything installed from one repository moves together, so `aireg update` on one of them updates them all. A folder on this machine has no versions: what it holds now is what installs, and `@<version>` is refused.
+A git repository is read at one commit, recorded in the lockfile. Without `--ref`, that is the newest release tag, such as `v1.2.0`, or the default branch when there is none. Each artifact's version is the tag on that commit, an artifact's own tag such as `pdf/v1.2.0` winning over the repository's, or else a pseudo-version such as `1.2.1-0.20261019120000-4e1d2c9a8b7f`, made from the newest tag before it, the commit's time and its first 12 characters. `@<version>` takes either, so a pseudo-version pins its commit. Everything installed from one repository moves together, so `aireg update` on one of them updates them all. A folder on this machine has no versions: what it holds now is what installs, and `@<version>` is refused.
 
 A plugin marketplace is read from `.claude-plugin/marketplace.json`, or else `.agents/plugins/marketplace.json`; when both are there and list different plugins, aireg reads the first and says so. A folder with only a plugin manifest, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` or an Agent Plugins `plugin.json`, is a marketplace of one. Each plugin installs whole, as a plugin, and its skills and agents are filed under the plugin's name. A plugin is named after its marketplace entry, the name Claude Code installs it by, and its own manifest's name still prefixes its commands and skills. aireg reads a plugin's components as Claude Code does: its marketplace entry is its manifest when it has none of its own, an entry adds components to its own unless it sets `"strict": false`, and `skills/`, `agents/`, `commands/`, `hooks/hooks.json`, `.mcp.json`, `.lsp.json`, `monitors/` and `bin/` are where it looks by default. A plugin whose source is a relative path, or a bare name under `metadata.pluginRoot`, installs from the marketplace's own files. In a marketplace aireg reads with git, a `github`, `url` or `git-subdir` source is fetched with git too, over `https`, `ssh` or `file`, each plugin at a commit of its own: its `sha`, which wins over `ref`, or else the newest commit on `ref`. The lockfile records that commit, so `install` keeps it and `update` moves it. A source of any other type, such as `npm`, `archive` or `command`, is skipped with a warning, and a `command` is never run.
 
@@ -137,7 +132,7 @@ Adding a registry trusts whoever publishes to it. Skills and agents are instruct
 ## Exit status
 
 - `0`: installed, nothing to do, or canceled at a question.
-- `1`: the registry isn't declared, a dependency is in a registry the scope doesn't declare, the registry publishes nothing, a name, version, namespace or dependency doesn't exist, two artifacts need different versions of one dependency or ranges of it no published version satisfies together, the manifest names an unknown harness, or a file doesn't match what its version describes.
+- `1`: the registry isn't declared, the registry publishes nothing, a name, version, namespace or dependency doesn't exist, two artifacts need different versions of one dependency, the manifest names an unknown harness, or a file doesn't match what its version describes.
 - `2`: nothing was named and aireg can't ask, more than 10 artifacts would be installed without `--select` or `--all`, a folder has no `registry.json` in or above it or names no artifact inside one, a name matches more than one artifact, another artifact already has the name it would take and `defaults.name-collision` is `report` or `fail`, `--as` isn't a valid name, the name already belongs to another address, or `--for` names an unknown harness.
 - `3`: `--frozen` was passed and the install would change the lockfile or the manifest, or an artifact wasn't installed because its name is taken and `defaults.name-collision` is `report`.
 
@@ -153,12 +148,6 @@ Install one artifact, pinned to a version:
 
 ```bash
 aireg add acme/engineering/pr-review@1.2.0
-```
-
-Install one artifact at the newest version in a range, which `aireg update` moves within:
-
-```bash
-aireg add acme/engineering/pr-review@^1.2
 ```
 
 Install a namespace for yourself, in every project:

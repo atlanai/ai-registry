@@ -1,6 +1,6 @@
 import { shownNames } from "#cli/names.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
-import { asksFor, type Manifest, pinOf, rangeOf } from "#core/manifest.ts";
+import { asksFor, type Manifest, pinOf } from "#core/manifest.ts";
 import { abbreviate, type Printer } from "#core/output.ts";
 import { type Scope, scopeName } from "#core/store/paths.ts";
 import type { Column } from "#core/term/table.ts";
@@ -13,10 +13,7 @@ export interface Installed {
   registry: string;
   address: string;
   ref: string;
-  /** Whether the manifest pins its version. A range is not a pin. */
   pinned: boolean;
-  /** The version range the manifest asks for it in, when it gives one, such as `^1.2`. */
-  range?: string | undefined;
   targets: string[];
   watched?: Watched | undefined;
   /** What it is installed for, when the manifest does not ask for it itself. */
@@ -42,7 +39,6 @@ export function installed(lock: Lock, manifest: Manifest): Installed[] {
     .map((name) => {
       const entry = lock.artifacts[name];
       const source = entry === undefined ? undefined : lock.registries[entry.registry];
-      const range = entry === undefined ? undefined : rangeOf(manifest, entry);
       return {
         name,
         shown: shown.get(name) ?? name,
@@ -57,7 +53,6 @@ export function installed(lock: Lock, manifest: Manifest): Installed[] {
             ? ""
             : abbreviate(source.revision)),
         pinned: entry !== undefined && pinOf(manifest, entry) !== undefined,
-        ...(range === undefined ? {} : { range }),
         // One harness, however many links it took to reach it: a plugin harness
         // gets a link inside the projection as well as the one pointing at it.
         targets: [...new Set((entry?.links ?? []).map((link) => link.harness))].sort(),
@@ -80,7 +75,6 @@ export function identity<R>(printer: Printer, of: (row: R) => Installed): Column
       header: "version",
       value: (row) => {
         const item = of(row);
-        if (item.range !== undefined) return `${item.ref} ${style.yellow(item.range)}`;
         return item.pinned ? `${item.ref} ${style.yellow("pinned")}` : item.ref;
       },
     },

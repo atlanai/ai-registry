@@ -1,7 +1,7 @@
 import type { AdapterError, Envelope } from "#adapter/index.ts";
 import type { LayoutId } from "#adapter/layouts/ids.ts";
 import { quoted } from "#adapter/text.ts";
-import { canonicalRegistryUrl, type SourceConfig } from "#core/adapter/identity.ts";
+import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -9,7 +9,7 @@ import type { Codec, KeyFile } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Carried } from "./carries.ts";
-import type { Conflict, Need, Undeclared, Unresolved } from "./depends.ts";
+import type { Conflict, Need, Unresolved } from "./depends.ts";
 import type { Untrusted } from "./select.ts";
 import type { Unlisted } from "./unlisted.ts";
 
@@ -29,11 +29,6 @@ export interface Origin {
   revision: string | undefined;
   /** How the source lays out what it holds, when its adapter says. */
   layout?: LayoutId | undefined;
-  /**
-   * The `https` root its `registry.json` names, as `reportedRegistryUrl` writes it, when it was
-   * read, or the lockfile recorded it, and names one.
-   */
-  url?: string | undefined;
 }
 
 /** Upstream identity known before content is fetched. */
@@ -54,10 +49,6 @@ export interface Placement {
   plugin?: PluginDocument | undefined;
   /** The commit it was read at, where that is its own rather than the registry's. */
   revision?: string | undefined;
-  /**
-   * For a kind a harness takes as one file, a version holding more: the file it installs as,
-   * and the others, which no harness is given.
-   */
   leftOut?: { entry: string; files: readonly string[] } | undefined;
 }
 
@@ -120,11 +111,6 @@ export function lockSourceOf(origin: Origin): LockRegistry {
     key: origin.key,
     config: origin.config,
     revision: origin.revision,
-    // Only where the declared address has no `https` form is the URL it reported what an edge
-    // reaches it by (`declaredRegistryUrl`), so only there is it kept.
-    ...(origin.url === undefined || canonicalRegistryUrl(origin.declared) !== undefined
-      ? {}
-      : { url: origin.url }),
   };
 }
 
@@ -219,8 +205,6 @@ export interface Plan {
   pruned: string[];
   /** Needs no source listed at the version asked for; the caller asks again or refuses. */
   unresolved: Unresolved[];
-  /** Needs in a registry this scope does not declare; the caller reads the others or refuses. */
-  undeclared: Undeclared[];
   /** Requirements no single installation can meet. */
   conflicts: Conflict[];
   /** Installed artifacts kept as they are, because the registry withholds the version it reached. */
@@ -251,7 +235,6 @@ export function emptyPlan(): Plan {
     neededBy: {},
     pruned: [],
     unresolved: [],
-    undeclared: [],
     conflicts: [],
     withheld: [],
     unlisted: [],

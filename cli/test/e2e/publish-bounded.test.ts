@@ -13,11 +13,11 @@ interface Held {
   name: string;
   version: string;
   content: string;
-  relationships?: { rel_type: string; to: string; range?: string }[];
+  relationships?: { rel_type: string; to: string }[];
 }
 
 const REVIEW = skillBody("review", "The review checklist.");
-const EDGE = { rel_type: "depends_on", to: "eng/skill/style@2.0.0", range: "^2.0.0" };
+const EDGE = { rel_type: "depends_on", to: "eng/skill/style@2.0.0" };
 
 /** A home whose config registers an adapter that lists nothing it is not asked for by name. */
 const test = base.extend("bounded", async ({ home: { dir: home }, project }) => {
@@ -117,7 +117,7 @@ describe("publishing to a registry that bounds its whole listing", () => {
         name: "review",
         from: "1.2.0",
         version: "1.2.1",
-        dependsOn: [{ to: EDGE.to, range: EDGE.range }],
+        dependsOn: [{ to: EDGE.to }],
       }),
     ]);
 

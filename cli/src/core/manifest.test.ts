@@ -5,7 +5,6 @@ import { roots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
 import {
   artifactFor,
-  coveredByWhole,
   formatManifest,
   parseManifest,
   readManifest,
@@ -51,41 +50,13 @@ describe("manifest keys", () => {
   });
 });
 
-describe("a version range", () => {
-  test("is read from `@<range>` and written back as it was written", () => {
-    const text = [
-      "registries:",
-      "  kit: acme/kit",
-      "artifacts:",
-      "  - kit/skill/lint@^1.2",
-      "  - kit/skill/format@>=1.0.0 <2.0.0",
-      "  - kit/skill/sort@1.2",
-      "",
-    ].join("\n");
-    const manifest = parseManifest(text);
-    expect(manifest.artifacts.map((ref) => [ref.version, ref.range])).toEqual([
-      [undefined, "^1.2"],
-      [undefined, ">=1.0.0 <2.0.0"],
-      ["1.2", undefined],
-    ]);
-    expect(parseManifest(formatManifest(manifest))).toEqual(manifest);
-    expect(formatManifest(manifest)).toContain("  - kit/skill/lint@^1.2\n");
-  });
-
-  test("keeps its own entry beside a whole namespace that takes the same artifact", () => {
-    const whole = [parseRef("kit/eng")];
-    expect(coveredByWhole(parseRef("kit/eng/skill/lint"), whole)).toBe(true);
-    expect(coveredByWhole(parseRef("kit/eng/skill/lint@^1"), whole)).toBe(false);
-  });
-});
-
 describe("exports and publish", () => {
   const declared = [
     "registries:",
     "  acme: github.com/acme/agent-registry",
     "  public: github.com/acme/public-registry",
     "artifacts:",
-    "  - public/platform/skill/sql-style@^1.2",
+    "  - public/platform/skill/sql-style@0.1.2",
     "",
   ].join("\n");
   const read = (rest: string) => parseManifest(`${declared}${rest}`);
@@ -134,7 +105,7 @@ describe("exports and publish", () => {
   test("finds a remote dependency's `artifacts:` entry by address, whatever its version", () => {
     const manifest = read("");
     const entry = artifactFor(manifest.artifacts, parseRef("public/platform/skill/sql-style"));
-    expect(entry?.range).toBe("^1.2");
+    expect(entry?.version).toBe("0.1.2");
     expect(artifactFor(manifest.artifacts, parseRef("public/platform/skill/lint"))).toBeUndefined();
     const pinned = parseManifest(
       "registries: { public: x }\nartifacts: [public/platform/skill/sql-style@1.2.0]\nexports:\n  - path: a.md\n    depends_on: [public/platform/skill/sql-style]\n",
@@ -343,10 +314,10 @@ describe("exports and publish", () => {
     expect(refused(entry("    depends_on: [public/skill/sql-style]\n"))).toThrow(neither);
     expect(refused(entry("    depends_on: [public/platform/sql-style]\n"))).toThrow(neither);
     expect(refused(entry("    depends_on: [../skills/review]\n"))).toThrow(neither);
-    expect(refused(entry("    depends_on: [public/platform/skill/sql-style@^1.2]\n"))).toThrow(
+    expect(refused(entry("    depends_on: [public/platform/skill/sql-style@0.1.2]\n"))).toThrow(
       expect.objectContaining({
-        message: `manifest.yml: ${of} "public/platform/skill/sql-style@^1.2", but its version belongs on its \`artifacts:\` entry.`,
-        hint: "Write public/platform/skill/sql-style here, and public/platform/skill/sql-style@^1.2 under `artifacts:`.",
+        message: `manifest.yml: ${of} "public/platform/skill/sql-style@0.1.2", but its version belongs on its \`artifacts:\` entry.`,
+        hint: "Write public/platform/skill/sql-style here, and public/platform/skill/sql-style@0.1.2 under `artifacts:`.",
       }),
     );
     expect(refused(entry("    depends_on: [public/platform/skill/lint]\n"))).toThrow(
@@ -533,7 +504,7 @@ describe("writeManifest", () => {
       "  kit: acme/kit",
       "artifacts:",
       "  - kit/eng/skill/lint",
-      "  - kit/eng/skill/sql-style@^1.2",
+      "  - kit/eng/skill/sql-style@0.1.2",
       "",
       "# What this repository publishes.",
       "exports:",
@@ -561,7 +532,7 @@ describe("writeManifest", () => {
     expect(await readFile(path, "utf8")).toBe(
       before
         .replace("  - kit/eng/skill/lint\n", "")
-        .replace("@^1.2\n", "@^1.2\n  - kit/eng/skill/format\n"),
+        .replace("@0.1.2\n", "@0.1.2\n  - kit/eng/skill/format\n"),
     );
     expect((await readManifest(path)).exports).toEqual(added.exports);
   });

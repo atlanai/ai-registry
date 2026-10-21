@@ -73,28 +73,16 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
   const targetOf = async (want: readonly Want[]): Promise<string> => {
     // A want with its own revision is a fetched plugin's, whose version is its own repository's.
     const pinned = want.filter((item) => item.version !== undefined && item.revision === undefined);
-    // A range gives way to a version asked for the same artifact, such as the one a lockfile holds.
-    const ranged = want.filter(
-      (item) =>
-        item.version === undefined &&
-        item.range !== undefined &&
-        item.revision === undefined &&
-        !pinned.some((other) => other.name === item.name),
-    );
-    if (pinned.length + ranged.length > 0) {
-      const commits = await Promise.all([
-        ...pinned.map(async (item) => ({
+    if (pinned.length > 0) {
+      const commits = await Promise.all(
+        pinned.map(async (item) => ({
           item,
           commit: await versions.commitOf(item.version as string, item.name),
         })),
-        ...ranged.map(async (item) => ({
-          item,
-          commit: await versions.commitIn(item.range as string, item.name),
-        })),
-      ]);
+      );
       const distinct = [...new Set(commits.map((entry) => entry.commit))];
       if (distinct.length > 1) {
-        const named = commits.map(({ item }) => `${item.name}@${item.version ?? item.range}`);
+        const named = commits.map(({ item }) => `${item.name}@${item.version}`);
         throw new GitError(
           "invalid",
           `${list(named)} are at different commits of ${spec.location}, which aireg reads at one commit.`,

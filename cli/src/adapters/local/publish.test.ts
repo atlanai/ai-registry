@@ -215,7 +215,7 @@ describe("the envelope a publish writes", () => {
   });
 
   test("carries the version's relationships, and an edge alone makes another version", async () => {
-    const edge = { rel_type: "depends_on", to: "house/skill/style@1.2.0", range: "^1.2.0" };
+    const edge = { rel_type: "depends_on", to: "house/skill/style@1.2.0" };
     await writeOffer(root, [offer({ relationships: [edge] })], "2026-01-02T00:00:00Z", alone);
     const envelope = (version: string) =>
       readFile(join(root, `artifacts/house/skill/lint/${version}/artifact.json`), "utf8").then(
@@ -225,7 +225,7 @@ describe("the envelope a publish writes", () => {
     const versions = await readVersions(read(root), "house", "skill", "lint");
     expect(versions.versions[0]?.digest).toBe(await pinned("1.0.0"));
 
-    const moved = { ...edge, to: "house/skill/style@1.3.0", range: "^1.3.0" };
+    const moved = { ...edge, to: "house/skill/style@1.3.0" };
     await expect(
       writeOffer(root, [offer({ relationships: [moved] })], "2026-01-03T00:00:00Z", alone),
     ).rejects.toMatchObject({ failure: "conflict" });

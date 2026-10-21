@@ -1,15 +1,21 @@
-import { satisfies } from "#adapter/semver.ts";
+import { credentialFor } from "#accounts/credentials.ts";
+import { contentDigest, type ResolveOptions, type Want } from "#adapter/index.ts";
 import { shownNames } from "#cli/names.ts";
 import { noArguments, parse } from "#cli/options.ts";
 import { type Watched, watchedFrom } from "#cli/render/installed.ts";
-import { type Head, head, newer } from "#cli/upstream.ts";
+import { expandLocation } from "#core/adapter/location.ts";
+import { declaredLayout } from "#core/adapter/registry.ts";
+import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
+import type { Entry } from "#core/catalog/model.ts";
 import { ExitCode } from "#core/errors.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
-import { type Manifest, pinOf, rangeOf } from "#core/manifest.ts";
+import { type Manifest, pinOf } from "#core/manifest.ts";
 import { abbreviate, type Printer, sentence } from "#core/output.ts";
+import { type Request, recordedAdapter, wanted } from "#core/plan/acquire.ts";
 import { listedAt } from "#core/plan/model.ts";
 import { excluded } from "#core/plan/select.ts";
 import type { Ref } from "#core/ref.ts";
+import { olderThan } from "#core/semver.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { load } from "#engine/pipeline.ts";
@@ -23,12 +29,6 @@ interface Row {
   moved: boolean;
   /** The version the manifest pinned, when it pinned one. */
   pinned: string | undefined;
-  /** The version range the manifest asks for, when it gives one. */
-  range?: string | undefined;
-  /** The newest version in `range`, which `aireg update` moves to. */
-  inRange?: string | undefined;
-  /** Newer than installed past anything that holds it: no pin, and inside its range. Not in JSON. */
-  behind?: boolean;
   /** Set when the answer is unknown, rather than known to be unchanged. */
   unchecked: string | undefined;
   /** Published since the last install, under a registry or namespace the manifest takes whole. */
@@ -38,18 +38,90 @@ interface Row {
   unpublished?: true;
 }
 
+/** What one source publishes right now, or why it could not be asked. */
+interface Head {
+  /**
+   * Keyed by the address: an artifact's id carries its version, so it never
+   * matches across the very bump this command exists to report.
+   */
+  byAddress: Map<string, Upstream>;
+  entries: readonly Entry[];
+  why: string | undefined;
+}
+
+interface Upstream {
+  contentId: string | undefined;
+  version: string | undefined;
+  name: string;
+  namespace: string | undefined;
+}
+
+/**
+ * Include locked names the manifest does not ask for, so a withdrawal stays
+ * visible. Pins are dropped: asking at the pinned version would only echo it back.
+ */
+function asked(request: Request | undefined, lock: Lock, alias: string): [Want[], ResolveOptions] {
+  if (request === undefined || request.all || request.want.length === 0) return [[], {}];
+  const locked = Object.values(lock.artifacts)
+    .filter((artifact) => artifact.registry === alias)
+    .map((artifact) => artifact.name);
+  const names = new Set([...request.want.map((item) => item.name), ...locked]);
+  return [[...names].map((name) => ({ name })), {}];
+}
+
+/** The namespaces a manifest takes whole from one registry; `*` for all of it. */
 /** The manifest's whole-registry and whole-namespace entries for one registry. */
 function wholes(manifest: Manifest, alias: string): Ref[] {
   return manifest.artifacts.filter((ref) => ref.registry === alias && ref.name === undefined);
 }
 
-function row(
-  name: string,
-  entry: LockArtifact,
-  found: Head,
-  held: { pinned: string | undefined; range: string | undefined },
-): Row {
-  const base = { name, registry: entry.registry, ...held, watched: watchedFrom(entry) };
+async function head(alias: string, manifest: Manifest, lock: Lock, base: string): Promise<Head> {
+  const declared = manifest.registries[alias];
+  if (declared === undefined) {
+    return { byAddress: new Map(), entries: [], why: "it is no longer declared" };
+  }
+
+  const location = expandLocation(declared.location, base);
+  try {
+    const credential = await credentialFor(alias, declared, location);
+    const open = await connectSource(
+      {
+        alias,
+        location,
+        adapter: recordedAdapter(declared, lock, alias),
+        config: declared.config,
+        layout: declaredLayout(declared.config),
+      },
+      credential === undefined ? {} : { credential },
+    );
+    try {
+      const [want, options] = asked(wanted(manifest, alias), lock, alias);
+      const listing = await resolveArtifacts(open, want, options);
+      return {
+        byAddress: new Map(
+          listing.listed.map((item) => [
+            item.path,
+            {
+              contentId: contentDigest(item.artifact.envelope),
+              version: item.artifact.version ?? item.artifact.envelope.metadata.version,
+              name: item.artifact.envelope.metadata.name,
+              namespace: item.artifact.envelope.metadata.namespace,
+            },
+          ]),
+        ),
+        entries: listing.catalog.entries,
+        why: undefined,
+      };
+    } finally {
+      await open.handle.close();
+    }
+  } catch (error) {
+    return { byAddress: new Map(), entries: [], why: (error as Error).message };
+  }
+}
+
+function row(name: string, entry: LockArtifact, found: Head, pinned: string | undefined): Row {
+  const base = { name, registry: entry.registry, pinned, watched: watchedFrom(entry) };
   if (found.why !== undefined) {
     return { ...base, current: "", latest: "", moved: false, unchecked: found.why };
   }
@@ -89,23 +161,17 @@ function row(
     };
   }
 
-  const moved = newer(upstream, entry);
-  // A range holds back what is outside it, as a pin holds back everything. An adapter that
-  // ignored the range answered outside it, which says nothing about what is inside.
-  const within =
-    held.range === undefined || address === undefined ? undefined : found.inRange.get(address);
-  const inRange =
-    within?.version !== undefined && satisfies(within.version, held.range as string)
-      ? within
-      : undefined;
-  const behind =
-    held.pinned === undefined &&
-    (held.range === undefined ? moved : inRange !== undefined && newer(inRange, entry));
+  // A source that attests content answers without a download; one that does not
+  // can only be compared on the version it publishes. A latest that a yank moved
+  // below what is installed is older, so it is not offered as an update.
+  const moved =
+    !olderThan(upstream.version, entry.version) &&
+    (upstream.contentId !== undefined && entry.content !== ""
+      ? upstream.contentId !== entry.content
+      : upstream.version !== entry.version);
 
   return {
     ...base,
-    ...(held.range === undefined ? {} : { inRange: inRange?.version }),
-    behind,
     // Mirrors `latest`: the version when there is one, the content digest otherwise.
     current: entry.version ?? (entry.content === undefined ? "?" : abbreviate(entry.content)),
     latest,
@@ -155,7 +221,6 @@ function additions(manifest: Manifest, lock: Lock, heads: Map<string, Head>): Ro
           (upstream.contentId === undefined ? "?" : abbreviate(upstream.contentId)),
         moved: true,
         pinned: undefined,
-        behind: true,
         unchecked: undefined,
         added: true,
       });
@@ -166,9 +231,8 @@ function additions(manifest: Manifest, lock: Lock, heads: Map<string, Head>): Ro
 
 function next(printer: Printer, moved: readonly Row[], scope: string): void {
   const flag = scope === "user" ? " -g" : "";
-  // A pin or range that is holding is not something to act on, and `update` never moves a
-  // watched row.
-  if (moved.some((entry) => entry.behind === true && entry.watched === undefined)) {
+  // A pin that is holding is not something to act on, and `update` never moves a watched row.
+  if (moved.some((entry) => entry.pinned === undefined && entry.watched === undefined)) {
     printer.note("next", `aireg update${flag}`);
   }
   if (moved.some((entry) => entry.watched !== undefined)) {
@@ -185,7 +249,7 @@ export async function run(context: CommandContext): Promise<void> {
 
   const heads = new Map<string, Head>();
   for (const alias of new Set(Object.values(lock.artifacts).map((entry) => entry.registry))) {
-    heads.set(alias, await head(alias, manifest, lock, roots.base, true));
+    heads.set(alias, await head(alias, manifest, lock, roots.base));
   }
 
   const rows: Row[] = [];
@@ -197,19 +261,17 @@ export async function run(context: CommandContext): Promise<void> {
         entry,
         heads.get(entry.registry) ?? {
           byAddress: new Map(),
-          inRange: new Map(),
           entries: [],
           why: "its registry could not be read",
         },
-        { pinned: pinOf(manifest, entry), range: rangeOf(manifest, entry) },
+        pinOf(manifest, entry),
       ),
     );
   }
   rows.push(...additions(manifest, lock, heads));
 
   if (context.printer.format === "json") {
-    const artifacts = rows.map(({ behind: _, ...entry }) => entry);
-    context.printer.json({ ok: true, data: { scope: roots.scope, artifacts } });
+    context.printer.json({ ok: true, data: { scope: roots.scope, artifacts: rows } });
   } else if (rows.length === 0) {
     context.printer.info(
       context.printer.style.dim(`Nothing is installed in ${scopeName(roots.scope)}.`),
@@ -252,18 +314,8 @@ export async function run(context: CommandContext): Promise<void> {
             value: (entry: Row) => {
               const current = entry.added === true ? style.dim("new") : entry.current;
               if (entry.watched !== undefined) return `${current} ${style.cyan("watched")}`;
-              if (entry.range !== undefined) return `${current} ${style.yellow(entry.range)}`;
               return entry.pinned === undefined ? current : `${current} ${style.yellow("pinned")}`;
             },
-          },
-          {
-            header: "in range",
-            value: (entry: Row) => {
-              if (entry.range === undefined) return "";
-              const version = entry.inRange ?? entry.current;
-              return entry.behind === true ? style.green(version) : version;
-            },
-            optional: true,
           },
           { header: "latest", value: (entry: Row) => style.green(entry.latest) },
         ],
@@ -274,7 +326,7 @@ export async function run(context: CommandContext): Promise<void> {
     }
   }
 
-  if (rows.some((entry) => (entry.moved && entry.behind === true) || entry.unchecked)) {
+  if (rows.some((entry) => (entry.moved && entry.pinned === undefined) || entry.unchecked)) {
     context.exit = ExitCode.Changed;
   }
 }

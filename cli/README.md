@@ -47,7 +47,6 @@ git add . && git commit -m "release pr-review, reviewer" && git push
 ```sh
 aireg registry add github.com/acme/ai-registry -g   # named acme, by the registry
 aireg add acme/engineering/pr-review@0.1.0                # this project, pinned
-aireg add acme/engineering/lint@^1.2                      # the newest 1.x from 1.2.0, which update moves within
 aireg add -g acme/engineering                             # your user scope, kept current
 aireg install --frozen && aireg status                    # CI
 aireg outdated
@@ -60,7 +59,6 @@ aireg update
 aireg skill bump pr-review minor                # in the registry: start 0.2.0
 aireg registry index && git add . && git commit -m "release pr-review 0.2.0"
 aireg publish .claude/skills/triage --to ../ai-registry/engineering   # into your clone
-aireg publish --yes                             # in a project: its manifest's exports, with their dependencies
 ```
 
 aireg doesn't push to git registries: publish into your clone, then commit and push it with
@@ -88,8 +86,7 @@ A released version is never rewritten. How registries, sign-in and pins are stor
 ## Files
 
 ```yaml
-# .registry/manifest.yml, committed: which harnesses, registries and artifacts,
-# and what this project publishes
+# .registry/manifest.yml, committed: which harnesses, registries and artifacts
 harnesses:
   - claude
   - codex
@@ -97,14 +94,6 @@ registries:
   acme: github.com/acme/ai-registry
 artifacts:
   - acme/engineering/skill/pr-review@0.1.0
-  - acme/engineering/skill/lint@^1.2
-exports:
-  - .claude/skills/*
-  - path: .claude/agents/reviewer.md
-    depends_on:
-      - ./.claude/skills/triage
-publish:
-  to: ../ai-registry/engineering
 ```
 
 This project and your user scope each keep what they install in one folder. In a project that

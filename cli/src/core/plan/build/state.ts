@@ -62,8 +62,6 @@ export interface BuildState {
   unlinks: Extract<Action, { kind: "unlink" }>[];
   /** By installed name, the installed names of what needs it. */
   neededBy: Map<string, string[]>;
-  /** By installed name, what its ranged edges ask of each artifact they reach, by installed name. */
-  dependsOn: Map<string, Record<string, string>>;
   pruned: string[];
   /** By installed name, the registry address of what holds each claimed path. */
   addresses: Map<string, string>;

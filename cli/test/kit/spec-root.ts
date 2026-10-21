@@ -8,14 +8,6 @@ import { buildEnvelope, type Envelope } from "#adapter/index.ts";
  * one rather than a folder of loose skills, because that is what the client reads.
  */
 
-/** One `depends_on` edge, as the envelope writes it. */
-export interface SpecEdge {
-  to: string;
-  range?: string;
-  /** The canonical URL of another registry `to` resolves in. */
-  registry?: string;
-}
-
 export interface SpecVersion {
   version: string;
   description?: string;
@@ -27,11 +19,8 @@ export interface SpecVersion {
   reason?: string;
   /** `active` unless set, as `versions.json` records it. */
   status?: string;
-  /**
-   * This version's `depends_on` edges: a fully qualified ref, with its range after a space, or
-   * the edge as written.
-   */
-  dependsOn?: readonly (string | SpecEdge)[];
+  /** Fully qualified refs this version's `depends_on` edges name. */
+  dependsOn?: readonly string[];
 }
 
 export interface SpecArtifact {
@@ -67,15 +56,7 @@ function envelopeFor(artifact: SpecArtifact, version: SpecVersion): Envelope {
       ...digestOf(body),
       urls: [path],
     })),
-    relationships: (version.dependsOn ?? []).map((edge) => {
-      if (typeof edge !== "string") return { rel_type: "depends_on", ...edge };
-      const [to, ...range] = edge.split(" ");
-      return {
-        rel_type: "depends_on",
-        to: to as string,
-        ...(range.length === 0 ? {} : { range: range.join(" ") }),
-      };
-    }),
+    relationships: (version.dependsOn ?? []).map((to) => ({ rel_type: "depends_on", to })),
   });
 }
 
@@ -161,7 +142,7 @@ async function writeArtifact(root: string, artifact: SpecArtifact): Promise<unkn
 export async function writeSpecRoot(
   root: string,
   artifacts: readonly SpecArtifact[],
-  options: { name?: string; slug?: string; url?: string } = {},
+  options: { name?: string; slug?: string } = {},
 ): Promise<void> {
   const entries: unknown[] = [];
   for (const artifact of artifacts) entries.push(await writeArtifact(root, artifact));
@@ -171,7 +152,6 @@ export async function writeSpecRoot(
     format_version: 1,
     name: options.name ?? basename(root),
     ...(options.slug === undefined ? {} : { slug: options.slug }),
-    ...(options.url === undefined ? {} : { url: options.url }),
     capabilities: ["files"],
     auth: { type: "none" },
     blob_url: "blobs/sha256/{digest}",

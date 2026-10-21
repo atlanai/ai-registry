@@ -64,11 +64,6 @@ export interface RegistryIdentity {
   slug?: string | undefined;
   /** One line on what it holds. */
   description?: string | undefined;
-  /**
-   * Its canonical `https` root, the file spec's `registry.json` `url`, which is what a
-   * `depends_on` edge's `registry` names it by. Absent, its declared address stands in.
-   */
-  url?: string | undefined;
 }
 
 /** What `resolve` found. */
@@ -91,33 +86,6 @@ export interface Resolution {
   warnings?: readonly string[] | undefined;
   /** How the source lays out what it holds, where the adapter reads more than one way. */
   layout?: LayoutId | undefined;
-  /**
-   * The project manifest a source that is not a registry holds, whose `exports` give what it
-   * lists their `depends_on` edges. Untrusted: the client ignores one it cannot read.
-   */
-  manifest?: SourceManifest | undefined;
-}
-
-/** A project's `.registry/manifest.yml`, as a source that is not a registry holds it. */
-export interface SourceManifest {
-  /** The file's text, read within a bound. */
-  text: string;
-  /**
-   * Everything the source holds, whatever the request reached, at the path in the source an
-   * `exports` entry names it by: a skill's folder, or an agent's file.
-   */
-  artifacts: readonly SourceArtifact[];
-}
-
-/** One artifact a source holds, by where it sits and what it is listed as. */
-export interface SourceArtifact {
-  /** POSIX, relative to the source's root. */
-  path: string;
-  /** The `id` the artifact is listed with. */
-  id: string;
-  kind: ArtifactKind;
-  name: string;
-  namespace?: string | undefined;
 }
 
 /** An artifact whose version is not installable as asked, such as a blocked one or an unpinned draft. */
@@ -147,13 +115,6 @@ export interface Want {
   name: string;
   /** An exact version, which pins it. */
   version?: string | undefined;
-  /**
-   * A version range (file spec section 2.4): the highest version satisfying it that the status
-   * rules allow for a request that names no version. Ignored when `version` is set. An adapter
-   * that cannot read it serves what it would serve without it, and aireg refuses that version
-   * when it is outside the range.
-   */
-  range?: string | undefined;
   /** Each narrows the want, so a pin reaches only the artifact it was written on. */
   namespace?: string | undefined;
   /** Narrows the want to one kind, as `namespace` narrows it to one namespace. */
@@ -312,10 +273,6 @@ export interface PublishRelationship {
   rel_type: string;
   /** The artifact it points at, as `<namespace>/<kind>/<name>@<version>`. */
   to: string;
-  /** The versions of `to`'s artifact the edge accepts, a range that `to`'s own version satisfies. */
-  range?: string;
-  /** The canonical `https` root of the registry `to` resolves in, when that is not this one. */
-  registry?: string;
 }
 
 /** One artifact to publish. */

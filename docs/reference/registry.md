@@ -125,7 +125,7 @@ Checks a registry against the file spec and reports every problem it finds, each
 - every version a `versions.json` lists, yanked or not, still has its folder
 - each artifact is of a kind the registry holds, has the files that kind needs, and holds no symlink and no file that may hold credentials
 - each artifact's front matter is valid, has no `TODO` left in it, and its `name` matches its folder
-- each [dependency](kinds.md#dependencies) names a version the registry holds, or, when it names another registry, an `https` address with no trailing slash and a `<namespace>/<kind>/<name>@<version>`; and a dependency's `range` admits the version it names
+- each [dependency](kinds.md#dependencies) names a version the registry holds
 - each locally served kind manifest satisfies the manifest schema and JSON Schema Draft 2020-12, with its local references resolved
 - no released version was changed or deleted after it was released, and every released version is still listed in `versions.json` with its digest. To withdraw a release, set `"yanked": true` on it in `versions.json` instead.
 

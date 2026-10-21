@@ -32,24 +32,7 @@ describe("parseRef", () => {
   });
 
   it.each([
-    ["kit/skill/lint@^1.2", { range: "^1.2" }],
-    ["kit/skill/lint@~1.2.3", { range: "~1.2.3" }],
-    ["kit/skill/lint@1.x", { range: "1.x" }],
-    ["kit/skill/lint@*", { range: "*" }],
-    ["kit/skill/lint@>=1.0.0 <2.0.0 || 3", { range: ">=1.0.0 <2.0.0 || 3" }],
-    // What reads as a version is one, since a registry may publish a version so named.
-    ["kit/skill/lint@1.2", { version: "1.2" }],
-    ["kit/skill/lint@1.2.0-rc.1", { version: "1.2.0-rc.1" }],
-    ["kit/skill/lint@2024.10", { version: "2024.10" }],
-  ])("reads the version or range in %s", (input, asked) => {
-    expect(parseRef(input)).toEqual({ registry: "kit", kind: "skill", name: "lint", ...asked });
-  });
-
-  it.each([
     ["kit@1.0.0", /only one artifact can be pinned to a version/],
-    ["kit/sales@^1", /only one artifact can be given a version range/],
-    ["kit/skill/lint@>= 1.0.0", /">= 1.0.0" is not a version or a version range/],
-    ["kit/skill/lint@^", /is not a version or a version range/],
     ["kit/sales@1.0.0", /only one artifact can be pinned to a version/],
     ["kit/skill/lint@", /no version follows the @/],
     ["kit/skill/lint@1.0.0@2", /at most one @version/],
@@ -90,16 +73,13 @@ describe("withLocalName", () => {
 
 describe("formatting", () => {
   // formatRef is what the manifest stores, so the short form survives as written.
-  it.each([
-    "kit/sales/skill/deploy@2.0.0",
-    "kit/sales/deploy@2.0.0",
-    "kit/skill/lint",
-    "kit/skill/lint@^1.2",
-    "kit/skill/lint@>=1.0.0 <2.0.0",
-  ])("round-trips %s through formatRef", (input) => {
-    expect(formatRef(parseRef(input))).toBe(input);
-    expect(formatRef(parseRef(formatRef(parseRef(input))))).toBe(input);
-  });
+  it.each(["kit/sales/skill/deploy@2.0.0", "kit/sales/deploy@2.0.0", "kit/skill/lint"])(
+    "round-trips %s through formatRef",
+    (input) => {
+      expect(formatRef(parseRef(input))).toBe(input);
+      expect(formatRef(parseRef(formatRef(parseRef(input))))).toBe(input);
+    },
+  );
 
   it.each([
     ["kit/skill/lint@1.2.0", "kit/skill/lint"],

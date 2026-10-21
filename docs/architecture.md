@@ -81,7 +81,7 @@ An MCP server is also planned, so agents will be able to read a registry's artif
 
 **Content digest and catalog digest.** The content digest identifies the bytes of a version and never changes. The catalog digest identifies the version plus its mutable state and moves when that state does. See [Digests](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md#4-digests).
 
-**Relationship.** An outbound edge from one version to another ref: `depends_on` or `supersedes`. An edge may also carry a `range`, the versions of that artifact it accepts, and a `registry`, the canonical address of the registry the ref resolves in when that is not this one. Installing an agent resolves its `depends_on` closure.
+**Relationship.** An outbound edge from one version to another ref: `depends_on` or `supersedes`. Installing an agent resolves its `depends_on` closure.
 
 **Publisher.** The one writer of a registry's pointer files. In a repository, whoever runs `aireg registry index`, by hand or in CI.
 
