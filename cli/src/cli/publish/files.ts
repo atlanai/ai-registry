@@ -9,12 +9,6 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import type { Export, ExportFile } from "#core/manifest.ts";
 
-// Which files one folder artifact publishes, and the path each is stored at: in a git repository
-// only what git tracks, never what belongs to an artifact inside it that is exported on its own,
-// only what `include` lists when an entry has it, less what `ignore` leaves out, and always its
-// entry file, as itself.
-
-/** The file that makes a folder the kind it is, published first and always as itself. */
 function entryOf(kind: ArtifactKind): string {
   return kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
 }
@@ -33,23 +27,20 @@ export interface Choosing {
   matched: Set<string>;
 }
 
-/** Below the folder, by its path relative to it: what git tracks, or every file in it. */
 async function candidates(root: string, tracked: readonly string[] | undefined): Promise<string[]> {
   if (tracked !== undefined) {
     return tracked
       .filter((file) => file !== root && isWithin(root, file))
       .map((file) => posixRelative(root, file));
   }
-  // A link or a file that may hold credentials stays listed, so the publish refuses it by name.
+
   const { files, irregular } = await authored(root);
   return [...files, ...irregular].map((file) => file.path).sort();
 }
 
-/** Whether a path is a file listed, or a folder holding one. */
 const matches = (paths: readonly string[], from: string) =>
   paths.some((path) => path === from || path.startsWith(`${from}/`));
 
-/** Why nothing an `include` path names goes: the artifact does not hold it, or it belongs to another export. */
 function unmatched(
   entry: Export,
   from: string,
@@ -76,10 +67,6 @@ function unmatched(
   );
 }
 
-/**
- * The files `include` lists, each at the path it is stored at; a path that matches nothing is
- * refused, and so is one whose files all belong to an artifact inside that is exported on its own.
- */
 function included(
   held: { own: readonly string[]; all: readonly string[] },
   include: readonly { entry: Export; file: ExportFile }[],
@@ -97,7 +84,6 @@ function included(
   return out;
 }
 
-/** Two files stored at one path would overwrite each other, so they are refused. */
 function refuseShared(files: readonly ExportFile[], shown: string): void {
   const by = new Map<string, string>();
   for (const { from, as } of files) {
@@ -112,16 +98,12 @@ function refuseShared(files: readonly ExportFile[], shown: string): void {
   }
 }
 
-/**
- * What a folder artifact publishes, relative to it, each with the path it is stored at, its entry
- * file first: the entries' `include` lists combined, or every file, less what their `ignore`
- * patterns leave out.
- */
+/** Select mapped publication files, keeping the entry first and applying include/ignore rules. */
 export async function chooseFiles(choosing: Choosing, base: string): Promise<ExportFile[]> {
   const { root, kind, entries, tracked } = choosing;
   const shown = posixRelative(base, root);
   const entry = entryOf(kind);
-  // An artifact inside this one that is exported is published on its own, so it is not part of this one.
+
   const nested = [...choosing.exported].filter((other) => other !== root && isWithin(root, other));
   const all = await candidates(root, tracked);
   const held = all.filter((path) => !nested.some((other) => isWithin(other, resolve(root, path))));
@@ -143,7 +125,7 @@ export async function chooseFiles(choosing: Choosing, base: string): Promise<Exp
   }
   const files = [{ from: entry, as: entry }, ...kept.filter((file) => file.from !== entry)];
   refuseShared(files, shown);
-  // One file listed by two entries is one file.
+
   const unique = [...new Map(files.map((file) => [`${file.from}\0${file.as}`, file])).values()];
   const [first, ...rest] = unique;
   return [first as ExportFile, ...rest.sort((a, b) => (a.as < b.as ? -1 : a.as > b.as ? 1 : 0))];

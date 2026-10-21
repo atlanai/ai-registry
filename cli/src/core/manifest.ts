@@ -91,10 +91,7 @@ interface PublishTarget {
   to: string;
 }
 
-/**
- * One `exports:` entry. A plain string is an entry with a path and nothing else. The path is an
- * artifact, or a folder whose artifacts directly inside it are each one.
- */
+/** An exported artifact path, glob, or folder whose immediate artifacts are exported. */
 export interface Export {
   /** Relative to the project, with `/`; only a plain entry may be a glob. */
   path: string;
@@ -113,11 +110,7 @@ export interface Export {
   include?: ExportFile[] | undefined;
 }
 
-/**
- * What an export needs installed beside it: an artifact in this project, by the path after its
- * `./`, which is exported with it, or an artifact this project installs, by the address of its
- * `artifacts:` entry.
- */
+/** A local exported path or the unversioned address of a declared installed artifact. */
 export type ExportDependency = { type: "local"; path: string } | { type: "remote"; ref: Ref };
 
 export { type ExportFile, isGlob } from "./export-fields.ts";
@@ -151,7 +144,6 @@ export const EXPORT_KEYS = [
 /** Every transport's keys; which are legal together is checked below. */
 export const REGISTRY_KEYS = ["source", "adapter", "ref", "path", "layout", "config"] as const;
 
-/** Every key a mapping in `artifacts:` takes. */
 const ARTIFACT_KEYS = ["ref", "as", "exclude", "harnesses", "copy", "trust"] as const;
 
 /**
@@ -192,14 +184,12 @@ export function emptyManifest(): Manifest {
   };
 }
 
-/** A file that names a newer aireg than this one is refused for that, before anything in it is. */
 function refuseOldCli(engine: string | undefined): void {
   const why = unmetEngine(VERSION, engine);
   if (why === undefined) return;
   throw new AiregError(`This project ${why}.`, { hint: "Run `aireg self update`." });
 }
 
-/** Read without judging the rest of the file, which a newer aireg may have written. */
 function engineOf(raw: unknown): string | undefined {
   const value = isRecord(raw) ? raw[NAME] : undefined;
   return typeof value === "string" ? parseEngine(value) : undefined;
@@ -364,7 +354,6 @@ export function artifactFor(artifacts: readonly Ref[], ref: Ref): Ref | undefine
   return artifacts.find((entry) => formatAddress(entry) === address);
 }
 
-/** A folder target rather than `<registry>/<namespace>`; `~` and a drive letter would not travel with the file. */
 function isFolderTarget(to: string): boolean {
   return to.startsWith(".") || to.startsWith("/");
 }
@@ -438,7 +427,7 @@ function parsePublish(
 function exportVersion(raw: unknown, path: string): string | undefined {
   if (raw === undefined || raw === null) return undefined;
   const parsed = typeof raw === "string" ? parseVersion(raw) : undefined;
-  // Written back as read, so build metadata, which orders nothing, is no part of one.
+
   if (parsed === undefined || formatVersion(parsed) !== raw) {
     throw new ManifestError(
       `\`version\` of export ${quoted(path)} must be an exact version, such as 2.0.0.`,

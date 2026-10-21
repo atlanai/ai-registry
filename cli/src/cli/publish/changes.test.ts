@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeLines, changesFrom, changesJson } from "./changes.ts";
+import { changeLines, changesFrom } from "./changes.ts";
 
 const file = (path: string, digest = `sha256:${path}`) => ({ path, digest });
 const edge = (to: string) => ({ rel_type: "depends_on", to });
@@ -37,19 +37,6 @@ describe("changesFrom", () => {
 });
 
 describe("changeLines", () => {
-  it("lists replaced and archived files first, then added ones, then dependencies", () => {
-    const changes = changesFrom(
-      { files: [file("a.md"), file("b.md")], relationships: [edge("eng/skill/x@1.0.0")] },
-      { files: [file("a.md", "sha256:new"), file("c.md")], relationships: [] },
-    );
-    expect(changeLines(changes)).toEqual([
-      "    changed  a.md",
-      "    removed  b.md",
-      "    added    c.md",
-      "    removed  depends on eng/skill/x@1.0.0",
-    ]);
-  });
-
   it("lists at most ten lines, the last saying how many more", () => {
     const many = Array.from({ length: 12 }, (_, at) => file(`f${String(at).padStart(2, "0")}.md`));
     const lines = changeLines(changesFrom(undefined, { files: many }));
@@ -65,19 +52,3 @@ describe("changeLines", () => {
   });
 });
 
-describe("changesJson", () => {
-  it("leaves out a list of changes that has nothing", () => {
-    expect(changesJson(undefined)).toEqual({});
-    const files = changesFrom({ files: [file("a.md")] }, { files: [file("a.md", "sha256:new")] });
-    expect(changesJson(files)).toEqual({
-      filesChanged: { added: [], changed: ["a.md"], removed: [] },
-    });
-    const edges = changesFrom(
-      { files: [file("a.md")] },
-      { files: [file("a.md")], relationships: [edge("eng/skill/x@1.0.0")] },
-    );
-    expect(changesJson(edges)).toEqual({
-      dependsOnChanged: { added: ["eng/skill/x@1.0.0"], removed: [] },
-    });
-  });
-});

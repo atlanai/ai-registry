@@ -6,10 +6,6 @@ import { test as base } from "#test/kit/fixtures.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
-// A registry whose adapter publishes skills but not agents takes a repository's skills, and
-// leaves its agents out with the reason, rather than failing the run over them.
-
-/** A project exporting a skill and an agent, and a home whose config registers that adapter. */
 const test = base.extend("skillsOnly", async ({ home: { dir: home }, project }) => {
   const adapter = join(home, "skills-only.mjs");
   const sent = join(home, "sent.jsonl");

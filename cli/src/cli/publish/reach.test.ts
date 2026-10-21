@@ -71,7 +71,7 @@ describe("exportsOn", () => {
       ],
       publish: undefined,
     });
-    // The glob alone reaches style, which keeps no rules of its own.
+
     expect(found.get(join(base, "skills", "style"))).toMatchObject({ path: "skills/*" });
   });
 
@@ -379,7 +379,7 @@ describe("exportsOn, choosing an artifact's files", () => {
     ).rejects.toThrow(
       'Export "agents/reviewer.md" sets `ignore`, but an agent\'s .md file is one file.',
     );
-    // Reached through its folder, the folder's patterns simply have nothing to apply to.
+
     const { found } = await exportsOn(
       manifestWith("  - path: agents\n    ignore: ['*.log']\n"),
       base,
@@ -402,7 +402,6 @@ describe("exportsOn, choosing an artifact's files", () => {
   });
 });
 
-/** A skill with more in its folder than its SKILL.md. */
 function beforeEachFiles(): void {
   test.beforeEach(async () => {
     const review = join(base, "skills", "review");
@@ -431,7 +430,7 @@ describe("exportsOn, for an artifact inside another", () => {
     await writeFile(join(review, "helpers", "lint", "rules.md"), "Rules.\n");
     await writeFile(join(review, "helpers", "notes.md"), "Notes.\n");
     await writeFile(join(review, "helper.md"), "---\nname: helper\ndescription: Helps.\n---\n");
-    // Reached by no entry, what is inside the skill is part of it.
+
     const alone = await exportsOn(manifestWith("  - skills/review\n"), base);
     expect(alone.found.get(review)?.files?.map((file) => file.as)).toEqual([
       "SKILL.md",

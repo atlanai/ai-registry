@@ -96,8 +96,7 @@ With `--json`, `publish` asks no questions and prints each artifact with its old
 
 ## Repository exports
 
-Declare what this repository publishes in `.registry/manifest.yml`, then run `aireg publish`
-(or `aireg publish --dry-run --json` to preview):
+Declare what this repository publishes in `.registry/manifest.yml`, then run `aireg publish` (or `aireg publish --dry-run --json` to preview):
 
 ```yaml
 registries:
@@ -114,16 +113,9 @@ publish:
   to: acme/engineering
 ```
 
-`depends_on` names another exported path or a declared installed artifact. Remote
-pins belong in `artifacts:`; publish records the exact installed release label
-and refuses a stale pin until `aireg install` updates it. Dependencies must belong
-to the publishing registry. An unpinned parent gets a new version when its exact
-dependency changes; bump a fixed parent version explicitly.
+`depends_on` names another exported path or a declared installed artifact. Remote pins belong in `artifacts:`; publish records the exact installed release label and refuses a stale pin until `aireg install` updates it. Dependencies must belong to the publishing registry. An unpinned parent gets a new version when its exact dependency changes; bump a fixed parent version explicitly.
 
-An agent folder contains `AGENT.md` and its companion files. Exports may set
-`version`, `include` (with optional `as`), and `publish: false`. The preview shows
-added, modified and removed files; publishing looks up each exported artifact by
-name instead of resolving the entire registry.
+An agent folder contains `AGENT.md` and its companion files. Exports may set `version`, `include` (with optional `as`), and `publish: false`. The preview shows added, modified and removed files; publishing looks up each exported artifact by name instead of resolving the entire registry.
 
 ## Examples
 

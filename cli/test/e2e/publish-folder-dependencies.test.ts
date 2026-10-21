@@ -5,10 +5,6 @@ import { type Aireg, fileTest as test } from "#test/kit/fixtures.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
-// A repository makes an agent that depends on a folder of three skills, only two of which have
-// an `exports:` entry. A bare `aireg publish` sends all four into a registry folder, the agent
-// with an edge to each skill, and another project that adds the agent gets the three skills too.
-
 let aireg: Aireg;
 /** The repository that makes the agent, with its registry folder inside it. */
 let maker: string;

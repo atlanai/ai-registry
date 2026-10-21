@@ -5,11 +5,6 @@ import { type Aireg, fileTest as test } from "#test/kit/fixtures.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
-// A repository publishes a folder agent and the skill it depends on into a registry folder.
-// Then one of the agent's files changes, one is added, one is removed, and the skill changes,
-// so the agent's edge moves to the skill's next version. A dry run lists, under each update,
-// what the registry would replace, archive and gain, and `--json` says the same.
-
 let aireg: Aireg;
 /** The repository that makes the agent, with its registry folder inside it. */
 let maker: string;

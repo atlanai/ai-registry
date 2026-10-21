@@ -5,9 +5,6 @@ import type { Placement } from "#core/plan/model.ts";
 import { acquired, entry, kitManifest, PLAN_OPTIONS } from "#test/kit/builders/plan.ts";
 import { test } from "#test/kit/fixtures.ts";
 
-// A version a harness takes as one file, such as a folder agent, installs as its entry file
-// alone, and the run that moves to it says which of its files it left out.
-
 const HELPER = "agents/helper.md";
 
 function withLeftOut(files: string[]) {

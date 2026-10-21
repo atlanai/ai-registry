@@ -485,7 +485,7 @@ async function acquireOne(
 }
 
 /** A commit an adapter reports for one artifact, which the lockfile records and hands back. */
-/** The files a version holds beyond the one file it installs as, beside that file's name. */
+
 function leftOutOf(
   artifact: Artifact,
   leftOut: readonly string[] | undefined,

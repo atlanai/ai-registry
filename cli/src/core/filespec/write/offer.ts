@@ -34,17 +34,12 @@ export interface OfferTarget {
   asAgentDocument?: boolean | undefined;
   /** The edges the version carries, such as its `depends_on`. Absent, it carries none. */
   relationships?: readonly PublishRelationship[] | undefined;
-  /**
-   * A folder's files to send, relative to it, when not every one in it, each with the path it is
-   * stored at; sent in this order.
-   */
+  /** Selected files in publication order, mapped to their destination paths. */
   files?: readonly { from: string; as: string }[] | undefined;
 }
 
-/** Relationship schema: `rel_type` is a lowercase word, as `depends_on` is. */
 const REL_TYPE = /^[a-z][a-z0-9_]*$/;
 
-/** What is wrong with one edge, by the relationship schema, or undefined when nothing is. */
 function edgeProblem(edge: PublishRelationship): string | undefined {
   const { rel_type: type, to } = edge;
   if (!REL_TYPE.test(type)) {
@@ -65,10 +60,6 @@ function edgeProblem(edge: PublishRelationship): string | undefined {
   return undefined;
 }
 
-/**
- * The edges as the envelope spells them: each checked before anything is sent, since the
- * registry stores them as given, and copied field by field, so nothing else rides along.
- */
 function edgesOf(target: OfferTarget): PublishRelationship[] {
   return (target.relationships ?? []).map((edge) => {
     const problem = edgeProblem(edge);
@@ -94,7 +85,6 @@ function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
   return { path: AGENT_ENTRY, content: Buffer.from(filled, "utf8"), executable: false };
 }
 
-/** A folder's files with its entry file first, as an adapter reads the artifact from. */
 function firstOf<T extends { path: string }>(kind: ArtifactKind, files: readonly T[]): T[] {
   const entry = kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
   return [
@@ -112,7 +102,7 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
     return [{ path: basename(path), content, executable: false }];
   }
   const all = await authored(path);
-  // A file left out is never read, so neither is it refused.
+
   const only =
     target.files === undefined
       ? undefined

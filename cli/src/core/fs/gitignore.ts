@@ -1,7 +1,3 @@
-// Gitignore patterns, matched against `/`-separated paths relative to one folder, as git reads a
-// `.gitignore` there: `!` re-includes, a trailing `/` matches only folders, a `/` before the end
-// anchors the pattern to the folder, `*` and `?` stay within one part, and `**` spans parts.
-
 /** One pattern, read. */
 interface Rule {
   /** The pattern as written, which a caller reports by. */
@@ -12,7 +8,6 @@ interface Rule {
   regex: RegExp;
 }
 
-/** `[...]` as a character class, or undefined when it never closes, as git then reads `[` itself. */
 function bracket(body: string, at: number): { source: string; end: number } | undefined {
   let end = at + 1;
   if (body[end] === "!" || body[end] === "^") end += 1;
@@ -27,7 +22,6 @@ function bracket(body: string, at: number): { source: string; end: number } | un
 
 const escaped = (char: string) => char.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 
-/** `**` as a whole part: before a slash, any number of folders, none included; at the end, everything below. */
 function doubleStar(body: string, at: number): { source: string; end: number } | undefined {
   if (body[at + 1] !== "*") return undefined;
   const before = at === 0 || body[at - 1] === "/";
@@ -36,7 +30,6 @@ function doubleStar(body: string, at: number): { source: string; end: number } |
   return last ? { source: ".*", end: at + 1 } : { source: "(?:.*/)?", end: at + 2 };
 }
 
-/** The source of the token starting at `at`, and the index of its last character. */
 function token(body: string, at: number): { source: string; end: number } {
   const char = body[at] as string;
   if (char === "*") return doubleStar(body, at) ?? { source: "[^/]*", end: at };
@@ -48,7 +41,6 @@ function token(body: string, at: number): { source: string; end: number } {
   return { source: escaped(char), end: at };
 }
 
-/** The regular expression one pattern's body is, matched against a whole relative path. */
 function sourceOf(body: string): string {
   let source = "";
   for (let at = 0; at < body.length; at += 1) {
@@ -59,7 +51,6 @@ function sourceOf(body: string): string {
   return source;
 }
 
-/** One pattern as a rule, or undefined for one that matches nothing, such as a comment. */
 function ruleOf(pattern: string): Rule | undefined {
   let body = pattern.replace(/(?<!\\)\s+$/, "");
   if (body === "" || body.startsWith("#")) return undefined;
@@ -68,7 +59,7 @@ function ruleOf(pattern: string): Rule | undefined {
   else if (body.startsWith("\\!") || body.startsWith("\\#")) body = body.slice(1);
   const folderOnly = body.endsWith("/");
   if (folderOnly) body = body.slice(0, -1);
-  // A slash anywhere but the end anchors it here; otherwise it matches at any depth.
+
   const anchored = body.includes("/");
   if (body.startsWith("/")) body = body.slice(1);
   if (body === "") return undefined;
@@ -87,7 +78,7 @@ export interface Ignore {
 export function gitignore(patterns: readonly string[]): Ignore {
   const rules = patterns.flatMap((pattern) => ruleOf(pattern) ?? []);
   const matched = new Set<Rule>();
-  /** The last rule matching decides; undefined when none does. */
+
   const decide = (path: string, folder: boolean): boolean | undefined => {
     let ignored: boolean | undefined;
     for (const rule of rules) {

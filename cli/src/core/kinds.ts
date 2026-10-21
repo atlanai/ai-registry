@@ -16,10 +16,7 @@ export interface KindSpec {
    * A directory without it is not this kind; absent, any directory is.
    */
   entry?: string;
-  /**
-   * For a file-shaped kind, the files a version holding several of them is installed as: the
-   * first it holds. Its other files go to no harness, which takes the kind as one file.
-   */
+  /** Entry filenames a file-shaped kind can install; companion files stay in the registry. */
   served?: readonly string[];
 }
 

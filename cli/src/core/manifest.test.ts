@@ -3,13 +3,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { roots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
-import {
-  artifactFor,
-  formatManifest,
-  parseManifest,
-  readManifest,
-  writeManifest,
-} from "./manifest.ts";
+import { formatManifest, parseManifest, readManifest, writeManifest } from "./manifest.ts";
 import { parseRef } from "./ref.ts";
 
 // A release's version, so a manifest can ask for one older or newer than this CLI.
@@ -94,25 +88,6 @@ describe("exports and publish", () => {
       { path: ".claude/skills/scratch", version: undefined, dependsOn: [], publish: false },
     ]);
     expect(manifest.publish).toEqual({ to: "acme/engineering" });
-  });
-
-  test("writes both back after `artifacts:`, as they were written", () => {
-    const manifest = read(full);
-    expect(formatManifest(manifest)).toBe(`${declared}${full}`);
-    expect(parseManifest(formatManifest(manifest))).toEqual(manifest);
-  });
-
-  test("finds a remote dependency's `artifacts:` entry by address, whatever its version", () => {
-    const manifest = read("");
-    const entry = artifactFor(manifest.artifacts, parseRef("public/platform/skill/sql-style"));
-    expect(entry?.version).toBe("0.1.2");
-    expect(artifactFor(manifest.artifacts, parseRef("public/platform/skill/lint"))).toBeUndefined();
-    const pinned = parseManifest(
-      "registries: { public: x }\nartifacts: [public/platform/skill/sql-style@1.2.0]\nexports:\n  - path: a.md\n    depends_on: [public/platform/skill/sql-style]\n",
-    );
-    expect(pinned.exports[0]?.dependsOn).toEqual([
-      { type: "remote", ref: parseRef("public/platform/skill/sql-style") },
-    ]);
   });
 
   test("refuses entries that are not paths or `{ path, ... }` mappings", () => {

@@ -31,7 +31,6 @@ export function artifactRoot(path: string): string {
   return name === SKILL_ENTRY || name === AGENT_ENTRY ? dirname(path) : path;
 }
 
-/** What git tracks below `base`, or undefined outside a repository, where nothing is filtered. */
 async function trackedFiles(base: string): Promise<string[] | undefined> {
   const listed = await gitIn(base, ["ls-files", "-z"]);
   if (listed.code !== 0) return undefined;
@@ -51,11 +50,6 @@ export function installedPaths(lock: Lock, base: string): Set<string> {
   );
 }
 
-/**
- * An export is published from where it really is: one that a link, or a glob, takes outside the
- * project would publish whatever is there, so it is refused. A folder's own links are refused
- * when its files are read, so its root decides where everything in it sits.
- */
 async function refuseOutside(entry: Export, path: string, base: string): Promise<void> {
   const [real, project] = await Promise.all([canonicalAsync(path), canonicalAsync(base)]);
   if (isWithin(base, path) && isWithin(project, real)) return;
@@ -76,18 +70,12 @@ interface Reach {
   named: boolean;
 }
 
-/** What an entry sets once for each artifact it reaches, where two entries can disagree. */
 const SINGLE = ["version", "publish", "kind"] as const;
 
-/** The same dependency, however an entry spells its path. */
 function dependencyKey(need: ExportDependency): string {
   return need.type === "local" ? `./${artifactRoot(need.path)}` : formatAddress(need.ref);
 }
 
-/**
- * One value for the artifact: an entry naming it decides over one that only reaches it, and two
- * entries that decide alike must agree, so no entry quietly undoes another.
- */
 function decide<K extends (typeof SINGLE)[number]>(
   key: K,
   reaches: readonly Reach[],
@@ -109,7 +97,6 @@ function decide<K extends (typeof SINGLE)[number]>(
   return undefined;
 }
 
-/** Each list's items once, in the order the entries give them. */
 function combined<T>(
   lists: readonly (readonly T[] | undefined)[],
   key: (item: T) => string,
@@ -122,7 +109,6 @@ function combined<T>(
   return [...out.values()];
 }
 
-/** Every entry that reaches one artifact, as one: their lists combined, each single value decided. */
 function merged(reaches: readonly Reach[], shown: string): Export {
   const [first] = reaches;
   const deciding = reaches.find((each) => each.named) ?? (first as Reach);
@@ -156,7 +142,6 @@ type Held = { root: string; kind: ArtifactKind } | { stray: string };
 
 const NOT_AGENT = "has no name and description in its front matter, so it is no agent";
 
-/** Whether a Markdown file's front matter gives an agent's name and description. */
 async function namesAgent(path: string): Promise<boolean> {
   const meta = frontmatter(await readFile(path, "utf8"));
   return meta.name !== undefined && meta.description !== undefined;
@@ -164,7 +149,6 @@ async function namesAgent(path: string): Promise<boolean> {
 
 const shownAt = (path: string, base: string) => posixRelative(base, path);
 
-/** A folder agent and an agent's file of the same name beside it would be one agent twice. */
 function refuseTwice(folder: string, base: string): void {
   if (!existsSync(`${folder}.md`)) return;
   const [file, agent] = [`${folder}.md`, join(folder, AGENT_ENTRY)].map((path) =>
@@ -176,7 +160,6 @@ function refuseTwice(folder: string, base: string): void {
   });
 }
 
-/** A folder holding SKILL.md is a skill; one holding AGENT.md, an agent of many files. */
 async function heldIn(path: string, base: string): Promise<Held> {
   const skill = existsSync(join(path, SKILL_ENTRY));
   const agent = existsSync(join(path, AGENT_ENTRY));
@@ -194,11 +177,6 @@ async function heldIn(path: string, base: string): Promise<Held> {
     : { stray: `holds an AGENT.md that ${NOT_AGENT}` };
 }
 
-/**
- * A skill is a folder holding SKILL.md, and a folder agent one holding AGENT.md, reached by
- * either; an agent is also a `.md` file whose front matter gives its name and description, so a
- * README or a note beside them is never one.
- */
 async function heldAt(path: string, base: string): Promise<Held> {
   if (await isDirectory(path)) return heldIn(path, base);
   if (basename(path) === SKILL_ENTRY || basename(path) === AGENT_ENTRY) {
@@ -230,13 +208,11 @@ interface Reaching {
 const NAME_HINT =
   "Name a skill folder that holds SKILL.md, an agent's folder that holds AGENT.md, an agent's .md file whose front matter has a name and a description, or a folder of them.";
 
-/** Whether git leaves a path out of what it tracks, so no entry reaching through a folder sees it. */
 function untracked(path: string, reading: Reading): boolean {
   const { tracked } = reading;
   return tracked !== undefined && !tracked.some((file) => isWithin(path, file));
 }
 
-/** A path that a glob or a folder reaches, which is skipped with a note when it is no artifact. */
 async function reachThrough(
   entry: Export,
   path: string,
@@ -253,16 +229,11 @@ async function reachThrough(
   else reading.notes.push(`Skipped ${shownAt(path, base)}, which ${held.stray}.`);
 }
 
-/** A folder that no entry file makes an artifact, which is read as a folder of them. */
 async function isPlainFolder(path: string): Promise<boolean> {
   const entryFile = [SKILL_ENTRY, AGENT_ENTRY].some((name) => existsSync(join(path, name)));
   return !entryFile && (await isDirectory(path));
 }
 
-/**
- * A folder that holds no artifact itself, as an entry's path or a dependency: each artifact
- * directly inside it, less the names in `exclude`, the entry's own when it names the folder.
- */
 async function reachInside(
   entry: Export,
   folder: string,
@@ -288,10 +259,6 @@ async function reachInside(
   return roots;
 }
 
-/**
- * The artifacts a local dependency names, by their roots and kinds: the one at its path, or
- * each one directly inside the folder it names, skipping the rest with a note.
- */
 async function neededAt(
   entry: Export,
   need: string,
@@ -327,12 +294,6 @@ async function neededAt(
   );
 }
 
-/**
- * An entry's local dependencies, each as the path of an artifact, however it is spelled, and a
- * folder as each artifact in it; the kind of each is kept in `kinds`, for one no entry reaches.
- * An artifact a folder holds does not depend on itself through it, so each artifact the entry
- * reaches gets the list without itself, unless a path names it.
- */
 async function neededBy(
   entry: Export,
   reading: Reading,
@@ -358,7 +319,6 @@ async function neededBy(
       : needs.filter((need) => need.type !== "local" || resolve(reading.base, need.path) !== root);
 }
 
-/** The one artifact an entry names, or the folder of them it names. */
 async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
   const path = resolve(reading.base, entry.path);
   if (!existsSync(path)) {
@@ -400,7 +360,6 @@ async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
   });
 }
 
-/** The artifacts one entry reaches, by their roots; a glob skips anything else it matches, with a note. */
 async function reachedBy(entry: Export, reading: Reading): Promise<Reaching> {
   const reached = isGlob(entry.path)
     ? { roots: new Map<string, ArtifactKind>(), named: false }
@@ -416,7 +375,6 @@ async function reachedBy(entry: Export, reading: Reading): Promise<Reaching> {
 
 const aKind = (kind: ArtifactKind) => `${kind === "agent" ? "an" : "a"} ${kind}`;
 
-/** With `kind`, an entry reaching anything else is refused, naming what it reached. */
 function refuseKind(entry: Export, roots: ReadonlyMap<string, ArtifactKind>, base: string): void {
   if (entry.kind === undefined) return;
   for (const [root, kind] of roots) {
@@ -459,7 +417,6 @@ interface Needing {
 const orLeaveOut = ({ needed, entry }: Needing) =>
   `or leave ./${needed} out of the \`depends_on\` of export ${quoted(entry)}`;
 
-/** An export depending on one that an entry keeps here would publish an edge to nothing. */
 function keptHere(needing: Needing, kept: Export): AiregError {
   const { dependent, needed } = needing;
   return new AiregError(
@@ -471,10 +428,6 @@ function keptHere(needing: Needing, kept: Export): AiregError {
   );
 }
 
-/**
- * Why a dependency that no entry reaches cannot be exported for it: an entry leaves it out of its
- * folder with `exclude`, or aireg installed it here, so it is no one's to publish.
- */
 function refuseUnreached(
   needing: Needing,
   path: string,
@@ -498,11 +451,6 @@ function refuseUnreached(
   });
 }
 
-/**
- * A dependency that no entry reaches is exported as if an entry named it with its path alone:
- * all its files, at the next version, with no dependencies of its own. An export kept here
- * publishes no edge, so nothing is exported for it.
- */
 function exportNeeded(
   exports: Map<string, Exporting>,
   kinds: ReadonlyMap<string, ArtifactKind>,
@@ -529,16 +477,7 @@ function exportNeeded(
   }
 }
 
-/**
- * Every artifact `exports:` reaches, by its absolute path, with the entries that reach it merged.
- * In a git repository an entry reaching through a glob or a folder reaches only what git tracks,
- * so scratch work beside an export is not published, and never what aireg installed there;
- * inside a folder, too, only what git tracks is published, and never an artifact inside it that is
- * exported too, which is published on its own. Every entry reaching an artifact applies to it:
- * their lists are combined, and an entry naming the artifact sets its `version`, `publish` and
- * `kind` over one that only reaches it. An artifact in the project that an export depends on is
- * exported too, as if an entry named it.
- */
+/** Expand and merge exports by absolute path; repository globs and folders reach only tracked files. */
 export async function exportsOn(
   manifest: Manifest,
   base: string,
@@ -578,7 +517,6 @@ export async function exportsOn(
   };
 }
 
-/** A warning on each `ignore` pattern that left nothing out of anything its entry reaches. */
 function unmatchedPatterns(entries: readonly Export[], matched: ReadonlySet<string>): string[] {
   return entries.flatMap((entry) =>
     (entry.ignore ?? [])

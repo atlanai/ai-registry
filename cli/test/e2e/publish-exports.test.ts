@@ -7,10 +7,6 @@ import { type Aireg, fileTest as test } from "#test/kit/fixtures.ts";
 import { lockPath, manifestPath, writeManifestIn } from "#test/kit/scope.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
-// A repository lists what it makes under `exports:` and where it goes under `publish.to`, so a bare
-// `aireg publish` sends each export in dependency order, writing its `depends_on` as registry edges.
-// Another project then installs the agent from that registry and gets the skill it depends on.
-
 let aireg: Aireg;
 /** The repository that makes the skill and the agent, with its registry folder inside it. */
 let maker: string;
@@ -220,7 +216,7 @@ describe("an export's own version", () => {
       repo,
       `exports:\n  - path: .claude/skills/lint${version === undefined ? "" : `\n    version: ${version}`}\npublish:\n  to: ./registry/eng\n`,
     );
-  /** Sets a version's status in `versions.json`, as a registry's maintainers do. */
+
   const mark = async (version: string, status: string, reason?: string) => {
     const document = JSON.parse(await readFile(versionsAt(), "utf8")) as {
       versions: { version: string; status?: string; reason?: string }[];

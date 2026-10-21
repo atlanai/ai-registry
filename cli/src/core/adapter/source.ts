@@ -125,11 +125,6 @@ function entryPath(artifact: Artifact): string | undefined {
   return only === undefined ? undefined : `${address}${extname(only.path)}`;
 }
 
-/**
- * A version of a file-shaped kind is installed as one file, so one holding several, such as a
- * folder agent, is installed as its entry file alone, the first of the kind's `served` files it
- * holds; the rest are left out of what is fetched. Undefined when it holds none of them.
- */
 function asServed(artifact: Artifact): { artifact: Artifact; leftOut?: string[] } | undefined {
   const spec = KIND_SPECS[artifact.kind];
   if (spec.shape !== "file" || artifact.files.length <= 1) return { artifact };

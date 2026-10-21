@@ -179,8 +179,7 @@ describe("creating a registry and publishing into it", () => {
         aireg(["publish", `race/${racer}/racer`, "--to", "team/platform", "--yes"], { cwd: work }),
       ),
     );
-    // Those that read the registry before another wrote ask for the same version, and only the
-    // first to write it lands; none is written at a version other than the one it reports.
+
     const reported: string[] = [];
     for (const [at, run] of sent.entries()) {
       if (run.code !== 0) {

@@ -65,10 +65,7 @@ export function newestFrom(reported: unknown): Newest[] {
   });
 }
 
-/**
- * The version to count the next one from: this one, or the newest the registry holds of the
- * artifact when that is above it, such as a yanked one, since a held version is never written again.
- */
+/** Count past the newest held version, including yanked releases, to avoid reusing a version. */
 export function countPast(
   version: string | undefined,
   newest: readonly Newest[] | undefined,

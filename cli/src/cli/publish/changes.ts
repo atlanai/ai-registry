@@ -16,11 +16,7 @@ export interface Side {
   relationships?: readonly (Relationship | PublishRelationship)[] | undefined;
 }
 
-/**
- * What a publish changes, each list sorted: files by the path they are stored at, a changed one
- * being one whose digest differs, and `depends_on` edges by their `to`, so an edge that moves to
- * another version is the old `to` removed and the new one added.
- */
+/** Sorted file changes and exact dependency edges added or removed by a publish. */
 export interface Changes {
   files: { added: string[]; changed: string[]; removed: string[] };
   dependsOn: { added: string[]; removed: string[] };
@@ -56,13 +52,9 @@ export function changesFrom(held: Side | undefined, sent: Side): Changes {
   };
 }
 
-/** The most lines listed under one artifact; past it, the last says how many more there are. */
 const SHOWN = 10;
 
-/**
- * The lines under an `update` line, replaced and archived files first. The registry's paths and
- * edges are its own to write, so each is made safe to print.
- */
+/** Format bounded change details, sanitizing paths and edges supplied by the registry. */
 export function changeLines(changes: Changes): string[] {
   const { files, dependsOn: edges } = changes;
   const line = (label: string, what: string) => `    ${label.padEnd(9)}${sanitizeText(what)}`;

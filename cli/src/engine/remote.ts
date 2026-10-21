@@ -16,7 +16,6 @@ import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
 import type { Scan } from "./scan.ts";
 
-/** Sync sends the version after the one it counts from (`countFrom`), or a first one. */
 async function publishInput(
   path: string,
   name: string,
@@ -35,11 +34,6 @@ async function publishInput(
   return input;
 }
 
-/**
- * The version to count the next one from: the lock's, or what the registry serves now when a
- * teammate published past it, or the newest version it holds when that is above both, such as a
- * yanked one, since a registry never takes a version it already holds.
- */
 function countFrom(scan: Scan, row: LockArtifact, locked: string): string {
   const acquired = scan.acquired.find((item) => item.alias === row.registry);
   const at = acquired === undefined ? undefined : listedAt(row, acquired.catalog.entries);

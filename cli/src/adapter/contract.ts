@@ -76,11 +76,7 @@ export interface Resolution {
   registry?: RegistryIdentity | undefined;
   /** Artifacts a want reached that the registry's status rules kept back, rather than unpublished. */
   withheld?: readonly Withheld[] | undefined;
-  /**
-   * The newest version the source holds of an artifact the request reached, whatever its status,
-   * where that is not the version it served, such as a yanked one above `latest`. A publish counts
-   * the next version past it, since a version the source holds is never written again.
-   */
+  /** The newest held version when it differs from the served version, including yanked releases. */
   newest?: readonly Newest[] | undefined;
   /** What a person should know about how the source was read, one sentence each. */
   warnings?: readonly string[] | undefined;
@@ -158,17 +154,9 @@ export interface Capabilities {
    * gets the namespace as one, named after it, rather than each artifact on its own.
    */
   namespacePlugins?: boolean;
-  /**
-   * `publish` stores each version's `relationships` with it, as the file spec's envelope does,
-   * so an artifact published with its dependencies is installed with them. aireg sends
-   * `relationships` to no other adapter, and refuses an artifact that has them instead.
-   */
+  /** Stores and resolves version relationships; required before the host sends dependency edges. */
   relationships?: boolean;
-  /**
-   * `publish` stores an agent's files beyond its `AGENT.md`, each at its path, and `resolve`
-   * serves them back with it, so an agent can be a folder. aireg sends an agent with more than
-   * its entry file to no other adapter, and leaves it out of the publish instead.
-   */
+  /** Stores and resolves every agent file at its published path; required for folder agents. */
   agentFolders?: boolean;
 }
 
@@ -293,10 +281,7 @@ export interface PublishInput {
   /** The kind's structured fields as the host read them from the files, for a source that stores them. */
   spec?: Record<string, unknown> | undefined;
   files: readonly UploadFile[];
-  /**
-   * The edges this version carries, already checked against the file spec's grammar. Only an
-   * adapter that declares `capabilities.relationships` is sent any; it stores them with the version.
-   */
+  /** Validated edges to store with this version; sent only when the adapter declares relationships. */
   relationships?: readonly PublishRelationship[] | undefined;
 }
 

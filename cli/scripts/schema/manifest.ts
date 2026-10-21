@@ -123,15 +123,12 @@ const DetailedReference = Type.Object(
   { additionalProperties: false },
 );
 
-/** Below the project, with `/`: not absolute, and no empty, `.` or `..` part. */
 const PATH = String.raw`(?![A-Za-z]:)(?!(?:[^/]*/)*\.\.?(?:/|$))[^/\\]+(?:/[^/\\]+)*`;
 
-/** One path, not a glob over several. */
 const ONE_PATH = String.raw`(?![^*?[\]{}]*[*?[\]{}])${PATH}`;
 
 const NAMESPACE = "[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?";
 
-/** `<registry>/<namespace>`, or a folder, starting with `.` or `/`, that ends in one. */
 const Target = Type.String({
   pattern: `^[^./][^/]*/${NAMESPACE}$|^(\\.[^/]*)?(/.*)?/${NAMESPACE}$`,
   description:

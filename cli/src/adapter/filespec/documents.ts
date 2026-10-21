@@ -285,10 +285,7 @@ export function resolveVersion(document: VersionsDocument, wanted: string | unde
   });
 }
 
-/**
- * The newest version the document lists, whatever its status, a yanked one included: what a
- * publish counts the next version past, since a listed version is never written again.
- */
+/** Return the newest held version, including yanked releases, to avoid republishing it. */
 export function newestListed(document: VersionsDocument): string {
   let best: { version: string; parsed: Version } | undefined;
   for (const { version } of document.versions) {

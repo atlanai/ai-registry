@@ -174,14 +174,12 @@ async function destinationOf(
   return where;
 }
 
-/** The dependency name and its exact release label. */
 function dependencyOf(edge: PublishRelationship): string {
   const at = edge.to.lastIndexOf("@");
   const name = edge.to.slice(0, at).split("/").at(-1);
   return `${name} ${edge.to.slice(at + 1)}`;
 }
 
-/** One artifact's line in the plan; under an `update`, the files and dependencies it changes. */
 function describe(item: Planned): string[] {
   const address = `${item.namespace}/${item.work.kind}/${item.work.name}`;
   const edges = item.input.relationships ?? [];
@@ -209,7 +207,6 @@ interface Outcome {
   skipped: readonly Skipped[];
 }
 
-/** An agent's files, by the paths they are stored at, AGENT.md first, when it has more than that. */
 function filesOf(item: Planned): { files?: string[] } {
   const { files } = item.input;
   return item.work.kind === "agent" && files.length > 1
@@ -254,10 +251,7 @@ type EdgesFor = (
   planned: (path: string) => Promise<Planned | undefined>,
 ) => Promise<PublishRelationship[] | undefined>;
 
-/**
- * Whether any artifact takes its version from how big a change it is: published before, changed
- * since, and with no version of its own, as an export's `version` is.
- */
+/** Whether an existing changed artifact needs a version-bump choice rather than a fixed version. */
 export function bumped(items: readonly Planned[]): boolean {
   return items.some(
     (item) => item.from !== undefined && !item.same && item.work.exported?.version === undefined,
@@ -276,7 +270,6 @@ async function planAll(
   edgesFor: EdgesFor | undefined,
 ): Promise<Sending | undefined> {
   const at = (how: Bump) => {
-    // In dependency order, so each export waits only for the versions its edges name.
     const pending = new Map<Work, Promise<Sending[number]>>();
     for (const work of works) {
       const target = where.get(work) as { registry: string; namespace: string };
@@ -362,7 +355,7 @@ async function review(
     {
       message: `Publish ${plural(sending.length, "artifact")}?`,
       style: printer.errStyle,
-      // One level less, so what an `update` changes stays under it.
+
       body: lines.map((line) => line.replace(/^ {2}/, "")),
     },
     step.io,
@@ -464,7 +457,6 @@ async function sendTo(
   return published;
 }
 
-/** `--to <registry>/<namespace>/<name>` renames one artifact; for exports, only one named by its path. */
 function nameOne(works: Work[], to: Destination | undefined, explicit: boolean): void {
   if (to?.name === undefined) return;
   if (!explicit) {
@@ -494,10 +486,6 @@ interface Bound {
   target: string | undefined;
 }
 
-/**
- * Exports go to the manifest's one `publish.to` target, which `--to` may only repeat. A folder
- * target is the manifest's, so it is read against the project, not where you are.
- */
 async function boundFor(
   works: Work[],
   manifest: Manifest,
@@ -525,7 +513,6 @@ async function boundFor(
   return { ...forTarget(works, dirs.base), ...chosen, target };
 }
 
-/** Each export's edges for the target it goes to; other work's are left as they are. */
 function edgesOf(
   loaded: Loaded,
   found: ReadonlyMap<string, Export> | undefined,
@@ -548,7 +535,6 @@ function edgesOf(
         });
 }
 
-/** The paths named, else the manifest's exports, else the work edited here; each with its export. */
 async function gather(
   step: Interaction,
   loaded: Loaded,
@@ -563,7 +549,7 @@ async function gather(
   const { paths, since, found } = options;
   const keep = async (works: Work[]) =>
     since === undefined ? works : changedSince(works, since, cwd);
-  // Read whatever is named, so exports that would collide are refused in every run.
+
   const exported = found === undefined ? undefined : await exportWork(found, loaded.roots.base);
   const works =
     paths.length > 0
@@ -575,10 +561,6 @@ async function gather(
   return works;
 }
 
-/**
- * The registries a publish could be asked into, checked before any question so a scope with
- * none refuses at once. With `publish.to`, where exports go is the manifest's to say instead.
- */
 async function writableFirst(
   to: Destination | undefined,
   manifest: Manifest,
@@ -604,14 +586,12 @@ function refuseUndeclared(
   );
 }
 
-/** Nothing left to publish, and the exports left out of this target, if any. */
 function nothing(printer: Printer, outcome: Outcome): void {
   printer.info(printer.style.dim("Nothing to publish."));
   for (const skip of outcome.skipped) printer.info(describeSkip(skip, outcome.to?.namespace ?? ""));
   report(printer, [], new Map(), outcome);
 }
 
-/** A cache of the registries this run opens, each read once and closed together. */
 function opener(
   known: Readonly<Record<string, RegistrySource>>,
   cwd: string,
@@ -633,17 +613,14 @@ function opener(
   return { open, close };
 }
 
-/** Your own default for new work that names no destination, when this scope declares its registry. */
 async function savedDefault(
   known: Readonly<Record<string, RegistrySource>>,
 ): Promise<Destination | undefined> {
-  // It spans every project, so one that does not declare its registry simply has no default.
   const declared = (await readConfig()).defaults.namespace;
   const fallback = declared === undefined ? undefined : parseTo(declared);
   return fallback !== undefined && known[fallback.registry] !== undefined ? fallback : undefined;
 }
 
-/** What the manifest's `exports:` reach, saying what they skipped; undefined when it lists none. */
 async function reachExports(
   loaded: Loaded,
   printer: Printer,

@@ -19,10 +19,7 @@ import { artifactRoot } from "./reach.ts";
 import type { Destination, Planned, Published } from "./target.ts";
 import { fromPath, type Work } from "./work.ts";
 
-/**
- * The work `exports:` names, less what it leaves unpublished. Two exports of one kind and name
- * would be two versions of one artifact, written over each other, so they are refused.
- */
+/** Collect publishable exports and reject duplicate kind/name identities. */
 export async function exportWork(
   found: ReadonlyMap<string, Export>,
   base: string,
@@ -103,11 +100,6 @@ export function forTarget(
   return { works: kept, skipped };
 }
 
-/**
- * Why the registry an export goes to does not take it, as a lowercase clause, or undefined when
- * it does: its adapter publishes only some kinds, and keeps no agent's files beyond its AGENT.md
- * unless it declares `agentFolders`.
- */
 function untaken(work: Work, adapter: SourceAdapter, alias: string): string | undefined {
   if (work.exported === undefined) return undefined;
   const kinds = adapter.publishKinds ?? adapter.artifactKinds;
@@ -128,10 +120,7 @@ export interface Taken {
   warnings: string[];
 }
 
-/**
- * An export the registry it goes to does not take is left out, not failed, so the rest still
- * publish; an export depending on it publishes without that edge, and says so.
- */
+/** Skip unsupported exports and warn when their dependency edges are omitted. */
 export async function takenBy(
   works: readonly Work[],
   registryOf: (work: Work) => Promise<{ alias: string; adapter: SourceAdapter }>,
@@ -164,7 +153,6 @@ export async function takenBy(
   return taken;
 }
 
-/** The exports a local dependency names, by path, among those `found`. */
 function localNeeds(entry: Export, found: ReadonlyMap<string, Export>, base: string): string[] {
   return entry.dependsOn
     .filter((need): need is Extract<ExportDependency, { type: "local" }> => need.type === "local")
@@ -172,10 +160,7 @@ function localNeeds(entry: Export, found: ReadonlyMap<string, Export>, base: str
     .filter((path) => found.has(path));
 }
 
-/**
- * The work with each export after the exports it depends on, so a dependency's version is
- * known before the edge naming it is written. A cycle among the exports is refused, naming it.
- */
+/** Order exports after their dependencies and reject cycles. */
 export function inDependencyOrder(
   works: readonly Work[],
   found: ReadonlyMap<string, Export>,
@@ -200,7 +185,7 @@ export function inDependencyOrder(
     rank.set(path, rank.size);
   };
   for (const path of found.keys()) visit(path);
-  // Work that is no export keeps its place, ahead of the exports.
+
   const of = (work: Work) => (work.exported === undefined ? -1 : (rank.get(work.path) ?? -1));
   return [...works].sort((left, right) => of(left) - of(right));
 }
@@ -220,7 +205,6 @@ export interface EdgeContext {
   planned: (path: string) => Promise<Planned | undefined>;
 }
 
-/** Whether two registries are one, by name or by where they are. */
 function sameRegistry(context: EdgeContext, alias: string): boolean {
   if (alias === context.target.registry) return true;
   const one = context.known[alias];
@@ -234,16 +218,11 @@ function sameRegistry(context: EdgeContext, alias: string): boolean {
   );
 }
 
-/** A folder by its resolved path, which a trailing separator or a drive letter cannot split; any other address as compared. */
 function placeOf(location: string): string {
   return isAbsolute(location) ? resolve(location) : comparableLocation(location);
 }
 
-/**
- * The `depends_on` edges an export carries into this target: another export at the version this
- * run publishes, or the target's newest; an installed artifact at its exact locked version. None to an
- * export this run leaves out because its registry does not take it.
- */
+/** Resolve local exports and installed artifacts to exact dependency release labels. */
 export async function dependsOnFor(
   work: Work,
   context: EdgeContext,
@@ -261,10 +240,7 @@ export async function dependsOnFor(
   return edges;
 }
 
-/**
- * What a publish asks each registry for, by its alias: each artifact it may publish there, and each
- * export a local dependency names, whose version an edge takes. No want names a version, so none pins.
- */
+/** Request only publish targets and dependencies by name, without version pins. */
 export async function publishWants(
   works: readonly Work[],
   where: ReadonlyMap<Work, { registry: string; namespace: string }>,
@@ -297,7 +273,7 @@ async function localEdge(
   context: EdgeContext,
 ): Promise<PublishRelationship | undefined> {
   const { namespace, registry } = context.target;
-  // `exportsOn` exports every artifact a local dependency names, so each one is an export.
+
   const path = artifactRoot(resolve(context.base, needed));
   // Left out because its registry does not take it, so its dependents go without the edge.
   if (context.left?.has(path) === true) return undefined;

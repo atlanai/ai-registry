@@ -36,11 +36,7 @@ export interface Work {
 
 /** What `exports:` says of one artifact: its entries merged into one, and the files it publishes. */
 export interface Exported extends Export {
-  /**
-   * A folder's files, relative to it, its entry file first, each with the path it is stored at:
-   * in a git repository only those git tracks, and its entry file whatever git says. Undefined
-   * for an agent's own file.
-   */
+  /** Selected folder files, with the entry first; absent for a native agent file. */
   files?: readonly ExportFile[] | undefined;
 }
 
@@ -67,7 +63,6 @@ function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
   };
 }
 
-/** A file's text, or undefined when nothing, or a folder, is there. */
 async function textAt(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, "utf8");
@@ -77,7 +72,6 @@ async function textAt(path: string): Promise<string | undefined> {
   }
 }
 
-/** The entry file a folder holds, read once, which says its kind; a folder with both is no one artifact. */
 async function folderEntry(
   root: string,
 ): Promise<{ kind: ArtifactKind; text: string } | undefined> {
@@ -95,11 +89,7 @@ async function folderEntry(
   return agent === undefined ? undefined : { kind: "agent", text: agent };
 }
 
-/**
- * A skill is a directory with SKILL.md, and a folder agent one with AGENT.md, reached by either;
- * any other .md is an agent. Each file is read once and judged by what was read, so nothing can
- * change between a check and the read it guards.
- */
+/** Read each entry once to identify a skill, folder agent or native agent file. */
 export async function fromPath(path: string): Promise<Work> {
   const entry = basename(path) === SKILL_ENTRY || basename(path) === AGENT_ENTRY;
   const root = entry ? dirname(path) : path;

@@ -214,7 +214,6 @@ export interface Published {
 
 const keyOf = (namespace: string, kind: string, name: string) => `${namespace}/${kind}/${name}`;
 
-/** One version the registry gives the files of, as a publish compares it. */
 function heldOf(artifact: Artifact, version: string | undefined): Current {
   const { files, relationships } = artifact.envelope;
   return {
@@ -226,7 +225,6 @@ function heldOf(artifact: Artifact, version: string | undefined): Current {
   };
 }
 
-/** A registry opened to publish into, refused when its adapter does not publish. */
 async function connectToPublish(
   alias: string,
   declared: RegistrySource,
@@ -282,8 +280,7 @@ export async function readPublished(
   how?: string,
 ): Promise<Published> {
   const { location, source } = await connectToPublish(alias, declared, cwd, how);
-  // Asked by name, not with `all`, under which a version-less want is no pin and may go unheard:
-  // an adapter may bound a whole listing, but must answer what is named.
+
   const listing = await resolveArtifacts(source, want);
   const latest = new Map<string, Current>();
   const newest = [...(listing.catalog.newest ?? [])];
@@ -298,7 +295,7 @@ export async function readPublished(
     }
     latest.set(keyOf(namespace, artifact.kind, name), heldOf(artifact, version));
   }
-  // Held back is still published: the next version goes past it, never back over it.
+
   const withheld = new Map<string, Current>();
   for (const item of listing.catalog.withheld ?? []) {
     if (item.group === undefined) continue;
@@ -329,14 +326,10 @@ export interface Planned {
   /** The version sorts below the registry's newest, as an export's own older `version` can. */
   belowLatest: boolean;
   input: PublishInput;
-  /**
-   * What it changes against the registry's latest version, when it is sent; absent for one
-   * already published, and when the registry gives no files to compare, as for one held back.
-   */
+  /** Changes against the latest version, when files are available and a publish is needed. */
   changes?: Changes | undefined;
 }
 
-/** What the registry holds at one version of this artifact, when it holds that version. */
 async function heldAt(
   published: Published,
   namespace: string,
@@ -351,7 +344,7 @@ async function heldAt(
     (each) => each.envelope.metadata.version === version && each.kind === kind,
   );
   if (artifact !== undefined) return heldOf(artifact, version);
-  // A resolve hides a version its status holds back, such as a blocked one, but still names it.
+
   const kept = withheldFrom(found?.withheld).find(
     (item) =>
       item.name === name &&
@@ -391,10 +384,6 @@ async function refuseInvalid(
   );
 }
 
-/**
- * An adapter without `capabilities.relationships` would publish the files alone, and the
- * artifact would install without what it depends on, so nothing is sent to it at all.
- */
 function refuseRelationships(
   work: Work,
   published: Published,
@@ -411,10 +400,6 @@ function refuseRelationships(
   );
 }
 
-/**
- * An adapter without `capabilities.agentFolders` keeps an agent as its AGENT.md alone, so one
- * with more files would lose them; it is refused before anything is sent.
- */
 function refuseAgentFolder(work: Work, published: Published, input: PublishInput): void {
   if (work.kind !== "agent" || input.files.length <= 1) return;
   if (published.source.adapter.capabilities.agentFolders === true) return;
@@ -427,10 +412,6 @@ function refuseAgentFolder(work: Work, published: Published, input: PublishInput
   );
 }
 
-/**
- * An edit made on an older version, published as the newest, drops whatever
- * was published in between; that is a conflict, the same one sync reports.
- */
 function refuseBehind(work: Work, current: Current | undefined): void {
   if (work.base === undefined || current?.version === undefined || work.base === current.version)
     return;
@@ -443,7 +424,6 @@ function refuseBehind(work: Work, current: Current | undefined): void {
   );
 }
 
-/** A version asked for that the registry holds with other content, or holds back unseen. */
 function alreadyPublished(
   work: Work,
   namespace: string,
@@ -463,10 +443,7 @@ function alreadyPublished(
   );
 }
 
-/**
- * A version the registry refused as one it already holds, though its listing did not show it, as
- * one whose adapter reports no yanked version leaves it: the hint says what to publish instead.
- */
+/** Explain an immutable-version conflict, including versions hidden from the listing. */
 export function heldUnlisted(error: unknown, alias: string, items: readonly Planned[]): unknown {
   if (!isAdapterError(error) || error.failure !== "conflict") return error;
   const [only] = items;
@@ -488,7 +465,6 @@ export function heldUnlisted(error: unknown, alias: string, items: readonly Plan
   });
 }
 
-/** A path is part of file identity; digest-only snapshots keep their earlier comparison. */
 function sameFiles(held: Current, offered: Awaited<ReturnType<typeof offerFrom>>): boolean {
   const sameDigests = held.digests.join() === offered.digests.join();
   if (held.files === undefined) return sameDigests;
@@ -501,7 +477,6 @@ function sameFiles(held: Current, offered: Awaited<ReturnType<typeof offerFrom>>
   return canonicalize(records(held.files)) === canonicalize(records(offered.files));
 }
 
-/** The same edges, whatever order each one's fields were written in. */
 function sameEdges(
   current: readonly Relationship[] | undefined,
   offered: readonly PublishRelationship[] | undefined,
@@ -516,11 +491,7 @@ export async function plan(
   how: Bump,
   exact: string | undefined,
   force: boolean,
-  /**
-   * The edges this version carries. Absent, the publish does not manage them: the files alone
-   * decide sameness, as for work that names none. Present, even empty, an edge that changed is
-   * a new version too.
-   */
+  /** Absent leaves existing edges unmanaged; an explicit list participates in version identity. */
   relationships?: readonly PublishRelationship[],
 ): Promise<Planned> {
   refuseRelationships(work, published, relationships);
@@ -539,25 +510,24 @@ export async function plan(
     relationships,
     files: work.exported?.files,
   });
-  // An export's own version is what it is published at, unless `--to` names another.
+
   const fixed = exact === undefined ? work.exported?.version : undefined;
   const asked = exact ?? fixed;
-  // The files and the edges decide sameness: the digest covers the version, so it always moves.
+
   const probe = await offerFrom(work.path, target(asked ?? "0.1.0"));
   refuseAgentFolder(work, published, probe.input);
   const matches = (held: Current) =>
     held.withheld === undefined &&
     sameFiles(held, probe) &&
     (relationships === undefined || sameEdges(held.relationships, probe.input.relationships));
-  // A version is looked up by itself, whatever its status, so one held back is never taken for new;
-  // a pin reaches a draft's files, which a listing withholds.
+
   const held =
     asked === undefined
       ? undefined
       : asked === current?.version && current.withheld === undefined
         ? current
         : await heldAt(published, namespace, work, asked);
-  // Asking again for an export's version already published with these files is a repeat, not a conflict.
+
   const same =
     held !== undefined
       ? fixed !== undefined && matches(held)
@@ -579,7 +549,7 @@ export async function plan(
       },
     );
   }
-  // Counted past every version the registry holds, a yanked one included, never back onto one.
+
   const from = countPast(current?.version, published.newest, {
     name: work.name,
     group: namespace,
@@ -588,7 +558,7 @@ export async function plan(
   const version = asked ?? (same ? (current?.version as string) : bumpVersion(from, how));
   // The version is not part of the content identity, so the files read once serve it.
   const moved = version === probe.input.version ? probe.input : { ...probe.input, version };
-  // What is already published is shown with the edges it carries, not those it was compared with.
+
   const input =
     same && relationships !== undefined && held !== undefined
       ? { ...moved, relationships: [...(held.relationships ?? [])] }
@@ -608,11 +578,6 @@ export async function plan(
   };
 }
 
-/**
- * What a version sent changes against the latest one: nothing for one already published, and
- * nothing known when the registry gives none of the newest one's files, as for one held back, or
- * one the listing does not show, such as a yanked one.
- */
 function changesAgainst(
   at: { same: boolean; current: Current | undefined; from: string | undefined },
   sent: Side,

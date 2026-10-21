@@ -1,17 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
-import { AdapterError } from "#adapter/index.ts";
 import { offerFrom } from "#core/filespec/write/offer.ts";
 import { test } from "#test/kit/fixtures.ts";
-import {
-  commitAndPush,
-  heldUnlisted,
-  type Planned,
-  type Published,
-  parseTo,
-  plan,
-} from "./target.ts";
+import { commitAndPush, type Published, parseTo, plan } from "./target.ts";
 import type { Work } from "./work.ts";
 
 vi.mock("#core/filespec/write/offer.ts", async (importOriginal) => {
@@ -100,12 +92,12 @@ describe("plan's changes", () => {
       files: { added: ["SKILL.md", "rules.md"], changed: [], removed: [] },
       dependsOn: { added: ["eng/skill/style@1.3.0"], removed: [] },
     });
-    // A version held back gives no files, so what changes against it is unknown.
+
     const blocked = { id: undefined, version: "1.0.0", digests: [], withheld: {} };
     expect(
       (await plan(work, holding(blocked, true), "eng", "patch", undefined, false)).changes,
     ).toBeUndefined();
-    // Nor does a newest version the listing does not show, such as a yanked one.
+
     const yanked = {
       ...holding(undefined),
       newest: [{ name: "lint", group: "eng", kind: "skill", version: "1.0.0" }],
@@ -250,10 +242,6 @@ describe("plan with an export's version", () => {
     return { work, digests };
   }
 
-  /**
-   * A registry whose newest lint is 1.0.0, and which also holds `older` at 0.9.0, and 0.8.0 held
-   * back by its status, as a resolve reports one: by name and version, without its files.
-   */
   const holding = (latest: string[], older: string[] = ["sha256:other"]) =>
     ({
       alias: "acme",
@@ -326,7 +314,7 @@ describe("plan with an export's version", () => {
       message: "eng/lint@0.8.0 is already published, and is blocked (leaks tokens).",
       code: "conflict",
     });
-    // `--to` naming that version exactly is refused the same way.
+
     const named = { ...work, exported: undefined };
     await expect(
       plan(named, holding(["sha256:newer"]), "eng", "patch", "0.8.0", false),
@@ -427,40 +415,9 @@ describe("plan with an export's version", () => {
     expect(past).toMatchObject({ same: false, from: "0.1.0", version: "0.1.2" });
     const minor = await plan(work, holding(latest, "0.3.0"), "eng", "minor", undefined, false);
     expect(minor.version).toBe("0.4.0");
-    // Every version yanked, so the listing shows none: still never 0.1.0 again.
+
     const none = await plan(work, holding([], "0.1.0"), "eng", "patch", undefined, false);
     expect(none).toMatchObject({ from: "0.1.0", version: "0.1.1" });
-  });
-});
-
-describe("heldUnlisted", () => {
-  const planned = (exported?: { path: string; version: string | undefined }) =>
-    ({
-      work: { name: "lint", kind: "skill", exported },
-      namespace: "eng",
-      input: { name: "lint" },
-    }) as unknown as Planned;
-  const conflict = new AdapterError(
-    "local",
-    "conflict",
-    "eng/skill/lint@0.1.1 is already published with other content.",
-    { artifact: "lint", hint: "A published version is never rewritten." },
-  );
-
-  test("says how to name a version the registry does not hold, for a conflict only", () => {
-    expect(heldUnlisted(conflict, "./registry", [planned()])).toMatchObject({
-      name: "AdapterError",
-      failure: "conflict",
-      message: "eng/skill/lint@0.1.1 is already published with other content.",
-      hint: "Name a version ./registry does not hold yet: `aireg publish <path> --to ./registry/eng/lint@<version>`; a published version is never rewritten.",
-    });
-    expect(
-      heldUnlisted(conflict, "acme", [planned({ path: ".claude/skills/lint", version: "0.1.1" })]),
-    ).toMatchObject({
-      hint: 'Set the `version` of export ".claude/skills/lint" to one acme does not hold yet; a published version is never rewritten.',
-    });
-    const other = new AdapterError("local", "invalid", "Nope.");
-    expect(heldUnlisted(other, "acme", [planned()])).toBe(other);
   });
 });
 

@@ -105,7 +105,6 @@ async function existingDigest(read: ReadPath, at: string): Promise<string | unde
   return typeof metadata?.digest === "string" ? metadata.digest : undefined;
 }
 
-/** The digest `versions.json` gives this version, for one listed without its directory. */
 async function listedDigest(
   read: ReadPath,
   change: PublishInput,

@@ -5,10 +5,6 @@ import { test as base } from "#test/kit/fixtures.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
-// A registry may bound a whole listing, as one that drops a large namespace unless a want names
-// what it needs from it. A publish asks for what it writes and what its edges name, so an
-// artifact the registry already holds is planned from its latest version, not as a new one.
-
 interface Held {
   name: string;
   version: string;
@@ -19,7 +15,6 @@ interface Held {
 const REVIEW = skillBody("review", "The review checklist.");
 const EDGE = { rel_type: "depends_on", to: "eng/skill/style@2.0.0" };
 
-/** A home whose config registers an adapter that lists nothing it is not asked for by name. */
 const test = base.extend("bounded", async ({ home: { dir: home }, project }) => {
   const adapter = join(home, "bounded.mjs");
   const state = join(home, "held.json");

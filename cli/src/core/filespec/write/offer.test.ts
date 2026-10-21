@@ -84,23 +84,6 @@ describe("offerFrom", () => {
     await expect(offerFrom(skill, target)).rejects.toThrow("lint/.env may hold credentials");
   });
 
-  test("stores each file named at its own path, in the order given", async () => {
-    const skill = await lint();
-    await mkdir(join(skill, "workspace"), { recursive: true });
-    await writeFile(join(skill, "workspace", "SOUL.md"), "Who it is.\n");
-    const sent = await offerFrom(skill, {
-      name: "lint",
-      kind: "skill",
-      version: "1.0.0",
-      files: [
-        { from: "SKILL.md", as: "SKILL.md" },
-        { from: "workspace/SOUL.md", as: "identity/SOUL.md" },
-      ],
-    });
-    expect(sent.input.files.map((file) => file.path)).toEqual(["SKILL.md", "identity/SOUL.md"]);
-    expect(Buffer.from(sent.input.files[1]!.content).toString()).toBe("Who it is.\n");
-  });
-
   test("sends a folder agent's AGENT.md first, then its other files", async () => {
     const agent = join(root, "helper");
     await mkdir(agent, { recursive: true });

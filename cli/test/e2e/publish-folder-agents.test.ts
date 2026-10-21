@@ -5,11 +5,6 @@ import { type Aireg, fileTest as test } from "#test/kit/fixtures.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
-// A repository makes a skill and a folder agent: an AGENT.md with the files it works from, a
-// skill kept inside its folder that is exported on its own, a runtime folder it never publishes,
-// and one file stored at another path. A bare `aireg publish` sends both into a registry folder,
-// and another project installs the agent from there as its AGENT.md.
-
 let aireg: Aireg;
 /** The repository that makes the agent, with its registry folder inside it. */
 let maker: string;
@@ -36,7 +31,6 @@ const agent = (...parts: string[]) => join(maker, "agents", "websiteclaw", ...pa
 const versionDir = (kind: string, name: string, version: string) =>
   join(maker, "registry", "artifacts", "marketing", kind, name, version);
 
-/** Every file below a folder, relative to it, sorted. */
 async function filesIn(dir: string): Promise<string[]> {
   const found = await readdir(dir, { recursive: true, withFileTypes: true });
   return found
@@ -165,7 +159,7 @@ describe("publishing a folder agent", () => {
     expect(await readFile(join(project, ".claude", "agents", "websiteclaw.md"), "utf8")).toBe(
       await readFile(agent("AGENT.md"), "utf8"),
     );
-    // Installed once, it says so no more.
+
     const again = await aireg(["install"]);
     expect(again.code, again.stderr).toBe(0);
     expect(again.stderr).not.toContain("left out");

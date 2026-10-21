@@ -13,7 +13,6 @@ import {
   forTarget,
   inDependencyOrder,
   namesTarget,
-  publishWants,
   takenBy,
 } from "./exports.ts";
 import { exportsOn } from "./reach.ts";
@@ -53,7 +52,6 @@ function manifestWith(exports: string, to = "acme/engineering"): Manifest {
   return parseManifest(`${REGISTRIES}exports:\n${exports}publish:\n  to: ${to}\n`);
 }
 
-/** The exports of a manifest whose agent depends on whatever `needs` lists. */
 async function exported(needs: string[], extra = "") {
   const manifest = manifestWith(
     `  - skills/*\n  - path: agents/reviewer.md\n    depends_on: [${needs.join(", ")}]\n${extra}`,
@@ -114,7 +112,7 @@ describe("exportWork", () => {
       hint: "Give one of them another `name` in its front matter, or leave it out of `exports:`.",
       code: "invalid",
     });
-    // One kept in the repository is never published, so it takes no name from the other.
+
     const kept = await exportsOn(
       manifestWith("  - skills/*\n  - path: vendor/review\n    publish: false\n"),
       base,
@@ -199,7 +197,7 @@ describe("takenBy", () => {
     ]);
     const review = named(taken.works, "review");
     expect(await dependsOnFor(review, context(manifest, { left: taken.left }))).toEqual([]);
-    // A registry that names no narrower kinds takes every kind it serves.
+
     const every = await takenBy(
       works,
       async () => ({ alias: "acme", adapter: adapter() }),
@@ -278,34 +276,6 @@ describe("inDependencyOrder", () => {
     expect(() => inDependencyOrder(works, found, base)).toThrow(
       "The exports depend on each other in a cycle: ./agents/reviewer.md → ./skills/review → ./agents/reviewer.md.",
     );
-  });
-});
-
-describe("publishWants", () => {
-  test("names each artifact a registry may be sent or named in, pinning none", async () => {
-    const { works } = await exported(["./skills/review", "public/platform/skill/sql-style"]);
-    const reviewer = named(works, "reviewer");
-    const style = named(works, "style");
-    // Only the agent is sent: the export it depends on is asked for all the same.
-    const where = new Map([
-      [reviewer, { registry: "acme", namespace: "engineering" }],
-      [style, { registry: "vendor", namespace: "docs" }],
-    ]);
-    const wants = await publishWants([reviewer, style], where, base);
-    expect(Object.fromEntries(wants)).toEqual({
-      acme: [
-        { name: "reviewer", namespace: "engineering", kind: "agent" },
-        { name: "review", namespace: "engineering", kind: "skill" },
-      ],
-      vendor: [{ name: "style", namespace: "docs", kind: "skill" }],
-    });
-    // Asked for twice, once sent and once depended on, it is named once.
-    const both = await publishWants(
-      works,
-      new Map(works.map((work) => [work, { registry: "acme", namespace: "engineering" }])),
-      base,
-    );
-    expect(both.get("acme")?.map((want) => want.name)).toEqual(["review", "style", "reviewer"]);
   });
 });
 

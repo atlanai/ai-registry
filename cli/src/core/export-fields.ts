@@ -14,7 +14,6 @@ export interface ExportFile {
   as: string;
 }
 
-/** What a glob is written with, as `fs.glob` reads one. */
 const GLOB = /[*?[\]{}]/;
 
 /** Whether a path matches other paths rather than naming one. */
@@ -35,7 +34,6 @@ export function pathProblem(path: string): string | undefined {
 
 export const PATH_HINT = "Write it relative to the project, such as .claude/skills/review.";
 
-/** The kinds an export can be: what a folder or a file in a project is. */
 const EXPORT_KINDS: readonly ArtifactKind[] = ["skill", "agent"];
 
 export function exportKind(raw: unknown, path: string): ArtifactKind | undefined {
@@ -46,7 +44,6 @@ export function exportKind(raw: unknown, path: string): ArtifactKind | undefined
   throw new ManifestError(`\`kind\` of export ${quoted(path)} must be skill or agent.`);
 }
 
-/** A list of text, or undefined when absent. */
 function texts(raw: unknown, key: string, path: string, what: string): string[] | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (!Array.isArray(raw) || raw.some((item) => textOf(item) === undefined)) {
@@ -89,10 +86,8 @@ export function exportIgnore(raw: unknown, path: string): string[] | undefined {
   return texts(raw, "ignore", path, "gitignore patterns");
 }
 
-/** The entry files, which an artifact always publishes as themselves. */
 const ENTRIES: ReadonlySet<string> = new Set([SKILL_ENTRY, AGENT_ENTRY]);
 
-/** A path inside an artifact: below it, one file or folder, never a glob. */
 function insidePath(text: string, path: string, key: "from" | "as" | "include"): string {
   const problem =
     pathProblem(text) ?? (isSafePath(text) ? undefined : "is no path a registry stores");
@@ -112,7 +107,6 @@ function insidePath(text: string, path: string, key: "from" | "as" | "include"):
   return text;
 }
 
-/** One `include` item: a path stored as it is, or `{ from, as }` stored at another path. */
 function includeItem(raw: unknown, path: string): ExportFile {
   if (typeof raw === "string" && raw.trim() !== "") {
     const from = insidePath(raw, path, "include");
@@ -132,10 +126,7 @@ function includeItem(raw: unknown, path: string): ExportFile {
   return { from: insidePath(from, path, "from"), as: insidePath(as, path, "as") };
 }
 
-/**
- * The files each artifact the entry reaches publishes, besides its entry file, which always goes
- * as itself: so no other file is stored under its name, and two files never share a path.
- */
+/** Validate include mappings without moving entry files or assigning two files to one destination. */
 export function exportInclude(raw: unknown, path: string): ExportFile[] | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (!Array.isArray(raw)) {

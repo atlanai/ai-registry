@@ -202,8 +202,7 @@ export async function resolveFromRoot(
     if (options.all !== true && options.wanted.length > 0 && !asked) return [];
     return [{ entry, asked, pinned: pinOf(reaching) }];
   });
-  // Each artifact keeps what it withholds and how far it goes in its own row, so the lists come
-  // out in index order however the reads interleave.
+
   const rows = await inOrder(chosen, async ({ entry, asked, pinned }) => {
     // A malformed path segment is the indexer's mistake, and installing from
     // it would write that mistake into somebody's tree.
@@ -218,8 +217,7 @@ export async function resolveFromRoot(
     const version = resolveVersion(versions, pinned);
     const held: Withheld[] = [];
     const served = await serve(read, { entry, version, asked, pinned }, held, options.blobUrl);
-    // A version above what was served or withheld, such as a yanked one, is still held: a publish
-    // goes past it.
+
     const reported =
       served !== undefined || heldBack(version, pinned) ? version.version : undefined;
     const top = newestListed(versions);
@@ -238,13 +236,11 @@ export async function resolveFromRoot(
   };
 }
 
-/** Blocked never installs, and draft and pending_review only when pinned. */
 function heldBack(version: VersionRow, pinned: string | undefined): boolean {
   const status = version.status ?? "";
   return status === "blocked" || (pinned === undefined && UNRELEASED.has(status));
 }
 
-/** The artifact at the version a request resolved to, unless its status keeps it back. */
 async function serve(
   read: ReadPath,
   {
@@ -259,8 +255,7 @@ async function serve(
   // Section 5 rule 7: a yanked version stays resolvable by name, because a
   // lockfile pinning one must keep resolving, but `latest` must not hand it out.
   if (version.yanked && pinned === undefined) return undefined;
-  // The caller is told of a version held back, so an installed copy is kept rather than taken
-  // for unpublished.
+
   const status = version.status ?? "";
   if (heldBack(version, pinned)) {
     const { namespace, kind, name } = entry;

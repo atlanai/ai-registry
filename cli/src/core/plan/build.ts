@@ -247,13 +247,8 @@ export function clashMessage({ name, kept, dropped, at }: Clash): string {
     : `${dropped} and ${kept} would both install at ${at}`;
 }
 
-/** At most this many files are named; the rest are counted. */
 const NAMED_FILES = 5;
 
-/**
- * A version a harness takes as one file but that holds more, such as a folder agent, installs as
- * its entry file alone; a run moving to it says which files it left out.
- */
 function warnLeftOut(item: Selected, previous: LockArtifact | undefined, build: BuildState): void {
   const leftOut = build.byAlias.get(item.source)?.placements.get(item.path)?.leftOut;
   if (leftOut === undefined || leftOut.files.length === 0) return;

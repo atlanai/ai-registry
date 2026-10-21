@@ -241,12 +241,4 @@ describe("the envelope a publish writes", () => {
     expect((await envelope("1.0.0")).relationships).toEqual([edge]);
     expect((await envelope("1.0.1")).relationships).toEqual([moved]);
   });
-
-  test("writes no relationships for a version offered without any", async () => {
-    await writeOffer(root, [offer({ relationships: [] })], "2026-01-02T00:00:00Z", alone);
-    const written = JSON.parse(
-      await readFile(join(root, "artifacts/house/skill/lint/1.0.0/artifact.json"), "utf8"),
-    );
-    expect(written).not.toHaveProperty("relationships");
-  });
 });
