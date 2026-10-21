@@ -49,9 +49,12 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir, git }) => {
     join(maker, ".claude", "agents", "reviewer.md"),
     "---\nname: reviewer\ndescription: Reviews a pull request.\n---\nReview it.\n",
   );
+  // A README beside the skills is no agent, so the glob skips it.
+  await writeFile(join(maker, ".claude", "skills", "README.md"), "# Our skills\n");
   await writeManifestIn(maker, `${EXPORTS}publish:\n  to: [./registry/eng]\n`);
   // The scratch skill is never committed, so the glob leaves it out.
-  await git(maker, "add", ".claude/skills/review", ".claude/agents", ".registry");
+  await git(maker, "add", ".claude/skills/review", ".claude/skills/README.md", ".claude/agents");
+  await git(maker, "add", ".registry");
   await git(maker, "commit", "-qm", "exports");
   // Nor is a note written in the review skill since, so its folder is published without it.
   await writeFile(join(maker, ".claude", "skills", "review", "draft.md"), "Not yet.\n");
@@ -69,6 +72,9 @@ describe("publishing a repository's exports", () => {
       /add {5}eng\/skill\/review {2}0\.1\.0\n {2}add {5}eng\/agent\/reviewer {2}0\.1\.0, depends on review \^0\.1\.0/,
     );
     expect(shown.stdout).not.toContain("scratch");
+    expect(shown.stdout).toContain(
+      "Skipped .claude/skills/README.md, which has no name and description in its front matter, so it is no agent.",
+    );
 
     const json = await publish("--dry-run", "--json");
     expect(json.code, json.stderr).toBe(0);

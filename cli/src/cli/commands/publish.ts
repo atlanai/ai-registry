@@ -598,10 +598,12 @@ export async function run(context: CommandContext): Promise<void> {
   const base = loaded.roots.base;
   const early = await writableFirst(given.to, manifest, known, context.cwd);
 
-  const found =
+  const reached =
     manifest.exports.length > 0
       ? await exportsOn(manifest, base, installedPaths(loaded.lock, base))
       : undefined;
+  for (const note of reached?.notes ?? []) printer.info(note);
+  const found = reached?.found;
   const chosen = await gather(step, loaded, common, context.cwd, {
     paths: positionals,
     since: own["changed-since"],

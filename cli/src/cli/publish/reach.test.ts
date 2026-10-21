@@ -18,7 +18,10 @@ test.beforeEach(async ({ tmp }) => {
     );
   }
   await mkdir(join(base, "agents"), { recursive: true });
-  await writeFile(join(base, "agents", "reviewer.md"), "---\nname: reviewer\n---\nReview.\n");
+  await writeFile(
+    join(base, "agents", "reviewer.md"),
+    "---\nname: reviewer\ndescription: Reviews.\n---\nReview.\n",
+  );
 });
 
 function manifestWith(exports: string): Manifest {
@@ -29,7 +32,7 @@ function manifestWith(exports: string): Manifest {
 
 describe("exportsOn", () => {
   test("expands a glob, and lets a mapping refine one of its paths", async () => {
-    const found = await exportsOn(
+    const { found } = await exportsOn(
       manifestWith(
         "  - skills/*\n  - agents/reviewer.md\n  - path: skills/style\n    publish: false\n",
       ),
@@ -44,7 +47,7 @@ describe("exportsOn", () => {
   });
 
   test("merges every entry that reaches an artifact, combining their dependencies", async () => {
-    const found = await exportsOn(
+    const { found } = await exportsOn(
       manifestWith(
         [
           "  - skills/*",
@@ -107,7 +110,7 @@ describe("exportsOn", () => {
       "---\nname: inside\ndescription: Inside.\n---\n",
     );
     await symlink(join(base, "lib", "inside"), join(base, "skills", "inside"));
-    const found = await exportsOn(manifestWith("  - skills/inside\n"), base);
+    const { found } = await exportsOn(manifestWith("  - skills/inside\n"), base);
     expect([...found.keys()]).toEqual([join(base, "skills", "inside")]);
   });
 
@@ -121,7 +124,7 @@ describe("exportsOn", () => {
   test("reaches only what git tracks in a repository", async ({ git }) => {
     await git.init(base);
     await git(base, "add", "skills/review", "agents");
-    const found = await exportsOn(manifestWith("  - skills/*\n"), base);
+    const { found } = await exportsOn(manifestWith("  - skills/*\n"), base);
     expect([...found.keys()]).toEqual([join(base, "skills", "review")]);
   });
 
@@ -132,12 +135,12 @@ describe("exportsOn", () => {
     await writeFile(join(base, "skills", "review", "scratch.md"), "Not tracked.\n");
     const manifest = manifestWith("  - skills/review\n  - skills/style\n  - agents/reviewer.md\n");
     // Outside a repository every file goes.
-    expect((await exportsOn(manifest, base)).get(join(base, "skills", "review"))?.files).toBe(
+    expect((await exportsOn(manifest, base)).found.get(join(base, "skills", "review"))?.files).toBe(
       undefined,
     );
     await git.init(base);
     await git(base, "add", "skills/review/SKILL.md", "skills/review/checklist.md");
-    const found = await exportsOn(manifest, base);
+    const { found } = await exportsOn(manifest, base);
     expect(found.get(join(base, "skills", "review"))?.files).toEqual(["SKILL.md", "checklist.md"]);
     expect(found.get(join(base, "skills", "style"))?.files).toEqual(["SKILL.md"]);
     expect(found.get(join(base, "agents", "reviewer.md"))?.files).toBe(undefined);
@@ -148,12 +151,39 @@ describe("exportsOn", () => {
       .registry("acme", { location: "github.com/acme/agent-registry" })
       .artifact("style", { links: [{ harness: "claude", path: "skills/style", mode: "symlink" }] })
       .build();
-    const found = await exportsOn(
+    const { found } = await exportsOn(
       manifestWith("  - skills/*\n"),
       base,
       installedPaths(installed, base),
     );
     expect([...found.keys()]).toEqual([join(base, "skills", "review")]);
+  });
+
+  test("skips what a glob matches that is no artifact, with a note on each", async () => {
+    await writeFile(join(base, "agents", "README.md"), "# Agents\n\nWhat lives here.\n");
+    await writeFile(join(base, "agents", "draft.md"), "---\nname: draft\n---\nUnfinished.\n");
+    await writeFile(join(base, "agents", "notes.txt"), "Ideas.\n");
+    await mkdir(join(base, "agents", "shared"));
+    const { found, notes } = await exportsOn(manifestWith("  - agents/*\n"), base);
+    expect([...found.keys()]).toEqual([join(base, "agents", "reviewer.md")]);
+    expect(notes).toEqual([
+      "Skipped agents/README.md, which has no name and description in its front matter, so it is no agent.",
+      "Skipped agents/draft.md, which has no name and description in its front matter, so it is no agent.",
+      "Skipped agents/notes.txt, which is neither a skill folder nor an agent's .md file.",
+      "Skipped agents/shared, which holds no SKILL.md.",
+    ]);
+  });
+
+  test("refuses an entry naming a file or folder that is no artifact", async () => {
+    await writeFile(join(base, "agents", "README.md"), "# Agents\n");
+    await expect(exportsOn(manifestWith("  - agents/README.md\n"), base)).rejects.toMatchObject({
+      message:
+        'Export "agents/README.md" is not an artifact: it has no name and description in its front matter, so it is no agent.',
+      code: "invalid",
+    });
+    await expect(exportsOn(manifestWith("  - agents\n"), base)).rejects.toThrow(
+      'Export "agents" is not an artifact: it holds no SKILL.md.',
+    );
   });
 
   test("refuses an entry that names nothing", async () => {
