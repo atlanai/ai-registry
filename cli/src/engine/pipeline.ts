@@ -417,17 +417,26 @@ function refuseWithheld(
   printer: Printer,
   moving: ReadonlySet<string> | undefined,
 ): void {
+  const absent = plan.withheld.filter((item) => item.absent);
   const blocked = plan.withheld.filter(
-    (item) => item.withheld.status === "blocked" && moving?.has(item.name) === true,
+    (item) => !item.absent && item.withheld.status === "blocked" && moving?.has(item.name) === true,
   );
-  for (const line of keptLines(plan.withheld.filter((item) => !blocked.includes(item)))) {
+  const failed = [...absent, ...blocked];
+  for (const line of keptLines(plan.withheld.filter((item) => !failed.includes(item)))) {
     printer.warning(`${line}.`);
   }
-  if (blocked.length === 0) return;
-  throw new AiregError(`${list(keptLines(blocked))}.`, {
+  if (failed.length === 0) return;
+  const lines = [...absentLines(absent), ...keptLines(blocked)];
+  throw new AiregError(`${list(lines)}.`, {
     code: ErrorCode.Invalid,
-    hint: removeHint(blocked.map(({ name }) => name)),
+    hint: removeHint(failed.map(({ name }) => name)),
   });
+}
+
+function absentLines(absent: readonly Kept[]): string[] {
+  return absent.map(
+    ({ name, withheld }) => `${withheldMessage(withheld)}, so ${quoted(name)} is not installed`,
+  );
 }
 
 /** The commands that take each kept row out, said once for all of them. */
