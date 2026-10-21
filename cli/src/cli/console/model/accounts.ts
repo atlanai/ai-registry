@@ -1,6 +1,6 @@
 import { canSignIn } from "#adapter/contract.ts";
 import { sanitizeText, withoutCredentials } from "#adapter/text.ts";
-import { adapterFor } from "#core/adapter/registry.ts";
+import { adapterFor, declaredLayout } from "#core/adapter/registry.ts";
 import type { Account, RegistryConfig } from "#core/config/model.ts";
 import type { AccountRow } from "#core/console/model.ts";
 import { signedInAccounts } from "#core/credentials/store.ts";
@@ -43,7 +43,11 @@ async function abilities(
   const declared = manifest.registries[alias];
   if (declared === undefined) return { signIn: true, publishes: true };
   try {
-    const adapter = await adapterFor(declared.location, declared.adapter);
+    const adapter = await adapterFor(
+      declared.location,
+      declared.adapter,
+      declaredLayout(declared.config),
+    );
     return { signIn: canSignIn(adapter), publishes: adapter.capabilities.publish };
   } catch {
     return { signIn: true, publishes: true };

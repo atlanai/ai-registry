@@ -4,6 +4,7 @@ import { shownNames } from "#cli/names.ts";
 import { noArguments, parse } from "#cli/options.ts";
 import { type Watched, watchedFrom } from "#cli/render/installed.ts";
 import { expandLocation } from "#core/adapter/location.ts";
+import { declaredLayout } from "#core/adapter/registry.ts";
 import { connectSource, resolveArtifacts } from "#core/adapter/source.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import { ExitCode } from "#core/errors.ts";
@@ -84,7 +85,13 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
   try {
     const credential = await credentialFor(alias, declared, location);
     const open = await connectSource(
-      { alias, location, adapter: recordedAdapter(declared, lock, alias), config: declared.config },
+      {
+        alias,
+        location,
+        adapter: recordedAdapter(declared, lock, alias),
+        config: declared.config,
+        layout: declaredLayout(declared.config),
+      },
       credential === undefined ? {} : { credential },
     );
     try {

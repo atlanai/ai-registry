@@ -25,7 +25,7 @@ import { ID as GIT, pastedRepository, settlePastedLink } from "#adapters/git/api
 import { materialize } from "#core/adapter/content.ts";
 import { canonicalConfig } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { limitsFor, loadAdapter } from "#core/adapter/registry.ts";
+import { declaredLayout, limitsFor, loadAdapter } from "#core/adapter/registry.ts";
 import { connectSource, type Listing, resolveArtifacts } from "#core/adapter/source.ts";
 import type { Catalog, Entry } from "#core/catalog/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -440,14 +440,15 @@ export async function probe(
   let open: Awaited<ReturnType<typeof connectSource>>;
   let listing: Listing;
   let alias = declaredAlias ?? registryNameFromLocation(location, adapter ?? "registry");
+  const layout = declaredAlias === undefined ? config.layout : declaredLayout(config);
   try {
     // An undeclared address has no alias yet, so its account is found by address.
     const credential =
       declaredAlias === undefined
         ? await credentialForLocation(location, alias, { adapter })
-        : await credentialFor(declaredAlias, { adapter }, location);
+        : await credentialFor(declaredAlias, { adapter, config }, location);
     open = await connectSource(
-      { alias, location, adapter, config },
+      { alias, location, adapter, config, layout },
       credential === undefined ? {} : { credential },
     );
     alias = declaredAlias ?? registryNameFromLocation(location, open.adapter.id);

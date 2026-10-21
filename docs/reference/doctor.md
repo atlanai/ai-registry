@@ -12,7 +12,8 @@ aireg doctor
 
 `aireg doctor` checks what aireg needs and lists each check with a mark: `✓` when it passes, `!` for a suggestion, `✗` when it stops aireg from installing, and `i` for information. A suggestion or a problem names the command that deals with it on the line below. It only reads; it changes nothing.
 
-It opens with the versions of aireg, Node.js and git. A missing git or a Node.js older than 22.20.0 is listed as a problem instead.
+It opens with the versions of aireg, Node.js and git. A missing git or an unsupported Node.js version is listed as a problem instead.
+Node.js requires 22.23.4+ on major 22, 24.22.1+ on major 24, or 26.12.1 and later.
 
 | Check | What it reports |
 |---|---|

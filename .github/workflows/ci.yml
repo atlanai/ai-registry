@@ -149,7 +149,7 @@ jobs:
       security-events: write
 
   # Fixed jobs preserve every required check name when path selection skips them.
-  # The oldest supported runtime is 22.20.0; the other jobs share these steps.
+  # Runtime values use patched floors; fixed check names stay stable for branch protection.
   compat-node-min:
     name: CLI compatibility (Node 22.20.0, ubuntu-latest)
     needs: changes
@@ -157,7 +157,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      CI_NODE_VERSION: "22.20.0"
+      CI_NODE_VERSION: "22.23.4"
     steps: &compat-steps
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -190,9 +190,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      CI_NODE_VERSION: "24"
+      CI_NODE_VERSION: "24.22.1"
       # The Ubuntu and Fedora login default, where new files are group-writable.
       CI_UMASK: "002"
+    steps: *compat-steps
+
+  compat-node-26:
+    name: CLI compatibility (Node 26.12.1, ubuntu-latest)
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI_NODE_VERSION: "26.12.1"
     steps: *compat-steps
 
   compat-macos:
@@ -202,7 +212,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     env:
-      CI_NODE_VERSION: "24"
+      CI_NODE_VERSION: "24.22.1"
     steps: *compat-steps
 
   compat-windows:
@@ -222,7 +232,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "24"
+          node-version: "24.22.1"
           package-manager-cache: false
 
       - run: corepack enable pnpm
