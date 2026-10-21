@@ -2,7 +2,7 @@ import { posix } from "node:path";
 import type { SourceArtifact, SourceManifest } from "#adapter/index.ts";
 import { quoted, sanitizeText } from "#adapter/text.ts";
 import { canonicalRegistryUrl } from "#core/adapter/identity.ts";
-import { SKILL_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import {
   artifactFor,
   type Export,
@@ -29,9 +29,10 @@ export interface Exported {
 
 const WHERE = `${SCOPE_DIR}/${MANIFEST_FILE}`;
 
-/** A skill is its folder, however an entry reaches it, so one path names one export. */
+/** A skill or folder agent is its folder, however an entry reaches it: one path, one export. */
 function artifactRoot(path: string): string {
-  return posix.basename(path) === SKILL_ENTRY ? posix.dirname(path) : path;
+  const entry = posix.basename(path);
+  return entry === SKILL_ENTRY || entry === AGENT_ENTRY ? posix.dirname(path) : path;
 }
 
 /**

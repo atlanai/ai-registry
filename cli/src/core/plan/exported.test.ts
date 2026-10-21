@@ -128,6 +128,33 @@ exports:
     ]);
   });
 
+  it("takes a folder agent's AGENT.md as its folder, as a skill's SKILL.md is", () => {
+    const agent: SourceArtifact = {
+      path: "agents/websiteclaw",
+      id: "agents/websiteclaw",
+      kind: "agent",
+      name: "websiteclaw",
+      namespace: "tools",
+    };
+    const text = `exports:
+  - path: .claude/skills/review
+    depends_on: [./agents/websiteclaw/AGENT.md]
+  - path: agents/websiteclaw/AGENT.md
+    depends_on: [./.claude/agents/triage.md]
+`;
+    const { needs, warnings } = exportedNeeds({ text, artifacts: [...HELD, agent] }, [
+      ...listed,
+      { id: agent.id, name: agent.name },
+    ]);
+    expect(warnings).toEqual([]);
+    expect(needs.get(".claude/skills/review")).toEqual([
+      { namespace: "tools", kind: "agent", name: "websiteclaw" },
+    ]);
+    expect(needs.get("agents/websiteclaw")).toEqual([
+      { namespace: "tools", kind: "agent", name: "triage" },
+    ]);
+  });
+
   it("gives a path a glob exports nothing, and never matches a glob", () => {
     // Matched as a glob, this would backtrack for longer than any test waits.
     const slow = `${"*a".repeat(20)}b`;
