@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import type { SourceAdapter } from "#adapter/index.ts";
 import { type Manifest, parseManifest } from "#core/manifest.ts";
 import { lock } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
@@ -12,6 +13,7 @@ import {
   forTarget,
   inDependencyOrder,
   namesTarget,
+  takenBy,
 } from "./exports.ts";
 import { exportsOn } from "./reach.ts";
 import type { Planned, Published } from "./target.ts";
@@ -136,9 +138,54 @@ describe("forTarget", () => {
     expect(await exportWork(found)).toEqual([]);
     const path = join(base, "skills", "style");
     const style = { ...(await fromPath(path)), exported: found.get(path) };
-    expect(forTarget([style]).skipped).toEqual([
-      { name: "style", kind: "skill", reason: "its export sets publish: false" },
+    expect(forTarget([style], base).skipped).toEqual([
+      {
+        name: "style",
+        kind: "skill",
+        path: "skills/style",
+        reason: "its export sets publish: false",
+      },
     ]);
+  });
+});
+
+describe("takenBy", () => {
+  const adapter = (publishKinds?: readonly string[]) =>
+    ({ artifactKinds: ["skill", "agent"], publishKinds }) as unknown as SourceAdapter;
+
+  test("leaves out an export whose registry does not take its kind, and the edges to it", async () => {
+    const { manifest, found, works } = await exported(
+      [],
+      "  - path: skills/review\n    depends_on: [./agents/reviewer.md]\n",
+    );
+    const taken = await takenBy(
+      works,
+      async () => ({ alias: "acme", adapter: adapter(["skill"]) }),
+      found,
+      base,
+    );
+    expect(taken.works.map((work) => work.name)).toEqual(["review", "style"]);
+    expect(taken.skipped).toEqual([
+      {
+        name: "reviewer",
+        kind: "agent",
+        path: "agents/reviewer.md",
+        reason: "acme does not take agents",
+      },
+    ]);
+    expect(taken.warnings).toEqual([
+      "Left out the dependency of review on reviewer, since acme does not take agents.",
+    ]);
+    const review = named(taken.works, "review");
+    expect(await dependsOnFor(review, context(found, manifest, { left: taken.left }))).toEqual([]);
+    // A registry that names no narrower kinds takes every kind it serves.
+    const every = await takenBy(
+      works,
+      async () => ({ alias: "acme", adapter: adapter() }),
+      found,
+      base,
+    );
+    expect(every.skipped).toEqual([]);
   });
 });
 

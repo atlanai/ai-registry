@@ -1,7 +1,7 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { readRegistry } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
-import type { ArtifactKind, PublishRelationship } from "#adapter/index.ts";
+import type { ArtifactKind, PublishRelationship, SourceAdapter } from "#adapter/index.ts";
 import { expandHome, isLocalPath } from "#adapter/paths.ts";
 import { parseVersion } from "#adapter/semver.ts";
 import { quoted } from "#adapter/text.ts";
@@ -66,19 +66,85 @@ export function chooseTarget(
 export interface Skipped {
   name: string;
   kind: ArtifactKind;
+  /** Where it is, relative to the project. */
+  path: string;
   reason: string;
 }
 
+const skip = (work: Work, base: string, reason: string): Skipped => ({
+  name: work.name,
+  kind: work.kind,
+  path: posixRelative(base, work.path) || ".",
+  reason,
+});
+
 /** The work that goes to the target, and the exports that set `publish: false` to stay here. */
-export function forTarget(works: readonly Work[]): { works: Work[]; skipped: Skipped[] } {
+export function forTarget(
+  works: readonly Work[],
+  base: string,
+): { works: Work[]; skipped: Skipped[] } {
   const kept: Work[] = [];
   const skipped: Skipped[] = [];
   for (const work of works) {
     if (work.exported?.publish !== false) kept.push(work);
-    else
-      skipped.push({ name: work.name, kind: work.kind, reason: "its export sets publish: false" });
+    else skipped.push(skip(work, base, "its export sets publish: false"));
   }
   return { works: kept, skipped };
+}
+
+/**
+ * Why the registry an export goes to does not take it, as a lowercase clause, or undefined when
+ * it does: its adapter publishes only some kinds.
+ */
+function untaken(work: Work, adapter: SourceAdapter, alias: string): string | undefined {
+  if (work.exported === undefined) return undefined;
+  const kinds = adapter.publishKinds ?? adapter.artifactKinds;
+  return kinds.includes(work.kind) ? undefined : `${alias} does not take ${work.kind}s`;
+}
+
+/** The work its registry takes, the exports it does not, and a warning for each edge left out. */
+export interface Taken {
+  works: Work[];
+  skipped: Skipped[];
+  /** The exports left out, by path, so an edge to one is left out too. */
+  left: Set<string>;
+  warnings: string[];
+}
+
+/**
+ * An export the registry it goes to does not take is left out, not failed, so the rest still
+ * publish; an export depending on it publishes without that edge, and says so.
+ */
+export async function takenBy(
+  works: readonly Work[],
+  registryOf: (work: Work) => Promise<{ alias: string; adapter: SourceAdapter }>,
+  found: ReadonlyMap<string, Export> | undefined,
+  base: string,
+): Promise<Taken> {
+  const taken: Taken = { works: [], skipped: [], left: new Set(), warnings: [] };
+  const why = new Map<string, { name: string; reason: string }>();
+  for (const work of works) {
+    const { alias, adapter } = await registryOf(work);
+    const reason = untaken(work, adapter, alias);
+    if (reason === undefined) {
+      taken.works.push(work);
+      continue;
+    }
+    taken.skipped.push(skip(work, base, reason));
+    taken.left.add(work.path);
+    why.set(work.path, { name: work.name, reason });
+  }
+  for (const work of taken.works) {
+    if (work.exported === undefined || found === undefined) continue;
+    for (const need of localNeeds(work.exported, found, base)) {
+      const left = why.get(need);
+      if (left === undefined) continue;
+      taken.warnings.push(
+        `Left out the dependency of ${work.name} on ${left.name}, since ${left.reason}.`,
+      );
+    }
+  }
+  return taken;
 }
 
 /** The exports a local dependency names, by path, among those `found`. */
@@ -126,6 +192,8 @@ export function inDependencyOrder(
 export interface EdgeContext {
   base: string;
   found: ReadonlyMap<string, Export>;
+  /** The exports this run leaves out because their registry does not take them, by path. */
+  left?: ReadonlySet<string> | undefined;
   manifest: Manifest;
   lock: Lock;
   /** Every registry this scope reaches, with folders as absolute paths. */
@@ -152,7 +220,8 @@ function placeOf(location: string): string {
 /**
  * The `depends_on` edges an export carries into this target: another export at the version this
  * run publishes, or the target's newest, accepting that version's minor and patch releases; an
- * installed artifact at its locked version, accepting what its `artifacts:` entry does.
+ * installed artifact at its locked version, accepting what its `artifacts:` entry does. None to an
+ * export this run leaves out because its registry does not take it.
  */
 export async function dependsOnFor(
   work: Work,
@@ -162,11 +231,11 @@ export async function dependsOnFor(
   if (entry === undefined) return [];
   const edges: PublishRelationship[] = [];
   for (const need of entry.dependsOn) {
-    edges.push(
+    const edge =
       need.type === "local"
         ? await localEdge(work, entry, need.path, context)
-        : await remoteEdge(work, need.ref, context),
-    );
+        : await remoteEdge(work, need.ref, context);
+    if (edge !== undefined) edges.push(edge);
   }
   return edges;
 }
@@ -176,7 +245,7 @@ async function localEdge(
   entry: Export,
   needed: string,
   context: EdgeContext,
-): Promise<PublishRelationship> {
+): Promise<PublishRelationship | undefined> {
   const { namespace, registry } = context.target;
   const path = artifactRoot(resolve(context.base, needed));
   const other = context.found.get(path);
@@ -186,6 +255,8 @@ async function localEdge(
       hint: `List it under \`exports:\`, or remove it from the \`depends_on\` of export ${quoted(entry.path)}.`,
     });
   }
+  // Left out because its registry does not take it, so its dependents go without the edge.
+  if (context.left?.has(path) === true) return undefined;
   const sent = await context.planned(path);
   const { name, kind } = sent?.work ?? (await fromPath(path));
   const version =

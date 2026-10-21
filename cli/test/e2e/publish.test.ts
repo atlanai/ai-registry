@@ -244,6 +244,7 @@ describe("creating a registry and publishing into it", () => {
     expect(sent.code, sent.stderr).toBe(0);
     expect(JSON.parse(sent.stdout).data).toEqual({
       dryRun: false,
+      target: { registry: "team", namespace: "data" },
       artifacts: [
         {
           name: "triage",

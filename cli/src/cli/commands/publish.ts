@@ -16,6 +16,7 @@ import {
   inDependencyOrder,
   namesTarget,
   type Skipped,
+  takenBy,
 } from "#cli/publish/exports.ts";
 import { exportsOn, installedPaths } from "#cli/publish/reach.ts";
 import {
@@ -193,15 +194,24 @@ function describeSkip(skip: Skipped, namespace: string): string {
 
 type Sending = { alias: string; item: Planned }[];
 
+/** What `--json` says beside each artifact: whether anything was sent, where, and what was left out. */
+interface Outcome {
+  dryRun: boolean;
+  /** Where exports go, from `--to` or `publish.to`; absent when each artifact goes where it came from. */
+  to: Destination | undefined;
+  skipped: readonly Skipped[];
+}
+
 /** Each artifact under `--json`: its versions, and where it went. */
 function report(
   printer: Printer,
   planned: Sending,
   results: ReadonlyMap<string, PublishResult | undefined>,
-  dryRun: boolean,
-  skipped: readonly Skipped[],
+  outcome: Outcome,
 ): void {
   if (printer.format !== "json") return;
+  const { dryRun, to, skipped } = outcome;
+  const target = to === undefined ? null : { registry: to.registry, namespace: to.namespace };
   const artifacts = planned.map(({ alias, item }) => {
     const result = results.get(alias);
     return {
@@ -220,7 +230,7 @@ function report(
       })),
     };
   });
-  printer.json({ ok: true, data: { dryRun, artifacts, skipped } });
+  printer.json({ ok: true, data: { dryRun, target, artifacts, skipped } });
 }
 
 /** The edges an export carries into one target, given what this run plans for the others. */
@@ -482,7 +492,8 @@ async function boundFor(
   known: Record<string, RegistrySource>,
   dirs: { base: string; cwd: string },
 ): Promise<Bound> {
-  if (manifest.publish === undefined) return { ...forTarget(works), ...given, target: undefined };
+  if (manifest.publish === undefined)
+    return { ...forTarget(works, dirs.base), ...given, target: undefined };
   if (!works.some((work) => work.exported !== undefined))
     return { works, skipped: [], ...given, target: undefined };
   const { to } = given;
@@ -497,7 +508,7 @@ async function boundFor(
     to === undefined
       ? await destinationFrom(target, isLocalPath(target) ? dirs.base : dirs.cwd, known)
       : given;
-  return { ...forTarget(works), ...chosen, target };
+  return { ...forTarget(works, dirs.base), ...chosen, target };
 }
 
 /** Each export's edges for the target it goes to; other work's are left as they are. */
@@ -505,6 +516,7 @@ function edgesOf(
   loaded: Loaded,
   found: ReadonlyMap<string, Export> | undefined,
   known: Record<string, RegistrySource>,
+  left: ReadonlySet<string>,
 ): EdgesFor | undefined {
   if (found === undefined) return undefined;
   return async (work, target, published, planned) =>
@@ -513,6 +525,7 @@ function edgesOf(
       : dependsOnFor(work, {
           base: loaded.roots.base,
           found,
+          left,
           manifest: loaded.manifest,
           lock: loaded.lock,
           known,
@@ -577,10 +590,39 @@ function refuseUndeclared(
 }
 
 /** Nothing left to publish, and the exports left out of this target, if any. */
-function nothing(printer: Printer, bound: Bound, dryRun: boolean): void {
+function nothing(printer: Printer, outcome: Outcome): void {
   printer.info(printer.style.dim("Nothing to publish."));
-  for (const skip of bound.skipped) printer.info(describeSkip(skip, bound.to?.namespace ?? ""));
-  report(printer, [], new Map(), dryRun, bound.skipped);
+  for (const skip of outcome.skipped) printer.info(describeSkip(skip, outcome.to?.namespace ?? ""));
+  report(printer, [], new Map(), outcome);
+}
+
+/** A cache of the registries this run opens, each read once and closed together. */
+function opener(
+  known: Readonly<Record<string, RegistrySource>>,
+  cwd: string,
+  /** The command that sends this work into a clone of a registry instead. */
+  how: (alias: string) => string,
+) {
+  const opened = new Map<string, Published>();
+  const open = async (alias: string): Promise<Published> => {
+    const cached = opened.get(alias);
+    if (cached !== undefined) return cached;
+    const read = await readPublished(alias, known[alias] as RegistrySource, cwd, how(alias));
+    opened.set(alias, read);
+    return read;
+  };
+  const close = () => Promise.all([...opened.values()].map((entry) => entry.source.handle.close()));
+  return { open, close };
+}
+
+/** Your own default for new work that names no destination, when this scope declares its registry. */
+async function savedDefault(
+  known: Readonly<Record<string, RegistrySource>>,
+): Promise<Destination | undefined> {
+  // It spans every project, so one that does not declare its registry simply has no default.
+  const declared = (await readConfig()).defaults.namespace;
+  const fallback = declared === undefined ? undefined : parseTo(declared);
+  return fallback !== undefined && known[fallback.registry] !== undefined ? fallback : undefined;
 }
 
 export async function run(context: CommandContext): Promise<void> {
@@ -615,42 +657,37 @@ export async function run(context: CommandContext): Promise<void> {
   const works = found === undefined ? bound.works : inDependencyOrder(bound.works, found, base);
   const targets =
     early ?? (to === undefined ? await writableRegistries(known, context.cwd) : known);
-  if (works.length === 0) return nothing(printer, bound, common.dryRun);
+  if (works.length === 0) return nothing(printer, { dryRun: common.dryRun, to, skipped });
   nameOne(works, to, positionals.length > 0 || target === undefined);
-  const edgesFor = edgesOf(loaded, found, known);
 
-  const opened = new Map<string, Published>();
-  const open = async (alias: string): Promise<Published> => {
-    const cached = opened.get(alias);
-    if (cached !== undefined) return cached;
-    const read = await readPublished(
-      alias,
-      known[alias] as RegistrySource,
-      context.cwd,
-      intoClone(works, alias, to, context.cwd),
-    );
-    opened.set(alias, read);
-    return read;
-  };
+  const { open, close } = opener(known, context.cwd, (alias) =>
+    intoClone(works, alias, to, context.cwd),
+  );
   try {
-    // Your own default for new work that names no destination. It spans every
-    // project, so one that does not declare its registry simply has no default.
-    const declared = (await readConfig()).defaults.namespace;
-    const fallback = declared === undefined ? undefined : parseTo(declared);
-    const saved =
-      fallback !== undefined && known[fallback.registry] !== undefined ? fallback : undefined;
-    const where = await destinationOf(step, works, targets, to, open, saved);
+    const where = await destinationOf(step, works, targets, to, open, await savedDefault(known));
     if (where === undefined) return printer.info("Canceled. Nothing was published.");
+    const taken = await takenBy(
+      works,
+      async (work) => {
+        const alias = (where.get(work) as Destination).registry;
+        return { alias, adapter: (await open(alias)).source.adapter };
+      },
+      found,
+      base,
+    );
+    for (const warning of taken.warnings) printer.warning(warning);
+    const outcome = { dryRun: common.dryRun, to, skipped: [...skipped, ...taken.skipped] };
+    if (taken.works.length === 0) return nothing(printer, outcome);
 
     const planned = await planAll(
       step,
-      works,
+      taken.works,
       where,
       open,
       bumpOf(own.bump),
       to?.version,
       common.force,
-      edgesFor,
+      edgesOf(loaded, found, known, taken.left),
     );
     if (planned === undefined) return printer.info("Canceled. Nothing was published.");
     // Only a person at a terminal is asked, and only by a source that records a reason.
@@ -659,9 +696,11 @@ export async function run(context: CommandContext): Promise<void> {
       own.message === undefined &&
       (await open(alias)).source.adapter.capabilities.messages === true;
     const skips =
-      to === undefined ? undefined : { into: to.registry, namespace: to.namespace, skipped };
+      to === undefined
+        ? undefined
+        : { into: to.registry, namespace: to.namespace, skipped: outcome.skipped };
     const sending = await review(context, step, planned, open, common.dryRun, asks, skips);
-    if (sending === undefined) return report(printer, planned, new Map(), common.dryRun, skipped);
+    if (sending === undefined) return report(printer, planned, new Map(), outcome);
 
     const results = new Map<string, PublishResult | undefined>();
     for (const alias of new Set(sending.map((entry) => entry.alias))) {
@@ -680,7 +719,7 @@ export async function run(context: CommandContext): Promise<void> {
       common,
       sending.map(({ item }) => item),
     );
-    report(printer, planned, results, false, skipped);
+    report(printer, planned, results, { ...outcome, dryRun: false });
     // A registry folder is not your user scope; an installed copy it sent from is.
     if (
       !isLocalPath(own.to ?? target ?? "") ||
@@ -689,7 +728,7 @@ export async function run(context: CommandContext): Promise<void> {
       noteUserScope(printer, common.scope, context.cwd);
     }
   } finally {
-    await Promise.all([...opened.values()].map((entry) => entry.source.handle.close()));
+    await close();
   }
 }
 

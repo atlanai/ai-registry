@@ -109,6 +109,8 @@ acme  github.com/acme/agent-registry
   skip    engineering/skill/scratch  its export sets publish: false
 ```
 
+A registry whose adapter doesn't publish a kind, such as one that takes skills but not agents, takes the rest of the exports: each export of that kind is listed as `skip`, with the reason, and the run still succeeds. An export that depends on one it leaves out publishes without that dependency, with a warning such as `Left out the dependency of reviewer on triage, since acme does not take agents.`
+
 ### Versions
 
 An export with a `version` is published at that version. When the target already holds that version with the same files and dependencies, it is `same`; when it holds it with others, `publish` refuses, since a published version is never rewritten. A version the registry holds back by its status counts as published too: a draft or a version pending review is compared as any other, and `publish` refuses a blocked one, whose files the registry doesn't give, as in `engineering/review@0.2.0 is already published, and is blocked (leaks tokens).` An export without a `version` takes the next one, as any other artifact does.
@@ -159,14 +161,14 @@ For an artifact without a fixed `version`, a version whose only change is a depe
 With `--json`, `publish` asks no questions and prints each artifact with its old and new version, and where it went:
 
 ```json
-{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "belowLatest": false, "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}]}], "skipped": [{"name": "scratch", "kind": "skill", "reason": "its export sets publish: false"}]}}
+{"ok": true, "data": {"dryRun": false, "target": {"registry": "acme", "namespace": "engineering"}, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "belowLatest": false, "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}]}], "skipped": [{"name": "reviewer", "kind": "agent", "path": ".claude/agents/reviewer.md", "reason": "acme does not take agents"}]}}
 ```
 
-`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and otherwise the registry's newest version. `belowLatest` is `true` when `version` sorts below `from`, as an export's own `version` can. `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `skipped` lists the exports named on the command line whose own `publish: false` keeps them in the repository.
+`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and otherwise the registry's newest version. `belowLatest` is `true` when `version` sorts below `from`, as an export's own `version` can. `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `target` is where this run sends its work, from `--to` or `publish.to`, its `registry` written as each artifact's is; it is `null` when each artifact goes where it was installed from. `skipped` lists the exports left out, each with its `name`, `kind`, `path` in the project and `reason`: one the registry doesn't take, or one named on the command line whose own `publish: false` keeps it in the repository.
 
 ## Exit status
 
-- `0`: published, nothing new to publish, a dry run, or canceled at a question.
+- `0`: published, nothing new to publish, a dry run, or canceled at a question. Exports left out because the registry doesn't take their kind don't change it.
 - `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published, whatever its status. For exports: an entry names nothing, names something that is no skill or agent, or reaches outside the project, two entries set an artifact's `version` or `publish` differently, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
 - `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder. For exports: `--to` names another target than `publish.to`, or a registry without dependencies would receive an artifact that has them.
 - `3`: the artifact was edited from an older version than the one published since. Install the newer version and redo the edit, or pass `--force`.

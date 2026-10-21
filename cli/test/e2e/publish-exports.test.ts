@@ -80,6 +80,7 @@ describe("publishing a repository's exports", () => {
     expect(json.code, json.stderr).toBe(0);
     expect(JSON.parse(json.stdout).data).toEqual({
       dryRun: true,
+      target: { registry: "./registry", namespace: "eng" },
       artifacts: [
         expect.objectContaining({ name: "review", version: "0.1.0", dependsOn: [] }),
         expect.objectContaining({
@@ -188,7 +189,12 @@ publish:
     const named = await publish(".claude/skills/review", "--dry-run", "--json");
     expect(named.code, named.stderr).toBe(0);
     expect(JSON.parse(named.stdout).data.skipped).toEqual([
-      { name: "review", kind: "skill", reason: "its export sets publish: false" },
+      {
+        name: "review",
+        kind: "skill",
+        path: ".claude/skills/review",
+        reason: "its export sets publish: false",
+      },
     ]);
   });
 });
