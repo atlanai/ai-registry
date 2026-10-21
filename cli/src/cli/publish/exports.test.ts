@@ -1,4 +1,4 @@
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { type Manifest, parseManifest } from "#core/manifest.ts";
@@ -8,13 +8,12 @@ import {
   chooseTarget,
   dependsOnFor,
   type EdgeContext,
-  exportsOn,
   exportWork,
   forTarget,
   inDependencyOrder,
-  installedPaths,
   namesTarget,
 } from "./exports.ts";
+import { exportsOn } from "./reach.ts";
 import type { Planned, Published } from "./target.ts";
 import { fromPath, type Work } from "./work.ts";
 
@@ -100,80 +99,6 @@ function context(
     ...over,
   };
 }
-
-describe("exportsOn", () => {
-  test("expands a glob, and lets a mapping refine one of its paths", async () => {
-    const { found, works } = await exported([], "  - path: skills/style\n    publish: false\n");
-    expect([...found.keys()]).toEqual([
-      join(base, "skills", "review"),
-      join(base, "skills", "style"),
-      join(base, "agents", "reviewer.md"),
-    ]);
-    expect(works.map((work) => work.name)).toEqual(["review", "reviewer"]);
-  });
-
-  test("refuses an export that a tracked link takes outside the project", async ({
-    git,
-    fileTmp,
-  }) => {
-    const elsewhere = join(fileTmp, "elsewhere", "evil");
-    await mkdir(elsewhere, { recursive: true });
-    await writeFile(join(elsewhere, "SKILL.md"), "---\nname: evil\ndescription: Evil.\n---\n");
-    await symlink(elsewhere, join(base, "skills", "evil"));
-    await git.init(base);
-    await git(base, "add", "skills");
-    await expect(exportsOn(manifestWith("  - skills/*\n"), base)).rejects.toMatchObject({
-      message: 'Export "skills/*" reaches skills/evil, which is outside this project.',
-      code: "invalid",
-    });
-    await expect(exportsOn(manifestWith("  - skills/evil\n"), base)).rejects.toThrow(
-      "which is outside this project.",
-    );
-    // A link that stays inside the project publishes what it points to.
-    await mkdir(join(base, "lib", "inside"), { recursive: true });
-    await writeFile(
-      join(base, "lib", "inside", "SKILL.md"),
-      "---\nname: inside\ndescription: Inside.\n---\n",
-    );
-    await symlink(join(base, "lib", "inside"), join(base, "skills", "inside"));
-    const found = await exportsOn(manifestWith("  - skills/inside\n"), base);
-    expect([...found.keys()]).toEqual([join(base, "skills", "inside")]);
-  });
-
-  test("refuses a glob whose expansion leaves the project", async () => {
-    // Its braces climb out as `..` would, spelled so no part of it reads as `..`.
-    await expect(exportsOn(manifestWith("  - '{.,.}./*'\n"), base)).rejects.toThrow(
-      "which is outside this project.",
-    );
-  });
-
-  test("reaches only what git tracks in a repository", async ({ git }) => {
-    await git.init(base);
-    await git(base, "add", "skills/review", "agents");
-    const found = await exportsOn(manifestWith("  - skills/*\n"), base);
-    expect([...found.keys()]).toEqual([join(base, "skills", "review")]);
-  });
-
-  test("never reaches what aireg installed there", async () => {
-    const installed = lock()
-      .registry("acme", { location: "github.com/acme/agent-registry" })
-      .artifact("style", { links: [{ harness: "claude", path: "skills/style", mode: "symlink" }] })
-      .build();
-    const found = await exportsOn(
-      manifestWith("  - skills/*\n"),
-      base,
-      installedPaths(installed, base),
-    );
-    expect([...found.keys()]).toEqual([join(base, "skills", "review")]);
-  });
-
-  test("refuses an entry that names nothing", async () => {
-    await expect(exportsOn(manifestWith("  - skills/gone\n"), base)).rejects.toMatchObject({
-      message: 'Export "skills/gone" names nothing in this project.',
-      code: "not_found",
-    });
-  });
-});
 
 describe("chooseTarget", () => {
   const listed = ["acme/engineering", "public/acme"];

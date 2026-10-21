@@ -11,14 +11,13 @@ import { multiselect } from "#cli/prompt/multiselect.ts";
 import {
   chooseTarget,
   dependsOnFor,
-  exportsOn,
   exportWork,
   forTarget,
   inDependencyOrder,
-  installedPaths,
   namesTarget,
   type Skipped,
 } from "#cli/publish/exports.ts";
+import { exportsOn, installedPaths } from "#cli/publish/reach.ts";
 import {
   commitAndPush,
   type Destination,
