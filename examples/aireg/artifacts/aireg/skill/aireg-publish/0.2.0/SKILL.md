@@ -44,7 +44,8 @@ before publishing it:
 aireg show ./<path> --json
 ```
 
-A skill is a folder holding `SKILL.md`; an agent is one `.md` file. aireg doesn't publish to
+A skill is a folder holding `SKILL.md`; an agent is one `.md` file, or a folder holding
+`AGENT.md` and the files it works from. aireg doesn't publish to
 a git registry: it writes the new version into a clone, and git carries it from there. For a
 registry in a git repository, the usual case:
 
@@ -87,14 +88,27 @@ the user asks to set it up:
 artifacts:
   - <registry>/<namespace>/skill/<name>@^1.2   # installed here, and an export depends on it
 exports:
-  - .claude/skills/*
-  - path: .claude/agents/reviewer.md
+  - .claude/skills                              # a folder: each skill or agent directly inside
+  - path: .claude/agents/reviewer.md            # one artifact
     depends_on:
       - ./.claude/skills/review                 # another export
       - <registry>/<namespace>/skill/<name>     # an artifacts: entry, without a version
+  - path: agents/<agent>                        # a folder agent: AGENT.md and its files
+    ignore: [runtime/]                          # gitignore patterns, files left out
+    include:                                    # the only files sent beside AGENT.md
+      - workspace
+      - { from: notes/SOUL.md, as: identity/SOUL.md }
 publish:
   to: ../<clone>/<namespace>
 ```
+
+Write each entry as a plain path: an artifact, or a folder whose artifacts directly inside it
+are each exported, the rest skipped with a note. A glob also works, but a path needs no
+quoting. A mapping can add `kind` (`skill` or `agent`, which everything it reaches must be),
+`exclude` (names in a folder entry to leave out), `include` and `ignore`, with paths relative
+to each artifact. In a git repository only what git tracks is published, and the entry file
+always goes. A skill inside an agent's folder that another entry reaches is published on its
+own, not with the agent.
 
 ```sh
 aireg publish --dry-run --yes --json   # data.artifacts and data.skipped: what it would do
@@ -104,7 +118,11 @@ aireg publish --yes --json
 - `publish.to` is one target, not a list. Exports go only there: a `--to` naming another
   exits 2. An export with `publish: false` stays in the repository.
 - `data.skipped` lists the exports left out, each with its `reason`. That is the manifest
-  working, not a failure.
+  working, not a failure: a registry may not take a kind, or keep a folder agent's files
+  beyond its `AGENT.md`. A registry folder keeps them.
+- A folder agent in `data.artifacts` has `files`, the paths its version stores, `AGENT.md`
+  first. Show them to the user: a file missing there is one `include`, `ignore` or git left
+  out. A `warning:` about an `ignore` pattern means it leaves nothing out.
 - Each of `data.artifacts` has `dependsOn`, the edges its version carries: each a `to`, a
   `range` unless the edge takes only that version, and a `registry` when the dependency is
   in another registry. Show them to the user with the versions before publishing.
