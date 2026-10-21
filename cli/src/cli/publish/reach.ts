@@ -333,7 +333,8 @@ export interface Reached {
  * Every artifact `exports:` reaches, by its absolute path, with the entries that reach it merged.
  * In a git repository an entry reaching through a glob or a folder reaches only what git tracks,
  * so scratch work beside an export is not published, and never what aireg installed there;
- * inside a folder, too, only what git tracks is published. Every entry reaching an artifact
+ * inside a folder, too, only what git tracks is published, and never an artifact inside it that an
+ * entry also reaches, which is published on its own. Every entry reaching an artifact
  * applies to it: their lists are combined, and an entry naming the artifact sets its `version`,
  * `publish` and `kind` over one that only reaches it.
  */
@@ -359,7 +360,14 @@ export async function exportsOn(
     const exported = merged(reaches, shownAt(root, base));
     const files = (await isDirectory(root))
       ? await chooseFiles(
-          { root, kind, entries: reaches.map((each) => each.entry), tracked, matched },
+          {
+            root,
+            kind,
+            entries: reaches.map((each) => each.entry),
+            tracked,
+            exported: reached.keys(),
+            matched,
+          },
           base,
         )
       : undefined;

@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -9,8 +10,9 @@ import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import type { Export, ExportFile } from "#core/manifest.ts";
 
 // Which files one folder artifact publishes, and the path each is stored at: in a git repository
-// only what git tracks, only what `include` lists when an entry has it, less what `ignore` leaves
-// out, and always its entry file, as itself.
+// only what git tracks, never what belongs to an artifact inside it that is exported on its own,
+// only what `include` lists when an entry has it, less what `ignore` leaves out, and always its
+// entry file, as itself.
 
 /** The file that makes a folder the kind it is, published first and always as itself. */
 function entryOf(kind: ArtifactKind): string {
@@ -25,6 +27,8 @@ export interface Choosing {
   entries: readonly Export[];
   /** Files git tracks below the project, or undefined outside a repository. */
   tracked: readonly string[] | undefined;
+  /** Every artifact that is exported, so one inside this one publishes its own files. */
+  exported: Iterable<string>;
   /** The patterns of each entry that left something out, keyed by entry path and pattern. */
   matched: Set<string>;
 }
@@ -94,7 +98,11 @@ export async function chooseFiles(choosing: Choosing, base: string): Promise<Exp
   const { root, kind, entries, tracked } = choosing;
   const shown = posixRelative(base, root);
   const entry = entryOf(kind);
-  const held = await candidates(root, tracked);
+  // An artifact inside this one that is exported is published on its own, so it is not part of this one.
+  const nested = [...choosing.exported].filter((other) => other !== root && isWithin(root, other));
+  const held = (await candidates(root, tracked)).filter(
+    (path) => !nested.some((other) => isWithin(other, resolve(root, path))),
+  );
   const include = entries.flatMap((each) =>
     (each.include ?? []).map((file) => ({ entry: each, file })),
   );

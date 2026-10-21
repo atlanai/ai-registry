@@ -131,6 +131,8 @@ exports:
 - `include` lists the only files to publish beside the entry file, which always goes. A path, a file or a folder, is stored at the same path; `{ from, as }` stores it at another path, such as `notes/style.md` as `style.md`. A path the artifact doesn't hold, or git doesn't track, is refused, and so is an `as` that two files would share or that names an entry file such as `SKILL.md`.
 - `ignore` takes gitignore patterns, such as `fixtures/` for a folder at any depth, `/fixtures` for the one at the top, and `*.log`. The files they match stay out, after `include`; the entry file never does. A pattern that leaves nothing out is a warning, as in `Export "skills" ignores "*.log", which matches no file it publishes, so it leaves nothing out.`
 
+An artifact inside another one, such as a skill folder inside another skill's folder, is part of it until an entry reaches it too. Then it is published on its own, and left out of the files of the one it sits in.
+
 ### Entries that reach one artifact
 
 Every entry that reaches an artifact applies to it: their `depends_on`, `include` and `ignore` lists are combined, and an entry naming the artifact, such as `.claude/skills/review` or `.claude/skills/review/SKILL.md`, sets its `kind`, `version` and `publish` over a folder or glob that only reaches it. Two entries that set one of these differently for the same artifact are refused, naming both. Two exports of the same kind and name are refused too, naming both paths, as in `skills/review and vendor/review are both exported as skill review.` An entry with `publish: false` is left out. A path you name on the command line that is an export follows its entry's rules too; other paths behave as described above.

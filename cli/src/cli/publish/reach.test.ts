@@ -419,3 +419,43 @@ function beforeEachFiles(): void {
     }
   });
 }
+
+describe("exportsOn, for an artifact inside another", () => {
+  test("publishes one that an entry reaches on its own, and leaves it out of the other's files", async () => {
+    const review = join(base, "skills", "review");
+    await mkdir(join(review, "helpers", "lint"), { recursive: true });
+    await writeFile(
+      join(review, "helpers", "lint", "SKILL.md"),
+      "---\nname: lint\ndescription: Lints.\n---\n",
+    );
+    await writeFile(join(review, "helpers", "lint", "rules.md"), "Rules.\n");
+    await writeFile(join(review, "helpers", "notes.md"), "Notes.\n");
+    await writeFile(join(review, "helper.md"), "---\nname: helper\ndescription: Helps.\n---\n");
+    // Reached by no entry, what is inside the skill is part of it.
+    const alone = await exportsOn(manifestWith("  - skills/review\n"), base);
+    expect(alone.found.get(review)?.files?.map((file) => file.as)).toEqual([
+      "SKILL.md",
+      "helper.md",
+      "helpers/lint/SKILL.md",
+      "helpers/lint/rules.md",
+      "helpers/notes.md",
+    ]);
+    const { found } = await exportsOn(
+      manifestWith("  - skills/review\n  - skills/review/helpers\n  - skills/review/helper.md\n"),
+      base,
+    );
+    expect([...found.keys()]).toEqual([
+      review,
+      join(review, "helpers", "lint"),
+      join(review, "helper.md"),
+    ]);
+    expect(found.get(review)?.files?.map((file) => file.as)).toEqual([
+      "SKILL.md",
+      "helpers/notes.md",
+    ]);
+    expect(found.get(join(review, "helpers", "lint"))?.files?.map((file) => file.as)).toEqual([
+      "SKILL.md",
+      "rules.md",
+    ]);
+  });
+});
