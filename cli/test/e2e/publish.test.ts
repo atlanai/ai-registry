@@ -145,6 +145,24 @@ describe("creating a registry and publishing into it", () => {
     expect((await aireg(["registry", "validate"], { cwd: registryRoot })).code).toBe(0);
   });
 
+  test("publishes past an archived latest, even with the same files", async ({ aireg }) => {
+    const path = join(work, "archive", "retire");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "SKILL.md"), skillBody("retire", "retire", "Retire it.\n"));
+    const send = () =>
+      aireg(["publish", "archive/retire", "--to", "team/platform", "--yes"], { cwd: work });
+    expect((await send()).code).toBe(0);
+    const at = join(registryRoot, "artifacts", "platform", "skill", "retire", "versions.json");
+    const document = JSON.parse(await readFile(at, "utf8"));
+    for (const row of document.versions) row.status = "archived";
+    await writeFile(at, JSON.stringify(document, null, 2));
+    expect((await aireg(["registry", "index"], { cwd: registryRoot })).code).toBe(0);
+
+    const sent = await send();
+    expect(sent.code, sent.stderr).toBe(0);
+    expect(sent.stdout).toMatch(/update\s+platform\/skill\/retire\s+0\.1\.0 → 0\.1\.1/);
+  });
+
   test("writes each of three publishes at once at the version it reports, or refuses it", async ({
     aireg,
   }) => {

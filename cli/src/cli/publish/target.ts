@@ -10,6 +10,7 @@ import {
   type PublishRelationship,
   type Relationship,
   type SourceAdapter,
+  type Want,
 } from "#adapter/index.ts";
 import {
   type Bump,
@@ -221,7 +222,6 @@ export interface Published {
   alias: string;
   location: string;
   source: ConnectedSource;
-  namespaces: string[];
   latest: Map<string, Current>;
   /** Artifacts whose newest version the registry holds back, such as a blocked one, at that version. */
   withheld: Map<string, Current>;
@@ -243,13 +243,13 @@ function heldOf(artifact: Artifact, version: string | undefined): Current {
   };
 }
 
-export async function readPublished(
+/** A registry opened to publish into, refused when its adapter does not publish. */
+async function connectToPublish(
   alias: string,
   declared: RegistrySource,
   cwd: string,
-  /** The command that publishes this work into a clone, for when the registry is a git one. */
-  how?: string,
-): Promise<Published> {
+  how: string | undefined,
+): Promise<{ location: string; source: ConnectedSource }> {
   const refused = readOnlyLayout(alias, declared.config);
   if (refused !== undefined) throw refused;
   const location = expandLocation(declared.location, cwd);
@@ -269,13 +269,50 @@ export async function readPublished(
     await source.handle.close();
     throw cannotPublish(source.adapter, alias, how);
   }
-  const listing = await resolveArtifacts(source, [], { all: true });
+  return { location, source };
+}
+
+/** The namespaces a registry lists, to choose one from: the one whole listing a publish reads. */
+export async function namespacesIn(
+  alias: string,
+  declared: RegistrySource,
+  cwd: string,
+  how?: string,
+): Promise<string[]> {
+  const { source } = await connectToPublish(alias, declared, cwd, how);
+  try {
+    const { listed } = await resolveArtifacts(source, [], { all: true });
+    const namespaces = listed.flatMap(({ artifact }) => artifact.envelope.metadata.namespace ?? []);
+    return [...new Set(namespaces)].sort();
+  } finally {
+    await source.handle.close();
+  }
+}
+
+export async function readPublished(
+  alias: string,
+  declared: RegistrySource,
+  cwd: string,
+  /** Every artifact this run may publish or name here, as `publishWants` gives them. */
+  want: readonly Want[],
+  /** The command that publishes this work into a clone, for when the registry is a git one. */
+  how?: string,
+): Promise<Published> {
+  const { location, source } = await connectToPublish(alias, declared, cwd, how);
+  // Asked by name, not with `all`, under which a version-less want is no pin and may go unheard:
+  // an adapter may bound a whole listing, but must answer what is named.
+  const listing = await resolveArtifacts(source, want);
   const latest = new Map<string, Current>();
-  const namespaces = new Set<string>();
+  const newest = [...(listing.catalog.newest ?? [])];
   for (const { artifact } of listing.listed) {
     const { namespace, name, version } = artifact.envelope.metadata;
     if (namespace === undefined) continue;
-    namespaces.add(namespace);
+    // Named, an archived version is served, though a listing of everything leaves it out: a
+    // publish goes past it, so sending the same files again still revives the artifact.
+    if (artifact.status?.name === "archived" && version !== undefined) {
+      newest.push({ name, group: namespace, kind: artifact.kind, version });
+      continue;
+    }
     latest.set(keyOf(namespace, artifact.kind, name), heldOf(artifact, version));
   }
   // Held back is still published: the next version goes past it, never back over it.
@@ -293,10 +330,9 @@ export async function readPublished(
     alias,
     location,
     source,
-    namespaces: [...namespaces].sort(),
     latest,
     withheld,
-    newest: listing.catalog.newest,
+    ...(newest.length === 0 ? {} : { newest }),
   };
 }
 

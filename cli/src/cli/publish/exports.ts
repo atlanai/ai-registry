@@ -1,7 +1,7 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { readRegistry } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
-import type { ArtifactKind, PublishRelationship, SourceAdapter } from "#adapter/index.ts";
+import type { ArtifactKind, PublishRelationship, SourceAdapter, Want } from "#adapter/index.ts";
 import { expandHome, isLocalPath } from "#adapter/paths.ts";
 import { parseVersion } from "#adapter/semver.ts";
 import { plural, quoted } from "#adapter/text.ts";
@@ -261,6 +261,36 @@ export async function dependsOnFor(
     if (edge !== undefined) edges.push(edge);
   }
   return edges;
+}
+
+/**
+ * What a publish asks each registry for, by its alias: each artifact it may publish there, and each
+ * export a local dependency names, whose version an edge takes. No want names a version, so none pins.
+ */
+export async function publishWants(
+  works: readonly Work[],
+  where: ReadonlyMap<Work, { registry: string; namespace: string }>,
+  base: string,
+): Promise<Map<string, Want[]>> {
+  const wants = new Map<string, Map<string, Want>>();
+  const ask = (registry: string, want: Want) => {
+    const into = wants.get(registry) ?? new Map<string, Want>();
+    into.set(`${want.namespace}/${want.kind}/${want.name}`, want);
+    wants.set(registry, into);
+  };
+  for (const work of works) {
+    const target = where.get(work);
+    if (target === undefined) continue;
+    const { registry, namespace } = target;
+    ask(registry, { name: work.name, namespace, kind: work.kind });
+    for (const need of work.exported?.dependsOn ?? []) {
+      if (need.type !== "local") continue;
+      const path = artifactRoot(resolve(base, need.path));
+      const { name, kind } = works.find((each) => each.path === path) ?? (await fromPath(path));
+      ask(registry, { name, namespace, kind });
+    }
+  }
+  return new Map([...wants].map(([registry, into]) => [registry, [...into.values()]]));
 }
 
 async function localEdge(

@@ -1,6 +1,6 @@
 import { relative, resolve } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
-import type { PublishRelationship, PublishResult } from "#adapter/index.ts";
+import type { PublishRelationship, PublishResult, Want } from "#adapter/index.ts";
 import { isLocalPath } from "#adapter/paths.ts";
 import { BUMPS, type Bump, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { list, plural, quoted } from "#adapter/text.ts";
@@ -16,6 +16,7 @@ import {
   forTarget,
   inDependencyOrder,
   namesTarget,
+  publishWants,
   type Skipped,
   takenBy,
 } from "#cli/publish/exports.ts";
@@ -25,6 +26,7 @@ import {
   type Destination,
   folderTo,
   heldUnlisted,
+  namespacesIn,
   type Planned,
   type Published,
   parseTo,
@@ -125,7 +127,7 @@ async function destinationOf(
   works: readonly Work[],
   known: Readonly<Record<string, RegistrySource>>,
   to: Destination | undefined,
-  open: (alias: string) => Promise<Published>,
+  namespacesOf: (alias: string) => Promise<string[]>,
   saved: Destination | undefined,
 ): Promise<Map<Work, { registry: string; namespace: string }> | undefined> {
   const where = new Map<Work, { registry: string; namespace: string }>();
@@ -151,7 +153,7 @@ async function destinationOf(
       `Name one: \`aireg publish <path> --to <registry>/<namespace>\`, such as ${aliases}.`,
   });
   if (registry === undefined) return undefined;
-  const { namespaces } = await open(registry);
+  const namespaces = await namespacesOf(registry);
   if (namespaces.length === 0) {
     throw new AiregError(`${registry} has no namespace yet.`, {
       code: ErrorCode.NotFound,
@@ -619,12 +621,15 @@ function opener(
   cwd: string,
   /** The command that sends this work into a clone of a registry instead. */
   how: (alias: string) => string,
+  /** What this run asks each registry for, by its alias. */
+  wants: ReadonlyMap<string, readonly Want[]>,
 ) {
   const opened = new Map<string, Published>();
   const open = async (alias: string): Promise<Published> => {
     const cached = opened.get(alias);
     if (cached !== undefined) return cached;
-    const read = await readPublished(alias, known[alias] as RegistrySource, cwd, how(alias));
+    const declared = known[alias] as RegistrySource;
+    const read = await readPublished(alias, declared, cwd, wants.get(alias) ?? [], how(alias));
     opened.set(alias, read);
     return read;
   };
@@ -685,12 +690,20 @@ export async function run(context: CommandContext): Promise<void> {
   if (works.length === 0) return nothing(printer, { dryRun: common.dryRun, to, skipped });
   nameOne(works, to, positionals.length > 0 || target === undefined);
 
-  const { open, close } = opener(known, context.cwd, (alias) =>
-    intoClone(works, alias, to, context.cwd),
+  const how = (alias: string) => intoClone(works, alias, to, context.cwd);
+  const namespacesOf = (alias: string) =>
+    namespacesIn(alias, known[alias] as RegistrySource, context.cwd, how(alias));
+  const where = await destinationOf(
+    step,
+    works,
+    targets,
+    to,
+    namespacesOf,
+    await savedDefault(known),
   );
+  if (where === undefined) return printer.info("Canceled. Nothing was published.");
+  const { open, close } = opener(known, context.cwd, how, await publishWants(works, where, base));
   try {
-    const where = await destinationOf(step, works, targets, to, open, await savedDefault(known));
-    if (where === undefined) return printer.info("Canceled. Nothing was published.");
     const taken = await takenBy(
       works,
       async (work) => {
