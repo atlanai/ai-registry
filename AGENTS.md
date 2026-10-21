@@ -7,7 +7,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for shared contribution and verification
 This repository holds the ai-registry file spec, `aireg` (a CLI that creates registries, publishes to them and installs from them), the documentation site, and example registries. See the [project map](README.md).
 
 - `spec/` owns the registry requirements. `spec/file-spec.md` is the one specification document, a normative draft rather than an adopted contract; `spec/schemas/` holds its JSON Schemas; `spec/registry/` holds notes on a future server and binds nobody.
-- `cli/` is aireg: TypeScript on Node.js 22.20 or later, built and tested with pnpm. [cli/ARCHITECTURE.md](cli/ARCHITECTURE.md) maps its source. Every name aireg leaves on disk, in the OS, or in a release is defined in `cli/src/core/product.ts`; never hard-code one elsewhere.
+- `cli/` is aireg: TypeScript on Node.js 22.23.4+ (22.x), 24.22.1+ (24.x), or 26.12.1 or later, built and tested with pnpm. [cli/ARCHITECTURE.md](cli/ARCHITECTURE.md) maps its source. Every name aireg leaves on disk, in the OS, or in a release is defined in `cli/src/core/product.ts`; never hard-code one elsewhere.
 - `docs/` is the MkDocs documentation site.
 - `examples/` holds complete file registries. `examples/aireg` holds the `/aireg` skills.
 - `skills/ai-registry` is the setup skill an agent reads from this repository's GitHub link, before aireg is installed. The README's prompt points to it.

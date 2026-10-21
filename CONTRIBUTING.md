@@ -34,7 +34,7 @@ The file spec is a draft (v0.1), so it can still change, but every change affect
 
 ## Development setup
 
-You need git and Python 3 for the spec checks and docs. For the CLI you also need Node.js 22.20 or later and pnpm; enable pnpm with `corepack enable pnpm`.
+You need git and Python 3 for the spec checks and docs. For the CLI you also need Node.js 22.23.4+ (22.x), 24.22.1+ (24.x), or 26.12.1 or later and pnpm; enable pnpm with `corepack enable pnpm`.
 
 Fork the repository on GitHub, then clone your fork and create a branch:
 

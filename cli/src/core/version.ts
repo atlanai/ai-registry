@@ -22,13 +22,30 @@ export function versionInfo(): { version: string; commit?: string } {
   return COMMIT === "" ? { version: VERSION } : { version: VERSION, commit: COMMIT };
 }
 
-/** The oldest Node.js aireg runs on, matching `engines` in package.json. */
-export const MIN_NODE = "22.20.0";
+// Each older major needs its own patched floor; the final floor also admits future majors.
+const NODE_MINIMUMS = ["22.23.4", "24.22.1", "26.12.1"];
+export const NODE_REQUIREMENT = NODE_MINIMUMS.map(
+  (minimum, index) => `${index === NODE_MINIMUMS.length - 1 ? ">=" : "^"}${minimum}`,
+).join(" || ");
 
-export function nodeTooOld(node = process.versions.node): string | undefined {
+export function nodeTooOld(
+  node = process.versions.node,
+  bun: string | undefined = process.versions.bun,
+): string | undefined {
+  // Bun carries its own certificates; its emulated Node version says nothing about their safety.
+  if (bun !== undefined) return undefined;
   const current = parseVersion(node);
-  const min = parseVersion(MIN_NODE);
-  if (current === undefined || min === undefined) return undefined;
-  if (compareVersion(current, min) >= 0) return undefined;
-  return `${NAME} requires Node.js ${MIN_NODE} or later; this is ${node}.`;
+  if (current === undefined) return undefined;
+  const supported =
+    current.prerelease.length === 0 &&
+    NODE_MINIMUMS.some((floor, index) => {
+      const minimum = parseVersion(floor);
+      return (
+        minimum !== undefined &&
+        (current.major === minimum.major || index === NODE_MINIMUMS.length - 1) &&
+        compareVersion(current, minimum) >= 0
+      );
+    });
+  if (supported) return undefined;
+  return `${NAME} requires Node.js ${NODE_REQUIREMENT}; this is ${node}.`;
 }
