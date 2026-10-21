@@ -521,6 +521,7 @@ export async function plan(
     description: work.description,
     asAgentDocument: folder,
     relationships,
+    files: work.exported?.files,
   });
   // An export's own version is what it is published at, unless `--to` names another.
   const fixed = exact === undefined ? work.exported?.version : undefined;

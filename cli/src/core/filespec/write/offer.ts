@@ -35,6 +35,8 @@ export interface OfferTarget {
   asAgentDocument?: boolean | undefined;
   /** The edges the version carries, such as its `depends_on`. Absent, it carries none. */
   relationships?: readonly PublishRelationship[] | undefined;
+  /** A folder's files to send, relative to it, when not every one in it. */
+  files?: readonly string[] | undefined;
 }
 
 /** Relationship schema: `rel_type` is a lowercase word, as `depends_on` is. */
@@ -98,8 +100,11 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
     }
     return [{ path: basename(path), content, executable: false }];
   }
-  const { files, irregular } = await authored(path);
-  const [refused] = irregular;
+  const all = await authored(path);
+  // A file left out is never read, so neither is it refused.
+  const only = target.files === undefined ? undefined : new Set(target.files);
+  const files = all.files.filter((entry) => only === undefined || only.has(entry.path));
+  const [refused] = all.irregular.filter((entry) => only === undefined || only.has(entry.path));
   if (refused !== undefined) {
     throw new AiregError(`${basename(path)}/${refused.path} ${refusal(refused)}.`, {
       code: ErrorCode.Invalid,

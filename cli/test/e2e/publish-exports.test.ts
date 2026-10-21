@@ -53,6 +53,8 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir, git }) => {
   // The scratch skill is never committed, so the glob leaves it out.
   await git(maker, "add", ".claude/skills/review", ".claude/agents", ".registry");
   await git(maker, "commit", "-qm", "exports");
+  // Nor is a note written in the review skill since, so its folder is published without it.
+  await writeFile(join(maker, ".claude", "skills", "review", "draft.md"), "Not yet.\n");
   const made = await aireg(["registry", "init", "registry", "--name", "maker", "-y"], {
     cwd: maker,
   });
@@ -94,6 +96,8 @@ describe("publishing a repository's exports", () => {
     expect((await envelope("agent", "reviewer", "0.1.0")).relationships).toEqual([
       { rel_type: "depends_on", to: "eng/skill/review@0.1.0", range: "^0.1.0" },
     ]);
+    const files = (await envelope("skill", "review", "0.1.0")).files as { path: string }[];
+    expect(files.map((file) => file.path)).toEqual(["SKILL.md"]);
     const valid = await aireg(["registry", "validate"], { cwd: join(maker, "registry") });
     expect(valid.code, valid.stdout + valid.stderr).toBe(0);
     expect((await publish("-y")).stdout).toMatch(/Nothing new to publish/);

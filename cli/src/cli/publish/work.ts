@@ -29,8 +29,17 @@ export interface Work {
   row: string | undefined;
   /** The version an installed copy was edited from, so a newer one is not written over. */
   base: string | undefined;
-  /** The manifest's `exports:` entry for this path, whose version, dependencies and targets apply. */
-  exported?: Export | undefined;
+  /** The manifest's `exports:` entries for this path, merged, whose version, dependencies and targets apply. */
+  exported?: Exported | undefined;
+}
+
+/** What `exports:` says of one artifact: its entries merged into one, and the files it publishes. */
+export interface Exported extends Export {
+  /**
+   * Its files, relative to its folder, when not every one in it: in a git repository, those git
+   * tracks, and its entry file whatever git says. Undefined for an agent's own file.
+   */
+  files?: readonly string[] | undefined;
 }
 
 const SHAPE_HINT = "Name a skill folder that holds SKILL.md, or an agent's .md file.";

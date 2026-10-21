@@ -125,6 +125,24 @@ describe("exportsOn", () => {
     expect([...found.keys()]).toEqual([join(base, "skills", "review")]);
   });
 
+  test("publishes only what git tracks inside a folder, and always its entry file", async ({
+    git,
+  }) => {
+    await writeFile(join(base, "skills", "review", "checklist.md"), "Tracked.\n");
+    await writeFile(join(base, "skills", "review", "scratch.md"), "Not tracked.\n");
+    const manifest = manifestWith("  - skills/review\n  - skills/style\n  - agents/reviewer.md\n");
+    // Outside a repository every file goes.
+    expect((await exportsOn(manifest, base)).get(join(base, "skills", "review"))?.files).toBe(
+      undefined,
+    );
+    await git.init(base);
+    await git(base, "add", "skills/review/SKILL.md", "skills/review/checklist.md");
+    const found = await exportsOn(manifest, base);
+    expect(found.get(join(base, "skills", "review"))?.files).toEqual(["SKILL.md", "checklist.md"]);
+    expect(found.get(join(base, "skills", "style"))?.files).toEqual(["SKILL.md"]);
+    expect(found.get(join(base, "agents", "reviewer.md"))?.files).toBe(undefined);
+  });
+
   test("never reaches what aireg installed there", async () => {
     const installed = lock()
       .registry("acme", { location: "github.com/acme/agent-registry" })

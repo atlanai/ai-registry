@@ -6,12 +6,13 @@ import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonicalAsync } from "#core/fs/canonical.ts";
 import { posixRelative } from "#core/fs/path.ts";
+import { isDirectory } from "#core/fs/tree.ts";
 import { gitIn } from "#core/git.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import { type Export, type ExportDependency, isGlob, type Manifest } from "#core/manifest.ts";
 import { formatAddress } from "#core/ref.ts";
-import { expand } from "./work.ts";
+import { type Exported, expand } from "./work.ts";
 
 // Which artifacts `exports:` reaches in this project, and the entry whose rules apply to each.
 
@@ -150,7 +151,8 @@ async function reachedBy(
 /**
  * Every artifact `exports:` reaches, by its absolute path, with the entries that reach it merged.
  * In a git repository a glob reaches only what git tracks, so scratch work beside an export is
- * not published, and never what aireg installed there. Every entry reaching an artifact applies
+ * not published, and never what aireg installed there; inside a folder, too, only what git
+ * tracks is published. Every entry reaching an artifact applies
  * to it: their `depends_on` lists are combined, and an entry naming the artifact sets its
  * `version` and `publish` over a glob that only matches it.
  */
@@ -158,10 +160,8 @@ export async function exportsOn(
   manifest: Manifest,
   base: string,
   installed: ReadonlySet<string> = new Set(),
-): Promise<Map<string, Export>> {
-  const tracked = manifest.exports.some((entry) => isGlob(entry.path))
-    ? await trackedFiles(base)
-    : undefined;
+): Promise<Map<string, Exported>> {
+  const tracked = manifest.exports.length > 0 ? await trackedFiles(base) : undefined;
   const reached = new Map<string, Reach[]>();
   for (const entry of manifest.exports) {
     for (const root of await reachedBy(entry, base, tracked, installed)) {
@@ -169,7 +169,25 @@ export async function exportsOn(
       reached.set(root, [...(reached.get(root) ?? []), reach]);
     }
   }
-  return new Map(
-    [...reached].map(([root, reaches]) => [root, merged(reaches, posixRelative(base, root))]),
-  );
+  const found = new Map<string, Exported>();
+  for (const [root, reaches] of reached) {
+    const files = await filesOf(root, tracked);
+    found.set(root, { ...merged(reaches, posixRelative(base, root)), files });
+  }
+  return found;
+}
+
+/**
+ * What a folder publishes, relative to it: in a git repository only what git tracks, so scratch
+ * work inside a skill's folder stays out, and its entry file, which makes it the artifact it is.
+ */
+async function filesOf(
+  root: string,
+  tracked: readonly string[] | undefined,
+): Promise<string[] | undefined> {
+  if (tracked === undefined || !(await isDirectory(root))) return undefined;
+  const inside = tracked
+    .filter((file) => file !== root && isWithin(root, file))
+    .map((file) => posixRelative(root, file));
+  return [...new Set([SKILL_ENTRY, ...inside])].sort();
 }

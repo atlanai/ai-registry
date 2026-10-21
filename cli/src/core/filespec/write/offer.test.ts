@@ -70,6 +70,17 @@ describe("offerFrom", () => {
     expect(linked.digests).toEqual(bare.digests);
   });
 
+  test("sends only the files named, never reading or refusing one left out", async () => {
+    const skill = await lint();
+    await writeFile(join(skill, "notes.md"), "Scratch.\n");
+    await writeFile(join(skill, ".env"), "TOKEN=x\n");
+    const target = { name: "lint", kind: "skill" as const, version: "1.0.0" };
+    const sent = await offerFrom(skill, { ...target, files: ["SKILL.md"] });
+    expect(sent.input.files.map((file) => file.path)).toEqual(["SKILL.md"]);
+    // Every file, when none are named, refusing the one that may hold credentials.
+    await expect(offerFrom(skill, target)).rejects.toThrow("lint/.env may hold credentials");
+  });
+
   test("sends only the fields an edge has in the spec", async () => {
     const skill = await lint();
     const extra = { ...edge, note: "kept out" } as typeof edge;
