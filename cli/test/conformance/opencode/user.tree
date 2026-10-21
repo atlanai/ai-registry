@@ -1,0 +1,16 @@
+.agents/
+.agents/skills/
+.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+.agents/skills/ship -> ../../.registry/artifacts/kit/kit/skills/ship
+.config/
+.config/opencode/
+.config/opencode/agents/
+.config/opencode/agents/planner.md 309fa89710f4
+.config/opencode/agents/reviewer.md a4479ed1c52a
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+project/.opencode/
+project/.opencode/agents/
+project/.opencode/agents/reviewer.md a4479ed1c52a

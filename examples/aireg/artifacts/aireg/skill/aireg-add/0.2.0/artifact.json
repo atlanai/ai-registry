@@ -5,14 +5,14 @@
     "name": "aireg-add",
     "namespace": "aireg",
     "version": "0.2.0",
-    "description": "Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI.",
-    "digest": "sha256:19f72a2a0b392490e61f47ea7e3ba11a519c8524bdbd2d21ad492865261f09c9"
+    "description": "Connect a registry and install, inspect, update or remove its skills and agents in a project or user scope. Use when managing registry installs, checking versions or provenance, or diagnosing missing, edited or blocked copies in coding agents.",
+    "digest": "sha256:da635a77162eabf39dd9c55d9f20f912586c9fafd2e9209eaaf7c9b757020e84"
   },
   "files": [
     {
       "path": "SKILL.md",
-      "digest": "sha256:785c2e04884679d6ec1ffbc70a8d8a125fe79c4582b08515498220d2245ce283",
-      "size": 8133,
+      "digest": "sha256:08b5c3a28f59548582e31ecec0f81b7bebe6e6b10a4a713b06ba00073be8e068",
+      "size": 8975,
       "media_type": "text/markdown",
       "urls": [
         "SKILL.md"

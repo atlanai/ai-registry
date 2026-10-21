@@ -44,10 +44,19 @@
         "noExcessiveCognitiveComplexity": {
           "level": "warn",
           "options": { "maxAllowedComplexity": 25 }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "warn",
+          "options": { "maxLines": 100, "skipBlankLines": true }
         }
       },
       "style": {
+        "noExcessiveLinesPerFile": {
+          "level": "warn",
+          "options": { "maxLines": 1000, "skipBlankLines": true }
+        },
         "noNonNullAssertion": "error",
+        "noParameterAssign": "warn",
         "useConsistentArrayType": { "level": "error", "options": { "syntax": "shorthand" } },
         "useImportType": "error",
         "useNodejsImportProtocol": "error",
@@ -71,8 +80,9 @@
       "includes": ["**/*.test.ts", "test/**"],
       "linter": {
         "rules": {
+          "complexity": { "noExcessiveLinesPerFunction": "off" },
           "suspicious": { "noConsole": "off" },
-          "style": { "noNonNullAssertion": "off" }
+          "style": { "noExcessiveLinesPerFile": "off", "noNonNullAssertion": "off" }
         }
       }
     }

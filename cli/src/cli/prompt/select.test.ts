@@ -29,6 +29,17 @@ async function pick<T>(options: Omit<SelectOptions<T>, "style">, keys: string[])
 }
 
 describe("select", () => {
+  it("completes and writes its answer when output is redirected", async () => {
+    const term = terminal();
+    const run = select(
+      { ...scope, style },
+      { ...term.io, output: { ...term.io.output, isTTY: false } },
+    );
+    await term.press(enter);
+    expect(await run).toBe("project");
+    expect(term.screen()).toEqual(["◇  Installation scope  Project"]);
+  });
+
   it("draws its options with hints, the cursor on the first", async () => {
     const { frame } = await pick(scope, [enter]);
     expect(frame).toEqual([

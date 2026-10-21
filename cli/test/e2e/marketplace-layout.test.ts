@@ -118,6 +118,36 @@ describe("a plugin marketplace", () => {
     );
   }, 60_000);
 
+  test("names the shared folder it left a command out of by its path", async ({
+    aireg,
+    home,
+    tmp,
+  }) => {
+    const root = await marketplace(join(tmp, "mkt")).write();
+    await mkdir(join(home.aireg, "harnesses"), { recursive: true });
+    const tool = {
+      id: "tool",
+      displayName: "Tool",
+      roots: { project: ".tool", user: { default: "~/.tool" } },
+      reads: { skill: ["agents"] },
+      kinds: {
+        plugin: { shape: "contents" },
+        skill: {
+          shape: "directory",
+          subdir: "skills",
+          keys: { "disable-model-invocation": false },
+        },
+      },
+    };
+    await writeFile(join(home.aireg, "harnesses", "tool.json"), JSON.stringify(tool));
+    await init(aireg, "tool");
+    const added = await aireg(["add", root, "--all", "--trust", "deploy-kit"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect(added.stderr).toContain(
+      "Did not install docs-kit-summarize for .agents: it sets disable-model-invocation, which Tool cannot read.",
+    );
+  }, 60_000);
+
   test("asks for trust before a plugin that runs things as you, and records it", async ({
     aireg,
     project,

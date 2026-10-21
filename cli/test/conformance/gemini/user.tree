@@ -1,0 +1,13 @@
+.gemini/
+.gemini/agents/
+.gemini/agents/planner.md 732bc56aaeab
+.gemini/agents/reviewer.md ce14e241d21a
+.gemini/skills/
+.gemini/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+.gemini/skills/ship -> ../../.registry/artifacts/kit/kit/skills/ship
+project/
+project/.gemini/
+project/.gemini/agents/
+project/.gemini/agents/reviewer.md ce14e241d21a
+project/.gemini/skills/
+project/.gemini/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint

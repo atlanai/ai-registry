@@ -1,6 +1,6 @@
 ---
 name: aireg-add
-description: Answer what is installed and keep it right. List the skills and agents in this project or for the user, say where each came from, find edited, missing or unmanaged ones and why one isn't loading in Claude Code, Codex or Cursor, and install, update or remove them from a registry. Use for any question about installed skills or agents, instead of listing .claude/skills or .agents/skills, and when asked to add or connect a registry, see what it offers, read a skill or agent, or check installs in CI.
+description: Connect a registry and install, inspect, update or remove its skills and agents in a project or user scope. Use when managing registry installs, checking versions or provenance, or diagnosing missing, edited or blocked copies in coding agents.
 compatibility: Needs the aireg CLI and git, on macOS, Linux or Windows.
 license: Apache-2.0
 ---
@@ -10,7 +10,9 @@ license: Apache-2.0
 An artifact's full name is `<registry>/<namespace>/<name>`, optionally `@<version>` or
 `@<range>`. Add the kind, as in `<registry>/<namespace>/skill/<name>`, only when a skill and
 an agent share the name.
-Pass `--json` to every command and read `data`; nothing prompts under `--json`.
+Pass `--json` to every command and read `data`; nothing prompts under `--json`. Reuse the
+user's stated scope, harness choices and authorization; ask only for missing decisions or
+actions they have not approved.
 
 ## Answer from aireg, not from the folders
 
@@ -29,7 +31,8 @@ installed copy from the user's own, an edited one or one that's behind, so answe
 
 Add `-g` to each for the user's own installs.
 
-After any change, run `aireg status --json` (or `aireg list --json`) and report what it shows.
+After an install or update, run `aireg status --json` and verify every intended artifact
+and harness. Use `aireg list --json` for version and provenance details.
 Don't take the exit code as success: `add` can exit 0 when a skill reached no harness.
 
 ## 1. Check the CLI
@@ -63,6 +66,13 @@ installing it when the user has not seen it.
 
 ## 4. Install
 
+Before replacing hand-installed skills with registry versions, run `aireg status --json`
+(with `-g` for the user scope). Review matching unmanaged copies in every target harness:
+`data.unmanaged` can group several copies into a row with only one path. Offer to move each
+blocking copy to a backup outside harness search folders, showing the paths and destinations.
+Get agreement unless that backup was already authorized. Preserve differing copies for review; do not publish
+them just to clear an install collision. Unrelated unmanaged skills stay where they are.
+
 | Where | Command |
 | --- | --- |
 | This project, one artifact | `aireg add <registry>/<namespace>/<name> --yes --json` |
@@ -74,8 +84,8 @@ installing it when the user has not seen it.
 Inside a repository, installs belong to the project. aireg keeps them in `.registry/`:
 `manifest.yml` records what the project asks for, `manifest.lock.yml` the exact versions and
 digests, and `artifacts/` the installed copies. Commit the folder; teammates run
-`aireg install`. Ask before `-g`: it installs into the user scope, reaches every project
-here, and stays current in the background. Outside a repository, `add` installs into the
+`aireg install`. Explain `-g` before running it unless already authorized: it installs into
+the user scope, reaches every project here, and adds a background update job. Outside a repository, `add` installs into the
 user scope even without `-g`, so check where you are first.
 
 Pin with `@<version>` only when the user asks: `update` never moves a pin. Adding the
@@ -142,6 +152,7 @@ access to the registry, even a private one, and no secret.
 
 | Exit | Meaning | Do |
 | --- | --- | --- |
+| 0 | A warning says a destination already holds something of yours | Show every blocked path; with permission, move the copies to backups outside harness search folders, then run `aireg install --json` (with `-g` for the user scope) and verify every intended harness with `aireg status --json` |
 | 1 | A dependency is in a registry this project does not declare: `needs <name> from <url>, which this project does not declare` | Ask the user, since adding it trusts that registry, then run the `aireg registry add <url>` the `hint` gives and add again |
 | 1 | The command failed: no such name, version or version in a range, or dependencies that disagree | Follow the `hint`, or report the `error` |
 | 2 | The command was incomplete, or names more than 10 artifacts | Supply what the `hint` names |

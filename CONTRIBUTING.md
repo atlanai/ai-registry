@@ -61,6 +61,10 @@ The schemas in `cli/schema/` are generated. Edit the definitions under `cli/scri
 
 Add a test that fails without your change and passes with it, written against the public interface.
 
+Opt in to local pre-push checks with `git config core.hooksPath .githooks`; this replaces `.git/hooks` for this clone. The hook runs the typecheck and changed-file lint, requires a clean `cli/` working tree, and accepts only the checked-out commit. Set `LINT_BASE` to override the default comparison base, `origin/main`.
+
+Run the hook regression tests with `python3 -m unittest discover -s tools -p test_pre_push.py`.
+
 ### Spec and schemas
 
 ```sh

@@ -1,0 +1,14 @@
+{
+  "id": "copilot",
+  "displayName": "GitHub Copilot",
+  "overrides": true,
+  "roots": { "project": ".github", "user": { "default": "~/.copilot", "env": "COPILOT_HOME" } },
+  "detect": { "env": ["COPILOT_HOME"], "binary": ["copilot"], "projectRoot": false },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": { "shape": "directory", "subdir": "skills" },
+    "agent": { "shape": "file", "subdir": "agents", "extension": ".agent.md" }
+  },
+  "verified": { "command": ["copilot", "--version"], "range": "1.0.96" },
+  "reload": "Run `/skills reload` in a running Copilot CLI session, and start a new session for changed agents."
+}

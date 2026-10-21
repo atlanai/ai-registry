@@ -6,12 +6,9 @@ import { CALLER_SIGNALS } from "#core/harness/index.ts";
  * becomes a harness takes its variables into its own definition.
  */
 const OTHER_SIGNALS: readonly { agent: string; env: readonly string[] }[] = [
-  { agent: "gemini", env: ["GEMINI_CLI"] },
   { agent: "antigravity", env: ["ANTIGRAVITY_AGENT"] },
   { agent: "augment", env: ["AUGMENT_AGENT"] },
-  { agent: "opencode", env: ["OPENCODE_CLIENT"] },
   { agent: "replit", env: ["REPL_ID"] },
-  { agent: "copilot", env: ["COPILOT_MODEL", "COPILOT_ALLOW_ALL"] },
 ];
 
 export const SIGNALS = [...CALLER_SIGNALS, ...OTHER_SIGNALS];

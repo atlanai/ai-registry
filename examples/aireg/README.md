@@ -8,7 +8,7 @@ registry of their own. It was made with the CLI it documents, the way any regist
 ```
 registry.json                                      slug ai-registry
 index.json
-artifacts/aireg/skill/aireg-new/0.2.1/SKILL.md     set up a registry: create it, add skills, release, gate pull requests, hand it over
+artifacts/aireg/skill/aireg-new/0.3.0/SKILL.md     set up a registry: create it, add skills, release, gate pull requests, hand it over
 artifacts/aireg/skill/aireg-add/0.2.0/SKILL.md     find, read, install and update from a registry, in version ranges, and check installs in CI
 artifacts/aireg/skill/aireg-publish/0.2.0/SKILL.md publish a skill, release its next version, publish a project's exports, or its skills from CI
 ```

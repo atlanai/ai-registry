@@ -13,8 +13,8 @@ by the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-sp
 aireg is a CLI client for it. It creates registries, publishes to them and installs from
 them into Claude Code, Codex and Cursor.
 
-aireg asks no questions when it runs inside a coding agent, so ask the user yourself before
-each step that changes their machine.
+aireg asks no questions when it runs inside a coding agent. Reuse the user's stated choices
+and authorization; ask only for missing decisions or actions they have not approved.
 
 ## 1. Install aireg
 
@@ -83,9 +83,10 @@ For anything else, follow the `aireg-new` skill to set up a registry, the `aireg
 to install from one, or the `aireg-publish` skill to publish to one. For one person, one namespace such as
 `personal` is enough, and the pull request check is optional.
 
-When the user brings skills in from their own harness folders, such as `~/.claude/skills`,
-move the originals out, with their yes, before installing the registry with `-g`. aireg
-doesn't link over a folder of theirs, so the original would stay in use instead.
+For an existing skills-only repository, use `aireg-new`'s in-place conversion path, including
+verified cleanup and release readiness. For hand-installed copies on this or another machine,
+use `aireg-add`'s migration procedure before installing; check every intended harness afterward.
+Keep application sources that will continue publishing to a separate registry.
 
 ## Done when
 

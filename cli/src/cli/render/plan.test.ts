@@ -127,6 +127,27 @@ describe("summarize", () => {
     ]);
   });
 
+  it("names in one line every kind that waits on the same trust step", () => {
+    const lock = {
+      artifacts: {
+        lint: { kind: "skill", links: [at("gemini")] },
+        reviewer: { kind: "agent", links: [at("gemini")] },
+      },
+    };
+    const applied = {
+      performed: { link: 2 } as never,
+      installed: ["lint", "reviewer"],
+      added: ["lint", "reviewer"],
+      lock: lock as never,
+    };
+    const lines = printed([link("lint", "gemini"), link("reviewer", "gemini")], applied, {}, [
+      "gemini",
+    ]);
+    expect(lines.filter((line) => line.includes("trust"))).toEqual([
+      "hint: Gemini CLI loads skills and agents here only once you trust them: run `/permissions trust`.",
+    ]);
+  });
+
   it("says a plugin's hooks run only where it installs whole, not where its skills went", () => {
     const actions = [
       { ...link("tools", "claude"), plugin: true } as Action,

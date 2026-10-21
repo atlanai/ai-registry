@@ -1,0 +1,7 @@
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+project/.opencode/
+project/.opencode/agents/
+project/.opencode/agents/reviewer.md a4479ed1c52a

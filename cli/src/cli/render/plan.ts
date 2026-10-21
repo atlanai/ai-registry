@@ -154,6 +154,11 @@ export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses" | 
   applied: ApplyResult;
 };
 
+function harnessOf(action: Shown): string | undefined {
+  if (action.kind === "link") return action.harness;
+  return action.kind === "unlink" ? action.link?.harness : undefined;
+}
+
 /** What a harness asks of a person once it was given something; printed, never run. */
 function followUps(
   printer: Printer,
@@ -162,15 +167,11 @@ function followUps(
   harnesses: Harnesses,
   scope: Ran["scope"],
 ): void {
-  const steps = new Set<string>();
+  // One line per harness and command, naming every kind that waits on it.
+  const steps = new Map<string, { harness: string; run: string; kinds: Set<string> }>();
   const reloads = new Set<string>();
   for (const action of shown) {
-    const harness =
-      action.kind === "link"
-        ? action.harness
-        : action.kind === "unlink"
-          ? action.link?.harness
-          : undefined;
+    const harness = harnessOf(action);
     const target = harness === undefined ? undefined : harnesses[harness];
     if (target === undefined) continue;
     if (target.reload !== undefined) reloads.add(target.reload);
@@ -180,13 +181,18 @@ function followUps(
     const kind = placed ?? kindOf(action.name);
     const run =
       action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
-    if (run !== undefined) {
-      steps.add(
-        `${target.displayName} loads ${kind}s here only once you trust them: run \`${run}\`.`,
-      );
+    if (run !== undefined && kind !== undefined) {
+      const key = `${target.name}\0${run}`;
+      const step = steps.get(key) ?? { harness: target.displayName, run, kinds: new Set() };
+      step.kinds.add(`${kind}s`);
+      steps.set(key, step);
     }
   }
-  for (const step of steps) printer.hint(step);
+  for (const { harness, run, kinds } of steps.values()) {
+    printer.hint(
+      `${harness} loads ${list([...kinds])} here only once you trust them: run \`${run}\`.`,
+    );
+  }
   for (const reload of reloads) printer.hint(reload);
 }
 

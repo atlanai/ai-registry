@@ -51,6 +51,9 @@ describe("harnesses", () => {
     vi.stubEnv("PATH", "");
     vi.stubEnv("CLAUDE_CONFIG_DIR", join(cwd, ".claude"));
     vi.stubEnv("CODEX_HOME", "");
+    vi.stubEnv("COPILOT_HOME", "");
+    vi.stubEnv("GEMINI_CLI_HOME", "");
+    vi.stubEnv("OPENCODE_CONFIG_DIR", "");
   });
 
   afterEach(async () => {
@@ -68,7 +71,10 @@ describe("harnesses", () => {
     expect(payload.data.harnesses).toEqual([
       { name: "claude", displayName: "Claude Code", ...builtIn, detected: true, by: "env" },
       { name: "codex", displayName: "Codex", ...builtIn, detected: false },
+      { name: "copilot", displayName: "GitHub Copilot", ...builtIn, detected: false },
       { name: "cursor", displayName: "Cursor", ...builtIn, detected: false },
+      { name: "gemini", displayName: "Gemini CLI", ...builtIn, detected: false },
+      { name: "opencode", displayName: "OpenCode", ...builtIn, detected: false },
       {
         name: "agents",
         displayName: "Shared .agents folder",
@@ -87,7 +93,7 @@ describe("harnesses", () => {
     expect(lines).toContain("  harness      id      status  where");
     expect(lines).toContain("  Claude Code  claude  found   from its environment variables");
     expect(lines.some((line) => /^ +(Codex|Cursor|agents|Shared)/.test(line))).toBe(false);
-    expect(lines).toContain("Found 1 of 3 supported harnesses on this machine.");
+    expect(lines).toContain("Found 1 of 6 supported harnesses on this machine.");
     expect(lines).toContain("hint: Run `aireg harnesses --all` to see every one.");
 
     const every: string[] = [];
@@ -96,6 +102,16 @@ describe("harnesses", () => {
     expect(every.join("")).toMatch(/^ +Cursor +cursor +not found$/m);
     expect(all.some((line) => line.includes("--all"))).toBe(false);
     expect(all.some((line) => line.includes("shared"))).toBe(false);
+  });
+
+  test("finds no GitHub Copilot from a project's .github folder alone", async () => {
+    await mkdir(join(cwd, ".github", "workflows"), { recursive: true });
+    const writes: string[] = [];
+    await run(context(cwd, writes));
+    const { data } = JSON.parse(writes.join("")) as {
+      data: { harnesses: { name: string; detected: boolean }[] };
+    };
+    expect(data.harnesses.find((item) => item.name === "copilot")?.detected).toBe(false);
   });
 
   test("says which file defines a harness, and skips a broken one with a warning", async () => {

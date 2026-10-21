@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+head="$(git rev-parse HEAD)"
+sending=false
+while read -r _ local_sha _ _; do
+  [[ "$local_sha" =~ ^0+$ ]] && continue
+  if ! pushed_commit="$(git rev-parse --verify --quiet "$local_sha^{commit}")" || [ "$pushed_commit" != "$head" ]; then
+    echo "pre-push: check out the commit being pushed, or push it from its own worktree." >&2
+    exit 1
+  fi
+  sending=true
+done
+[ "$sending" = true ] || exit 0
+
+trap 'echo "pre-push: push stopped. Fix the problems above, then push again." >&2' ERR
+
+base="${LINT_BASE:-origin/main}"
+if ! git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+  echo "pre-push: no $base to compare with. Fetch it, or set LINT_BASE to the branch you will merge into." >&2
+  exit 1
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+if [ -n "$(git status --porcelain --untracked-files=normal -- cli)" ]; then
+  echo "pre-push: commit or stash changes in cli/ so the checks match the commit being pushed." >&2
+  exit 1
+fi
+
+cd cli
+pnpm run --silent typecheck
+pnpm run --silent lint:changed --since="$base"

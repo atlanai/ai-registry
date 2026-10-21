@@ -90,7 +90,7 @@ Vitest runs five projects. `pnpm test` runs them all, and `pnpm run test:unit`, 
 
 A scenario in `test/scenarios/*.md` is a CLI session: `$ aireg ...` lines with the output expected, `? <code>` for an exit status, and `file` blocks for what should be on disk. `UPDATE_SCENARIOS=1` rewrites the expected output after a deliberate change.
 
-`pnpm run verify` runs the typecheck, lint, dead-code check, third-party notices check, build, package check and tests. While you work, `pnpm run fix` formats and drops unused imports, `pnpm run test:watch` reruns every project's tests as files change, and `pnpm run test:e2e -u` updates the help snapshots after a deliberate change.
+`pnpm run verify` runs the typecheck, lint, dead-code check, third-party notices check, build, package check and tests. Lint warns about a function over 100 lines or a file over 1000, blank lines aside and outside tests, a function whose cognitive complexity is over 25, and a reassigned parameter. Existing code may carry these warnings, but a pull request must leave every file it adds or edits free of them: CI runs `pnpm run lint:changed --since=<base>`, which fails on any warning in those files. Run it before you push, with `--since=origin/main`.
 
 ## Messages
 

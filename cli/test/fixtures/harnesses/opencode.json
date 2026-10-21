@@ -1,0 +1,26 @@
+{
+  "id": "opencode",
+  "displayName": "OpenCode",
+  "overrides": true,
+  "roots": {
+    "project": ".opencode",
+    "user": { "default": "~/.config/opencode", "env": "XDG_CONFIG_HOME", "within": "opencode" }
+  },
+  "detect": { "env": ["OPENCODE_CONFIG_DIR"], "binary": ["opencode"] },
+  "reads": { "skill": ["agents", "opencode", "claude"] },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": {
+      "shape": "directory",
+      "subdir": "skills",
+      "keys": { "disable-model-invocation": false }
+    },
+    "agent": {
+      "shape": "file",
+      "subdir": "agents",
+      "extension": ".md",
+      "codec": { "id": "frontmatter-strict", "keep": ["description"] }
+    }
+  },
+  "verified": { "command": ["opencode", "--version"], "range": "1.19.0" }
+}

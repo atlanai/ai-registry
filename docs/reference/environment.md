@@ -19,11 +19,13 @@
 | `CLICOLOR` | `0` turns color off. |
 | `CLAUDE_CONFIG_DIR` | Where Claude Code keeps its user folder, if not `~/.claude`. |
 | `CODEX_HOME` | Where Codex keeps its user folder, if not `~/.codex`. |
-| `AI_AGENT`, `CLAUDECODE`, `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_THREAD_ID`, `CURSOR_AGENT`, `GEMINI_CLI`, `ANTIGRAVITY_AGENT`, `AUGMENT_AGENT`, `OPENCODE_CLIENT`, `REPL_ID`, `COPILOT_MODEL`, `COPILOT_ALLOW_ALL` | Set by a coding agent that runs aireg, which then asks no questions. See [When aireg asks questions](options.md#when-aireg-asks-questions). |
+| `COPILOT_HOME` | Where GitHub Copilot keeps its user folder, if not `~/.copilot`. |
+| `GEMINI_CLI_HOME` | The folder that holds Gemini CLI's `.gemini` user folder, if not your home folder. |
+| `AI_AGENT`, `CLAUDECODE`, `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_THREAD_ID`, `CURSOR_AGENT`, `COPILOT_CLI`, `GEMINI_CLI`, `ANTIGRAVITY_AGENT`, `AUGMENT_AGENT`, `OPENCODE`, `REPL_ID` | Set by a coding agent that runs aireg, which then asks no questions. See [When aireg asks questions](options.md#when-aireg-asks-questions). |
 | `CI` | Any value means a CI service runs aireg. aireg then asks no questions, skips its update check, and the installer offers no skills. |
 | `TERM` | `dumb` turns color and animation off. |
 | `HOME`, `USERPROFILE` | Your home folder, in that order, else the one your OS reports. `~` in a path you type means this folder. |
-| `XDG_CONFIG_HOME` | Where the fish startup file and the Linux daemon service go, if not `~/.config`. |
+| `XDG_CONFIG_HOME` | Where the fish startup file, the Linux daemon service and OpenCode's `opencode/` user folder go, if not `~/.config`. |
 | `XDG_RUNTIME_DIR` | Where the daemon's socket goes, if set to an absolute path. Otherwise the system's temporary folder. A folder there that another user made first is passed over, ending at `run/` in aireg's folder. |
 | `SHELL`, `ZDOTDIR` | Which shell startup files the installer adds aireg to, and where zsh keeps them. |
 | `GITHUB_ACTIONS` | Set to `true` by GitHub Actions. The installer then puts aireg on `PATH` through `GITHUB_PATH`, and `aireg registry validate` prints problems as annotations. |
