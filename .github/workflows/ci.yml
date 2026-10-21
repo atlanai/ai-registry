@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   # Stacked PRs target another PR branch before they are retargeted to main.
