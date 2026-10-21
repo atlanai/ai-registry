@@ -152,8 +152,103 @@ describe("exports and publish", () => {
     expect(refused('exports: [""]\n')).toThrow("An `exports:` entry has an empty path.");
     expect(refused("exports:\n  - version: 1.0.0\n")).toThrow("An `exports:` entry has no `path`.");
     expect(refused(entry("    as: review\n"))).toThrow(
-      'An `exports:` entry does not take "as"; it takes depends_on, path, publish and version.',
+      'An `exports:` entry does not take "as"; it takes depends_on, exclude, ignore, include, kind, path, publish and version.',
     );
+  });
+
+  test("reads what an entry reaches and which files each artifact publishes, and writes it back", () => {
+    const text = [
+      "exports:",
+      "  - path: agents",
+      "    kind: agent",
+      "    exclude:",
+      "      - drafts",
+      "    ignore:",
+      "      - workspace-data/",
+      '      - "*.log"',
+      "  - path: agents/helper",
+      "    include:",
+      "      - workspace/AGENTS.md",
+      "      - from: workspace/SOUL.md",
+      "        as: identity/SOUL.md",
+      "",
+    ].join("\n");
+    const manifest = read(text);
+    expect(manifest.exports).toEqual([
+      {
+        path: "agents",
+        kind: "agent",
+        version: undefined,
+        dependsOn: [],
+        publish: undefined,
+        exclude: ["drafts"],
+        ignore: ["workspace-data/", "*.log"],
+      },
+      {
+        path: "agents/helper",
+        version: undefined,
+        dependsOn: [],
+        publish: undefined,
+        include: [
+          { from: "workspace/AGENTS.md", as: "workspace/AGENTS.md" },
+          { from: "workspace/SOUL.md", as: "identity/SOUL.md" },
+        ],
+      },
+    ]);
+    expect(formatManifest(manifest)).toBe(`${declared}${text}`);
+  });
+
+  test("refuses a `kind` it does not export", () => {
+    expect(refused(entry("    kind: plugin\n"))).toThrow(
+      'manifest.yml: `kind` of export ".claude/agents/reviewer.md" must be skill or agent.',
+    );
+  });
+
+  test("refuses an `exclude` name that is not directly inside the folder", () => {
+    expect(refused(entry("    exclude: [a/b]\n"))).toThrow(
+      'Export ".claude/agents/reviewer.md" excludes "a/b", which is not the name of something directly inside it.',
+    );
+    expect(refused(entry("    exclude: ['*']\n"))).toThrow("which is not the name of");
+    expect(refused(entry("    exclude: [a, a]\n"))).toThrow(
+      'Export ".claude/agents/reviewer.md" lists "a" twice under `exclude`.',
+    );
+    expect(refused(entry("    ignore: [3]\n"))).toThrow(
+      '`ignore` of export ".claude/agents/reviewer.md" must be a list of gitignore patterns.',
+    );
+  });
+
+  test("refuses an `include` path outside the artifact, a glob, or two files stored as one", () => {
+    expect(refused(entry("    include: [../other.md]\n"))).toThrow(
+      '`include` "../other.md" of export ".claude/agents/reviewer.md" leaves the artifact.',
+    );
+    expect(refused(entry("    include: ['docs/*']\n"))).toThrow(
+      '`include` "docs/*" of export ".claude/agents/reviewer.md" is a glob, not a file or folder.',
+    );
+    expect(refused(entry("    include: [{ from: a.md, as: /b.md }]\n"))).toThrow(
+      '`include as` "/b.md" of export ".claude/agents/reviewer.md" is absolute.',
+    );
+    expect(refused(entry("    include: [{ from: a.md }]\n"))).toThrow(
+      'An `include` mapping of export ".claude/agents/reviewer.md" needs both `from` and `as`.',
+    );
+    expect(refused(entry("    include: [a.md, { from: b.md, as: a.md }]\n"))).toThrow(
+      'Export ".claude/agents/reviewer.md" would store two files as a.md.',
+    );
+    expect(refused(entry("    include: [a.md, a.md]\n"))).toThrow(
+      'Export ".claude/agents/reviewer.md" lists a.md twice under `include`.',
+    );
+  });
+
+  test("refuses an `include` that would store a file as an entry file, or move one", () => {
+    expect(refused(entry("    include: [{ from: notes.md, as: AGENT.md }]\n"))).toThrow(
+      'Export ".claude/agents/reviewer.md" would store notes.md as AGENT.md, which is an entry file.',
+    );
+    expect(refused(entry("    include: [{ from: SKILL.md, as: docs/SKILL.md }]\n"))).toThrow(
+      'Export ".claude/agents/reviewer.md" would store its entry file SKILL.md as docs/SKILL.md.',
+    );
+    // Listed as itself, it is what goes anyway.
+    expect(read(entry("    include: [SKILL.md]\n")).exports[0]?.include).toEqual([
+      { from: "SKILL.md", as: "SKILL.md" },
+    ]);
   });
 
   test("refuses a path that is not below the project, written with /", () => {

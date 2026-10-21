@@ -32,7 +32,7 @@ import {
   releaseSubject,
   writableRegistries,
 } from "#cli/publish/target.ts";
-import { changedSince, edited, fromArgs, type Work } from "#cli/publish/work.ts";
+import { changedSince, type Exported, edited, fromArgs, type Work } from "#cli/publish/work.ts";
 import { chooseRegistry, knownIn, knownRegistries } from "#cli/registries.ts";
 import { underHome } from "#cli/render/home.ts";
 import { noteUserScope } from "#cli/render/where.ts";
@@ -627,6 +627,19 @@ async function savedDefault(
   return fallback !== undefined && known[fallback.registry] !== undefined ? fallback : undefined;
 }
 
+/** What the manifest's `exports:` reach, saying what they skipped; undefined when it lists none. */
+async function reachExports(
+  loaded: Loaded,
+  printer: Printer,
+): Promise<Map<string, Exported> | undefined> {
+  const { manifest, roots, lock } = loaded;
+  if (manifest.exports.length === 0) return undefined;
+  const reached = await exportsOn(manifest, roots.base, installedPaths(lock, roots.base));
+  for (const note of reached.notes) printer.info(note);
+  for (const warning of reached.warnings) printer.warning(warning);
+  return reached.found;
+}
+
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common, own } = parse<Own>(context.argv, builtin("publish"));
   const printer = context.printer;
@@ -641,12 +654,7 @@ export async function run(context: CommandContext): Promise<void> {
   const base = loaded.roots.base;
   const early = await writableFirst(given.to, manifest, known, context.cwd);
 
-  const reached =
-    manifest.exports.length > 0
-      ? await exportsOn(manifest, base, installedPaths(loaded.lock, base))
-      : undefined;
-  for (const note of reached?.notes ?? []) printer.info(note);
-  const found = reached?.found;
+  const found = await reachExports(loaded, printer);
   const chosen = await gather(step, loaded, common, context.cwd, {
     paths: positionals,
     since: own["changed-since"],

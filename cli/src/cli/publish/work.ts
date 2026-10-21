@@ -11,7 +11,7 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { gitIn } from "#core/git.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
-import type { Export } from "#core/manifest.ts";
+import type { Export, ExportFile } from "#core/manifest.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/pipeline.ts";
@@ -36,10 +36,11 @@ export interface Work {
 /** What `exports:` says of one artifact: its entries merged into one, and the files it publishes. */
 export interface Exported extends Export {
   /**
-   * Its files, relative to its folder, when not every one in it: in a git repository, those git
-   * tracks, and its entry file whatever git says. Undefined for an agent's own file.
+   * A folder's files, relative to it, its entry file first, each with the path it is stored at:
+   * in a git repository only those git tracks, and its entry file whatever git says. Undefined
+   * for an agent's own file.
    */
-  files?: readonly string[] | undefined;
+  files?: readonly ExportFile[] | undefined;
 }
 
 const SHAPE_HINT = "Name a skill folder that holds SKILL.md, or an agent's .md file.";

@@ -15,7 +15,7 @@ import { quoted } from "#adapter/text.ts";
 import { frontmatterRecord, ownDescription } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { authored, isDirectory, refusal } from "#core/fs/tree.ts";
-import { AGENT_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import { CONCURRENCY, limiter } from "#core/limit.ts";
 import { envelopeSpec } from "./kinds.ts";
 import { edgeVersion, ROOT_URL } from "./validate.ts";
@@ -35,8 +35,11 @@ export interface OfferTarget {
   asAgentDocument?: boolean | undefined;
   /** The edges the version carries, such as its `depends_on`. Absent, it carries none. */
   relationships?: readonly PublishRelationship[] | undefined;
-  /** A folder's files to send, relative to it, when not every one in it. */
-  files?: readonly string[] | undefined;
+  /**
+   * A folder's files to send, relative to it, when not every one in it, each with the path it is
+   * stored at; sent in this order.
+   */
+  files?: readonly { from: string; as: string }[] | undefined;
 }
 
 /** Relationship schema: `rel_type` is a lowercase word, as `depends_on` is. */
@@ -92,6 +95,15 @@ function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
   return { path: AGENT_ENTRY, content: Buffer.from(filled, "utf8"), executable: false };
 }
 
+/** A folder's files with its entry file first, as an adapter reads the artifact from. */
+function firstOf<T extends { path: string }>(kind: ArtifactKind, files: readonly T[]): T[] {
+  const entry = kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
+  return [
+    ...files.filter((file) => file.path === entry),
+    ...files.filter((file) => file.path !== entry),
+  ];
+}
+
 async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFile[]> {
   if (!(await isDirectory(path))) {
     const content = await readFile(path);
@@ -102,20 +114,30 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
   }
   const all = await authored(path);
   // A file left out is never read, so neither is it refused.
-  const only = target.files === undefined ? undefined : new Set(target.files);
-  const files = all.files.filter((entry) => only === undefined || only.has(entry.path));
+  const only =
+    target.files === undefined
+      ? undefined
+      : new Map(target.files.map((file) => [file.from, file.as]));
   const [refused] = all.irregular.filter((entry) => only === undefined || only.has(entry.path));
   if (refused !== undefined) {
     throw new AiregError(`${basename(path)}/${refused.path} ${refusal(refused)}.`, {
       code: ErrorCode.Invalid,
     });
   }
+  const byPath = new Map(all.files.map((entry) => [entry.path, entry]));
+  const files =
+    target.files === undefined
+      ? firstOf(target.kind, all.files).map((entry) => ({ entry, as: entry.path }))
+      : target.files.flatMap(({ from, as }) => {
+          const entry = byPath.get(from);
+          return entry === undefined ? [] : [{ entry, as }];
+        });
   // Bounded, so a tree of thousands of files neither runs out of descriptors nor
   // has every read in flight at once.
   return Promise.all(
-    files.map((entry) =>
+    files.map(({ entry, as }) =>
       reading(async () => ({
-        path: entry.path,
+        path: as,
         content: await readFile(join(path, entry.path)),
         executable: entry.executable,
       })),

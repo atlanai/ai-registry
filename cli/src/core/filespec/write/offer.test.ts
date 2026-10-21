@@ -75,10 +75,43 @@ describe("offerFrom", () => {
     await writeFile(join(skill, "notes.md"), "Scratch.\n");
     await writeFile(join(skill, ".env"), "TOKEN=x\n");
     const target = { name: "lint", kind: "skill" as const, version: "1.0.0" };
-    const sent = await offerFrom(skill, { ...target, files: ["SKILL.md"] });
+    const sent = await offerFrom(skill, {
+      ...target,
+      files: [{ from: "SKILL.md", as: "SKILL.md" }],
+    });
     expect(sent.input.files.map((file) => file.path)).toEqual(["SKILL.md"]);
     // Every file, when none are named, refusing the one that may hold credentials.
     await expect(offerFrom(skill, target)).rejects.toThrow("lint/.env may hold credentials");
+  });
+
+  test("stores each file named at its own path, in the order given", async () => {
+    const skill = await lint();
+    await mkdir(join(skill, "workspace"), { recursive: true });
+    await writeFile(join(skill, "workspace", "SOUL.md"), "Who it is.\n");
+    const sent = await offerFrom(skill, {
+      name: "lint",
+      kind: "skill",
+      version: "1.0.0",
+      files: [
+        { from: "SKILL.md", as: "SKILL.md" },
+        { from: "workspace/SOUL.md", as: "identity/SOUL.md" },
+      ],
+    });
+    expect(sent.input.files.map((file) => file.path)).toEqual(["SKILL.md", "identity/SOUL.md"]);
+    expect(Buffer.from(sent.input.files[1]!.content).toString()).toBe("Who it is.\n");
+  });
+
+  test("sends a folder agent's AGENT.md first, then its other files", async () => {
+    const agent = join(root, "helper");
+    await mkdir(agent, { recursive: true });
+    await writeFile(
+      join(agent, "AGENT.md"),
+      "---\nname: helper\ndescription: Helps.\n---\nHelp.\n",
+    );
+    await writeFile(join(agent, "a.md"), "First by name.\n");
+    const { input } = await offerFrom(agent, { name: "helper", kind: "agent", version: "1.0.0" });
+    expect(input.files.map((file) => file.path)).toEqual(["AGENT.md", "a.md"]);
+    expect(input.spec).toMatchObject({ name: "helper", description: "Helps." });
   });
 
   test("sends only the fields an edge has in the spec", async () => {

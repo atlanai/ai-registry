@@ -93,7 +93,7 @@ A repository that also makes agents, or whose skills and agents depend on each o
 
 ```yaml
 exports:
-  - .claude/skills/*
+  - .claude/skills
   - path: .claude/agents/reviewer.md
     depends_on:
       - ./.claude/skills/pr-review

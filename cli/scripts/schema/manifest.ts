@@ -148,8 +148,14 @@ const DetailedExport = Type.Object(
   {
     path: Type.String({
       pattern: `^${ONE_PATH}$`,
-      description: "One path relative to the project, such as .claude/agents/reviewer.md.",
+      description:
+        "One path relative to the project: an artifact, such as .claude/agents/reviewer.md, or a folder, whose artifacts directly inside it are each exported.",
     }),
+    kind: Type.Optional(
+      Type.Union([Type.Literal("skill"), Type.Literal("agent")], {
+        description: "When set, every artifact the entry reaches must be this kind.",
+      }),
+    ),
     version: Type.Optional(
       Type.String({
         pattern: String.raw`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-${SEMVER_IDENT}(\.${SEMVER_IDENT})*)?$`,
@@ -170,6 +176,47 @@ const DetailedExport = Type.Object(
       Type.Literal(false, {
         description: "`false` keeps it in this repository; absent, it goes to `publish.to`.",
       }),
+    ),
+    exclude: Type.Optional(
+      Type.Array(Type.String({ pattern: String.raw`^(?!\.\.?$)[^/\\*?[\]{}]+$` }), {
+        uniqueItems: true,
+        description:
+          "For a folder of artifacts: the names of what is directly inside it that it does not export.",
+      }),
+    ),
+    ignore: Type.Optional(
+      Type.Array(Type.String({ minLength: 1 }), {
+        uniqueItems: true,
+        description:
+          "Gitignore patterns, relative to each artifact the entry reaches: the files left out. The entry file always goes.",
+      }),
+    ),
+    include: Type.Optional(
+      Type.Array(
+        Type.Union([
+          Type.String({
+            pattern: `^${ONE_PATH}$`,
+            description: "A file or folder relative to the artifact, stored at the same path.",
+          }),
+          Type.Object(
+            {
+              from: Type.String({
+                pattern: `^${ONE_PATH}$`,
+                description: "A file or folder relative to the artifact.",
+              }),
+              as: Type.String({
+                pattern: `^${ONE_PATH}$`,
+                description: "The path it is stored at in the published version.",
+              }),
+            },
+            { additionalProperties: false },
+          ),
+        ]),
+        {
+          description:
+            "The only files each artifact the entry reaches publishes, besides its entry file, which always goes: a path, or `{ from, as }` to store one at another path.",
+        },
+      ),
     ),
   },
   { additionalProperties: false },
@@ -229,7 +276,7 @@ export const Manifest = Type.Object(
     exports: Type.Optional(
       Type.Array(AnyExport, {
         description:
-          "What this project makes for others to install: a path or glob, or `{ path, version, depends_on, publish }` to give one path an exact version, dependencies, or `publish: false` to keep it here.",
+          "What this project makes for others to install: a path, such as an artifact or a folder of them, or a glob, or `{ path, kind, version, depends_on, publish, exclude, ignore, include }` to give one path a kind it must be, an exact version, dependencies, `publish: false` to keep it here, or the files it publishes.",
       }),
     ),
     publish: Type.Optional(

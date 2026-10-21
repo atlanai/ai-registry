@@ -12,6 +12,7 @@ import {
   type YAMLSeq,
 } from "yaml";
 import { isNamespace } from "#adapter/filespec/names.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isLayoutId, LAYOUT_IDS } from "#adapter/layouts/ids.ts";
 import { formatVersion, parseVersion } from "#adapter/semver.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
@@ -24,6 +25,16 @@ import { type Roots, type Scope, scopeName } from "#core/store/paths.ts";
 import { VERSION } from "#core/version.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import {
+  type ExportFile,
+  exportExclude,
+  exportIgnore,
+  exportInclude,
+  exportKind,
+  isGlob,
+  PATH_HINT,
+  pathProblem,
+} from "./export-fields.ts";
+import {
   dict,
   type Fields,
   isRecord,
@@ -34,6 +45,7 @@ import {
   unknownKeysProblem,
   withoutUndefined,
 } from "./fields.ts";
+import { ManifestError } from "./manifest-error.ts";
 import { NAME } from "./product.ts";
 import {
   formatAddress,
@@ -79,15 +91,26 @@ interface PublishTarget {
   to: string;
 }
 
-/** One `exports:` entry. A plain string is an entry with a path and nothing else. */
+/**
+ * One `exports:` entry. A plain string is an entry with a path and nothing else. The path is an
+ * artifact, or a folder whose artifacts directly inside it are each one.
+ */
 export interface Export {
   /** Relative to the project, with `/`; only a plain entry may be a glob. */
   path: string;
+  /** When set, every artifact the entry reaches must be this kind. */
+  kind?: ArtifactKind | undefined;
   /** The exact version to publish it at, instead of the next one. */
   version: string | undefined;
   dependsOn: ExportDependency[];
   /** `false` keeps it in this repository; absent, it goes to `publish.to`. */
   publish: false | undefined;
+  /** For a folder of artifacts, the names directly inside it that it does not reach. */
+  exclude?: string[] | undefined;
+  /** Gitignore patterns, relative to each artifact it reaches: the files left out. */
+  ignore?: string[] | undefined;
+  /** When set, the only files each artifact publishes besides its entry file, and where each is stored. */
+  include?: ExportFile[] | undefined;
 }
 
 /**
@@ -95,6 +118,9 @@ export interface Export {
  * or an artifact this project installs, by the address of its `artifacts:` entry.
  */
 export type ExportDependency = { type: "local"; path: string } | { type: "remote"; ref: Ref };
+
+export { type ExportFile, isGlob } from "./export-fields.ts";
+export { ManifestError } from "./manifest-error.ts";
 
 /** The published schema is held to this list. */
 export const MANIFEST_KEYS = [
@@ -110,20 +136,22 @@ export const MANIFEST_KEYS = [
 ] as const;
 
 /** Every key a mapping in `exports:` takes. */
-export const EXPORT_KEYS = ["path", "version", "depends_on", "publish"] as const;
+export const EXPORT_KEYS = [
+  "path",
+  "kind",
+  "version",
+  "depends_on",
+  "publish",
+  "exclude",
+  "ignore",
+  "include",
+] as const;
 
 /** Every transport's keys; which are legal together is checked below. */
 export const REGISTRY_KEYS = ["source", "adapter", "ref", "path", "layout", "config"] as const;
 
 /** Every key a mapping in `artifacts:` takes. */
 const ARTIFACT_KEYS = ["ref", "as", "exclude", "harnesses", "copy", "trust"] as const;
-
-export class ManifestError extends AiregError {
-  constructor(message: string, hint?: string) {
-    super(message, { code: ErrorCode.Invalid, hint });
-    this.name = "ManifestError";
-  }
-}
 
 /**
  * One failure for a registry a scope does not declare, wherever it is looked
@@ -329,27 +357,6 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
   return out;
 }
 
-/** What a glob is written with, as `fs.glob` reads one. */
-const GLOB = /[*?[\]{}]/;
-
-/** Whether an export's path matches other paths rather than naming one. */
-export function isGlob(path: string): boolean {
-  return GLOB.test(path);
-}
-
-/** Why a path cannot name something below the project, or undefined when it can. */
-function pathProblem(path: string): string | undefined {
-  if (path.includes("\\")) return "uses a backslash, where a path uses /";
-  if (path.startsWith("/") || /^[A-Za-z]:/.test(path)) return "is absolute";
-  const parts = path.split("/");
-  // A glob's brace alternatives are path parts too: `{..,skills}/*` climbs out as `../*` does.
-  if (parts.includes("..") || /(?:^|[/{,])\.\.(?=$|[/,}])/.test(path)) return "leaves the project";
-  if (parts.some((part) => part === "" || part === ".")) return "has an empty or . part";
-  return undefined;
-}
-
-const PATH_HINT = "Write it relative to the project, such as .claude/skills/review.";
-
 /** The `artifacts:` entry a remote dependency names: the same address, at any version or range. */
 export function artifactFor(artifacts: readonly Ref[], ref: Ref): Ref | undefined {
   const address = formatAddress(ref);
@@ -526,11 +533,18 @@ function exportEntry(raw: unknown, artifacts: readonly Ref[]): Export {
       "Give each path it matches an entry of its own to set its version, dependencies or targets.",
     );
   }
+  const optional = withoutUndefined({
+    kind: exportKind(raw.kind, path),
+    exclude: exportExclude(raw.exclude, path),
+    ignore: exportIgnore(raw.ignore, path),
+    include: exportInclude(raw.include, path),
+  });
   return {
     path,
     version: exportVersion(raw.version, path),
     dependsOn: dependencies(raw.depends_on, path, artifacts),
     publish: exportPublish(raw.publish, path),
+    ...optional,
   };
 }
 
@@ -732,6 +746,7 @@ function manifestData(manifest: Manifest): Record<string, unknown> {
 function exportData(entry: Export): unknown {
   const written = withoutUndefined({
     path: entry.path,
+    kind: entry.kind,
     version: entry.version,
     depends_on:
       entry.dependsOn.length === 0
@@ -740,6 +755,9 @@ function exportData(entry: Export): unknown {
             need.type === "local" ? `./${need.path}` : formatAddress(need.ref),
           ),
     publish: entry.publish,
+    exclude: entry.exclude,
+    ignore: entry.ignore,
+    include: entry.include?.map((file) => (file.from === file.as ? file.from : { ...file })),
   });
   return Object.keys(written).length === 1 ? entry.path : written;
 }

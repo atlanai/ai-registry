@@ -18,7 +18,7 @@ let maker: string;
 let project: string;
 
 const EXPORTS = `exports:
-  - .claude/skills/*
+  - .claude/skills
   - path: .claude/agents/reviewer.md
     depends_on:
       - ./.claude/skills/review

@@ -78,7 +78,7 @@ registries:
 artifacts:
   - public/platform/skill/sql-style@^1.2
 exports:
-  - .claude/skills/*
+  - .claude/skills
   - path: .claude/agents/reviewer.md
     depends_on:
       - ./.claude/skills/review
@@ -89,7 +89,51 @@ publish:
   to: acme/engineering
 ```
 
-The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-spec.md) defines each field. With no arguments, `publish` takes every export. In a git repository, only what git tracks counts: a glob such as `.claude/skills/*` reaches only skills with files git tracks, and an export's folder publishes only the files git tracks in it, with its `SKILL.md` always, so a draft or scratch file beside them stays out. A glob never reaches an artifact aireg installed there. An export is a skill folder holding `SKILL.md`, or an agent's `.md` file whose front matter has a `name` and a `description`. A glob skips anything else it matches, such as a `README.md`, and says so, as in `Skipped .claude/skills/README.md, which has no name and description in its front matter, so it is no agent.`; an entry naming one is refused. An export is published from where it really is, so `publish` refuses one that a link, or a glob, takes outside the project, such as a tracked link `.claude/skills/shared` to a folder elsewhere on your machine. Every entry that reaches an artifact applies to it: their `depends_on` lists are combined, and an entry naming the artifact, such as `.claude/skills/review` or `.claude/skills/review/SKILL.md`, sets its `version` and `publish` over a glob that only matches it. Two entries that set one of these differently for the same artifact are refused, naming both. Two exports of the same kind and name are refused too, naming both paths, as in `skills/review and vendor/review are both exported as skill review.` An entry with `publish: false` is left out. A path you name on the command line that is an export follows its entry's rules too; other paths behave as described above.
+The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-spec.md) defines each field. With no arguments, `publish` takes every export.
+
+### What an entry reaches
+
+Each entry is a path in the project:
+
+- **An artifact** exports that artifact: a skill folder holding `SKILL.md`, such as `.claude/skills/review`, or an agent's `.md` file whose front matter has a `name` and a `description`, such as `.claude/agents/reviewer.md`.
+- **Any other folder**, such as `.claude/skills`, exports each artifact directly inside it. It skips anything else there, such as a `README.md`, and says so, as in `Skipped .claude/skills/README.md, which has no name and description in its front matter, so it is no agent.`
+- **A glob**, such as `.claude/skills/*`, exports each artifact it matches, and skips the rest the same way.
+
+An entry naming something that is no artifact or folder is refused. In a git repository, only what git tracks counts, so a skill you haven't committed stays out of a folder or glob entry, and neither ever reaches an artifact aireg installed there. An export is published from where it really is, so `publish` refuses one that a link, or a glob, takes outside the project, such as a tracked link `.claude/skills/shared` to a folder elsewhere on your machine.
+
+A mapping can narrow what a folder entry reaches:
+
+```yaml
+exports:
+  - path: agents
+    kind: agent
+    exclude: [drafts, legacy.md]
+```
+
+- `kind` is `skill` or `agent`. Everything the entry reaches must be that kind, and `publish` refuses one that isn't, naming it: `Export "agents" reaches agents/triage, which is a skill, not an agent.`
+- `exclude` names what is directly inside the folder that the entry doesn't export. A name the folder doesn't hold is refused, so a typo never publishes what you meant to leave out.
+
+### Which files go
+
+A skill publishes the files in its folder, except version-control folders, OS files and `node_modules/`, as [What it sends](#what-it-sends) describes; in a git repository, only those git tracks, and always its `SKILL.md`. Two fields of a mapping change that, for each artifact the entry reaches, with paths relative to the artifact's folder:
+
+```yaml
+exports:
+  - path: skills
+    ignore: [fixtures/, "*.log"]
+  - path: skills/review
+    include:
+      - checklist.md
+      - examples
+      - { from: notes/style.md, as: style.md }
+```
+
+- `include` lists the only files to publish beside the entry file, which always goes. A path, a file or a folder, is stored at the same path; `{ from, as }` stores it at another path, such as `notes/style.md` as `style.md`. A path the artifact doesn't hold, or git doesn't track, is refused, and so is an `as` that two files would share or that names an entry file such as `SKILL.md`.
+- `ignore` takes gitignore patterns, such as `fixtures/` for a folder at any depth, `/fixtures` for the one at the top, and `*.log`. The files they match stay out, after `include`; the entry file never does. A pattern that leaves nothing out is a warning, as in `Export "skills" ignores "*.log", which matches no file it publishes, so it leaves nothing out.`
+
+### Entries that reach one artifact
+
+Every entry that reaches an artifact applies to it: their `depends_on`, `include` and `ignore` lists are combined, and an entry naming the artifact, such as `.claude/skills/review` or `.claude/skills/review/SKILL.md`, sets its `kind`, `version` and `publish` over a folder or glob that only reaches it. Two entries that set one of these differently for the same artifact are refused, naming both. Two exports of the same kind and name are refused too, naming both paths, as in `skills/review and vendor/review are both exported as skill review.` An entry with `publish: false` is left out. A path you name on the command line that is an export follows its entry's rules too; other paths behave as described above.
 
 ### Target
 
@@ -169,7 +213,7 @@ With `--json`, `publish` asks no questions and prints each artifact with its old
 ## Exit status
 
 - `0`: published, nothing new to publish, a dry run, or canceled at a question. Exports left out because the registry doesn't take their kind don't change it.
-- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published, whatever its status. For exports: an entry names nothing, names something that is no skill or agent, or reaches outside the project, two entries set an artifact's `version` or `publish` differently, two exports have the same kind and name, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
+- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published, whatever its status. For exports: an entry names nothing, names something that is no skill, agent or folder, or reaches outside the project, reaches an artifact of another `kind` than it sets, excludes a name its folder doesn't hold, includes a path the artifact doesn't hold, or would store two files at one path, two entries set an artifact's `kind`, `version` or `publish` differently, two exports have the same kind and name, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
 - `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder. For exports: `--to` names another target than `publish.to`, or a registry without dependencies would receive an artifact that has them.
 - `3`: the artifact was edited from an older version than the one published since. Install the newer version and redo the edit, or pass `--force`.
 
