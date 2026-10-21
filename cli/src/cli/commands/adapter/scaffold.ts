@@ -7,7 +7,7 @@ import { isBuiltinAdapter } from "#core/adapter/registry.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { HostCommandContext } from "#core/host/extend.ts";
 import { NAME, PACKAGE } from "#core/product.ts";
-import { MIN_NODE, VERSION } from "#core/version.ts";
+import { NODE_REQUIREMENT, VERSION } from "#core/version.ts";
 
 interface Own {
   dir?: string | undefined;
@@ -40,7 +40,7 @@ function files(id: string): Record<string, string> {
       type: "module",
       exports: { ".": { types: "./dist/index.d.ts", default: "./dist/index.js" } },
       files: ["dist"],
-      engines: { node: `>=${MIN_NODE}` },
+      engines: { node: NODE_REQUIREMENT },
       scripts: { build: "tsc", test: "node --test test/*.test.ts" },
       peerDependencies: { [PACKAGE]: range },
       devDependencies: { [PACKAGE]: range, "@types/node": "^22.0.0", typescript: "^5.9.0" },

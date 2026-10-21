@@ -250,12 +250,21 @@ describe("the command surface", () => {
     expect((await aireg(["add", "--dryrun", "kit"])).stderr).toContain("Did you mean `--dry-run`?");
   }, 30_000);
 
+  test("does not apply the Node.js floor to Bun's emulated version", async ({ aireg }) => {
+    const hook =
+      'Object.defineProperties(process.versions,{node:{value:"24.3.0"},bun:{value:"1.3.12"}})';
+    const ran = await aireg(["--version"], { node: ["--import", `data:text/javascript,${hook}`] });
+    expect(ran.code).toBe(0);
+    expect(ran.stdout).toMatch(/\d+\.\d+\.\d+/);
+    expect(ran.stderr).not.toContain("requires Node.js");
+  });
+
   test.for([
     {
       failure: "an old Node.js",
       args: ["--version"],
       hook: 'Object.defineProperty(process.versions,"node",{value:"22.18.0"})',
-      error: "error: aireg requires Node.js 22.20.0 or later; this is 22.18.0.",
+      error: "error: aireg requires Node.js ^22.23.4 || ^24.22.1 || >=26.12.1; this is 22.18.0.",
     },
     {
       failure: "a failure before the command starts",
@@ -279,6 +288,10 @@ describe("the command surface", () => {
       });
     } else {
       expect(ran.stderr).toContain(error);
+      if (args[0] === "--version") {
+        expect(ran.stderr).toContain("Install a supported Node.js version");
+        expect(ran.stderr).not.toContain("standalone");
+      }
     }
     expect(ran.stderr).not.toMatch(/\n\s+at /);
   });

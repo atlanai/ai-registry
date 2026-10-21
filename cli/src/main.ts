@@ -21,8 +21,7 @@ import { releaseLeasesOnInterrupt } from "#core/lease.ts";
 import { LogLevelError } from "#core/log/index.ts";
 import { type LogBootstrap, openCliLog } from "#core/log/open.ts";
 import { Printer } from "#core/output.ts";
-import { releaseStamp } from "#core/release/stamp.ts";
-import { MIN_NODE, nodeTooOld, VERSION, versionInfo } from "#core/version.ts";
+import { NODE_REQUIREMENT, nodeTooOld, VERSION, versionInfo } from "#core/version.ts";
 import { extensionHost } from "#daemon/extension-host.ts";
 import { recycleDaemon } from "#daemon/service.ts";
 import { hintUpdate, refreshUpdates, scheduleUpdateCheck, UPDATE_CHECK_FLAG } from "#self/check.ts";
@@ -87,16 +86,6 @@ async function unknownKind(name: string, action: string): Promise<AiregError> {
   );
 }
 
-const installCommand = (origin: string) => `curl -fsSL ${origin}/install | sh`;
-
-/** A release build can point at the standalone aireg, which needs no Node.js. */
-function nodeHint(): string {
-  const stamp = releaseStamp(process.env);
-  const upgrade = `Install Node.js ${MIN_NODE} or later`;
-  if (stamp === undefined) return `${upgrade}.`;
-  return `${upgrade}, or install the standalone aireg, which needs no Node.js: \`${installCommand(stamp.origin)}\`.`;
-}
-
 /** A stray throw skips main's catch, and handling it suppresses Node's exit, so this exits. */
 function reportStrayErrors(printer: Printer): void {
   const report = (error: unknown) => process.exit(reportError(printer, error));
@@ -152,7 +141,12 @@ async function dispatch(
 ): Promise<ExitCode> {
   const tooOld = nodeTooOld();
   if (tooOld !== undefined)
-    return reportError(printer, new AiregError(tooOld, { hint: nodeHint() }));
+    return reportError(
+      printer,
+      new AiregError(tooOld, {
+        hint: `Install a supported Node.js version (${NODE_REQUIREMENT}).`,
+      }),
+    );
 
   const misused = misusedGlobal(values);
   if (misused !== undefined) return reportError(printer, misused);

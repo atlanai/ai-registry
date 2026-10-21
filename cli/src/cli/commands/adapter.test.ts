@@ -103,10 +103,12 @@ describe("adapter command", () => {
     );
     const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
       dependencies?: unknown;
+      engines: { node: string };
       peerDependencies: Record<string, string>;
       devDependencies: Record<string, string>;
     };
     expect(pkg.dependencies).toBeUndefined();
+    expect(pkg.engines.node).toBe("^22.23.4 || ^24.22.1 || >=26.12.1");
     expect(pkg.peerDependencies[PACKAGE]).toMatch(/^\^\d+\.\d+$/);
     expect(pkg.devDependencies[PACKAGE]).toBe(pkg.peerDependencies[PACKAGE]);
     expect(await readFile(join(cwd, "src/index.ts"), "utf8")).toContain(`from "${PACKAGE}"`);
