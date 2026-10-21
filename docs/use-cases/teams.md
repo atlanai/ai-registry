@@ -78,7 +78,7 @@ jobs:
           path: registry
           token: ${{ secrets.ACME_REGISTRY_TOKEN }}
           persist-credentials: false
-      - run: curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.4 sh
+      - run: curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.5 sh
       - run: aireg publish '.claude/skills/*' --to ./registry/engineering --yes
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.4 sh
+      - run: curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.5 sh
       - run: aireg registry validate
 ```
 
