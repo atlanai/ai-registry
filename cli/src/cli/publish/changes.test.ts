@@ -51,4 +51,3 @@ describe("changeLines", () => {
     expect(changeLines(changes)).toEqual(["    removed  evil.md"]);
   });
 });
-
