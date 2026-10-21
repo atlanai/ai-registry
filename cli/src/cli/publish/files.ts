@@ -45,30 +45,53 @@ async function candidates(root: string, tracked: readonly string[] | undefined):
   return [...files, ...irregular].map((file) => file.path).sort();
 }
 
-/** The files `include` lists, each at the path it is stored at; a path that matches nothing is refused. */
+/** Whether a path is a file listed, or a folder holding one. */
+const matches = (paths: readonly string[], from: string) =>
+  paths.some((path) => path === from || path.startsWith(`${from}/`));
+
+/** Why nothing an `include` path names goes: the artifact does not hold it, or it belongs to another export. */
+function unmatched(
+  entry: Export,
+  from: string,
+  inner: boolean,
+  how: { shown: string; tracked: boolean },
+) {
+  if (inner) {
+    return new AiregError(
+      `Export ${quoted(entry.path)} includes ${from}, which belongs to an artifact inside ${how.shown} that is exported on its own.`,
+      {
+        code: ErrorCode.Invalid,
+        hint: "Remove it from `include`, or the entry that exports the artifact inside.",
+      },
+    );
+  }
+  return new AiregError(
+    `Export ${quoted(entry.path)} includes ${from}, which ${how.shown} does not hold.`,
+    {
+      code: ErrorCode.NotFound,
+      hint: how.tracked
+        ? "Check the path under `include`, relative to the artifact's folder, and that git tracks it."
+        : "Check the path under `include`, relative to the artifact's folder.",
+    },
+  );
+}
+
+/**
+ * The files `include` lists, each at the path it is stored at; a path that matches nothing is
+ * refused, and so is one whose files all belong to an artifact inside that is exported on its own.
+ */
 function included(
-  held: readonly string[],
+  held: { own: readonly string[]; all: readonly string[] },
   include: readonly { entry: Export; file: ExportFile }[],
-  shown: string,
-  tracked: boolean,
+  how: { shown: string; tracked: boolean },
 ): ExportFile[] {
   const out: ExportFile[] = [];
   for (const { entry, file } of include) {
-    const inside = held.filter((path) => path.startsWith(`${file.from}/`));
-    if (held.includes(file.from)) out.push(file);
-    else if (inside.length > 0) {
-      for (const path of inside)
-        out.push({ from: path, as: `${file.as}${path.slice(file.from.length)}` });
-    } else {
-      throw new AiregError(
-        `Export ${quoted(entry.path)} includes ${file.from}, which ${shown} does not hold.`,
-        {
-          code: ErrorCode.NotFound,
-          hint: tracked
-            ? "Check the path under `include`, relative to the artifact's folder, and that git tracks it."
-            : "Check the path under `include`, relative to the artifact's folder.",
-        },
-      );
+    if (!matches(held.own, file.from))
+      throw unmatched(entry, file.from, matches(held.all, file.from), how);
+    if (held.own.includes(file.from)) out.push(file);
+    for (const path of held.own.filter((each) => each.startsWith(`${file.from}/`))) {
+      out.push({ from: path, as: `${file.as}${path.slice(file.from.length)}` });
     }
   }
   return out;
@@ -100,15 +123,14 @@ export async function chooseFiles(choosing: Choosing, base: string): Promise<Exp
   const entry = entryOf(kind);
   // An artifact inside this one that is exported is published on its own, so it is not part of this one.
   const nested = [...choosing.exported].filter((other) => other !== root && isWithin(root, other));
-  const held = (await candidates(root, tracked)).filter(
-    (path) => !nested.some((other) => isWithin(other, resolve(root, path))),
-  );
+  const all = await candidates(root, tracked);
+  const held = all.filter((path) => !nested.some((other) => isWithin(other, resolve(root, path))));
   const include = entries.flatMap((each) =>
     (each.include ?? []).map((file) => ({ entry: each, file })),
   );
   const listed = entries.some((each) => each.include !== undefined);
   const chosen = listed
-    ? included(held, include, shown, tracked !== undefined)
+    ? included({ own: held, all }, include, { shown, tracked: tracked !== undefined })
     : held.map((path) => ({ from: path, as: path }));
   const patterns = entries.flatMap((each) =>
     (each.ignore ?? []).map((pattern) => ({ entry: each, pattern })),

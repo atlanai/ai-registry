@@ -202,6 +202,14 @@ interface Outcome {
   skipped: readonly Skipped[];
 }
 
+/** An agent's files, by the paths they are stored at, AGENT.md first, when it has more than that. */
+function filesOf(item: Planned): { files?: string[] } {
+  const { files } = item.input;
+  return item.work.kind === "agent" && files.length > 1
+    ? { files: files.map((file) => file.path) }
+    : {};
+}
+
 /** Each artifact under `--json`: its versions, and where it went. */
 function report(
   printer: Printer,
@@ -228,6 +236,7 @@ function report(
         ...(range === undefined ? {} : { range }),
         ...(registry === undefined ? {} : { registry }),
       })),
+      ...filesOf(item),
     };
   });
   printer.json({ ok: true, data: { dryRun, target, artifacts, skipped } });

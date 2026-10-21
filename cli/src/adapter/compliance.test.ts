@@ -174,4 +174,74 @@ describe("assertAdapterCompliance", () => {
       );
     });
   });
+
+  describe("agentFolders", () => {
+    /** Publishes agents into memory, serving back every file, or only the first. */
+    function storing(
+      every: boolean,
+      kinds: ("skill" | "agent")[] = ["skill", "agent"],
+    ): SourceAdapter {
+      const held: { artifact: Artifact; bytes: Map<string, Uint8Array> }[] = [];
+      return defineAdapter({
+        id: "probe",
+        displayName: "Probe",
+        artifactKinds: kinds,
+        dispatch: { schemes: ["probe"] },
+        capabilities: { publish: true, agentFolders: true },
+        connect: async () => ({
+          resolve: async (want) => ({
+            artifacts: held
+              .map((each) => each.artifact)
+              .filter((artifact) =>
+                want.every((asked) => asked.name === artifact.envelope.metadata.name),
+              ),
+          }),
+          fetch: async (artifact, file) =>
+            held.find((each) => each.artifact === artifact)?.bytes.get(file.path) ??
+            new Uint8Array(),
+          publish: async (changes: readonly PublishInput[]) => {
+            for (const change of changes) {
+              const files = every ? change.files : change.files.slice(0, 1);
+              held.push({
+                artifact: {
+                  id: change.name,
+                  kind: change.kind,
+                  envelope: {
+                    apiVersion: ENVELOPE_API_VERSION,
+                    kind: change.kind,
+                    metadata: { name: change.name },
+                    files: [],
+                  },
+                  files: files.map((file) => ({
+                    path: file.path,
+                    locator: file.path,
+                    executable: false,
+                  })),
+                },
+                bytes: new Map(files.map((file) => [file.path, file.content])),
+              });
+            }
+            return {};
+          },
+          close: async () => {},
+        }),
+      });
+    }
+
+    it("publishes an agent with a file beyond AGENT.md and reads it back", async () => {
+      await expect(assertAdapterCompliance(storing(true), context())).resolves.toBeUndefined();
+    });
+
+    it("refuses an adapter that serves back only AGENT.md", async () => {
+      await expect(assertAdapterCompliance(storing(false), context())).rejects.toThrow(
+        "probe declared agentFolders but aireg-compliance-folder came back without notes/probe.md.",
+      );
+    });
+
+    it("refuses agentFolders on an adapter that publishes no agent", async () => {
+      await expect(assertAdapterCompliance(storing(true, ["skill"]), context())).rejects.toThrow(
+        "probe declared agentFolders but publishes no agent.",
+      );
+    });
+  });
 });

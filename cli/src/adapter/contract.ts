@@ -203,6 +203,12 @@ export interface Capabilities {
    * `relationships` to no other adapter, and refuses an artifact that has them instead.
    */
   relationships?: boolean;
+  /**
+   * `publish` stores an agent's files beyond its `AGENT.md`, each at its path, and `resolve`
+   * serves them back with it, so an agent can be a folder. aireg sends an agent with more than
+   * its entry file to no other adapter, and leaves it out of the publish instead.
+   */
+  agentFolders?: boolean;
 }
 
 /** Whether an adapter has a sign-in: its `auth.login`, which `capabilities.auth` must declare. */
@@ -222,6 +228,7 @@ export function advertisedCapabilities(
     fileSpec: capabilities?.fileSpec === true,
     namespacePlugins: capabilities?.namespacePlugins === true,
     relationships: capabilities?.relationships === true,
+    agentFolders: capabilities?.agentFolders === true,
   };
 }
 

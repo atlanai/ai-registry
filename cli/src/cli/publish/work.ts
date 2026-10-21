@@ -9,7 +9,7 @@ import { matchInstalled, rowsNamed } from "#cli/names.ts";
 import { descriptionText, frontmatter } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { gitIn } from "#core/git.ts";
-import { SKILL_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Export, ExportFile } from "#core/manifest.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
@@ -43,7 +43,8 @@ export interface Exported extends Export {
   files?: readonly ExportFile[] | undefined;
 }
 
-const SHAPE_HINT = "Name a skill folder that holds SKILL.md, or an agent's .md file.";
+const SHAPE_HINT =
+  "Name a skill folder that holds SKILL.md, an agent's folder that holds AGENT.md, or an agent's .md file.";
 
 function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
   return {
@@ -65,28 +66,41 @@ function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
   };
 }
 
-/** A skill is a directory with SKILL.md, reached by either; any other .md is an agent. */
+/** The entry file a folder holds, which says its kind; a folder with both is no one artifact. */
+function folderKind(root: string): ArtifactKind | undefined {
+  const skill = existsSync(join(root, SKILL_ENTRY));
+  const agent = existsSync(join(root, AGENT_ENTRY));
+  if (skill && agent) {
+    throw new AiregError(`${root} holds both SKILL.md and AGENT.md.`, {
+      code: ErrorCode.Invalid,
+      hint: "A folder is one artifact: keep SKILL.md for a skill, or AGENT.md for an agent.",
+    });
+  }
+  return skill ? "skill" : agent ? "agent" : undefined;
+}
+
+/**
+ * A skill is a directory with SKILL.md, and a folder agent one with AGENT.md, reached by either;
+ * any other .md is an agent.
+ */
 export async function fromPath(path: string): Promise<Work> {
   const isDir = (await stat(path)).isDirectory();
-  const root = !isDir && basename(path) === SKILL_ENTRY ? dirname(path) : path;
-  const skill = isDir || root !== path;
-  if (skill && !existsSync(join(root, SKILL_ENTRY))) {
+  const entry = basename(path) === SKILL_ENTRY || basename(path) === AGENT_ENTRY;
+  const root = !isDir && entry ? dirname(path) : path;
+  const folder = isDir || root !== path;
+  const kind = folder ? folderKind(root) : "agent";
+  if (kind === undefined || (!folder && extname(path) !== ".md")) {
     throw new AiregError(`${path} is not an artifact.`, {
       code: ErrorCode.Invalid,
       hint: SHAPE_HINT,
     });
   }
-  if (!skill && extname(path) !== ".md") {
-    throw new AiregError(`${path} is not an artifact.`, {
-      code: ErrorCode.Invalid,
-      hint: SHAPE_HINT,
-    });
-  }
-  const meta = frontmatter(await readFile(skill ? join(root, SKILL_ENTRY) : path, "utf8"));
-  const fallback = skill ? basename(root) : basename(path, ".md");
+  const file = !folder ? path : join(root, kind === "skill" ? SKILL_ENTRY : AGENT_ENTRY);
+  const meta = frontmatter(await readFile(file, "utf8"));
+  const fallback = folder ? basename(root) : basename(path, ".md");
   return {
     name: sanitizeName(meta.name ?? fallback),
-    kind: skill ? "skill" : "agent",
+    kind,
     path: root,
     description: meta.description === undefined ? undefined : descriptionText(meta.description),
     home: undefined,

@@ -212,6 +212,54 @@ describe("takenBy", () => {
     );
     expect(every.skipped).toEqual([]);
   });
+
+  test("leaves out a folder agent with files beyond its AGENT.md, unless the registry keeps them", async () => {
+    for (const [name, files] of [
+      ["helper", ["workspace/AGENTS.md", "workspace/SOUL.md"]],
+      ["plain", []],
+    ] as const) {
+      await mkdir(join(base, "agents", name, "workspace"), { recursive: true });
+      await writeFile(
+        join(base, "agents", name, "AGENT.md"),
+        `---\nname: ${name}\ndescription: Helps.\n---\n`,
+      );
+      for (const file of files) await writeFile(join(base, "agents", name, file), "Kept.\n");
+    }
+    const { found } = await exportsOn(manifestWith("  - agents\n"), base);
+    const works = await exportWork(found, base);
+    expect(works.map((work) => `${work.kind} ${work.name}`)).toEqual([
+      "agent helper",
+      "agent plain",
+      "agent reviewer",
+    ]);
+    const keeping = (agentFolders: boolean) =>
+      ({
+        ...adapter(),
+        capabilities: { agentFolders },
+      }) as unknown as SourceAdapter;
+    const without = await takenBy(
+      works,
+      async () => ({ alias: "acme", adapter: keeping(false) }),
+      found,
+      base,
+    );
+    expect(without.works.map((work) => work.name)).toEqual(["plain", "reviewer"]);
+    expect(without.skipped).toEqual([
+      {
+        name: "helper",
+        kind: "agent",
+        path: "agents/helper",
+        reason: "acme keeps no agent's files beyond its AGENT.md, and it has 2 more files",
+      },
+    ]);
+    const keeps = await takenBy(
+      works,
+      async () => ({ alias: "acme", adapter: keeping(true) }),
+      found,
+      base,
+    );
+    expect(keeps.skipped).toEqual([]);
+  });
 });
 
 describe("inDependencyOrder", () => {

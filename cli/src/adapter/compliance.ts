@@ -141,6 +141,64 @@ async function checkRelationships(
   }
 }
 
+/** What the folder agent check publishes, beside its `AGENT.md`. */
+const FOLDER_PROBE = `${PROBE}-folder`;
+const FOLDER_FILE = "notes/probe.md";
+
+/** Publishes an agent with a file beyond its `AGENT.md`, and reads both back, byte for byte. */
+async function checkAgentFolders(adapter: SourceAdapter, handle: SourceHandle): Promise<void> {
+  const flags = advertisedCapabilities(adapter.capabilities);
+  if (!flags.agentFolders) return;
+  if (!flags.publish || handle.publish === undefined) {
+    throw new ComplianceError(`${adapter.id} declared agentFolders but does not publish.`);
+  }
+  if (!(adapter.publishKinds ?? adapter.artifactKinds).includes("agent")) {
+    throw new ComplianceError(`${adapter.id} declared agentFolders but publishes no agent.`);
+  }
+  const encode = (text: string) => new TextEncoder().encode(text);
+  const files = [
+    {
+      path: "AGENT.md",
+      content: encode(
+        `---\nname: ${FOLDER_PROBE}\ndescription: ${PROBE_DESCRIPTION}\n---\nCheck.\n`,
+      ),
+      executable: false,
+    },
+    { path: FOLDER_FILE, content: encode("Kept beside AGENT.md.\n"), executable: false },
+  ];
+  const metadata = { name: FOLDER_PROBE, description: PROBE_DESCRIPTION };
+  const contentId = contentDigest(
+    buildEnvelope({
+      kind: "agent",
+      metadata,
+      files: files.map((file) =>
+        describeFile(file.path, sha256(file.content), file.content.byteLength),
+      ),
+    }),
+  );
+  const namespace = "compliance";
+  await handle.publish(
+    [{ ...metadata, kind: "agent", namespace, version: "1.0.0", contentId, files }],
+    {},
+  );
+  const found = await handle.resolve([{ name: FOLDER_PROBE, namespace, kind: "agent" }]);
+  const published = found.artifacts.find(
+    (artifact) => artifact.envelope.metadata.name === FOLDER_PROBE,
+  );
+  const served = published?.files.find((file) => file.path === FOLDER_FILE);
+  if (published === undefined || served === undefined) {
+    throw new ComplianceError(
+      `${adapter.id} declared agentFolders but ${FOLDER_PROBE} came back without ${FOLDER_FILE}.`,
+    );
+  }
+  const bytes = await handle.fetch(published, served);
+  if (sha256(bytes) !== sha256(files[1]?.content ?? new Uint8Array())) {
+    throw new ComplianceError(
+      `${adapter.id} served ${FOLDER_PROBE}'s ${FOLDER_FILE} with other bytes.`,
+    );
+  }
+}
+
 function checkDeclaration(adapter: SourceAdapter): void {
   if (!ADAPTER_ID.test(adapter.id)) {
     throw new ComplianceError(`Adapter id ${JSON.stringify(adapter.id)} is not ${ADAPTER_ID}.`);
@@ -158,7 +216,8 @@ function checkDeclaration(adapter: SourceAdapter): void {
 
 /**
  * The checks an adapter's own test runs: its declaration, then a live handle against a real
- * registry. An adapter that declares `relationships` also publishes `aireg-compliance` there.
+ * registry. An adapter that declares `relationships` also publishes `aireg-compliance` there, and
+ * one that declares `agentFolders` publishes the agent `aireg-compliance-folder`.
  */
 export async function assertAdapterCompliance(
   adapter: SourceAdapter,
@@ -170,6 +229,7 @@ export async function assertAdapterCompliance(
     checkCapabilities(adapter, handle);
     const listed = await checkListing(adapter, handle);
     await checkRelationships(adapter, handle, listed);
+    await checkAgentFolders(adapter, handle);
   } finally {
     await handle.close();
   }

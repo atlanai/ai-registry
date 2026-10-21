@@ -14,10 +14,11 @@ function serving(
   files: { path: string; locator?: string }[],
   registry?: RegistryIdentity,
   more: Record<string, unknown> = {},
+  kind: "skill" | "agent" = "skill",
 ): SourceAdapter {
   const envelope: Envelope = {
     apiVersion: ENVELOPE_API_VERSION,
-    kind: "skill",
+    kind,
     metadata: { name: "lint" },
     files: files.map((file) => ({ path: file.path, digest: `sha256:${"0".repeat(64)}`, size: 0 })),
   };
@@ -25,7 +26,7 @@ function serving(
     id: "probe",
     displayName: "Probe",
     protocol: 1,
-    artifactKinds: ["skill"],
+    artifactKinds: [kind],
     dispatch: { schemes: ["probe"] },
     capabilities: { pinsSource: false, publish: false, auth: false },
     connect: async () => ({
@@ -33,7 +34,7 @@ function serving(
         artifacts: [
           {
             id: "a1",
-            kind: "skill" as const,
+            kind,
             envelope,
             files: files.map((file) => ({
               path: file.path,
@@ -75,6 +76,30 @@ describe("the identity an adapter reports", () => {
     expect(await at("https://GitHub.com/acme/kit.git/")).toBe("https://github.com/acme/kit");
     expect(await at("http://github.com/acme/kit")).toBeUndefined();
     expect(await at("file:///srv/kit")).toBeUndefined();
+  });
+});
+
+describe("an agent of many files", () => {
+  it("is listed as its AGENT.md, its other files left out of what installs", async () => {
+    const files = [{ path: "AGENT.md" }, { path: "workspace/AGENTS.md" }, { path: "a.md" }];
+    const listing = await resolveWith(serving(files, undefined, {}, "agent"));
+    const [listed] = listing.listed;
+    expect(listed?.path).toBe("artifacts/lint/agent/lint.md");
+    expect(listed?.artifact.files.map((file) => file.path)).toEqual(["AGENT.md"]);
+    expect(listed?.leftOut).toEqual(["a.md", "workspace/AGENTS.md"]);
+    // Its envelope still describes every file, so its content identity is the one published.
+    expect(listed?.artifact.envelope.files).toHaveLength(3);
+    expect(listing.catalog.warnings).toEqual([]);
+  });
+
+  it("is dropped, with a warning, when it holds no entry file", async () => {
+    const listing = await resolveWith(
+      serving([{ path: "one.md" }, { path: "two.md" }], undefined, {}, "agent"),
+    );
+    expect(listing.listed).toEqual([]);
+    expect(listing.catalog.warnings).toEqual([
+      '"lint" is an agent, which is one file, but 2 were published and none is its entry file.',
+    ]);
   });
 });
 

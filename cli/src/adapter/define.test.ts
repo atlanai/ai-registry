@@ -25,6 +25,7 @@ describe("defineAdapter", () => {
       fileSpec: false,
       namespacePlugins: false,
       relationships: false,
+      agentFolders: false,
     });
   });
 

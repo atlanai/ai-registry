@@ -91,6 +91,11 @@ export async function connectSource(
 interface Listed {
   path: string;
   artifact: Artifact;
+  /**
+   * The files of a file-shaped kind's version that hold more than it installs as, such as a
+   * folder agent's beside its AGENT.md: listed in its envelope, but fetched for no harness.
+   */
+  leftOut?: readonly string[];
 }
 
 export interface Listing {
@@ -127,6 +132,22 @@ function entryPath(artifact: Artifact): string | undefined {
 
   const only = artifact.files.length === 1 ? artifact.files[0] : undefined;
   return only === undefined ? undefined : `${address}${extname(only.path)}`;
+}
+
+/**
+ * A version of a file-shaped kind is installed as one file, so one holding several, such as a
+ * folder agent, is installed as its entry file alone, the first of the kind's `served` files it
+ * holds; the rest are left out of what is fetched. Undefined when it holds none of them.
+ */
+function asServed(artifact: Artifact): { artifact: Artifact; leftOut?: string[] } | undefined {
+  const spec = KIND_SPECS[artifact.kind];
+  if (spec.shape !== "file" || artifact.files.length <= 1) return { artifact };
+  const entry = (spec.served ?? [])
+    .map((name) => artifact.files.find((file) => file.path === name))
+    .find((file) => file !== undefined);
+  if (entry === undefined) return undefined;
+  const leftOut = artifact.files.filter((file) => file !== entry).map((file) => file.path);
+  return { artifact: { ...artifact, files: [entry] }, leftOut: leftOut.sort() };
 }
 
 type Fail = (message: string) => never;
@@ -224,12 +245,14 @@ export async function resolveArtifacts(
 
   for (const [index, artifact] of resolution.artifacts.entries()) check(adapter, artifact, index);
 
-  for (const artifact of resolution.artifacts) {
-    const { name, description } = artifact.envelope.metadata;
-    const path = entryPath(artifact);
+  for (const listedAs of resolution.artifacts) {
+    const { name, description } = listedAs.envelope.metadata;
+    const served = asServed(listedAs);
+    const artifact = served?.artifact ?? listedAs;
+    const path = served === undefined ? undefined : entryPath(artifact);
     if (path === undefined) {
       catalog.warnings.push(
-        `${quoted(name)} is a ${artifact.kind}, which is one file, but ${artifact.files.length} were published.`,
+        `${quoted(name)} is ${artifact.kind === "agent" ? "an" : "a"} ${artifact.kind}, which is one file, but ${artifact.files.length} were published and none is its entry file.`,
       );
       continue;
     }
@@ -255,7 +278,11 @@ export async function resolveArtifacts(
       engine: engineFromUnknown(artifact.engines),
       from: { file: adapter.id, pointer: artifact.id },
     });
-    listed.push({ path, artifact });
+    listed.push({
+      path,
+      artifact,
+      ...(served?.leftOut === undefined ? {} : { leftOut: served.leftOut }),
+    });
   }
 
   merge(catalog, adapter.id, entries);

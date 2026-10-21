@@ -58,6 +58,41 @@ describe("plan", () => {
   });
 });
 
+describe("plan for a folder agent", () => {
+  test("refuses one with files beyond AGENT.md to a registry that keeps only AGENT.md", async () => {
+    const path = join(root, "helper");
+    await mkdir(join(path, "workspace"), { recursive: true });
+    await writeFile(join(path, "AGENT.md"), "---\nname: helper\ndescription: Helps.\n---\n");
+    await writeFile(join(path, "workspace", "AGENTS.md"), "How.\n");
+    const work: Work = {
+      name: "helper",
+      kind: "agent",
+      path,
+      description: undefined,
+      home: undefined,
+      row: undefined,
+      base: undefined,
+    };
+    const at = (capabilities: Record<string, boolean>) =>
+      ({
+        alias: "acme",
+        source: { adapter: { id: "probe", capabilities } },
+        latest: new Map(),
+        withheld: new Map(),
+      }) as unknown as Published;
+    await expect(plan(work, at({}), "eng", "patch", undefined, false)).rejects.toMatchObject({
+      message: "helper has files beyond its AGENT.md, but acme keeps only an agent's AGENT.md.",
+      code: "usage",
+    });
+    const planned = await plan(work, at({ agentFolders: true }), "eng", "patch", undefined, false);
+    expect(planned.input.files.map((file) => file.path)).toEqual([
+      "AGENT.md",
+      "workspace/AGENTS.md",
+    ]);
+    expect(planned.input.spec).toMatchObject({ name: "helper", description: "Helps." });
+  });
+});
+
 describe("plan with relationships", () => {
   const edge = { rel_type: "depends_on", to: "eng/skill/style@1.2.0", range: "^1.2.0" };
 

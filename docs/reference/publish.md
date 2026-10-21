@@ -19,7 +19,7 @@ The second form publishes the manifest's `exports:`; see [Publishing a repositor
 
 `aireg publish` sends skills and agents to a registry as new versions. Each argument can be:
 
-- a path to a skill folder (a folder holding `SKILL.md`) or to an agent's `.md` file
+- a path to a skill folder (a folder holding `SKILL.md`), to an agent's folder (a folder holding `AGENT.md`), or to an agent's `.md` file
 - a glob over paths, such as `'.claude/skills/*'`
 - the name of an installed artifact, to publish the edits you made to it
 
@@ -65,7 +65,7 @@ aireg publish .claude/skills/triage --to ../acme-registry/engineering
 
 The `next` line is the git command that commits the new version in the registry's clone and pushes it. Once the change merges, machines that sync with the registry take the new version within 15 minutes, and projects take it with [`aireg update`](update.md).
 
-Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own file, such as `.claude/agents/reviewer.md`, goes in as it is, named after the file when its front matter has no `name`, and aireg checks it as `aireg registry validate` would.
+Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own file, such as `.claude/agents/reviewer.md`, goes in as it is, named after the file when its front matter has no `name`, and aireg checks it as `aireg registry validate` would. An agent's folder goes in with every file in it, as [Folder agents](#folder-agents) describes.
 
 ## Publishing a repository's exports
 
@@ -95,7 +95,7 @@ The [storage spec](https://github.com/atlanai/ai-registry/blob/main/cli/storage-
 
 Each entry is a path in the project:
 
-- **An artifact** exports that artifact: a skill folder holding `SKILL.md`, such as `.claude/skills/review`, or an agent's `.md` file whose front matter has a `name` and a `description`, such as `.claude/agents/reviewer.md`.
+- **An artifact** exports that artifact: a skill folder holding `SKILL.md`, such as `.claude/skills/review`, an agent's folder holding `AGENT.md`, such as `agents/websiteclaw`, or an agent's `.md` file whose front matter has a `name` and a `description`, such as `.claude/agents/reviewer.md`. A folder holding both `SKILL.md` and `AGENT.md` is refused, and so is an agent's `x.md` beside an agent's folder `x/`, since both would be one agent.
 - **Any other folder**, such as `.claude/skills`, exports each artifact directly inside it. It skips anything else there, such as a `README.md`, and says so, as in `Skipped .claude/skills/README.md, which has no name and description in its front matter, so it is no agent.`
 - **A glob**, such as `.claude/skills/*`, exports each artifact it matches, and skips the rest the same way.
 
@@ -131,7 +131,44 @@ exports:
 - `include` lists the only files to publish beside the entry file, which always goes. A path, a file or a folder, is stored at the same path; `{ from, as }` stores it at another path, such as `notes/style.md` as `style.md`. A path the artifact doesn't hold, or git doesn't track, is refused, and so is an `as` that two files would share or that names an entry file such as `SKILL.md`.
 - `ignore` takes gitignore patterns, such as `fixtures/` for a folder at any depth, `/fixtures` for the one at the top, and `*.log`. The files they match stay out, after `include`; the entry file never does. A pattern that leaves nothing out is a warning, as in `Export "skills" ignores "*.log", which matches no file it publishes, so it leaves nothing out.`
 
-An artifact inside another one, such as a skill folder inside another skill's folder, is part of it until an entry reaches it too. Then it is published on its own, and left out of the files of the one it sits in.
+An artifact inside another one, such as a skill folder inside an agent's folder, is part of it until an entry reaches it too. Then it is published on its own, and left out of the files of the one it sits in.
+
+### Folder agents
+
+An agent can be a folder: an `AGENT.md`, whose front matter gives its `name` and `description` and whose body is its instructions, and the files it works from. `publish` sends the folder as one agent, with its `AGENT.md` and its other files, chosen as [Which files go](#which-files-go) describes:
+
+```text
+agents/websiteclaw/
+  AGENT.md
+  notes/SOUL.md
+  workspace/AGENTS.md
+  workspace/TOOLS.md
+  runtime/state.json          # written as it runs
+  skills/site-health/SKILL.md # a skill of its own
+```
+
+```yaml
+exports:
+  - skills
+  - path: agents/websiteclaw
+    ignore: [runtime/]
+    include:
+      - workspace
+      - runtime
+      - { from: notes/SOUL.md, as: identity/SOUL.md }
+    depends_on:
+      - ./skills/pr-approval
+      - ./agents/websiteclaw/skills/site-health
+  - agents/websiteclaw/skills
+publish:
+  to: ./registry/marketing
+```
+
+Its version folder in the registry then holds `AGENT.md`, `identity/SOUL.md`, `workspace/AGENTS.md` and `workspace/TOOLS.md`: `include` lists `workspace` and `runtime`, `ignore` takes `runtime/` back out, and `notes/SOUL.md` is stored as `identity/SOUL.md`. `skills/site-health` is published as a skill of its own, since an entry reaches it, and the agent depends on it. The version's digest covers every file, so changing one of them is a new version, and changing a file left out is none.
+
+A registry keeps an agent's other files only when its adapter says it does: a registry folder does. One whose adapter doesn't keep them takes the other exports, and lists such an agent as `skip`, as in `skip    marketing/agent/websiteclaw  acme keeps no agent's files beyond its AGENT.md, and it has 3 more files`; one named on the command line is refused. A folder agent with no file but its `AGENT.md` goes to any registry that takes agents.
+
+A project installs a folder agent as its `AGENT.md` alone, since each coding agent takes an agent as one file.
 
 ### Entries that reach one artifact
 
@@ -207,16 +244,16 @@ For an artifact without a fixed `version`, a version whose only change is a depe
 With `--json`, `publish` asks no questions and prints each artifact with its old and new version, and where it went:
 
 ```json
-{"ok": true, "data": {"dryRun": false, "target": {"registry": "acme", "namespace": "engineering"}, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "belowLatest": false, "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}]}], "skipped": [{"name": "reviewer", "kind": "agent", "path": ".claude/agents/reviewer.md", "reason": "acme does not take agents"}]}}
+{"ok": true, "data": {"dryRun": false, "target": {"registry": "acme", "namespace": "engineering"}, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "belowLatest": false, "published": true, "dependsOn": [{"to": "engineering/skill/review@0.3.2", "range": "^0.3.2"}]}, {"name": "websiteclaw", "kind": "agent", "registry": "acme", "namespace": "engineering", "from": null, "version": "0.1.0", "belowLatest": false, "published": true, "dependsOn": [], "files": ["AGENT.md", "identity/SOUL.md", "workspace/AGENTS.md"]}], "skipped": [{"name": "reviewer", "kind": "agent", "path": ".claude/agents/reviewer.md", "reason": "acme does not take agents"}]}}
 ```
 
-`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and otherwise the registry's newest version. `belowLatest` is `true` when `version` sorts below `from`, as an export's own `version` can. `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `target` is where this run sends its work, from `--to` or `publish.to`, its `registry` written as each artifact's is; it is `null` when each artifact goes where it was installed from. `skipped` lists the exports left out, each with its `name`, `kind`, `path` in the project and `reason`: one the registry doesn't take, or one named on the command line whose own `publish: false` keeps it in the repository.
+`registry` is the registry's name, or for `--to <folder>` or a folder target, the registry folder as it was written. `from` is `null` for a new artifact, and otherwise the registry's newest version. `belowLatest` is `true` when `version` sorts below `from`, as an export's own `version` can. `published` is `false` for one already published or under `--dry-run`. `dependsOn` lists the edges the version carries, each with its `to`, and its `range` and `registry` when it has them; it is empty for an artifact with none. `files` is there only for an agent with more files than its `AGENT.md`: the path each is stored at, `AGENT.md` first. `target` is where this run sends its work, from `--to` or `publish.to`, its `registry` written as each artifact's is; it is `null` when each artifact goes where it was installed from. `skipped` lists the exports left out, each with its `name`, `kind`, `path` in the project and `reason`: one the registry doesn't take, a folder agent whose other files it doesn't keep, or one named on the command line whose own `publish: false` keeps it in the repository.
 
 ## Exit status
 
-- `0`: published, nothing new to publish, a dry run, or canceled at a question. Exports left out because the registry doesn't take their kind don't change it.
-- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published, whatever its status. For exports: an entry names nothing, names something that is no skill, agent or folder, or reaches outside the project, reaches an artifact of another `kind` than it sets, excludes a name its folder doesn't hold, includes a path the artifact doesn't hold, or would store two files at one path, two entries set an artifact's `kind`, `version` or `publish` differently, two exports have the same kind and name, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
-- `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder. For exports: `--to` names another target than `publish.to`, or a registry without dependencies would receive an artifact that has them.
+- `0`: published, nothing new to publish, a dry run, or canceled at a question. Exports left out because the registry doesn't take their kind, or a folder agent's other files, don't change it.
+- `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published, whatever its status. For exports: an entry names nothing, names something that is no skill, agent or folder, names a folder holding both `SKILL.md` and `AGENT.md` or an agent's `.md` file beside an agent's folder of the same name, or reaches outside the project, reaches an artifact of another `kind` than it sets, excludes a name its folder doesn't hold, includes a path the artifact doesn't hold, or would store two files at one path, two entries set an artifact's `kind`, `version` or `publish` differently, two exports have the same kind and name, the exports depend on each other in a cycle, a dependency isn't published to the target, isn't installed or comes from a registry with no https address.
+- `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder. For exports: `--to` names another target than `publish.to`, or a registry without dependencies would receive an artifact that has them. A folder agent with other files, named on the command line, would go to a registry that keeps only its `AGENT.md`.
 - `3`: the artifact was edited from an older version than the one published since. Install the newer version and redo the edit, or pass `--force`.
 
 ## Examples

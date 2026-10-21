@@ -4,7 +4,7 @@ import { rootReader } from "#adapter/filespec/folder.ts";
 import type { ArtifactKind, PublishRelationship, SourceAdapter } from "#adapter/index.ts";
 import { expandHome, isLocalPath } from "#adapter/paths.ts";
 import { parseVersion } from "#adapter/semver.ts";
-import { quoted } from "#adapter/text.ts";
+import { plural, quoted } from "#adapter/text.ts";
 import {
   comparableLocation,
   declaredRegistryUrl,
@@ -112,12 +112,18 @@ export function forTarget(
 
 /**
  * Why the registry an export goes to does not take it, as a lowercase clause, or undefined when
- * it does: its adapter publishes only some kinds.
+ * it does: its adapter publishes only some kinds, and keeps no agent's files beyond its AGENT.md
+ * unless it declares `agentFolders`.
  */
 function untaken(work: Work, adapter: SourceAdapter, alias: string): string | undefined {
   if (work.exported === undefined) return undefined;
   const kinds = adapter.publishKinds ?? adapter.artifactKinds;
-  return kinds.includes(work.kind) ? undefined : `${alias} does not take ${work.kind}s`;
+  if (!kinds.includes(work.kind)) return `${alias} does not take ${work.kind}s`;
+  const files = work.exported.files?.length ?? 1;
+  if (work.kind !== "agent" || files <= 1 || adapter.capabilities.agentFolders === true) {
+    return undefined;
+  }
+  return `${alias} keeps no agent's files beyond its AGENT.md, and it has ${plural(files - 1, "more file")}`;
 }
 
 /** The work its registry takes, the exports it does not, and a warning for each edge left out. */

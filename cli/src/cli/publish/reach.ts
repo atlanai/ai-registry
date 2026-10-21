@@ -10,7 +10,7 @@ import { canonicalAsync } from "#core/fs/canonical.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { isDirectory } from "#core/fs/tree.ts";
 import { gitIn } from "#core/git.ts";
-import { type ArtifactKind, SKILL_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, type ArtifactKind, SKILL_ENTRY } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import {
   type Export,
@@ -25,9 +25,10 @@ import { type Exported, expand } from "./work.ts";
 
 // Which artifacts `exports:` reaches in this project, and the entry whose rules apply to each.
 
-/** A skill is its folder, however an entry reaches it, so one path names one export. */
+/** A folder artifact is its folder, however an entry reaches it, so one path names one export. */
 export function artifactRoot(path: string): string {
-  return basename(path) === SKILL_ENTRY ? dirname(path) : path;
+  const name = basename(path);
+  return name === SKILL_ENTRY || name === AGENT_ENTRY ? dirname(path) : path;
 }
 
 /** What git tracks below `base`, or undefined outside a repository, where nothing is filtered. */
@@ -163,24 +164,53 @@ async function namesAgent(path: string): Promise<boolean> {
 
 const shownAt = (path: string, base: string) => posixRelative(base, path);
 
-/** A folder holding SKILL.md is a skill. */
-function heldIn(path: string): Held {
-  return existsSync(join(path, SKILL_ENTRY))
-    ? { root: path, kind: "skill" }
-    : { stray: "holds no SKILL.md" };
+/** A folder agent and an agent's file of the same name beside it would be one agent twice. */
+function refuseTwice(folder: string, base: string): void {
+  if (!existsSync(`${folder}.md`)) return;
+  const [file, agent] = [`${folder}.md`, join(folder, AGENT_ENTRY)].map((path) =>
+    shownAt(path, base),
+  );
+  throw new AiregError(`${file} and ${agent} are one agent written twice.`, {
+    code: ErrorCode.Invalid,
+    hint: "Keep one of them: the folder, with its AGENT.md, or the one file.",
+  });
+}
+
+/** A folder holding SKILL.md is a skill; one holding AGENT.md, an agent of many files. */
+async function heldIn(path: string, base: string): Promise<Held> {
+  const skill = existsSync(join(path, SKILL_ENTRY));
+  const agent = existsSync(join(path, AGENT_ENTRY));
+  if (skill && agent) {
+    throw new AiregError(`${shownAt(path, base)} holds both SKILL.md and AGENT.md.`, {
+      code: ErrorCode.Invalid,
+      hint: "A folder is one artifact: keep SKILL.md for a skill, or AGENT.md for an agent.",
+    });
+  }
+  if (skill) return { root: path, kind: "skill" };
+  if (!agent) return { stray: "holds no SKILL.md or AGENT.md" };
+  refuseTwice(path, base);
+  return (await namesAgent(join(path, AGENT_ENTRY)))
+    ? { root: path, kind: "agent" }
+    : { stray: `holds an AGENT.md that ${NOT_AGENT}` };
 }
 
 /**
- * A skill is a folder holding SKILL.md, reached by either; an agent is a `.md` file whose front
- * matter gives its name and description, so a README or a note beside them is never one.
+ * A skill is a folder holding SKILL.md, and a folder agent one holding AGENT.md, reached by
+ * either; an agent is also a `.md` file whose front matter gives its name and description, so a
+ * README or a note beside them is never one.
  */
-async function heldAt(path: string): Promise<Held> {
-  if (await isDirectory(path)) return heldIn(path);
-  if (basename(path) === SKILL_ENTRY) return heldIn(dirname(path));
-  if (extname(path) !== ".md") {
-    return { stray: "is neither a skill folder nor an agent's .md file" };
+async function heldAt(path: string, base: string): Promise<Held> {
+  if (await isDirectory(path)) return heldIn(path, base);
+  if (basename(path) === SKILL_ENTRY || basename(path) === AGENT_ENTRY) {
+    return heldIn(dirname(path), base);
   }
-  return (await namesAgent(path)) ? { root: path, kind: "agent" } : { stray: NOT_AGENT };
+  if (extname(path) !== ".md") {
+    return { stray: "is neither a skill or agent folder nor an agent's .md file" };
+  }
+  if (!(await namesAgent(path))) return { stray: NOT_AGENT };
+  const folder = path.slice(0, -".md".length);
+  if (existsSync(join(folder, AGENT_ENTRY))) refuseTwice(folder, base);
+  return { root: path, kind: "agent" };
 }
 
 /** What every entry is read against, and the notes on what an entry skipped. */
@@ -198,7 +228,7 @@ interface Reaching {
 }
 
 const NAME_HINT =
-  "Name a skill folder that holds SKILL.md, an agent's .md file whose front matter has a name and a description, or a folder of them.";
+  "Name a skill folder that holds SKILL.md, an agent's folder that holds AGENT.md, an agent's .md file whose front matter has a name and a description, or a folder of them.";
 
 /** Whether git leaves a path out of what it tracks, so no entry reaching through a folder sees it. */
 function untracked(path: string, reading: Reading): boolean {
@@ -218,7 +248,7 @@ async function reachThrough(
   if (!isWithin(base, root)) await refuseOutside(entry, root, base);
   if (installed.has(root) || untracked(path, reading)) return;
   await refuseOutside(entry, root, base);
-  const held = await heldAt(path);
+  const held = await heldAt(path, base);
   if ("root" in held) into.set(held.root, held.kind);
   else reading.notes.push(`Skipped ${shownAt(path, base)}, which ${held.stray}.`);
 }
@@ -258,7 +288,7 @@ async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
     });
   }
   await refuseOutside(entry, artifactRoot(path), reading.base);
-  const held = await heldAt(path);
+  const held = await heldAt(path, reading.base);
   if ("root" in held) {
     if (entry.exclude !== undefined) {
       throw new AiregError(
@@ -281,8 +311,11 @@ async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
     }
     return { roots: new Map([[held.root, held.kind]]), named: true };
   }
-  if (await isDirectory(path))
+  // A folder an entry file makes an artifact is never read as a folder of them.
+  const entryFile = [SKILL_ENTRY, AGENT_ENTRY].some((name) => existsSync(join(path, name)));
+  if ((await isDirectory(path)) && !entryFile) {
     return { roots: await reachInside(entry, path, reading), named: false };
+  }
   throw new AiregError(`Export ${quoted(entry.path)} is not an artifact: it ${held.stray}.`, {
     code: ErrorCode.Invalid,
     hint: NAME_HINT,

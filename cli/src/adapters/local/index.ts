@@ -17,6 +17,7 @@ export default defineAdapter({
     auth: false,
     fileSpec: true,
     relationships: true,
+    agentFolders: true,
   },
   connect,
 });

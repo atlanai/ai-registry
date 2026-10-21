@@ -387,6 +387,22 @@ function refuseRelationships(
 }
 
 /**
+ * An adapter without `capabilities.agentFolders` keeps an agent as its AGENT.md alone, so one
+ * with more files would lose them; it is refused before anything is sent.
+ */
+function refuseAgentFolder(work: Work, published: Published, input: PublishInput): void {
+  if (work.kind !== "agent" || input.files.length <= 1) return;
+  if (published.source.adapter.capabilities.agentFolders === true) return;
+  throw new AiregError(
+    `${work.name} has files beyond its AGENT.md, but ${published.alias} keeps only an agent's AGENT.md.`,
+    {
+      code: ErrorCode.Usage,
+      hint: "Publish it to a registry folder, which keeps them: `aireg publish <path> --to <folder>/<namespace>`.",
+    },
+  );
+}
+
+/**
  * An edit made on an older version, published as the newest, drops whatever
  * was published in between; that is a conflict, the same one sync reports.
  */
@@ -528,6 +544,7 @@ export async function plan(
   const asked = exact ?? fixed;
   // The files and the edges decide sameness: the digest covers the version, so it always moves.
   const probe = await offerFrom(work.path, target(asked ?? "0.1.0"));
+  refuseAgentFolder(work, published, probe.input);
   // A version held back gives no files to compare, so it is never the same. An export's own
   // version cannot move, so its edges need only still take what they reach now.
   const sameAs = fixed === undefined ? sameEdges : edgesHold;

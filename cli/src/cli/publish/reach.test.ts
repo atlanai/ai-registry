@@ -173,8 +173,8 @@ describe("exportsOn", () => {
     expect(notes).toEqual([
       "Skipped agents/README.md, which has no name and description in its front matter, so it is no agent.",
       "Skipped agents/draft.md, which has no name and description in its front matter, so it is no agent.",
-      "Skipped agents/notes.txt, which is neither a skill folder nor an agent's .md file.",
-      "Skipped agents/shared, which holds no SKILL.md.",
+      "Skipped agents/notes.txt, which is neither a skill or agent folder nor an agent's .md file.",
+      "Skipped agents/shared, which holds no SKILL.md or AGENT.md.",
     ]);
   });
 
@@ -190,7 +190,7 @@ describe("exportsOn", () => {
     );
     await writeFile(join(base, "skills", "review", "notes.txt"), "Ideas.\n");
     await expect(exportsOn(manifestWith("  - skills/review/notes.txt\n"), base)).rejects.toThrow(
-      'Export "skills/review/notes.txt" is not an artifact: it is neither a skill folder nor an agent\'s .md file.',
+      'Export "skills/review/notes.txt" is not an artifact: it is neither a skill or agent folder nor an agent\'s .md file.',
     );
   });
 
@@ -457,5 +457,94 @@ describe("exportsOn, for an artifact inside another", () => {
       "SKILL.md",
       "rules.md",
     ]);
+  });
+});
+
+describe("exportsOn, for a folder agent", () => {
+  const agent = () => join(base, "agents", "helper");
+
+  test.beforeEach(async () => {
+    await mkdir(join(agent(), "workspace"), { recursive: true });
+    await writeFile(
+      join(agent(), "AGENT.md"),
+      "---\nname: helper\ndescription: Helps.\n---\nHelp.\n",
+    );
+    await writeFile(join(agent(), "workspace", "AGENTS.md"), "How.\n");
+  });
+
+  test("is a folder holding AGENT.md, with all its files, however an entry reaches it", async () => {
+    for (const entry of ["agents/helper", "agents/helper/AGENT.md", "agents", "agents/*"]) {
+      const { found } = await exportsOn(manifestWith(`  - ${entry}\n`), base);
+      expect(found.get(agent())?.files, entry).toEqual([
+        { from: "AGENT.md", as: "AGENT.md" },
+        { from: "workspace/AGENTS.md", as: "workspace/AGENTS.md" },
+      ]);
+    }
+    const { found } = await exportsOn(manifestWith("  - path: agents\n    kind: agent\n"), base);
+    expect([...found.keys()]).toEqual([agent(), join(base, "agents", "reviewer.md")]);
+  });
+
+  test("refuses a folder holding both SKILL.md and AGENT.md", async () => {
+    await writeFile(join(agent(), "SKILL.md"), "---\nname: helper\ndescription: Helps.\n---\n");
+    for (const entry of ["agents/helper", "agents"]) {
+      await expect(exportsOn(manifestWith(`  - ${entry}\n`), base)).rejects.toMatchObject({
+        message: "agents/helper holds both SKILL.md and AGENT.md.",
+        code: "invalid",
+      });
+    }
+  });
+
+  test("refuses an agent's .md file beside a folder agent of the same name", async () => {
+    await writeFile(
+      join(base, "agents", "helper.md"),
+      "---\nname: helper\ndescription: Helps.\n---\n",
+    );
+    for (const entry of ["agents/helper", "agents/helper.md", "agents"]) {
+      await expect(exportsOn(manifestWith(`  - ${entry}\n`), base)).rejects.toMatchObject({
+        message: "agents/helper.md and agents/helper/AGENT.md are one agent written twice.",
+        code: "invalid",
+      });
+    }
+  });
+
+  test("is no agent when its AGENT.md names none", async () => {
+    await writeFile(join(agent(), "AGENT.md"), "# Helper\n");
+    const { found, notes } = await exportsOn(manifestWith("  - agents\n"), base);
+    expect([...found.keys()]).toEqual([join(base, "agents", "reviewer.md")]);
+    expect(notes).toEqual([
+      "Skipped agents/helper, which holds an AGENT.md that has no name and description in its front matter, so it is no agent.",
+    ]);
+    await expect(exportsOn(manifestWith("  - agents/helper\n"), base)).rejects.toThrow(
+      'Export "agents/helper" is not an artifact: it holds an AGENT.md that has no name and description in its front matter, so it is no agent.',
+    );
+  });
+
+  test("publishes the skills inside it that an entry reaches on their own", async () => {
+    await mkdir(join(agent(), "skills", "site-health"), { recursive: true });
+    await writeFile(
+      join(agent(), "skills", "site-health", "SKILL.md"),
+      "---\nname: site-health\ndescription: Checks a site.\n---\n",
+    );
+    const { found } = await exportsOn(
+      manifestWith("  - agents/helper\n  - agents/helper/skills\n"),
+      base,
+    );
+    expect(found.get(agent())?.files?.map((file) => file.as)).toEqual([
+      "AGENT.md",
+      "workspace/AGENTS.md",
+    ]);
+    expect(
+      found.get(join(agent(), "skills", "site-health"))?.files?.map((file) => file.as),
+    ).toEqual(["SKILL.md"]);
+    await expect(
+      exportsOn(
+        manifestWith("  - path: agents/helper\n    include: [skills]\n  - agents/helper/skills\n"),
+        base,
+      ),
+    ).rejects.toMatchObject({
+      message:
+        'Export "agents/helper" includes skills, which belongs to an artifact inside agents/helper that is exported on its own.',
+      code: "invalid",
+    });
   });
 });
