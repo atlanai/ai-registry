@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that every aireg install pin matches the version in cli/package.json.
+"""Check that documentation install pins match the version in cli/package.json.
 
 Standard library only. A pin is `AIREG_VERSION=<version>` in a fenced code
 block, as in `curl -fsSL https://aireg.sh/install | AIREG_VERSION=0.1.4 sh` or
@@ -8,8 +8,8 @@ prose that shows the syntax with an example version is not a pin.
 
     python3 tools/check_pins.py
 
-It reads every page under docs/, and the newest version of each artifact in
-examples/aireg that is not archived, since released versions never change.
+It reads every page under docs/. Published skills are immutable and retain
+the install pins they were released with.
 """
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 PACKAGE = REPO / "cli" / "package.json"
 DOCS = REPO / "docs"
-SKILLS = REPO / "examples" / "aireg"
 PIN_RE = re.compile(r"""AIREG_VERSION\s*=\s*["']?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)""")
 # Any indent, since a code block inside a list item is indented with it.
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
@@ -42,31 +41,11 @@ def pinned_lines(text: str):
         yield number, line
 
 
-def latest_versions(root: Path) -> list[Path]:
-    """The newest version folder of each artifact that is not archived."""
-    folders = []
-    for listing in sorted(root.glob("artifacts/*/*/*/versions.json")):
-        versions = json.loads(listing.read_text(encoding="utf-8"))
-        latest = versions.get("latest")
-        row = next((v for v in versions.get("versions", []) if v.get("version") == latest), None)
-        if row is None or row.get("status", "active") == "archived":
-            continue
-        folders.append(listing.parent / latest)
-    return folders
-
-
-def sources() -> list[Path]:
-    files = sorted(DOCS.rglob("*.md"))
-    for folder in latest_versions(SKILLS):
-        files.extend(sorted(folder.rglob("*.md")))
-    return files
-
-
 def main() -> int:
     want = json.loads(PACKAGE.read_text(encoding="utf-8"))["version"]
     errors = 0
     pins = 0
-    for path in sources():
+    for path in sorted(DOCS.rglob("*.md")):
         for number, line in pinned_lines(path.read_text(encoding="utf-8")):
             for match in PIN_RE.finditer(line):
                 pins += 1
