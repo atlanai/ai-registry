@@ -57,8 +57,8 @@ async function root(
   extra: readonly SpecArtifact[] = [],
   dir?: string,
 ): Promise<(path: string) => Promise<Uint8Array | undefined>> {
-  dir ??= await mkdtemp(join(scratch, "aireg-spec-read-"));
-  await writeSpecRoot(dir, [
+  const at = dir ?? (await mkdtemp(join(scratch, "aireg-spec-read-")));
+  await writeSpecRoot(at, [
     {
       namespace: "aireg",
       kind: "skill",
@@ -73,7 +73,6 @@ async function root(
     },
     ...extra,
   ]);
-  const at = dir;
   return (path) => readFile(join(at, path)).catch(() => undefined);
 }
 

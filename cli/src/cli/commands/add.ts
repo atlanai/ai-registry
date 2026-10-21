@@ -66,14 +66,23 @@ import {
   relativeTo,
   withExclusions,
 } from "#core/ref.ts";
-import { MANIFEST_FILE, SCOPE_DIR, type Scope, scopeFor, userScopeDir } from "#core/store/paths.ts";
+import {
+  MANIFEST_FILE,
+  type Roots,
+  SCOPE_DIR,
+  type Scope,
+  scopeFor,
+  userScopeDir,
+} from "#core/store/paths.ts";
 import { autostartState } from "#daemon/autostart/index.ts";
 import { withFreshConfig } from "#daemon/rpc/client.ts";
 import { withDaemon } from "#daemon/service.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import {
+  type Loaded,
   load,
   locate,
+  type RunHooks,
   type RunResult,
   resolveScope,
   resolveTargets,
@@ -230,113 +239,39 @@ async function addAddress(
   // Taking everything an address names is the address itself, not the whole
   // registry: `add acme/my-team --all` must not drag in every other team.
   const whole = resolved.declared ? input : [alias, within].filter(Boolean).join("/");
-  const refs = choices.select === undefined ? [whole] : choices.select.map((n) => pin(alias, n));
+  const refs =
+    choices.select === undefined ? [whole] : choices.select.map((n) => pin(resolved, alias, n));
 
-  function pin(registry: string, qualified: string): string {
-    const address = `${registry}/${qualified}`;
-    const leaf = qualified.split("/").at(-1);
-    const at = resolved.version ?? resolved.range;
-    return at !== undefined && leaf === resolved.name ? `${address}@${at}` : address;
-  }
-
-  const effective: CommonOptions = {
-    ...asked,
-    scope: choices.scope,
-    targets: undefined,
-    // `--copy` is recorded on the entries this adds, so the rest of the scope is not copied.
-    copy: false,
+  const addition: Addition = {
+    alias,
+    resolved,
+    source,
+    known,
+    asked,
+    choices,
+    refs,
+    trust,
+    asking,
+    adopt,
   };
+  const { result, admitted } = await runAddition(context, loaded.roots, addition);
 
-  let approved = true;
-  let introduced = false;
-  let copied = false;
-  let repinned: Repin[] = [];
-  let { location, config } = source.declared;
-  const result = await runPipeline(
-    loaded.roots,
-    effective,
-    context.printer,
-    context.cwd,
-    planReport(context.printer),
-    (fresh) => {
-      const { manifest, roots } = fresh;
-      const holder = manifest.registries[alias] ?? known[alias];
-      if (
-        !resolved.declared &&
-        holder !== undefined &&
-        !sameLocation(expandLocation(holder.location, roots.base), source.declared.location)
-      ) {
-        throw new AiregError(
-          `The name ${quoted(alias)} is already taken by ${withoutCredentials(holder.location)}.`,
-          {
-            code: ErrorCode.Usage,
-            hint: "Pass `--as <name>` to save this registry under another name.",
-          },
-        );
-      }
-      introduced = manifest.registries[alias] === undefined && known[alias] === undefined;
-      copied =
-        roots.scope !== "user" &&
-        manifest.registries[alias] === undefined &&
-        known[alias] !== undefined;
-      const recorded = rememberSource(holder, {
-        ...source.declared,
-        location: recordedLocation(resolved.input, source.declared.location, roots),
-      });
-      manifest.registries[alias] = recorded;
-      ({ location, config } = recorded);
-
-      const narrowed = narrowedTargets(fresh, asked, choices.targets);
-
-      repinned = declare(manifest.artifacts, refs, narrowed, choices.copy, trust, (ref) =>
-        reached(fresh.lock, ref).at(0),
-      );
-      manifest.artifacts = manifest.artifacts.filter(
-        (ref) => !coveredByWhole(ref, manifest.artifacts),
-      );
-
-      return {
-        // Every other registry stays as the lock has it, so adding one skill
-        // does not fetch and re-plan the whole scope.
-        aliases: [alias],
-        ...(adopt === undefined ? {} : { adopt }),
-        // Naming something already locked is asking for its newest version again.
-        moving: new Set(refs.flatMap((text) => reached(fresh.lock, parseRef(text)))),
-        // A whole namespace still installs the rest when one member's name is taken.
-        adding: new Set(
-          refs.map(parseRef).flatMap((ref) => (ref.name === undefined ? [] : [formatAddress(ref)])),
-        ),
-        approve: async (plan, targets) => {
-          approved = await confirmPlan(asking, plan, {
-            verb: "Install",
-            // The harnesses picked for this add, which an entry may narrow from the scope's.
-            targets: choices.targets ?? targets,
-            kinds: choices.kinds,
-            harnesses: fresh.harnesses,
-          });
-          return approved;
-        },
-      };
-    },
-  );
-
-  if (!approved) {
+  if (!admitted.approved) {
     cancel(step);
     return;
   }
-
   // `--json` changes only what is printed, so the background job is still added.
   let jobId: string | undefined;
   if (result.applied !== undefined) {
     jobId = await reportAdded(context, {
       alias,
       source,
-      location,
-      config,
+      location: admitted.declared.location,
+      config: admitted.declared.config,
       named: own.as !== undefined,
-      introduced,
-      copied,
-      repinned,
+      introduced: admitted.introduced,
+      copied: admitted.copied,
+      repinned: admitted.repinned,
       ran: { ...result, applied: result.applied },
       scope: choices.scope,
       autoUpdate: own["no-auto-update"] !== true,
@@ -363,6 +298,136 @@ async function addAddress(
       ),
     );
   }
+}
+
+/** An address the add names, pinned to the version or range the command line gave its artifact. */
+function pin(resolved: Resolved, registry: string, qualified: string): string {
+  const address = `${registry}/${qualified}`;
+  const leaf = qualified.split("/").at(-1);
+  const at = resolved.version ?? resolved.range;
+  return at !== undefined && leaf === resolved.name ? `${address}@${at}` : address;
+}
+
+/** What an add has settled on before the pipeline runs it. */
+interface Addition {
+  alias: string;
+  resolved: Resolved;
+  source: Probed;
+  known: Record<string, RegistrySource>;
+  asked: CommonOptions;
+  choices: Choices;
+  /** The manifest addresses this add declares. */
+  refs: string[];
+  trust: string[];
+  asking: Interaction;
+  adopt: ReadonlySet<string> | undefined;
+}
+
+/** What the pipeline's pass over an add decided beside its plan, for the report. */
+interface Admitted {
+  approved: boolean;
+  introduced: boolean;
+  copied: boolean;
+  repinned: Repin[];
+  /** The registry as the manifest records it. */
+  declared: RegistrySource;
+}
+
+/** Runs an add through the pipeline, which may load the scope again before it declares it. */
+async function runAddition(
+  context: CommandContext,
+  roots: Roots,
+  addition: Addition,
+): Promise<{ result: RunResult; admitted: Admitted }> {
+  const effective: CommonOptions = {
+    ...addition.asked,
+    scope: addition.choices.scope,
+    targets: undefined,
+    // `--copy` is recorded on the entries this adds, so the rest of the scope is not copied.
+    copy: false,
+  };
+  const admitted: Admitted = {
+    approved: true,
+    introduced: false,
+    copied: false,
+    repinned: [],
+    declared: addition.source.declared,
+  };
+  const result = await runPipeline(
+    roots,
+    effective,
+    context.printer,
+    context.cwd,
+    planReport(context.printer),
+    (fresh) => admit(fresh, addition, admitted),
+  );
+  return { result, admitted };
+}
+
+/** Declares an add in the scope as the pipeline loaded it, and says what to plan. */
+function admit(fresh: Loaded, addition: Addition, admitted: Admitted): RunHooks {
+  const { manifest, roots } = fresh;
+  const { alias, known, resolved, source, choices, refs } = addition;
+  const holder = manifest.registries[alias] ?? known[alias];
+  if (
+    !resolved.declared &&
+    holder !== undefined &&
+    !sameLocation(expandLocation(holder.location, roots.base), source.declared.location)
+  ) {
+    throw new AiregError(
+      `The name ${quoted(alias)} is already taken by ${withoutCredentials(holder.location)}.`,
+      {
+        code: ErrorCode.Usage,
+        hint: "Pass `--as <name>` to save this registry under another name.",
+      },
+    );
+  }
+  admitted.introduced = manifest.registries[alias] === undefined && known[alias] === undefined;
+  admitted.copied =
+    roots.scope !== "user" &&
+    manifest.registries[alias] === undefined &&
+    known[alias] !== undefined;
+  const recorded = rememberSource(holder, {
+    ...source.declared,
+    location: recordedLocation(resolved.input, source.declared.location, roots),
+  });
+  manifest.registries[alias] = recorded;
+  admitted.declared = recorded;
+
+  const narrowed = narrowedTargets(fresh, addition.asked, choices.targets);
+
+  admitted.repinned = declare(
+    manifest.artifacts,
+    refs,
+    narrowed,
+    choices.copy,
+    addition.trust,
+    (ref) => reached(fresh.lock, ref).at(0),
+  );
+  manifest.artifacts = manifest.artifacts.filter((ref) => !coveredByWhole(ref, manifest.artifacts));
+
+  return {
+    // Every other registry stays as the lock has it, so adding one skill
+    // does not fetch and re-plan the whole scope.
+    aliases: [alias],
+    ...(addition.adopt === undefined ? {} : { adopt: addition.adopt }),
+    // Naming something already locked is asking for its newest version again.
+    moving: new Set(refs.flatMap((text) => reached(fresh.lock, parseRef(text)))),
+    // A whole namespace still installs the rest when one member's name is taken.
+    adding: new Set(
+      refs.map(parseRef).flatMap((ref) => (ref.name === undefined ? [] : [formatAddress(ref)])),
+    ),
+    approve: async (plan, targets) => {
+      admitted.approved = await confirmPlan(addition.asking, plan, {
+        verb: "Install",
+        // The harnesses picked for this add, which an entry may narrow from the scope's.
+        targets: choices.targets ?? targets,
+        kinds: choices.kinds,
+        harnesses: fresh.harnesses,
+      });
+      return admitted.approved;
+    },
+  };
 }
 
 function printAdded(

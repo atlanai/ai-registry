@@ -88,6 +88,84 @@ function entryOf(url: URL, item: Record<string, unknown>, warnings: string[]): E
   return { name, type: item.type, description, url: at, digest };
 }
 
+/** No credentials and no cookies: a site's index is public, whatever host an entry names. */
+async function get(
+  context: SourceContext,
+  url: URL,
+  limit: number,
+): Promise<{ status: number; bytes: Uint8Array }> {
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopback(url))) {
+    throw fail("invalid", `${url.href} has no transport security.`);
+  }
+  const signal = AbortSignal.any([context.signal, AbortSignal.timeout(context.limits.timeoutMs)]);
+  let response: Response;
+  try {
+    response = await fetch(url, { signal, credentials: "omit", redirect: "follow" });
+  } catch (error) {
+    if (context.signal.aborted) throw error;
+    throw fail("unavailable", `Could not read ${url.href}: ${(error as Error).message}.`);
+  }
+  const landed = new URL(response.url || url.href);
+  if (landed.protocol !== "https:" && !(landed.protocol === "http:" && isLoopback(landed))) {
+    throw fail(
+      "invalid",
+      `${url.href} sent aireg to ${landed.href}, which has no transport security.`,
+    );
+  }
+  if (!response.ok) return { status: response.status, bytes: new Uint8Array() };
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > limit) throw fail("invalid", `${url.href} is larger than aireg reads.`);
+  context.onBytes(bytes.byteLength);
+  return { status: response.status, bytes };
+}
+
+/** The index's entries, checked; the index itself must be the one format aireg reads. */
+function entriesOf(url: URL, document: unknown, warnings: string[]): Entry[] {
+  if (!isRecord(document) || document.$schema !== SCHEMA) {
+    const named = isRecord(document) ? document.$schema : undefined;
+    throw fail(
+      "invalid",
+      `${url.href} is ${typeof named === "string" ? `an index in ${quoted(named)}` : "not an index with a $schema"}, and aireg reads only ${SCHEMA}.`,
+    );
+  }
+  if (!Array.isArray(document.skills)) throw fail("invalid", `${url.href} has no \`skills\` list.`);
+  const entries: Entry[] = [];
+  for (const raw of document.skills) {
+    const entry = entryOf(url, isRecord(raw) ? raw : {}, warnings);
+    if (entry !== undefined) entries.push(entry);
+  }
+  return entries;
+}
+
+/** The skill an entry's files make, in the one group a site's index has. */
+function artifactOf(
+  entry: Entry,
+  files: Map<string, { bytes: Uint8Array; executable: boolean }>,
+  namespace: string,
+): Artifact {
+  const front = readFrontmatter(new TextDecoder().decode(files.get("SKILL.md")?.bytes));
+  const description = textField(front, "description") ?? (entry.description || undefined);
+  const envelope = buildEnvelope({
+    kind: "skill",
+    metadata: { name: entry.name, ...(description === undefined ? {} : { description }) },
+    files: [...files].map(([path, file]) =>
+      describeFile(path, sha256(file.bytes), file.bytes.byteLength),
+    ),
+    spec: { name: entry.name, ...(description === undefined ? {} : { description }) },
+  });
+  return {
+    id: entry.name,
+    kind: "skill",
+    envelope,
+    group: namespace,
+    files: [...files].map(([path, file]) => ({
+      path,
+      locator: path,
+      executable: file.executable,
+    })),
+  };
+}
+
 export async function connect(context: SourceContext): Promise<SourceHandle> {
   const { location, registry } = context.source;
   let site: URL;
@@ -99,36 +177,9 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
   const namespace = registryNameFromLocation(location, site.hostname.replace(/\./g, "-"));
   const held = new Map<string, Map<string, Uint8Array>>();
 
-  /** No credentials and no cookies: a site's index is public, whatever host an entry names. */
-  const get = async (url: URL, limit: number): Promise<{ status: number; bytes: Uint8Array }> => {
-    if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopback(url))) {
-      throw fail("invalid", `${url.href} has no transport security.`);
-    }
-    const signal = AbortSignal.any([context.signal, AbortSignal.timeout(context.limits.timeoutMs)]);
-    let response: Response;
-    try {
-      response = await fetch(url, { signal, credentials: "omit", redirect: "follow" });
-    } catch (error) {
-      if (context.signal.aborted) throw error;
-      throw fail("unavailable", `Could not read ${url.href}: ${(error as Error).message}.`);
-    }
-    const landed = new URL(response.url || url.href);
-    if (landed.protocol !== "https:" && !(landed.protocol === "http:" && isLoopback(landed))) {
-      throw fail(
-        "invalid",
-        `${url.href} sent aireg to ${landed.href}, which has no transport security.`,
-      );
-    }
-    if (!response.ok) return { status: response.status, bytes: new Uint8Array() };
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > limit) throw fail("invalid", `${url.href} is larger than aireg reads.`);
-    context.onBytes(bytes.byteLength);
-    return { status: response.status, bytes };
-  };
-
   const readIndex = async (): Promise<{ url: URL; document: unknown }> => {
     for (const url of indexUrls(location)) {
-      const { status, bytes } = await get(url, MAX_INDEX);
+      const { status, bytes } = await get(context, url, MAX_INDEX);
       if (status === 404) continue;
       if (status !== 200) throw fail("unavailable", `${url.href} answered ${status}.`);
       try {
@@ -138,7 +189,7 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
       }
     }
     // An index without digests cannot be checked, so it is named rather than read.
-    if ((await get(new URL(`/${LEGACY}`, site), MAX_INDEX)).status === 200) {
+    if ((await get(context, new URL(`/${LEGACY}`, site), MAX_INDEX)).status === 200) {
       throw fail(
         "invalid",
         `${site.origin} has only a /${LEGACY} index, which gives no digests, so aireg does not read it.`,
@@ -153,30 +204,12 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
     );
   };
 
-  const entriesOf = (url: URL, document: unknown, warnings: string[]): Entry[] => {
-    if (!isRecord(document) || document.$schema !== SCHEMA) {
-      const named = isRecord(document) ? document.$schema : undefined;
-      throw fail(
-        "invalid",
-        `${url.href} is ${typeof named === "string" ? `an index in ${quoted(named)}` : "not an index with a $schema"}, and aireg reads only ${SCHEMA}.`,
-      );
-    }
-    if (!Array.isArray(document.skills))
-      throw fail("invalid", `${url.href} has no \`skills\` list.`);
-    const entries: Entry[] = [];
-    for (const raw of document.skills) {
-      const entry = entryOf(url, isRecord(raw) ? raw : {}, warnings);
-      if (entry !== undefined) entries.push(entry);
-    }
-    return entries;
-  };
-
   /** Bytes that do not hash to the digest the index gives never land; the whole read fails. */
   const filesOf = async (
     entry: Entry,
   ): Promise<Map<string, { bytes: Uint8Array; executable: boolean }>> => {
     const limit = entry.type === "archive" ? MAX_ARCHIVE : MAX_SKILL;
-    const { status, bytes } = await get(entry.url, limit);
+    const { status, bytes } = await get(context, entry.url, limit);
     if (status !== 200) throw fail("unavailable", `${entry.url.href} answered ${status}.`);
     const digest = sha256(bytes);
     if (digest !== entry.digest) {
@@ -194,33 +227,6 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
     if (!files.has("SKILL.md"))
       throw fail("invalid", `${entry.name}'s archive has no SKILL.md at its root.`);
     return files;
-  };
-
-  const artifactOf = (
-    entry: Entry,
-    files: Map<string, { bytes: Uint8Array; executable: boolean }>,
-  ): Artifact => {
-    const front = readFrontmatter(new TextDecoder().decode(files.get("SKILL.md")?.bytes));
-    const description = textField(front, "description") ?? (entry.description || undefined);
-    const envelope = buildEnvelope({
-      kind: "skill",
-      metadata: { name: entry.name, ...(description === undefined ? {} : { description }) },
-      files: [...files].map(([path, file]) =>
-        describeFile(path, sha256(file.bytes), file.bytes.byteLength),
-      ),
-      spec: { name: entry.name, ...(description === undefined ? {} : { description }) },
-    });
-    return {
-      id: entry.name,
-      kind: "skill",
-      envelope,
-      group: namespace,
-      files: [...files].map(([path, file]) => ({
-        path,
-        locator: path,
-        executable: file.executable,
-      })),
-    };
   };
 
   return {
@@ -248,7 +254,7 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
       for (const entry of entries) {
         const files = await filesOf(entry);
         held.set(entry.name, new Map([...files].map(([path, file]) => [path, file.bytes])));
-        artifacts.push(artifactOf(entry, files));
+        artifacts.push(artifactOf(entry, files, namespace));
       }
       return {
         artifacts,

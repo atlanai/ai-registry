@@ -5,6 +5,7 @@ import {
   cancel,
   chooseRemovals,
   confirmPlan,
+  type Interaction,
   interaction,
   interactive,
   preparing,
@@ -22,7 +23,8 @@ import { editedAnywhere } from "#core/plan/model.ts";
 import { survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
-import { load, resolveTargets, run as runPipeline } from "#engine/pipeline.ts";
+import type { CommonOptions } from "#engine/options.ts";
+import { type Loaded, load, resolveTargets, run as runPipeline } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
 /**
@@ -105,6 +107,50 @@ function keptWatched(context: CommandContext, lock: Lock, watched: readonly stri
   );
 }
 
+/** Asks which installed artifacts to remove, when the command line names none. */
+async function pickRemovals(
+  step: Interaction,
+  loaded: Loaded,
+  common: CommonOptions,
+): Promise<string[] | undefined> {
+  const installed = new Set(Object.keys(loaded.lock.artifacts));
+  if (installed.size === 0) {
+    throw new AiregError(`Nothing is installed in ${scopeName(loaded.roots.scope)}.`, {
+      code: ErrorCode.NotFound,
+      hint:
+        loaded.roots.scope === "user"
+          ? "Run `aireg list` in a project to see what it installs."
+          : "Run `aireg list -g` to see your user scope.",
+    });
+  }
+  if (!interactive(step)) {
+    // Name the reason: on a terminal this command would have offered a list,
+    // and "nothing to remove" alone reads as though nothing is installed.
+    throw new AiregError("`aireg remove` needs an artifact name.", {
+      code: ErrorCode.Usage,
+      hint: `Name one: \`aireg remove <name>\`, or pass \`--all\`. No list was offered because ${silence(step)}.`,
+    });
+  }
+  const picked = await chooseRemovals(
+    step,
+    [...installed].sort().map((name) => {
+      const entry = loaded.lock.artifacts[name];
+      return {
+        name,
+        kind: entry?.kind ?? "",
+        source: entry?.registry ?? "",
+        targets: loadedBy(
+          loaded.harnesses,
+          resolveTargets(loaded.manifest, loaded.harnesses, common),
+          entry?.kind,
+          (entry?.links ?? []).map((linked) => linked.harness),
+        ).map((name) => toolName(loaded.harnesses, name)),
+      };
+    }),
+  );
+  return canceled(picked) ? undefined : picked;
+}
+
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common } = parse(context.argv, builtin("remove"));
   const named = [...positionals, ...(common.select ?? [])].filter((name) => name !== "*");
@@ -114,45 +160,11 @@ export async function run(context: CommandContext): Promise<void> {
   if (named.length === 0 && !removeAll) preparing(step);
   const loaded = await load(common, context.cwd);
   const lock = loaded.lock;
-  const installed = new Set(Object.keys(lock.artifacts));
 
   let names = named;
   if (names.length === 0 && !removeAll) {
-    if (installed.size === 0) {
-      throw new AiregError(`Nothing is installed in ${scopeName(loaded.roots.scope)}.`, {
-        code: ErrorCode.NotFound,
-        hint:
-          loaded.roots.scope === "user"
-            ? "Run `aireg list` in a project to see what it installs."
-            : "Run `aireg list -g` to see your user scope.",
-      });
-    }
-    if (!interactive(step)) {
-      // Name the reason: on a terminal this command would have offered a list,
-      // and "nothing to remove" alone reads as though nothing is installed.
-      throw new AiregError("`aireg remove` needs an artifact name.", {
-        code: ErrorCode.Usage,
-        hint: `Name one: \`aireg remove <name>\`, or pass \`--all\`. No list was offered because ${silence(step)}.`,
-      });
-    }
-    const picked = await chooseRemovals(
-      step,
-      [...installed].sort().map((name) => {
-        const entry = loaded.lock.artifacts[name];
-        return {
-          name,
-          kind: entry?.kind ?? "",
-          source: entry?.registry ?? "",
-          targets: loadedBy(
-            loaded.harnesses,
-            resolveTargets(loaded.manifest, loaded.harnesses, common),
-            entry?.kind,
-            (entry?.links ?? []).map((linked) => linked.harness),
-          ).map((name) => toolName(loaded.harnesses, name)),
-        };
-      }),
-    );
-    if (canceled(picked)) {
+    const picked = await pickRemovals(step, loaded, common);
+    if (picked === undefined) {
       cancel(step);
       return;
     }
