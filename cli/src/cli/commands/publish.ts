@@ -550,11 +550,13 @@ async function gather(
   const { paths, since, found } = options;
   const keep = async (works: Work[]) =>
     since === undefined ? works : changedSince(works, since, cwd);
+  // Read whatever is named, so exports that would collide are refused in every run.
+  const exported = found === undefined ? undefined : await exportWork(found, loaded.roots.base);
   const works =
     paths.length > 0
       ? await keep(await fromArgs(paths, loaded, cwd))
-      : found !== undefined
-        ? await keep(await exportWork(found))
+      : exported !== undefined
+        ? await keep(exported)
         : await chooseWork(step, loaded, common, cwd, keep);
   for (const work of works ?? []) work.exported = found?.get(work.path);
   return works;

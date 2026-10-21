@@ -26,12 +26,30 @@ import { artifactRoot } from "./reach.ts";
 import type { Destination, Planned, Published } from "./target.ts";
 import { fromPath, type Work } from "./work.ts";
 
-/** The work `exports:` names, less what it leaves unpublished. */
-export async function exportWork(found: ReadonlyMap<string, Export>): Promise<Work[]> {
+/**
+ * The work `exports:` names, less what it leaves unpublished. Two exports of one kind and name
+ * would be two versions of one artifact, written over each other, so they are refused.
+ */
+export async function exportWork(
+  found: ReadonlyMap<string, Export>,
+  base: string,
+): Promise<Work[]> {
   const works: Work[] = [];
+  const seen = new Map<string, Work>();
   for (const [path, entry] of found) {
     if (entry.publish === false) continue;
-    works.push({ ...(await fromPath(path)), exported: entry });
+    const work: Work = { ...(await fromPath(path)), exported: entry };
+    const key = `${work.kind}/${work.name}`;
+    const other = seen.get(key);
+    if (other !== undefined) {
+      const [one, two] = [other, work].map((each) => posixRelative(base, each.path) || ".");
+      throw new AiregError(`${one} and ${two} are both exported as ${work.kind} ${work.name}.`, {
+        code: ErrorCode.Invalid,
+        hint: "Give one of them another `name` in its front matter, or leave it out of `exports:`.",
+      });
+    }
+    seen.set(key, work);
+    works.push(work);
   }
   return works;
 }

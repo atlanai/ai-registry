@@ -58,7 +58,7 @@ async function exported(needs: string[], extra = "") {
     `  - skills/*\n  - path: agents/reviewer.md\n    depends_on: [${needs.join(", ")}]\n${extra}`,
   );
   const { found } = await exportsOn(manifest, base);
-  const works = await exportWork(found);
+  const works = await exportWork(found, base);
   return { manifest, found, works };
 }
 
@@ -105,6 +105,31 @@ function context(
   };
 }
 
+describe("exportWork", () => {
+  test("refuses two exports of one kind and name, naming both paths", async () => {
+    await mkdir(join(base, "vendor", "review"), { recursive: true });
+    await writeFile(
+      join(base, "vendor", "review", "SKILL.md"),
+      "---\nname: review\ndescription: Another review.\n---\n",
+    );
+    const { found } = await exportsOn(manifestWith("  - skills/*\n  - vendor/review\n"), base);
+    await expect(exportWork(found, base)).rejects.toMatchObject({
+      message: "skills/review and vendor/review are both exported as skill review.",
+      hint: "Give one of them another `name` in its front matter, or leave it out of `exports:`.",
+      code: "invalid",
+    });
+    // One kept in the repository is never published, so it takes no name from the other.
+    const kept = await exportsOn(
+      manifestWith("  - skills/*\n  - path: vendor/review\n    publish: false\n"),
+      base,
+    );
+    expect((await exportWork(kept.found, base)).map((work) => work.name)).toEqual([
+      "review",
+      "style",
+    ]);
+  });
+});
+
 describe("chooseTarget", () => {
   test("takes the manifest's target, and refuses a --to naming another", () => {
     expect(chooseTarget("acme/engineering", undefined, () => false)).toBe("acme/engineering");
@@ -135,7 +160,7 @@ describe("forTarget", () => {
   test("skips an export named by its path that is never published", async () => {
     const manifest = manifestWith("  - path: skills/style\n    publish: false\n");
     const { found } = await exportsOn(manifest, base);
-    expect(await exportWork(found)).toEqual([]);
+    expect(await exportWork(found, base)).toEqual([]);
     const path = join(base, "skills", "style");
     const style = { ...(await fromPath(path)), exported: found.get(path) };
     expect(forTarget([style], base).skipped).toEqual([
@@ -205,7 +230,7 @@ describe("inDependencyOrder", () => {
       "  - path: agents/reviewer.md\n    depends_on: [./skills/review]\n  - path: skills/review\n    depends_on: [./agents/reviewer.md]\n",
     );
     const { found } = await exportsOn(manifest, base);
-    const works = await exportWork(found);
+    const works = await exportWork(found, base);
     expect(() => inDependencyOrder(works, found, base)).toThrow(
       "The exports depend on each other in a cycle: ./agents/reviewer.md → ./skills/review → ./agents/reviewer.md.",
     );
@@ -256,7 +281,7 @@ describe("dependsOnFor", () => {
       "  - path: agents/reviewer.md\n    depends_on: [./skills/review]\n",
     );
     const { found } = await exportsOn(manifest, base);
-    const [reviewer] = await exportWork(found);
+    const [reviewer] = await exportWork(found, base);
     await expect(dependsOnFor(reviewer as Work, context(found, manifest))).rejects.toThrow(
       "reviewer depends on ./skills/review, which is not an export.",
     );
