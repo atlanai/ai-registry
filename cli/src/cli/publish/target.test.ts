@@ -269,7 +269,7 @@ describe("plan with an export's version", () => {
                     kind: "skill",
                     envelope: {
                       metadata: { version: "0.9.0" },
-                      files: older.map((digest) => ({ digest })),
+                      files: older.map((digest) => ({ path: "SKILL.md", digest })),
                     },
                   },
                 ]

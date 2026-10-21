@@ -505,6 +505,19 @@ export function heldUnlisted(error: unknown, alias: string, items: readonly Plan
   });
 }
 
+/** A path is part of file identity; digest-only snapshots keep their earlier comparison. */
+function sameFiles(held: Current, offered: Awaited<ReturnType<typeof offerFrom>>): boolean {
+  const sameDigests = held.digests.join() === offered.digests.join();
+  if (held.files === undefined) return sameDigests;
+  // A harness may name an agent's sole entry <name>.md while a registry calls it AGENT.md.
+  if (offered.input.kind === "agent" && held.files.length === 1 && offered.files.length === 1) {
+    return sameDigests;
+  }
+  const records = (files: readonly StoredFile[]) =>
+    files.map(({ path, digest }) => canonicalize({ path, digest })).sort();
+  return canonicalize(records(held.files)) === canonicalize(records(offered.files));
+}
+
 /** The same edges, whatever order each one's fields were written in. */
 function sameEdges(
   current: readonly Relationship[] | undefined,
@@ -592,7 +605,7 @@ export async function plan(
   const sameAs = fixed === undefined ? sameEdges : edgesHold;
   const matches = (held: Current) =>
     held.withheld === undefined &&
-    held.digests.join() === probe.digests.join() &&
+    sameFiles(held, probe) &&
     (relationships === undefined || sameAs(held.relationships, probe.input.relationships));
   // A version is looked up by itself, whatever its status, so one held back is never taken for new;
   // a pin reaches a draft's files, which a listing withholds.
