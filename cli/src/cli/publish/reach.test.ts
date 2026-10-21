@@ -614,7 +614,7 @@ describe("exportsOn, for a dependency no entry reaches", () => {
     ).rejects.toMatchObject({
       message:
         'agents/reviewer.md depends on skills/style, which export "skills/style" keeps here with `publish: false`.',
-      hint: 'Remove `publish: false` from export "skills/style", or ./skills/style from the `depends_on` of export "agents/reviewer.md".',
+      hint: 'Remove `publish: false` from export "skills/style", or leave ./skills/style out of the `depends_on` of export "agents/reviewer.md".',
       code: "invalid",
     });
     await expect(
@@ -627,7 +627,7 @@ describe("exportsOn, for a dependency no entry reaches", () => {
     ).rejects.toMatchObject({
       message:
         'agents/reviewer.md depends on skills/style, which export "skills" leaves out with `exclude`.',
-      hint: 'Remove it from that `exclude`, or ./skills/style from the `depends_on` of export "agents/reviewer.md".',
+      hint: 'Remove it from that `exclude`, or leave ./skills/style out of the `depends_on` of export "agents/reviewer.md".',
       code: "invalid",
     });
   });
@@ -671,5 +671,133 @@ describe("exportsOn, for a dependency no entry reaches", () => {
         'Export "agents/reviewer.md" depends on ./skills/review/notes.txt, which is not an artifact: it is neither a skill or agent folder nor an agent\'s .md file.',
       code: "invalid",
     });
+  });
+});
+
+describe("exportsOn, for a dependency on a folder", () => {
+  const agentNeeding = (needs: string) =>
+    manifestWith(`  - path: agents/reviewer.md\n    depends_on: [${needs}]\n`);
+
+  test("depends on each artifact directly inside it, exporting those no entry reaches", async () => {
+    await writeFile(join(base, "skills", "README.md"), "# Skills\n");
+    await mkdir(join(base, "skills", "review", "deeper"), { recursive: true });
+    await writeFile(
+      join(base, "skills", "review", "deeper", "SKILL.md"),
+      "---\nname: deeper\ndescription: Deeper.\n---\n",
+    );
+    const { found, notes } = await exportsOn(
+      manifestWith(
+        "  - path: agents/reviewer.md\n    depends_on: [./skills, ./skills/review]\n  - path: skills/review\n    version: 2.0.0\n",
+      ),
+      base,
+    );
+    expect(found.get(join(base, "agents", "reviewer.md"))?.dependsOn).toEqual([
+      { type: "local", path: "skills/review" },
+      { type: "local", path: "skills/style" },
+    ]);
+    expect([...found.keys()]).toEqual([
+      join(base, "agents", "reviewer.md"),
+      join(base, "skills", "review"),
+      join(base, "skills", "style"),
+    ]);
+    // The entry naming review still decides for it; style has the defaults.
+    expect(found.get(join(base, "skills", "review"))?.version).toBe("2.0.0");
+    expect(found.get(join(base, "skills", "style"))).toMatchObject({
+      path: "skills/style",
+      version: undefined,
+      dependsOn: [],
+    });
+    expect(notes).toEqual([
+      "Skipped skills/README.md, which has no name and description in its front matter, so it is no agent.",
+    ]);
+  });
+
+  test("reaches only what git tracks in it, and never what aireg installed there", async ({
+    git,
+  }) => {
+    await mkdir(join(base, "skills", "draft"));
+    await writeFile(
+      join(base, "skills", "draft", "SKILL.md"),
+      "---\nname: draft\ndescription: Draft.\n---\n",
+    );
+    await git.init(base);
+    await git(base, "add", "skills/review", "skills/style", "agents");
+    const installed = lock()
+      .registry("acme", { location: "github.com/acme/agent-registry" })
+      .artifact("style", { links: [{ harness: "claude", path: "skills/style", mode: "symlink" }] })
+      .build();
+    const { found } = await exportsOn(
+      agentNeeding("./skills"),
+      base,
+      installedPaths(installed, base),
+    );
+    expect(found.get(join(base, "agents", "reviewer.md"))?.dependsOn).toEqual([
+      { type: "local", path: "skills/review" },
+    ]);
+  });
+
+  test("refuses one with no artifact directly inside it", async () => {
+    await mkdir(join(base, "empty", "deeper", "skill"), { recursive: true });
+    await writeFile(
+      join(base, "empty", "deeper", "skill", "SKILL.md"),
+      "---\nname: deep\ndescription: Deep.\n---\n",
+    );
+    await expect(exportsOn(agentNeeding("./empty"), base)).rejects.toMatchObject({
+      message:
+        'Export "agents/reviewer.md" depends on ./empty, a folder with no skill or agent directly inside it.',
+      code: "invalid",
+    });
+  });
+
+  test("refuses it when an entry keeps one inside it here, or leaves one out", async () => {
+    await expect(
+      exportsOn(
+        manifestWith(
+          "  - path: agents/reviewer.md\n    depends_on: [./skills]\n  - path: skills\n    exclude: [style]\n",
+        ),
+        base,
+      ),
+    ).rejects.toThrow(
+      'agents/reviewer.md depends on skills/style, which export "skills" leaves out with `exclude`.',
+    );
+    await expect(
+      exportsOn(
+        manifestWith(
+          "  - path: agents/reviewer.md\n    depends_on: [./skills]\n  - path: skills/review\n    publish: false\n",
+        ),
+        base,
+      ),
+    ).rejects.toThrow(
+      'agents/reviewer.md depends on skills/review, which export "skills/review" keeps here with `publish: false`.',
+    );
+  });
+});
+
+describe("exportsOn, for a dependency on the folder an export sits in", () => {
+  test("depends on the others in it, not on itself", async () => {
+    await writeFile(
+      join(base, "agents", "lead.md"),
+      "---\nname: lead\ndescription: Leads.\n---\nLead.\n",
+    );
+    const { found } = await exportsOn(
+      manifestWith("  - path: agents/lead.md\n    depends_on: [./agents]\n"),
+      base,
+    );
+    expect(found.get(join(base, "agents", "lead.md"))?.dependsOn).toEqual([
+      { type: "local", path: "agents/reviewer.md" },
+    ]);
+  });
+
+  test("keeps a path naming the export itself, however it is spelled", async () => {
+    const { found } = await exportsOn(
+      manifestWith(
+        "  - path: skills/review\n    depends_on: [./skills, ./skills/review/SKILL.md]\n",
+      ),
+      base,
+    );
+    expect(found.get(join(base, "skills", "review"))?.dependsOn).toEqual([
+      { type: "local", path: "skills/review" },
+      { type: "local", path: "skills/style" },
+    ]);
   });
 });

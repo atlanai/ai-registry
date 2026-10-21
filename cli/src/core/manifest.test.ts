@@ -315,16 +315,19 @@ describe("exports and publish", () => {
     );
   });
 
-  test("reads `./` as another export's path, checking only how it is written", () => {
+  test("reads `./` as a path in the project, checking only how it is written", () => {
     const of = 'Export ".claude/agents/reviewer.md" depends on';
     expect(
-      read(entry("    depends_on: [./skills/not-yet-on-disk]\n")).exports[0]?.dependsOn,
-    ).toEqual([{ type: "local", path: "skills/not-yet-on-disk" }]);
+      read(entry("    depends_on: [./skills/not-yet-on-disk, ./skills]\n")).exports[0]?.dependsOn,
+    ).toEqual([
+      { type: "local", path: "skills/not-yet-on-disk" },
+      { type: "local", path: "skills" },
+    ]);
     expect(refused(entry("    depends_on: [./../skills/review]\n"))).toThrow(
       `${of} "./../skills/review", whose path leaves the project.`,
     );
     expect(refused(entry("    depends_on: [./skills/*]\n"))).toThrow(
-      `${of} "./skills/*", a glob rather than one export.`,
+      `${of} "./skills/*", a glob rather than a path.`,
     );
     expect(refused(entry("    depends_on: [./.claude/agents/reviewer.md]\n"))).toThrow(
       'Export ".claude/agents/reviewer.md" depends on itself.',

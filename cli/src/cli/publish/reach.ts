@@ -253,14 +253,24 @@ async function reachThrough(
   else reading.notes.push(`Skipped ${shownAt(path, base)}, which ${held.stray}.`);
 }
 
-/** The folder an entry names, which holds no artifact itself: each one directly inside it. */
+/** A folder that no entry file makes an artifact, which is read as a folder of them. */
+async function isPlainFolder(path: string): Promise<boolean> {
+  const entryFile = [SKILL_ENTRY, AGENT_ENTRY].some((name) => existsSync(join(path, name)));
+  return !entryFile && (await isDirectory(path));
+}
+
+/**
+ * A folder that holds no artifact itself, as an entry's path or a dependency: each artifact
+ * directly inside it, less the names in `exclude`, the entry's own when it names the folder.
+ */
 async function reachInside(
   entry: Export,
   folder: string,
   reading: Reading,
+  exclude: readonly string[],
 ): Promise<Map<string, ArtifactKind>> {
   const names = (await readdir(folder)).sort();
-  for (const name of entry.exclude ?? []) {
+  for (const name of exclude) {
     if (names.includes(name)) continue;
     throw new AiregError(
       `Export ${quoted(entry.path)} excludes ${quoted(name)}, which is not in it.`,
@@ -272,18 +282,21 @@ async function reachInside(
   }
   const roots = new Map<string, ArtifactKind>();
   for (const name of names) {
-    if (entry.exclude?.includes(name) === true) continue;
+    if (exclude.includes(name)) continue;
     await reachThrough(entry, join(folder, name), reading, roots);
   }
   return roots;
 }
 
-/** The artifact a local dependency names, by its root and kind. */
+/**
+ * The artifacts a local dependency names, by their roots and kinds: the one at its path, or
+ * each one directly inside the folder it names, skipping the rest with a note.
+ */
 async function neededAt(
   entry: Export,
   need: string,
   reading: Reading,
-): Promise<Map<string, ArtifactKind>> {
+): Promise<{ roots: Map<string, ArtifactKind>; folder: boolean }> {
   const path = resolve(reading.base, need);
   if (!existsSync(path)) {
     throw new AiregError(
@@ -293,7 +306,21 @@ async function neededAt(
   }
   await refuseOutside(entry, artifactRoot(path), reading.base);
   const held = await heldAt(path, reading.base);
-  if ("root" in held) return new Map([[held.root, held.kind]]);
+  if ("root" in held) return { roots: new Map([[held.root, held.kind]]), folder: false };
+  if (await isPlainFolder(path)) {
+    const roots = await reachInside(entry, path, reading, []);
+    if (roots.size > 0) return { roots, folder: true };
+    throw new AiregError(
+      `Export ${quoted(entry.path)} depends on ./${need}, a folder with no skill or agent directly inside it.`,
+      {
+        code: ErrorCode.Invalid,
+        hint:
+          reading.tracked === undefined
+            ? NAME_HINT
+            : `${NAME_HINT} In a git repository, only what git tracks counts.`,
+      },
+    );
+  }
   throw new AiregError(
     `Export ${quoted(entry.path)} depends on ./${need}, which is not an artifact: it ${held.stray}.`,
     { code: ErrorCode.Invalid, hint: NAME_HINT },
@@ -301,26 +328,34 @@ async function neededAt(
 }
 
 /**
- * An entry's local dependencies, each as the path of the artifact it names, however it is
- * spelled; the kind of each is kept in `kinds`, for one that no entry reaches.
+ * An entry's local dependencies, each as the path of an artifact, however it is spelled, and a
+ * folder as each artifact in it; the kind of each is kept in `kinds`, for one no entry reaches.
+ * An artifact a folder holds does not depend on itself through it, so each artifact the entry
+ * reaches gets the list without itself, unless a path names it.
  */
 async function neededBy(
   entry: Export,
   reading: Reading,
   kinds: Map<string, ArtifactKind>,
-): Promise<ExportDependency[]> {
+): Promise<(root: string) => ExportDependency[]> {
   const needs: ExportDependency[] = [];
+  const named = new Set<string>();
   for (const need of entry.dependsOn) {
     if (need.type !== "local") {
       needs.push(need);
       continue;
     }
-    for (const [root, kind] of await neededAt(entry, need.path, reading)) {
+    const { roots, folder } = await neededAt(entry, need.path, reading);
+    for (const [root, kind] of roots) {
       kinds.set(root, kind);
+      if (!folder) named.add(root);
       needs.push({ type: "local", path: posixRelative(reading.base, root) });
     }
   }
-  return needs;
+  return (root) =>
+    named.has(root)
+      ? needs
+      : needs.filter((need) => need.type !== "local" || resolve(reading.base, need.path) !== root);
 }
 
 /** The one artifact an entry names, or the folder of them it names. */
@@ -356,10 +391,8 @@ async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
     }
     return { roots: new Map([[held.root, held.kind]]), named: true };
   }
-  // A folder an entry file makes an artifact is never read as a folder of them.
-  const entryFile = [SKILL_ENTRY, AGENT_ENTRY].some((name) => existsSync(join(path, name)));
-  if ((await isDirectory(path)) && !entryFile) {
-    return { roots: await reachInside(entry, path, reading), named: false };
+  if (await isPlainFolder(path)) {
+    return { roots: await reachInside(entry, path, reading, entry.exclude ?? []), named: false };
   }
   throw new AiregError(`Export ${quoted(entry.path)} is not an artifact: it ${held.stray}.`, {
     code: ErrorCode.Invalid,
@@ -423,8 +456,8 @@ interface Needing {
   entry: string;
 }
 
-const orDrop = ({ needed, entry }: Needing) =>
-  `or ./${needed} from the \`depends_on\` of export ${quoted(entry)}`;
+const orLeaveOut = ({ needed, entry }: Needing) =>
+  `or leave ./${needed} out of the \`depends_on\` of export ${quoted(entry)}`;
 
 /** An export depending on one that an entry keeps here would publish an edge to nothing. */
 function keptHere(needing: Needing, kept: Export): AiregError {
@@ -433,7 +466,7 @@ function keptHere(needing: Needing, kept: Export): AiregError {
     `${dependent} depends on ${needed}, which export ${quoted(kept.path)} keeps here with \`publish: false\`.`,
     {
       code: ErrorCode.Invalid,
-      hint: `Remove \`publish: false\` from export ${quoted(kept.path)}, ${orDrop(needing)}.`,
+      hint: `Remove \`publish: false\` from export ${quoted(kept.path)}, ${orLeaveOut(needing)}.`,
     },
   );
 }
@@ -455,7 +488,7 @@ function refuseUnreached(
   if (excluding !== undefined) {
     throw new AiregError(
       `${dependent} depends on ${needed}, which export ${quoted(excluding.path)} leaves out with \`exclude\`.`,
-      { code: ErrorCode.Invalid, hint: `Remove it from that \`exclude\`, ${orDrop(needing)}.` },
+      { code: ErrorCode.Invalid, hint: `Remove it from that \`exclude\`, ${orLeaveOut(needing)}.` },
     );
   }
   if (!reading.installed.has(path)) return;
@@ -517,10 +550,10 @@ export async function exportsOn(
   const kinds = new Map<string, ArtifactKind>();
   for (const listed of manifest.exports) {
     const { roots, named } = await reachedBy(listed, reading);
-    const entry = { ...listed, dependsOn: await neededBy(listed, reading, kinds) };
+    const needed = await neededBy(listed, reading, kinds);
     for (const [root, kind] of roots) {
       const at = reached.get(root) ?? { kind, reaches: [] };
-      at.reaches.push({ entry, named });
+      at.reaches.push({ entry: { ...listed, dependsOn: needed(root) }, named });
       reached.set(root, at);
     }
   }

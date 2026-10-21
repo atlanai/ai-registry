@@ -184,7 +184,7 @@ publish:
       '.claude/agents/reviewer.md depends on .claude/skills/review, which export ".claude/skills/review" keeps here with `publish: false`.',
     );
     expect(sent.stderr).toContain(
-      'Remove `publish: false` from export ".claude/skills/review", or ./.claude/skills/review from the `depends_on` of export ".claude/agents/reviewer.md".',
+      'Remove `publish: false` from export ".claude/skills/review", or leave ./.claude/skills/review out of the `depends_on` of export ".claude/agents/reviewer.md".',
     );
     await writeManifestIn(
       maker,

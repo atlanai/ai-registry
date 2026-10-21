@@ -453,7 +453,12 @@ function dependency(text: string, path: string, artifacts: readonly Ref[]): Expo
     const local = text.slice(2);
     const problem = pathProblem(local);
     if (problem !== undefined) throw new ManifestError(`${of}, whose path ${problem}.`, PATH_HINT);
-    if (isGlob(local)) throw new ManifestError(`${of}, a glob rather than one export.`);
+    if (isGlob(local)) {
+      throw new ManifestError(
+        `${of}, a glob rather than a path.`,
+        "Name an artifact, or a folder of them, such as ./skills.",
+      );
+    }
     if (local === path) throw new ManifestError(`Export ${quoted(path)} depends on itself.`);
     return { type: "local", path: local };
   }

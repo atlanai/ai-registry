@@ -101,6 +101,33 @@ exports:
     ]);
   });
 
+  it("gives a folder of the source as each artifact directly inside it", () => {
+    const { needs, warnings } = read(`exports:
+  - path: .claude/skills/review
+    depends_on: [./.claude/agents, ./.claude/agents/triage.md]
+  - path: .claude/agents/reviewer.md
+    depends_on: [./.claude]
+`);
+    expect(needs.get(".claude/skills/review")).toEqual([
+      { namespace: "tools", kind: "agent", name: "reviewer" },
+      { namespace: "tools", kind: "agent", name: "triage" },
+    ]);
+    // An artifact in the folder does not depend on itself through it.
+    expect(
+      read("exports:\n  - path: .claude/agents/triage.md\n    depends_on: [./.claude/agents]\n")
+        .needs,
+    ).toEqual(
+      new Map([
+        [".claude/agents/triage.md", [{ namespace: "tools", kind: "agent", name: "reviewer" }]],
+      ]),
+    );
+    // Nothing is directly inside .claude, so it gives no edge.
+    expect(needs.has(".claude/agents/reviewer.md")).toBe(false);
+    expect(warnings).toEqual([
+      '"reviewer" depends on "./.claude", which this source does not hold; it was left out.',
+    ]);
+  });
+
   it("gives a path a glob exports nothing, and never matches a glob", () => {
     // Matched as a glob, this would backtrack for longer than any test waits.
     const slow = `${"*a".repeat(20)}b`;

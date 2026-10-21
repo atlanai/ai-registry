@@ -16,9 +16,10 @@ import { MANIFEST_FILE, SCOPE_DIR } from "#core/store/paths.ts";
 import type { Need } from "./depends.ts";
 
 // A repository installed as a folder of skills may be a project that exports some of them. Its
-// manifest's `depends_on` gives those their edges: one to another export of the source names it
-// with no version, as both are read at one commit, and one to an artifact the project installs
-// takes that artifact's range and the address of the registry the project declares it in.
+// manifest's `depends_on` gives those their edges. One to another artifact of the source, or to
+// each one directly inside a folder of it, names it with no version, as both are read at one
+// commit; one to an artifact the project installs takes that artifact's range and the address of
+// the registry the project declares it in.
 
 /** The edges a source's exports give, by the id each artifact is listed with, and what was left out. */
 export interface Exported {
@@ -57,17 +58,35 @@ function leftOut(name: string, to: string, why: string): string {
   return `"${sanitizeText(name)}" depends on "${sanitizeText(to)}", ${why}; it was left out.`;
 }
 
-/** One `depends_on` entry as the edge it gives, or why it gives none. */
-function needOf(
+/**
+ * The artifacts a local dependency of the one at `self` names: the one at its path, or each one
+ * directly inside its folder but `self`.
+ */
+function siblingsAt(
+  path: string,
+  self: string,
+  byPath: ReadonlyMap<string, SourceArtifact>,
+): (SourceArtifact & { namespace: string })[] {
+  const root = artifactRoot(path);
+  const one = byPath.get(root);
+  const inside = (each: SourceArtifact) => posix.dirname(each.path) === root && each.path !== self;
+  const held = one === undefined ? [...byPath.values()].filter(inside) : [one];
+  return held.filter(
+    (each): each is SourceArtifact & { namespace: string } => each.namespace !== undefined,
+  );
+}
+
+/** One `depends_on` entry as the edges it gives, or why it gives none. */
+function needsOf(
   dependency: ExportDependency,
   manifest: Manifest,
-  byPath: ReadonlyMap<string, SourceArtifact>,
-): Need | string {
+  at: { self: string; byPath: ReadonlyMap<string, SourceArtifact> },
+): Need[] | string {
   if (dependency.type === "local") {
-    const sibling = byPath.get(artifactRoot(dependency.path));
-    if (sibling?.namespace === undefined) return "which this source does not hold";
+    const siblings = siblingsAt(dependency.path, at.self, at.byPath);
+    if (siblings.length === 0) return "which this source does not hold";
     // Read at the one commit its dependent is, so the edge needs no version to be exact.
-    return { namespace: sibling.namespace, kind: sibling.kind, name: sibling.name };
+    return siblings.map(({ namespace, kind, name }) => ({ namespace, kind, name }));
   }
   const { ref } = dependency;
   const location = manifest.registries[ref.registry]?.location ?? "";
@@ -78,14 +97,16 @@ function needOf(
     return `in a registry the source declares at ${quoted(sanitizeText(location))}, which has no https address`;
   }
   const entry = artifactFor(manifest.artifacts, ref);
-  return {
-    namespace: ref.namespace as string,
-    kind: ref.kind as Need["kind"],
-    name: ref.name as string,
-    ...(entry?.version === undefined ? {} : { version: entry.version }),
-    ...(entry?.range === undefined ? {} : { range: entry.range }),
-    registry,
-  };
+  return [
+    {
+      namespace: ref.namespace as string,
+      kind: ref.kind as Need["kind"],
+      name: ref.name as string,
+      ...(entry?.version === undefined ? {} : { version: entry.version }),
+      ...(entry?.range === undefined ? {} : { range: entry.range }),
+      registry,
+    },
+  ];
 }
 
 /**
@@ -112,18 +133,20 @@ export function exportedNeeds(
   for (const { id, name } of listed) {
     const path = byId.get(id)?.path;
     const dependencies = path === undefined ? undefined : at.get(path);
-    if (dependencies === undefined) continue;
-    const edges: Need[] = [];
+    if (path === undefined || dependencies === undefined) continue;
+    // A folder and an artifact in it give that artifact once.
+    const edges = new Map<string, Need>();
     for (const dependency of dependencies) {
-      const need = needOf(dependency, manifest, byPath);
-      if (typeof need !== "string") edges.push(need);
-      else {
+      const need = needsOf(dependency, manifest, { self: path, byPath });
+      if (typeof need !== "string") {
+        for (const each of need) edges.set(JSON.stringify(each), each);
+      } else {
         const to =
           dependency.type === "local" ? `./${dependency.path}` : formatAddress(dependency.ref);
         warnings.push(leftOut(name, to, need));
       }
     }
-    if (edges.length > 0) needs.set(id, edges);
+    if (edges.size > 0) needs.set(id, [...edges.values()]);
   }
   return { needs, warnings };
 }
