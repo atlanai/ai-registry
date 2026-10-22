@@ -1,8 +1,9 @@
 import { posix } from "node:path";
 import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
-import { REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
+import { isKindSegment, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
+import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { frontmatterRecord } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -53,17 +54,24 @@ const BUNDLED: Readonly<Record<string, KindManifest>> = dict([
 /** A manifest a registry serves itself, or why it could not be used. */
 type Served = { manifest: KindManifest } | { problem: string };
 
+interface Listed {
+  name: string;
+  url?: string;
+  served?: Served;
+  /** A name the kind grammar refuses: it would become a command and a folder, so it is neither. */
+  invalid?: true;
+}
+
 /** Each kind `registry.json` lists, with the manifest it serves when it names one in the root. */
-async function listedKinds(
-  root: string,
-): Promise<{ name: string; url?: string; served?: Served }[]> {
+async function listedKinds(root: string): Promise<Listed[]> {
   const registry = await readJson(rootReader(root), REGISTRY_DOCUMENT).catch(() => undefined);
   const listed = isRecord(registry) && Array.isArray(registry.kinds) ? registry.kinds : [];
-  const kinds: { name: string; url?: string; served?: Served }[] = [];
+  const kinds: Listed[] = [];
   for (const item of listed) {
     const { name, manifest_url: url } = (item ?? {}) as { name?: unknown; manifest_url?: unknown };
     if (typeof name !== "string") continue;
-    if (typeof url !== "string" || isRemote(url)) kinds.push({ name });
+    if (!isKindSegment(name)) kinds.push({ name, invalid: true });
+    else if (typeof url !== "string" || isRemote(url)) kinds.push({ name });
     else kinds.push({ name, url, served: await served(root, url) });
   }
   return kinds;
@@ -78,7 +86,8 @@ export async function kindsOf(root: string | undefined): Promise<Record<string, 
   const listed = await listedKinds(root);
   if (listed.length === 0) return dict(Object.entries(BUNDLED));
   const kinds = dict<KindManifest>();
-  for (const { name, served } of listed) {
+  for (const { name, served, invalid } of listed) {
+    if (invalid === true) continue;
     const manifest =
       (served !== undefined && "manifest" in served ? served.manifest : undefined) ?? BUNDLED[name];
     if (manifest !== undefined) kinds[name] = manifest;
@@ -88,7 +97,11 @@ export async function kindsOf(root: string | undefined): Promise<Record<string, 
 
 /** Each manifest `registry.json` names in the root that cannot be used, and what is checked instead. */
 export async function manifestProblems(root: string): Promise<{ path: string; message: string }[]> {
-  return (await listedKinds(root)).flatMap(({ name, url, served }) => {
+  return (await listedKinds(root)).flatMap(({ name, url, served, invalid }) => {
+    if (invalid === true) {
+      const message = `lists ${quoted(name)}, which is not a kind name, so it is not used`;
+      return [{ path: REGISTRY_DOCUMENT, message }];
+    }
     if (url === undefined || served === undefined || !("problem" in served)) return [];
     const instead =
       BUNDLED[name] === undefined ? "not checked" : "checked against the one aireg bundles";
@@ -111,12 +124,33 @@ async function served(root: string, url: string): Promise<Served> {
   if (!isRecord(raw) || !("x-registry-files" in raw)) {
     return { problem: "has no x-registry-files, so it is not a kind manifest" };
   }
+  // `aireg <kind> new` writes these paths, so each must stay inside the version folder.
+  const unsafe = filePaths(raw["x-registry-files"]).find(
+    (path) => typeof path !== "string" || !isSafePath(path),
+  );
+  if (unsafe !== undefined) {
+    const named = quoted(String(unsafe));
+    return { problem: `names the file ${named}, which is not a path inside a version` };
+  }
   try {
     await prepareManifest(root, raw);
   } catch (error) {
     return { problem: `has an invalid kind schema: ${(error as Error).message}` };
   }
   return { manifest: raw as unknown as KindManifest };
+}
+
+/** Every exact `path` the file rules name, however the manifest nests them. */
+function filePaths(files: unknown): unknown[] {
+  if (!isRecord(files)) return [];
+  const rules = [
+    files.required,
+    files.optional,
+    ...(Array.isArray(files.one_of) ? files.one_of : []),
+  ];
+  return rules
+    .flatMap((set) => (Array.isArray(set) ? set : []))
+    .flatMap((rule) => (isRecord(rule) && "path" in rule ? [rule.path] : []));
 }
 
 /** Shared required files plus the selected alternative, or the first alternative by default. */

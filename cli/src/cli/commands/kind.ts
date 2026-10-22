@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { stringify } from "yaml";
+import { redirection } from "#adapter/files.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import {
@@ -32,7 +33,7 @@ import {
   specOf,
 } from "#core/filespec/write/kinds.ts";
 import { expandUserPath } from "#core/fs/path.ts";
-import { authored, refusal } from "#core/fs/tree.ts";
+import { authored, present, refusal } from "#core/fs/tree.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import { type CommandContext, type CommandSpec, runAction } from "./index.ts";
 
@@ -46,6 +47,36 @@ interface Own extends Record<string, unknown> {
 
 /** Written for a required field the command cannot know; `aireg registry validate` refuses it. */
 const PLACEHOLDER = "TODO";
+
+/** Copies that never write over anything, so a file already there is a conflict, not lost. */
+const FRESH = { recursive: true, errorOnExist: true, force: false } as const;
+
+/**
+ * Every write here lands under `root`, and a registry ships its own folders: a link
+ * anywhere from `root` down to `path` would put the new files somewhere else.
+ */
+function refuseRedirect(root: string, path: string): void {
+  const found = redirection(root, path);
+  if (found === undefined) return;
+  const what = found.problem === "symlink" ? "a symlink" : "not a folder";
+  throw new AiregError(`${found.at} is ${what}, so nothing was written through it.`, {
+    code: ErrorCode.Invalid,
+    hint: "Replace it with a real folder, then run it again.",
+  });
+}
+
+/** Written only where nothing is, so a file the check above missed is still never replaced. */
+async function writeFresh(path: string, content: string, shown: string): Promise<void> {
+  try {
+    await writeFile(path, content, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    throw new AiregError(`${shown} already exists.`, {
+      code: ErrorCode.Conflict,
+      hint: "Move it aside, or name a new artifact.",
+    });
+  }
+}
 
 /** `aireg <kind> <action>`: one set of verbs for every kind a registry holds. */
 export async function runKind(
@@ -327,10 +358,13 @@ async function init(
   const { fields, todo } = scaffold(manifest, name, sets);
   if (interactive(step) && !(await askFields(step, fields, todo))) return cancel(step);
 
-  await mkdir(at, { recursive: true });
-  for (const file of files) await writeFile(join(at, file), render(file, fields), "utf8");
-
   const created = files.map((file) => (shown === "." ? file : `${shown}/${file}`));
+  for (const file of files) refuseRedirect(inRegistry ? root : context.cwd, join(at, file));
+  await mkdir(at, { recursive: true });
+  for (const [index, file] of files.entries()) {
+    await writeFresh(join(at, file), render(file, fields), created[index] as string);
+  }
+
   if (context.printer.format === "json") {
     context.printer.json({ ok: true, data: { kind, name, created, todo } });
     return;
@@ -449,6 +483,7 @@ async function newFrom(
   const namespace = await namespaceFor(root, context.cwd, own, context, yes);
   if (namespace === undefined) return;
   for (const item of found) {
+    refuseRedirect(root, join(root, "artifacts", namespace, kind, item.name, "0.1.0"));
     if (existsSync(join(root, "artifacts", namespace, kind, item.name))) {
       throw new AiregError(`${namespace}/${kind}/${item.name} already exists.`, {
         code: ErrorCode.Conflict,
@@ -462,7 +497,7 @@ async function newFrom(
     const at = join(root, "artifacts", namespace, kind, item.name, "0.1.0");
     await mkdir(at, { recursive: true });
     for (const path of item.entries) {
-      await cp(join(item.dir, path), join(at, path), { recursive: true });
+      await cp(join(item.dir, path), join(at, path), FRESH);
     }
     await rm(join(at, ENVELOPE), { force: true });
     // `--name` renames the copy, and index checks the folder against its front matter.
@@ -540,7 +575,15 @@ async function version(
       hint: "Edit it there, or name a newer version.",
     });
   }
-  await cp(join(home, latest), join(home, next), { recursive: true });
+  // Any entry at all where the version goes, such as a link a folder listing skips, is refused.
+  refuseRedirect(root, join(home, next));
+  if (await present(join(home, next))) {
+    throw new AiregError(`${input} ${next} already exists.`, {
+      code: ErrorCode.Conflict,
+      hint: `Move ${relative(context.cwd, join(home, next)) || "."} aside, or name a newer version.`,
+    });
+  }
+  await cp(join(home, latest), join(home, next), FRESH);
   await rm(join(home, next, ENVELOPE), { force: true });
   const kept = await keepFromEnvelope(join(home, latest), join(home, next));
 
