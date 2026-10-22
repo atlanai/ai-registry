@@ -11,7 +11,7 @@ import {
 import { describeFile } from "#adapter/spec/envelope.ts";
 import { frontmatterRecord, ownDescription } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { authored, isDirectory, refusal } from "#core/fs/tree.ts";
+import { authoredArtifact, isDirectory, refusal } from "#core/fs/tree.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { CONCURRENCY, limiter } from "#core/limit.ts";
 import { envelopeSpec } from "./kinds.ts";
@@ -44,19 +44,19 @@ function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
 }
 
 async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFile[]> {
-  if (!(await isDirectory(path))) {
+  // Read without following the root itself, so a link named like an artifact sends nothing.
+  const { files, irregular } = await authoredArtifact(path);
+  const [refused] = irregular;
+  if (refused !== undefined) {
+    const at = refused.path === "" ? basename(path) : `${basename(path)}/${refused.path}`;
+    throw new AiregError(`${at} ${refusal(refused)}.`, { code: ErrorCode.Invalid });
+  }
+  if (files.length === 1 && files[0]?.path === "") {
     const content = await readFile(path);
     if (target.kind === "agent" && target.asAgentDocument === true) {
       return [agentDocument(content, target)];
     }
     return [{ path: basename(path), content, executable: false }];
-  }
-  const { files, irregular } = await authored(path);
-  const [refused] = irregular;
-  if (refused !== undefined) {
-    throw new AiregError(`${basename(path)}/${refused.path} ${refusal(refused)}.`, {
-      code: ErrorCode.Invalid,
-    });
   }
   // Bounded, so a tree of thousands of files neither runs out of descriptors nor
   // has every read in flight at once.

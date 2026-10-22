@@ -9,6 +9,7 @@ import type { Account } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { offerFrom } from "#core/filespec/write/offer.ts";
 import type { RegistrySource } from "#core/manifest.ts";
+import { refuseRedirectedCopy } from "#core/store/managed-paths.ts";
 import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
 import type { Scan } from "./scan.ts";
@@ -126,6 +127,7 @@ async function stageMutations(
         copyLeaf(item.name, previous.name),
         previous.address ?? "",
       );
+      refuseRedirectedCopy(item.name, path, scan.roots);
       staged.publishing.push(
         await publishInput(path, item.name, item.kind, {
           id: previous.id ?? "",

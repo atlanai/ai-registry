@@ -12,7 +12,7 @@ import { type Loaded, resolveTargets } from "./pipeline.ts";
 export interface Scan {
   items: SyncItem[];
   /** Where this scope's own copies live, which is what a publish sends. */
-  roots: Pick<Roots, "artifacts">;
+  roots: Roots;
   local: Candidate[];
   undeclared: Candidate[];
   publisher: Map<string, string>;
