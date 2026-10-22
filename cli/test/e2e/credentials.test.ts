@@ -187,6 +187,38 @@ describe("credentials.json, end to end", () => {
     expect(await signsIn.seen()).toBe("");
   });
 
+  test("declares a registry it cannot read yet when its adapter signs in beside a credentials hint", async ({
+    aireg,
+    home,
+    signsIn,
+  }) => {
+    // As Atlan's adapter does: a desktop session it brings itself, and `auth login` beside it.
+    const module = join(home.dir, "signs-in.mjs");
+    const source = await readFile(module, "utf8");
+    await writeFile(
+      module,
+      source.replace(
+        "capabilities:",
+        'credentialsHint: "Sign in with the Acme app.",\n  capabilities:',
+      ),
+    );
+    const env = { AIREG_TOKEN_ACME: TOKEN };
+    const added = await aireg(["registry", "add", `${ORIGIN}/private`, "--as", "acme", "-g"], {
+      env,
+    });
+    expect(added.code, added.stderr).toBe(0);
+    expect(added.stdout).toContain(`Added registry acme at ${ORIGIN}/private.`);
+    // The variable is the sign-in, so `auth login`, which refuses to store one beside it, is not suggested.
+    expect(added.stdout).not.toContain("aireg auth login");
+    expect(added.stdout + added.stderr).not.toContain(TOKEN);
+    // Nothing declared the address under acme when it was read, so the token was not sent.
+    expect(await signsIn.seen()).toBe(`none ${ORIGIN}/private\n`);
+
+    const shown = await aireg(["registry", "show", "acme", "-g"], { env });
+    expect(shown.code, shown.stderr).toBe(0);
+    expect(await signsIn.seen()).toBe(`none ${ORIGIN}/private\ntoken ${ORIGIN}/private\n`);
+  }, 60_000);
+
   test("hands AIREG_TOKEN_<NAME> to the one sync the daemon runs for this command", async ({
     aireg,
     home,
