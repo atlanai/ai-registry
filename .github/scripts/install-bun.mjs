@@ -66,7 +66,11 @@ const executable = os === "windows" ? "bun.exe" : "bun";
 await mkdir(bin);
 try {
   await writeFile(tarball, archive, { flag: "wx", mode: 0o600 });
-  execFileSync("tar", ["-xzf", tarball, "-C", bin, "--strip-components=2", `package/bin/${executable}`], { stdio: "inherit" });
+  // GNU tar treats Windows drive letters in archive paths as remote hosts.
+  execFileSync("tar", ["-xzf", "bun.tgz", "-C", "bin", "--strip-components=2", `package/bin/${executable}`], {
+    cwd: directory,
+    stdio: "inherit",
+  });
   const binary = join(bin, executable);
   await chmod(binary, 0o755);
   const revision = execFileSync(binary, ["--revision"], { encoding: "utf8" }).trim();
