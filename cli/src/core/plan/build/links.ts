@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { list, quoted } from "#adapter/text.ts";
 import type { LinkMode, LockArtifact } from "#core/lock.ts";
 import { type Action, type ArtifactSurvey, copyEdited, type Selected } from "#core/plan/model.ts";
-import { claim, linksFor, type PlannedLink } from "#core/plan/projection.ts";
+import { claim, linksFor, type PlannedLink, rowPlugin } from "#core/plan/projection.ts";
 import { removal } from "#core/plan/removable.ts";
 import { addressOf } from "#core/plan/select.ts";
 import { renamedTo } from "./rename.ts";
@@ -42,16 +42,33 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
     }
   };
   // A path the lockfile gives another artifact stays its own, though this one comes first, as a
-  // plugin linked beside it may. A plugin's own folder is shared, so it is never held this way.
+  // plugin linked beside it may.
   const open = planned.filter((link) => {
-    if (link.shared === true || build.claimed.has(link.absolute)) return true;
+    if (build.claimed.has(link.absolute)) return true;
     const holder = build.recorded.get(link.absolute);
-    if (holder === undefined || holder === item.name) return true;
+    if (holder === undefined || holder === item.name || !holds(holder, link, build)) return true;
     collided(holder, link);
     return false;
   });
-  const links = claim(open, item.name, build.claimed, collided);
+  const links = claim(open, item.name, build.claimed, build.plugins, collided);
   return { links, skipped, blocked };
+}
+
+/**
+ * Whether the lockfile's holder keeps this path from `link`. A plugin directory is shared by its
+ * namespace's artifacts, and another namespace holds it only while the naming rule still puts its
+ * plugin there; a link that is no plugin directory is its holder's alone.
+ */
+function holds(holder: string, link: PlannedLink, build: BuildState): boolean {
+  if (link.shared !== true) return true;
+  const entry = build.lock.artifacts[holder];
+  const { base } = build.options.roots;
+  const recorded = entry?.links.find((each) => resolve(base, each.path) === link.absolute);
+  if (entry === undefined || recorded === undefined) return true;
+  const plugin = rowPlugin(holder, entry, recorded, build.options);
+  if (plugin === undefined) return true;
+  if (plugin.content === link.content) return false;
+  return (build.crowded.has(plugin.bare) ? plugin.qualified : plugin.bare) === link.absolute;
 }
 
 /**
