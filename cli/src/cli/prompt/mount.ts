@@ -2,6 +2,7 @@ import type { EventEmitter } from "node:events";
 import { Writable } from "node:stream";
 import { Box, type Key, render, Text, useApp, useInput } from "ink";
 import { createElement, type ReactElement, useEffect, useReducer, useState } from "react";
+import { ownStyleOnly } from "#core/output.ts";
 import { CSI_BODY, cells, ESC } from "#core/term/format.ts";
 import { wrapRows } from "./layout.ts";
 import {
@@ -52,10 +53,11 @@ function keypress(text: string, key: Key): Keypress {
 
 /**
  * Lines measured here, one Text per terminal row: a long line breaks where the
- * terminal would, and Ink erases every row it drew on the next frame.
+ * terminal would, and Ink erases every row it drew on the next frame. Options
+ * carry registry text, and Ink keeps hyperlinks and any styling, so only ours stays.
  */
 function Frame(props: { lines: readonly string[]; columns: number }): ReactElement {
-  const rows = props.lines.flatMap((line) => wrapRows(line, props.columns));
+  const rows = props.lines.flatMap((line) => wrapRows(ownStyleOnly(line), props.columns));
   return createElement(
     Box,
     { flexDirection: "column" },
