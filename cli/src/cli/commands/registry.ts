@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { canSignIn } from "#adapter/contract.ts";
 import { readRegistry } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import {
@@ -36,7 +37,7 @@ import { loadAdapter } from "#core/adapter/registry.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import { emptyRegistryConfig, type RegistryConfig } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
-import { inGitHubActions } from "#core/env.ts";
+import { inGitHubActions, registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { indexRoot } from "#core/filespec/write/indexer.ts";
 import { findRegistry, requireRegistry, writeRoot } from "#core/filespec/write/init.ts";
@@ -128,11 +129,11 @@ async function add(
     await source.close();
   } catch (error) {
     if (!(error instanceof AiregError) || error.code !== ErrorCode.Unauthorized) throw error;
-    // An adapter that brings its own credentials has no sign-in to finish later.
+    // Adapters that manage credentials without a sign-in flow cannot recover after declaration.
     const failed = isAdapterError(error.cause)
       ? await loadAdapter(error.cause.adapter).catch(() => undefined)
       : undefined;
-    if (failed?.credentialsHint !== undefined) throw error;
+    if (failed?.credentialsHint !== undefined && !canSignIn(failed)) throw error;
     if (flags.as === undefined) {
       throw new AiregError(`Cannot read ${input} before you sign in, so it needs a name.`, {
         code: ErrorCode.Unauthorized,
@@ -168,8 +169,10 @@ async function add(
   if (fromAddress) context.printer.note("named", "after its address; choose another with --as");
   noteUserScope(context.printer, common.scope, context.cwd);
   const g = loaded.roots.scope === "user" ? "-g " : "";
-  if (!readable) context.printer.note("next", `aireg auth login ${alias}`);
-  context.printer.note(readable ? "next" : "then", `aireg add ${g}${alias}/<namespace>`);
+  // Login cannot store credentials while the registry token variable is set.
+  const signIn = !readable && registryToken(alias) === undefined;
+  if (signIn) context.printer.note("next", `aireg auth login ${alias}`);
+  context.printer.note(signIn ? "then" : "next", `aireg add ${g}${alias}/<namespace>`);
 }
 
 /** A dry run still refuses a clashing alias, so its preview is what a real run would do. */

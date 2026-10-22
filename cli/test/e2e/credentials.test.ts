@@ -164,6 +164,35 @@ describe("credentials.json, end to end", () => {
     });
   }, 60_000);
 
+  test("declares an unreadable registry whose adapter supports sign-in and a credentials hint", async ({
+    aireg,
+    home,
+    signsIn,
+  }) => {
+    const module = join(home.dir, "signs-in.mjs");
+    const source = await readFile(module, "utf8");
+    await writeFile(
+      module,
+      source.replace(
+        "capabilities:",
+        'credentialsHint: "Sign in with the Acme app.",\n  capabilities:',
+      ),
+    );
+    const env = { AIREG_TOKEN_ACME: TOKEN };
+    const added = await aireg(["registry", "add", `${ORIGIN}/private`, "--as", "acme", "-g"], {
+      env,
+    });
+    expect(added.code, added.stderr).toBe(0);
+    expect(added.stdout).toContain(`Added registry acme at ${ORIGIN}/private.`);
+    expect(added.stdout).not.toContain("aireg auth login");
+    expect(added.stdout + added.stderr).not.toContain(TOKEN);
+    expect(await signsIn.seen()).toBe(`none ${ORIGIN}/private\n`);
+
+    const shown = await aireg(["registry", "show", "acme", "-g"], { env });
+    expect(shown.code, shown.stderr).toBe(0);
+    expect(await signsIn.seen()).toBe(`none ${ORIGIN}/private\ntoken ${ORIGIN}/private\n`);
+  }, 60_000);
+
   test("hands AIREG_TOKEN_<NAME> to the one sync the daemon runs for this command", async ({
     aireg,
     home,
