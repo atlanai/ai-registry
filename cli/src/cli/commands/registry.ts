@@ -142,8 +142,7 @@ async function add(
     }
   } catch (error) {
     if (!(error instanceof AiregError) || error.code !== ErrorCode.Unauthorized) throw error;
-    // An adapter that brings its own credentials and has no sign-in has nothing to finish
-    // later. One with both, like Atlan's desktop session beside `auth login`, still signs in.
+    // Adapters that manage credentials without a sign-in flow cannot recover after declaration.
     const failed = isAdapterError(error.cause)
       ? await loadAdapter(error.cause.adapter).catch(() => undefined)
       : undefined;
@@ -185,7 +184,7 @@ async function add(
   if (fromAddress) context.printer.note("named", "after its address; choose another with --as");
   noteUserScope(context.printer, common.scope, context.cwd);
   const g = loaded.roots.scope === "user" ? "-g " : "";
-  // A token in the environment is already the sign-in, and `auth login` refuses to store one beside it.
+  // Login cannot store credentials while the registry token variable is set.
   const signIn = !readable && registryToken(alias) === undefined;
   if (signIn) context.printer.note("next", `aireg auth login ${alias}`);
   context.printer.note(signIn ? "then" : "next", `aireg add ${g}${alias}/<namespace>`);
