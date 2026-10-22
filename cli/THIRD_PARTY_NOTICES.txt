@@ -860,7 +860,7 @@ License: MIT
 This package ships no license file. Its package.json declares MIT.
 
 --------------------------------------------------------------------------------
-Bun 1.4.4-canary.1+963452075, the runtime the standalone aireg binary embeds
+Bun 1.4.4+38afee6c8, the runtime the standalone aireg binary embeds
 License: MIT, with the statically linked libraries below under their own licenses
 --------------------------------------------------------------------------------
 
