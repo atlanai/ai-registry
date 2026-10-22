@@ -2,6 +2,7 @@ import { cp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
+import skill from "#schema/kinds/skill.json" with { type: "json" };
 import { registry } from "#test/kit/builders/registry.ts";
 import { test as base, type Git } from "#test/kit/fixtures.ts";
 import { validateRoot } from "./validate.ts";
@@ -142,6 +143,19 @@ const CASES: Case[] = [
     },
     path: "kinds/skill.json",
     message: 'is not valid JSON, so "skill" is checked against the one aireg bundles',
+  },
+  {
+    name: "a kind manifest the registry serves with a pattern aireg cannot run",
+    edit: async (root) => {
+      const document = JSON.parse(await readFile(join(root, "registry.json"), "utf8"));
+      const kinds = [{ name: "skill", manifest_url: "kinds/skill.json" }, { name: "agent" }];
+      await writeFile(join(root, "registry.json"), JSON.stringify({ ...document, kinds }));
+      const name = { ...skill.properties.name, pattern: "^(?!draft-)[a-z-]+$" };
+      const manifest = { ...skill, properties: { ...skill.properties, name } };
+      await put(root, "kinds/skill.json", JSON.stringify(manifest));
+    },
+    path: "kinds/skill.json",
+    message: `has an invalid kind schema: pattern "^(?!draft-)[a-z-]+$" uses syntax aireg does not support`,
   },
   {
     name: "a released version folder deleted",
