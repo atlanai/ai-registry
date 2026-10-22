@@ -79,19 +79,13 @@ async function folderEntry(
     textAt(join(root, SKILL_ENTRY)),
     textAt(join(root, AGENT_ENTRY)),
   ]);
-  if (skill !== undefined && agent !== undefined) {
-    throw new AiregError(`${root} holds both SKILL.md and AGENT.md.`, {
-      code: ErrorCode.Invalid,
-      hint: "A folder is one artifact: keep SKILL.md for a skill, or AGENT.md for an agent.",
-    });
-  }
   if (skill !== undefined) return { kind: "skill", text: skill };
   return agent === undefined ? undefined : { kind: "agent", text: agent };
 }
 
 /** Read each entry once to identify a skill, folder agent or native agent file. */
 export async function fromPath(path: string): Promise<Work> {
-  const entry = basename(path) === SKILL_ENTRY || basename(path) === AGENT_ENTRY;
+  const entry = basename(path) === SKILL_ENTRY;
   const root = entry ? dirname(path) : path;
   const inside = await folderEntry(root);
   const text =

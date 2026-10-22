@@ -163,12 +163,6 @@ function refuseTwice(folder: string, base: string): void {
 async function heldIn(path: string, base: string): Promise<Held> {
   const skill = existsSync(join(path, SKILL_ENTRY));
   const agent = existsSync(join(path, AGENT_ENTRY));
-  if (skill && agent) {
-    throw new AiregError(`${shownAt(path, base)} holds both SKILL.md and AGENT.md.`, {
-      code: ErrorCode.Invalid,
-      hint: "A folder is one artifact: keep SKILL.md for a skill, or AGENT.md for an agent.",
-    });
-  }
   if (skill) return { root: path, kind: "skill" };
   if (!agent) return { stray: "holds no SKILL.md or AGENT.md" };
   refuseTwice(path, base);

@@ -483,13 +483,15 @@ describe("exportsOn, for a folder agent", () => {
     expect([...found.keys()]).toEqual([agent(), join(base, "agents", "reviewer.md")]);
   });
 
-  test("refuses a folder holding both SKILL.md and AGENT.md", async () => {
+  test("keeps a folder holding SKILL.md and AGENT.md as a skill", async () => {
     await writeFile(join(agent(), "SKILL.md"), "---\nname: helper\ndescription: Helps.\n---\n");
     for (const entry of ["agents/helper", "agents"]) {
-      await expect(exportsOn(manifestWith(`  - ${entry}\n`), base)).rejects.toMatchObject({
-        message: "agents/helper holds both SKILL.md and AGENT.md.",
-        code: "invalid",
-      });
+      const { found } = await exportsOn(manifestWith(`  - ${entry}\n`), base);
+      expect(found.get(agent())?.files).toEqual([
+        { from: "SKILL.md", as: "SKILL.md" },
+        { from: "AGENT.md", as: "AGENT.md" },
+        { from: "workspace/AGENTS.md", as: "workspace/AGENTS.md" },
+      ]);
     }
   });
 
