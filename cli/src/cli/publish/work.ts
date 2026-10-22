@@ -11,6 +11,7 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { gitIn } from "#core/git.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
+import { refuseRedirectedCopy } from "#core/store/managed-paths.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/pipeline.ts";
@@ -33,18 +34,20 @@ export interface Work {
 const SHAPE_HINT = "Name a skill folder that holds SKILL.md, or an agent's .md file.";
 
 function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
+  const path = artifactPath(
+    loaded.roots,
+    entry.registry,
+    entry.namespace,
+    entry.kind,
+    copyLeaf(key, entry.name),
+    // A watched row has no address yet; its recorded path still carries the extension.
+    entry.address ?? entry.path,
+  );
+  refuseRedirectedCopy(key, path, loaded.roots);
   return {
     name: entry.name,
     kind: entry.kind,
-    path: artifactPath(
-      loaded.roots,
-      entry.registry,
-      entry.namespace,
-      entry.kind,
-      copyLeaf(key, entry.name),
-      // A watched row has no address yet; its recorded path still carries the extension.
-      entry.address ?? entry.path,
-    ),
+    path,
     description: undefined,
     home: { registry: entry.registry, namespace: entry.namespace },
     row: key,

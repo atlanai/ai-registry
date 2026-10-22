@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -75,4 +75,19 @@ test("publishing an explicit native agent file preserves its front matter", asyn
   expect(input.spec).toEqual({ name: "reviewer", description: "Reviews.", model: "sonnet" });
   expect(input.files[0]?.path).toBe("reviewer.md");
   expect(Buffer.from(input.files[0]!.content).toString()).toBe(body);
+});
+
+// A link named like an artifact would otherwise send whatever it points at, such as a home folder.
+test.each([
+  ["a skill folder", "lint", "outside", "skill"],
+  ["an agent file", "reviewer.md", "outside/reviewer.md", "agent"],
+] as const)("refuses %s that is itself a symlink", async (_what, name, target, kind) => {
+  await mkdir(join(root, "outside"));
+  await writeFile(join(root, "outside", "SKILL.md"), "---\nname: lint\ndescription: L.\n---\n");
+  await writeFile(join(root, "outside", "reviewer.md"), "---\nname: reviewer\n---\n");
+  await symlink(join(root, target), join(root, name));
+
+  await expect(
+    offerFrom(join(root, name), { kind, name: "probe", version: "1.0.0" }),
+  ).rejects.toThrow(`${name} is a symlink`);
 });
