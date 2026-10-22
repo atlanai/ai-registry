@@ -52,10 +52,13 @@ export async function inspect(
   // Everything the registry publishes, so a report can offer the names this job skips.
   const common = syncOptions(job, undefined);
   const loaded = await load(common, job.root);
-  const source = registryOf(loaded, account);
+  // Refuses an account whose registry the manifest no longer declares.
+  registryOf(loaded, account);
   const found = await scan(loaded, common, {
     aliases: [account.registry],
-    credentials: await credentialsForManifest({ [account.registry]: source }, job.root, signal),
+    credentials: await credentialsForManifest(loaded.manifest.registries, job.root, signal, [
+      account.registry,
+    ]),
     signal,
   });
   return { loaded, common, found };

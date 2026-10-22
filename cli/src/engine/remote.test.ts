@@ -8,12 +8,12 @@ import type { Scan } from "./scan.ts";
 
 const offered = vi.hoisted(() => [] as PublishInput[]);
 
-vi.mock("#accounts/service.ts", () => ({
-  AccountService: class {
-    async resolve() {
-      return { location: "https://acme.example", source: { location: "https://acme.example" } };
-    }
-  },
+vi.mock("#accounts/registry.ts", () => ({
+  readRootManifest: async () => ({ registries: { acme: { location: "https://acme.example" } } }),
+  resolveRegistry: async () => ({
+    location: "https://acme.example",
+    source: { location: "https://acme.example" },
+  }),
 }));
 vi.mock("#accounts/credentials.ts", () => ({ credentialFor: async () => undefined }));
 vi.mock("#core/adapter/source.ts", () => ({

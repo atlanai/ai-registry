@@ -188,6 +188,8 @@ function digestsOf(artifact: Artifact): string[] {
 export async function readPublished(
   alias: string,
   declared: RegistrySource,
+  /** Every registry this scope declares, any of which may read the same token. */
+  aliases: readonly string[],
   cwd: string,
   /** The command that publishes this work into a clone, for when the registry is a git one. */
   how?: string,
@@ -195,7 +197,7 @@ export async function readPublished(
   const refused = readOnlyLayout(alias, declared.config);
   if (refused !== undefined) throw refused;
   const location = expandLocation(declared.location, cwd);
-  const credential = await credentialFor(alias, declared, location);
+  const credential = await credentialFor(alias, declared, location, aliases);
   const source = await connectSource(
     {
       alias,

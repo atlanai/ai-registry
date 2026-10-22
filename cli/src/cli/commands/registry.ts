@@ -565,7 +565,7 @@ async function show(
     const unknown = await undeclaredRegistry(target, known, common, context.cwd);
     if (unknown !== undefined) throw unknown;
   }
-  const source = await probe(resolved.input, resolved.flags, context.cwd, [], resolved.alias);
+  const source = await probe(resolved.input, resolved.flags, context.cwd, [], resolved);
   const catalog = source.catalog;
 
   if (context.printer.format === "json") {
