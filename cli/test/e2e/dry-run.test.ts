@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { describe, expect } from "vitest";
@@ -39,6 +40,19 @@ describe("--dry-run", () => {
     expect(removed.stdout).toContain("Would remove registry kit");
     expect((await aireg(["registry", "list", "-g"], { cwd })).stdout).toContain("kit");
     expect(await written(home.dir)).toEqual(before);
+  });
+
+  test("leaves no lease folder in the project", async ({ aireg, project, kit }) => {
+    await aireg(["init", "--for", "claude"]);
+    expect((await aireg(["registry", "add", kit, "--as", "kit"])).code).toBe(0);
+    const leases = join(project, ".registry", "leases");
+    await rm(leases, { recursive: true, force: true });
+
+    for (const argv of [["add", "kit", "--all"], ["install"], ["update"]]) {
+      const ran = await aireg([...argv, "--dry-run"]);
+      expect(ran.code, ran.stderr).toBe(0);
+      expect(existsSync(leases), argv.join(" ")).toBe(false);
+    }
   });
 });
 
