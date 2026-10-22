@@ -4,6 +4,18 @@
 # Minutes. A week is long enough for a compromised publish to be yanked first.
 minimumReleaseAge: 10080
 
+# GHSA-qxg6-89mg-rqv8 / GHSA-xp26-3454-mjgp security fixes; remove after 2026-10-22 14:52 UTC.
+minimumReleaseAgeExclude:
+  - "vitest@4.1.12"
+  - "@vitest/coverage-v8@4.1.12"
+  - "@vitest/expect@4.1.12"
+  - "@vitest/mocker@4.1.12"
+  - "@vitest/pretty-format@4.1.12"
+  - "@vitest/runner@4.1.12"
+  - "@vitest/snapshot@4.1.12"
+  - "@vitest/spy@4.1.12"
+  - "@vitest/utils@4.1.12"
+
 engineStrict: true
 saveExact: true
 autoInstallPeers: false

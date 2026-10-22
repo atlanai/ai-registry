@@ -95,12 +95,12 @@
     "@sinclair/typebox": "0.34.52",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "4.1.12",
     "knip": "6.41.0",
     "publint": "0.3.25",
     "tsup": "8.5.1",
     "typescript": "7.0.2",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   },
   "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621"
 }
