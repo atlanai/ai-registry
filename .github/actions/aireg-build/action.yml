@@ -26,10 +26,10 @@ runs:
         node-version-file: cli/.node-version
         package-manager-cache: false
 
-    # Exact: the binary embeds this Bun, and packaging/targets.ts refuses any other.
-    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-      with:
-        bun-version-file: cli/.bun-version
+    - name: Install the pinned Bun runtime
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: node .github/scripts/install-bun.mjs
 
     - name: Compile
       shell: bash

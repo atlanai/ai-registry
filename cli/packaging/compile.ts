@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import { formatVersion, parseVersion, type Version } from "#adapter/semver.ts";
 import { NAME, PUBLISHER } from "#core/product.ts";
 import { defines } from "./defines.ts";
-import { BUN_VERSION, type Target } from "./targets.ts";
+import { BUN_VERSION, hostTarget, type Target } from "./targets.ts";
 
 /** Bundled by Bun, not by tsup: the compiled binary has no `dist/` to load. Bun reads `/` on Windows too. */
 const ENTRY = "src/main.ts";
@@ -39,7 +39,7 @@ function windowsResources(version: Version): string[] {
   ];
 }
 
-export function compileArgs(options: CompileOptions): string[] {
+export function compileArgs(options: CompileOptions, executable?: string): string[] {
   const version = parseVersion(options.version);
   if (version === undefined || formatVersion(version) !== options.version) {
     throw new Error(`compile version must be exact SemVer (got ${options.version})`);
@@ -47,6 +47,7 @@ export function compileArgs(options: CompileOptions): string[] {
   return [
     "build",
     "--compile",
+    ...(executable === undefined ? [] : [`--compile-executable-path=${executable}`]),
     `--target=${options.target.bunTarget}`,
     // Bun otherwise reads .env and bunfig.toml from whatever folder aireg runs in.
     "--no-compile-autoload-dotenv",
@@ -66,16 +67,16 @@ export function compileArgs(options: CompileOptions): string[] {
   ];
 }
 
-function bunVersion(bun = "bun"): string {
-  return execFileSync(bun, ["--version"], { encoding: "utf8" }).trim();
-}
-
 export function compile(options: CompileOptions, cwd: string, bun = "bun"): string {
-  const found = bunVersion(bun);
+  if (hostTarget()?.platform !== options.target.platform) {
+    throw new Error("release builds require the target's native runner");
+  }
+  const found = execFileSync(bun, ["--revision"], { encoding: "utf8" }).trim();
   if (found !== BUN_VERSION) {
     throw new Error(`release builds pin Bun ${BUN_VERSION}; this is ${found}`);
   }
+  const executable = execFileSync(bun, ["-p", "process.execPath"], { encoding: "utf8" }).trim();
   mkdirSync(dirname(options.outFile), { recursive: true });
-  execFileSync(bun, compileArgs(options), { cwd, stdio: "inherit" });
+  execFileSync(bun, compileArgs(options, executable), { cwd, stdio: "inherit" });
   return options.outFile;
 }

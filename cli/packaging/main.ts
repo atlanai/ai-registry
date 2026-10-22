@@ -27,7 +27,7 @@ function signingSeed(): string {
   return value;
 }
 
-/** Named targets build from any host; none named builds the host's own pair. */
+/** Release targets use native runners; none named selects the host's own pair. */
 function wanted(names: readonly string[]): Target[] {
   if (names.length === 0) {
     const host = hostTarget();

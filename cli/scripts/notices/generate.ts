@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { NAME } from "#core/product.ts";
-import { BUN_VERSION } from "#packaging/targets.ts";
+import { BUN_COMMIT, BUN_VERSION } from "#packaging/targets.ts";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 
@@ -100,11 +100,11 @@ function shippedPackages(): Package[] {
 }
 
 /** The vendored LICENSE.md must come from the Bun release builds pin. */
-export function bunLicense(text: string, version = BUN_VERSION): string {
+export function bunLicense(text: string, revision = BUN_COMMIT): string {
   const [source = "", ...body] = text.split("\n");
-  if (!source.includes(`/bun-v${version}/`)) {
+  if (!source.includes(`/${revision}/`)) {
     throw new Error(
-      `packaging/licenses/bun.md is not from Bun ${version}; vendor its LICENSE.md from the bun-v${version} tag`,
+      `packaging/licenses/bun.md is not from Bun ${revision}; vendor its LICENSE.md from that commit`,
     );
   }
   return normalize(body.join("\n"));
