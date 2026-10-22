@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { actionOf, builtin } from "#cli/commands/index.ts";
-import { parse } from "#cli/options.ts";
+import { parse, takeGlobals } from "#cli/options.ts";
 import { isStepPolicy } from "#core/config/model.ts";
 import * as actions from "#core/console/actions.ts";
 
@@ -39,4 +39,31 @@ describe("console actions", () => {
     expect(command.display).toBe(`aireg ${command.argv.join(" ")}`);
     accepted(command.argv);
   });
+
+  // A committed lockfile or config chooses these names, so one spelled like an option
+  // must not widen the scope, skip a prompt or force anything.
+  it.each(["-g", "--force", "--yes", "--help", "--to=elsewhere"])(
+    "pass the name %j as a name, not an option",
+    (name) => {
+      for (const [built, words] of [
+        [actions.publish([name], undefined, "project"), [name]],
+        [actions.pullLatest(name, "project"), [name]],
+        [actions.runJob(name), ["start", name]],
+        [actions.setJobEnabled(name, false), ["disable", name]],
+        [actions.retryRun(name), ["retry", name]],
+      ] as const) {
+        const [command = "", ...rest] = built.argv;
+        const globals = takeGlobals(rest, builtin(command));
+        expect(globals.values, built.display).toEqual({});
+        const { positionals, common, own } = parse<Record<string, unknown>>(
+          globals.argv,
+          builtin(command),
+        );
+        expect(positionals, built.display).toEqual(words);
+        expect(common.scope, built.display).toBeUndefined();
+        expect(common.force, built.display).toBe(false);
+        expect(own.to, built.display).toBeUndefined();
+      }
+    },
+  );
 });

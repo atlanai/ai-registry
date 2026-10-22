@@ -50,8 +50,8 @@ describe("opening a link", () => {
 describe("the command a console action shows", () => {
   it("quotes an argument a shell would split or expand, so it can be pasted as shown", () => {
     expect(actions.publish(["pr-review"], "acme/engineering", "user").display).toBe(
-      "aireg publish -g pr-review --to acme/engineering --yes",
+      "aireg publish -g --to acme/engineering --yes -- pr-review",
     );
-    expect(actions.runJob("it's $HOME").display).toBe("aireg job start 'it'\\''s $HOME'");
+    expect(actions.runJob("it's $HOME").display).toBe("aireg job start -- 'it'\\''s $HOME'");
   });
 });

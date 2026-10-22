@@ -29,9 +29,17 @@ function scoped(scope: Scope): string[] {
   return scope === "user" ? ["-g"] : [];
 }
 
+/**
+ * Names read from a lockfile or a config, after `--` and every option: a name
+ * such as `-g` or `--yes` then stays a name and cannot change what the child does.
+ */
+function data(values: readonly string[]): string[] {
+  return values.length === 0 ? [] : ["--", ...values];
+}
+
 export function pullLatest(alias: string | undefined, scope: Scope): Command {
   const argv = [
-    ...(alias === undefined ? ["sync"] : ["sync", alias]),
+    "sync",
     ...scoped(scope),
     "--pull",
     "on",
@@ -41,30 +49,31 @@ export function pullLatest(alias: string | undefined, scope: Scope): Command {
     "--delete",
     "off",
     "--yes",
+    ...data(alias === undefined ? [] : [alias]),
   ];
   return shown(argv);
 }
 
 /** Installed work goes back where it came from; only authored work needs a `<alias>/<namespace>`. */
 export function publish(names: readonly string[], to: string | undefined, scope: Scope): Command {
-  const argv = ["publish", ...scoped(scope), ...names];
+  const argv = ["publish", ...scoped(scope)];
   if (to !== undefined) argv.push("--to", to);
-  argv.push("--yes");
+  argv.push("--yes", ...data(names));
   return shown(argv);
 }
 
 export function runJob(id: string): Command {
-  const argv = ["job", "start", id];
+  const argv = ["job", "start", ...data([id])];
   return shown(argv);
 }
 
 export function setJobEnabled(id: string, enabled: boolean): Command {
-  const argv = ["job", enabled ? "enable" : "disable", id];
+  const argv = ["job", enabled ? "enable" : "disable", ...data([id])];
   return shown(argv);
 }
 
 export function retryRun(id: string): Command {
-  const argv = ["job", "retry", id];
+  const argv = ["job", "retry", ...data([id])];
   return shown(argv);
 }
 
