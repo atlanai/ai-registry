@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { compileArgs } from "./compile.ts";
-import { findTarget, TARGETS, type Target } from "./targets.ts";
+import { compile, compileArgs } from "./compile.ts";
+import { findTarget, hostTarget, TARGETS, type Target } from "./targets.ts";
 
 function need(os: string, arch: string): Target {
   const found = findTarget(os, arch);
@@ -22,6 +22,31 @@ function args(overrides: Partial<Parameters<typeof compileArgs>[0]> = {}): strin
 }
 
 describe("compileArgs", () => {
+  it("embeds the verified executable instead of downloading a target runtime", () => {
+    const options = {
+      target: TARGET,
+      version: "1.2.3",
+      origin: "",
+      keyring: "",
+      outFile: "/out/aireg",
+    };
+    expect(compileArgs(options, "/verified/bun")).toContain(
+      "--compile-executable-path=/verified/bun",
+    );
+  });
+
+  it("refuses a release target that differs from its native runner", () => {
+    const target = TARGETS.find((item) => item.platform !== hostTarget()?.platform);
+    expect(target).toBeDefined();
+    expect(() =>
+      compile(
+        { target: target as Target, version: "1.2.3", origin: "", keyring: "", outFile: "/out" },
+        "/unused",
+        "/unused/bun",
+      ),
+    ).toThrow(/native runner/);
+  });
+
   it("compiles the entrypoint for the requested Bun target", () => {
     expect(args()).toEqual([
       "build",

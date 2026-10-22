@@ -1,0 +1,12 @@
+{
+  "packageVersion": "1.4.3-canary.20261021.1",
+  "commit": "963452075e9d7e2a47a482f297143af5ed4f76c0",
+  "integrity": {
+    "darwin-arm64": "sha512-cS8VZ7sNuBnQqQ43e7EHd7WhEhz8u7MLsatSiDW1T0wP/1ezDvCrPUWcHNVZC0JQULAkXSowIP2DYxlfXQ/Irg==",
+    "darwin-amd64": "sha512-BfzWfYZ6hsuLrkxB4iJ6B7mOME+wteQ3z4MI/x89mFOQJydgfOZaWmDAJ9iwidSEseqIuJ0oKM3W6nSogkn4gQ==",
+    "linux-arm64": "sha512-StNo8md2B7IpL6xsKULeh+eg5MO6irkdm3FW1uYw5NSYDt7nFYV2tT2IJThD22wjaoW0HX4g5GYU7p7HA1GZsg==",
+    "linux-amd64": "sha512-uyfI/qBJqtxxUcw0gOJoHXbQdoQrB1AQ6v6njYj1YdCb9yqG0Yje/EewAthifZbmTanP15HGJzfDRyVqshaTTA==",
+    "windows-arm64": "sha512-c3hjPU/YGrv7l1c4LklryUiWEg9piLEPqYHARaBPal2YkxQuP1SvHf/lclUxr3CEslGpyBL9ysbBWowApptjew==",
+    "windows-amd64": "sha512-99UxNqk0vaxVUtkoS5+kojgfbwRvjz4BFqmKiEEJjqrZUv3VUw+fqVtAf+FA/z7xprxw/eZqywTJ+3xmBsKPSg=="
+  }
+}

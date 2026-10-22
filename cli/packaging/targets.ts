@@ -7,6 +7,11 @@ import { RELEASE_PLATFORMS, type ReleasePlatform, releasePlatform } from "#core/
  * release a different, untested runtime. `.bun-version` is also what CI installs.
  */
 export const BUN_VERSION = readFileSync(new URL("../.bun-version", import.meta.url), "utf8").trim();
+export const BUN_COMMIT = (
+  JSON.parse(readFileSync(new URL("./bun-runtime.json", import.meta.url), "utf8")) as {
+    commit: string;
+  }
+).commit;
 
 export interface Target {
   readonly platform: ReleasePlatform;
