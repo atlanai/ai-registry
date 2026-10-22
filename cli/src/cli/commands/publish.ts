@@ -233,6 +233,8 @@ function report(
       namespace: item.namespace,
       from: item.from ?? null,
       version: item.version,
+      // Leaves out the version, so two dry runs agree exactly when the content does.
+      digest: item.input.contentId,
       belowLatest: item.belowLatest,
       published: !item.same && results.has(alias) && result?.unchanged !== true,
       dependsOn: (item.input.relationships ?? []).map(({ to }) => ({ to })),

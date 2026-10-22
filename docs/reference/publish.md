@@ -82,10 +82,10 @@ Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own fil
 With `--json`, `publish` asks no questions and prints each artifact with its old and new version, and where it went:
 
 ```json
-{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "published": true}]}}
+{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "digest": "sha256:9f2c...", "published": true}]}}
 ```
 
-`registry` is the registry's name, or for `--to <folder>`, the registry folder as `--to` gave it. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`.
+`registry` is the registry's name, or for `--to <folder>`, the registry folder as `--to` gave it. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`. `digest` is the artifact's content identity: its files and dependencies, but not its version. Two runs give the same digest exactly when they would publish the same content.
 
 ## Exit status
 

@@ -270,6 +270,7 @@ describe("creating a registry and publishing into it", () => {
           namespace: "data",
           from: null,
           version: "0.1.0",
+          digest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
           belowLatest: false,
           published: true,
           dependsOn: [],

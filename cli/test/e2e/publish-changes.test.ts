@@ -8,6 +8,8 @@ import { skillBody } from "#test/kit/spec-root.ts";
 let aireg: Aireg;
 /** The repository that makes the agent, with its registry folder inside it. */
 let maker: string;
+/** Each artifact's digest as first published. */
+let published: Map<string, string>;
 
 const MANIFEST = `exports:
   - skills
@@ -19,6 +21,11 @@ publish:
 
 const agent = (...parts: string[]) => join(maker, "agents", "websiteclaw", ...parts);
 const publish = (...args: string[]) => aireg(["publish", ...args], { cwd: maker });
+
+const digestsOf = (stdout: string) =>
+  (JSON.parse(stdout).data.artifacts as { name: string; digest: string }[]).map(
+    ({ name, digest }) => [name, digest] as const,
+  );
 
 async function write(path: string, body: string): Promise<void> {
   await mkdir(join(path, ".."), { recursive: true });
@@ -42,8 +49,9 @@ test.beforeAll(async ({ aireg: run, tmp, git }) => {
     cwd: maker,
   });
   expect(made.code, made.stderr).toBe(0);
-  const first = await publish("-y");
+  const first = await publish("-y", "--json");
   expect(first.code, first.stderr).toBe(0);
+  published = new Map(digestsOf(first.stdout));
 
   await write(agent("identity", "SOUL.md"), "Who it is now.\n");
   await write(agent("workspace", "NEW.md"), "A new file.\n");
@@ -103,5 +111,16 @@ describe("a dry run of an update", () => {
         },
       },
     ]);
+  });
+
+  test("gives each artifact a digest of its content, which an edit moves", async () => {
+    const shown = await publish("--dry-run", "--json");
+    expect(shown.code, shown.stderr).toBe(0);
+    const digests = digestsOf(shown.stdout);
+    expect(digests.map(([, digest]) => digest)).toEqual([
+      expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+      expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+    ]);
+    for (const [name, digest] of digests) expect(digest).not.toBe(published.get(name));
   });
 });
