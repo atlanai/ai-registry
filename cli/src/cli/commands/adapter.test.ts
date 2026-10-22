@@ -1,8 +1,8 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeAll, describe, expect } from "vitest";
 import { registerBuiltinAdapters } from "#adapters/index.ts";
-import { AiregError } from "#core/errors.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
 import { Printer } from "#core/output.ts";
 import { PACKAGE } from "#core/product.ts";
 import { homeTest as test } from "#test/kit/fixtures.ts";
@@ -123,5 +123,68 @@ describe("adapter command", () => {
 
   test("refuses to scaffold a built-in adapter", async () => {
     await expect(run(context(["init", "git"]))).rejects.toThrow(/built into aireg/);
+  });
+});
+
+// The folder may be one a cloned repository ships, so a link in it must not carry the package out.
+describe("adapter init writes only inside its folder", () => {
+  /** An empty folder outside the one being scaffolded, and where the package goes. */
+  async function folders(tmp: string): Promise<{ dir: string; outside: string }> {
+    const outside = join(tmp, "outside");
+    await mkdir(outside);
+    return { dir: join(tmp, "acme"), outside };
+  }
+
+  test("refuses a folder that is a symlink, even an empty one", async ({ tmp }) => {
+    const { dir, outside } = await folders(tmp);
+    await symlink(outside, dir);
+    await expect(runJson(["init", "acme", "--dir", dir], tmp)).rejects.toMatchObject({
+      code: ErrorCode.Invalid,
+    });
+    expect(await readdir(outside)).toEqual([]);
+  });
+
+  test("refuses with --force a file that is a symlink, and leaves its target", async ({ tmp }) => {
+    const { dir, outside } = await folders(tmp);
+    await mkdir(dir);
+    await writeFile(join(outside, "keep.json"), "keep");
+    await symlink(join(outside, "keep.json"), join(dir, "package.json"));
+    await expect(runJson(["init", "acme", "--dir", dir, "--force"], tmp)).rejects.toMatchObject({
+      code: ErrorCode.Invalid,
+    });
+    expect(await readFile(join(outside, "keep.json"), "utf8")).toBe("keep");
+    expect(await readdir(dir)).toEqual(["package.json"]);
+  });
+
+  test("refuses with --force a subfolder that is a symlink", async ({ tmp }) => {
+    const { dir, outside } = await folders(tmp);
+    await mkdir(dir);
+    await symlink(outside, join(dir, "src"));
+    await expect(runJson(["init", "acme", "--dir", dir, "--force"], tmp)).rejects.toMatchObject({
+      code: ErrorCode.Invalid,
+    });
+    expect(await readdir(outside)).toEqual([]);
+    expect(await readdir(dir)).toEqual(["src"]);
+  });
+
+  test("refuses a folder that holds files without --force, and keeps them", async ({ tmp }) => {
+    const { dir } = await folders(tmp);
+    await mkdir(dir);
+    await writeFile(join(dir, "package.json"), "keep");
+    await expect(runJson(["init", "acme", "--dir", dir], tmp)).rejects.toMatchObject({
+      code: ErrorCode.Conflict,
+    });
+    expect(await readFile(join(dir, "package.json"), "utf8")).toBe("keep");
+  });
+
+  test("replaces its own files with --force", async ({ tmp }) => {
+    const { dir } = await folders(tmp);
+    await mkdir(dir);
+    await writeFile(join(dir, "package.json"), "old");
+    await runJson(["init", "acme", "--dir", dir, "--force"], tmp);
+    expect(JSON.parse(await readFile(join(dir, "package.json"), "utf8"))).toMatchObject({
+      name: expect.stringContaining("acme"),
+    });
+    expect(await readdir(join(dir, "src"))).toContain("index.ts");
   });
 });
