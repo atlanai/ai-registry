@@ -358,6 +358,40 @@ test("narrows a run by the address grammar, not only by the catalog name", async
   expect(namesPassedToApply()).toEqual(["sales/alpha"]);
 });
 
+test("a run narrowed to one kind publishes nothing of another kind with the same name", async () => {
+  scan.mockResolvedValue({
+    ...scanOf([]),
+    local: [
+      { name: "lint", kind: "agent", from: "/tmp/agents/lint.md" },
+      { name: "lint", kind: "skill", from: "/tmp/skills/lint" },
+    ],
+  });
+  mutateRemote.mockResolvedValue({
+    published: new Set<string>(),
+    archived: new Set<string>(),
+  });
+  const reported: Array<{ artifact: string; kind: unknown }> = [];
+  const capturing = {
+    ...hooks,
+    item: (artifact: string, _phase: string, settled: { kind?: unknown }) => {
+      reported.push({ artifact, kind: settled.kind });
+    },
+  };
+
+  await executeSync(
+    job,
+    account,
+    "sync",
+    [`${REGISTRY}/engineering/skill/lint`],
+    new AbortController().signal,
+    capturing,
+  );
+
+  const operations = mutateRemote.mock.calls.at(-1)?.[4] as ReadonlyMap<string, string>;
+  expect([...operations]).toEqual([["skill:lint", "publish"]]);
+  expect(reported).toEqual([{ artifact: "lint", kind: "skill" }]);
+});
+
 describe("a folder the registry already publishes", () => {
   let root: string;
   const { artifacts, cwd } = loaded.roots;

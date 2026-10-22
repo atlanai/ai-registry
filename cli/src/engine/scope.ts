@@ -4,6 +4,7 @@ import type { Ref } from "#core/ref.ts";
 import { isWholeNamespace, isWholeRegistry, parseRef } from "#core/ref.ts";
 import type { Candidate } from "#core/sync/adopt.ts";
 import type { SyncItem } from "#core/sync/model.ts";
+import { artifactKey } from "./decide.ts";
 import type { RunScope } from "./inspect.ts";
 import type { Scan } from "./scan.ts";
 
@@ -52,15 +53,18 @@ function matchesCandidate(ref: Ref, registry: string, candidate: Candidate): boo
   return ref.kind === undefined || ref.kind === candidate.kind;
 }
 
-/** Names this one ref reaches, in the vocabulary `classify` keys outcomes by. */
+/**
+ * Artifacts this one ref reaches, in the keys `classify` keys outcomes by: a ref
+ * that names a kind reaches only that kind, and one that names none, every kind.
+ */
 function reached(raw: string, registry: string, scan: Scan): Set<string> {
-  const names = new Set<string>();
+  const keys = new Set<string>();
   // The catalog name is what a run's events name, so it is accepted alongside the address grammar.
   for (const item of scan.items) {
-    if (item.source === registry && item.name === raw) names.add(item.name);
+    if (item.source === registry && item.name === raw) keys.add(artifactKey(item.kind, item.name));
   }
   for (const candidate of scan.local) {
-    if (candidate.name === raw) names.add(candidate.name);
+    if (candidate.name === raw) keys.add(artifactKey(candidate.kind, candidate.name));
   }
 
   let ref: Ref;
@@ -68,28 +72,30 @@ function reached(raw: string, registry: string, scan: Scan): Set<string> {
     ref = parseRef(raw);
   } catch {
     // Not an address; the exact-name pass above was its only reading.
-    return names;
+    return keys;
   }
   for (const item of scan.items) {
-    if (matchesItem(ref, registry, item)) names.add(item.name);
+    if (matchesItem(ref, registry, item)) keys.add(artifactKey(item.kind, item.name));
   }
   for (const candidate of scan.local) {
-    if (matchesCandidate(ref, registry, candidate)) names.add(candidate.name);
+    if (matchesCandidate(ref, registry, candidate)) {
+      keys.add(artifactKey(candidate.kind, candidate.name));
+    }
   }
-  return names;
+  return keys;
 }
 
 /**
  * `undefined` covers everything the job does. Throws when any ref reached
  * nothing, so a run cannot report success for work it never looked at.
  */
-export function scopedNames(
+export function scopedKeys(
   refs: RunScope,
   scan: Scan,
   registry: string,
 ): ReadonlySet<string> | undefined {
   if (refs === undefined) return undefined;
-  const names = new Set<string>();
+  const keys = new Set<string>();
   const missed: string[] = [];
   for (const raw of refs) {
     const found = reached(raw, registry, scan);
@@ -97,8 +103,8 @@ export function scopedNames(
       missed.push(raw);
       continue;
     }
-    for (const name of found) names.add(name);
+    for (const key of found) keys.add(key);
   }
   if (missed.length > 0) throw new RunScopeError(missed);
-  return names;
+  return keys;
 }
