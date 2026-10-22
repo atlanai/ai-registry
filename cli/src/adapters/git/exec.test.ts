@@ -109,4 +109,36 @@ unix("git", () => {
       await expect(access(join(tmp, `${tool}.ran`)), tool).rejects.toThrow();
     }
   });
+
+  // An empty PATH, all that is left of one with no absolute folder, searches the working folder.
+  test("refuses to run git or gh when no folder on PATH is absolute", async ({ tmp }) => {
+    for (const tool of ["git", "gh"]) {
+      // A redirect, which needs nothing on PATH, so the marker shows any run.
+      await writeFile(join(tmp, tool), `#!/bin/sh\n: > "${join(tmp, `${tool}.ran`)}"\n`);
+      await chmod(join(tmp, tool), 0o755);
+    }
+    vi.stubEnv("PATH", ["", ".", "bin"].join(delimiter));
+    const refusal = {
+      failure: "invalid",
+      message: "No folder on PATH is absolute, so aireg runs no program from it.",
+    };
+    try {
+      await expect(git(["--version"], { cwd: tmp, timeoutMs: 60_000 })).rejects.toMatchObject({
+        ...refusal,
+        hint: "Set PATH to the absolute folders that hold git, then run the command again.",
+      });
+      await expect(gitTry(["--version"], { cwd: tmp, timeoutMs: 60_000 })).rejects.toMatchObject(
+        refusal,
+      );
+      await expect(gh(["--version"], { cwd: tmp, timeoutMs: 60_000 })).rejects.toMatchObject({
+        ...refusal,
+        hint: "Set PATH to the absolute folders that hold gh, then run the command again.",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    for (const tool of ["git", "gh"]) {
+      await expect(access(join(tmp, `${tool}.ran`)), tool).rejects.toThrow();
+    }
+  });
 });
