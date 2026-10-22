@@ -113,9 +113,9 @@ publish:
   to: acme/engineering
 ```
 
-`depends_on` names another exported path or a declared installed artifact. Remote pins belong in `artifacts:`; publish records the exact installed release label and refuses a stale pin until `aireg install` updates it. Dependencies must belong to the publishing registry. An unpinned parent gets a new version when its exact dependency changes; bump a fixed parent version explicitly.
+`depends_on` names an artifact in the project, as `./<path>`, or a declared installed artifact. A path no entry reaches is exported with it, at its next version; one an entry keeps with `publish: false` or leaves out with `exclude` is refused. Remote pins belong in `artifacts:`; publish records the exact installed release label and refuses a stale pin until `aireg install` updates it. Dependencies must belong to the publishing registry. An unpinned parent gets a new version when its exact dependency changes; bump a fixed parent version explicitly.
 
-An agent folder contains `AGENT.md` and its companion files. Exports may set `version`, `include` (with optional `as`), and `publish: false`. The preview shows added, modified and removed files; publishing looks up each exported artifact by name instead of resolving the entire registry.
+An agent folder contains `AGENT.md` and its companion files. Exports may set `version`, `include` (with optional `as`), and `publish: false`. `include` lists the only files an artifact publishes besides its `AGENT.md` or `SKILL.md`, so a folder agent with `include` leaves out every companion file it doesn't list. The preview shows added, modified and removed files; publishing looks up each exported artifact by name instead of resolving the entire registry.
 
 ## Examples
 
