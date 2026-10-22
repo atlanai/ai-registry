@@ -410,6 +410,7 @@ export async function run(context: CommandContext): Promise<void> {
     const read = await readPublished(
       alias,
       known[alias] as RegistrySource,
+      Object.keys(known),
       context.cwd,
       intoClone(works, alias, to, context.cwd),
     );

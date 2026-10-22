@@ -81,11 +81,9 @@ async function executeScanned(
 
   const publishable = await publishableTo(account, source);
 
-  const credentials = await credentialsForManifest(
-    { [account.registry]: source },
-    job.root,
-    signal,
-  );
+  const credentials = await credentialsForManifest(loaded.manifest.registries, job.root, signal, [
+    account.registry,
+  ]);
   hooks.event("run.phase", "listing");
   const downloaded = new Set<string>();
   const onDownload = (artifact: Artifact) => {

@@ -143,6 +143,8 @@ export interface Resolved {
   declared: boolean;
   /** The declared alias, whose account is the one to read with. */
   alias: string | undefined;
+  /** Every alias the same declarations hold, any of which may read the same token. */
+  aliases: readonly string[];
 }
 
 /**
@@ -159,7 +161,15 @@ export function throughManifest(
   const alias = (input.split("@")[0] ?? input).split("/")[0] ?? input;
   const source = registries[alias];
   if (source === undefined) {
-    return { input, flags, name: undefined, version: undefined, declared: false, alias: undefined };
+    return {
+      input,
+      flags,
+      name: undefined,
+      version: undefined,
+      declared: false,
+      alias: undefined,
+      aliases: Object.keys(registries),
+    };
   }
 
   let ref: Ref;
@@ -177,6 +187,7 @@ export function throughManifest(
       version: undefined,
       declared: true,
       alias,
+      aliases: Object.keys(registries),
     };
   }
   return {
@@ -187,6 +198,7 @@ export function throughManifest(
     version: ref.version,
     declared: true,
     alias,
+    aliases: Object.keys(registries),
   };
 }
 
@@ -228,6 +240,7 @@ export function throughRegistry(
     version: ref.version,
     declared: false,
     alias: undefined,
+    aliases: Object.keys(registries),
   };
 }
 
@@ -287,7 +300,7 @@ export async function probeAddress(
   want: readonly Want[],
 ): Promise<Probed> {
   try {
-    return await probe(resolved.input, resolved.flags, cwd, want, resolved.alias);
+    return await probe(resolved.input, resolved.flags, cwd, want, resolved);
   } catch (error) {
     const { name, namespace, kind } = resolved;
     const versioned = want.some((item) => item.version !== undefined);
@@ -295,7 +308,7 @@ export async function probeAddress(
     const failure = adapterOf(error)?.failure;
     if (failure !== "invalid" && failure !== "not_found") throw error;
     // Read again only after such a failure, so a versioned address costs one read otherwise.
-    const bare = await probe(resolved.input, resolved.flags, cwd, [{ name }], resolved.alias).catch(
+    const bare = await probe(resolved.input, resolved.flags, cwd, [{ name }], resolved).catch(
       () => undefined,
     );
     if (bare === undefined) throw error;
@@ -423,8 +436,9 @@ export async function probe(
   /** What to ask for, at the version wanted. Empty asks for everything. */
   want: readonly Want[] = [],
   /** A declared registry reads with its own account; two aliases can share one address. */
-  declaredAlias?: string,
+  declared?: Pick<Resolved, "alias" | "aliases">,
 ): Promise<Probed> {
+  const declaredAlias = declared?.alias;
   // A pasted link names the repository, a ref and a folder; each is recorded where it belongs.
   const pasted = await settlePastedLink(
     pastedRepository(input.replace(/#.*$/, "")),
@@ -444,9 +458,9 @@ export async function probe(
   try {
     // An undeclared address has no alias yet, so its account is found by address.
     const credential =
-      declaredAlias === undefined
+      declared?.alias === undefined
         ? await credentialForLocation(location, alias, { adapter })
-        : await credentialFor(declaredAlias, { adapter, config }, location);
+        : await credentialFor(declared.alias, { adapter, config }, location, declared.aliases);
     open = await connectSource(
       { alias, location, adapter, config, layout },
       credential === undefined ? {} : { credential },

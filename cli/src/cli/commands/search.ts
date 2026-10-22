@@ -100,7 +100,7 @@ export async function run(context: CommandContext): Promise<void> {
 
 /** Read through the same listing `aireg registry show` prints. */
 async function matchesIn(target: Resolved, cwd: string): Promise<Match[]> {
-  const source = await probe(target.input, target.flags, cwd, [], target.alias);
+  const source = await probe(target.input, target.flags, cwd, [], target);
   try {
     const registry = target.alias ?? source.alias;
     const entries = source.catalog.entries;
