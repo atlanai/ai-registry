@@ -100,7 +100,8 @@ jobs:
           package-manager-cache: false
 
       # Verifies pnpm against the integrity hash in packageManager.
-      - run: corepack enable pnpm
+      # Hosted Windows runners preinstall Yarn shims; replace them with Corepack.
+      - run: npm install --global --force corepack@0.34.6 && corepack enable pnpm
 
       - id: store
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
@@ -169,7 +170,7 @@ jobs:
           node-version: ${{ env.CI_NODE_VERSION }}
           package-manager-cache: false
 
-      - run: corepack enable pnpm
+      - run: npm install --global --force corepack@0.34.6 && corepack enable pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
 
@@ -213,7 +214,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     env:
-      CI_NODE_VERSION: "24.22.1"
+      CI_NODE_VERSION: "26.12.1"
     steps: *compat-steps
 
   compat-windows:
@@ -233,10 +234,10 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "24.22.1"
+          node-version: "26.12.1"
           package-manager-cache: false
 
-      - run: corepack enable pnpm
+      - run: npm install --global --force corepack@0.34.6 && corepack enable pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
 

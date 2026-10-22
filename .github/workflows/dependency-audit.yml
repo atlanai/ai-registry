@@ -26,7 +26,7 @@ jobs:
         with:
           node-version-file: cli/.node-version
           package-manager-cache: false
-      - run: corepack enable pnpm
+      - run: npm install --global --force corepack@0.34.6 && corepack enable pnpm
       # Audit the committed lockfile without installing packages. Cooldown and
       # provenance checks remain enforced by the CLI validation installs.
       # Development tools parse repository input too, so audit all dependencies.

@@ -41,6 +41,7 @@ runs:
         TRUSTED_KEYS: ${{ inputs.trusted-keys }}
       run: |
         set -euo pipefail
+        npm install --global --force corepack@0.34.6
         corepack enable pnpm
         pnpm install --frozen-lockfile
         AIREG_RELEASE_KEYRING="$(printf '%s' "$TRUSTED_KEYS" | base64 | tr -d '\n')"
