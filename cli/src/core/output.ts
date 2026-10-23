@@ -56,6 +56,11 @@ export class Styler {
   cyan(text: string): string {
     return this.wrap("36", text);
   }
+
+  /** `text` with every escape removed but the styling this writes: data in it could carry any other. */
+  inert(text: string): string {
+    return this.on ? ownStyleOnly(text) : sanitizeBlock(text);
+  }
 }
 
 export interface PrinterOptions {
@@ -73,6 +78,12 @@ const DIGEST = /^(sha256:)?[0-9a-f]{32,}$/i;
 const ESC = "\u001B";
 /** Exactly what `Styler` writes, so any other escape in a line can be told apart and dropped. */
 const OWN_STYLE = new RegExp(`(${ESC}\\[(?:0|1|2|31|32|33|36)m)`);
+
+/** `text` less every escape but those `Styler` writes, for a line styled before it is written. */
+export function ownStyleOnly(text: string): string {
+  const parts = text.split(OWN_STYLE);
+  return parts.map((part, at) => (at % 2 === 1 ? part : sanitizeBlock(part))).join("");
+}
 
 /**
  * A revision is opaque: a commit, a snapshot id, an ordinal. Only something
@@ -133,8 +144,7 @@ export class Printer {
 
   /** Only the styling this printer added survives: a manifest or registry could write any other escape. */
   private print(line: string): void {
-    const parts = this.style.on ? line.split(OWN_STYLE) : [line];
-    this.out.write(parts.map((part, at) => (at % 2 === 1 ? part : sanitizeBlock(part))).join(""));
+    this.out.write(this.style.inert(line));
   }
 
   /** Primary output. Never suppressed. */

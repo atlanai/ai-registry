@@ -332,6 +332,9 @@ function stringList(raw: unknown, ref: string, key: string): string[] | undefine
   return names;
 }
 
+/** Controls and characters that hide or reorder text: a registry's name is shown everywhere. */
+const UNSHOWABLE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+
 function parseRegistries(root: Record<string, unknown>): Record<string, RegistrySource> {
   const registries = root.registries;
   if (registries === undefined || registries === null) return {};
@@ -340,7 +343,7 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
   }
   const out = dict<RegistrySource>();
   for (const [alias, raw] of Object.entries(registries as Record<string, unknown>)) {
-    if (RESERVED_KEYS.has(alias)) {
+    if (RESERVED_KEYS.has(alias) || UNSHOWABLE.test(alias)) {
       throw new ManifestError(`${quoted(alias)} cannot name a registry.`);
     }
     out[alias] = parseSource(alias, raw);

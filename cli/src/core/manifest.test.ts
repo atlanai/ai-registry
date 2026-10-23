@@ -591,6 +591,20 @@ describe("names that reach a prototype", () => {
   });
 });
 
+describe("names a terminal cannot show as they are", () => {
+  // YAML's double-quoted escapes put the raw characters in the key.
+  test.each([
+    ["an escape", '"kit\\e]8;;https://example.test/\\a"'],
+    ["a bidi override", '"kit\\u202Eevil"'],
+    ["a line break", '"kit\\nfake"'],
+    ["a zero-width space", '"k\\u200Bit"'],
+  ])("are refused as registry names: %s", (_label, key) => {
+    expect(() => parseManifest(`registries:\n  ${key}: /srv/kit\n`)).toThrow(
+      /cannot name a registry/,
+    );
+  });
+});
+
 describe("an address", () => {
   test("longer than any registry needs is refused before anything parses it", () => {
     const long = `https://example.com/${"a/".repeat(1100)}`;

@@ -1,5 +1,5 @@
 import { namesHost, registryNameFromLocation } from "#adapter/location.ts";
-import { list, stripTrailing, withoutCredentials } from "#adapter/text.ts";
+import { list, sanitizeText, stripTrailing, withoutCredentials } from "#adapter/text.ts";
 import { splitRepository } from "#adapters/git/api.ts";
 import { type Interaction, interactive } from "#cli/prompt/flow.ts";
 import { canceled, select } from "#cli/prompt/index.ts";
@@ -106,10 +106,11 @@ export async function chooseRegistry(
       message: ask.message,
       style: step.printer.errStyle,
       initial: aliases[0] as string,
+      // A cloned project's manifest chose these; only what is shown is cleaned, not the answer.
       options: aliases.map((alias) => ({
         value: alias,
-        label: alias,
-        hint: withoutCredentials(known[alias]?.location ?? ""),
+        label: sanitizeText(alias),
+        hint: sanitizeText(withoutCredentials(known[alias]?.location ?? "")),
       })),
     },
     step.io,
