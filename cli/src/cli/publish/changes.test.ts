@@ -24,6 +24,20 @@ describe("changesFrom", () => {
     });
   });
 
+  it("compares a sole entry by content when the registry names it AGENT.md", () => {
+    const held = { files: [file("AGENT.md", "sha256:same")] };
+    expect(changesFrom(held, { files: [file("reviewer.md", "sha256:same")] }).files).toEqual({
+      added: [],
+      changed: [],
+      removed: [],
+    });
+    expect(changesFrom(held, { files: [file("reviewer.md", "sha256:new")] }).files).toEqual({
+      added: [],
+      changed: ["reviewer.md"],
+      removed: [],
+    });
+  });
+
   it("adds everything when no version is held, and counts only depends_on edges", () => {
     const sent = {
       files: [file("SKILL.md"), file("a.md")],

@@ -31,7 +31,15 @@ function dependsOn(side: Side | undefined): Set<string> {
 
 /** What `sent` changes against `held`; with no version held, everything it sends is added. */
 export function changesFrom(held: Side | undefined, sent: Side): Changes {
-  const before = new Map((held?.files ?? []).map((file) => [file.path, file.digest]));
+  const heldFiles = held?.files ?? [];
+  const [entry] = heldFiles;
+  const [sole] = sent.files;
+  // A sole file on each side is the entry, which a harness may name <name>.md and a registry AGENT.md.
+  const compared =
+    heldFiles.length === 1 && sent.files.length === 1 && entry && sole
+      ? [{ path: sole.path, digest: entry.digest }]
+      : heldFiles;
+  const before = new Map(compared.map((file) => [file.path, file.digest]));
   const after = new Map(sent.files.map((file) => [file.path, file.digest]));
   const was = dependsOn(held);
   const now = dependsOn(sent);
