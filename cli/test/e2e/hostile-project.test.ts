@@ -99,3 +99,33 @@ test("lists a declared address without its userinfo", async ({ aireg, project })
     expect(ran.stdout + ran.stderr, argv.join(" ")).not.toContain("synthetic-pass");
   }
 });
+
+// Copies live in .registry/artifacts/<alias as a folder>, and `Team` and `team` are one folder:
+// new work there would be read as the other registry's, and sync could send it there.
+test("refuses a cloned manifest whose registries would share one storage folder", async ({
+  aireg,
+  tmp,
+}) => {
+  const root = await realpath(tmp);
+  const ours = join(root, "ours");
+  const theirs = join(root, "theirs");
+  await registry(ours, { name: "ours", slug: "ours" }).skill("eng/lint@1.0.0").write();
+  await registry(theirs, { name: "theirs", slug: "theirs" }).skill("eng/secret@1.0.0").write();
+  const project = join(root, "project");
+  await writeManifestIn(
+    project,
+    `registries:\n  team: ${ours}\n  Team: ${theirs}\nartifacts:\n  - team/eng/skill/lint\n  - Team/eng/skill/secret\n`,
+  );
+
+  for (const argv of [["install"], ["status"], ["sync", "--dry-run"], ["publish", "--dry-run"]]) {
+    const ran = await aireg([...argv, "--json"], { cwd: project });
+    expect(ran.code, argv.join(" ")).not.toBe(0);
+    expect(JSON.parse(ran.stdout).error, argv.join(" ")).toMatchObject({
+      code: "invalid",
+      message: expect.stringContaining(
+        'Registries "team" and "Team" would share the folder .registry/artifacts/team.',
+      ),
+    });
+  }
+  expect(await readdir(join(project, ".registry"))).toEqual(["manifest.yml"]);
+});

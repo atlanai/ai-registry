@@ -598,3 +598,36 @@ describe("an address", () => {
     expect(() => parseManifest(`registries:\n  acme:\n    source: ${long}\n`)).toThrow(/too long/);
   });
 });
+
+// Each registry's installed copies live in .registry/artifacts/<folder>, so two aliases that
+// name one folder would each read the other's copies, and new work there, as their own.
+describe("registries sharing a storage folder", () => {
+  test("are told apart when their folders differ", () => {
+    const manifest = parseManifest("registries:\n  team: ../a\n  team-b: ../b\n");
+    expect(Object.keys(manifest.registries)).toEqual(["team", "team-b"]);
+  });
+
+  test.for([
+    ["case", "team", "Team", "team"],
+    ["punctuation", "team-a", "team_a", "team-a"],
+    ["nothing left", "'!!'", "'__'", "unnamed"],
+  ])("are refused when they differ only by %s", ([, first, second, folder]) => {
+    const text = `registries:\n  ${first}: ../a\n  ${second}: ../b\n`;
+    expect(() => parseManifest(text)).toThrow(
+      `would share the folder .registry/artifacts/${folder}.`,
+    );
+  });
+
+  test("are never written, so the manifest stays readable", async ({ tmp }) => {
+    const project = roots("project", tmp);
+    await writeManifest(project, parseManifest("registries:\n  Team: ../b\n"));
+    const before = await readFile(project.manifest, "utf8");
+    const manifest = await readManifest(project.manifest);
+    manifest.registries.team = { location: "../a", adapter: undefined, config: {} };
+
+    await expect(writeManifest(project, manifest)).rejects.toThrow(
+      'Registries "Team" and "team" would share the folder .registry/artifacts/team.',
+    );
+    expect(await readFile(project.manifest, "utf8")).toBe(before);
+  });
+});
