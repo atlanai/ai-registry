@@ -1,12 +1,15 @@
 import { rm } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { redirection } from "#adapter/files.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { rewriteAtomic } from "#core/fs/atomic.ts";
+import { canonical } from "#core/fs/canonical.ts";
 import { inspect } from "#core/fs/link.ts";
 import { isStrictlyWithin, readTextIfPresent } from "#core/fs/path.ts";
 import { pruneEmptyParent } from "#core/fs/tree.ts";
 import type { ConfigValue, Harnesses, KindMapping, RegisterEntry } from "#core/harness/contract.ts";
+import { targetRoot } from "#core/harness/index.ts";
 import {
   expand,
   expandValue,
@@ -17,18 +20,30 @@ import {
   placementTemplate,
   type Vars,
 } from "#core/harness/template.ts";
+import type { Scope } from "#core/store/paths.ts";
 import { type ConfigDocument, jsonDocument, tomlDocument, yamlDocument } from "./document.ts";
 
 /** A path an apply linked or unlinked. A link names its harness; a removal does not know it. */
 export interface Touched {
   path: string;
   harness: string | undefined;
+  /** For a removal, the harness the lockfile recorded the link for, when it recorded one. */
+  recorded?: string | undefined;
 }
 
 /** A config entry left as a person set it, rather than overwritten. */
 export interface Kept {
   name: string;
   path: string;
+  /** Why it was not edited, when not because a person set it. */
+  reason?: string;
+}
+
+/** The run registrations are for: its scope, and the folder a project's harness roots are in. */
+export interface Where {
+  scope: Scope;
+  cwd: string;
+  env?: NodeJS.ProcessEnv | undefined;
 }
 
 interface OpenFile {
@@ -218,7 +233,8 @@ function touchedByRoot(
 ): Map<string, Map<string, Vars>> {
   const byRoot = new Map<string, Map<string, Vars>>();
   for (const touch of touched) {
-    if (touch.harness !== undefined && touch.harness !== harness) continue;
+    const owner = touch.harness ?? touch.recorded;
+    if (owner !== undefined && owner !== harness) continue;
     const found = pattern.match(touch.path);
     if (found === undefined) continue;
     const paths = byRoot.get(found.root) ?? new Map<string, Vars>();
@@ -239,6 +255,7 @@ async function reconcile(
   members: ReadonlyMap<string, Vars>,
   files: Files,
   stop: string,
+  anchor: string,
 ): Promise<Kept[]> {
   const kept: Kept[] = [];
   const blocked = new Set<string>();
@@ -247,6 +264,12 @@ async function reconcile(
       if ([...group.present.keys()].some((path) => blocked.has(path))) continue;
       const vars = first(group);
       const file = join(root, expand(entry.file, vars));
+      const reason = outside(file, root, anchor);
+      if (reason !== undefined) {
+        kept.push({ name: expand(entry.at.at(-1) ?? entry.file, vars), path: file, reason });
+        for (const path of group.present.keys()) blocked.add(path);
+        continue;
+      }
       const doc = await files.get(file, entry, vars, stop);
       if (!edit(entry, doc, group)) continue;
       kept.push({ name: expand(entry.at.at(-1) ?? entry.file, vars), path: file });
@@ -256,12 +279,32 @@ async function reconcile(
   return kept;
 }
 
+/**
+ * Why a config file is not edited, if it is not: it must sit inside the harness's root, reached
+ * through real folders from `anchor`. The file itself may be a link, as a person's dotfiles are.
+ */
+function outside(file: string, root: string, anchor: string): string | undefined {
+  if (!isWithin(root, file)) return `it is not inside ${root}`;
+  const real = canonical(anchor);
+  const found = redirection(real, join(real, relative(anchor, file)), false);
+  if (found === undefined) return undefined;
+  return found.problem === "symlink"
+    ? `${found.at} is a symlink, so it may lead outside ${root}`
+    : `${found.at} is not a directory`;
+}
+
+/** The touched root, however it is spelled, is the harness's own for this run. */
+function isRoot(found: string, root: string): boolean {
+  return resolve(found) === resolve(root) || canonical(found) === canonical(root);
+}
+
 async function registerMapping(
   harness: string,
   mapping: KindMapping,
   touched: readonly Touched[],
   owned: { scopeDir: string; copies: ReadonlySet<string> },
   files: Files,
+  at: { root: string; anchor: string },
 ): Promise<Kept[]> {
   const template = placementTemplate(mapping);
   const entries = mapping.register ?? [];
@@ -269,6 +312,9 @@ async function registerMapping(
   const pattern = placementPattern(template);
   const kept: Kept[] = [];
   for (const [root, paths] of touchedByRoot(touched, harness, pattern)) {
+    // Only the harness's own root for this scope: a path elsewhere that merely ends the
+    // way a placement does names no config of this harness's.
+    if (!isRoot(root, at.root)) continue;
     // Only a kind placed as copies by design: a `--copy` install is not registered.
     const copies = mapping.place === "copy" ? owned.copies : new Set<string>();
     const members = await ours(await pattern.scan(root), owned.scopeDir, copies);
@@ -279,7 +325,7 @@ async function registerMapping(
     if (paths.size === 0) continue;
     // Folders below the kind's fixed prefix are ours to tidy; the harness's own are not.
     const stop = join(root, ...fixedPrefix(template));
-    kept.push(...(await reconcile(entries, root, paths, members, files, stop)));
+    kept.push(...(await reconcile(entries, root, paths, members, files, stop, at.anchor)));
   }
   return kept;
 }
@@ -292,6 +338,7 @@ async function registerMapping(
 export async function applyRegister(
   touched: readonly Touched[],
   harnesses: Harnesses,
+  where: Where,
   scopeDir: string,
   copies: ReadonlySet<string> = new Set(),
 ): Promise<Kept[]> {
@@ -299,9 +346,16 @@ export async function applyRegister(
   const kept: Kept[] = [];
   const owned = { scopeDir, copies };
   for (const target of Object.values(harnesses)) {
+    const root = targetRoot(target, where.scope, where.cwd, where.env);
+    // A project's own folders hold its harness roots, and a link among them may lead out of
+    // it; a person's harness root is theirs to keep wherever they like, dotfiles included.
+    const anchor = where.scope === "project" ? where.cwd : root;
     for (const mapping of Object.values(target.kinds)) {
       if (mapping === undefined) continue;
-      kept.push(...(await registerMapping(target.name, mapping, touched, owned, files)));
+      // A kind loaded from another scope's installation is that scope's to register.
+      if (mapping.scope !== undefined && mapping.scope !== where.scope) continue;
+      const at = { root, anchor };
+      kept.push(...(await registerMapping(target.name, mapping, touched, owned, files, at)));
     }
   }
   await files.flush();
