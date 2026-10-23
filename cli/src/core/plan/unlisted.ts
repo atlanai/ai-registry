@@ -21,9 +21,17 @@ function listed(row: LockArtifact, source: Acquired): boolean {
   return entryFor(entries, row.namespace, row.kind, row.name) !== undefined;
 }
 
+// An empty listing is still taken for a broken read, whatever the adapter says of it.
+function deletedFrom(source: Acquired): boolean {
+  return (
+    source.whole === true && source.catalog.complete === true && source.catalog.entries.length > 0
+  );
+}
+
 /**
  * Rows a registry read this run stopped listing, though the manifest still reaches them. A short
- * listing is not a removal: only `aireg remove` takes an installed artifact out.
+ * listing is not a removal: only `aireg remove` takes an installed artifact out, unless the
+ * adapter read the whole listing to its end and no entry names the row.
  */
 export function unlistedRows(
   manifest: Manifest,
@@ -32,6 +40,9 @@ export function unlistedRows(
 ): Unlisted[] {
   const view = lockView(lock);
   const reached = new Set(manifest.artifacts.flatMap((ref) => view.reached(ref)));
+  const named = new Set(
+    manifest.artifacts.filter((ref) => ref.name !== undefined).flatMap((ref) => view.reached(ref)),
+  );
   const found: Unlisted[] = [];
   for (const source of acquired) {
     for (const [name, row] of view.rows(source.alias)) {
@@ -39,6 +50,7 @@ export function unlistedRows(
       if (row.origin !== undefined || !reached.has(name) || listed(row, source)) continue;
       const at = { name: row.name, group: row.namespace, kind: row.kind };
       if (withheldAt(source.catalog.withheld, at) !== undefined) continue;
+      if (deletedFrom(source) && !named.has(name)) continue;
       const empty = source.whole === true && source.catalog.entries.length === 0;
       found.push({ name, registry: source.alias, empty });
     }

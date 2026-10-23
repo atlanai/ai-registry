@@ -274,6 +274,7 @@ export async function resolveArtifacts(
   merge(catalog, adapter.id, entries);
   const withheld = withheldFrom(resolution.withheld);
   if (withheld.length > 0) catalog.withheld = withheld;
+  if (resolution.complete === true) catalog.complete = true;
   const newest = newestFrom(resolution.newest);
   if (newest.length > 0) catalog.newest = newest;
   const said = Array.isArray(resolution.warnings) ? resolution.warnings : [];
