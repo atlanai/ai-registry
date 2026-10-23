@@ -6,10 +6,12 @@ import {
   isCI,
   isSet,
   registryToken,
+  removeTokens,
   SETTINGS,
   type Setting,
   setting,
   tokenVariable,
+  withoutTokens,
   withRegistryTokens,
 } from "./env.ts";
 
@@ -56,6 +58,27 @@ describe("gitTimeoutMs", () => {
         `AIREG_GIT_TIMEOUT_MS is ${JSON.stringify(value)}, not a whole number of milliseconds.`,
       );
     }
+  });
+});
+
+describe("withoutTokens", () => {
+  // Windows reads names in any case, so each of these reaches registryToken("acme") there.
+  const env = {
+    AIREG_TOKEN_ACME: "synthetic-token",
+    aireg_token_acme: "synthetic-token",
+    Aireg_Token_Acme: "synthetic-token",
+    AIREG_HOME: "/tmp/home",
+    PATH: "/bin",
+  };
+
+  it("drops every token variable whatever its case", () => {
+    expect(withoutTokens(env)).toEqual({ AIREG_HOME: "/tmp/home", PATH: "/bin" });
+  });
+
+  it("deletes them from the environment itself when asked to", () => {
+    const own = { ...env };
+    removeTokens(own);
+    expect(own).toEqual({ AIREG_HOME: "/tmp/home", PATH: "/bin" });
   });
 });
 
