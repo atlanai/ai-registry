@@ -33,6 +33,8 @@ export interface Catalog {
   warnings: string[];
   /** What the registry reached but would not serve by status, so a copy of it is kept. */
   withheld?: Withheld[];
+  /** The adapter read the listing to its end, so what it leaves out was deleted. */
+  complete?: boolean;
   /** Each artifact's newest version where the registry served another, so a publish goes past it. */
   newest?: Newest[];
 }
