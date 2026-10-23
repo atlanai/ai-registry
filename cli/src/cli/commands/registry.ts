@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { redirection } from "#adapter/files.ts";
 import { readRegistry } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import {
@@ -243,6 +244,7 @@ async function init(
   if (listed === undefined) return cancel(step);
   const namespaces = namespacesOf(listed);
 
+  refuseLinked(root, ["artifacts", ...namespaces.map((item) => `artifacts/${item}`)]);
   await mkdir(join(root, "artifacts"), { recursive: true });
   const written = await writeRoot(
     root,
@@ -289,6 +291,22 @@ function namespacesOf(listed: readonly string[]): string[] {
   return namespaces;
 }
 
+/**
+ * A folder may already hold links, such as an `artifacts` one a cloned repository ships: one
+ * anywhere from the root down to a folder `init` makes would put that folder somewhere else.
+ */
+function refuseLinked(root: string, folders: readonly string[]): void {
+  for (const folder of folders) {
+    const found = redirection(root, join(root, folder));
+    if (found === undefined) continue;
+    const what = found.problem === "symlink" ? "a symlink" : "not a folder";
+    throw new AiregError(`${found.at} is ${what}, so nothing was written through it.`, {
+      code: ErrorCode.Invalid,
+      hint: "Replace it with a real folder, then run it again.",
+    });
+  }
+}
+
 /** `init` in a registry adds only the namespaces it was given; the registry itself is left as it is. */
 async function extend(
   context: CommandContext,
@@ -297,6 +315,10 @@ async function extend(
   namespaces: readonly string[],
 ): Promise<void> {
   const added = namespaces.filter((item) => !existsSync(join(root, "artifacts", item)));
+  refuseLinked(
+    root,
+    added.map((item) => `artifacts/${item}`),
+  );
   for (const namespace of added) {
     await mkdir(join(root, "artifacts", namespace), { recursive: true });
   }
