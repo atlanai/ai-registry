@@ -134,7 +134,7 @@ describe("parseLock", () => {
       /artifact "lint" it cannot read/,
     );
   });
-  test("refuses a row whose names or paths would reach outside the scope", () => {
+  test("refuses a row whose names or paths would reach outside the scope or read as options", () => {
     const head = "version: 1\nregistries:\n  kit: {source: x, adapter: git, key: k}\n";
     const row = (key: string, fields: string) =>
       `${head}artifacts:\n  ${JSON.stringify(key)}:\n    registry: kit\n    kind: skill\n${fields}`;
@@ -147,6 +147,10 @@ describe("parseLock", () => {
       named("a\\b"),
       named(".."),
       row("..", "    name: lint\n"),
+      // The console passes these to `aireg publish`, which would read them as options.
+      row("-g", "    name: lint\n"),
+      row("eng/--force", "    name: lint\n"),
+      named("--yes"),
       at("    path: ../outside\n"),
       at("    path: /etc\n"),
       at("    links:\n      - {harness: claude, path: ../../.claude/skills/x, mode: symlink}\n"),
