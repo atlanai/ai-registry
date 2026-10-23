@@ -14,6 +14,7 @@ import type { RegistrySource } from "#core/manifest.ts";
 import { listedAt } from "#core/plan/model.ts";
 import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
+import { artifactKey } from "./decide.ts";
 import type { Scan } from "./scan.ts";
 
 async function publishInput(
@@ -111,6 +112,7 @@ interface StagedMutations {
 
 async function stageMutations(
   scan: Scan,
+  /** Keyed by `artifactKey`, so a choice for one kind never sends another of the same name. */
   operations: ReadonlyMap<string, SyncOperation>,
   hooks: RemoteMutationHooks,
   /** Where the account publishes new work. */
@@ -124,7 +126,7 @@ async function stageMutations(
   };
 
   for (const item of scan.items) {
-    const next = operations.get(item.name);
+    const next = operations.get(artifactKey(item.kind, item.name));
     const previous = scan.pinned.artifacts[item.name];
     if (next === "archive" && previous !== undefined) {
       hooks.event("archiving", item.name);
@@ -159,7 +161,7 @@ async function stageMutations(
   }
 
   for (const candidate of scan.local) {
-    if (operations.get(candidate.name) !== "publish") continue;
+    if (operations.get(artifactKey(candidate.kind, candidate.name)) !== "publish") continue;
     hooks.event("publishing", candidate.name);
     staged.publishing.push(
       await publishInput(

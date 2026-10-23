@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Candidate } from "#core/sync/adopt.ts";
 import type { SyncItem } from "#core/sync/model.ts";
 import type { Scan } from "./scan.ts";
-import { RunScopeError, scopedNames } from "./scope.ts";
+import { RunScopeError, scopedKeys } from "./scope.ts";
 
 const REGISTRY = "shop";
 
@@ -27,54 +27,62 @@ const catalog = scanOf(
     item("loose"),
     item("other/deploy", "skill", "elsewhere"),
   ],
-  [candidate("written-here")],
+  [candidate("written-here"), candidate("helper"), candidate("helper", "agent")],
 );
 
-describe("scopedNames", () => {
+describe("scopedKeys", () => {
   it("covers everything the job does when no refs were asked for", () => {
-    expect(scopedNames(undefined, catalog, REGISTRY)).toBeUndefined();
+    expect(scopedKeys(undefined, catalog, REGISTRY)).toBeUndefined();
   });
 
   it.each([
-    ["the catalog name", "sales/deploy", ["sales/deploy"]],
-    ["the address grammar manifest.yml uses", "shop/sales/skill/deploy", ["sales/deploy"]],
-    ["a whole namespace", "shop/sales", ["sales/deploy", "sales/lint"]],
-    ["one of two kinds that share a name", "shop/engineering/agent/lint", ["engineering/lint"]],
+    ["the catalog name", "sales/deploy", ["skill:sales/deploy"]],
+    ["the address grammar manifest.yml uses", "shop/sales/skill/deploy", ["skill:sales/deploy"]],
+    ["a whole namespace", "shop/sales", ["skill:sales/deploy", "skill:sales/lint"]],
+    [
+      "one of two kinds that share a name",
+      "shop/engineering/agent/lint",
+      ["agent:engineering/lint"],
+    ],
     [
       "an address with no namespace, wherever it is",
       "shop/skill/lint",
-      ["engineering/lint", "sales/lint"],
+      ["skill:engineering/lint", "skill:sales/lint"],
     ],
     [
       "a local artifact the registry does not carry yet",
       "shop/skill/written-here",
-      ["written-here"],
+      ["skill:written-here"],
+    ],
+    ["one kind of two local artifacts that share a name", "shop/skill/helper", ["skill:helper"]],
+    [
+      "every kind of a local name, when no kind is named",
+      "helper",
+      ["agent:helper", "skill:helper"],
     ],
   ])("resolves %s", (_, ref, expected) => {
-    expect([...(scopedNames([ref], catalog, REGISTRY) ?? [])].sort()).toEqual(expected);
+    expect([...(scopedKeys([ref], catalog, REGISTRY) ?? [])].sort()).toEqual(expected);
   });
 
   it("reaches the whole registry, and only this job's", () => {
-    const scoped = scopedNames(["shop"], catalog, REGISTRY);
-    expect([...(scoped ?? [])]).not.toContain("other/deploy");
-    expect([...(scoped ?? [])]).toContain("loose");
+    const scoped = scopedKeys(["shop"], catalog, REGISTRY);
+    expect([...(scoped ?? [])]).not.toContain("skill:other/deploy");
+    expect([...(scoped ?? [])]).toContain("skill:loose");
   });
 
   it("refuses a ref that reaches nothing rather than running empty", () => {
-    expect(() => scopedNames(["shop/sales/skill/absent"], catalog, REGISTRY)).toThrow(
-      RunScopeError,
-    );
+    expect(() => scopedKeys(["shop/sales/skill/absent"], catalog, REGISTRY)).toThrow(RunScopeError);
   });
 
   it("refuses an address whose registry is not this job's", () => {
-    expect(() => scopedNames(["elsewhere/other/skill/deploy"], catalog, REGISTRY)).toThrow(
+    expect(() => scopedKeys(["elsewhere/other/skill/deploy"], catalog, REGISTRY)).toThrow(
       RunScopeError,
     );
   });
 
   it("names every ref that missed, so one call fixes them all", () => {
     try {
-      scopedNames(["sales/deploy", "nope", "also/nope"], catalog, REGISTRY);
+      scopedKeys(["sales/deploy", "nope", "also/nope"], catalog, REGISTRY);
       expect.unreachable("should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(RunScopeError);

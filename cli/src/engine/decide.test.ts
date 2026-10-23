@@ -30,8 +30,8 @@ describe("classify", () => {
       new Map(),
       (kind) => kind === "skill",
     );
-    expect(outcomes.get("helper")?.operation).toBe("report");
-    expect(outcomes.get("lint")?.operation).toBe("publish");
+    expect(outcomes.get("agent:helper")?.operation).toBe("report");
+    expect(outcomes.get("skill:lint")?.operation).toBe("publish");
     expect(mutates).toBe(true);
   });
 
@@ -45,8 +45,22 @@ describe("classify", () => {
       new Map(),
       () => false,
     );
-    expect(outcomes.get("lint")?.operation).toBe("ignore");
+    expect(outcomes.get("skill:lint")?.operation).toBe("ignore");
     expect(mutates).toBe(false);
+  });
+
+  it("keeps two local artifacts that share a name apart, and a narrowed run to its kind", () => {
+    const both = scan([
+      { name: "lint", kind: "agent" },
+      { name: "lint", kind: "skill" },
+    ] as Scan["local"]);
+    const all = classify(both, job, "acme", undefined, "sync", new Map());
+    expect([...all.outcomes.keys()].sort()).toEqual(["agent:lint", "skill:lint"]);
+
+    const narrowed = classify(both, job, "acme", new Set(["skill:lint"]), "sync", new Map());
+    expect([...narrowed.outcomes.values()]).toEqual([
+      expect.objectContaining({ artifact: "lint", kind: "skill", operation: "publish" }),
+    ]);
   });
 });
 
@@ -73,7 +87,7 @@ describe("classify across registries", () => {
       acquired: [],
     } as unknown as Scan;
     const { outcomes, mutates } = classify(shared, job, "second", undefined, "sync", new Map());
-    expect(outcomes.has("shared/evals")).toBe(false);
+    expect(outcomes.has("skill:shared/evals")).toBe(false);
     expect(mutates).toBe(false);
   });
 });
@@ -108,7 +122,7 @@ describe("a folder of yours with a registry name", () => {
 
   it("keeps the registry's copy out, without asking anyone to act", () => {
     const { outcomes, writes } = classify(withFolder(), job, "acme", undefined, "sync", new Map());
-    expect(outcomes.get("ws/hello")).toMatchObject({
+    expect(outcomes.get("skill:ws/hello")).toMatchObject({
       operation: "ignore",
       detail: "a folder of yours with this name is in use",
     });
@@ -119,12 +133,12 @@ describe("a folder of yours with a registry name", () => {
     const claiming = { ...job, policy: { ...job.policy, claim: "on" as const } };
     expect(
       classify(withFolder(), claiming, "acme", undefined, "sync", new Map()).outcomes.get(
-        "ws/hello",
+        "skill:ws/hello",
       )?.operation,
     ).toBe("pull");
     const locked = withFolder({ "ws/hello": { registry: "acme", kind: "skill" } });
     expect(
-      classify(locked, job, "acme", undefined, "sync", new Map()).outcomes.get("ws/hello")
+      classify(locked, job, "acme", undefined, "sync", new Map()).outcomes.get("skill:ws/hello")
         ?.operation,
     ).toBe("pull");
   });
