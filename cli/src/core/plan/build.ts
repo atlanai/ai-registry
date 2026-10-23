@@ -94,6 +94,7 @@ function planWith(
     warnings,
     rewritten: [],
     claimed: new Map(),
+    plugins: new Map(),
     recorded: new Map(),
     linked: new Set(),
     // Namespaces wrap only at user scope, as the adapter contract says, whoever loads plugins.
