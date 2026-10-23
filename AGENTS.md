@@ -20,6 +20,7 @@ Do not hand-edit these. Change the source, then regenerate:
 - A registry's `index.json`, and each artifact's `artifact.json` and `versions.json`: Run `aireg registry index` in the registry root.
 - `cli/schema/*.json`: Edit `cli/scripts/schema/`, then run `pnpm run schema` in `cli/`. The copies in `cli/schema/kinds/` come from `spec/schemas/kinds/`: edit the spec, then run the same command.
 - `docs/assets/*.svg`: Edit `tools/build_figures.py`, then run it.
+- `docs/assets/readme-header.png` and `docs/assets/social-preview.png`: Edit `tools/build_header.py`, then run it. It renders with headless Chrome.
 - `cli/THIRD_PARTY_NOTICES.txt`: Run `pnpm run notices` in `cli/` after changing production dependencies or the Bun version. A new Bun version also needs its `LICENSE.md` vendored as `cli/packaging/licenses/bun.md`.
 
 ## Writing the spec and docs
