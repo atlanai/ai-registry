@@ -83,7 +83,8 @@ function failed(
 
 /**
  * Runs a command to completion without a shell. A non-zero exit, a timeout, a signal,
- * output past the limit or a missing binary is a `code` to read, never a throw.
+ * output past the limit or a missing binary is a `code` to read, never a throw. A PATH
+ * with no absolute folder has nowhere to find the command, so it is missing too.
  */
 export function exec(
   command: string,
@@ -91,6 +92,13 @@ export function exec(
   options: ExecOptions,
 ): Promise<ExecResult> {
   return new Promise((resolve, reject) => {
+    let env: NodeJS.ProcessEnv;
+    try {
+      env = withAbsolutePath(options.env ?? process.env);
+    } catch (error) {
+      resolve({ code: 127, stdout: "", stderr: (error as Error).message });
+      return;
+    }
     execFile(
       command,
       [...args],
@@ -100,7 +108,7 @@ export function exec(
         maxBuffer: options.maxOutputBytes ?? MAX_OUTPUT_BYTES,
         windowsHide: true,
         ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-        env: withAbsolutePath(options.env ?? process.env),
+        env,
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       },
       (error, stdout, stderr) => {
