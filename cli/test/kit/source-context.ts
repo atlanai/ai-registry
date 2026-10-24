@@ -7,7 +7,6 @@ export function sourceContext(source: SourceContext["source"], cache: string): S
     source,
     credential: undefined,
     signal: new AbortController().signal,
-    // The host's default: a Windows runner can take over a second to clone a local repository.
     limits: { timeoutMs: 30_000, retries: 0 },
     onBytes: () => {},
     cacheDir: () => {

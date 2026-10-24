@@ -98,5 +98,4 @@ minimumReleaseAgeExclude:
   - "unbash@6.0.1"
   - "vite@8.3.5"
   - "vitest@5.0.5"
-  # Approved 2026-10-24 for its GHSA-w74x-v6f9-j3xg and GHSA-wjr9-j795-jxcr fixes, before it ages.
   - "fast-uri@3.1.9"
