@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { statusWarning, withheldAt, withheldFrom, withheldMessage } from "./withheld.ts";
+import {
+  countPast,
+  newestFrom,
+  statusWarning,
+  withheldAt,
+  withheldFrom,
+  withheldMessage,
+} from "./withheld.ts";
 
 describe("what a registry withholds", () => {
   it("drops what it cannot name, and shows a reason without its escapes", () => {
@@ -43,5 +50,27 @@ describe("statusWarning", () => {
     expect(statusWarning({ ...at, status: "pending_review", reason: undefined })).toBe(
       "ops/lint 1.1.0 is pending review, and installs only because it is pinned.",
     );
+  });
+});
+
+describe("countPast", () => {
+  const lint = { name: "lint", group: "ops", kind: "skill" as const };
+  const newest = newestFrom([
+    { name: "lint", namespace: "ops", kind: "skill", version: "0.1.1" },
+    { name: "lint", namespace: "data", kind: "skill", version: "9.0.0" },
+    { name: "lint", kind: "tool", version: "9.0.0" },
+  ]);
+
+  it("counts from a newer version the registry holds, such as a yanked one", () => {
+    expect(countPast("0.1.0", newest, lint)).toBe("0.1.1");
+    expect(countPast(undefined, newest, lint)).toBe("0.1.1");
+  });
+
+  it("keeps the version when nothing it holds is newer, or names another artifact", () => {
+    expect(countPast("0.2.0", newest, lint)).toBe("0.2.0");
+    expect(countPast("0.1.0", newest, { ...lint, kind: "agent" })).toBe("0.1.0");
+    expect(countPast("0.1.0", undefined, lint)).toBe("0.1.0");
+    // Not SemVer, so the caller refuses it rather than counting from what it cannot order.
+    expect(countPast("1", newest, lint)).toBe("1");
   });
 });
