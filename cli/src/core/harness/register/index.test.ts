@@ -299,8 +299,6 @@ const settingsIn = (folder: string): RegisterEntry => ({
   file: `${folder}/settings.json`,
 });
 
-// Registration edits a harness's own config, so each input that says which config is checked
-// here too, rather than trusted to the plan that produced it.
 describe("applyRegister, kept to the run's harness roots", () => {
   test("registers no kind another scope loads", async () => {
     const sales = await place("acme", "sales");
@@ -382,7 +380,6 @@ describe("applyRegister, kept to the run's harness roots", () => {
         home,
       );
 
-      // A person's root kept in their dotfiles is theirs to link; a link inside it is not ours.
       expect(await readFile(join(dotfiles, "real", "settings.json"), "utf8")).toContain(
         "sales@acme",
       );
