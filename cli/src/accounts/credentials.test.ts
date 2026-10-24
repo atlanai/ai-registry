@@ -163,6 +163,12 @@ describe("credentials", () => {
     await expect(
       credentialFor("my__reg", SIGNS_IN, SAME_ORIGIN, ["my--reg", "my__reg"]),
     ).rejects.toThrow("AIREG_TOKEN_MY__REG names both my__reg and my--reg");
+  });
+
+  test("sends an environment token when no other alias the project declares shares it", async () => {
+    vi.stubEnv("AIREG_TOKEN_MY__REG", FROM_ENV);
+    await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
+
     expect(await credentialFor("my--reg", SIGNS_IN, SIGNED_IN, ["acme", "my--reg"])).toEqual({
       type: "bearer",
       accessToken: FROM_ENV,
