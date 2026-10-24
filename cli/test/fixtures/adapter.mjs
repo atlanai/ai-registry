@@ -42,7 +42,6 @@ function kindOf(kind) {
   return kind;
 }
 
-/** The segments of a relative POSIX path with no empty, `.` or `..` one, no backslash and no `:`. */
 function segments(path) {
   const safe =
     typeof path === "string" &&
@@ -181,10 +180,10 @@ async function read(context, artifact, file) {
 async function publish(context, input) {
   const path = join(namespaceDir(context), kindOf(input.kind), segment(input.name, "name"));
   // Every path is checked before the old copy goes, so a refused publish leaves it whole.
-  const targets = input.files.map((file) => join(path, ...segments(file.path)));
+  const targets = input.files.map((file) => [file, join(path, ...segments(file.path))]);
   await rm(await contained(path), { recursive: true, force: true });
-  for (const [index, file] of input.files.entries()) {
-    const target = await contained(targets[index] ?? "");
+  for (const [file, joined] of targets) {
+    const target = await contained(joined);
     await mkdir(join(target, ".."), { recursive: true });
     await writeFile(target, file.content, { mode: file.executable ? 0o755 : 0o644 });
   }
