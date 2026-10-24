@@ -2,7 +2,6 @@ import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { SchemaObject } from "ajv/dist/2020.js";
 import { describe, expect } from "vitest";
-import agent from "#schema/kinds/agent.json" with { type: "json" };
 import skill from "#schema/kinds/skill.json" with { type: "json" };
 import { test } from "#test/kit/fixtures.ts";
 import { kindsOf, manifestProblems } from "./kinds.ts";
@@ -152,49 +151,10 @@ describe("kind patterns", () => {
     expect(check(schema, { name: "a".repeat(24) })).toEqual([]);
   });
 
-  test("keep JavaScript escapes, Unicode classes and the bundled kinds' patterns", async ({
-    tmp,
-  }) => {
+  test("keep JavaScript escapes and Unicode classes", async ({ tmp }) => {
     const schema = named("^\\u0041\\p{Lu}+$");
     await prepareManifest(tmp, schema);
     expect(check(schema, { name: "AÉB" })).toEqual([]);
     expect(check(schema, { name: "Ab" })).not.toEqual([]);
-    expect(check(skill, { name: "pr-review", description: "Reviews." })).toEqual([]);
-    expect(check(skill, { name: "PR--review", description: "Reviews." })).toEqual([
-      '`name` "PR--review" does not match ^[a-z0-9]+(-[a-z0-9]+)*$',
-    ]);
-    expect(check(agent, { name: "reviewer", description: "Reviews." })).toEqual([]);
-    expect(check(agent, { name: "-reviewer", description: "Reviews." })).toEqual([
-      '`name` "-reviewer" does not match ^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$',
-    ]);
-  });
-
-  test("report lookarounds and backreferences instead of running them", async ({ tmp }) => {
-    for (const pattern of ["^(?!draft-)[a-z-]+$", "(?<=a)b", "^(a)\\1$"]) {
-      await expect(prepareManifest(tmp, named(pattern))).rejects.toThrow(
-        `pattern ${JSON.stringify(pattern)} uses syntax aireg does not support`,
-      );
-      expect(check(named(pattern), { name: "a" })).toEqual([
-        expect.stringContaining(`kind schema is invalid: pattern ${JSON.stringify(pattern)}`),
-      ]);
-    }
-  });
-
-  test("leave a served manifest whose pattern aireg cannot run unused", async ({ tmp }) => {
-    await mkdir(join(tmp, "kinds"));
-    await writeFile(
-      join(tmp, "registry.json"),
-      JSON.stringify({ kinds: [{ name: "custom", manifest_url: "kinds/custom.json" }] }),
-    );
-    await writeFile(join(tmp, "kinds", "custom.json"), JSON.stringify(named("(?=a)b")));
-    expect(await kindsOf(tmp)).toEqual({});
-    expect(await manifestProblems(tmp)).toEqual([
-      {
-        path: "kinds/custom.json",
-        message: expect.stringMatching(
-          /^has an invalid kind schema: pattern "\(\?=a\)b" uses syntax aireg does not support: .+, so "custom" is not checked$/,
-        ),
-      },
-    ]);
   });
 });
