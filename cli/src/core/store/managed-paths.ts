@@ -32,9 +32,8 @@ export async function guardManagedPath(
 }
 
 /**
- * Before an installed copy is read to be published. A repository ships its `.registry`
- * folder, so a link anywhere from the scope down to the copy would send what it points
- * at, such as a folder in your home, to the registry.
+ * Refuses a copy reached through a link: a repository ships its .registry, so a link
+ * there could publish a folder from your home.
  */
 export function refuseRedirectedCopy(name: string, path: string, roots: Roots): void {
   const found = redirection(scopeRoot(roots), path);
