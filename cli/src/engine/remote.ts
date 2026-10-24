@@ -112,6 +112,42 @@ interface StagedMutations {
   refused: unknown;
 }
 
+async function stageInstalled(
+  scan: Scan,
+  item: Scan["items"][number],
+  previous: LockArtifact,
+  hooks: RemoteMutationHooks,
+  staged: StagedMutations,
+): Promise<void> {
+  const path = artifactPath(
+    scan.roots,
+    previous.registry,
+    previous.namespace,
+    item.kind,
+    copyLeaf(item.name, previous.name),
+    previous.address ?? "",
+  );
+  try {
+    refuseRedirectedCopy(item.name, path, scan.roots);
+  } catch (error) {
+    hooks.failed?.(item.name, error);
+    staged.refused ??= error;
+    return;
+  }
+  hooks.event("publishing", item.name);
+  staged.publishing.push(
+    await publishInput(path, item.name, item.kind, {
+      id: previous.id ?? "",
+      name: previous.name,
+      ...(previous.namespace === undefined ? {} : { namespace: previous.namespace }),
+      ...(previous.version === undefined
+        ? {}
+        : { version: countFrom(scan, previous, previous.version) }),
+    }),
+  );
+  staged.publishingNames.add(item.name);
+}
+
 async function stageMutations(
   scan: Scan,
   operations: ReadonlyMap<string, SyncOperation>,
@@ -135,37 +171,10 @@ async function stageMutations(
       if (previous.id !== undefined) staged.archiving.push({ id: previous.id, kind: item.kind });
       staged.archivingNames.add(item.name);
     }
-    if (next === "publish") {
-      // Installed or authored alike: a policy that publishes was opted into, and
-      // whether the edit may land is the registry's call, not this client's.
-      if (previous === undefined) continue;
-      const path = artifactPath(
-        scan.roots,
-        previous.registry,
-        previous.namespace,
-        item.kind,
-        copyLeaf(item.name, previous.name),
-        previous.address ?? "",
-      );
-      try {
-        refuseRedirectedCopy(item.name, path, scan.roots);
-      } catch (error) {
-        hooks.failed?.(item.name, error);
-        staged.refused ??= error;
-        continue;
-      }
-      hooks.event("publishing", item.name);
-      staged.publishing.push(
-        await publishInput(path, item.name, item.kind, {
-          id: previous.id ?? "",
-          name: previous.name,
-          ...(previous.namespace === undefined ? {} : { namespace: previous.namespace }),
-          ...(previous.version === undefined
-            ? {}
-            : { version: countFrom(scan, previous, previous.version) }),
-        }),
-      );
-      staged.publishingNames.add(item.name);
+    // Installed or authored alike: a policy that publishes was opted into, and
+    // whether the edit may land is the registry's call, not this client's.
+    if (next === "publish" && previous !== undefined) {
+      await stageInstalled(scan, item, previous, hooks, staged);
     }
   }
 
