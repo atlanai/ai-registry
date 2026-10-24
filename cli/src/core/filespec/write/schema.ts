@@ -16,9 +16,8 @@ import manifestSchema from "#schema/kind-manifest.schema.json" with { type: "jso
 const compiled = new WeakMap<object, ValidateFunction>();
 
 /**
- * Registries serve their own kind schemas, so a backtracking RegExp could spend
- * exponential time on one pattern. RE2 matches in time linear in the value; it has
- * no lookarounds or backreferences, so a pattern using them fails to compile.
+ * Registries serve their own kind schemas, so patterns run on RE2, which matches in linear
+ * time; a lookaround or backreference fails to compile.
  */
 const re2: NonNullable<CodeOptions["regExp"]> = Object.assign(
   // RE2 always matches by code point, as the "u" flag Ajv passes asks.

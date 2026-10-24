@@ -141,7 +141,7 @@ describe("kind patterns", () => {
   test("match in time linear in the value, even when a backtracking engine would not", async ({
     tmp,
   }) => {
-    // Each "a" doubles a backtracking engine's time: these 24 take seconds, and 40 would take hours.
+    // Each extra "a" doubles a backtracking engine's time on this pattern.
     const schema = named("^(a+)+$");
     await prepareManifest(tmp, schema);
     const value = { name: `${"a".repeat(24)}!` };
