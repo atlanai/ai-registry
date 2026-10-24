@@ -114,10 +114,8 @@ export interface NamespaceWant {
 }
 
 /**
- * Plugin directories more than one registry's namespace wants under its bare name. A harness that
- * does not key them by registry would load one namespace and hide the other. Qualifying a name can
- * land it on another's bare name, which is then crowded too, until no bare name is shared; two
- * qualified names alike are left to clash when the second claims the directory.
+ * Plugin directories two registries' namespaces want under a bare name, repeated until no
+ * qualified name lands on another's bare name; equal qualified names are left to clash in claim().
  */
 export function crowdedContainers(
   wants: Iterable<NamespaceWant>,

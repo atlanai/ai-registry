@@ -55,9 +55,8 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
 }
 
 /**
- * Whether the lockfile's holder keeps this path from `link`. A plugin directory is shared by its
- * namespace's artifacts, and another namespace holds it only while the naming rule still puts its
- * plugin there; a link that is no plugin directory is its holder's alone.
+ * Whether the lockfile row recorded at this path still keeps it from `link`: a plugin directory is
+ * held only by its own namespace, while the naming rule still puts it there.
  */
 function holds(holder: string, link: PlannedLink, build: BuildState): boolean {
   if (link.shared !== true) return true;

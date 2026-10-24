@@ -53,9 +53,8 @@ function named(bytes: Buffer, name: string): Buffer | string {
 }
 
 /**
- * A plugin's own manifest is copied, under the projection's name for Claude Code, and Claude
- * Code's is written from its document when it has none. Any other is named after the projection,
- * and only ever created.
+ * Copies a plugin's own manifest (Claude Code's under the projection's name), writes Claude Code's
+ * from the document when it has none, and only ever creates the rest.
  */
 async function writePluginManifest(
   dir: string,
