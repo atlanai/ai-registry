@@ -65,7 +65,7 @@ function refuseRedirect(root: string, path: string): void {
   });
 }
 
-/** Written only where nothing is, so a file the check above missed is still never replaced. */
+// Exclusive create: a file that appeared after the checks is reported, never replaced.
 async function writeFresh(path: string, content: string, shown: string): Promise<void> {
   try {
     await writeFile(path, content, { encoding: "utf8", flag: "wx" });
