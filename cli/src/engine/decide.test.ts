@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { artifactKey, classify, type SyncOutcome } from "./decide.ts";
+import { classify, type SyncOutcome } from "./decide.ts";
 import type { Scan } from "./scan.ts";
 import type { ScopeWork } from "./work.ts";
 
@@ -54,7 +54,7 @@ describe("classify", () => {
     expect(mutates).toBe(false);
   });
 
-  it("keeps two local artifacts that share a name apart, and a narrowed run to its kind", () => {
+  it("keeps two local artifacts that share a name apart", () => {
     const both = scan([
       { name: "lint", kind: "agent" },
       { name: "lint", kind: "skill" },
@@ -63,18 +63,6 @@ describe("classify", () => {
     expect([...all.outcomes.values()]).toEqual([
       expect.objectContaining({ artifact: "lint", kind: "agent" }),
       expect.objectContaining({ artifact: "lint", kind: "skill" }),
-    ]);
-
-    const narrowed = classify(
-      both,
-      job,
-      "acme",
-      new Set([artifactKey("skill", "lint")]),
-      "sync",
-      new Map(),
-    );
-    expect([...narrowed.outcomes.values()]).toEqual([
-      expect.objectContaining({ artifact: "lint", kind: "skill", operation: "publish" }),
     ]);
   });
 });

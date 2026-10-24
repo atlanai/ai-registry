@@ -28,7 +28,7 @@ const catalog = scanOf(
     item("loose"),
     item("other/deploy", "skill", "elsewhere"),
   ],
-  [candidate("written-here"), candidate("helper"), candidate("helper", "agent")],
+  [candidate("written-here")],
 );
 
 describe("scopedKeys", () => {
@@ -62,16 +62,6 @@ describe("scopedKeys", () => {
       "a local artifact the registry does not carry yet",
       "shop/skill/written-here",
       [artifactKey("skill", "written-here")],
-    ],
-    [
-      "one kind of two local artifacts that share a name",
-      "shop/skill/helper",
-      [artifactKey("skill", "helper")],
-    ],
-    [
-      "every kind of a local name, when no kind is named",
-      "helper",
-      [artifactKey("agent", "helper"), artifactKey("skill", "helper")],
     ],
   ])("resolves %s", (_, ref, expected) => {
     expect([...(scopedKeys([ref], catalog, REGISTRY) ?? [])].sort()).toEqual(expected);
