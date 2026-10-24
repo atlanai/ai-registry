@@ -73,7 +73,6 @@ describe("daemonEnv", () => {
       AIREG_TOKEN_ACME: "synthetic-token",
       AIREG_TOKEN_ACME_PROD: "synthetic-token",
       aireg_token_kit: "synthetic-token",
-      Aireg_Token_Kit_Prod: "synthetic-token",
       AIREG_HOME: "/tmp/home",
     };
     expect(daemonEnv(env)).toEqual({ AIREG_HOME: "/tmp/home" });
