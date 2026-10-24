@@ -108,6 +108,8 @@ interface StagedMutations {
   /** Kept apart from the result, which must describe only what landed. */
   archivingNames: Set<string>;
   publishingNames: Set<string>;
+  /** The first copy refused before sending, reported on its artifact while the rest go out. */
+  refused: unknown;
 }
 
 async function stageMutations(
@@ -122,6 +124,7 @@ async function stageMutations(
     publishing: [],
     archivingNames: new Set<string>(),
     publishingNames: new Set<string>(),
+    refused: undefined,
   };
 
   for (const item of scan.items) {
@@ -136,7 +139,6 @@ async function stageMutations(
       // Installed or authored alike: a policy that publishes was opted into, and
       // whether the edit may land is the registry's call, not this client's.
       if (previous === undefined) continue;
-      hooks.event("publishing", item.name);
       const path = artifactPath(
         scan.roots,
         previous.registry,
@@ -145,7 +147,14 @@ async function stageMutations(
         copyLeaf(item.name, previous.name),
         previous.address ?? "",
       );
-      refuseRedirectedCopy(item.name, path, scan.roots);
+      try {
+        refuseRedirectedCopy(item.name, path, scan.roots);
+      } catch (error) {
+        hooks.failed?.(item.name, error);
+        staged.refused ??= error;
+        continue;
+      }
+      hooks.event("publishing", item.name);
       staged.publishing.push(
         await publishInput(path, item.name, item.kind, {
           id: previous.id ?? "",
@@ -268,18 +277,15 @@ export async function mutateRemote(
   const opened = await openForMutation(roots, source, account, signal);
   const { adapter, handle } = opened;
   try {
-    const { archiving, publishing, archivingNames, publishingNames } = await stageMutations(
-      scan,
-      operations,
-      hooks,
-      account.defaultNamespace,
-    );
+    const staged = await stageMutations(scan, operations, hooks, account.defaultNamespace);
+    const { archiving, publishing, archivingNames, publishingNames } = staged;
 
     // A refused archive is reported on its artifacts and must not hold back the publishes.
     let refused =
       archiving.length === 0
         ? undefined
         : await archive(opened, account.registry, archiving, archivingNames, result, hooks);
+    refused ??= staged.refused;
     if (publishing.length > 0) {
       const laidOut = readOnlyLayout(account.registry, source.config);
       if (laidOut !== undefined) throw laidOut;

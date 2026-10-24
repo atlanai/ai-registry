@@ -55,37 +55,53 @@ test("offers new local work in the namespace the account publishes into", async 
   ]);
 });
 
-test("refuses an installed copy reached through a symlinked namespace folder", async ({ tmp }) => {
+test("fails only the installed copy reached through a symlinked namespace folder", async ({
+  tmp,
+}) => {
+  offered.length = 0;
   const roots = makeRoots("project", join(tmp, "project"));
-  const outside = join(tmp, "outside");
-  await mkdir(join(outside, "skills", "lint"), { recursive: true });
-  await writeFile(
-    join(outside, "skills", "lint", "SKILL.md"),
-    "---\nname: lint\ndescription: L.\n---\n",
-  );
-  await mkdir(join(roots.artifacts, "acme"), { recursive: true });
-  await symlink(outside, join(roots.artifacts, "acme", "eng"));
+  const skill = "---\nname: lint\ndescription: L.\n---\n";
+  await mkdir(join(roots.artifacts, "acme", "ops", "skills", "deploy"), { recursive: true });
+  await writeFile(join(roots.artifacts, "acme", "ops", "skills", "deploy", "SKILL.md"), skill);
+  await mkdir(join(tmp, "outside", "skills", "lint"), { recursive: true });
+  await writeFile(join(tmp, "outside", "skills", "lint", "SKILL.md"), skill);
+  await symlink(join(tmp, "outside"), join(roots.artifacts, "acme", "eng"));
+  const row = (name: string, namespace: string) => ({
+    registry: "acme",
+    namespace,
+    name,
+    id: `skill_${name}`,
+    version: "1.0.0",
+  });
   const scan = {
-    items: [{ name: "lint", kind: "skill" }],
+    items: [
+      { name: "lint", kind: "skill" },
+      { name: "deploy", kind: "skill" },
+    ],
     roots,
     local: [],
+    acquired: [],
     pinned: {
       registries: {},
-      artifacts: {
-        lint: { registry: "acme", namespace: "eng", name: "lint", id: "skill_1", version: "1.0.0" },
-      },
+      artifacts: { lint: row("lint", "eng"), deploy: row("deploy", "ops") },
     },
   } as unknown as Scan;
+  const failed: string[] = [];
 
-  await expect(
-    mutateRemote(
-      scan,
-      { scope: "project", cwd: roots.cwd },
-      { config: {} } as never,
-      { id: "acc_1", registry: "acme" },
-      new Map([["lint", "publish"]]),
-      new AbortController().signal,
-      { event: () => {} },
-    ),
-  ).rejects.toThrow(/lint was not published because .* is a symlink/);
+  const sent = mutateRemote(
+    scan,
+    { scope: "project", cwd: roots.cwd },
+    { config: {} } as never,
+    { id: "acc_1", registry: "acme" },
+    new Map([
+      ["lint", "publish"],
+      ["deploy", "publish"],
+    ]),
+    new AbortController().signal,
+    { event: () => {}, failed: (name) => failed.push(name) },
+  );
+
+  await expect(sent).rejects.toThrow(/lint was not published because .* is a symlink/);
+  expect(offered.map(({ name }) => name)).toEqual(["deploy"]);
+  expect(failed).toEqual(["lint"]);
 });
