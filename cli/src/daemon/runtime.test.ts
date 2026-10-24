@@ -12,7 +12,6 @@ describe("daemon runtime", () => {
     await expect(runDaemon("test")).resolves.toBe(0);
   });
 
-  // A service manager or the Run key starts it with whatever environment that has.
   test("drops every registry token it inherited, whatever its case", async ({ daemon }) => {
     await daemon.start();
     vi.stubEnv("AIREG_TOKEN_ACME", "synthetic-token");
