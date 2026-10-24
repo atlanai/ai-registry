@@ -37,6 +37,8 @@ export interface Kept {
   path: string;
   /** Why it was not edited, when not because a person set it. */
   reason?: string;
+  /** A harness config file left unedited, for an install or a removal alike. */
+  config?: true;
 }
 
 /** The run registrations are for: its scope, and the folder a project's harness roots are in. */
@@ -266,7 +268,12 @@ async function reconcile(
       const file = join(root, expand(entry.file, vars));
       const reason = outside(file, root, at);
       if (reason !== undefined) {
-        kept.push({ name: expand(entry.at.at(-1) ?? entry.file, vars), path: file, reason });
+        kept.push({
+          name: vars.name ?? expand(entry.file, vars),
+          path: file,
+          reason,
+          config: true,
+        });
         for (const path of group.present.keys()) blocked.add(path);
         continue;
       }
