@@ -351,7 +351,7 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
     if (other !== undefined) {
       throw new ManifestError(
         `Registries ${quoted(other)} and ${quoted(alias)} would share the folder .registry/artifacts/${folder}.`,
-        "Rename one of them, using lowercase letters, digits and hyphens.",
+        "Rename one of them and its `artifacts:` entries in manifest.yml, using lowercase letters, digits and hyphens, then run `aireg install`.",
       );
     }
     folders.set(folder, alias);

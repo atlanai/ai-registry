@@ -123,6 +123,7 @@ test("refuses a cloned manifest whose registries would share one storage folder"
     message: expect.stringContaining(
       'Registries "team" and "Team" would share the folder .registry/artifacts/team.',
     ),
+    hint: expect.stringContaining("its `artifacts:` entries in manifest.yml"),
   });
   expect(await readdir(join(project, ".registry"))).toEqual(["manifest.yml"]);
 });
