@@ -160,6 +160,18 @@ describe("writes stay inside the registry", () => {
     expect(await readdir(outside)).toEqual([]);
   });
 
+  test("refuses new --from a file that is a symlink, and leaves its target", async ({ tmp }) => {
+    const { root, outside } = await registry(tmp);
+    const original = "---\nname: demo\ndescription: D.\n---\n";
+    await writeFile(join(outside, "SKILL.md"), original);
+    const source = join(tmp, "SKILL.md");
+    await symlink(join(outside, "SKILL.md"), source);
+
+    const argv = ["new", "--from", source, "--name", "renamed", "--namespace", "ops", "--yes"];
+    await expect(skill(root, argv)).rejects.toMatchObject({ code: ErrorCode.Invalid });
+    expect(await readFile(join(outside, "SKILL.md"), "utf8")).toBe(original);
+  });
+
   test("refuses bump through a linked artifact folder", async ({ tmp }) => {
     const { root, outside, lint } = await registry(tmp);
     await mkdir(join(outside, "0.1.0"));

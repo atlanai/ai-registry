@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { stringify } from "yaml";
 import { redirection } from "#adapter/files.ts";
@@ -33,7 +33,7 @@ import {
   specOf,
 } from "#core/filespec/write/kinds.ts";
 import { expandUserPath } from "#core/fs/path.ts";
-import { authored, present, refusal } from "#core/fs/tree.ts";
+import { authored, type Irregular, present, refusal } from "#core/fs/tree.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import { type CommandContext, type CommandSpec, runAction } from "./index.ts";
 
@@ -411,7 +411,7 @@ async function incoming(
   const isDirectory = (await stat(source)).isDirectory();
   const dir = isDirectory ? source : dirname(source);
   const visible = (path: string) => !path.split("/").some((part) => part.startsWith("."));
-  const found = isDirectory ? await authored(dir) : { files: [], irregular: [] };
+  const found = isDirectory ? await authored(dir) : { files: [], irregular: await linked(source) };
   const entries = isDirectory
     ? found.files.map((record) => record.path).filter(visible)
     : [basename(source)];
@@ -443,6 +443,12 @@ async function incoming(
   const front =
     file !== undefined && typeof spec?.name === "string" ? { file, name: spec.name } : undefined;
   return { input, dir, entries, name, front };
+}
+
+/** One file named by `--from`, refused as a link the way a folder's entries are. */
+async function linked(source: string): Promise<Irregular[]> {
+  if (!(await lstat(source)).isSymbolicLink()) return [];
+  return [{ path: basename(source), reason: "is a symlink" }];
 }
 
 /** Starts new artifacts from folders that already exist; the originals stay where they are. */
