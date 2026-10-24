@@ -255,7 +255,7 @@ async function reconcile(
   members: ReadonlyMap<string, Vars>,
   files: Files,
   stop: string,
-  anchor: string,
+  at: Anchor,
 ): Promise<Kept[]> {
   const kept: Kept[] = [];
   const blocked = new Set<string>();
@@ -264,7 +264,7 @@ async function reconcile(
       if ([...group.present.keys()].some((path) => blocked.has(path))) continue;
       const vars = first(group);
       const file = join(root, expand(entry.file, vars));
-      const reason = outside(file, root, anchor);
+      const reason = outside(file, root, at);
       if (reason !== undefined) {
         kept.push({ name: expand(entry.at.at(-1) ?? entry.file, vars), path: file, reason });
         for (const path of group.present.keys()) blocked.add(path);
@@ -279,18 +279,29 @@ async function reconcile(
   return kept;
 }
 
+/** The run's own spelling of a harness root, and the folder its containment is checked from. */
+interface Anchor {
+  root: string;
+  anchor: string;
+}
+
 /**
- * Why a config file is not edited, if it is not: it must sit inside the harness's root, reached
- * through real folders from `anchor`. The file itself may be a link, as a person's dotfiles are.
+ * Why a config file under the touched `root` is not edited, if it is not: it must be reached
+ * through real folders from the anchor. The file itself may be a link, as a person's dotfiles are.
  */
-function outside(file: string, root: string, anchor: string): string | undefined {
-  if (!isWithin(root, file)) return `it is not inside ${root}`;
-  const real = canonical(anchor);
-  const found = redirection(real, join(real, relative(anchor, file)), false);
-  if (found === undefined) return undefined;
-  return found.problem === "symlink"
-    ? `${found.at} is a symlink, so it may lead outside ${root}`
-    : `${found.at} is not a directory`;
+function outside(file: string, root: string, at: Anchor): string | undefined {
+  if (!isWithin(root, file)) return "it is not inside the harness folder";
+  // Rebuilt on the run's spelling, so a root reached another way is still walked from its anchor.
+  const real = canonical(at.anchor);
+  const path = join(real, relative(at.anchor, at.root), relative(root, file));
+  try {
+    const found = redirection(real, path, false);
+    if (found === undefined) return undefined;
+    const shown = relative(real, found.at) || found.at;
+    return found.problem === "symlink" ? `${shown} is a symlink` : `${shown} is not a folder`;
+  } catch {
+    return "it could not be checked";
+  }
 }
 
 /** The touched root, however it is spelled, is the harness's own for this run. */
@@ -304,7 +315,7 @@ async function registerMapping(
   touched: readonly Touched[],
   owned: { scopeDir: string; copies: ReadonlySet<string> },
   files: Files,
-  at: { root: string; anchor: string },
+  at: Anchor,
 ): Promise<Kept[]> {
   const template = placementTemplate(mapping);
   const entries = mapping.register ?? [];
@@ -325,7 +336,7 @@ async function registerMapping(
     if (paths.size === 0) continue;
     // Folders below the kind's fixed prefix are ours to tidy; the harness's own are not.
     const stop = join(root, ...fixedPrefix(template));
-    kept.push(...(await reconcile(entries, root, paths, members, files, stop, at.anchor)));
+    kept.push(...(await reconcile(entries, root, paths, members, files, stop, at)));
   }
   return kept;
 }

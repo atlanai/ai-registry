@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test as base } from "#test/kit/fixtures.ts";
@@ -109,5 +109,24 @@ describe("a source that does not", () => {
     expect(existsSync(join(home, ".claude", "skills", "team"))).toBe(false);
     expect(existsSync(join(home, ".codex", "plugins"))).toBe(false);
     expect(existsSync(join(home, ".registry", "artifacts", ".projections"))).toBe(false);
+  }, 60_000);
+});
+
+describe("a Codex home kept in a dotfiles folder", () => {
+  test("loses its plugin entries on remove when CODEX_HOME names the real folder", async ({
+    aireg,
+    adapters: home,
+    tmp,
+  }) => {
+    const real = join(home, "dotfiles", "codex");
+    await mkdir(real, { recursive: true });
+    await rm(join(home, ".codex"), { recursive: true });
+    await symlink(real, join(home, ".codex"));
+    expect((await aireg(add("wraps", "deploy"), { cwd: tmp })).code).toBe(0);
+
+    const remove = ["remove", "-g", "team/deploy", "--force", "--yes"];
+    const removed = await aireg(remove, { cwd: tmp, env: { CODEX_HOME: real } });
+    expect(removed.code, removed.stderr).toBe(0);
+    expect(existsSync(join(real, "config.toml"))).toBe(false);
   }, 60_000);
 });
