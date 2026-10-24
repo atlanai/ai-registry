@@ -81,10 +81,7 @@ export function tokenVariable(alias: string): string {
   return `${TOKEN_PREFIX}${alias.toUpperCase().replaceAll(/[^A-Z0-9]/g, "_")}`;
 }
 
-/**
- * In any case: Windows reads `aireg_token_acme` as `AIREG_TOKEN_ACME`, so a name only
- * matched as written would carry a token past every filter that strips them.
- */
+// Windows reads aireg_token_acme as AIREG_TOKEN_ACME, so the prefix matches in any case.
 function isTokenVariable(name: string): boolean {
   return name.toUpperCase().startsWith(TOKEN_PREFIX);
 }
