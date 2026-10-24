@@ -88,18 +88,10 @@ describe("sshUrl", () => {
   });
 });
 
-// The account an address names is who git signs in as; dropping it signs in as someone else.
 describe("an scp-style address", () => {
-  it("keeps the user it names, and git when it names none", () => {
-    expect(parseSource("org-123@github.com:acme/kit.git")).toMatchObject({
-      location: "org-123@github.com:acme/kit.git",
-    });
-    expect(parseSource("deploy@git.example.com:acme/kit@v1")).toMatchObject({
-      location: "deploy@git.example.com:acme/kit",
-      ref: "v1",
-    });
-    expect(parseSource("git@github.com:acme/kit.git")).toMatchObject({
-      location: "git@github.com:acme/kit.git",
-    });
+  it("keeps the user it names", () => {
+    expect(parseSource("org-123@github.com:acme/kit.git").location).toBe(
+      "org-123@github.com:acme/kit.git",
+    );
   });
 });

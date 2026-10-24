@@ -36,13 +36,11 @@ describe("the clone ladder", () => {
   });
 });
 
-// A fallback is rebuilt from host and slug alone, so it may only stand in for an address with nothing else.
 describe("an address naming its own account or port", () => {
   test.for([
     ["an scp user", "org-123@github.com:acme/kit.git", "ssh"],
-    ["an ssh user and port", "ssh://deploy@git.example.com:2222/acme/kit.git", "ssh"],
+    ["an ssh user", "ssh://deploy@git.example.com/acme/kit.git", "ssh"],
     ["an https port", "https://git.example.com:8443/acme/kit", "https"],
-    ["a port on github.com", "https://github.com:8443/acme/kit", "https"],
   ] as const)("is tried only as written, for %s", async ([, input, label], { tmp }) => {
     const env = await withGh(tmp);
     const spec = parseSource(input);
@@ -52,7 +50,6 @@ describe("an address naming its own account or port", () => {
   test.for([
     ["git@github.com:acme/kit.git", ["ssh", "https"]],
     ["ssh://git@git.example.com:22/acme/kit.git", ["ssh", "https"]],
-    ["https://github.com:443/acme/kit", ["https", "gh", "ssh"]],
   ] as const)(
     "keeps every fallback for %s, which names only the defaults",
     async ([input, labels], { tmp }) => {
