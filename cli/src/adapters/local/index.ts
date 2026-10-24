@@ -11,6 +11,13 @@ export default defineAdapter({
   publishKinds: ["skill", "agent"],
   dispatch: { paths: true },
   configSchema: { properties: { layout: { type: "string" } } },
-  capabilities: { pinsSource: false, publish: true, auth: false, fileSpec: true },
+  capabilities: {
+    pinsSource: false,
+    publish: true,
+    auth: false,
+    fileSpec: true,
+    relationships: true,
+    agentFolders: true,
+  },
   connect,
 });
