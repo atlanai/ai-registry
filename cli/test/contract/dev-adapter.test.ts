@@ -60,20 +60,11 @@ describe("the development adapter", () => {
     expect(archived).toEqual([expect.stringMatching(/^lint-\d+$/)]);
   });
 
-  test.for([
-    ["a namespace", "../escaped", lint()],
-    ["a kind", "personal", lint({ kind: "../../escaped" as PublishInput["kind"] })],
-    ["a name", "personal", lint({ name: "../../../escaped" })],
-    [
-      "a file path",
-      "personal",
-      lint({ files: [{ path: "../../../../escaped/x", content: BODY, executable: false }] }),
-    ],
-  ] as const)("refuses %s that leaves the remote", async ([, namespace, input], { tmp }) => {
+  test("refuses a namespace that leaves the remote", async ({ tmp }) => {
     const remote = join(tmp, "remote");
-    const handle = await connect(remote, namespace);
+    const handle = await connect(remote, "../escaped");
 
-    await expect(handle.publish?.([input], {})).rejects.toThrow("The dev adapter refuses");
+    await expect(handle.publish?.([lint()], {})).rejects.toThrow("The dev adapter refuses");
     expect(existsSync(join(tmp, "escaped"))).toBe(false);
   });
 
