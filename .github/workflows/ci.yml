@@ -66,7 +66,7 @@ jobs:
                       # The install pins in the docs follow the CLI's version.
                       if path == "cli/package.json":
                           selected["docs"] = True
-                  elif path in ("tools/check.py", "tools/check_schemas.py", "tools/requirements.txt"):
+                  elif path in ("tools/check.py", "tools/check_schemas.py", "tools/requirements.txt", "tools/test_check.py"):
                       selected["spec"] = True
                   elif (path.startswith("docs/")
                         or path in ("mkdocs.yml", "tools/build_figures.py", "tools/check_pins.py")
@@ -349,6 +349,7 @@ jobs:
       - run: python3 -m pip install --require-hashes -r tools/requirements.txt
       - run: python3 tools/check.py examples/acme-registry
       - run: python3 tools/check.py examples/aireg
+      - run: python3 -I -m unittest discover -s tools -p test_check.py
       # Fails rather than skipping the instance tier if jsonschema is missing.
       - run: python3 tools/check_schemas.py --require-jsonschema
 
