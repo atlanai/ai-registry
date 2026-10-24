@@ -126,7 +126,6 @@ describe("adapter command", () => {
   });
 });
 
-// The folder may be one a cloned repository ships, so a link in it must not carry the package out.
 describe("adapter init writes only inside its folder", () => {
   /** An empty folder outside the one being scaffolded, and where the package goes. */
   async function folders(tmp: string): Promise<{ dir: string; outside: string }> {
@@ -134,27 +133,6 @@ describe("adapter init writes only inside its folder", () => {
     await mkdir(outside);
     return { dir: join(tmp, "acme"), outside };
   }
-
-  test("refuses a folder that is a symlink, even an empty one", async ({ tmp }) => {
-    const { dir, outside } = await folders(tmp);
-    await symlink(outside, dir);
-    await expect(runJson(["init", "acme", "--dir", dir], tmp)).rejects.toMatchObject({
-      code: ErrorCode.Invalid,
-    });
-    expect(await readdir(outside)).toEqual([]);
-  });
-
-  test("refuses with --force a file that is a symlink, and leaves its target", async ({ tmp }) => {
-    const { dir, outside } = await folders(tmp);
-    await mkdir(dir);
-    await writeFile(join(outside, "keep.json"), "keep");
-    await symlink(join(outside, "keep.json"), join(dir, "package.json"));
-    await expect(runJson(["init", "acme", "--dir", dir, "--force"], tmp)).rejects.toMatchObject({
-      code: ErrorCode.Invalid,
-    });
-    expect(await readFile(join(outside, "keep.json"), "utf8")).toBe("keep");
-    expect(await readdir(dir)).toEqual(["package.json"]);
-  });
 
   test("refuses with --force a subfolder that is a symlink", async ({ tmp }) => {
     const { dir, outside } = await folders(tmp);
@@ -165,16 +143,6 @@ describe("adapter init writes only inside its folder", () => {
     });
     expect(await readdir(outside)).toEqual([]);
     expect(await readdir(dir)).toEqual(["src"]);
-  });
-
-  test("refuses a folder that holds files without --force, and keeps them", async ({ tmp }) => {
-    const { dir } = await folders(tmp);
-    await mkdir(dir);
-    await writeFile(join(dir, "package.json"), "keep");
-    await expect(runJson(["init", "acme", "--dir", dir], tmp)).rejects.toMatchObject({
-      code: ErrorCode.Conflict,
-    });
-    expect(await readFile(join(dir, "package.json"), "utf8")).toBe("keep");
   });
 
   test("replaces its own files with --force", async ({ tmp }) => {

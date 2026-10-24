@@ -65,7 +65,6 @@ describe("aireg init --registry", () => {
   });
 });
 
-// A folder may be a cloned repository that ships its own links, so none may carry a namespace out.
 describe("aireg registry init through a linked artifacts folder", () => {
   const refused = "artifacts is a symlink, so nothing was written through it.";
 
