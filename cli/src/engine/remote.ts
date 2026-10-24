@@ -1,19 +1,21 @@
 import { credentialFor } from "#accounts/credentials.ts";
 import { AccountService } from "#accounts/service.ts";
 import type { PublishInput, SourceHandle, UnpublishInput } from "#adapter/index.ts";
-import { bumpVersion } from "#adapter/semver.ts";
+import { bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { declaredLayout } from "#core/adapter/registry.ts";
 import { connectSource } from "#core/adapter/source.ts";
 import { readOnlyLayout } from "#core/adapter/writable.ts";
+import { countPast } from "#core/catalog/withheld.ts";
 import type { Account } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { offerFrom } from "#core/filespec/write/offer.ts";
+import type { LockArtifact } from "#core/lock.ts";
 import type { RegistrySource } from "#core/manifest.ts";
+import { listedAt } from "#core/plan/model.ts";
 import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
 import type { Scan } from "./scan.ts";
 
-/** Sync sends the next version of what the lock pinned, or a first one. */
 async function publishInput(
   path: string,
   name: string,
@@ -30,6 +32,22 @@ async function publishInput(
     description,
   });
   return input;
+}
+
+function countFrom(scan: Scan, row: LockArtifact, locked: string): string {
+  const acquired = scan.acquired.find((item) => item.alias === row.registry);
+  const at = acquired === undefined ? undefined : listedAt(row, acquired.catalog.entries);
+  const served = at === undefined ? undefined : acquired?.placements.get(at)?.version;
+  const now = served === undefined ? undefined : parseVersion(served);
+  const then = parseVersion(locked);
+  const ahead =
+    served !== undefined &&
+    now !== undefined &&
+    then !== undefined &&
+    compareVersion(now, then) > 0;
+  const from = ahead ? served : locked;
+  const artifact = { name: row.name, group: row.namespace, kind: row.kind };
+  return countPast(from, acquired?.catalog.newest, artifact) ?? from;
 }
 
 export interface RemoteMutationHooks {
@@ -131,7 +149,9 @@ async function stageMutations(
           id: previous.id ?? "",
           name: previous.name,
           ...(previous.namespace === undefined ? {} : { namespace: previous.namespace }),
-          ...(previous.version === undefined ? {} : { version: previous.version }),
+          ...(previous.version === undefined
+            ? {}
+            : { version: countFrom(scan, previous, previous.version) }),
         }),
       );
       staged.publishingNames.add(item.name);

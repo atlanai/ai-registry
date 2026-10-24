@@ -123,6 +123,110 @@ const DetailedReference = Type.Object(
   { additionalProperties: false },
 );
 
+const PATH = String.raw`(?![A-Za-z]:)(?!(?:[^/]*/)*\.\.?(?:/|$))[^/\\]+(?:/[^/\\]+)*`;
+
+const ONE_PATH = String.raw`(?![^*?[\]{}]*[*?[\]{}])${PATH}`;
+
+const NAMESPACE = "[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?";
+
+const Target = Type.String({
+  pattern: `^[^./][^/]*/${NAMESPACE}$|^(\\.[^/]*)?(/.*)?/${NAMESPACE}$`,
+  description:
+    "Where exports are published, as `aireg publish --to` takes it: a declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
+});
+
+const SEMVER_IDENT = String.raw`(0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`;
+
+const DetailedExport = Type.Object(
+  {
+    path: Type.String({
+      pattern: `^${ONE_PATH}$`,
+      description:
+        "One path relative to the project: an artifact, such as .claude/agents/reviewer.md, or a folder, whose artifacts directly inside it are each exported.",
+    }),
+    kind: Type.Optional(
+      Type.Union([Type.Literal("skill"), Type.Literal("agent")], {
+        description: "When set, every artifact the entry reaches must be this kind.",
+      }),
+    ),
+    version: Type.Optional(
+      Type.String({
+        pattern: String.raw`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-${SEMVER_IDENT}(\.${SEMVER_IDENT})*)?$`,
+        description: "The exact version to publish it at, such as 2.0.0.",
+      }),
+    ),
+    depends_on: Type.Optional(
+      Type.Array(
+        Type.String({
+          pattern: String.raw`^\./${ONE_PATH}$|^[^@\\/]+(/[^@\\/]+){3}$`,
+          description:
+            "An artifact in the project, or a folder of them, as ./ and its path, which is exported with it, or an artifact listed under `artifacts:`, as <registry>/<namespace>/<kind>/<name> with no version.",
+        }),
+        { uniqueItems: true, description: "What it needs installed beside it." },
+      ),
+    ),
+    publish: Type.Optional(
+      Type.Literal(false, {
+        description: "`false` keeps it in this repository; absent, it goes to `publish.to`.",
+      }),
+    ),
+    exclude: Type.Optional(
+      Type.Array(Type.String({ pattern: String.raw`^(?!\.\.?$)[^/\\*?[\]{}]+$` }), {
+        uniqueItems: true,
+        description:
+          "For a folder of artifacts: the names of what is directly inside it that it does not export.",
+      }),
+    ),
+    ignore: Type.Optional(
+      Type.Array(Type.String({ minLength: 1 }), {
+        uniqueItems: true,
+        description:
+          "Gitignore patterns, relative to each artifact the entry reaches: the files left out. The entry file always goes.",
+      }),
+    ),
+    include: Type.Optional(
+      Type.Array(
+        Type.Union([
+          Type.String({
+            pattern: `^${ONE_PATH}$`,
+            description: "A file or folder relative to the artifact, stored at the same path.",
+          }),
+          Type.Object(
+            {
+              from: Type.String({
+                pattern: `^${ONE_PATH}$`,
+                description: "A file or folder relative to the artifact.",
+              }),
+              as: Type.String({
+                pattern: `^${ONE_PATH}$`,
+                description: "The path it is stored at in the published version.",
+              }),
+            },
+            { additionalProperties: false },
+          ),
+        ]),
+        {
+          description:
+            "The only files each artifact the entry reaches publishes, besides its entry file, which always goes: a path, or `{ from, as }` to store one at another path.",
+        },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+const AnyExport = Type.Union(
+  [
+    Type.String({
+      pattern: `^${PATH}$`,
+      description:
+        "A path relative to the project, or a glob over paths, such as .claude/skills/*.",
+    }),
+    DetailedExport,
+  ],
+  { description: "One path, or one path and what to publish it with." },
+);
+
 export const Manifest = Type.Object(
   {
     $schema: Type.Optional(
@@ -161,6 +265,20 @@ export const Manifest = Type.Object(
         description:
           "A string reference, or `{ ref, as, exclude, harnesses, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
       }),
+    ),
+    exports: Type.Optional(
+      Type.Array(AnyExport, {
+        description:
+          "What this project makes for others to install: a path, such as an artifact or a folder of them, or a glob, or `{ path, kind, version, depends_on, publish, exclude, ignore, include }` to give one path a kind it must be, an exact version, dependencies, `publish: false` to keep it here, or the files it publishes.",
+      }),
+    ),
+    publish: Type.Optional(
+      Type.Object(
+        {
+          to: Target,
+        },
+        { additionalProperties: false },
+      ),
     ),
   },
   {
