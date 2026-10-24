@@ -106,10 +106,10 @@ export async function chooseRegistry(
       message: ask.message,
       style: step.printer.errStyle,
       initial: aliases[0] as string,
-      // A cloned project's manifest chose these; only what is shown is cleaned, not the answer.
       options: aliases.map((alias) => ({
         value: alias,
-        label: sanitizeText(alias),
+        label: alias,
+        // A cloned project's manifest can put line breaks and escapes in an address.
         hint: sanitizeText(withoutCredentials(known[alias]?.location ?? "")),
       })),
     },
