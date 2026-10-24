@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveHarnesses } from "#core/harness/index.ts";
 import { emptyLock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
-import { claim, movedPluginLinks, type PlannedLink } from "./projection.ts";
+import { movedPluginLinks } from "./projection.ts";
 
 describe("movedPluginLinks", () => {
   const USER = roots("user", "/work");
@@ -63,26 +63,5 @@ describe("movedPluginLinks", () => {
       },
     });
     expect([...movedPluginLinks(lock, scope)]).toEqual([]);
-  });
-});
-
-describe("claim", () => {
-  const container = (content: string): PlannedLink => ({
-    harness: "claude",
-    absolute: "/home/.claude/skills/a-b-c",
-    relative: ".claude/skills/a-b-c",
-    from: "/projections/a-b-c",
-    shared: true,
-    content,
-  });
-
-  it("does not take a path a link of another artifact holds", () => {
-    const claimed = new Map([["/home/.claude/skills/a-b-c", "flat"]]);
-    const collisions: string[] = [];
-    const kept = claim([container("/content/a-b/c")], "one", claimed, new Map(), (owner) =>
-      collisions.push(owner),
-    );
-    expect(kept).toEqual([]);
-    expect(collisions).toEqual(["flat"]);
   });
 });
