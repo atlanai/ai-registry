@@ -61,7 +61,6 @@ describe("an address naming its own account or port", () => {
     },
   );
 
-  // A bare owner/repo is looked up on GH_HOST, or on whichever host gh signed in to.
   test("hands gh the whole github.com URL", async ({ tmp }) => {
     const env = await withGh(tmp);
     const gh = attempts(parseSource("github.com/acme/kit"), env).find((a) => a.viaGh);
