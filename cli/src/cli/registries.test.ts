@@ -8,7 +8,6 @@ import { asAddress, sameLocation } from "./registries.ts";
 
 const at = (location: string): RegistrySource => ({ location, adapter: undefined, config: {} });
 
-// A declaration is reused for a new address only when both name one source.
 describe("sameLocation", () => {
   test("matches a repository however its URL is spelled", () => {
     expect(sameLocation("github.com/acme/kit", "https://github.com/Acme/kit.git")).toBe(true);
@@ -17,11 +16,14 @@ describe("sameLocation", () => {
 
   test.for([
     ["a .git suffix", "/regs/team", "/regs/team.git"],
-    ["case", "/regs/acme", "/regs/ACME"],
     ["a trailing space", "/regs/sp", "/regs/sp "],
     ["the scheme of a URL", "/regs/kit", "file:///regs/kit"],
   ])("tells two folders apart by %s", ([, left, right]) => {
     expect(sameLocation(left as string, right as string)).toBe(false);
+  });
+
+  test("compares folders that do not exist by their spelling, case included", () => {
+    expect(sameLocation("/regs/acme", "/regs/ACME")).toBe(false);
   });
 
   test("matches one folder however its path is spelled", async ({ tmp }) => {

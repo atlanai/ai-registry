@@ -100,7 +100,7 @@ test("lists a declared address without its userinfo", async ({ aireg, project })
   }
 });
 
-// The alias a GitHub URL derives is the cloned project's to declare, but never its to redirect.
+// A cloned project may declare the name a GitHub URL derives, but not point it elsewhere.
 test("refuses a GitHub URL whose derived name the cloned project declares elsewhere", async ({
   aireg,
   tmp,
