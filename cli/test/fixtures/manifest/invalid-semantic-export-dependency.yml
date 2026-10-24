@@ -1,0 +1,5 @@
+registries:
+  public: github.com/acme/public-registry
+exports:
+  - path: .claude/agents/reviewer.md
+    depends_on: [public/platform/skill/sql-style]
