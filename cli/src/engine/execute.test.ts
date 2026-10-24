@@ -2,6 +2,7 @@ import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import type { PublishInput } from "#adapter/index.ts";
 import type { Account } from "#core/config/model.ts";
 import type { SyncItem } from "#core/sync/model.ts";
 import { test } from "#test/kit/fixtures.ts";
@@ -86,6 +87,27 @@ vi.mock("./scan.ts", async (importOriginal) => ({
 vi.mock("./remote.ts", () => ({ mutateRemote, partialMutation }));
 vi.mock("./local.ts", () => ({ applyLocal }));
 vi.mock("./pipeline.ts", () => ({ load: vi.fn(async () => loaded) }));
+// Only for a test that runs the real publish: where it opens, and what it is handed.
+const offered = vi.hoisted(() => [] as PublishInput[]);
+vi.mock("#accounts/service.ts", () => ({
+  AccountService: class {
+    async resolve() {
+      return { location: ENDPOINT, source: { location: ENDPOINT, adapter: "acme" } };
+    }
+  },
+}));
+vi.mock("#core/adapter/source.ts", () => ({
+  connectSource: async () => ({
+    adapter: { id: "acme", displayName: "Acme" },
+    handle: {
+      publish: async (changes: readonly PublishInput[]) => {
+        offered.push(...changes);
+        return {};
+      },
+      close: async () => {},
+    },
+  }),
+}));
 
 const hooks = { event: () => {}, item: () => {} };
 
@@ -358,18 +380,25 @@ test("narrows a run by the address grammar, not only by the catalog name", async
   expect(namesPassedToApply()).toEqual(["sales/alpha"]);
 });
 
-test("a run narrowed to one kind publishes nothing of another kind with the same name", async () => {
+test("a run narrowed to one kind publishes nothing of another kind with the same name", async ({
+  tmp,
+}) => {
+  const skill = join(tmp, "skills", "lint");
+  await mkdir(skill, { recursive: true });
+  await writeFile(join(skill, "SKILL.md"), "---\nname: lint\ndescription: Lints.\n---\n");
+  const agent = join(tmp, "agents", "lint.md");
+  await mkdir(join(tmp, "agents"), { recursive: true });
+  await writeFile(agent, "---\nname: lint\ndescription: Lints too.\n---\n");
   scan.mockResolvedValue({
     ...scanOf([]),
     local: [
-      { name: "lint", kind: "agent", from: "/tmp/agents/lint.md" },
-      { name: "lint", kind: "skill", from: "/tmp/skills/lint" },
+      { name: "lint", kind: "agent", from: agent },
+      { name: "lint", kind: "skill", from: skill },
     ],
   });
-  mutateRemote.mockResolvedValue({
-    published: new Set<string>(),
-    archived: new Set<string>(),
-  });
+  const remote = await vi.importActual<typeof import("./remote.ts")>("./remote.ts");
+  mutateRemote.mockImplementationOnce(remote.mutateRemote);
+  offered.length = 0;
   const reported: Array<{ artifact: string; kind: unknown }> = [];
   const capturing = {
     ...hooks,
@@ -380,15 +409,16 @@ test("a run narrowed to one kind publishes nothing of another kind with the same
 
   await executeSync(
     job,
-    account,
+    { ...account, defaultNamespace: "engineering" },
     "sync",
     [`${REGISTRY}/engineering/skill/lint`],
     new AbortController().signal,
     capturing,
   );
 
-  const operations = mutateRemote.mock.calls.at(-1)?.[4] as ReadonlyMap<string, string>;
-  expect([...operations]).toEqual([["skill:lint", "publish"]]);
+  expect(offered.map(({ name, kind }) => ({ name, kind }))).toEqual([
+    { name: "lint", kind: "skill" },
+  ]);
   expect(reported).toEqual([{ artifact: "lint", kind: "skill" }]);
 });
 
