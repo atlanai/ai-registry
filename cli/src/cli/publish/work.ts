@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { glob, readFile, stat } from "node:fs/promises";
+import { glob, readFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import type { ArtifactKind } from "#adapter/index.ts";
@@ -8,9 +8,11 @@ import { quoted, sanitizeName } from "#adapter/text.ts";
 import { matchInstalled, rowsNamed } from "#cli/names.ts";
 import { descriptionText, frontmatter } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { isAbsent } from "#core/fs/path.ts";
 import { gitIn } from "#core/git.ts";
-import { SKILL_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
+import type { Export, ExportFile } from "#core/manifest.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/pipeline.ts";
@@ -28,9 +30,18 @@ export interface Work {
   row: string | undefined;
   /** The version an installed copy was edited from, so a newer one is not written over. */
   base: string | undefined;
+  /** The manifest's `exports:` entries for this path, merged, whose version, dependencies and targets apply. */
+  exported?: Exported | undefined;
 }
 
-const SHAPE_HINT = "Name a skill folder that holds SKILL.md, or an agent's .md file.";
+/** What `exports:` says of one artifact: its entries merged into one, and the files it publishes. */
+export interface Exported extends Export {
+  /** Selected folder files, with the entry first; absent for a native agent file. */
+  files?: readonly ExportFile[] | undefined;
+}
+
+const SHAPE_HINT =
+  "Name a skill folder that holds SKILL.md, an agent's folder that holds AGENT.md, or an agent's .md file.";
 
 function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
   return {
@@ -52,29 +63,47 @@ function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
   };
 }
 
-/** A skill is a directory with SKILL.md, reached by either; any other .md is an agent. */
-async function fromPath(path: string): Promise<Work> {
-  const isDir = (await stat(path)).isDirectory();
-  const root = !isDir && basename(path) === SKILL_ENTRY ? dirname(path) : path;
-  const skill = isDir || root !== path;
-  if (skill && !existsSync(join(root, SKILL_ENTRY))) {
+async function textAt(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if (isAbsent(error) || (error as NodeJS.ErrnoException).code === "EISDIR") return undefined;
+    throw error;
+  }
+}
+
+async function folderEntry(
+  root: string,
+): Promise<{ kind: ArtifactKind; text: string } | undefined> {
+  const [skill, agent] = await Promise.all([
+    textAt(join(root, SKILL_ENTRY)),
+    textAt(join(root, AGENT_ENTRY)),
+  ]);
+  if (skill !== undefined) return { kind: "skill", text: skill };
+  return agent === undefined ? undefined : { kind: "agent", text: agent };
+}
+
+/** Read each entry once to identify a skill, folder agent or native agent file. */
+export async function fromPath(path: string): Promise<Work> {
+  const entry = basename(path) === SKILL_ENTRY;
+  const root = entry ? dirname(path) : path;
+  const inside = await folderEntry(root);
+  const text =
+    inside === undefined && !entry && extname(path) === ".md" ? await textAt(path) : undefined;
+  const kind = inside?.kind ?? (text === undefined ? undefined : "agent");
+  if (kind === undefined) {
     throw new AiregError(`${path} is not an artifact.`, {
       code: ErrorCode.Invalid,
       hint: SHAPE_HINT,
     });
   }
-  if (!skill && extname(path) !== ".md") {
-    throw new AiregError(`${path} is not an artifact.`, {
-      code: ErrorCode.Invalid,
-      hint: SHAPE_HINT,
-    });
-  }
-  const meta = frontmatter(await readFile(skill ? join(root, SKILL_ENTRY) : path, "utf8"));
-  const fallback = skill ? basename(root) : basename(path, ".md");
+  const folder = inside !== undefined;
+  const meta = frontmatter(inside?.text ?? (text as string));
+  const fallback = folder ? basename(root) : basename(path, ".md");
   return {
     name: sanitizeName(meta.name ?? fallback),
-    kind: skill ? "skill" : "agent",
-    path: root,
+    kind,
+    path: folder ? root : path,
     description: meta.description === undefined ? undefined : descriptionText(meta.description),
     home: undefined,
     row: undefined,
@@ -82,7 +111,7 @@ async function fromPath(path: string): Promise<Work> {
   };
 }
 
-async function expand(pattern: string, cwd: string): Promise<string[]> {
+export async function expand(pattern: string, cwd: string): Promise<string[]> {
   const found: string[] = [];
   for await (const match of glob(pattern, { cwd })) found.push(resolve(cwd, match));
   if (found.length === 0 && existsSync(resolve(cwd, pattern))) found.push(resolve(cwd, pattern));
