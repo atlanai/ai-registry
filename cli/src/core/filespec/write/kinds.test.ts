@@ -182,8 +182,8 @@ describe("a kind manifest a registry serves", () => {
   test.for([
     ["required", { required: [{ path: "../../outside.md" }] }],
     ["optional", { optional: [{ path: "/etc/outside.md" }] }],
-    ["one_of", { one_of: [[{ path: "NOTE.md" }], [{ path: "docs\\..\\x.md" }]] }],
-    ["one_of", { one_of: [[{ path: ".git/hooks/pre-commit" }]] }],
+    ["one_of (backslash)", { one_of: [[{ path: "NOTE.md" }], [{ path: "docs\\..\\x.md" }]] }],
+    ["one_of (.git)", { one_of: [[{ path: ".git/hooks/pre-commit" }]] }],
   ] as const)(
     "is refused when its %s rules name a file outside the version",
     async ([, files], { tmp }) => {
