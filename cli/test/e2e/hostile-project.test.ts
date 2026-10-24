@@ -100,7 +100,6 @@ test("lists a declared address without its userinfo", async ({ aireg, project })
   }
 });
 
-// A cloned project may declare the name a GitHub URL derives, but not point it elsewhere.
 test("refuses a GitHub URL whose derived name the cloned project declares elsewhere", async ({
   aireg,
   tmp,
