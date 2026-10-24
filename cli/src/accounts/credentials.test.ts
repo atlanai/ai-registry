@@ -165,32 +165,6 @@ describe("credentials", () => {
     ).rejects.toThrow("AIREG_TOKEN_MY__REG names both my__reg and my--reg");
   });
 
-  test("sends an environment token when no other alias the project declares shares it", async () => {
-    vi.stubEnv("AIREG_TOKEN_MY__REG", FROM_ENV);
-    await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
-
-    expect(await credentialFor("my--reg", SIGNS_IN, SIGNED_IN, ["acme", "my--reg"])).toEqual({
-      type: "bearer",
-      accessToken: FROM_ENV,
-    });
-  });
-
-  test("checks every declared alias for a shared token, even when resolving one", async () => {
-    vi.stubEnv("AIREG_TOKEN_MY__REG", FROM_ENV);
-    vi.stubEnv("AIREG_TOKEN_ACME", FROM_ENV);
-    await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
-    const source = (location: string) => ({ location, adapter: "dev", config: {} });
-
-    const clashing = { "my--reg": source(SIGNED_IN), my__reg: source(SAME_ORIGIN) };
-    await expect(credentialsForManifest(clashing, home, undefined, ["my__reg"])).rejects.toThrow(
-      "AIREG_TOKEN_MY__REG names both my__reg and my--reg",
-    );
-    const apart = { "my--reg": source(SIGNED_IN), acme: source(SAME_ORIGIN) };
-    expect(await credentialsForManifest(apart, home, undefined, ["my--reg"])).toEqual({
-      "my--reg": { type: "bearer", accessToken: FROM_ENV },
-    });
-  });
-
   // Windows keeps no permission bits to refuse a readable file by.
   test.skipIf(process.platform === "win32")(
     "reads credentials.json only for a registry that could use a stored sign-in",

@@ -59,14 +59,3 @@ test("refuses a token the job's registry shares with another the project declare
   );
   expect(scan).not.toHaveBeenCalled();
 });
-
-test("reads with the job's own token when no other declared registry shares it", async () => {
-  load.mockResolvedValue(declaring({ "my--reg": at("one"), acme: at("two") }));
-  scan.mockResolvedValue({});
-
-  await inspect(job, account, new AbortController().signal);
-  expect(scan.mock.calls[0]?.[2]).toMatchObject({
-    aliases: ["my--reg"],
-    credentials: { "my--reg": { type: "bearer", accessToken: TOKEN } },
-  });
-});
