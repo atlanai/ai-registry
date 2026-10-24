@@ -45,7 +45,6 @@ export interface Kept {
 export interface Where {
   scope: Scope;
   cwd: string;
-  env?: NodeJS.ProcessEnv | undefined;
 }
 
 interface OpenFile {
@@ -364,7 +363,7 @@ export async function applyRegister(
   const kept: Kept[] = [];
   const owned = { scopeDir, copies };
   for (const target of Object.values(harnesses)) {
-    const root = targetRoot(target, where.scope, where.cwd, where.env);
+    const root = targetRoot(target, where.scope, where.cwd);
     // A project's own folders hold its harness roots, and a link among them may lead out of
     // it; a person's harness root is theirs to keep wherever they like, dotfiles included.
     const anchor = where.scope === "project" ? where.cwd : root;
