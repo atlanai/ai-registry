@@ -49,6 +49,7 @@ export interface Placement {
   plugin?: PluginDocument | undefined;
   /** The commit it was read at, where that is its own rather than the registry's. */
   revision?: string | undefined;
+  leftOut?: { entry: string; files: readonly string[] } | undefined;
 }
 
 /** A resolved registry with lazy access to artifact content. */

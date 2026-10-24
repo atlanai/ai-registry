@@ -1,0 +1,17 @@
+registries:
+  acme: github.com/acme/agent-registry
+exports:
+  - path: agents
+    kind: agent
+    exclude:
+      - drafts
+    ignore:
+      - workspace-data/
+      - "*.log"
+  - path: agents/helper
+    include:
+      - workspace/AGENTS.md
+      - from: workspace/SOUL.md
+        as: identity/SOUL.md
+publish:
+  to: acme/engineering

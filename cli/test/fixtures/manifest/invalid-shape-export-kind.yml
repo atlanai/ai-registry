@@ -1,0 +1,3 @@
+exports:
+  - path: plugins/kit
+    kind: plugin

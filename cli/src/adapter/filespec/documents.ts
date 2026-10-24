@@ -1,5 +1,6 @@
 import type { RegistryIdentity } from "../contract.ts";
 import { type ArtifactKind, isKind } from "../kinds.ts";
+import { compareVersion, parseVersion, type Version } from "../semver.ts";
 import { SUPPORTED_FORMAT } from "../spec/types.ts";
 import { list, quoted } from "../text.ts";
 import { INDEX_DOCUMENT, isVersion, REGISTRY_DOCUMENT, versionsPath } from "./names.ts";
@@ -282,4 +283,15 @@ export function resolveVersion(document: VersionsDocument, wanted: string | unde
     hint:
       offered.length === 0 ? undefined : `Use ${list(offered.slice(0, SUGGESTED), "or")}${more}.`,
   });
+}
+
+/** Return the newest held version, including yanked releases, to avoid republishing it. */
+export function newestListed(document: VersionsDocument): string {
+  let best: { version: string; parsed: Version } | undefined;
+  for (const { version } of document.versions) {
+    const parsed = parseVersion(version);
+    if (parsed === undefined) continue;
+    if (best === undefined || compareVersion(parsed, best.parsed) > 0) best = { version, parsed };
+  }
+  return best?.version ?? document.latest;
 }
