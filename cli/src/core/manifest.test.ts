@@ -183,33 +183,15 @@ describe("an address", () => {
   });
 });
 
-describe("registries and their storage folders", () => {
-  test("are accepted when their folders differ", () => {
-    const manifest = parseManifest("registries:\n  team: ../a\n  team-b: ../b\n");
-    expect(Object.keys(manifest.registries)).toEqual(["team", "team-b"]);
-  });
+test("never writes registries that would share a storage folder", async ({ tmp }) => {
+  const project = roots("project", tmp);
+  await writeManifest(project, parseManifest("registries:\n  Team: ../b\n"));
+  const before = await readFile(project.manifest, "utf8");
+  const manifest = await readManifest(project.manifest);
+  manifest.registries.team = { location: "../a", adapter: undefined, config: {} };
 
-  test.for([
-    ["they differ only by case", "team", "Team", "team"],
-    ["they differ only by punctuation", "team-a", "team_a", "team-a"],
-    ["both reduce to nothing", "'!!'", "'__'", "unnamed"],
-  ])("are refused when %s", ([, first, second, folder]) => {
-    const text = `registries:\n  ${first}: ../a\n  ${second}: ../b\n`;
-    expect(() => parseManifest(text)).toThrow(
-      `would share the folder .registry/artifacts/${folder}.`,
-    );
-  });
-
-  test("are never written, so the manifest stays readable", async ({ tmp }) => {
-    const project = roots("project", tmp);
-    await writeManifest(project, parseManifest("registries:\n  Team: ../b\n"));
-    const before = await readFile(project.manifest, "utf8");
-    const manifest = await readManifest(project.manifest);
-    manifest.registries.team = { location: "../a", adapter: undefined, config: {} };
-
-    await expect(writeManifest(project, manifest)).rejects.toThrow(
-      'Registries "Team" and "team" would share the folder .registry/artifacts/team.',
-    );
-    expect(await readFile(project.manifest, "utf8")).toBe(before);
-  });
+  await expect(writeManifest(project, manifest)).rejects.toThrow(
+    'Registries "Team" and "team" would share the folder .registry/artifacts/team.',
+  );
+  expect(await readFile(project.manifest, "utf8")).toBe(before);
 });

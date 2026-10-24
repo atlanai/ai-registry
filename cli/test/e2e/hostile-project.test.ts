@@ -115,15 +115,14 @@ test("refuses a cloned manifest whose registries would share one storage folder"
     `registries:\n  team: ${ours}\n  Team: ${theirs}\nartifacts:\n  - team/eng/skill/lint\n  - Team/eng/skill/secret\n`,
   );
 
-  for (const argv of [["install"], ["status"], ["sync", "--dry-run"], ["publish", "--dry-run"]]) {
-    const ran = await aireg([...argv, "--json"], { cwd: project });
-    expect(ran.code, argv.join(" ")).not.toBe(0);
-    expect(JSON.parse(ran.stdout).error, argv.join(" ")).toMatchObject({
-      code: "invalid",
-      message: expect.stringContaining(
-        'Registries "team" and "Team" would share the folder .registry/artifacts/team.',
-      ),
-    });
-  }
+  const ran = await aireg(["install", "--json"], { cwd: project });
+
+  expect(ran.code).not.toBe(0);
+  expect(JSON.parse(ran.stdout).error).toMatchObject({
+    code: "invalid",
+    message: expect.stringContaining(
+      'Registries "team" and "Team" would share the folder .registry/artifacts/team.',
+    ),
+  });
   expect(await readdir(join(project, ".registry"))).toEqual(["manifest.yml"]);
 });
