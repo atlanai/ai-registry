@@ -116,9 +116,8 @@ async function release(
 }
 
 /**
- * Undefined is the ordinary case: most registries need no account at all.
- * `alias` is the name the current scope declares at `location`, and `declared`
- * every name it declares, since any of them may read the same token.
+ * Undefined for most registries. `declared` is every alias the scope declares, since two can
+ * read one token variable.
  */
 export async function credentialFor(
   alias: string,
@@ -131,9 +130,8 @@ export async function credentialFor(
 }
 
 /**
- * Keyed by alias because that is how `acquire` asks for them, and skipping the
- * registries nobody is signed in to so an unauthenticated source stays free.
- * `only` narrows which registries are resolved, not which are checked for a shared token.
+ * Keyed by alias, as `acquire` asks; registries nobody is signed in to are skipped. `only`
+ * narrows what is resolved, never which aliases are checked for a shared token.
  */
 export async function credentialsForManifest(
   registries: Readonly<Record<string, RegistrySource>>,
