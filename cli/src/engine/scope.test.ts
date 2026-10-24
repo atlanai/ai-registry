@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Candidate } from "#core/sync/adopt.ts";
 import type { SyncItem } from "#core/sync/model.ts";
+import { artifactKey } from "./decide.ts";
 import type { Scan } from "./scan.ts";
 import { RunScopeError, scopedKeys } from "./scope.ts";
 
@@ -36,29 +37,41 @@ describe("scopedKeys", () => {
   });
 
   it.each([
-    ["the catalog name", "sales/deploy", ["skill:sales/deploy"]],
-    ["the address grammar manifest.yml uses", "shop/sales/skill/deploy", ["skill:sales/deploy"]],
-    ["a whole namespace", "shop/sales", ["skill:sales/deploy", "skill:sales/lint"]],
+    ["the catalog name", "sales/deploy", [artifactKey("skill", "sales/deploy")]],
+    [
+      "the address grammar manifest.yml uses",
+      "shop/sales/skill/deploy",
+      [artifactKey("skill", "sales/deploy")],
+    ],
+    [
+      "a whole namespace",
+      "shop/sales",
+      [artifactKey("skill", "sales/deploy"), artifactKey("skill", "sales/lint")],
+    ],
     [
       "one of two kinds that share a name",
       "shop/engineering/agent/lint",
-      ["agent:engineering/lint"],
+      [artifactKey("agent", "engineering/lint")],
     ],
     [
       "an address with no namespace, wherever it is",
       "shop/skill/lint",
-      ["skill:engineering/lint", "skill:sales/lint"],
+      [artifactKey("skill", "engineering/lint"), artifactKey("skill", "sales/lint")],
     ],
     [
       "a local artifact the registry does not carry yet",
       "shop/skill/written-here",
-      ["skill:written-here"],
+      [artifactKey("skill", "written-here")],
     ],
-    ["one kind of two local artifacts that share a name", "shop/skill/helper", ["skill:helper"]],
+    [
+      "one kind of two local artifacts that share a name",
+      "shop/skill/helper",
+      [artifactKey("skill", "helper")],
+    ],
     [
       "every kind of a local name, when no kind is named",
       "helper",
-      ["agent:helper", "skill:helper"],
+      [artifactKey("agent", "helper"), artifactKey("skill", "helper")],
     ],
   ])("resolves %s", (_, ref, expected) => {
     expect([...(scopedKeys([ref], catalog, REGISTRY) ?? [])].sort()).toEqual(expected);
@@ -66,8 +79,8 @@ describe("scopedKeys", () => {
 
   it("reaches the whole registry, and only this job's", () => {
     const scoped = scopedKeys(["shop"], catalog, REGISTRY);
-    expect([...(scoped ?? [])]).not.toContain("skill:other/deploy");
-    expect([...(scoped ?? [])]).toContain("skill:loose");
+    expect([...(scoped ?? [])]).not.toContain(artifactKey("skill", "other/deploy"));
+    expect([...(scoped ?? [])]).toContain(artifactKey("skill", "loose"));
   });
 
   it("refuses a ref that reaches nothing rather than running empty", () => {

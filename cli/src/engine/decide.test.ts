@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classify } from "./decide.ts";
+import { artifactKey, classify, type SyncOutcome } from "./decide.ts";
 import type { Scan } from "./scan.ts";
 import type { ScopeWork } from "./work.ts";
 
@@ -11,6 +11,11 @@ const job: ScopeWork = {
   policy: { pull: "on", publish: "on", delete: "on" },
   steps: [],
 };
+
+/** What classify settled for one artifact, found by its kind and name. */
+function outcomeFor(outcomes: ReadonlyMap<string, SyncOutcome>, kind: string, artifact: string) {
+  return [...outcomes.values()].find((item) => item.kind === kind && item.artifact === artifact);
+}
 
 function scan(local: Scan["local"]): Scan {
   return { items: [], local, undeclared: [], publisher: new Map() } as unknown as Scan;
@@ -30,8 +35,8 @@ describe("classify", () => {
       new Map(),
       (kind) => kind === "skill",
     );
-    expect(outcomes.get("agent:helper")?.operation).toBe("report");
-    expect(outcomes.get("skill:lint")?.operation).toBe("publish");
+    expect(outcomeFor(outcomes, "agent", "helper")?.operation).toBe("report");
+    expect(outcomeFor(outcomes, "skill", "lint")?.operation).toBe("publish");
     expect(mutates).toBe(true);
   });
 
@@ -45,7 +50,7 @@ describe("classify", () => {
       new Map(),
       () => false,
     );
-    expect(outcomes.get("skill:lint")?.operation).toBe("ignore");
+    expect(outcomeFor(outcomes, "skill", "lint")?.operation).toBe("ignore");
     expect(mutates).toBe(false);
   });
 
@@ -55,9 +60,19 @@ describe("classify", () => {
       { name: "lint", kind: "skill" },
     ] as Scan["local"]);
     const all = classify(both, job, "acme", undefined, "sync", new Map());
-    expect([...all.outcomes.keys()].sort()).toEqual(["agent:lint", "skill:lint"]);
+    expect([...all.outcomes.values()]).toEqual([
+      expect.objectContaining({ artifact: "lint", kind: "agent" }),
+      expect.objectContaining({ artifact: "lint", kind: "skill" }),
+    ]);
 
-    const narrowed = classify(both, job, "acme", new Set(["skill:lint"]), "sync", new Map());
+    const narrowed = classify(
+      both,
+      job,
+      "acme",
+      new Set([artifactKey("skill", "lint")]),
+      "sync",
+      new Map(),
+    );
     expect([...narrowed.outcomes.values()]).toEqual([
       expect.objectContaining({ artifact: "lint", kind: "skill", operation: "publish" }),
     ]);
@@ -87,7 +102,7 @@ describe("classify across registries", () => {
       acquired: [],
     } as unknown as Scan;
     const { outcomes, mutates } = classify(shared, job, "second", undefined, "sync", new Map());
-    expect(outcomes.has("skill:shared/evals")).toBe(false);
+    expect(outcomeFor(outcomes, "skill", "shared/evals")).toBeUndefined();
     expect(mutates).toBe(false);
   });
 });
@@ -122,7 +137,7 @@ describe("a folder of yours with a registry name", () => {
 
   it("keeps the registry's copy out, without asking anyone to act", () => {
     const { outcomes, writes } = classify(withFolder(), job, "acme", undefined, "sync", new Map());
-    expect(outcomes.get("skill:ws/hello")).toMatchObject({
+    expect(outcomeFor(outcomes, "skill", "ws/hello")).toMatchObject({
       operation: "ignore",
       detail: "a folder of yours with this name is in use",
     });
@@ -131,15 +146,10 @@ describe("a folder of yours with a registry name", () => {
 
   it("installs it when claiming is asked for, or when the lock already holds it", () => {
     const claiming = { ...job, policy: { ...job.policy, claim: "on" as const } };
-    expect(
-      classify(withFolder(), claiming, "acme", undefined, "sync", new Map()).outcomes.get(
-        "skill:ws/hello",
-      )?.operation,
-    ).toBe("pull");
+    const claimed = classify(withFolder(), claiming, "acme", undefined, "sync", new Map());
+    expect(outcomeFor(claimed.outcomes, "skill", "ws/hello")?.operation).toBe("pull");
     const locked = withFolder({ "ws/hello": { registry: "acme", kind: "skill" } });
-    expect(
-      classify(locked, job, "acme", undefined, "sync", new Map()).outcomes.get("skill:ws/hello")
-        ?.operation,
-    ).toBe("pull");
+    const held = classify(locked, job, "acme", undefined, "sync", new Map());
+    expect(outcomeFor(held.outcomes, "skill", "ws/hello")?.operation).toBe("pull");
   });
 });
