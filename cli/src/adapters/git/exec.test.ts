@@ -110,7 +110,6 @@ unix("git", () => {
     }
   });
 
-  // An empty PATH, all that is left of one with no absolute folder, searches the working folder.
   test("refuses to run git or gh when no folder on PATH is absolute", async ({ tmp }) => {
     for (const tool of ["git", "gh"]) {
       // A redirect, which needs nothing on PATH, so the marker shows any run.

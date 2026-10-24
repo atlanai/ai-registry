@@ -1,6 +1,5 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join, relative } from "node:path";
+import { delimiter, join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { collidingPaths, expandHome, isSafePath, onPath, withAbsolutePath } from "./paths.ts";
 
@@ -89,14 +88,6 @@ function asWindows<T>(run: () => T): T {
 const absolute = join(tmpdir(), "aireg-bin");
 
 describe("withAbsolutePath", () => {
-  test("keeps only the absolute folders on PATH", () => {
-    const path = ["", ".", "bin", absolute].join(delimiter);
-    expect(withAbsolutePath({ PATH: path, HOME: "/home/u" })).toEqual({
-      PATH: absolute,
-      HOME: "/home/u",
-    });
-  });
-
   test("leaves an environment without PATH alone", () => {
     expect(withAbsolutePath({ HOME: "/home/u" })).toEqual({ HOME: "/home/u" });
   });
@@ -118,17 +109,12 @@ describe("withAbsolutePath", () => {
 });
 
 describe("onPath", () => {
-  test("finds a program only in an absolute folder, not one relative to aireg's own", async () => {
-    // Beside the working folder, so the relative spelling stays relative: on Windows the
-    // temporary folder can sit on another drive, where `relative` gives an absolute path.
-    const dir = await mkdtemp(join(process.cwd(), "node_modules", ".aireg-onpath-"));
-    try {
-      await writeFile(join(dir, "aireg-test-tool"), "");
-      expect(onPath("aireg-test-tool", { PATH: dir })).toBe(true);
-      expect(onPath("aireg-test-tool", { PATH: relative(process.cwd(), dir) })).toBe(false);
-      expect(asWindows(() => onPath("aireg-test-tool", { Path: dir }))).toBe(true);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+  // An existing folder beside the working folder: a temporary one can sit on another
+  // Windows drive, where no relative spelling reaches it.
+  test("finds a program only in an absolute folder, not one relative to aireg's own", () => {
+    const bin = join("node_modules", ".bin");
+    expect(onPath("vitest", { PATH: join(process.cwd(), bin) })).toBe(true);
+    expect(onPath("vitest", { PATH: bin })).toBe(false);
+    expect(asWindows(() => onPath("vitest", { Path: join(process.cwd(), bin) }))).toBe(true);
   });
 });

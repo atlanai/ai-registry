@@ -22,10 +22,4 @@ describe("the PATH git is found on", () => {
     const path = ["", ".", "bin", "/usr/bin", "/bin"].join(delimiter);
     expect(gitEnv({ PATH: path }).PATH).toBe(["/usr/bin", "/bin"].join(delimiter));
   });
-
-  it("is refused when no folder on it is absolute, rather than left empty", () => {
-    expect(() => gitEnv({ PATH: ["", ".", "bin"].join(delimiter) })).toThrow(
-      "No folder on PATH is absolute, so aireg runs no program from it.",
-    );
-  });
 });

@@ -56,7 +56,6 @@ describe.skipIf(process.platform === "win32")("exec", () => {
     }
   });
 
-  // Emptied rather than refused, such a PATH would search the working folder.
   it("runs nothing when no folder on PATH is absolute", async () => {
     const dir = await mkdtemp(join(tmpdir(), "aireg-path-"));
     try {
