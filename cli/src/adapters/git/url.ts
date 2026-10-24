@@ -170,12 +170,14 @@ export function parseSource(input: string, cwd = process.cwd()): SourceSpec {
     alias: registryNameFromLocation(path, "registry"),
     slug: path.split("/").length === 2 ? path : undefined,
     host: url.hostname,
-    exact: (url.port !== "" && !(url.protocol === "ssh:" && url.port === "22")) || namesUser(url),
+    exact:
+      (url.port !== "" && !(url.protocol === "ssh:" && url.port === "22")) || namesSshUser(url),
   };
 }
 
-function namesUser(url: URL): boolean {
-  return url.username !== "" && url.username !== "git";
+// `cloneUrl` keeps a user only for ssh:, so elsewhere the user is not part of the address tried.
+function namesSshUser(url: URL): boolean {
+  return url.protocol === "ssh:" && url.username !== "" && url.username !== "git";
 }
 
 /** file:// is a git transport, not a directory read: `./dir` is the latter. */

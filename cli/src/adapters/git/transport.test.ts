@@ -50,13 +50,11 @@ describe("an address naming its own account or port", () => {
   test.for([
     ["git@github.com:acme/kit.git", ["ssh", "https"]],
     ["ssh://git@git.example.com:22/acme/kit.git", ["ssh", "https"]],
-  ] as const)(
-    "keeps every fallback for %s, which names only the defaults",
-    async ([input, labels], { tmp }) => {
-      const env = await withGh(tmp);
-      expect(attempts(parseSource(input), env).map((a) => a.label)).toEqual(labels);
-    },
-  );
+    ["https://user@github.com/acme/kit", ["https", "gh", "ssh"]],
+  ] as const)("keeps every fallback for %s", async ([input, labels], { tmp }) => {
+    const env = await withGh(tmp);
+    expect(attempts(parseSource(input), env).map((a) => a.label)).toEqual(labels);
+  });
 
   test("hands gh the whole github.com URL", async ({ tmp }) => {
     const env = await withGh(tmp);
