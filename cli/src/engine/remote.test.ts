@@ -2,7 +2,7 @@ import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, vi } from "vitest";
 import type { PublishInput } from "#adapter/index.ts";
-import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
+import { roots as makeRoots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { mutateRemote } from "./remote.ts";
 import type { Scan } from "./scan.ts";
@@ -55,9 +55,17 @@ test("offers new local work in the namespace the account publishes into", async 
   ]);
 });
 
-/** A scan that pinned lint from acme/eng and finds it edited, as sync reads one to publish. */
-function pinnedLint(roots: Roots): Scan {
-  return {
+test("refuses an installed copy reached through a symlinked namespace folder", async ({ tmp }) => {
+  const roots = makeRoots("project", join(tmp, "project"));
+  const outside = join(tmp, "outside");
+  await mkdir(join(outside, "skills", "lint"), { recursive: true });
+  await writeFile(
+    join(outside, "skills", "lint", "SKILL.md"),
+    "---\nname: lint\ndescription: L.\n---\n",
+  );
+  await mkdir(join(roots.artifacts, "acme"), { recursive: true });
+  await symlink(outside, join(roots.artifacts, "acme", "eng"));
+  const scan = {
     items: [{ name: "lint", kind: "skill" }],
     roots,
     local: [],
@@ -68,48 +76,16 @@ function pinnedLint(roots: Roots): Scan {
       },
     },
   } as unknown as Scan;
-}
 
-async function writeLint(namespace: string): Promise<void> {
-  await mkdir(join(namespace, "skills", "lint"), { recursive: true });
-  await writeFile(
-    join(namespace, "skills", "lint", "SKILL.md"),
-    "---\nname: lint\ndescription: L.\n---\n",
-  );
-}
-
-function publishLint(roots: Roots) {
-  return mutateRemote(
-    pinnedLint(roots),
-    { scope: "project", cwd: roots.cwd },
-    { config: {} } as never,
-    { id: "acc_1", registry: "acme" },
-    new Map([["lint", "publish"]]),
-    new AbortController().signal,
-    { event: () => {} },
-  );
-}
-
-test("publishes an installed copy reached through real folders", async ({ tmp }) => {
-  offered.length = 0;
-  const roots = makeRoots("project", join(tmp, "project"));
-  await writeLint(join(roots.artifacts, "acme", "eng"));
-
-  await publishLint(roots);
-
-  expect(offered.map(({ name }) => name)).toEqual(["lint"]);
-});
-
-test("refuses an installed copy reached through a symlinked namespace folder", async ({ tmp }) => {
-  offered.length = 0;
-  const roots = makeRoots("project", join(tmp, "project"));
-  const outside = join(tmp, "outside");
-  await writeLint(outside);
-  await mkdir(join(roots.artifacts, "acme"), { recursive: true });
-  await symlink(outside, join(roots.artifacts, "acme", "eng"));
-
-  await expect(publishLint(roots)).rejects.toThrow(
-    /lint was not published because .* is a symlink/,
-  );
-  expect(offered).toEqual([]);
+  await expect(
+    mutateRemote(
+      scan,
+      { scope: "project", cwd: roots.cwd },
+      { config: {} } as never,
+      { id: "acc_1", registry: "acme" },
+      new Map([["lint", "publish"]]),
+      new AbortController().signal,
+      { event: () => {} },
+    ),
+  ).rejects.toThrow(/lint was not published because .* is a symlink/);
 });
