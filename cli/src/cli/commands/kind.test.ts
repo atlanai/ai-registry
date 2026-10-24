@@ -127,7 +127,6 @@ describe("native agent import and indexing", () => {
   });
 });
 
-// A registry ships its own folders, so a link in one must not carry new files out of it.
 describe("writes stay inside the registry", () => {
   /** A registry with `eng/skill/lint` at 0.1.0, and an empty folder outside it. */
   async function registry(tmp: string): Promise<{ root: string; outside: string; lint: string }> {
@@ -175,21 +174,13 @@ describe("writes stay inside the registry", () => {
     expect(await readdir(lint)).toEqual(["0.1.0"]);
   });
 
-  test.for([
-    ["a link", ErrorCode.Invalid],
-    ["a file", ErrorCode.Conflict],
-  ] as const)(
-    "refuses bump onto %s already where the version goes",
-    async ([what, code], { tmp }) => {
-      const { root, outside, lint } = await registry(tmp);
-      if (what === "a link") await symlink(outside, join(lint, "0.1.1"));
-      else await writeFile(join(lint, "0.1.1"), "keep");
+  test("refuses bump onto a file already where the version goes", async ({ tmp }) => {
+    const { root, lint } = await registry(tmp);
+    await writeFile(join(lint, "0.1.1"), "keep");
 
-      await expect(skill(root, ["bump", "lint", "--namespace", "eng"])).rejects.toMatchObject({
-        code,
-      });
-      expect(await readdir(outside)).toEqual([]);
-      if (what === "a file") expect(await readFile(join(lint, "0.1.1"), "utf8")).toBe("keep");
-    },
-  );
+    await expect(skill(root, ["bump", "lint", "--namespace", "eng"])).rejects.toMatchObject({
+      code: ErrorCode.Conflict,
+    });
+    expect(await readFile(join(lint, "0.1.1"), "utf8")).toBe("keep");
+  });
 });

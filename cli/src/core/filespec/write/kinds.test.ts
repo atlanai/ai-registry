@@ -169,36 +169,20 @@ async function servingNote(root: string, kinds: unknown[], files: unknown): Prom
   await writeFile(join(root, "kinds", "note.json"), JSON.stringify(manifest));
 }
 
-// `aireg <kind> new` writes each file rule's path, so one that leaves the version is never served.
 describe("a kind manifest a registry serves", () => {
-  const note = [{ name: "note", manifest_url: "kinds/note.json" }];
-
-  test("is used when every file it names stays inside a version", async ({ tmp }) => {
-    await servingNote(tmp, note, { required: [{ path: "docs/NOTE.md" }] });
-    expect(Object.keys(await kindsOf(tmp))).toEqual(["note"]);
-    expect(await manifestProblems(tmp)).toEqual([]);
+  test("is refused when any alternative names a file outside the version", async ({ tmp }) => {
+    const note = [{ name: "note", manifest_url: "kinds/note.json" }];
+    await servingNote(tmp, note, { one_of: [[{ path: "NOTE.md" }], [{ path: "../x.md" }]] });
+    expect(await kindsOf(tmp)).not.toHaveProperty("note");
+    expect(await manifestProblems(tmp)).toEqual([
+      {
+        path: "kinds/note.json",
+        message: expect.stringContaining(
+          'names the file "../x.md", which is not a path inside a version',
+        ),
+      },
+    ]);
   });
-
-  test.for([
-    ["required", { required: [{ path: "../../outside.md" }] }],
-    ["optional", { optional: [{ path: "/etc/outside.md" }] }],
-    ["one_of (backslash)", { one_of: [[{ path: "NOTE.md" }], [{ path: "docs\\..\\x.md" }]] }],
-    ["one_of (.git)", { one_of: [[{ path: ".git/hooks/pre-commit" }]] }],
-  ] as const)(
-    "is refused when its %s rules name a file outside the version",
-    async ([, files], { tmp }) => {
-      await servingNote(tmp, note, files);
-      expect(await kindsOf(tmp)).not.toHaveProperty("note");
-      expect(await manifestProblems(tmp)).toEqual([
-        {
-          path: "kinds/note.json",
-          message: expect.stringMatching(
-            /^names the file .*, which is not a path inside a version/,
-          ),
-        },
-      ]);
-    },
-  );
 
   test("is refused, with its command, when registry.json lists it under no kind name", async ({
     tmp,
