@@ -53,10 +53,10 @@ function keypress(text: string, key: Key): Keypress {
 
 /**
  * Lines measured here, one Text per terminal row: a long line breaks where the
- * terminal would, and Ink erases every row it drew on the next frame. Options
- * carry registry text, and Ink keeps hyperlinks and any styling, so only ours stays.
+ * terminal would, and Ink erases every row it drew on the next frame.
  */
 function Frame(props: { lines: readonly string[]; columns: number }): ReactElement {
+  // Options carry registry text, and Ink passes hyperlinks and styling through.
   const rows = props.lines.flatMap((line) => wrapRows(ownStyleOnly(line), props.columns));
   return createElement(
     Box,

@@ -7,7 +7,6 @@ import type { PromptIo, PromptWriter } from "./prompt.ts";
 
 // The non-interactive parts of the prompt frame. Both write to the prompt's
 // stream, never to stdout, so a redirected stdout still holds only results.
-// Neither goes through the printer or Ink, so each strips registry text itself.
 
 /** A framed block of already-formatted lines under a title. */
 export function note(io: PromptIo, style: Styler, title: string, body: readonly string[]): void {
