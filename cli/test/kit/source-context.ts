@@ -7,7 +7,7 @@ export function sourceContext(source: SourceContext["source"], cache: string): S
     source,
     credential: undefined,
     signal: new AbortController().signal,
-    limits: { timeoutMs: 1000, retries: 0 },
+    limits: { timeoutMs: 30_000, retries: 0 },
     onBytes: () => {},
     cacheDir: () => {
       mkdirSync(cache, { recursive: true });

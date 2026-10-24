@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, vi } from "vitest";
+import { contentDigest } from "#adapter/spec/canonical.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { indexRoot } from "./indexer.ts";
 import { validateRoot } from "./validate.ts";
@@ -95,6 +96,28 @@ describe("indexRoot", () => {
       "assets/rubric.json",
     ]);
     expect(envelope.files[1]).toEqual(RUBRIC);
+  });
+
+  test("keeps the relationships a hand-written artifact.json gives, inside the digest", async () => {
+    const edge = {
+      rel_type: "depends_on",
+      to: "engineering/skill/pr-review@1.2.0",
+    };
+    const version = join(root, "artifacts", "engineering", "skill", "pr-review", "1.3.0");
+    await mkdir(version, { recursive: true });
+    await writeFile(
+      join(version, "SKILL.md"),
+      "---\nname: pr-review\ndescription: Reviews pull requests.\n---\n\nReview it.\n",
+    );
+    await writeFile(join(version, "artifact.json"), JSON.stringify({ relationships: [edge] }));
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    const envelope = JSON.parse(await readFile(join(version, "artifact.json"), "utf8"));
+    expect(envelope.relationships).toEqual([edge]);
+    const { digest, ...metadata } = envelope.metadata;
+    expect(digest).toBe(contentDigest({ ...envelope, metadata }));
+    expect(digest).not.toBe(contentDigest({ ...envelope, metadata, relationships: undefined }));
   });
 
   test("refuses to keep a blob-backed file whose blob is not there", async () => {

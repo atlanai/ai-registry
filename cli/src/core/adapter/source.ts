@@ -21,7 +21,7 @@ import { ENVELOPE_API_VERSION } from "#adapter/spec/types.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
 import type { Catalog, Entry } from "#core/catalog/model.ts";
 import { emptyCatalog, finalize, merge } from "#core/catalog/model.ts";
-import { withheldFrom } from "#core/catalog/withheld.ts";
+import { newestFrom, withheldFrom } from "#core/catalog/withheld.ts";
 import { bindAdapter } from "#core/hook/bind.ts";
 import { KIND_SPECS, specKindDir } from "#core/kinds.ts";
 import { withLease } from "#core/lease.ts";
@@ -88,6 +88,7 @@ export async function connectSource(
 interface Listed {
   path: string;
   artifact: Artifact;
+  leftOut?: readonly string[];
 }
 
 export interface Listing {
@@ -122,6 +123,17 @@ function entryPath(artifact: Artifact): string | undefined {
 
   const only = artifact.files.length === 1 ? artifact.files[0] : undefined;
   return only === undefined ? undefined : `${address}${extname(only.path)}`;
+}
+
+function asServed(artifact: Artifact): { artifact: Artifact; leftOut?: string[] } | undefined {
+  const spec = KIND_SPECS[artifact.kind];
+  if (spec.shape !== "file" || artifact.files.length <= 1) return { artifact };
+  const entry = (spec.served ?? [])
+    .map((name) => artifact.files.find((file) => file.path === name))
+    .find((file) => file !== undefined);
+  if (entry === undefined) return undefined;
+  const leftOut = artifact.files.filter((file) => file !== entry).map((file) => file.path);
+  return { artifact: { ...artifact, files: [entry] }, leftOut: leftOut.sort() };
 }
 
 type Fail = (message: string) => never;
@@ -219,12 +231,14 @@ export async function resolveArtifacts(
 
   for (const [index, artifact] of resolution.artifacts.entries()) check(adapter, artifact, index);
 
-  for (const artifact of resolution.artifacts) {
-    const { name, description } = artifact.envelope.metadata;
-    const path = entryPath(artifact);
+  for (const listedAs of resolution.artifacts) {
+    const { name, description } = listedAs.envelope.metadata;
+    const served = asServed(listedAs);
+    const artifact = served?.artifact ?? listedAs;
+    const path = served === undefined ? undefined : entryPath(artifact);
     if (path === undefined) {
       catalog.warnings.push(
-        `${quoted(name)} is a ${artifact.kind}, which is one file, but ${artifact.files.length} were published.`,
+        `${quoted(name)} is ${artifact.kind === "agent" ? "an" : "a"} ${artifact.kind}, which is one file, but ${artifact.files.length} were published and none is its entry file.`,
       );
       continue;
     }
@@ -250,12 +264,18 @@ export async function resolveArtifacts(
       engine: engineFromUnknown(artifact.engines),
       from: { file: adapter.id, pointer: artifact.id },
     });
-    listed.push({ path, artifact });
+    listed.push({
+      path,
+      artifact,
+      ...(served?.leftOut === undefined ? {} : { leftOut: served.leftOut }),
+    });
   }
 
   merge(catalog, adapter.id, entries);
   const withheld = withheldFrom(resolution.withheld);
   if (withheld.length > 0) catalog.withheld = withheld;
+  const newest = newestFrom(resolution.newest);
+  if (newest.length > 0) catalog.newest = newest;
   const said = Array.isArray(resolution.warnings) ? resolution.warnings : [];
   catalog.warnings.push(...said.flatMap((warning) => line(warning) ?? []));
   const layout = typeof resolution.layout === "string" && isLayoutId(resolution.layout);
