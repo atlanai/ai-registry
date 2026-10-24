@@ -125,9 +125,8 @@ function leaseDir(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.ProcessEnv):
 type Guard = (path: string) => Promise<void>;
 
 /**
- * A project's `.registry/` is committed, so a link anywhere from it down to the lease would carry
- * the lease's writes and removals out of the project; it is refused as every other scope write
- * refuses it. The user scope's leases stay in `AIREG_HOME`, which `ensureHome` sets up.
+ * A link from `.registry` down to the lease would carry its writes and removals out of the
+ * project. The user scope's leases live in `AIREG_HOME`, which `ensureHome` sets up.
  */
 function containment(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.ProcessEnv): Guard {
   if (roots.scope === "user") return async () => {};
