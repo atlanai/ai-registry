@@ -372,7 +372,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 --------------------------------------------------------------------------------
-fast-uri 3.1.8
+fast-uri 3.1.9
 License: BSD-3-Clause
 --------------------------------------------------------------------------------
 
@@ -887,7 +887,7 @@ License: MIT
 This package ships no license file. Its package.json declares MIT.
 
 --------------------------------------------------------------------------------
-Bun 1.4.4-canary.1+963452075, the runtime the standalone aireg binary embeds
+Bun 1.4.4+38afee6c8, the runtime the standalone aireg binary embeds
 License: MIT, with the statically linked libraries below under their own licenses
 --------------------------------------------------------------------------------
 

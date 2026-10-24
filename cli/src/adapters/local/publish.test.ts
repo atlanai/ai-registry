@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import {
@@ -128,29 +128,44 @@ describe("writeOffer", () => {
     expect(entry).toMatchObject({ latest: "1.0.0", digest: await pinned("1.0.0") });
   });
 
-  test("never rewrites a released version: different bytes become the next one", async () => {
-    await writeOffer(
-      root,
-      [
-        offer({
-          files: [
-            { path: "SKILL.md", content: body("One.\n"), executable: false },
-            { path: "extra.md", content: body("gone next time\n"), executable: false },
-          ],
-        }),
+  test("never rewrites a released version, nor writes another in its place", async () => {
+    const first = offer({
+      files: [
+        { path: "SKILL.md", content: body("One.\n"), executable: false },
+        { path: "extra.md", content: body("kept\n"), executable: false },
       ],
-      "2026-01-02T00:00:00Z",
-      alone,
-    );
-    await writeOffer(root, [offer()], "2026-01-03T00:00:00Z", alone);
+    });
+    await writeOffer(root, [first], "2026-01-02T00:00:00Z", alone);
+    const fresh = offer({ name: "fresh" });
 
-    expect((await readVersions(read(root), "house", "skill", "lint")).latest).toBe("1.0.1");
-    expect(await readFile(join(root, "artifacts/house/skill/lint/1.0.0/extra.md"), "utf8")).toBe(
-      "gone next time\n",
-    );
     await expect(
-      readFile(join(root, "artifacts/house/skill/lint/1.0.1/extra.md")),
+      writeOffer(root, [fresh, offer()], "2026-01-03T00:00:00Z", alone),
+    ).rejects.toMatchObject({
+      failure: "conflict",
+      message: "house/skill/lint@1.0.0 is already published with other content.",
+    });
+
+    const versions = await readVersions(read(root), "house", "skill", "lint");
+    expect(versions.versions.map((each) => each.version)).toEqual(["1.0.0"]);
+    expect(await readFile(join(root, "artifacts/house/skill/lint/1.0.0/extra.md"), "utf8")).toBe(
+      "kept\n",
+    );
+    // Refused before anything was written, so the change beside it is not there either.
+    await expect(
+      readFile(join(root, "artifacts/house/skill/fresh/versions.json")),
     ).rejects.toThrow();
+    expect((await writeOffer(root, [first], "2026-01-04T00:00:00Z", alone)).unchanged).toBe(true);
+  });
+
+  test("refuses a version versions.json lists with other content, though its folder is gone", async () => {
+    await writeOffer(root, [offer()], "2026-01-02T00:00:00Z", alone);
+    await rm(join(root, "artifacts/house/skill/lint/1.0.0"), { recursive: true });
+    const other = offer({
+      files: [{ path: "SKILL.md", content: body("Other.\n"), executable: false }],
+    });
+    await expect(writeOffer(root, [other], "2026-01-03T00:00:00Z", alone)).rejects.toMatchObject({
+      failure: "conflict",
+    });
   });
 
   test("refuses anything that cannot be a path segment", async () => {
@@ -197,5 +212,33 @@ describe("the envelope a publish writes", () => {
       describeFile(file.path, sha256(file.content), file.content.byteLength),
     ]);
     expect(written.files[0]).toMatchObject({ media_type: "text/markdown" });
+  });
+
+  test("carries the version's relationships, and an edge alone makes another version", async () => {
+    const edge = { rel_type: "depends_on", to: "house/skill/style@1.2.0" };
+    await writeOffer(root, [offer({ relationships: [edge] })], "2026-01-02T00:00:00Z", alone);
+    const envelope = (version: string) =>
+      readFile(join(root, `artifacts/house/skill/lint/${version}/artifact.json`), "utf8").then(
+        (text) => JSON.parse(text) as { relationships?: unknown },
+      );
+    expect((await envelope("1.0.0")).relationships).toEqual([edge]);
+    const versions = await readVersions(read(root), "house", "skill", "lint");
+    expect(versions.versions[0]?.digest).toBe(await pinned("1.0.0"));
+
+    const moved = { ...edge, to: "house/skill/style@1.3.0" };
+    await expect(
+      writeOffer(root, [offer({ relationships: [moved] })], "2026-01-03T00:00:00Z", alone),
+    ).rejects.toMatchObject({ failure: "conflict" });
+    const written = await writeOffer(
+      root,
+      [offer({ version: "1.0.1", relationships: [moved] })],
+      "2026-01-03T00:00:00Z",
+      alone,
+    );
+
+    expect(written.unchanged).toBe(false);
+    expect((await readVersions(read(root), "house", "skill", "lint")).latest).toBe("1.0.1");
+    expect((await envelope("1.0.0")).relationships).toEqual([edge]);
+    expect((await envelope("1.0.1")).relationships).toEqual([moved]);
   });
 });

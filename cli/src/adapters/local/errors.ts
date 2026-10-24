@@ -3,7 +3,7 @@ import { AdapterError, SpecError } from "#adapter/index.ts";
 export const ID = "local";
 
 export function fail(
-  failure: "invalid" | "not_found",
+  failure: "invalid" | "not_found" | "conflict",
   message: string,
   artifact?: string,
   hint?: string,
