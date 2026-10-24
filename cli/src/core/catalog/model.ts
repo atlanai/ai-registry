@@ -1,5 +1,5 @@
 import type { ArtifactKind } from "#core/kinds.ts";
-import type { Withheld } from "./withheld.ts";
+import type { Newest, Withheld } from "./withheld.ts";
 
 /** Where an entry was read from. */
 interface Provenance {
@@ -33,6 +33,8 @@ export interface Catalog {
   warnings: string[];
   /** What the registry reached but would not serve by status, so a copy of it is kept. */
   withheld?: Withheld[];
+  /** Each artifact's newest version where the registry served another, so a publish goes past it. */
+  newest?: Newest[];
 }
 
 export function emptyCatalog(root: string): Catalog {

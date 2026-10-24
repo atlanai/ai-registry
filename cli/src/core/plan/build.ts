@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { list, plural, sanitizeText } from "#adapter/text.ts";
 import { statusWarning } from "#core/catalog/withheld.ts";
 import { dict } from "#core/fields.ts";
 import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
@@ -173,6 +174,7 @@ function planItem(item: Selected, build: BuildState): void {
     return;
   }
   warnStatus(item, previous, build);
+  warnLeftOut(item, previous, build);
   const state = build.survey.artifacts[item.name];
   const copy = artifactPath(
     build.options.roots,
@@ -243,4 +245,21 @@ export function clashMessage({ name, kept, dropped, at }: Clash): string {
   return at === undefined
     ? `${dropped} and ${kept} would both install as "${name}"`
     : `${dropped} and ${kept} would both install at ${at}`;
+}
+
+const NAMED_FILES = 5;
+
+function warnLeftOut(item: Selected, previous: LockArtifact | undefined, build: BuildState): void {
+  const leftOut = build.byAlias.get(item.source)?.placements.get(item.path)?.leftOut;
+  if (leftOut === undefined || leftOut.files.length === 0) return;
+  if (previous !== undefined && previous.version === item.version) return;
+  const shown = [item.group, item.upstreamName].filter(Boolean).join("/");
+  const at = item.version === undefined ? "" : ` ${item.version}`;
+  const named = leftOut.files.slice(0, NAMED_FILES).map((file) => sanitizeText(file));
+  const rest = leftOut.files.length - named.length;
+  const files = rest === 0 ? list(named) : `${named.join(", ")} and ${plural(rest, "more file")}`;
+  build.warnings.push({
+    name: item.name,
+    message: `${shown}${at} installs as its ${sanitizeText(leftOut.entry)} alone, since a harness takes ${item.kind === "agent" ? "an" : "a"} ${item.kind} as one file, so ${files} ${leftOut.files.length === 1 ? "is" : "are"} left out.`,
+  });
 }
