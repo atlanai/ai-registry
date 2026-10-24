@@ -1,0 +1,4 @@
+registries:
+  acme: github.com/acme/agent-registry
+publish:
+  to: [acme/engineering]

@@ -16,6 +16,8 @@ export interface KindSpec {
    * A directory without it is not this kind; absent, any directory is.
    */
   entry?: string;
+  /** Entry filenames a file-shaped kind can install; companion files stay in the registry. */
+  served?: readonly string[];
 }
 
 /** The file that makes a directory a skill and holds its front matter. */
@@ -24,13 +26,20 @@ export const SKILL_ENTRY = "SKILL.md";
 /** The one file a registry's agent version folder holds. */
 export const AGENT_ENTRY = "AGENT.md";
 
-export { AGENT_CARD_ENTRY } from "./product.ts";
+import { AGENT_CARD_ENTRY } from "./product.ts";
+
+export { AGENT_CARD_ENTRY };
 
 /** Shared directory and shape vocabulary for discovery and staging. */
 export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
   plugin: { dir: "plugins", shape: "directory", extensions: [] },
   skill: { dir: "skills", shape: "directory", extensions: [], entry: SKILL_ENTRY },
-  agent: { dir: "agents", shape: "file", extensions: [".md"] },
+  agent: {
+    dir: "agents",
+    shape: "file",
+    extensions: [".md"],
+    served: [AGENT_ENTRY, AGENT_CARD_ENTRY],
+  },
 };
 
 /** Kinds the registry scanner walks; `plugin` is found by its manifest. */
