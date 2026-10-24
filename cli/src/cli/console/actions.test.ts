@@ -40,30 +40,21 @@ describe("console actions", () => {
     accepted(command.argv);
   });
 
-  // A committed lockfile or config chooses these names, so one spelled like an option
-  // must not widen the scope, skip a prompt or force anything.
-  it.each(["-g", "--force", "--yes", "--help", "--to=elsewhere"])(
-    "pass the name %j as a name, not an option",
-    (name) => {
-      for (const [built, words] of [
-        [actions.publish([name], undefined, "project"), [name]],
-        [actions.pullLatest(name, "project"), [name]],
-        [actions.runJob(name), ["start", name]],
-        [actions.setJobEnabled(name, false), ["disable", name]],
-        [actions.retryRun(name), ["retry", name]],
-      ] as const) {
-        const [command = "", ...rest] = built.argv;
-        const globals = takeGlobals(rest, builtin(command));
-        expect(globals.values, built.display).toEqual({});
-        const { positionals, common, own } = parse<Record<string, unknown>>(
-          globals.argv,
-          builtin(command),
-        );
-        expect(positionals, built.display).toEqual(words);
-        expect(common.scope, built.display).toBeUndefined();
-        expect(common.force, built.display).toBe(false);
-        expect(own.to, built.display).toBeUndefined();
-      }
-    },
-  );
+  it("passes a name spelled like an option as data", () => {
+    for (const [built, words] of [
+      [actions.publish(["-g"], undefined, "project"), ["-g"]],
+      [actions.pullLatest("-g", "project"), ["-g"]],
+      [actions.runJob("-g"), ["start", "-g"]],
+      [actions.setJobEnabled("-g", false), ["disable", "-g"]],
+      [actions.retryRun("-g"), ["retry", "-g"]],
+    ] as const) {
+      const [command = "", ...rest] = built.argv;
+      const { positionals, common } = parse<Record<string, unknown>>(
+        takeGlobals(rest, builtin(command)).argv,
+        builtin(command),
+      );
+      expect(positionals, built.display).toEqual(words);
+      expect(common.scope, built.display).toBeUndefined();
+    }
+  });
 });

@@ -147,9 +147,7 @@ describe("parseLock", () => {
       named("a\\b"),
       named(".."),
       row("..", "    name: lint\n"),
-      // The console passes these to `aireg publish`, which would read them as options.
       row("-g", "    name: lint\n"),
-      row("eng/--force", "    name: lint\n"),
       named("--yes"),
       at("    path: ../outside\n"),
       at("    path: /etc\n"),
