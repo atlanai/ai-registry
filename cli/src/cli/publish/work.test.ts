@@ -1,40 +1,49 @@
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
-import { roots as makeRoots } from "#core/store/paths.ts";
+import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
 import type { Loaded } from "#engine/pipeline.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { fromArgs } from "./work.ts";
 
-// A repository ships its .registry folder, so a link there could point an installed copy at your home.
-test.for([
-  ["a real folder", false],
-  ["a symlinked .registry/artifacts", true],
-] as const)("reads an installed copy to publish only through %s", async ([, linked], { tmp }) => {
-  const roots = makeRoots("project", join(tmp, "project"));
-  const real = linked ? join(tmp, "outside") : roots.artifacts;
-  await mkdir(join(real, "acme", "eng", "skills", "lint"), { recursive: true });
-  await writeFile(
-    join(real, "acme", "eng", "skills", "lint", "SKILL.md"),
-    "---\nname: lint\n---\n",
-  );
-  if (linked) {
-    await mkdir(join(roots.cwd, ".registry"), { recursive: true });
-    await symlink(real, roots.artifacts);
-  }
-  const loaded = {
+/** A project whose lock records lint, installed from acme/eng. */
+function installedLint(roots: Roots): Loaded {
+  return {
     roots,
     lock: {
       registries: {},
       artifacts: { lint: { registry: "acme", namespace: "eng", name: "lint", kind: "skill" } },
     },
   } as unknown as Loaded;
+}
 
-  const works = fromArgs(["lint"], loaded, roots.cwd);
+async function writeLint(artifacts: string): Promise<string> {
+  const copy = join(artifacts, "acme", "eng", "skills", "lint");
+  await mkdir(copy, { recursive: true });
+  await writeFile(join(copy, "SKILL.md"), "---\nname: lint\n---\n");
+  return copy;
+}
 
-  if (linked) await expect(works).rejects.toThrow(/lint was not published because .* is a symlink/);
-  else
-    expect((await works).map((work) => work.path)).toEqual([
-      join(real, "acme", "eng", "skills", "lint"),
-    ]);
+test("reads an installed copy to publish through real folders", async ({ tmp }) => {
+  const roots = makeRoots("project", join(tmp, "project"));
+  const copy = await writeLint(roots.artifacts);
+
+  const works = await fromArgs(["lint"], installedLint(roots), roots.cwd);
+
+  expect(works.map((work) => work.path)).toEqual([copy]);
+});
+
+// A repository ships its .registry folder, so a link there could point an installed copy at your home.
+test("refuses an installed copy reached through a symlinked .registry/artifacts", async ({
+  tmp,
+}) => {
+  const roots = makeRoots("project", join(tmp, "project"));
+  const outside = join(tmp, "outside");
+  await writeLint(outside);
+  await mkdir(join(roots.cwd, ".registry"), { recursive: true });
+  await symlink(outside, roots.artifacts);
+
+  await expect(fromArgs(["lint"], installedLint(roots), roots.cwd)).rejects.toThrow(
+    /lint was not published because .* is a symlink/,
+  );
 });
