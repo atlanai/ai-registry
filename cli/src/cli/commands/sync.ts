@@ -13,7 +13,7 @@ import { renderSync } from "#cli/render/sync.ts";
 import { isStepPolicy, STEP_POLICIES } from "#core/config/model.ts";
 import { registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
-import { type RegistrySource, unknownRegistry } from "#core/manifest.ts";
+import { unknownRegistry } from "#core/manifest.ts";
 import type { RunRecord } from "#core/run/model.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { type Candidate, displayPath } from "#core/sync/adopt.ts";
@@ -120,13 +120,15 @@ async function report(
 ): Promise<void> {
   const loaded = await load(common, context.cwd);
   const wanted = covered(loaded, only);
-  const registries = Object.fromEntries(
-    wanted.map((alias) => [alias, loaded.manifest.registries[alias] as RegistrySource]),
-  );
   const found = await scan(loaded, common, {
     ...(only === undefined ? {} : { aliases: wanted }),
     onStep: (message) => context.printer.step(message),
-    credentials: await credentialsForManifest(registries, context.cwd),
+    credentials: await credentialsForManifest(
+      loaded.manifest.registries,
+      context.cwd,
+      undefined,
+      wanted,
+    ),
   });
   // The lock's rows from the registries left closed are not this run's to report.
   const scoped =

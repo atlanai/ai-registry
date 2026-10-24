@@ -164,6 +164,33 @@ describe("credentials.json, end to end", () => {
     });
   }, 60_000);
 
+  test("refuses a dry run of one registry whose token another declared registry reads", async ({
+    aireg,
+    project: dir,
+    signsIn,
+  }) => {
+    const shared = [
+      "registries:",
+      "  my--reg:",
+      `    source: ${ORIGIN}/one`,
+      "    adapter: signs-in",
+      "  my__reg:",
+      `    source: ${ORIGIN}/two`,
+      "    adapter: signs-in",
+      "artifacts:",
+      "  - my--reg/skill/lint",
+      "",
+    ].join("\n");
+    await writeManifestIn(dir, shared);
+
+    const dry = await aireg(["sync", "--dry-run", "my--reg"], {
+      env: { AIREG_TOKEN_MY__REG: TOKEN },
+    });
+    expect(dry.code).not.toBe(0);
+    expect(dry.stderr).toContain("AIREG_TOKEN_MY__REG names both my--reg and my__reg");
+    expect(await signsIn.seen()).toBe("");
+  });
+
   test("hands AIREG_TOKEN_<NAME> to the one sync the daemon runs for this command", async ({
     aireg,
     home,
