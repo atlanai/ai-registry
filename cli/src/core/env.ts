@@ -91,9 +91,9 @@ export function withoutTokens(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([name]) => !isTokenVariable(name)));
 }
 
-/** Deletes every `AIREG_TOKEN_<NAME>` from `env` itself, for a process that must hold none. */
-export function removeTokens(env: NodeJS.ProcessEnv = process.env): void {
-  for (const name of Object.keys(env)) if (isTokenVariable(name)) delete env[name];
+/** Deletes every `AIREG_TOKEN_<NAME>` from this process's environment, for one that must hold none. */
+export function removeTokens(): void {
+  for (const name of Object.keys(process.env)) if (isTokenVariable(name)) delete process.env[name];
 }
 
 const supplied = new AsyncLocalStorage<Readonly<Record<string, string>>>();
