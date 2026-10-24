@@ -1,18 +1,80 @@
 // A filesystem-backed provider used to develop clients without a real backend.
 // Registered through `adapters:` in ~/.aireg/config.yml; never bundled.
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, posix } from "node:path";
+import { isAbsolute, join, posix, relative, sep } from "node:path";
 
 const KINDS = ["skill", "agent"];
 const ARCHIVE = "_archived";
+const UNPRINTABLE = /\p{Cc}/u;
 
 function remoteRoot() {
   const override = process.env.AIREG_DEV_REMOTE?.trim();
   if (override !== undefined && override !== "") return override;
   const home = process.env.AIREG_HOME?.trim();
   return join(home === undefined || home === "" ? join(homedir(), ".aireg") : home, "dev-remote");
+}
+
+/**
+ * The registry's config, a manifest and the host's ids all reach the paths below, so
+ * each name is one plain folder, as `isSafePath` in src/adapter/paths.ts keeps a path.
+ */
+function segment(value, what) {
+  if (
+    typeof value !== "string" ||
+    value === "" ||
+    value === "." ||
+    value === ".." ||
+    value === ARCHIVE ||
+    /[/\\:]/.test(value) ||
+    UNPRINTABLE.test(value)
+  ) {
+    throw new Error(`The dev adapter refuses the ${what} ${JSON.stringify(value)}.`);
+  }
+  return value;
+}
+
+function kindOf(kind) {
+  if (!KINDS.includes(kind)) {
+    throw new Error(`The dev adapter refuses the kind ${JSON.stringify(kind)}.`);
+  }
+  return kind;
+}
+
+function segments(path) {
+  const safe =
+    typeof path === "string" &&
+    path !== "" &&
+    !posix.isAbsolute(path) &&
+    !path.includes("\\") &&
+    !path.includes(":") &&
+    !UNPRINTABLE.test(path) &&
+    path.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+  if (!safe) throw new Error(`The dev adapter refuses the file path ${JSON.stringify(path)}.`);
+  return path.split("/");
+}
+
+/** `target`, once it is inside the remote and nothing on the way there is a link. */
+async function contained(target) {
+  const root = remoteRoot();
+  const rel = relative(root, target);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error(`The dev adapter refuses ${target}, which is outside ${root}.`);
+  }
+  let path = root;
+  for (const part of rel.split(sep)) {
+    path = join(path, part);
+    const found = await lstat(path).catch((cause) => {
+      if (cause.code === "ENOENT") return undefined;
+      throw cause;
+    });
+    if (found === undefined) break;
+    if (found.isSymbolicLink()) {
+      throw new Error(`The dev adapter refuses ${target}, which goes through the link ${path}.`);
+    }
+  }
+  return target;
 }
 
 function sha256(bytes) {
@@ -34,7 +96,7 @@ async function walk(root, prefix = "") {
   for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
     const next = prefix === "" ? entry.name : posix.join(prefix, entry.name);
     if (entry.isDirectory()) found.push(...(await walk(root, next)));
-    else if (entry.name !== "meta.json") found.push(next);
+    else if (entry.isFile() && entry.name !== "meta.json") found.push(next);
   }
   return found.sort();
 }
@@ -52,7 +114,7 @@ function namespaceDir(context) {
   if (typeof namespace !== "string" || namespace === "") {
     throw new Error("The dev adapter needs `namespace` in its registry's config.");
   }
-  return join(remoteRoot(), namespace);
+  return join(remoteRoot(), segment(namespace, "namespace"));
 }
 
 /**
@@ -93,7 +155,7 @@ async function describe(kind, name, path) {
 
 async function list(context, names) {
   const wanted = new Set(names);
-  const root = namespaceDir(context);
+  const root = await contained(namespaceDir(context));
   const artifacts = [];
   for (const kindDir of await directories(root)) {
     if (!KINDS.includes(kindDir.name)) continue;
@@ -110,15 +172,18 @@ async function list(context, names) {
 }
 
 async function read(context, artifact, file) {
-  const name = artifact.envelope.metadata.name;
-  return readFile(join(namespaceDir(context), artifact.kind, name, file.locator));
+  const name = segment(artifact.envelope.metadata.name, "name");
+  const path = join(namespaceDir(context), kindOf(artifact.kind), name, ...segments(file.locator));
+  return readFile(await contained(path));
 }
 
 async function publish(context, input) {
-  const path = join(namespaceDir(context), input.kind, input.name);
-  await rm(path, { recursive: true, force: true });
-  for (const file of input.files) {
-    const target = join(path, ...file.path.split(posix.sep));
+  const path = join(namespaceDir(context), kindOf(input.kind), segment(input.name, "name"));
+  // Every path is checked before the old copy goes, so a refused publish leaves it whole.
+  const targets = input.files.map((file) => [file, join(path, ...segments(file.path))]);
+  await rm(await contained(path), { recursive: true, force: true });
+  for (const [file, joined] of targets) {
+    const target = await contained(joined);
     await mkdir(join(target, ".."), { recursive: true });
     await writeFile(target, file.content, { mode: file.executable ? 0o755 : 0o644 });
   }
@@ -127,16 +192,18 @@ async function publish(context, input) {
     description: input.description,
     version: new Date().toISOString(),
   };
-  await writeFile(join(path, "meta.json"), `${JSON.stringify(meta, null, 2)}\n`);
+  await writeFile(await contained(join(path, "meta.json")), `${JSON.stringify(meta, null, 2)}\n`);
   return { id: meta.id };
 }
 
 async function archive(context, input) {
-  const name = input.id.startsWith(`${input.kind}_`)
-    ? input.id.slice(input.kind.length + 1)
-    : input.id;
-  const from = join(namespaceDir(context), input.kind, name);
-  const to = join(namespaceDir(context), ARCHIVE, input.kind, `${name}-${Date.now()}`);
+  const kind = kindOf(input.kind);
+  const name = segment(
+    input.id.startsWith(`${kind}_`) ? input.id.slice(kind.length + 1) : input.id,
+    "name in the id",
+  );
+  const from = await contained(join(namespaceDir(context), kind, name));
+  const to = await contained(join(namespaceDir(context), ARCHIVE, kind, `${name}-${Date.now()}`));
   await mkdir(join(to, ".."), { recursive: true });
   await rename(from, to);
 }
