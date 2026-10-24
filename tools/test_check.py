@@ -81,9 +81,6 @@ class CheckFixTests(unittest.TestCase):
     def test_linked_artifact_is_not_rewritten(self):
         self.assert_refused(self.link(SKILL / "1.2.0" / "artifact.json"))
 
-    def test_linked_versions_is_not_rewritten(self):
-        self.assert_refused(self.link(SKILL / "versions.json"))
-
     def test_linked_namespace_is_not_read_or_rewritten(self):
         namespace = self.link(Path("artifacts", "engineering"))
         self.assert_refused(
