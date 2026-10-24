@@ -147,8 +147,7 @@ def load_json(path: Path, rep: Report):
 
 def inside(root: Path, target: Path) -> bool:
     """True when target sits under root with no symlink on the way, so a
-    registry can never make the checker read, report on, or rewrite a file
-    outside it."""
+    registry cannot make the checker read or rewrite a file outside it."""
     base = root.resolve()
     if not target.resolve().is_relative_to(base):
         return False
