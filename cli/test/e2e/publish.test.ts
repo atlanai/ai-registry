@@ -323,6 +323,14 @@ describe("creating a registry and publishing into it", () => {
     expect((await aireg(["status"], { cwd: project })).code).toBe(0);
   }, 60_000);
 
+  test("publishes an installed copy named by its harness link", async ({ aireg, project }) => {
+    await appendFile(join(project, ".claude", "skills", "deploy", "SKILL.md"), "Roll back.\n");
+
+    const sent = await aireg(["publish", ".claude/skills/deploy", "--yes"], { cwd: project });
+    expect(sent.code, sent.stderr).toBe(0);
+    expect(sent.stdout).toMatch(/update\s+platform\/skill\/deploy\s+0\.1\.1 → 0\.1\.2/);
+  }, 60_000);
+
   test("refuses an edit made on a version something newer has replaced", async ({
     aireg,
     project,
