@@ -155,7 +155,7 @@ const CASES: Case[] = [
       await put(root, "kinds/skill.json", JSON.stringify(manifest));
     },
     path: "kinds/skill.json",
-    message: `has an invalid kind schema: pattern "^(?!draft-)[a-z-]+$" uses syntax aireg does not support`,
+    message: `has an invalid kind schema: pattern "^(?!draft-)[a-z-]+$" uses syntax aireg does not support: invalid or unsupported Perl syntax at (?!, so "skill" is checked against the one aireg bundles`,
   },
   {
     name: "a released version folder deleted",
