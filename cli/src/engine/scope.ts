@@ -38,11 +38,13 @@ export function kindAddress(registry: string, kind: ArtifactKind, name: string):
   return formatAddress({ registry, namespace, kind, name: leaf });
 }
 
-function matchesItem(ref: Ref, registry: string, item: SyncItem): boolean {
+function matchesItem(ref: Ref, registry: string, item: SyncItem, scan: Scan): boolean {
   // Both sides: the ref has to name this job's registry, and the item has
   // to come from it. Another account's catalog is not this run's to narrow.
   if (ref.registry !== registry || item.source !== registry) return false;
-  const { namespace, leaf } = split(item.name);
+  const { namespace: named, leaf } = split(item.name);
+  // An installed artifact's lock key is usually its bare name; its row records the namespace.
+  const namespace = named ?? scan.pinned?.artifacts[item.name]?.namespace;
   if (isWholeRegistry(ref)) return true;
   if (isWholeNamespace(ref)) return ref.namespace === namespace;
   if (ref.kind !== item.kind || ref.name !== leaf) return false;
@@ -82,7 +84,7 @@ function reached(raw: string, registry: string, scan: Scan): Set<string> {
     return keys;
   }
   for (const item of scan.items) {
-    if (matchesItem(ref, registry, item)) keys.add(artifactKey(item.kind, item.name));
+    if (matchesItem(ref, registry, item, scan)) keys.add(artifactKey(item.kind, item.name));
   }
   for (const candidate of scan.local) {
     if (matchesCandidate(ref, registry, candidate)) {

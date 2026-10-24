@@ -67,6 +67,19 @@ describe("scopedKeys", () => {
     expect([...(scopedKeys([ref], catalog, REGISTRY) ?? [])].sort()).toEqual(expected);
   });
 
+  it("reaches an installed artifact by the namespace its lock row records", () => {
+    const installed = {
+      items: [item("lint")],
+      local: [],
+      undeclared: [],
+      pinned: { registries: {}, artifacts: { lint: { name: "lint", namespace: "engineering" } } },
+    } as unknown as Scan;
+
+    expect([...(scopedKeys(["shop/engineering/skill/lint"], installed, REGISTRY) ?? [])]).toEqual([
+      artifactKey("skill", "lint"),
+    ]);
+  });
+
   it("reaches the whole registry, and only this job's", () => {
     const scoped = scopedKeys(["shop"], catalog, REGISTRY);
     expect([...(scoped ?? [])]).not.toContain(artifactKey("skill", "other/deploy"));
