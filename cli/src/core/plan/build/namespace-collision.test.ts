@@ -186,10 +186,11 @@ describe("registries whose plugin names meet once qualified", () => {
   const claudeSkills = (name: string) => join(homedir(), ".claude", "skills", name);
   const location = (alias: string) => `https://github.com/acme/${alias}.git`;
 
-  function source(alias: string, namespace: string, skill: string): Acquired {
-    const [base] = wrapping(
-      acquired([entry({ name: skill, path: `${namespace}/skills/${skill}`, group: namespace })]),
+  function source(alias: string, namespace: string, ...skills: string[]): Acquired {
+    const entries = skills.map((skill) =>
+      entry({ name: skill, path: `${namespace}/skills/${skill}`, group: namespace }),
     );
+    const [base] = wrapping(acquired(entries));
     if (base === undefined) throw new Error("no source");
     const at = location(alias);
     return { ...base, alias, origin: { ...base.origin, location: at, declared: at, key: alias } };
@@ -242,10 +243,15 @@ describe("registries whose plugin names meet once qualified", () => {
   ];
 
   it("links one registry's plugin where two qualified names meet, and reports the other", () => {
+    // `six` shares `three`'s plugin directory; only the other namespace's `one` is refused.
+    const sources = [
+      ...SOURCES.filter((each) => each.alias !== "a"),
+      source("a", "b-c", "three", "six"),
+    ];
     const plan = build(
       declaring(["a-b", "x", "a", "y"]),
       emptyLock(),
-      SOURCES,
+      sources,
       { artifacts: {} },
       options,
     );

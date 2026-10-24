@@ -1,10 +1,8 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolveHarnesses } from "#core/harness/index.ts";
 import { emptyLock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
-import { claim, crowdedContainers, movedPluginLinks, type PlannedLink } from "./projection.ts";
+import { claim, movedPluginLinks, type PlannedLink } from "./projection.ts";
 
 describe("movedPluginLinks", () => {
   const USER = roots("user", "/work");
@@ -68,38 +66,6 @@ describe("movedPluginLinks", () => {
   });
 });
 
-describe("crowdedContainers", () => {
-  const scope = { roots: roots("user", "/work"), harnesses: resolveHarnesses() };
-  const skills = (name: string) => join(homedir(), ".claude", "skills", name);
-  const wants = (pairs: [string, string][]) =>
-    pairs.map(([source, namespace]) => ({ harness: "claude", source, namespace }));
-
-  it("crowds a bare name another registry's qualified name lands on", () => {
-    const crowded = crowdedContainers(
-      wants([
-        ["q", "c"],
-        ["x", "c"],
-        ["z", "q-c"],
-      ]),
-      scope,
-    );
-    // `q`'s `c` qualifies to `q-c`, so `z`'s `q-c` qualifies too, to `z-q-c`.
-    expect([...crowded].sort()).toEqual([skills("c"), skills("q-c")]);
-  });
-
-  it("does not crowd a name only one registry's namespace wants", () => {
-    const crowded = crowdedContainers(
-      wants([
-        ["kit", "engineering"],
-        ["kit", "engineering"],
-        ["far", "ops"],
-      ]),
-      scope,
-    );
-    expect([...crowded]).toEqual([]);
-  });
-});
-
 describe("claim", () => {
   const container = (content: string): PlannedLink => ({
     harness: "claude",
@@ -108,19 +74,6 @@ describe("claim", () => {
     from: "/projections/a-b-c",
     shared: true,
     content,
-  });
-
-  it("shares a plugin directory within its namespace, and with no other", () => {
-    const claimed = new Map<string, string>();
-    const plugins = new Map<string, string>();
-    const collisions: string[] = [];
-    const collided = (owner: string) => collisions.push(owner);
-    const plugin = container("/content/a-b/c");
-
-    expect(claim([plugin], "one", claimed, plugins, collided)).toEqual([plugin]);
-    expect(claim([plugin], "two", claimed, plugins, collided)).toEqual([plugin]);
-    expect(claim([container("/content/a/b-c")], "three", claimed, plugins, collided)).toEqual([]);
-    expect(collisions).toEqual(["two"]);
   });
 
   it("does not take a path a link of another artifact holds", () => {
