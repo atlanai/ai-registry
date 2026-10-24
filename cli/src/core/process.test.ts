@@ -73,4 +73,10 @@ describe.skipIf(process.platform === "win32")("exec", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("runs a command named by its absolute path when no folder on PATH is absolute", async () => {
+    const [command, args] = node("process.stdout.write(String(process.env.PATH))");
+    const ran = await exec(command, args, { timeoutMs: 10_000, env: { PATH: "." } });
+    expect(ran).toEqual({ code: 0, stdout: "undefined", stderr: "" });
+  });
 });

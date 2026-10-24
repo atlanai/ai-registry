@@ -6,6 +6,7 @@ import {
   spawn,
 } from "node:child_process";
 import { constants } from "node:os";
+import { isAbsolute } from "node:path";
 import { withAbsolutePath } from "#adapter/paths.ts";
 import { launchArgv } from "#core/release/launch.ts";
 
@@ -83,8 +84,8 @@ function failed(
 
 /**
  * Runs a command to completion without a shell. A non-zero exit, a timeout, a signal,
- * output past the limit or a missing binary is a `code` to read, never a throw. A PATH
- * with no absolute folder has nowhere to find the command, so it is missing too.
+ * output past the limit or a missing binary is a `code` to read, never a throw. A command
+ * named without a folder is missing too when no folder on PATH is absolute.
  */
 export function exec(
   command: string,
@@ -92,12 +93,19 @@ export function exec(
   options: ExecOptions,
 ): Promise<ExecResult> {
   return new Promise((resolve, reject) => {
+    const given = options.env ?? process.env;
     let env: NodeJS.ProcessEnv;
     try {
-      env = withAbsolutePath(options.env ?? process.env);
+      env = withAbsolutePath(given);
     } catch (error) {
-      resolve({ code: 127, stdout: "", stderr: (error as Error).message });
-      return;
+      if (!isAbsolute(command)) {
+        resolve({ code: 127, stdout: "", stderr: (error as Error).message });
+        return;
+      }
+      // Found without PATH, so it runs; its own children get no PATH to search.
+      env = Object.fromEntries(
+        Object.entries(given).filter(([key]) => key.toUpperCase() !== "PATH"),
+      );
     }
     execFile(
       command,
