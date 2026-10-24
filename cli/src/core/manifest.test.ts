@@ -183,19 +183,17 @@ describe("an address", () => {
   });
 });
 
-// Each registry's installed copies live in .registry/artifacts/<folder>, so two aliases that
-// name one folder would each read the other's copies, and new work there, as their own.
-describe("registries sharing a storage folder", () => {
-  test("are told apart when their folders differ", () => {
+describe("registries and their storage folders", () => {
+  test("are accepted when their folders differ", () => {
     const manifest = parseManifest("registries:\n  team: ../a\n  team-b: ../b\n");
     expect(Object.keys(manifest.registries)).toEqual(["team", "team-b"]);
   });
 
   test.for([
-    ["case", "team", "Team", "team"],
-    ["punctuation", "team-a", "team_a", "team-a"],
-    ["nothing left", "'!!'", "'__'", "unnamed"],
-  ])("are refused when they differ only by %s", ([, first, second, folder]) => {
+    ["they differ only by case", "team", "Team", "team"],
+    ["they differ only by punctuation", "team-a", "team_a", "team-a"],
+    ["both reduce to nothing", "'!!'", "'__'", "unnamed"],
+  ])("are refused when %s", ([, first, second, folder]) => {
     const text = `registries:\n  ${first}: ../a\n  ${second}: ../b\n`;
     expect(() => parseManifest(text)).toThrow(
       `would share the folder .registry/artifacts/${folder}.`,

@@ -143,7 +143,7 @@ describe("credentials", () => {
     expect(await credentialsForManifest(project(ELSEWHERE), home)).toEqual({ acme: token });
   });
 
-  // Two folders, `my--reg` and `my-reg`, so the manifest takes both; one variable names both.
+  // `my--reg` and `my__reg` get separate folders but share one token variable.
   test("refuses an environment token two declared aliases share", async () => {
     vi.stubEnv("AIREG_TOKEN_MY__REG", FROM_ENV);
     await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);

@@ -100,8 +100,6 @@ test("lists a declared address without its userinfo", async ({ aireg, project })
   }
 });
 
-// Copies live in .registry/artifacts/<alias as a folder>, and `Team` and `team` are one folder:
-// new work there would be read as the other registry's, and sync could send it there.
 test("refuses a cloned manifest whose registries would share one storage folder", async ({
   aireg,
   tmp,
