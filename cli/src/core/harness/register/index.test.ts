@@ -15,7 +15,7 @@ test.beforeEach(async ({ tmp }) => {
   root = join(dir, ".tool");
   await mkdir(join(home, "artifacts"), { recursive: true });
 });
-function harness(register: RegisterEntry[], place?: "copy"): Harnesses {
+function harness(register: RegisterEntry[], place?: "copy", scope?: "user"): Harnesses {
   const target: Target = {
     name: "tool",
     displayName: "Tool",
@@ -30,6 +30,7 @@ function harness(register: RegisterEntry[], place?: "copy"): Harnesses {
         shape: "directory",
         register,
         ...(place === undefined ? {} : { place }),
+        ...(scope === undefined ? {} : { scope }),
       },
     },
     reads: {},
@@ -292,22 +293,18 @@ describe("applyRegister", () => {
   );
 });
 
-// Registration edits a harness's own config, so each input that says which config is checked
-// here too, rather than trusted to the plan that produced it.
 /** SETTINGS, kept in a folder below the harness root. */
 const settingsIn = (folder: string): RegisterEntry => ({
   ...SETTINGS,
   file: `${folder}/settings.json`,
 });
 
+// Registration edits a harness's own config, so each input that says which config is checked
+// here too, rather than trusted to the plan that produced it.
 describe("applyRegister, kept to the run's harness roots", () => {
   test("registers no kind another scope loads", async () => {
     const sales = await place("acme", "sales");
-    const userOnly = harness([SETTINGS]);
-    (userOnly.tool as Target).kinds.plugin = {
-      ...(userOnly.tool as Target).kinds.plugin,
-      scope: "user",
-    } as never;
+    const userOnly = harness([SETTINGS], undefined, "user");
 
     // The project's harness root is this same folder, but the kind is the user scope's.
     await applyRegister([{ path: sales, harness: "tool" }], userOnly, project(), home);
