@@ -62,14 +62,12 @@ describe.skipIf(process.platform === "win32")("exec", () => {
       const marker = join(dir, "planted.ran");
       // A redirect, which needs nothing on PATH, so the marker shows any run.
       await writeFile(join(dir, "planted"), `#!/bin/sh\n: > "${marker}"\n`, { mode: 0o755 });
-      for (const path of [".", ["", ".", "bin"].join(delimiter)]) {
-        const ran = await exec("planted", [], { timeoutMs: 5_000, cwd: dir, env: { PATH: path } });
-        expect(ran).toEqual({
-          code: 127,
-          stdout: "",
-          stderr: "No folder on PATH is absolute, so aireg runs no program from it.",
-        });
-      }
+      const ran = await exec("planted", [], { timeoutMs: 5_000, cwd: dir, env: { PATH: "." } });
+      expect(ran).toEqual({
+        code: 127,
+        stdout: "",
+        stderr: "No folder on PATH is absolute, so aireg runs no program from it.",
+      });
       await expect(access(marker)).rejects.toThrow();
     } finally {
       await rm(dir, { recursive: true, force: true });

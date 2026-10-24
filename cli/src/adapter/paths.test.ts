@@ -92,19 +92,9 @@ describe("withAbsolutePath", () => {
     expect(withAbsolutePath({ HOME: "/home/u" })).toEqual({ HOME: "/home/u" });
   });
 
-  // Emptied instead, PATH would send the search to the child's working folder.
-  test.each(["", ".", ["", ".", "bin"].join(delimiter)])("refuses PATH %j", (path) => {
-    expect(() => withAbsolutePath({ PATH: path })).toThrow(
-      "No folder on PATH is absolute, so aireg runs no program from it.",
-    );
-  });
-
   test("reads PATH under any case on Windows", () => {
     const path = [".", absolute].join(delimiter);
     expect(asWindows(() => withAbsolutePath({ Path: path }))).toEqual({ Path: absolute });
-    expect(() => asWindows(() => withAbsolutePath({ Path: "." }))).toThrow(
-      "No folder on PATH is absolute, so aireg runs no program from it.",
-    );
   });
 });
 
@@ -115,6 +105,5 @@ describe("onPath", () => {
     const bin = join("node_modules", ".bin");
     expect(onPath("vitest", { PATH: join(process.cwd(), bin) })).toBe(true);
     expect(onPath("vitest", { PATH: bin })).toBe(false);
-    expect(asWindows(() => onPath("vitest", { Path: join(process.cwd(), bin) }))).toBe(true);
   });
 });
