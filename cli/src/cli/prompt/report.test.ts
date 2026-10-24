@@ -17,7 +17,6 @@ function capture(): { io: PromptIo; written: () => string } {
   return { io: io as PromptIo, written: () => written };
 }
 
-/** None of what `HOSTILE` carries to move, clear, ring, link or hide reaches the terminal. */
 function expectInert(written: string): void {
   for (const found of ["\u001B]", "\u001B[2J", "\u001B[8m", "\u0007", "\b"]) {
     expect(written).not.toContain(found);

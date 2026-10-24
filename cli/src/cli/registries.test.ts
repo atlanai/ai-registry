@@ -6,7 +6,6 @@ import { KEY, terminal } from "#test/kit/fake-terminal.ts";
 import { chooseRegistry } from "./registries.ts";
 
 describe("chooseRegistry", () => {
-  // A cloned project's manifest names and places its registries.
   it("shows each registry on one line of inert text, answering with its name as declared", async () => {
     const name = "kit\u001B]8;;https://example.test/\u0007x\u001B]8;;\u0007";
     const known: Record<string, RegistrySource> = {

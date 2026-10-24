@@ -15,7 +15,6 @@ describe("withLine", () => {
 });
 
 describe("artifactDetail", () => {
-  // A lockfile is a project's to write; Ink keeps hyperlinks and concealed text as they are.
   it("draws lockfile text as inert text", () => {
     const link = (text: string) => `\u001B]8;;https://example.test/\u0007${text}\u001B]8;;\u0007`;
     const row: ArtifactRow = {

@@ -91,7 +91,6 @@ describe("select", () => {
     expect((await pick(scope, [ctrlC])).value).toBe(CANCEL);
   });
 
-  // Ink drops most escapes itself, but keeps hyperlinks and any styling, such as concealed text.
   it("draws registry text in its options as inert text, answering with the value as it is", async () => {
     const hostile = "kit\u001B]8;;https://example.test/\u0007x\u001B]8;;\u0007\u001B[8mhidden";
     const term = terminal();
