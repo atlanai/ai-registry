@@ -27,6 +27,10 @@ overrides:
   esbuild: 0.28.1
   # GHSA-68fv-2mgg-jv7q: indexed source-map offsets must be bounded.
   source-map-js: 1.2.2
+  # GHSA-mrhx-c7xc-m3w5: bound the memory used to validate oversized input.
+  zod: 4.6.7
+  # GHSA-w74x-v6f9-j3xg, GHSA-wjr9-j795-jxcr: no scheme spoofing or host confusion in parsed URIs.
+  fast-uri: 3.1.9
 
 # Exact versions approved for the 2026-10-21 refresh; later releases still age.
 
@@ -94,3 +98,4 @@ minimumReleaseAgeExclude:
   - "unbash@6.0.1"
   - "vite@8.3.5"
   - "vitest@5.0.5"
+  - "fast-uri@3.1.9"

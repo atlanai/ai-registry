@@ -2,13 +2,10 @@ import { rm } from "node:fs/promises";
 import { join, posix } from "node:path";
 import {
   buildEnvelope,
-  bumpVersion,
-  compareVersion,
   describeFile,
   ENVELOPE,
   type Envelope,
   type FileDescriptor,
-  formatVersion,
   INDEX_DOCUMENT,
   isArtifactName,
   isDeviceName,
@@ -19,7 +16,6 @@ import {
   mergedVersions,
   type OfferedVersion,
   type PublishInput,
-  parseVersion,
   quoted,
   REGISTRY_DOCUMENT,
   type ReadPath,
@@ -33,6 +29,7 @@ import {
   versionsPath,
   writeAtomic,
 } from "#adapter/index.ts";
+import { fail } from "./errors.ts";
 
 export interface WrittenOffer {
   /** Every version offered already sat in the root with this exact digest. */
@@ -73,6 +70,8 @@ function envelopeFor(change: PublishInput, files: readonly FileDescriptor[]): En
     },
     files,
     spec: change.spec,
+    // The envelope is where the file spec keeps a version's edges, so its digest covers them.
+    ...(change.relationships === undefined ? {} : { relationships: [...change.relationships] }),
   });
 }
 
@@ -98,22 +97,6 @@ function under(root: string, path: string): string {
   return join(root, ...path.split(posix.sep));
 }
 
-/** Versions `versions.json` lists for one artifact, oldest first. */
-async function listedVersions(read: ReadPath, path: string): Promise<string[]> {
-  const raw = await readJson(read, path);
-  const rows = (raw as { versions?: unknown } | undefined)?.versions;
-  if (!Array.isArray(rows)) return [];
-  return rows
-    .map((row) => (row as { version?: unknown }).version)
-    .filter((version): version is string => typeof version === "string")
-    .flatMap((version) => {
-      const parsed = parseVersion(version);
-      return parsed === undefined ? [] : [parsed];
-    })
-    .sort(compareVersion)
-    .map(formatVersion);
-}
-
 /** The digest the root already pins for this version, if the directory is there. */
 async function existingDigest(read: ReadPath, at: string): Promise<string | undefined> {
   const raw = await readJson(read, `${at}/${ENVELOPE}`);
@@ -122,7 +105,22 @@ async function existingDigest(read: ReadPath, at: string): Promise<string | unde
   return typeof metadata?.digest === "string" ? metadata.digest : undefined;
 }
 
-/** One writer per registry folder, so two publishes never take the same next version. */
+async function listedDigest(
+  read: ReadPath,
+  change: PublishInput,
+  namespace: string,
+  version: string,
+): Promise<string | undefined> {
+  const raw = await readJson(read, versionsPath(namespace, change.kind, change.name));
+  const rows = (raw as { versions?: unknown } | undefined)?.versions;
+  if (!Array.isArray(rows)) return undefined;
+  const row = rows.find((each) => (each as { version?: unknown })?.version === version) as
+    | { digest?: unknown }
+    | undefined;
+  return typeof row?.digest === "string" ? row.digest : undefined;
+}
+
+/** One writer per registry folder, so two publishes never write one version at once. */
 export function writeOffer(
   root: string,
   changes: readonly PublishInput[],
@@ -143,26 +141,27 @@ async function writeOfferNow(
 
   // Every change is checked before any is written: a refusal partway through
   // would leave an earlier artifact's versions.json ahead of the index.
+  const checked = [];
   for (const change of changes) {
-    destination(change);
-    sealed(change, descriptorsOf(change));
+    const { namespace, version, at } = destination(change);
+    const { envelope, digest } = sealed(change, descriptorsOf(change));
+    const existing =
+      (await existingDigest(read, at)) ?? (await listedDigest(read, change, namespace, version));
+    // A released version is never rewritten, nor quietly offered as another: the caller
+    // reports the version it asked for, so different bytes there are refused.
+    if (existing !== undefined && existing !== digest) {
+      throw fail(
+        "conflict",
+        `${namespace}/${change.kind}/${change.name}@${version} is already published with other content.`,
+        change.name,
+        "A published version is never rewritten; publish this one as a new version.",
+      );
+    }
+    if (existing !== digest) unchanged = false;
+    checked.push({ change, namespace, version, at, envelope, digest });
   }
 
-  for (const requested of changes) {
-    let change = requested;
-    let { namespace, version, at } = destination(change);
-
-    const descriptors = descriptorsOf(change);
-    let { envelope, digest } = sealed(change, descriptors);
-    const existing = await existingDigest(read, at);
-    if (existing !== digest) unchanged = false;
-    // A released version is never rewritten: different bytes become the next version.
-    if (existing !== undefined && existing !== digest) {
-      const listed = await listedVersions(read, versionsPath(namespace, change.kind, change.name));
-      change = { ...change, version: bumpVersion(listed.at(-1) ?? version) };
-      ({ namespace, version, at } = destination(change));
-      ({ envelope, digest } = sealed(change, descriptors));
-    }
+  for (const { change, namespace, version, at, envelope, digest } of checked) {
     await rm(under(root, at), { recursive: true, force: true });
     for (const file of change.files) {
       await writeAtomic(under(root, `${at}/${file.path}`), file.content);

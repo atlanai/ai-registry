@@ -15,6 +15,11 @@ function checkCapabilities(adapter: SourceAdapter, handle: SourceHandle): void {
   if (flags.publish && handle.publish === undefined) {
     throw new ComplianceError(`${adapter.id} declared publish but the handle has no publish.`);
   }
+  for (const capability of ["relationships", "agentFolders"] as const) {
+    if (flags[capability] && !flags.publish) {
+      throw new ComplianceError(`${adapter.id} declared ${capability} but does not publish.`);
+    }
+  }
   if (flags.auth && !canSignIn(adapter)) {
     throw new ComplianceError(`${adapter.id} declared auth but exported no auth.login.`);
   }
