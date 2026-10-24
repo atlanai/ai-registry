@@ -82,10 +82,10 @@ Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own fil
 With `--json`, `publish` asks no questions and prints each artifact with its old and new version, and where it went:
 
 ```json
-{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "published": true}]}}
+{"ok": true, "data": {"dryRun": false, "artifacts": [{"name": "triage", "kind": "skill", "registry": "acme", "namespace": "engineering", "from": "1.2.0", "version": "1.2.1", "digest": "sha256:9f2c...", "published": true}]}}
 ```
 
-`registry` is the registry's name, or for `--to <folder>`, the registry folder as `--to` gave it. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`.
+`registry` is the registry's name, or for `--to <folder>`, the registry folder as `--to` gave it. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`. `digest` is the artifact's content identity: its files and dependencies, but not its version. Two runs give the same digest exactly when they would publish the same content.
 
 ## Exit status
 
@@ -93,6 +93,29 @@ With `--json`, `publish` asks no questions and prints each artifact with its old
 - `1`: the registry isn't declared, a path isn't a skill or an agent or holds a symlink, nothing matches an argument, a skill would fail `aireg registry validate`, or the version is already published.
 - `2`: the registry doesn't accept published work, as a git registry doesn't, `--to` names no namespace or an invalid name, an artifact has nowhere to go, nothing was named without `--yes` and aireg can't ask, `--changed-since` names a commit that isn't in the repository, or a `--to` path isn't inside a registry folder.
 - `3`: the artifact was edited from an older version than the one published since. Install the newer version and redo the edit, or pass `--force`.
+
+## Repository exports
+
+Declare what this repository publishes in `.registry/manifest.yml`, then run `aireg publish` (or `aireg publish --dry-run --json` to preview):
+
+```yaml
+registries:
+  acme: https://registry.example.com
+artifacts:
+  - acme/platform/skill/sql-style@0.1.2
+exports:
+  - path: skills/review
+  - path: agents/reviewer
+    depends_on:
+      - ./skills/review
+      - acme/platform/skill/sql-style
+publish:
+  to: acme/engineering
+```
+
+`depends_on` names an artifact in the project, as `./<path>`, or a declared installed artifact. A path no entry reaches is exported with it, at its next version; one an entry keeps with `publish: false` or leaves out with `exclude` is refused. Remote pins belong in `artifacts:`; publish records the exact installed release label and refuses a stale pin until `aireg install` updates it. Dependencies must belong to the publishing registry. An unpinned parent gets a new version when its exact dependency changes; bump a fixed parent version explicitly.
+
+An agent folder contains `AGENT.md` and its companion files. Exports may set `version`, `include` (with optional `as`), and `publish: false`. `include` lists the only files an artifact publishes besides its `AGENT.md` or `SKILL.md`, so a folder agent with `include` leaves out every companion file it doesn't list. The preview shows added, modified and removed files; publishing looks up each exported artifact by name instead of resolving the entire registry.
 
 ## Examples
 

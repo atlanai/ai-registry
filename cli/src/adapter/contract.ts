@@ -76,6 +76,8 @@ export interface Resolution {
   registry?: RegistryIdentity | undefined;
   /** Artifacts a want reached that the registry's status rules kept back, rather than unpublished. */
   withheld?: readonly Withheld[] | undefined;
+  /** The newest held version when it differs from the served version, including yanked releases. */
+  newest?: readonly Newest[] | undefined;
   /** What a person should know about how the source was read, one sentence each. */
   warnings?: readonly string[] | undefined;
   /** How the source lays out what it holds, where the adapter reads more than one way. */
@@ -93,6 +95,14 @@ export interface Withheld {
   status: string;
   /** Why, as the registry gives it. */
   reason?: string | undefined;
+}
+
+/** The newest version a source holds of one artifact, in any status, yanked included. */
+export interface Newest {
+  name: string;
+  namespace?: string | undefined;
+  kind: ArtifactKind;
+  version: string;
 }
 
 /** One artifact a client asks for. A name alone tracks latest; a version pins it. */
@@ -144,6 +154,10 @@ export interface Capabilities {
    * gets the namespace as one, named after it, rather than each artifact on its own.
    */
   namespacePlugins?: boolean;
+  /** Stores and resolves version relationships; required before the host sends dependency edges. */
+  relationships?: boolean;
+  /** Stores and resolves every agent file at its published path; required for folder agents. */
+  agentFolders?: boolean;
 }
 
 /** Whether an adapter has a sign-in: its `auth.login`, which `capabilities.auth` must declare. */
@@ -162,6 +176,8 @@ export function advertisedCapabilities(
     messages: capabilities?.messages === true,
     fileSpec: capabilities?.fileSpec === true,
     namespacePlugins: capabilities?.namespacePlugins === true,
+    relationships: capabilities?.relationships === true,
+    agentFolders: capabilities?.agentFolders === true,
   };
 }
 
@@ -239,6 +255,14 @@ export interface UploadFile {
   executable: boolean;
 }
 
+/** One edge a published version carries: a `relationships[]` entry of the file spec (section 3.4). */
+export interface PublishRelationship {
+  /** What the edge means, such as `depends_on`. */
+  rel_type: string;
+  /** The artifact it points at, as `<namespace>/<kind>/<name>@<version>`. */
+  to: string;
+}
+
 /** One artifact to publish. */
 export interface PublishInput {
   /** The source's own address for this, when it already holds it. Absent means new. */
@@ -252,11 +276,13 @@ export interface PublishInput {
   version?: string | undefined;
   /** One line on what it does. */
   description?: string | undefined;
-  /** The content digest of the envelope these files make, as `sha256:<hex>`. */
+  /** The content digest of the envelope these files and relationships make, as `sha256:<hex>`. */
   contentId: string;
   /** The kind's structured fields as the host read them from the files, for a source that stores them. */
   spec?: Record<string, unknown> | undefined;
   files: readonly UploadFile[];
+  /** Validated edges to store with this version; sent only when the adapter declares relationships. */
+  relationships?: readonly PublishRelationship[] | undefined;
 }
 
 /**

@@ -57,8 +57,8 @@ async function root(
   extra: readonly SpecArtifact[] = [],
   dir?: string,
 ): Promise<(path: string) => Promise<Uint8Array | undefined>> {
-  dir ??= await mkdtemp(join(scratch, "aireg-spec-read-"));
-  await writeSpecRoot(dir, [
+  const at = dir ?? (await mkdtemp(join(scratch, "aireg-spec-read-")));
+  await writeSpecRoot(at, [
     {
       namespace: "aireg",
       kind: "skill",
@@ -73,7 +73,6 @@ async function root(
     },
     ...extra,
   ]);
-  const at = dir;
   return (path) => readFile(join(at, path)).catch(() => undefined);
 }
 
@@ -136,6 +135,23 @@ describe("resolveFromRoot", () => {
     expect(artifacts.map((item) => [item.id, item.yanked])).toEqual([
       ["artifacts/ops/skill/add/1.1.0", { reason: "broke the build" }],
     ]);
+  });
+
+  test("names the newest version it holds where it served another, a yanked one included", async () => {
+    const read = await root([OPS_ADD, OPS_GATE]);
+    const listed = await resolveFromRoot(read, { blobUrl: "blobs", wanted: [], all: true });
+    // The blocked gate is withheld at its newest version, which says it already.
+    expect(
+      [...(listed.newest ?? [])].sort((a, b) => a.namespace?.localeCompare(b.namespace ?? "") ?? 0),
+    ).toEqual([
+      { namespace: "aireg", kind: "skill", name: "use", version: "0.1.0" },
+      { namespace: "ops", kind: "skill", name: "add", version: "1.1.0" },
+    ]);
+    const pinned = await resolveFromRoot(read, {
+      blobUrl: "blobs",
+      wanted: [{ name: "add", namespace: "ops", kind: "skill", version: "1.1.0" }],
+    });
+    expect(pinned.newest).toBeUndefined();
   });
 
   test("still installs an archived artifact asked for by name", async () => {
