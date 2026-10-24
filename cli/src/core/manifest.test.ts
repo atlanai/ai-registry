@@ -591,11 +591,16 @@ describe("names that reach a prototype", () => {
   });
 });
 
-test("refuses a registry name a terminal cannot show as it is", () => {
-  // YAML's double-quoted escapes put the raw characters in the key.
-  const key = '"kit\\e]8;;https://example.test/\\a"';
-  expect(() => parseManifest(`registries:\n  ${key}: /srv/kit\n`)).toThrow(
-    /cannot name a registry/,
+test("refuses every registry name a terminal cannot show as it is, saying how to rename them", () => {
+  // YAML's double-quoted escapes put the raw characters in the keys.
+  const text = 'registries:\n  "kit\\e]8;;x\\a": /srv/kit\n  "te\\u200Dam": /srv/team\n';
+  expect(() => parseManifest(text)).toThrow(
+    expect.objectContaining({
+      message: expect.stringContaining(
+        '"kit\\u001b]8;;x\\u0007" and "te\\u200Dam" cannot name a registry.',
+      ),
+      hint: expect.stringContaining("its `artifacts:` entries in manifest.yml"),
+    }),
   );
 });
 

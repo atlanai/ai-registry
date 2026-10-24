@@ -341,9 +341,16 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
   if (typeof registries !== "object" || Array.isArray(registries)) {
     throw new ManifestError("`registries:` must map names to addresses.");
   }
+  const unshowable = Object.keys(registries).filter((alias) => UNSHOWABLE.test(alias));
+  if (unshowable.length > 0) {
+    throw new ManifestError(
+      `${list(unshowable.map(quoted))} cannot name a registry.`,
+      "Rename each one and its `artifacts:` entries in manifest.yml, using lowercase letters, digits and hyphens, then run `aireg install`.",
+    );
+  }
   const out = dict<RegistrySource>();
   for (const [alias, raw] of Object.entries(registries as Record<string, unknown>)) {
-    if (RESERVED_KEYS.has(alias) || UNSHOWABLE.test(alias)) {
+    if (RESERVED_KEYS.has(alias)) {
       throw new ManifestError(`${quoted(alias)} cannot name a registry.`);
     }
     out[alias] = parseSource(alias, raw);
