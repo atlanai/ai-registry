@@ -181,6 +181,132 @@
           }
         ]
       }
+    },
+    "exports": {
+      "description": "What this project makes for others to install: a path, such as an artifact or a folder of them, or a glob, or `{ path, kind, version, depends_on, publish, exclude, ignore, include }` to give one path a kind it must be, an exact version, dependencies, `publish: false` to keep it here, or the files it publishes.",
+      "type": "array",
+      "items": {
+        "description": "One path, or one path and what to publish it with.",
+        "anyOf": [
+          {
+            "pattern": "^(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+            "description": "A path relative to the project, or a glob over paths, such as .claude/skills/*.",
+            "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "path": {
+                "pattern": "^(?![^*?[\\]{}]*[*?[\\]{}])(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+                "description": "One path relative to the project: an artifact, such as .claude/agents/reviewer.md, or a folder, whose artifacts directly inside it are each exported.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "When set, every artifact the entry reaches must be this kind.",
+                "anyOf": [
+                  {
+                    "const": "skill",
+                    "type": "string"
+                  },
+                  {
+                    "const": "agent",
+                    "type": "string"
+                  }
+                ]
+              },
+              "version": {
+                "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-(0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*))*)?$",
+                "description": "The exact version to publish it at, such as 2.0.0.",
+                "type": "string"
+              },
+              "depends_on": {
+                "uniqueItems": true,
+                "description": "What it needs installed beside it.",
+                "type": "array",
+                "items": {
+                  "pattern": "^\\./(?![^*?[\\]{}]*[*?[\\]{}])(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){3}$",
+                  "description": "An artifact in the project, or a folder of them, as ./ and its path, which is exported with it, or an artifact listed under `artifacts:`, as <registry>/<namespace>/<kind>/<name> with no version.",
+                  "type": "string"
+                }
+              },
+              "publish": {
+                "description": "`false` keeps it in this repository; absent, it goes to `publish.to`.",
+                "const": false,
+                "type": "boolean"
+              },
+              "exclude": {
+                "uniqueItems": true,
+                "description": "For a folder of artifacts: the names of what is directly inside it that it does not export.",
+                "type": "array",
+                "items": {
+                  "pattern": "^(?!\\.\\.?$)[^/\\\\*?[\\]{}]+$",
+                  "type": "string"
+                }
+              },
+              "ignore": {
+                "uniqueItems": true,
+                "description": "Gitignore patterns, relative to each artifact the entry reaches: the files left out. The entry file always goes.",
+                "type": "array",
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "include": {
+                "description": "The only files each artifact the entry reaches publishes, besides its entry file, which always goes: a path, or `{ from, as }` to store one at another path.",
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "pattern": "^(?![^*?[\\]{}]*[*?[\\]{}])(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+                      "description": "A file or folder relative to the artifact, stored at the same path.",
+                      "type": "string"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "from",
+                        "as"
+                      ],
+                      "properties": {
+                        "from": {
+                          "pattern": "^(?![^*?[\\]{}]*[*?[\\]{}])(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+                          "description": "A file or folder relative to the artifact.",
+                          "type": "string"
+                        },
+                        "as": {
+                          "pattern": "^(?![^*?[\\]{}]*[*?[\\]{}])(?![A-Za-z]:)(?!(?:[^/]*/)*\\.\\.?(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+                          "description": "The path it is stored at in the published version.",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "publish": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "to"
+      ],
+      "properties": {
+        "to": {
+          "pattern": "^[^./][^/]*/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$|^(\\.[^/]*)?(/.*)?/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$",
+          "description": "Where exports are published, as `aireg publish --to` takes it: a declared registry and a namespace, such as acme/engineering, or a registry folder and a namespace, such as ./registry/engineering.",
+          "type": "string"
+        }
+      }
     }
   }
 }

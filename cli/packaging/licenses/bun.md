@@ -1,4 +1,4 @@
-<!-- Verbatim from https://github.com/oven-sh/bun/blob/963452075e9d7e2a47a482f297143af5ed4f76c0/LICENSE.md -->
+<!-- Verbatim from https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/LICENSE.md -->
 Bun itself is MIT-licensed.
 
 ## JavaScriptCore
