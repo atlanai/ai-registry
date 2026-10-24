@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, realpathSync, rmSync } from "node:fs";
 import { mkdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
-import { assertUnredirected } from "#adapter/files.ts";
+import { basename, dirname, join, relative, resolve } from "node:path";
+import { redirection } from "#adapter/files.ts";
 import { quoted } from "#adapter/text.ts";
 import { shortHash } from "#core/fs/hash.ts";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
@@ -134,9 +134,20 @@ function containment(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.ProcessEn
   const registry = dirname(parentOf(roots, env));
   return async (path) => {
     // The scope folder alone: a symlinked route to the project itself is still one project.
-    await assertUnredirected(folder, folder);
-    await assertUnredirected(registry, path);
+    refuseLink(folder, folder);
+    refuseLink(registry, path);
   };
+}
+
+/** A committed link on the way to the lease is the project's to replace, so it is named. */
+function refuseLink(root: string, path: string): void {
+  const found = redirection(root, path);
+  if (found === undefined) return;
+  const what = found.problem === "symlink" ? "a symlink" : "not a directory";
+  throw new AiregError(`${found.at} is ${what} in a managed path.`, {
+    code: ErrorCode.Invalid,
+    hint: `Replace ${relative(dirname(root), found.at)} with a real folder.`,
+  });
 }
 
 /** A project's `.registry/` is committed, so its lease folder ignores itself. */

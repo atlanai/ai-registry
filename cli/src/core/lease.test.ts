@@ -15,6 +15,7 @@ import {
 import { hostname } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
+import { ErrorCode } from "#core/errors.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { expectMode } from "#test/kit/mode.ts";
@@ -271,7 +272,10 @@ describe("where leases live", () => {
   test("takes no lease through a lease folder that links out of the project", async () => {
     const { roots, untouched } = await linkedOut();
 
-    await expect(acquire(roots, { env })).rejects.toThrow("is a symlink in a managed path");
+    await expect(acquire(roots, { env })).rejects.toMatchObject({
+      code: ErrorCode.Invalid,
+      hint: "Replace .registry/leases with a real folder.",
+    });
     await untouched();
   });
 
