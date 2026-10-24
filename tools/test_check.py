@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise check.py --fix on copies of the example registries in temporary folders."""
+"""Exercise check.py --fix on a copy of the acme example registry."""
 
 import json
 from pathlib import Path
@@ -49,7 +49,8 @@ class CheckFixTests(unittest.TestCase):
         }
 
     def stale(self, path):
-        """Rewrite a JSON file compactly with a wrong digest, so --fix wants to rewrite it."""
+        """Compact a JSON file and break its first file digest, if it has one,
+        so --fix rewrites it."""
         document = json.loads(path.read_text(encoding="utf-8"))
         if "files" in document:
             document["files"][0]["digest"] = "sha256:" + "0" * 64
@@ -64,8 +65,9 @@ class CheckFixTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("symlink", result.stdout)
 
-    def test_fix_leaves_example_unchanged(self):
+    def test_fix_restores_a_stale_artifact_to_the_example(self):
         example = ROOT / "examples" / "acme-registry"
+        self.stale(self.registry / SKILL / "1.2.0" / "artifact.json")
         result = self.check("--fix")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for path in sorted(example.rglob("*")):
