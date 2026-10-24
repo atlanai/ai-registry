@@ -32,8 +32,8 @@ function scopePathOf(value: unknown, scope: Scope): string | undefined {
 }
 
 /**
- * A key's last segment is what the console passes to `aireg publish`, which reads a word
- * that starts with `-` as an option. No install writes one: names are sanitized.
+ * No install writes a segment starting with "-"; refusing one keeps a hand-edited key from
+ * reading as an option in a command line built from it.
  */
 function isArtifactKey(key: string): boolean {
   return isSafePath(key) && key.split("/").every((segment) => !segment.startsWith("-"));
