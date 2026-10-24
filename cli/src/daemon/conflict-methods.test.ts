@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -149,6 +150,30 @@ describe("conflict methods", () => {
     expect(settled.artifacts).toEqual([
       expect.objectContaining({ name: SKILL, disposition: "synced", operation: "none" }),
     ]);
+  }, 60_000);
+
+  test("publishes only the kind waiting on `mine`, not an agent of the same name", async ({
+    setup,
+  }) => {
+    await diverge(setup.project, setup.remote);
+    const agents = join(setup.project, ".claude", "agents");
+    await mkdir(agents, { recursive: true });
+    await writeFile(
+      join(agents, `${SKILL}.md`),
+      `---\nname: ${SKILL}\ndescription: An agent.\n---\n`,
+    );
+
+    const { run } = await setup.client.request("conflict.resolve", {
+      jobId: WATCH,
+      name: SKILL,
+      resolution: "mine",
+    });
+    expect((await finished(setup.client, run.id)).state).toBe("succeeded");
+
+    expect(existsSync(join(setup.remote, NAMESPACE, "agent", SKILL))).toBe(false);
+    expect(await readFile(join(upstreamDir(setup.remote), "SKILL.md"), "utf8")).toContain(
+      LOCAL_BODY,
+    );
   }, 60_000);
 
   test("refuses to resolve an artifact that is not waiting on a decision", async ({ setup }) => {

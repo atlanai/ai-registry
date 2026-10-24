@@ -1,7 +1,8 @@
 import { list } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import type { ArtifactKind } from "#core/kinds.ts";
 import type { Ref } from "#core/ref.ts";
-import { isWholeNamespace, isWholeRegistry, parseRef } from "#core/ref.ts";
+import { formatAddress, isWholeNamespace, isWholeRegistry, parseRef } from "#core/ref.ts";
 import type { Candidate } from "#core/sync/adopt.ts";
 import type { SyncItem } from "#core/sync/model.ts";
 import { artifactKey } from "./decide.ts";
@@ -29,6 +30,12 @@ function split(name: string): { namespace: string | undefined; leaf: string } {
   const cut = name.lastIndexOf("/");
   if (cut < 0) return { namespace: undefined, leaf: name };
   return { namespace: name.slice(0, cut), leaf: name.slice(cut + 1) };
+}
+
+/** The address that reaches only this kind of a run's artifact, never another of its name. */
+export function kindAddress(registry: string, kind: ArtifactKind, name: string): string {
+  const { namespace, leaf } = split(name);
+  return formatAddress({ registry, namespace, kind, name: leaf });
 }
 
 function matchesItem(ref: Ref, registry: string, item: SyncItem): boolean {

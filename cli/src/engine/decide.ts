@@ -37,7 +37,7 @@ export interface SyncOutcome {
   detail?: string;
 }
 
-/** Wins over the policy mapping, for the named artifact only. */
+/** Keyed by `artifactKey`, and wins over the policy for that one artifact only. */
 export type Overrides = ReadonlyMap<string, SyncOperation>;
 
 export interface SyncExecution {
@@ -67,8 +67,13 @@ function relevant(mode: RunMode, disposition: Disposition): boolean {
   return (mode === "pull" ? PULL_DISPOSITIONS : PUBLISH_DISPOSITIONS).includes(disposition);
 }
 
-function decide(job: ScopeWork, overrides: Overrides, name: string, disposition: Disposition) {
-  return overrides.get(name) ?? operation(disposition, job.policy);
+function decide(
+  job: ScopeWork,
+  overrides: Overrides,
+  { kind, name }: { kind: ArtifactKind; name: string },
+  disposition: Disposition,
+) {
+  return overrides.get(artifactKey(kind, name)) ?? operation(disposition, job.policy);
 }
 
 const LOCAL_WRITES: readonly SyncOperation[] = ["pull", "remove-local", "forget"];
@@ -114,10 +119,7 @@ function adopt(
     // on this, so it is skipped rather than reported every run.
     const chosen = takesNone
       ? "ignore"
-      : withoutPublishing(
-          decide(job, overrides, candidate.name, "adopt"),
-          publishable(candidate.kind),
-        );
+      : withoutPublishing(decide(job, overrides, candidate, "adopt"), publishable(candidate.kind));
     outcomes.set(artifactKey(candidate.kind, candidate.name), {
       artifact: candidate.name,
       kind: candidate.kind,
@@ -228,7 +230,7 @@ export function classify(
     if (owner !== undefined && owner !== registry) continue;
     if (!relevant(mode, item.disposition)) continue;
     const chosen = withoutPublishing(
-      decide(job, overrides, item.name, item.disposition),
+      decide(job, overrides, item, item.disposition),
       publishable(item.kind),
     );
     outcomes.set(artifactKey(item.kind, item.name), decided(item, chosen));

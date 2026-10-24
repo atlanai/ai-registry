@@ -188,7 +188,7 @@ async function executeScanned(
       signal.throwIfAborted();
       hooks.event("run.phase", "applying");
       await applyReported(loaded, common, current, names, remote.published, overrides, hooks);
-      await takeTheirs(overrides, loaded.roots, account.registry, hooks);
+      await takeTheirs(overrides, current, loaded.roots, account.registry, hooks);
       if (remoteError !== undefined) throw remoteError;
     });
   }
@@ -299,11 +299,14 @@ function settleHeld(
 /** `--theirs` on a row of yours writes your folder too, which a pull alone never touches. */
 async function takeTheirs(
   overrides: Overrides,
+  scan: Scan,
   roots: Parameters<typeof takeIntoOrigins>[0],
   registry: string,
   hooks: SyncExecutionHooks,
 ): Promise<void> {
-  const theirs = [...overrides].filter(([, item]) => item === "pull").map(([name]) => name);
+  const theirs = scan.items
+    .filter((item) => overrides.get(artifactKey(item.kind, item.name)) === "pull")
+    .map((item) => item.name);
   if (theirs.length === 0) return;
   for (const taken of await takeIntoOrigins(roots, theirs, backupStamp())) {
     const kept = taken.backup === undefined ? "" : `; yours is in ${taken.backup}`;
