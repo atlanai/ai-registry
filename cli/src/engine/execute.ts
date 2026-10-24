@@ -81,9 +81,6 @@ async function executeScanned(
 
   const publishable = await publishableTo(account, source);
 
-  const credentials = await credentialsForManifest(loaded.manifest.registries, job.root, signal, [
-    account.registry,
-  ]);
   hooks.event("run.phase", "listing");
   const downloaded = new Set<string>();
   const onDownload = (artifact: Artifact) => {
@@ -95,7 +92,14 @@ async function executeScanned(
   // Only this job's registry: opening another account's lets two organizations on one tree
   // fail each other's runs.
   const aliases = [account.registry];
-  const rescan = () => scanning(loaded, common, { aliases, credentials, signal, onDownload });
+  // Released for the manifest each scan reads, which a reload may change, and checked against
+  // every declared alias, since two can read one token variable.
+  const released = () => {
+    registryOf(loaded, account);
+    return credentialsForManifest(loaded.manifest.registries, job.root, signal, [account.registry]);
+  };
+  const rescan = async () =>
+    scanning(loaded, common, { aliases, credentials: await released(), signal, onDownload });
   let current = await rescan();
   hooks.event("run.phase", "classifying");
   // Before anything is classified: a ref that reaches nothing is the caller's
@@ -164,7 +168,15 @@ async function executeScanned(
       // A refused publish must not skip pulls the run already classified.
       const { remote, remoteError } = await publishAndSettle(
         (hooksFor) =>
-          mutateRemote(current, loaded.roots, source, account, operations, signal, hooksFor),
+          mutateRemote(
+            current,
+            loaded.roots,
+            registryOf(loaded, account),
+            account,
+            operations,
+            signal,
+            hooksFor,
+          ),
         deferred,
         hooks,
       );

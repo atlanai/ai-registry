@@ -85,12 +85,37 @@ vi.mock("./scan.ts", async (importOriginal) => ({
 }));
 vi.mock("./remote.ts", () => ({ mutateRemote, partialMutation }));
 vi.mock("./local.ts", () => ({ applyLocal }));
-vi.mock("./pipeline.ts", () => ({ load: vi.fn(async () => loaded) }));
+const load = vi.hoisted(() => vi.fn());
+vi.mock("./pipeline.ts", () => ({ load }));
+// A token named after the place it was released for, so a test can see where each one went.
+const releaseCredentials = vi.hoisted(() =>
+  vi.fn(
+    async (
+      registries: Record<string, { location: string }>,
+      _cwd: string,
+      _signal?: AbortSignal,
+      only: readonly string[] = Object.keys(registries),
+    ) =>
+      Object.fromEntries(
+        Object.entries(registries)
+          .filter(([alias]) => only.includes(alias))
+          .map(([alias, { location }]) => [
+            alias,
+            { type: "bearer", accessToken: `released for ${location}` },
+          ]),
+      ),
+  ),
+);
+vi.mock("#accounts/credentials.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#accounts/credentials.ts")>()),
+  credentialsForManifest: releaseCredentials,
+}));
 
 const hooks = { event: () => {}, item: () => {} };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  load.mockResolvedValue(loaded);
   applyLocal.mockResolvedValue({ changed: 0, notices: [] });
 });
 
@@ -469,4 +494,54 @@ describe("a folder the registry already publishes", () => {
     );
     await expect(stat(copy)).resolves.toBeDefined();
   });
+});
+
+const ELSEWHERE = "https://elsewhere.test/";
+
+/** The same scope, with its manifest now declaring the registry at another place. */
+function moved(): Loaded {
+  const registries = { [REGISTRY]: { location: ELSEWHERE, adapter: "acme", config: {} } };
+  return { ...loaded, manifest: { registries } } as unknown as Loaded;
+}
+
+test("releases the token again for where the registry is declared after a reload", async () => {
+  load.mockResolvedValueOnce(loaded).mockResolvedValue(moved());
+  scan.mockResolvedValue(scanOf([item("alpha", "pull")]));
+  mutateRemote.mockResolvedValue({ published: new Set<string>(), archived: new Set<string>() });
+
+  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+
+  const sent = scan.mock.calls.map(([scanned, , options]) => ({
+    at: (scanned as Loaded).manifest.registries[REGISTRY]?.location,
+    token: options.credentials?.[REGISTRY]?.accessToken,
+  }));
+  expect(sent).toEqual([
+    { at: ENDPOINT, token: `released for ${ENDPOINT}` },
+    { at: ELSEWHERE, token: `released for ${ELSEWHERE}` },
+  ]);
+  expect(mutateRemote.mock.calls[0]?.[2]).toMatchObject({ location: ELSEWHERE });
+});
+
+test("stops when the reload no longer declares the registry, sending nothing", async () => {
+  const dropped = { ...loaded, manifest: { registries: {} } } as unknown as Loaded;
+  load.mockResolvedValueOnce(loaded).mockResolvedValue(dropped);
+  scan.mockResolvedValue(scanOf([item("alpha", "pull")]));
+
+  await expect(
+    executeSync(job, account, "sync", undefined, new AbortController().signal, hooks),
+  ).rejects.toThrow(`No registry named "${REGISTRY}"`);
+  expect(scan).toHaveBeenCalledTimes(1);
+  expect(mutateRemote).not.toHaveBeenCalled();
+});
+
+test("checks every declared registry for a shared token when it releases a sync's", async () => {
+  const other = { location: ELSEWHERE, adapter: "acme", config: {} };
+  const registries = { ...loaded.manifest.registries, other };
+  load.mockResolvedValue({ ...loaded, manifest: { registries } } as unknown as Loaded);
+  scan.mockResolvedValue(scanOf([item("alpha", "pull")]));
+  mutateRemote.mockResolvedValue({ published: new Set<string>(), archived: new Set<string>() });
+
+  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+
+  expect(Object.keys(releaseCredentials.mock.calls[0]?.[0] ?? {})).toEqual([REGISTRY, "other"]);
 });
