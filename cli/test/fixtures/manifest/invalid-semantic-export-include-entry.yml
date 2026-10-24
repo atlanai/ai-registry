@@ -1,0 +1,5 @@
+exports:
+  - path: agents/helper
+    include:
+      - from: notes.md
+        as: AGENT.md

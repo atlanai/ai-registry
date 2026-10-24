@@ -11,15 +11,29 @@ import {
   type YAMLMap,
   type YAMLSeq,
 } from "yaml";
+import { isNamespace } from "#adapter/filespec/names.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isLayoutId, LAYOUT_IDS } from "#adapter/layouts/ids.ts";
+import { formatVersion, parseVersion } from "#adapter/semver.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { isMissing } from "#core/fs/path.ts";
-import { parseEngine } from "#core/semver.ts";
+import { parseEngine, unmetEngine } from "#core/semver.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { type Roots, type Scope, scopeName } from "#core/store/paths.ts";
+import { VERSION } from "#core/version.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
+import {
+  type ExportFile,
+  exportExclude,
+  exportIgnore,
+  exportInclude,
+  exportKind,
+  isGlob,
+  PATH_HINT,
+  pathProblem,
+} from "./export-fields.ts";
 import {
   dict,
   type Fields,
@@ -27,15 +41,18 @@ import {
   namesOf,
   RESERVED_KEYS,
   textMapOf,
+  textOf,
   unknownKeysProblem,
   withoutUndefined,
 } from "./fields.ts";
+import { ManifestError } from "./manifest-error.ts";
 import { NAME } from "./product.ts";
 import {
   formatAddress,
   formatRef,
   parseRef,
   type Ref,
+  RefParseError,
   relativeTo,
   withExclusions,
   withLocalName,
@@ -62,7 +79,42 @@ export interface Manifest {
   /** `registries:`, keyed by the name a reference uses. */
   registries: Record<string, RegistrySource>;
   artifacts: Ref[];
+  /** `exports:`, what this project makes for others to install. */
+  exports: Export[];
+  /** `publish:`, where exports go. */
+  publish: PublishTarget | undefined;
 }
+
+/** Where exports are published, as `--to` takes it. */
+interface PublishTarget {
+  /** `<registry>/<namespace>` with the registry declared, or a folder ending in `/<namespace>`. */
+  to: string;
+}
+
+/** An exported artifact path, glob, or folder whose immediate artifacts are exported. */
+export interface Export {
+  /** Relative to the project, with `/`; only a plain entry may be a glob. */
+  path: string;
+  /** When set, every artifact the entry reaches must be this kind. */
+  kind?: ArtifactKind | undefined;
+  /** The exact version to publish it at, instead of the next one. */
+  version: string | undefined;
+  dependsOn: ExportDependency[];
+  /** `false` keeps it in this repository; absent, it goes to `publish.to`. */
+  publish: false | undefined;
+  /** For a folder of artifacts, the names directly inside it that it does not reach. */
+  exclude?: string[] | undefined;
+  /** Gitignore patterns, relative to each artifact it reaches: the files left out. */
+  ignore?: string[] | undefined;
+  /** When set, the only files each artifact publishes besides its entry file, and where each is stored. */
+  include?: ExportFile[] | undefined;
+}
+
+/** A local exported path or the unversioned address of a declared installed artifact. */
+export type ExportDependency = { type: "local"; path: string } | { type: "remote"; ref: Ref };
+
+export { type ExportFile, isGlob } from "./export-fields.ts";
+export { ManifestError } from "./manifest-error.ts";
 
 /** The published schema is held to this list. */
 export const MANIFEST_KEYS = [
@@ -73,17 +125,26 @@ export const MANIFEST_KEYS = [
   "harnesses",
   "registries",
   "artifacts",
+  "exports",
+  "publish",
+] as const;
+
+/** Every key a mapping in `exports:` takes. */
+export const EXPORT_KEYS = [
+  "path",
+  "kind",
+  "version",
+  "depends_on",
+  "publish",
+  "exclude",
+  "ignore",
+  "include",
 ] as const;
 
 /** Every transport's keys; which are legal together is checked below. */
 export const REGISTRY_KEYS = ["source", "adapter", "ref", "path", "layout", "config"] as const;
 
-export class ManifestError extends AiregError {
-  constructor(message: string, hint?: string) {
-    super(message, { code: ErrorCode.Invalid, hint });
-    this.name = "ManifestError";
-  }
-}
+const ARTIFACT_KEYS = ["ref", "as", "exclude", "harnesses", "copy", "trust"] as const;
 
 /**
  * One failure for a registry a scope does not declare, wherever it is looked
@@ -118,7 +179,20 @@ export function emptyManifest(): Manifest {
     targets: [],
     registries: dict(),
     artifacts: [],
+    exports: [],
+    publish: undefined,
   };
+}
+
+function refuseOldCli(engine: string | undefined): void {
+  const why = unmetEngine(VERSION, engine);
+  if (why === undefined) return;
+  throw new AiregError(`This project ${why}.`, { hint: "Run `aireg self update`." });
+}
+
+function engineOf(raw: unknown): string | undefined {
+  const value = isRecord(raw) ? raw[NAME] : undefined;
+  return typeof value === "string" ? parseEngine(value) : undefined;
 }
 
 function parseEnginesField(raw: unknown): string | undefined {
@@ -228,7 +302,7 @@ function artifactRef(raw: unknown): Ref {
     throw new ManifestError("`artifacts:` entries must be references or `{ ref, ... }` mappings.");
   }
   const entry = raw;
-  onlyKnown(entry, ["ref", "as", "exclude", "harnesses", "copy", "trust"], "An `artifacts:` entry");
+  onlyKnown(entry, ARTIFACT_KEYS, "An `artifacts:` entry");
   const text = optionalString(entry, "ref");
   if (text === undefined) throw new ManifestError("An `artifacts:` entry has no `ref`.");
   const localName = optionalString(entry, "as");
@@ -274,6 +348,224 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
   return out;
 }
 
+/** The `artifacts:` entry a remote dependency names: the same address, at any exact version. */
+export function artifactFor(artifacts: readonly Ref[], ref: Ref): Ref | undefined {
+  const address = formatAddress(ref);
+  return artifacts.find((entry) => formatAddress(entry) === address);
+}
+
+function isFolderTarget(to: string): boolean {
+  return to.startsWith(".") || to.startsWith("/");
+}
+
+function publishTo(raw: unknown, registries: Record<string, RegistrySource>): string {
+  const where = "`publish.to`";
+  if (Array.isArray(raw)) {
+    const [first] = raw;
+    const only = typeof first === "string" ? first : "acme/engineering";
+    throw new ManifestError(
+      `${where} names one target, not a list.`,
+      raw.length === 1
+        ? `Write it as \`to: ${only}\`.`
+        : `Keep the one this project publishes to, such as \`to: ${only}\`.`,
+    );
+  }
+  const to = textOf(raw);
+  if (to === undefined) {
+    throw new ManifestError(
+      `${where} must be one target, such as acme/engineering or ./registry/engineering.`,
+    );
+  }
+  checkTarget(to, where, registries);
+  return to;
+}
+
+function checkTarget(to: string, where: string, registries: Record<string, RegistrySource>): void {
+  const parts = to.split("/");
+  const namespace = parts.at(-1) as string;
+  if (isFolderTarget(to)) {
+    if (parts.length < 2 || !isNamespace(namespace)) {
+      throw new ManifestError(
+        `${where} names ${quoted(to)}, a folder that does not end in a namespace.`,
+        "End it with the namespace to publish under, such as ./registry/engineering.",
+      );
+    }
+    return;
+  }
+  const [registry = ""] = parts;
+  if (parts.length !== 2 || registry === "") {
+    throw new ManifestError(
+      `${where} names ${quoted(to)}, which is neither <registry>/<namespace> nor a folder.`,
+      "Write it as acme/engineering, or start a folder with ./ or /.",
+    );
+  }
+  if (registries[registry] === undefined) {
+    throw new ManifestError(
+      `${where} names registry ${quoted(registry)}, which is not declared under \`registries:\`.`,
+      `Declare it with \`aireg registry add <address> --as ${registry}\`.`,
+    );
+  }
+  if (!isNamespace(namespace)) {
+    throw new ManifestError(
+      `${where} names ${quoted(to)}, whose namespace is not valid.`,
+      "Use lowercase letters, digits and inner hyphens, such as engineering.",
+    );
+  }
+}
+
+function parsePublish(
+  raw: unknown,
+  registries: Record<string, RegistrySource>,
+): PublishTarget | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!isRecord(raw)) throw new ManifestError("`publish:` must be a mapping with `to`.");
+  onlyKnown(raw, ["to"], "`publish:`");
+  if (raw.to === undefined || raw.to === null) throw new ManifestError("`publish:` has no `to`.");
+  return { to: publishTo(raw.to, registries) };
+}
+
+function exportVersion(raw: unknown, path: string): string | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const parsed = typeof raw === "string" ? parseVersion(raw) : undefined;
+
+  if (parsed === undefined || formatVersion(parsed) !== raw) {
+    throw new ManifestError(
+      `\`version\` of export ${quoted(path)} must be an exact version, such as 2.0.0.`,
+    );
+  }
+  return raw;
+}
+
+function dependency(text: string, path: string, artifacts: readonly Ref[]): ExportDependency {
+  const of = `Export ${quoted(path)} depends on ${quoted(text)}`;
+  if (text.startsWith("./")) {
+    const local = text.slice(2);
+    const problem = pathProblem(local);
+    if (problem !== undefined) throw new ManifestError(`${of}, whose path ${problem}.`, PATH_HINT);
+    if (isGlob(local)) {
+      throw new ManifestError(
+        `${of}, a glob rather than a path.`,
+        "Name an artifact, or a folder of them, such as ./skills.",
+      );
+    }
+    if (local === path) throw new ManifestError(`Export ${quoted(path)} depends on itself.`);
+    return { type: "local", path: local };
+  }
+  let ref: Ref | undefined;
+  try {
+    ref = parseRef(text);
+  } catch (error) {
+    if (!(error instanceof RefParseError)) throw error;
+  }
+  if (ref === undefined || ref.namespace === undefined || ref.kind === undefined) {
+    throw new ManifestError(
+      `${of}, which is neither ./<path> nor <registry>/<namespace>/<kind>/<name>.`,
+      "Start a path in this project with ./, such as ./.claude/skills/review.",
+    );
+  }
+  const address = formatAddress(ref);
+  // Which versions it takes is the install's to say, so it is said once.
+  if (ref.version !== undefined) {
+    throw new ManifestError(
+      `${of}, but its version belongs on its \`artifacts:\` entry.`,
+      `Write ${address} here, and ${formatRef(ref)} under \`artifacts:\`.`,
+    );
+  }
+  if (artifactFor(artifacts, ref) === undefined) {
+    throw new ManifestError(
+      `${of}, which is not listed under \`artifacts:\`.`,
+      // Not `aireg add`, which reads this manifest first and so stops here too.
+      `List it under \`artifacts:\`, such as \`- ${address}\`.`,
+    );
+  }
+  return { type: "remote", ref };
+}
+
+function dependencies(raw: unknown, path: string, artifacts: readonly Ref[]): ExportDependency[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.some((item) => textOf(item) === undefined)) {
+    throw new ManifestError(
+      `\`depends_on\` of export ${quoted(path)} must be a list of paths and addresses.`,
+    );
+  }
+  const seen = new Set<string>();
+  return (raw as string[]).map((text) => {
+    if (seen.has(text)) {
+      throw new ManifestError(
+        `Export ${quoted(path)} lists ${quoted(text)} twice under \`depends_on\`.`,
+      );
+    }
+    seen.add(text);
+    return dependency(text, path, artifacts);
+  });
+}
+
+function exportPublish(raw: unknown, path: string): false | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (raw === false) return false;
+  // One target for the whole project, so an entry can only keep itself out of it.
+  throw new ManifestError(
+    `\`publish\` of export ${quoted(path)} takes only false.`,
+    "Remove it to publish the export to `publish.to`, or write `publish: false` to keep it here.",
+  );
+}
+
+function exportEntry(raw: unknown, artifacts: readonly Ref[]): Export {
+  if (typeof raw === "string") {
+    return { path: exportPath(raw), version: undefined, dependsOn: [], publish: undefined };
+  }
+  if (!isRecord(raw)) {
+    throw new ManifestError("`exports:` entries must be paths or `{ path, ... }` mappings.");
+  }
+  onlyKnown(raw, EXPORT_KEYS, "An `exports:` entry");
+  const text = optionalString(raw, "path");
+  if (text === undefined) throw new ManifestError("An `exports:` entry has no `path`.");
+  const path = exportPath(text);
+  // A glob's members are refined by entries of their own, so one path never reads two ways.
+  if (isGlob(path)) {
+    throw new ManifestError(
+      `Export ${quoted(path)} is a glob, which only a plain \`exports:\` entry can be.`,
+      "Give each path it matches an entry of its own to set its version, dependencies or targets.",
+    );
+  }
+  const optional = withoutUndefined({
+    kind: exportKind(raw.kind, path),
+    exclude: exportExclude(raw.exclude, path),
+    ignore: exportIgnore(raw.ignore, path),
+    include: exportInclude(raw.include, path),
+  });
+  return {
+    path,
+    version: exportVersion(raw.version, path),
+    dependsOn: dependencies(raw.depends_on, path, artifacts),
+    publish: exportPublish(raw.publish, path),
+    ...optional,
+  };
+}
+
+function exportPath(text: string): string {
+  if (text.trim() === "") throw new ManifestError("An `exports:` entry has an empty path.");
+  const problem = pathProblem(text);
+  if (problem !== undefined) {
+    throw new ManifestError(`Export ${quoted(text)} ${problem}.`, PATH_HINT);
+  }
+  return text;
+}
+
+function parseExports(raw: unknown, artifacts: readonly Ref[]): Export[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) throw new ManifestError("`exports:` must be a list of paths.");
+  const seen = new Set<string>();
+  return raw.map((item) => {
+    const entry = exportEntry(item, artifacts);
+    if (seen.has(entry.path)) {
+      throw new ManifestError(`Export ${quoted(entry.path)} is listed more than once.`);
+    }
+    seen.add(entry.path);
+    return entry;
+  });
+}
+
 export function parseManifest(text: string, filename = "manifest.yml"): Manifest {
   let doc: unknown;
   try {
@@ -295,6 +587,17 @@ export function parseManifest(text: string, filename = "manifest.yml"): Manifest
 }
 
 function parseFields(root: Record<string, unknown>): Manifest {
+  try {
+    return parseKnownFields(root);
+  } catch (error) {
+    // A key or form this aireg does not know is most likely one the newer
+    // aireg the file asks for added, so that is the failure worth reporting.
+    if (error instanceof ManifestError) refuseOldCli(engineOf(root.engines));
+    throw error;
+  }
+}
+
+function parseKnownFields(root: Record<string, unknown>): Manifest {
   onlyKnown(root, MANIFEST_KEYS, "The manifest");
   const registries = parseRegistries(root);
   const targets = parseSelection(root.harnesses, "harnesses");
@@ -327,7 +630,6 @@ function parseFields(root: Record<string, unknown>): Manifest {
     }
     seen.add(address);
   }
-
   return {
     schema: optionalString(root, "$schema"),
     name: optionalString(root, "name"),
@@ -336,6 +638,8 @@ function parseFields(root: Record<string, unknown>): Manifest {
     targets,
     registries,
     artifacts,
+    exports: parseExports(root.exports, artifacts),
+    publish: parsePublish(root.publish, registries),
   };
 }
 
@@ -382,7 +686,28 @@ function manifestData(manifest: Manifest): Record<string, unknown> {
     });
     return Object.keys(written).length === 1 ? formatRef(ref) : written;
   });
+  if (manifest.exports.length > 0) doc.exports = manifest.exports.map(exportData);
+  if (manifest.publish !== undefined) doc.publish = { to: manifest.publish.to };
   return doc;
+}
+
+function exportData(entry: Export): unknown {
+  const written = withoutUndefined({
+    path: entry.path,
+    kind: entry.kind,
+    version: entry.version,
+    depends_on:
+      entry.dependsOn.length === 0
+        ? undefined
+        : entry.dependsOn.map((need) =>
+            need.type === "local" ? `./${need.path}` : formatAddress(need.ref),
+          ),
+    publish: entry.publish,
+    exclude: entry.exclude,
+    ignore: entry.ignore,
+    include: entry.include?.map((file) => (file.from === file.as ? file.from : { ...file })),
+  });
+  return Object.keys(written).length === 1 ? entry.path : written;
 }
 
 export function formatManifest(manifest: Manifest): string {
@@ -567,7 +892,9 @@ export function reaches(ref: Ref, row: Pinnable): boolean {
 /** One artifact named on its own adds nothing when a whole namespace or registry entry already takes it. */
 export function coveredByWhole(ref: Ref, artifacts: readonly Ref[]): boolean {
   if (ref.name === undefined || ref.kind === undefined) return false;
-  if (ref.version !== undefined || ref.localName !== undefined) return false;
+  if (ref.version !== undefined || ref.localName !== undefined) {
+    return false;
+  }
   if (ref.targets !== undefined || ref.copy === true) return false;
   return artifacts.some(
     (whole) =>
