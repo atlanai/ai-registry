@@ -31,17 +31,9 @@ function scopePathOf(value: unknown, scope: Scope): string | undefined {
   return path !== undefined && (scope === "user" || isSafePath(path)) ? path : undefined;
 }
 
-/**
- * No install writes a segment starting with "-"; refusing one keeps a hand-edited key from
- * reading as an option in a command line built from it.
- */
-function isArtifactKey(key: string): boolean {
-  return isSafePath(key) && key.split("/").every((segment) => !segment.startsWith("-"));
-}
-
 /** A name becomes one folder under the scope's artifacts. */
 function isLeafName(name: string): boolean {
-  return isArtifactKey(name) && !name.includes("/");
+  return isSafePath(name) && !name.includes("/");
 }
 
 /**
@@ -293,7 +285,7 @@ export function parseLock(text: string, path = "The lockfile", scope: Scope = "p
     lock.registries[name] = registry;
   }
   for (const [name, raw] of artifacts) {
-    const artifact = isArtifactKey(name) ? parseArtifact(raw, scope) : undefined;
+    const artifact = isSafePath(name) ? parseArtifact(raw, scope) : undefined;
     if (artifact === undefined)
       throw unreadable(path, `has an artifact ${quoted(name)} it cannot read`);
     // An artifact whose registry vanished is unusable; drop it and rebuild.
