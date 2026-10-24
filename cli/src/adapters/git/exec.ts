@@ -165,7 +165,7 @@ function spawnOne(
     try {
       env = binary === "git" ? gitEnv(options.env) : withAbsolutePath(options.env ?? process.env);
     } catch (error) {
-      // Refused, not emptied: an empty PATH finds a program in the checkout git works in.
+      // An empty PATH would find a program in the checkout git works in.
       reject(
         new GitError(
           "invalid",
