@@ -295,6 +295,7 @@ describe("heartbeat", () => {
     const mtime = async () => (await stat(meta)).mtimeMs;
 
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const parse = vi.spyOn(JSON, "parse");
     try {
       const held = await acquire(roots, { env });
       // Still its own: each beat refreshes it.
@@ -304,15 +305,17 @@ describe("heartbeat", () => {
       await vi.waitFor(async () => expect(await mtime()).toBeGreaterThan(aged));
 
       // Reclaimed by another holder, whose lease ages out unless that holder keeps it alive.
-      const holder = JSON.parse(await readFile(meta, "utf8"));
-      await writeFile(meta, JSON.stringify({ ...holder, id: "theirs" }));
+      const record = JSON.stringify({ ...JSON.parse(await readFile(meta, "utf8")), id: "theirs" });
+      await writeFile(meta, record);
       await age(roots.lock, 60_000);
       const theirs = await mtime();
       vi.advanceTimersByTime(15_000);
-      await new Promise((wake) => setTimeout(wake, 250));
+      // The beat has decided once it has read the new holder's record.
+      await vi.waitFor(() => expect(parse).toHaveBeenCalledWith(record));
       expect(await mtime()).toBe(theirs);
       await held.release();
     } finally {
+      parse.mockRestore();
       vi.useRealTimers();
     }
   });
