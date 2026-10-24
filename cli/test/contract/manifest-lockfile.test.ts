@@ -4,7 +4,7 @@ import { Ajv2020, type SchemaObject } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { formatLock, parseLock } from "#core/lock.ts";
-import { MANIFEST_KEYS, parseManifest, REGISTRY_KEYS } from "#core/manifest.ts";
+import { EXPORT_KEYS, MANIFEST_KEYS, parseManifest, REGISTRY_KEYS } from "#core/manifest.ts";
 import { GENERATED, kindCopies, render } from "#scripts/schema/generate.ts";
 
 const SCHEMAS = join(import.meta.dirname, "..", "..", "schema");
@@ -88,6 +88,7 @@ describe("the schema describes every key the parser reads", () => {
     properties?: Record<string, unknown>;
     patternProperties?: Record<string, Node>;
     anyOf?: Node[];
+    items?: Node;
   }
 
   const schema = JSON.parse(
@@ -110,6 +111,12 @@ describe("the schema describes every key the parser reads", () => {
       for (const key of props(branch)) described.add(key);
     }
     expect([...described].sort()).toEqual([...REGISTRY_KEYS].sort());
+  });
+
+  it("on an export", () => {
+    const exports = schema.properties.exports as Node;
+    const described = (exports.items?.anyOf ?? []).flatMap(props);
+    expect(described.sort()).toEqual([...EXPORT_KEYS].sort());
   });
 });
 

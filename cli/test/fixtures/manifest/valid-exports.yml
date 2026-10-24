@@ -1,0 +1,16 @@
+registries:
+  acme: github.com/acme/agent-registry
+  public: github.com/acme/public-registry
+artifacts:
+  - public/platform/skill/sql-style@0.1.2
+exports:
+  - .claude/skills/*
+  - path: .claude/agents/reviewer.md
+    version: 2.0.0
+    depends_on:
+      - ./.claude/skills/review
+      - public/platform/skill/sql-style
+  - path: .claude/skills/scratch
+    publish: false
+publish:
+  to: acme/engineering

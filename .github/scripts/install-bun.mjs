@@ -16,10 +16,10 @@ const MAX_ARCHIVE_BYTES = 128 * 1024 * 1024;
 
 const pin = JSON.parse(await readFile(new URL("../../cli/packaging/bun-runtime.json", import.meta.url), "utf8"));
 const expected = (await readFile(new URL("../../cli/.bun-version", import.meta.url), "utf8")).trim();
-assert(/^\d+\.\d+\.\d+-canary\.\d{8}\.\d+$/.test(pin.packageVersion), "Invalid Bun package version");
+assert(/^\d+\.\d+\.\d+(-canary\.\d{8}\.\d+)?$/.test(pin.packageVersion), "Invalid Bun package version");
 assert(/^[a-f0-9]{40}$/.test(pin.commit), "Invalid Bun source commit");
 assert(
-  /^\d+\.\d+\.\d+-canary\.\d+\+[a-f0-9]{9}$/.test(expected) && expected.endsWith(`+${pin.commit.slice(0, 9)}`),
+  /^\d+\.\d+\.\d+(-canary\.\d+)?\+[a-f0-9]{9}$/.test(expected) && expected.endsWith(`+${pin.commit.slice(0, 9)}`),
   "Bun revision must match the pinned source commit",
 );
 assert(
