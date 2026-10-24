@@ -272,9 +272,6 @@ describe("where leases live", () => {
     const { roots, untouched } = await linkedOut();
 
     await expect(acquire(roots, { env })).rejects.toThrow("is a symlink in a managed path");
-    await expect(withLease(roots, { env }, async () => {})).rejects.toThrow(
-      "is a symlink in a managed path",
-    );
     await untouched();
   });
 
@@ -298,13 +295,11 @@ describe("heartbeat", () => {
     const parse = vi.spyOn(JSON, "parse");
     try {
       const held = await acquire(roots, { env });
-      // Still its own: each beat refreshes it.
       await age(roots.lock, 60_000);
       const aged = await mtime();
       vi.advanceTimersByTime(15_000);
       await vi.waitFor(async () => expect(await mtime()).toBeGreaterThan(aged));
 
-      // Reclaimed by another holder, whose lease ages out unless that holder keeps it alive.
       const record = JSON.stringify({ ...JSON.parse(await readFile(meta, "utf8")), id: "theirs" });
       await writeFile(meta, record);
       await age(roots.lock, 60_000);

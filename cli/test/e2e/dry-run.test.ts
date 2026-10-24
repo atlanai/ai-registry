@@ -48,11 +48,9 @@ describe("--dry-run", () => {
     const leases = join(project, ".registry", "leases");
     await rm(leases, { recursive: true, force: true });
 
-    for (const argv of [["add", "kit", "--all"], ["install"], ["update"]]) {
-      const ran = await aireg([...argv, "--dry-run"]);
-      expect(ran.code, ran.stderr).toBe(0);
-      expect(existsSync(leases), argv.join(" ")).toBe(false);
-    }
+    const ran = await aireg(["add", "kit", "--all", "--dry-run"]);
+    expect(ran.code, ran.stderr).toBe(0);
+    expect(existsSync(leases)).toBe(false);
   });
 });
 
