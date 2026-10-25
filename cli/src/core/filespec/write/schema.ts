@@ -15,6 +15,9 @@ import manifestSchema from "#schema/kind-manifest.schema.json" with { type: "jso
 /** Validators follow the lifetime of the manifest objects loaded for an operation. */
 const compiled = new WeakMap<object, ValidateFunction>();
 
+/** `translateRegExp` would turn `\k<name>` into the literal text `k<name>`. */
+const NAMED_BACKREFERENCE = /(?:^|[^\\])(?:\\\\)*\\k</;
+
 /**
  * Registries serve their own kind schemas, so patterns run on RE2, which matches in linear
  * time; a lookaround or backreference fails to compile.
@@ -22,6 +25,11 @@ const compiled = new WeakMap<object, ValidateFunction>();
 const re2: NonNullable<CodeOptions["regExp"]> = Object.assign(
   // RE2 always matches by code point, as the "u" flag Ajv passes asks.
   (pattern: string) => {
+    if (NAMED_BACKREFERENCE.test(pattern)) {
+      throw new Error(
+        `pattern ${quoted(pattern)} uses syntax aireg does not support: a named backreference`,
+      );
+    }
     try {
       return RE2JS.compile(RE2JS.translateRegExp(pattern));
     } catch (error) {

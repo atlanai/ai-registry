@@ -158,6 +158,19 @@ const CASES: Case[] = [
     message: `has an invalid kind schema: pattern "^(?!draft-)[a-z-]+$" uses syntax aireg does not support: invalid or unsupported Perl syntax at (?!, so "skill" is checked against the one aireg bundles`,
   },
   {
+    name: "a kind manifest the registry serves with a named backreference",
+    edit: async (root) => {
+      const document = JSON.parse(await readFile(join(root, "registry.json"), "utf8"));
+      const kinds = [{ name: "skill", manifest_url: "kinds/skill.json" }, { name: "agent" }];
+      await writeFile(join(root, "registry.json"), JSON.stringify({ ...document, kinds }));
+      const name = { ...skill.properties.name, pattern: "^(?<c>[a-z])\\k<c>$" };
+      const manifest = { ...skill, properties: { ...skill.properties, name } };
+      await put(root, "kinds/skill.json", JSON.stringify(manifest));
+    },
+    path: "kinds/skill.json",
+    message: 'a named backreference, so "skill" is checked against the one aireg bundles',
+  },
+  {
     name: "a released version folder deleted",
     edit: (root) => rm(join(root, "artifacts/eng/agent/reviewer/0.3.0"), { recursive: true }),
     path: "artifacts/eng/agent/reviewer/0.3.0",
