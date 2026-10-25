@@ -12,8 +12,10 @@ import { offerFrom } from "#core/filespec/write/offer.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { RegistrySource } from "#core/manifest.ts";
 import { listedAt } from "#core/plan/model.ts";
+import { refuseRedirectedCopy } from "#core/store/managed-paths.ts";
 import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
+import { artifactKey } from "./decide.ts";
 import type { Scan } from "./scan.ts";
 
 async function publishInput(
@@ -107,10 +109,49 @@ interface StagedMutations {
   /** Kept apart from the result, which must describe only what landed. */
   archivingNames: Set<string>;
   publishingNames: Set<string>;
+  /** The first copy refused before sending, reported on its artifact while the rest go out. */
+  refused: unknown;
+}
+
+async function stageInstalled(
+  scan: Scan,
+  item: Scan["items"][number],
+  previous: LockArtifact,
+  hooks: RemoteMutationHooks,
+  staged: StagedMutations,
+): Promise<void> {
+  const path = artifactPath(
+    scan.roots,
+    previous.registry,
+    previous.namespace,
+    item.kind,
+    copyLeaf(item.name, previous.name),
+    previous.address ?? "",
+  );
+  try {
+    refuseRedirectedCopy(item.name, path, scan.roots);
+  } catch (error) {
+    hooks.failed?.(item.name, error);
+    staged.refused ??= error;
+    return;
+  }
+  hooks.event("publishing", item.name);
+  staged.publishing.push(
+    await publishInput(path, item.name, item.kind, {
+      id: previous.id ?? "",
+      name: previous.name,
+      ...(previous.namespace === undefined ? {} : { namespace: previous.namespace }),
+      ...(previous.version === undefined
+        ? {}
+        : { version: countFrom(scan, previous, previous.version) }),
+    }),
+  );
+  staged.publishingNames.add(item.name);
 }
 
 async function stageMutations(
   scan: Scan,
+  /** Keyed by `artifactKey`, so a choice for one kind never sends another of the same name. */
   operations: ReadonlyMap<string, SyncOperation>,
   hooks: RemoteMutationHooks,
   /** Where the account publishes new work. */
@@ -121,45 +162,26 @@ async function stageMutations(
     publishing: [],
     archivingNames: new Set<string>(),
     publishingNames: new Set<string>(),
+    refused: undefined,
   };
 
   for (const item of scan.items) {
-    const next = operations.get(item.name);
+    const next = operations.get(artifactKey(item.kind, item.name));
     const previous = scan.pinned.artifacts[item.name];
     if (next === "archive" && previous !== undefined) {
       hooks.event("archiving", item.name);
       if (previous.id !== undefined) staged.archiving.push({ id: previous.id, kind: item.kind });
       staged.archivingNames.add(item.name);
     }
-    if (next === "publish") {
-      // Installed or authored alike: a policy that publishes was opted into, and
-      // whether the edit may land is the registry's call, not this client's.
-      if (previous === undefined) continue;
-      hooks.event("publishing", item.name);
-      const path = artifactPath(
-        scan.roots,
-        previous.registry,
-        previous.namespace,
-        item.kind,
-        copyLeaf(item.name, previous.name),
-        previous.address ?? "",
-      );
-      staged.publishing.push(
-        await publishInput(path, item.name, item.kind, {
-          id: previous.id ?? "",
-          name: previous.name,
-          ...(previous.namespace === undefined ? {} : { namespace: previous.namespace }),
-          ...(previous.version === undefined
-            ? {}
-            : { version: countFrom(scan, previous, previous.version) }),
-        }),
-      );
-      staged.publishingNames.add(item.name);
+    // Installed or authored alike: a policy that publishes was opted into, and
+    // whether the edit may land is the registry's call, not this client's.
+    if (next === "publish" && previous !== undefined) {
+      await stageInstalled(scan, item, previous, hooks, staged);
     }
   }
 
   for (const candidate of scan.local) {
-    if (operations.get(candidate.name) !== "publish") continue;
+    if (operations.get(artifactKey(candidate.kind, candidate.name)) !== "publish") continue;
     hooks.event("publishing", candidate.name);
     staged.publishing.push(
       await publishInput(
@@ -266,18 +288,15 @@ export async function mutateRemote(
   const opened = await openForMutation(roots, source, account, signal);
   const { adapter, handle } = opened;
   try {
-    const { archiving, publishing, archivingNames, publishingNames } = await stageMutations(
-      scan,
-      operations,
-      hooks,
-      account.defaultNamespace,
-    );
+    const staged = await stageMutations(scan, operations, hooks, account.defaultNamespace);
+    const { archiving, publishing, archivingNames, publishingNames } = staged;
 
     // A refused archive is reported on its artifacts and must not hold back the publishes.
     let refused =
       archiving.length === 0
         ? undefined
         : await archive(opened, account.registry, archiving, archivingNames, result, hooks);
+    refused ??= staged.refused;
     if (publishing.length > 0) {
       const laidOut = readOnlyLayout(account.registry, source.config);
       if (laidOut !== undefined) throw laidOut;

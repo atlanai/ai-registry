@@ -12,7 +12,7 @@ import {
 } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
-import type { Lock } from "#core/lock.ts";
+import type { Lock, LockArtifact } from "#core/lock.ts";
 import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
 import type { KeyRule, PluginDocument, Selected } from "./model.ts";
 
@@ -114,32 +114,41 @@ export interface NamespaceWant {
 }
 
 /**
- * Plugin directories more than one registry wants. A harness that does not
- * key them by registry would load one namespace and hide the other.
+ * Plugin directories two registries' namespaces want under a bare name, repeated until no
+ * qualified name lands on another's bare name; equal qualified names are left to clash in claim().
  */
 export function crowdedContainers(
   wants: Iterable<NamespaceWant>,
   options: Pick<ProjectionOptions, "roots" | "harnesses">,
 ): Set<string> {
   const { scope, cwd } = options.roots;
-  const sources = new Map<string, Set<string>>();
+  const places: { bare: string; qualified: string | undefined; owner: string }[] = [];
   for (const want of wants) {
     const target = options.harnesses[want.harness];
     if (target === undefined || !takesPlugin(target, scope)) continue;
-    const container = pluginProjection(
-      target,
-      want.namespace,
-      scope,
-      cwd,
-      process.env,
-      want.source,
-    );
-    if (container === undefined) continue;
-    const found = sources.get(container) ?? new Set<string>();
-    found.add(want.source);
-    sources.set(container, found);
+    const at = (name: string) =>
+      pluginProjection(target, name, scope, cwd, process.env, want.source);
+    const bare = at(want.namespace);
+    if (bare === undefined) continue;
+    const qualified = at(qualifiedName(want.source, want.namespace));
+    places.push({ bare, qualified, owner: JSON.stringify([want.source, want.namespace]) });
   }
-  return new Set([...sources].filter(([, found]) => found.size > 1).map(([path]) => path));
+  const crowded = new Set<string>();
+  for (let grew = true; grew; ) {
+    const owners = new Map<string, Set<string>>();
+    for (const place of places) {
+      const at = crowded.has(place.bare) ? place.qualified : place.bare;
+      if (at === undefined) continue;
+      owners.set(at, (owners.get(at) ?? new Set()).add(place.owner));
+    }
+    grew = false;
+    for (const place of places) {
+      if (crowded.has(place.bare) || (owners.get(place.bare)?.size ?? 0) < 2) continue;
+      crowded.add(place.bare);
+      grew = true;
+    }
+  }
+  return crowded;
 }
 
 /** What a namespace is called where another registry's namespace shares its name. */
@@ -230,6 +239,19 @@ export function pluginLinkAt(
   if (bare === undefined || qualified === undefined) return undefined;
   const at = resolve(base, link.path);
   return at === bare || at === qualified ? { bare, qualified } : undefined;
+}
+
+/** The namespace content a lockfile row's link holds as its plugin, if it is one. */
+export function rowPlugin(
+  name: string,
+  entry: LockArtifact,
+  link: { harness: string; path: string },
+  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+): string | undefined {
+  const source = entry.registry;
+  const namespace = namespaceOf({ kind: entry.kind, name, group: entry.namespace, source });
+  if (pluginLinkAt(link, namespace, source, options) === undefined) return undefined;
+  return namespaceDir(options.roots, source, namespace);
 }
 
 type Unreadable = (harness: string, kind: ArtifactKind) => void;
@@ -364,27 +386,32 @@ export function linksFor(
   return links;
 }
 
+/**
+ * Takes the paths no other artifact holds. `plugins` names, by the content each links, the
+ * namespace whose plugin holds a directory: only that namespace's artifacts share it.
+ */
 export function claim(
   links: readonly PlannedLink[],
   name: string,
   claimed: Map<string, string>,
+  plugins: Map<string, string>,
   collided: (owner: string, link: PlannedLink) => void,
 ): PlannedLink[] {
   const kept: PlannedLink[] = [];
   for (const link of links) {
     const owner = claimed.get(link.absolute);
-    // A plugin directory is shared on purpose: every artifact in the namespace
-    // keeps it, so removing one sibling never unlinks the plugin the rest need.
-    if (link.shared === true) {
-      claimed.set(link.absolute, name);
-      kept.push(link);
-      continue;
-    }
-    if (owner !== undefined && owner !== name) {
+    // A plugin directory is shared on purpose: every artifact in the namespace keeps it, so
+    // removing one sibling never unlinks the plugin the rest need. Anything else holding it collides.
+    const plugin = plugins.get(link.absolute);
+    const sibling = link.shared === true && plugin !== undefined && plugin === link.content;
+    if (owner !== undefined && owner !== name && !sibling) {
       collided(owner, link);
       continue;
     }
     claimed.set(link.absolute, name);
+    if (link.shared === true && link.content !== undefined) {
+      plugins.set(link.absolute, link.content);
+    } else plugins.delete(link.absolute);
     kept.push(link);
   }
   return kept;

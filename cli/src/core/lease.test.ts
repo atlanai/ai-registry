@@ -7,13 +7,15 @@ import {
   readFile,
   realpath,
   rm,
+  stat,
   symlink,
   utimes,
   writeFile,
 } from "node:fs/promises";
 import { hostname } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
+import { ErrorCode } from "#core/errors.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { expectMode } from "#test/kit/mode.ts";
@@ -243,6 +245,78 @@ describe("where leases live", () => {
 
     const ignore = join(home, "project", ".registry", "leases", ".gitignore");
     expect(await readFile(ignore, "utf8")).toBe("*\n");
+  });
+
+  /** A cloned project whose committed lease folder links out of it, to a stale lease and lock. */
+  async function linkedOut() {
+    const project = join(home, "cloned");
+    const outside = join(home, "outside");
+    await mkdir(join(project, ".registry"), { recursive: true });
+    const roots = scope(join(project, ".registry", "manifest.lock.yml"));
+    const planted = join(outside, `${leaseKey(roots)}.lease`);
+    await mkdir(planted, { recursive: true });
+    await mkdir(join(outside, ".coordination"));
+    const meta = JSON.stringify({ id: "planted", host: hostname(), pid: await exited() });
+    await writeFile(join(planted, "meta.json"), meta);
+    const past = new Date(Date.now() - 60_000);
+    await utimes(join(planted, "meta.json"), past, past);
+    await utimes(join(outside, ".coordination"), past, past);
+    await symlink(outside, join(project, ".registry", "leases"));
+    const untouched = async () => {
+      expect((await readdir(outside)).sort()).toEqual([".coordination", basename(planted)]);
+      expect(await readFile(join(planted, "meta.json"), "utf8")).toBe(meta);
+    };
+    return { roots, untouched };
+  }
+
+  test("takes no lease through a lease folder that links out of the project", async () => {
+    const { roots, untouched } = await linkedOut();
+
+    await expect(acquire(roots, { env })).rejects.toMatchObject({
+      code: ErrorCode.Invalid,
+      hint: "Replace .registry/leases with a real folder.",
+    });
+    await untouched();
+  });
+
+  test("breaks no lease through a lease folder that links out of the project", async () => {
+    const { roots, untouched } = await linkedOut();
+
+    await expect(breakLease(roots, "planted", env)).rejects.toThrow(
+      "is a symlink in a managed path",
+    );
+    await untouched();
+  });
+});
+
+describe("heartbeat", () => {
+  test("stops refreshing a lease another holder took over", async () => {
+    const roots = scope(join(home, "manifest.lock.yml"));
+    const meta = leaseMeta(roots.lock);
+    const mtime = async () => (await stat(meta)).mtimeMs;
+
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const parse = vi.spyOn(JSON, "parse");
+    try {
+      const held = await acquire(roots, { env });
+      await age(roots.lock, 60_000);
+      const aged = await mtime();
+      vi.advanceTimersByTime(15_000);
+      await vi.waitFor(async () => expect(await mtime()).toBeGreaterThan(aged));
+
+      const record = JSON.stringify({ ...JSON.parse(await readFile(meta, "utf8")), id: "theirs" });
+      await writeFile(meta, record);
+      await age(roots.lock, 60_000);
+      const theirs = await mtime();
+      vi.advanceTimersByTime(15_000);
+      // The beat has decided once it has read the new holder's record.
+      await vi.waitFor(() => expect(parse).toHaveBeenCalledWith(record));
+      expect(await mtime()).toBe(theirs);
+      await held.release();
+    } finally {
+      parse.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });
 

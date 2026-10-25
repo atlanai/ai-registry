@@ -17,7 +17,12 @@ export function attempts(spec: SourceSpec, env: NodeJS.ProcessEnv = process.env)
   if (spec.kind === "path") return [{ label: "direct", url: spec.location, viaGh: false }];
 
   const ssh = sshUrl(spec);
-  const isSsh = spec.location.startsWith("git@") || spec.location.startsWith("ssh://");
+  const isSsh = /^[\w.-]+@[\w.-]+:(?!\/)/.test(spec.location) || spec.location.startsWith("ssh://");
+  // Another transport rebuilt from host and slug would sign in as someone else, or
+  // reach another service on the default port, so this address is tried as written.
+  if (spec.exact === true) {
+    return [{ label: isSsh ? "ssh" : "https", url: spec.location, viaGh: false }];
+  }
 
   if (isSsh) {
     const https =
@@ -33,7 +38,8 @@ export function attempts(spec: SourceSpec, env: NodeJS.ProcessEnv = process.env)
   // gh reads github.com: on any other host the same owner/repo is someone else's repository.
   const slug = spec.host?.toLowerCase() === "github.com" ? spec.slug : undefined;
   if (slug !== undefined && !slug.startsWith("-") && onPath("gh", env)) {
-    ladder.push({ label: "gh", url: slug, viaGh: true });
+    // A whole URL, as a bare owner/repo is read on GH_HOST or whichever host gh signed in to.
+    ladder.push({ label: "gh", url: `https://github.com/${slug}`, viaGh: true });
   }
   if (ssh !== undefined) ladder.push({ label: "ssh", url: ssh, viaGh: false });
   return ladder;

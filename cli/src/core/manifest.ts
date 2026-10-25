@@ -332,17 +332,39 @@ function stringList(raw: unknown, ref: string, key: string): string[] | undefine
   return names;
 }
 
+/** Controls and characters that hide or reorder text: a registry's name is shown everywhere. */
+const UNSHOWABLE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+
 function parseRegistries(root: Record<string, unknown>): Record<string, RegistrySource> {
   const registries = root.registries;
   if (registries === undefined || registries === null) return {};
   if (typeof registries !== "object" || Array.isArray(registries)) {
     throw new ManifestError("`registries:` must map names to addresses.");
   }
+  const unshowable = Object.keys(registries).filter((alias) => UNSHOWABLE.test(alias));
+  if (unshowable.length > 0) {
+    throw new ManifestError(
+      `${list(unshowable.map(quoted))} cannot name a registry.`,
+      "Rename each one and its `artifacts:` entries in manifest.yml, using lowercase letters, digits and hyphens, then run `aireg install`.",
+    );
+  }
   const out = dict<RegistrySource>();
+  // A registry's installed copies live in a folder named after it, and `Team` and `team`
+  // name one folder: sharing it, either could read the other's copies as its own.
+  const folders = new Map<string, string>();
   for (const [alias, raw] of Object.entries(registries as Record<string, unknown>)) {
     if (RESERVED_KEYS.has(alias)) {
       throw new ManifestError(`${quoted(alias)} cannot name a registry.`);
     }
+    const folder = sanitizeName(alias);
+    const other = folders.get(folder);
+    if (other !== undefined) {
+      throw new ManifestError(
+        `Registries ${quoted(other)} and ${quoted(alias)} would share the folder .registry/artifacts/${folder}.`,
+        "Rename one of them and its `artifacts:` entries in manifest.yml, using lowercase letters, digits and hyphens, then run `aireg install`.",
+      );
+    }
+    folders.set(folder, alias);
     out[alias] = parseSource(alias, raw);
   }
   return out;

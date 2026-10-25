@@ -128,3 +128,33 @@ describe("Draft 2020-12 kind validation", () => {
     ]);
   });
 });
+
+describe("kind patterns", () => {
+  const named = (pattern: string) => ({
+    ...custom(),
+    required: ["name"],
+    properties: { name: { type: "string", pattern } },
+    patternProperties: { [pattern]: { type: "string" } },
+  });
+
+  test("match in time linear in the value, even when a backtracking engine would not", async ({
+    tmp,
+  }) => {
+    // Each extra "a" doubles a backtracking engine's time on this pattern.
+    const schema = named("^(a+)+$");
+    await prepareManifest(tmp, schema);
+    const value = { name: `${"a".repeat(24)}!` };
+    const start = performance.now();
+    const problems = check(schema, value);
+    expect(performance.now() - start).toBeLessThan(200);
+    expect(problems).toEqual([`\`name\` "${value.name}" does not match ^(a+)+$`]);
+    expect(check(schema, { name: "a".repeat(24) })).toEqual([]);
+  });
+
+  test("keep JavaScript escapes and Unicode classes", async ({ tmp }) => {
+    const schema = named("^\\u0041\\p{Lu}+$");
+    await prepareManifest(tmp, schema);
+    expect(check(schema, { name: "AÉB" })).toEqual([]);
+    expect(check(schema, { name: "Ab" })).not.toEqual([]);
+  });
+});

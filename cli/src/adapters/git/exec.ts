@@ -161,9 +161,24 @@ function spawnOne(
       reject(aborted(signal));
       return;
     }
+    let env: NodeJS.ProcessEnv;
+    try {
+      env = binary === "git" ? gitEnv(options.env) : withAbsolutePath(options.env ?? process.env);
+    } catch (error) {
+      // An empty PATH would find a program in the checkout git works in.
+      reject(
+        new GitError(
+          "invalid",
+          (error as Error).message,
+          "",
+          `Set PATH to the absolute folders that hold ${binary}, then run the command again.`,
+        ),
+      );
+      return;
+    }
     const child = spawn(binary, [...args], {
       cwd: options.cwd,
-      env: binary === "git" ? gitEnv(options.env) : withAbsolutePath(options.env ?? process.env),
+      env,
       detached: GROUPED,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -231,6 +246,7 @@ export async function git(args: readonly string[], options: GitOptions): Promise
     ran = await spawnTool("git", args, options, timeout);
   } catch (error) {
     if (options.signal?.aborted === true) throw error;
+    if (error instanceof GitError) throw error;
     const stderr = (error as { stderr?: string }).stderr ?? "";
     throw notInstalled(error) ?? new GitError("unavailable", (error as Error).message, stderr);
   }

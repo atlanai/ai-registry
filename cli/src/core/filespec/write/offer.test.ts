@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import type { PublishRelationship } from "#adapter/index.ts";
@@ -164,4 +164,14 @@ test("publishing an explicit native agent file preserves its front matter", asyn
   expect(input.spec).toEqual({ name: "reviewer", description: "Reviews.", model: "sonnet" });
   expect(input.files[0]?.path).toBe("reviewer.md");
   expect(Buffer.from(input.files[0]!.content).toString()).toBe(body);
+});
+
+test("refuses a skill folder that is itself a symlink", async () => {
+  await mkdir(join(root, "outside"));
+  await writeFile(join(root, "outside", "SKILL.md"), "---\nname: lint\ndescription: L.\n---\n");
+  await symlink(join(root, "outside"), join(root, "lint"));
+
+  await expect(
+    offerFrom(join(root, "lint"), { kind: "skill", name: "lint", version: "1.0.0" }),
+  ).rejects.toThrow("lint is a symlink");
 });

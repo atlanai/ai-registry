@@ -147,7 +147,7 @@ def load_json(path: Path, rep: Report):
 
 def inside(root: Path, target: Path) -> bool:
     """True when target sits under root with no symlink on the way, so a
-    registry can never make the checker read, or report on, a file outside it."""
+    registry cannot make the checker read or rewrite a file outside it."""
     base = root.resolve()
     if not target.resolve().is_relative_to(base):
         return False
@@ -159,7 +159,11 @@ def inside(root: Path, target: Path) -> bool:
     return True
 
 
-def dump_json(path: Path, obj) -> None:
+def write_json(root: Path, path: Path, obj, rep: Report) -> None:
+    """Every --fix write goes through here, so a link cannot redirect a repair."""
+    if not inside(root, path):
+        rep.error(f"{path.relative_to(root)}: not rewritten; it is a symlink, sits under one, or lies outside the root")
+        return
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
@@ -279,7 +283,11 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
 
     check_kind_manifests(root, registry, rep)
 
-    index = load_json(root / "index.json", rep)
+    index = None
+    if inside(root, root / "index.json"):
+        index = load_json(root / "index.json", rep)
+    else:
+        rep.error("index.json: is a symlink; not read")
     index_entries: dict[tuple[str, str, str], dict] = {}
     if index is not None:
         for e in index.get("entries", []):
@@ -295,15 +303,21 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
     for stray in sorted(root.glob("*/*/*/versions.json")):
         rep.error(f"{stray.relative_to(root)}: namespaces must live under artifacts/ in format 1")
     artifacts = root / "artifacts"
-    if not artifacts.is_dir() and index_entries:
+    if artifacts.is_symlink():
+        rep.error("artifacts/ is a symlink; not read")
+    elif not artifacts.is_dir() and index_entries:
         rep.error("artifacts/ is missing but index.json has entries")
 
-    for vpath in sorted(artifacts.glob("*/*/*/versions.json")) if artifacts.is_dir() else []:
+    for vpath in sorted(artifacts.glob("*/*/*/versions.json")) if inside(root, artifacts) and artifacts.is_dir() else []:
         name_dir = vpath.parent
         ns, kind, name = name_dir.parts[-3:]
         key = (ns, kind, name)
         seen_keys.add(key)
         label = f"{ns}/{kind}/{name}"
+        # The glob follows links, so a linked folder or file is refused before it is read.
+        if not inside(root, vpath):
+            rep.error(f"{label}: versions.json is a symlink or sits under one; not read")
+            continue
         if not NAMESPACE_RE.match(ns):
             rep.error(f"{label}: namespace violates grammar")
         if not KIND_RE.match(kind):
@@ -338,6 +352,9 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
                 rep.error(f"{label}@{v}: yanked must be a boolean")
 
             vdir = name_dir / v
+            if not inside(root, vdir / "artifact.json"):
+                rep.error(f"{label}@{v}: artifact.json is a symlink or sits under one; not read")
+                continue
             if not vdir.is_dir():
                 if partial:
                     rep.warn(f"{label}@{v}: not present locally (partial copy)")
@@ -412,10 +429,7 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
                 meta["digest"] = cdig
                 changed = True
             if changed:
-                dump_json(vdir / "artifact.json", env)
-                cdig = content_digest(env)
-                meta["digest"] = cdig
-                dump_json(vdir / "artifact.json", env)
+                write_json(root, vdir / "artifact.json", env, rep)
             if meta.get("digest") not in (None, cdig):
                 rep.error(f"{label}@{v}: metadata.digest {meta.get('digest')} != computed {cdig}")
 
@@ -447,12 +461,13 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
         if want is not None and latest != want:
             rep.error(f"{label}: latest is {latest!r}, but the newest active release is {want!r}")
         if fix:
-            dump_json(vpath, vdoc)
+            write_json(root, vpath, vdoc, rep)
 
         idx = index_entries.get(key)
         if idx is None:
             if fix and index is not None and latest in listed:
-                env_latest = load_json(name_dir / latest / "artifact.json", rep) or {}
+                latest_path = name_dir / latest / "artifact.json"
+                env_latest = (load_json(latest_path, rep) if inside(root, latest_path) else None) or {}
                 idx = {"namespace": ns, "kind": kind, "name": name}
                 meta_l = env_latest.get("metadata", {})
                 for f in ("display_name", "description"):
@@ -483,7 +498,7 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
 
     if fix and index is not None:
         index["entries"].sort(key=lambda e: (e["namespace"], e["kind"], e["name"]))
-        dump_json(root / "index.json", index)
+        write_json(root, root / "index.json", index, rep)
 
 
 def main() -> int:

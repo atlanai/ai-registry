@@ -109,4 +109,21 @@ unix("git", () => {
       await expect(access(join(tmp, `${tool}.ran`)), tool).rejects.toThrow();
     }
   });
+
+  test("refuses to run git when no folder on PATH is absolute", async ({ tmp }) => {
+    // A redirect, which needs nothing on PATH, so the marker shows any run.
+    await writeFile(join(tmp, "git"), `#!/bin/sh\n: > "${join(tmp, "git.ran")}"\n`);
+    await chmod(join(tmp, "git"), 0o755);
+    vi.stubEnv("PATH", ["", ".", "bin"].join(delimiter));
+    try {
+      await expect(git(["--version"], { cwd: tmp, timeoutMs: 60_000 })).rejects.toMatchObject({
+        failure: "invalid",
+        message: "No folder on PATH is absolute, so aireg runs no program from it.",
+        hint: "Set PATH to the absolute folders that hold git, then run the command again.",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    await expect(access(join(tmp, "git.ran"))).rejects.toThrow();
+  });
 });

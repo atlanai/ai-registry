@@ -591,10 +591,36 @@ describe("names that reach a prototype", () => {
   });
 });
 
+test("refuses every registry name a terminal cannot show as it is, saying how to rename them", () => {
+  // YAML's double-quoted escapes put the raw characters in the keys.
+  const text = 'registries:\n  "kit\\e]8;;x\\a": /srv/kit\n  "te\\u200Dam": /srv/team\n';
+  expect(() => parseManifest(text)).toThrow(
+    expect.objectContaining({
+      message: expect.stringContaining(
+        '"kit\\u001b]8;;x\\u0007" and "te\\u200Dam" cannot name a registry.',
+      ),
+      hint: expect.stringContaining("its `artifacts:` entries in manifest.yml"),
+    }),
+  );
+});
+
 describe("an address", () => {
   test("longer than any registry needs is refused before anything parses it", () => {
     const long = `https://example.com/${"a/".repeat(1100)}`;
     expect(() => parseManifest(`registries:\n  acme: ${long}\n`)).toThrow(/too long/);
     expect(() => parseManifest(`registries:\n  acme:\n    source: ${long}\n`)).toThrow(/too long/);
   });
+});
+
+test("never writes registries that would share a storage folder", async ({ tmp }) => {
+  const project = roots("project", tmp);
+  await writeManifest(project, parseManifest("registries:\n  Team: ../b\n"));
+  const before = await readFile(project.manifest, "utf8");
+  const manifest = await readManifest(project.manifest);
+  manifest.registries.team = { location: "../a", adapter: undefined, config: {} };
+
+  await expect(writeManifest(project, manifest)).rejects.toThrow(
+    'Registries "Team" and "team" would share the folder .registry/artifacts/team.',
+  );
+  expect(await readFile(project.manifest, "utf8")).toBe(before);
 });

@@ -372,6 +372,8 @@ export interface Clash {
   dropped: string;
   /** The harness path both would take, when they differ in name but not in where they land. */
   at?: string;
+  /** `at` is a namespace's plugin directory, which no rename of the artifact frees. */
+  container?: true;
 }
 
 /** An artifact installed under another name because another artifact holds its own. */

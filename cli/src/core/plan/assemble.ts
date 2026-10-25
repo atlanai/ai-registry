@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readdir, rm, stat, symlink } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
 import { assertUnredirected, readRegular } from "#adapter/files.ts";
+import { isRecord } from "#core/fields.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { exists } from "#core/fs/tree.ts";
 import { resolveHarnesses } from "#core/harness/index.ts";
@@ -38,8 +39,22 @@ async function names(dir: string): Promise<string[]> {
 }
 
 /**
- * A plugin's own manifest is copied, and Claude Code's is written from its document when it has
- * none. Any other is named after the projection, and only ever created.
+ * Claude Code keys plugins by the name in their manifest, so a copied one takes the projection's,
+ * which no other registry's plugin holds. One that is not a JSON object is copied as it is.
+ */
+function named(bytes: Buffer, name: string): Buffer | string {
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(bytes.toString("utf8"));
+  } catch {
+    return bytes;
+  }
+  return isRecord(manifest) ? `${JSON.stringify({ ...manifest, name }, null, 2)}\n` : bytes;
+}
+
+/**
+ * Copies a plugin's own manifest (Claude Code's under the projection's name), writes Claude Code's
+ * from the document when it has none, and only ever creates the rest.
  */
 async function writePluginManifest(
   dir: string,
@@ -56,7 +71,10 @@ async function writePluginManifest(
       await assertUnredirected(dir, file);
       const own = await readRegular(content, manifest.path);
       if (own.kind === "file") {
-        await writeAtomic(file, own.bytes);
+        await writeAtomic(
+          file,
+          manifest.path === CLAUDE_MANIFEST ? named(own.bytes, name) : own.bytes,
+        );
         continue;
       }
       if (manifest.path === CLAUDE_MANIFEST && document?.manifest !== undefined) {

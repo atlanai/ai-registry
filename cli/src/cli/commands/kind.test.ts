@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { ErrorCode } from "#core/errors.ts";
@@ -124,5 +124,75 @@ describe("native agent import and indexing", () => {
       custom: { enabled: true },
     });
     expect((await validateRoot(root)).problems).toEqual([]);
+  });
+});
+
+describe("writes stay inside the registry", () => {
+  /** A registry with `eng/skill/lint` at 0.1.0, and an empty folder outside it. */
+  async function registry(tmp: string): Promise<{ root: string; outside: string; lint: string }> {
+    const root = join(tmp, "registry");
+    const outside = join(tmp, "outside");
+    await writeRoot(root, { name: "team" }, "2026-10-14T00:00:00Z");
+    await mkdir(outside);
+    const lint = join(root, "artifacts", "eng", "skill", "lint");
+    await mkdir(join(lint, "0.1.0"), { recursive: true });
+    await writeFile(join(lint, "0.1.0", "SKILL.md"), "---\nname: lint\ndescription: L.\n---\n");
+    return { root, outside, lint };
+  }
+
+  async function skill(root: string, argv: string[]): Promise<void> {
+    const { run } = await ((await lookup("skill", root))?.load() ?? Promise.reject());
+    await run(context(root, argv));
+  }
+
+  test.for([
+    ["new", ["new", "demo", "--namespace", "ops", "--yes"]],
+    ["new --from", ["new", "--from", "SOURCE", "--namespace", "ops", "--yes"]],
+  ] as const)("refuses %s through a linked namespace folder", async ([, argv], { tmp }) => {
+    const { root, outside } = await registry(tmp);
+    const source = join(tmp, "demo");
+    await mkdir(source);
+    await writeFile(join(source, "SKILL.md"), "---\nname: demo\ndescription: D.\n---\n");
+    await symlink(outside, join(root, "artifacts", "ops"));
+
+    const args = argv.map((arg) => (arg === "SOURCE" ? source : arg));
+    await expect(skill(root, args)).rejects.toMatchObject({ code: ErrorCode.Invalid });
+    expect(await readdir(outside)).toEqual([]);
+  });
+
+  test("refuses new --from a file that is a symlink, and leaves its target", async ({ tmp }) => {
+    const { root, outside } = await registry(tmp);
+    const original = "---\nname: demo\ndescription: D.\n---\n";
+    await writeFile(join(outside, "SKILL.md"), original);
+    const source = join(tmp, "SKILL.md");
+    await symlink(join(outside, "SKILL.md"), source);
+
+    const argv = ["new", "--from", source, "--name", "renamed", "--namespace", "ops", "--yes"];
+    await expect(skill(root, argv)).rejects.toMatchObject({ code: ErrorCode.Invalid });
+    expect(await readFile(join(outside, "SKILL.md"), "utf8")).toBe(original);
+  });
+
+  test("refuses bump through a linked artifact folder", async ({ tmp }) => {
+    const { root, outside, lint } = await registry(tmp);
+    await mkdir(join(outside, "0.1.0"));
+    await writeFile(join(outside, "0.1.0", "SKILL.md"), "---\nname: lint\ndescription: L.\n---\n");
+    const linked = join(root, "artifacts", "eng", "skill", "probe");
+    await symlink(outside, linked);
+
+    await expect(skill(root, ["bump", "probe", "--namespace", "eng"])).rejects.toMatchObject({
+      code: ErrorCode.Invalid,
+    });
+    expect(await readdir(outside)).toEqual(["0.1.0"]);
+    expect(await readdir(lint)).toEqual(["0.1.0"]);
+  });
+
+  test("refuses bump onto a file already where the version goes", async ({ tmp }) => {
+    const { root, lint } = await registry(tmp);
+    await writeFile(join(lint, "0.1.1"), "keep");
+
+    await expect(skill(root, ["bump", "lint", "--namespace", "eng"])).rejects.toMatchObject({
+      code: ErrorCode.Conflict,
+    });
+    expect(await readFile(join(lint, "0.1.1"), "utf8")).toBe("keep");
   });
 });
