@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+import { isLocalPath } from "#adapter/paths.ts";
 import { list as listOf, plural, withoutCredentials } from "#adapter/text.ts";
 import type { Probed } from "#cli/source.ts";
 import { comparableLocation, sourceKey } from "#core/adapter/identity.ts";
@@ -32,8 +34,11 @@ export async function moveOf(
   source: Probed | undefined,
 ): Promise<Move | undefined> {
   const existing = manifest.registries[alias];
-  // Compared as the lockfile keys a registry, so a second spelling of one address is no move.
-  const at = (location: string) => comparableLocation(expandLocation(location, roots.base));
+  // A folder compares as its resolved path, since C:\ parses as a URL; else as the lock keys it.
+  const at = (location: string) =>
+    isLocalPath(location)
+      ? resolve(expandLocation(location, roots.base))
+      : comparableLocation(location);
   if (existing === undefined || at(existing.location) === at(declared.location)) return undefined;
 
   const to = withoutCredentials(declared.location);
