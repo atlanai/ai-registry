@@ -6,7 +6,7 @@ import { isWithin } from "#adapter/paths.ts";
 import { rewriteAtomic } from "#core/fs/atomic.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { inspect } from "#core/fs/link.ts";
-import { isStrictlyWithin, readTextIfPresent } from "#core/fs/path.ts";
+import { isStrictlyWithin, posixRelative, readTextIfPresent } from "#core/fs/path.ts";
 import { pruneEmptyParent } from "#core/fs/tree.ts";
 import type { ConfigValue, Harnesses, KindMapping, RegisterEntry } from "#core/harness/contract.ts";
 import { targetRoot } from "#core/harness/index.ts";
@@ -303,7 +303,7 @@ function outside(file: string, root: string, at: Anchor): string | undefined {
   try {
     const found = redirection(real, path, false);
     if (found === undefined) return undefined;
-    const shown = relative(real, found.at) || found.at;
+    const shown = posixRelative(real, found.at) || found.at;
     return found.problem === "symlink" ? `${shown} is a symlink` : `${shown} is not a folder`;
   } catch {
     return "it could not be checked";
