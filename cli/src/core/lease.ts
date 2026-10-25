@@ -3,11 +3,12 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, realpathSync, rmSync } from "node:fs";
 import { mkdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { redirection } from "#adapter/files.ts";
 import { quoted } from "#adapter/text.ts";
 import { shortHash } from "#core/fs/hash.ts";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
+import { posixRelative } from "#core/fs/path.ts";
 import { ensureHome, leasesDir, type Roots, type Scope } from "#core/store/paths.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import { processAlive } from "./process.ts";
@@ -146,7 +147,7 @@ function refuseLink(root: string, path: string): void {
   const what = found.problem === "symlink" ? "a symlink" : "not a directory";
   throw new AiregError(`${found.at} is ${what} in a managed path.`, {
     code: ErrorCode.Invalid,
-    hint: `Replace ${relative(dirname(root), found.at)} with a real folder.`,
+    hint: `Replace ${posixRelative(dirname(root), found.at)} with a real folder.`,
   });
 }
 
