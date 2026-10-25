@@ -1,4 +1,4 @@
-Declare a registry to install from, or move one to a new address
+Declare a registry to install from
 
 Usage: aireg registry add <address> [options]
 

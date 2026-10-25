@@ -167,7 +167,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     actions: [
       {
         name: "add",
-        summary: "Declare a registry to install from, or move one to a new address",
+        summary: "Declare a registry to install from",
         usage: ["aireg registry add <address> [options]"],
         maxArguments: 1,
         examples: [

@@ -3,7 +3,7 @@ Declare the registries you install from, or create and check one of your own
 Usage: aireg registry [<action>] [options]
 
 Actions:
-  add       Declare a registry to install from, or move one to a new address
+  add       Declare a registry to install from
   list      List the registries you have declared (alias: ls)
   show      Print what a registry publishes, without installing it
   remove    Remove a declared registry (alias: rm)
