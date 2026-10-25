@@ -135,7 +135,7 @@ function unmoved(before: Lock, after: Lock, alias: string): boolean {
 
 /**
  * The revision says what the lock was resolved at; serving the same rows again does not move it.
- * A registry at a new address is another source, whose revision the old one cannot stand for.
+ * A registry at a new address is another source, with a revision of its own.
  */
 export function keepUnmovedRevisions(before: Lock, next: Lock): void {
   for (const [alias, source] of Object.entries(next.registries)) {

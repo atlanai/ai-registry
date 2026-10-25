@@ -64,7 +64,7 @@ Declaring a name that already belongs to another address moves that registry the
 aireg registry add github.com/acme/ai-registry --as acme
 ```
 
-aireg first reads the new address and checks that it serves every artifact installed from the registry, at the installed version and with the same content. If it does, the manifest and lockfile take the new address, and everything else stays as it is: what's installed, its pins and links, and the background jobs that use the registry's name. If it doesn't, nothing changes, and aireg names each artifact the new address lacks or serves with other content. Remove those first with [`aireg remove`](remove.md), or choose another name with `--as` to declare the new address beside the old one.
+aireg first checks that the new address serves every artifact installed from the registry, at the installed version and with the same content. If it does, the manifest and lockfile take the new address; pins, links and background jobs refer to the registry by name, so they stay as they are. If it doesn't, nothing changes, and aireg names each artifact the new address lacks or serves with other content. Remove those first with [`aireg remove`](remove.md), or use `--as` to declare the new address beside the old one.
 
 A sign-in is for one host. If you signed in to the registry and its new address is on another host, aireg says so and suggests `aireg auth login <name>`.
 

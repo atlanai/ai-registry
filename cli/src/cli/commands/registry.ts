@@ -31,7 +31,13 @@ import { commitAndPush, releaseSubject } from "#cli/publish/target.ts";
 import { knownRegistries, undeclaredRegistry } from "#cli/registries.ts";
 import { underHome } from "#cli/render/home.ts";
 import { noteUserScope } from "#cli/render/where.ts";
-import { probe, type SourceFlags, sourceConfig, throughManifest } from "#cli/source.ts";
+import {
+  type Probed,
+  probe,
+  type SourceFlags,
+  sourceConfig,
+  throughManifest,
+} from "#cli/source.ts";
 import { workflowCommand } from "#cli/workflow-command.ts";
 import { expandLocation, recordedLocation } from "#core/adapter/location.ts";
 import { loadAdapter } from "#core/adapter/registry.ts";
@@ -47,7 +53,6 @@ import { validateRoot } from "#core/filespec/write/validate.ts";
 import { gitIn } from "#core/git.ts";
 import type { Lock } from "#core/lock.ts";
 import {
-  type Manifest,
   type RegistrySource,
   reaches,
   readManifest,
@@ -59,7 +64,7 @@ import { formatRef, type Ref } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
 import { fields, table } from "#core/term/table.ts";
 import type { CommonOptions } from "#engine/options.ts";
-import { type Loaded, load } from "#engine/pipeline.ts";
+import { type Loaded, load, withScope } from "#engine/pipeline.ts";
 import {
   builtin,
   type CommandContext,
@@ -111,7 +116,6 @@ async function add(
   }
 
   const loaded = await load(common, context.cwd, "user");
-  const manifest = await readManifest(loaded.roots.manifest);
 
   // Reading it proves the address resolves and supplies the alias. A private one
   // cannot be read before it is declared, so an auth failure declares it anyway.
@@ -131,7 +135,7 @@ async function add(
       alias = flags.as ?? source.alias;
       label = source.label;
       fromAddress = flags.as === undefined && source.named === "address";
-      move = await moveOf(loaded.roots, manifest, loaded.lock, alias, declared, source);
+      ({ declared, move } = await settle(context, loaded, common.dryRun, alias, declared, source));
     } finally {
       await source.close();
     }
@@ -155,10 +159,9 @@ async function add(
     };
     alias = flags.as;
     readable = false;
-    move = await moveOf(loaded.roots, manifest, loaded.lock, alias, declared, undefined);
+    ({ declared, move } = await settle(context, loaded, common.dryRun, alias, declared, undefined));
   }
 
-  if (!common.dryRun) await declare(loaded, manifest, alias, declared, move);
   const movedFrom = move === undefined ? {} : { movedFrom: move.from, kept: move.kept };
   if (context.printer.format === "json") {
     context.printer.json({
@@ -184,16 +187,38 @@ async function add(
   context.printer.note(readable ? "next" : "then", `aireg add ${g}${alias}/<namespace>`);
 }
 
-async function declare(
-  { roots, lock }: Loaded,
-  manifest: Manifest,
+/**
+ * Decided and written under the scope's lease, against the manifest and lock as they are then,
+ * so a command that writes the scope meanwhile is kept, not overwritten.
+ */
+async function settle(
+  context: CommandContext,
+  loaded: Loaded,
+  dryRun: boolean,
   alias: string,
   declared: RegistrySource,
-  move: Move | undefined,
-): Promise<void> {
-  manifest.registries[alias] = declared;
-  await writeManifest(roots, manifest);
-  if (move !== undefined) await recordMove(roots, lock, alias, declared, move);
+  source: Probed | undefined,
+): Promise<{ declared: RegistrySource; move: Move | undefined }> {
+  const decide = async ({ roots, manifest, lock }: Loaded) => {
+    const move = await moveOf(roots, manifest, lock, alias, declared, source);
+    const existing = manifest.registries[alias];
+    // Another spelling of the same registry keeps the one its lock rows were resolved at.
+    if (move !== undefined || existing === undefined) return { declared, move };
+    return { declared: { ...declared, location: existing.location }, move };
+  };
+  if (dryRun) return decide(loaded);
+  return withScope(
+    loaded.roots,
+    async (state) => {
+      const settled = await decide(state);
+      state.manifest.registries[alias] = settled.declared;
+      await writeManifest(state.roots, state.manifest);
+      if (settled.move !== undefined)
+        await recordMove(state.roots, state.lock, alias, settled.declared, settled.move);
+      return settled;
+    },
+    context.printer,
+  );
 }
 
 /** Reports a move. Nothing installed is touched, since the new address was checked to serve it. */

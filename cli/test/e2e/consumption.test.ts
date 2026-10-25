@@ -136,6 +136,7 @@ describe("consuming a registry like a package manager", () => {
     const respelled = await aireg(["registry", "add", `${market}/`, "--as", "acme"]);
     expect(respelled.code, respelled.stderr).toBe(0);
     expect(respelled.stdout).not.toContain("Moved");
+    expect((await aireg(["install", "--frozen"])).code).toBe(0);
   });
 
   test("reports an edit to an installed skill, and publishes it only when the run opts in", async () => {
