@@ -113,12 +113,12 @@ vi.mock("#accounts/credentials.ts", async (importOriginal) => ({
 }));
 // Only for a test that runs the real publish: where it opens, and what it is handed.
 const offered = vi.hoisted(() => [] as PublishInput[]);
-vi.mock("#accounts/service.ts", () => ({
-  AccountService: class {
-    async resolve() {
-      return { location: ENDPOINT, source: { location: ENDPOINT, adapter: "acme" } };
-    }
-  },
+vi.mock("#accounts/registry.ts", () => ({
+  readRootManifest: async () => ({ registries: { [REGISTRY]: { location: ENDPOINT } } }),
+  resolveRegistry: async () => ({
+    location: ENDPOINT,
+    source: { location: ENDPOINT, adapter: "acme" },
+  }),
 }));
 vi.mock("#core/adapter/source.ts", () => ({
   connectSource: async () => ({
