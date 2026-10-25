@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect } from "vitest";
 import { registry } from "#test/kit/builders/registry.ts";
@@ -61,6 +62,41 @@ describe("aireg init --registry", () => {
     const status = await aireg(["status"], { cwd: app });
     expect(status.stdout + status.stderr).not.toContain("something of yours");
     expect(status.code).toBe(0);
+  });
+});
+
+describe("aireg registry init through a linked artifacts folder", () => {
+  const refused = "artifacts is a symlink, so nothing was written through it.";
+
+  test("refuses to create a registry, and writes nothing", async ({ acme, aireg }) => {
+    const outside = join(dirname(acme), "outside");
+    const fresh = join(dirname(acme), "fresh");
+    await mkdir(outside);
+    await mkdir(fresh);
+    await symlink(outside, join(fresh, "artifacts"));
+    const init = ["registry", "init", "--name", "team", "--namespace", "eng", "-y"];
+    const made = await aireg(init, { cwd: fresh });
+    expect(made.code).toBe(1);
+    expect(made.stderr).toContain(refused);
+    expect(await readdir(outside)).toEqual([]);
+    expect(existsSync(join(fresh, "registry.json"))).toBe(false);
+  });
+
+  test("refuses to add a namespace to a registry", async ({ acme, aireg }) => {
+    const outside = join(dirname(acme), "outside");
+    await mkdir(outside);
+    await rm(join(acme, "artifacts"), { recursive: true });
+    await symlink(outside, join(acme, "artifacts"));
+    const added = await aireg(["registry", "init", "--namespace", "eng", "-y"], { cwd: acme });
+    expect(added.code).toBe(1);
+    expect(added.stderr).toContain(refused);
+    expect(await readdir(outside)).toEqual([]);
+  });
+
+  test("still adds a namespace to a registry with a real folder", async ({ acme, aireg }) => {
+    const added = await aireg(["registry", "init", "--namespace", "eng", "-y"], { cwd: acme });
+    expect(added.code, added.stderr).toBe(0);
+    expect(existsSync(join(acme, "artifacts", "eng"))).toBe(true);
   });
 });
 

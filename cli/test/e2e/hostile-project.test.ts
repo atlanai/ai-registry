@@ -100,6 +100,34 @@ test("lists a declared address without its userinfo", async ({ aireg, project })
   }
 });
 
+test("refuses a cloned manifest whose registries would share one storage folder", async ({
+  aireg,
+  tmp,
+}) => {
+  const root = await realpath(tmp);
+  const ours = join(root, "ours");
+  const theirs = join(root, "theirs");
+  await registry(ours, { name: "ours", slug: "ours" }).skill("eng/lint@1.0.0").write();
+  await registry(theirs, { name: "theirs", slug: "theirs" }).skill("eng/secret@1.0.0").write();
+  const project = join(root, "project");
+  await writeManifestIn(
+    project,
+    `registries:\n  team: ${ours}\n  Team: ${theirs}\nartifacts:\n  - team/eng/skill/lint\n  - Team/eng/skill/secret\n`,
+  );
+
+  const ran = await aireg(["install", "--json"], { cwd: project });
+
+  expect(ran.code).not.toBe(0);
+  expect(JSON.parse(ran.stdout).error).toMatchObject({
+    code: "invalid",
+    message: expect.stringContaining(
+      'Registries "team" and "Team" would share the folder .registry/artifacts/team.',
+    ),
+    hint: expect.stringContaining("its `artifacts:` entries in manifest.yml"),
+  });
+  expect(await readdir(join(project, ".registry"))).toEqual(["manifest.yml"]);
+});
+
 test("refuses a GitHub URL whose derived name the cloned project declares elsewhere", async ({
   aireg,
   tmp,

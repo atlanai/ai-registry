@@ -11,12 +11,14 @@ import type { Action } from "./model.ts";
  */
 export async function applyRegistrations(
   actions: readonly Action[],
-  roots: Pick<Roots, "artifacts" | "base">,
+  roots: Pick<Roots, "artifacts" | "base" | "scope" | "cwd">,
   lock: Lock | undefined,
 ): Promise<Kept[]> {
   const touched = actions.flatMap((action): Touched[] => {
     if (action.kind === "link") return [{ path: action.to, harness: action.harness }];
-    if (action.kind === "unlink") return [{ path: action.to, harness: undefined }];
+    if (action.kind === "unlink") {
+      return [{ path: action.to, harness: undefined, recorded: action.link?.harness }];
+    }
     return [];
   });
   if (touched.length === 0) return [];
@@ -28,5 +30,12 @@ export async function applyRegistrations(
         .map((link) => resolve(roots.base, link.path)),
     ),
   );
-  return applyRegister(touched, resolveHarnesses(), resolve(dirname(roots.artifacts)), copies);
+  const where = { scope: roots.scope, cwd: roots.cwd };
+  return applyRegister(
+    touched,
+    resolveHarnesses(),
+    where,
+    resolve(dirname(roots.artifacts)),
+    copies,
+  );
 }

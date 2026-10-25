@@ -70,8 +70,15 @@ async function mapIfRequested(printer: Printer, argv: string[]): Promise<ExitCod
 
 async function unknownKind(name: string, action: string): Promise<AiregError> {
   const { findRegistry } = await import("#core/filespec/write/init.ts");
-  const { kindsOf } = await import("#core/filespec/write/kinds.ts");
+  const { kindsOf, leftOutKind } = await import("#core/filespec/write/kinds.ts");
   const root = findRegistry(process.cwd());
+  const left = root === undefined ? undefined : await leftOutKind(root, name);
+  if (left !== undefined) {
+    return new AiregError(`The kind ${quoted(name)} is left out: ${left.path} ${left.problem}.`, {
+      code: ErrorCode.Invalid,
+      hint: `Fix ${left.path}, then run \`aireg registry validate\`.`,
+    });
+  }
   const kinds = Object.keys(await kindsOf(root));
   const near = closest(name, kinds);
   return new AiregError(

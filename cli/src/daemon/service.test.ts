@@ -68,10 +68,11 @@ describe("daemonEnv", () => {
     expect(env.AIREG_SKIP_MIN_UPDATE).toBe("1");
   });
 
-  it("drops every registry token, so one command's token never outlives that command", () => {
+  it("drops every registry token in any case, so one command's token never outlives that command", () => {
     const env = {
       AIREG_TOKEN_ACME: "synthetic-token",
       AIREG_TOKEN_ACME_PROD: "synthetic-token",
+      aireg_token_kit: "synthetic-token",
       AIREG_HOME: "/tmp/home",
     };
     expect(daemonEnv(env)).toEqual({ AIREG_HOME: "/tmp/home" });

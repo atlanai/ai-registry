@@ -12,6 +12,7 @@ import { backupStamp } from "#core/store/backups.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
 import { type Claim, moveAside, surveyClaims } from "./claim.ts";
 import {
+  artifactKey,
   classify,
   execution,
   type Overrides,
@@ -36,7 +37,7 @@ import {
   type RemoteMutationResult,
 } from "./remote.ts";
 import { closeScan, type Scan, scan } from "./scan.ts";
-import { scopedNames } from "./scope.ts";
+import { scopedKeys } from "./scope.ts";
 import type { ScopeWork } from "./work.ts";
 
 export async function executeSync(
@@ -104,13 +105,13 @@ async function executeScanned(
   hooks.event("run.phase", "classifying");
   // Before anything is classified: a ref that reaches nothing is the caller's
   // mistake, not an empty run.
-  const scoped = scopedNames(refs, current, account.registry);
+  const scoped = scopedKeys(refs, current, account.registry);
   const reclassify = () =>
     classify(current, job, account.registry, scoped, mode, overrides, publishable);
   const classified = reclassify();
   const outcomes = [...classified.outcomes.values()];
   const initialOperations = new Map(
-    [...classified.outcomes].map(([name, item]) => [name, item.operation]),
+    [...classified.outcomes].map(([key, item]) => [key, item.operation]),
   );
   // Read before the lease and reported either way: an import that changed is a
   // local write, so it needs the lease even when nothing goes upstream.
@@ -154,11 +155,12 @@ async function executeScanned(
         current = await rescan();
         // What was just imported is classified now, so it goes out in this run rather than the next.
         after = reclassify();
-        operations = withRefreshed(initialOperations, imported.refreshed, after);
+        const refreshed = refreshedKeys(imported.refreshed, loaded.lock);
+        operations = withRefreshed(initialOperations, refreshed, after);
         deferred = importedDeferred(
           deferred,
           current,
-          imported.refreshed,
+          refreshed,
           after.outcomes,
           initialOperations,
         );
@@ -196,7 +198,7 @@ async function executeScanned(
       signal.throwIfAborted();
       hooks.event("run.phase", "applying");
       await applyReported(loaded, common, current, names, remote.published, overrides, hooks);
-      await takeTheirs(overrides, loaded.roots, account.registry, hooks);
+      await takeTheirs(overrides, current, loaded.roots, account.registry, hooks);
       if (remoteError !== undefined) throw remoteError;
     });
   }
@@ -294,8 +296,9 @@ function settleHeld(
   const deferred: SyncOutcome[] = [];
   for (const before of held) {
     const now =
-      (refreshed.includes(before.artifact) ? after?.outcomes.get(before.artifact) : undefined) ??
-      before;
+      (refreshed.includes(before.artifact)
+        ? after?.outcomes.get(artifactKey(before.kind, before.artifact))
+        : undefined) ?? before;
     outcomes[outcomes.indexOf(before)] = now;
     if (sends(now)) deferred.push(now);
     else reportOutcome(now, hooks);
@@ -306,11 +309,14 @@ function settleHeld(
 /** `--theirs` on a row of yours writes your folder too, which a pull alone never touches. */
 async function takeTheirs(
   overrides: Overrides,
+  scan: Scan,
   roots: Parameters<typeof takeIntoOrigins>[0],
   registry: string,
   hooks: SyncExecutionHooks,
 ): Promise<void> {
-  const theirs = [...overrides].filter(([, item]) => item === "pull").map(([name]) => name);
+  const theirs = scan.items
+    .filter((item) => overrides.get(artifactKey(item.kind, item.name)) === "pull")
+    .map((item) => item.name);
   if (theirs.length === 0) return;
   for (const taken of await takeIntoOrigins(roots, theirs, backupStamp())) {
     const kept = taken.backup === undefined ? "" : `; yours is in ${taken.backup}`;
@@ -347,6 +353,7 @@ function reportOutcome(outcome: SyncOutcome, hooks: SyncExecutionHooks): void {
 function importedDeferred(
   deferred: readonly SyncOutcome[],
   current: Scan,
+  /** Outcome keys, from `refreshedKeys`. */
   refreshed: readonly string[],
   after: ReadonlyMap<string, SyncOutcome>,
   initial: ReadonlyMap<string, SyncOperation>,
@@ -355,25 +362,34 @@ function importedDeferred(
     ...current.items.map((item) => item.name),
     ...current.local.map((item) => item.name),
   ]);
-  const imported = refreshed.flatMap((name) => {
-    const item = after.get(name);
+  const imported = refreshed.flatMap((key) => {
+    const item = after.get(key);
     const sends = item?.operation === "publish" || item?.operation === "archive";
-    return item !== undefined && sends && item.failure === undefined && !initial.has(name)
+    return item !== undefined && sends && item.failure === undefined && !initial.has(key)
       ? [item]
       : [];
   });
   return [...deferred.filter((item) => present.has(item.artifact)), ...imported];
 }
 
+/** The lock keys an import refreshed, as outcome keys: the row it just wrote says the kind. */
+function refreshedKeys(refreshed: readonly string[], lock: Loaded["lock"]): string[] {
+  return refreshed.flatMap((name) => {
+    const row = lock.artifacts[name];
+    return row === undefined ? [] : [artifactKey(row.kind, name)];
+  });
+}
+
 function withRefreshed(
   operations: ReadonlyMap<string, SyncOperation>,
+  /** Outcome keys, from `refreshedKeys`. */
   refreshed: readonly string[],
   after: ReturnType<typeof classify>,
 ): Map<string, SyncOperation> {
   const updated = new Map(operations);
-  for (const name of refreshed) {
-    const item = after.outcomes.get(name);
-    if (item !== undefined) updated.set(name, item.operation);
+  for (const key of refreshed) {
+    const item = after.outcomes.get(key);
+    if (item !== undefined) updated.set(key, item.operation);
   }
   return updated;
 }

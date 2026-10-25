@@ -7,6 +7,8 @@ import type { SyncOperation } from "#core/sync/policy.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { type ConflictResolution, ProtocolError } from "#daemon/rpc/protocol.ts";
 import type { RpcContext } from "#daemon/rpc/server.ts";
+import { artifactKey } from "#engine/decide.ts";
+import { kindAddress } from "#engine/scope.ts";
 import { watchStatus } from "#engine/status.ts";
 import { jobOfWork, type ScopeWork, workOf } from "#engine/work.ts";
 import * as inputs from "./inputs.ts";
@@ -61,7 +63,7 @@ export async function startResolution(
 
   const status = await watchStatus(work, account, options.signal);
   const artifact = status.artifacts.find((entry) => entry.name === name);
-  if (!resolvable(artifact, wanted)) {
+  if (artifact === undefined || !resolvable(artifact, wanted)) {
     // Says what it is instead, because "not waiting" alone leaves a caller
     // guessing between an unknown name and an artifact that already settled.
     throw new ProtocolError(
@@ -72,10 +74,11 @@ export async function startResolution(
     );
   }
 
-  const overrides = new Map([[name, RESOLUTION_OPERATION[wanted]]]);
+  // A skill and an agent may share the name; only the kind waiting on the choice is settled.
+  const overrides = new Map([[artifactKey(artifact.kind, name), RESOLUTION_OPERATION[wanted]]]);
   return {
     run: await runner.start(work.id, "sync", "manual", {
-      refs: [name],
+      refs: [kindAddress(account.registry, artifact.kind, name)],
       overrides,
       ...(options.ephemeral === true ? { ephemeral: { job: jobOfWork(work), account } } : {}),
     }),

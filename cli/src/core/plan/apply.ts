@@ -123,7 +123,7 @@ export interface ApplyResult {
    */
   unstaged: { name: string; reason: string; error: unknown }[];
   /** Links not made: a person's own file or folder is at the destination, or `reason` says why. */
-  kept: { name: string; path: string; reason?: string }[];
+  kept: { name: string; path: string; reason?: string; config?: true }[];
   /** Copies already on disk, byte for byte what this run installs, recorded as aireg's in place. */
   adopted: { name: string; path: string }[];
   /** A person's own file or folder that stood where a recorded link was, and where it was moved. */

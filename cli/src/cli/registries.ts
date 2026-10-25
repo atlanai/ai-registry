@@ -1,7 +1,7 @@
 import { resolve, sep } from "node:path";
 import { namesHost, registryNameFromLocation } from "#adapter/location.ts";
 import { isLocalPath } from "#adapter/paths.ts";
-import { list, quoted, stripTrailing, withoutCredentials } from "#adapter/text.ts";
+import { list, quoted, sanitizeText, stripTrailing, withoutCredentials } from "#adapter/text.ts";
 import { splitRepository } from "#adapters/git/api.ts";
 import { type Interaction, interactive } from "#cli/prompt/flow.ts";
 import { canceled, select } from "#cli/prompt/index.ts";
@@ -121,7 +121,8 @@ export async function chooseRegistry(
       options: aliases.map((alias) => ({
         value: alias,
         label: alias,
-        hint: withoutCredentials(known[alias]?.location ?? ""),
+        // A cloned project's manifest can put line breaks and escapes in an address.
+        hint: sanitizeText(withoutCredentials(known[alias]?.location ?? "")),
       })),
     },
     step.io,

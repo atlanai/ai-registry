@@ -103,4 +103,18 @@ describe("assembling a projection", () => {
     ) as { name: string };
     expect(manifest.name).toBe("kit-engineering");
   });
+
+  test("names a plugin's own Claude Code manifest after its projection, keeping the rest", async () => {
+    await publish("skills", "lint");
+    await mkdir(join(content(), ".claude-plugin"), { recursive: true });
+    const own = { name: "toolkit", version: "1.2.0", author: { name: "Example" } };
+    await writeFile(join(content(), ".claude-plugin", "plugin.json"), JSON.stringify(own));
+    const renamed = join(root, "kit-toolkit");
+    await assemble(renamed, content(), ["claude"]);
+
+    const manifest = JSON.parse(
+      await readFile(join(renamed, ".claude-plugin", "plugin.json"), "utf8"),
+    ) as unknown;
+    expect(manifest).toEqual({ ...own, name: "kit-toolkit" });
+  });
 });

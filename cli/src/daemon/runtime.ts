@@ -6,7 +6,7 @@ import { list, quoted } from "#adapter/text.ts";
 import { updateAdapters } from "#core/adapter/installed/update.ts";
 import type { Account } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
-import { tokenVariable, withRegistryTokens } from "#core/env.ts";
+import { removeTokens, tokenVariable, withRegistryTokens } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { Fields } from "#core/fields.ts";
 import { type Logger, nullLogger } from "#core/log/index.ts";
@@ -433,6 +433,9 @@ export class DaemonRuntime {
 }
 
 export async function runDaemon(version: string): Promise<number> {
+  // A service manager, or Explorer through the Run key, starts the daemon without
+  // `daemonEnv`, so it drops what it inherited before any job can read it.
+  removeTokens();
   const log = openDaemonLog(version);
   installCrashHandlers(log.logger, log.close);
   log.logger.info("daemon starting", { version });

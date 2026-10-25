@@ -53,7 +53,7 @@ export function renamesFor(
   );
   const renames = new Map<string, string>();
   for (const clash of clashes) {
-    if (clash.at === undefined || renames.has(clash.dropped)) continue;
+    if (clash.at === undefined || clash.container === true || renames.has(clash.dropped)) continue;
     const item = byAddress.get(clash.dropped);
     if (item === undefined || item.aliased === true || !RENAMEABLE.has(item.kind)) continue;
     const name = candidates(item).find(

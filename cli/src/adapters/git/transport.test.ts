@@ -35,3 +35,30 @@ describe("the clone ladder", () => {
     expect(ladder.map((a) => a.label)).toEqual(["https", "ssh"]);
   });
 });
+
+describe("an address naming its own account or port", () => {
+  test.for([
+    ["an scp user", "org-123@github.com:acme/kit.git", "ssh"],
+    ["an ssh user", "ssh://deploy@git.example.com/acme/kit.git", "ssh"],
+    ["an https port", "https://git.example.com:8443/acme/kit", "https"],
+  ] as const)("is tried only as written, for %s", async ([, input, label], { tmp }) => {
+    const env = await withGh(tmp);
+    const spec = parseSource(input);
+    expect(attempts(spec, env)).toEqual([{ label, url: spec.location, viaGh: false }]);
+  });
+
+  test.for([
+    ["git@github.com:acme/kit.git", ["ssh", "https"]],
+    ["ssh://git@git.example.com:22/acme/kit.git", ["ssh", "https"]],
+    ["https://user@github.com/acme/kit", ["https", "gh", "ssh"]],
+  ] as const)("keeps every fallback for %s", async ([input, labels], { tmp }) => {
+    const env = await withGh(tmp);
+    expect(attempts(parseSource(input), env).map((a) => a.label)).toEqual(labels);
+  });
+
+  test("hands gh the whole github.com URL", async ({ tmp }) => {
+    const env = await withGh(tmp);
+    const gh = attempts(parseSource("github.com/acme/kit"), env).find((a) => a.viaGh);
+    expect(gh?.url).toBe("https://github.com/acme/kit");
+  });
+});

@@ -397,6 +397,26 @@ describe("the command surface", () => {
     );
   }, 30_000);
 
+  test("points a kind it left out at the manifest that left it out", async ({
+    aireg,
+    tmp: root,
+  }) => {
+    const dir = join(root, "left-out");
+    await cp(ACME, dir, { recursive: true });
+    const file = join(dir, "registry.json");
+    const json = JSON.parse(await readFile(file, "utf8"));
+    json.kinds.push({ name: "prompt", manifest_url: "kinds/prompt.json" });
+    await writeFile(file, JSON.stringify(json));
+    const manifest = JSON.parse(await readFile(join(dir, "kinds", "skill.json"), "utf8"));
+    manifest.properties.name.pattern = "^(?!draft-)[a-z-]+$";
+    await writeFile(join(dir, "kinds", "prompt.json"), JSON.stringify(manifest));
+
+    const created = await aireg(["prompt", "new", "x"], { cwd: dir });
+    expect(created.stderr).toContain(
+      'The kind "prompt" is left out: kinds/prompt.json has an invalid kind schema',
+    );
+  }, 30_000);
+
   // `sync` dispatches before parsing strictly: the common options know nothing of --mine,
   // so `resolve` could not otherwise run.
   test("reaches sync resolve, whose flags the sync parser does not know", async ({ aireg }) => {

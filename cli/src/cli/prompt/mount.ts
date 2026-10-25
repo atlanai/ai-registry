@@ -2,6 +2,7 @@ import type { EventEmitter } from "node:events";
 import { Writable } from "node:stream";
 import { Box, type Key, render, Text, useApp, useInput } from "ink";
 import { createElement, type ReactElement, useEffect, useReducer, useState } from "react";
+import { ownStyleOnly } from "#core/output.ts";
 import { CSI_BODY, cells, ESC } from "#core/term/format.ts";
 import { wrapRows } from "./layout.ts";
 import {
@@ -55,7 +56,8 @@ function keypress(text: string, key: Key): Keypress {
  * terminal would, and Ink erases every row it drew on the next frame.
  */
 function Frame(props: { lines: readonly string[]; columns: number }): ReactElement {
-  const rows = props.lines.flatMap((line) => wrapRows(line, props.columns));
+  // Options carry registry text, and Ink passes hyperlinks and styling through.
+  const rows = props.lines.flatMap((line) => wrapRows(ownStyleOnly(line), props.columns));
   return createElement(
     Box,
     { flexDirection: "column" },

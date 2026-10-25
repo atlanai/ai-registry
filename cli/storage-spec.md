@@ -110,7 +110,7 @@ A registry's `source` is its address, as the manifest declares it. An artifact's
 
 ## Registries
 
-`aireg registry add <address>` records a registry under `registries:` in the scope's `manifest.yml`, keyed by its name. The registry names itself from its `registry.json`; `--as` picks another name. The adapter that reads a registry is worked out from its address unless `adapter:` names one.
+`aireg registry add <address>` records a registry under `registries:` in the scope's `manifest.yml`, keyed by its name. The registry names itself from its `registry.json`; `--as` picks another name. Its copies live in `artifacts/<name>/`, with the name reduced to lowercase letters, digits and hyphens and cut at 64 characters, and a name that reduces to nothing becomes `unnamed`. A manifest declaring two names that reduce to one folder, such as `Team` and `team`, is refused. The adapter that reads a registry is worked out from its address unless `adapter:` names one.
 
 | Address | Recorded as | Read by |
 |---|---|---|

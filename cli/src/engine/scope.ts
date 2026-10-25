@@ -1,9 +1,11 @@
 import { list } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import type { ArtifactKind } from "#core/kinds.ts";
 import type { Ref } from "#core/ref.ts";
-import { isWholeNamespace, isWholeRegistry, parseRef } from "#core/ref.ts";
+import { formatAddress, isWholeNamespace, isWholeRegistry, parseRef } from "#core/ref.ts";
 import type { Candidate } from "#core/sync/adopt.ts";
 import type { SyncItem } from "#core/sync/model.ts";
+import { artifactKey } from "./decide.ts";
 import type { RunScope } from "./inspect.ts";
 import type { Scan } from "./scan.ts";
 
@@ -30,11 +32,19 @@ function split(name: string): { namespace: string | undefined; leaf: string } {
   return { namespace: name.slice(0, cut), leaf: name.slice(cut + 1) };
 }
 
-function matchesItem(ref: Ref, registry: string, item: SyncItem): boolean {
+/** The address that reaches only this kind of a run's artifact, never another of its name. */
+export function kindAddress(registry: string, kind: ArtifactKind, name: string): string {
+  const { namespace, leaf } = split(name);
+  return formatAddress({ registry, namespace, kind, name: leaf });
+}
+
+function matchesItem(ref: Ref, registry: string, item: SyncItem, scan: Scan): boolean {
   // Both sides: the ref has to name this job's registry, and the item has
   // to come from it. Another account's catalog is not this run's to narrow.
   if (ref.registry !== registry || item.source !== registry) return false;
-  const { namespace, leaf } = split(item.name);
+  const { namespace: named, leaf } = split(item.name);
+  // An installed artifact's lock key is usually its bare name; its row records the namespace.
+  const namespace = named ?? scan.pinned?.artifacts[item.name]?.namespace;
   if (isWholeRegistry(ref)) return true;
   if (isWholeNamespace(ref)) return ref.namespace === namespace;
   if (ref.kind !== item.kind || ref.name !== leaf) return false;
@@ -52,15 +62,18 @@ function matchesCandidate(ref: Ref, registry: string, candidate: Candidate): boo
   return ref.kind === undefined || ref.kind === candidate.kind;
 }
 
-/** Names this one ref reaches, in the vocabulary `classify` keys outcomes by. */
+/**
+ * Artifacts this one ref reaches, in the keys `classify` keys outcomes by: a ref
+ * that names a kind reaches only that kind, and one that names none, every kind.
+ */
 function reached(raw: string, registry: string, scan: Scan): Set<string> {
-  const names = new Set<string>();
+  const keys = new Set<string>();
   // The catalog name is what a run's events name, so it is accepted alongside the address grammar.
   for (const item of scan.items) {
-    if (item.source === registry && item.name === raw) names.add(item.name);
+    if (item.source === registry && item.name === raw) keys.add(artifactKey(item.kind, item.name));
   }
   for (const candidate of scan.local) {
-    if (candidate.name === raw) names.add(candidate.name);
+    if (candidate.name === raw) keys.add(artifactKey(candidate.kind, candidate.name));
   }
 
   let ref: Ref;
@@ -68,28 +81,30 @@ function reached(raw: string, registry: string, scan: Scan): Set<string> {
     ref = parseRef(raw);
   } catch {
     // Not an address; the exact-name pass above was its only reading.
-    return names;
+    return keys;
   }
   for (const item of scan.items) {
-    if (matchesItem(ref, registry, item)) names.add(item.name);
+    if (matchesItem(ref, registry, item, scan)) keys.add(artifactKey(item.kind, item.name));
   }
   for (const candidate of scan.local) {
-    if (matchesCandidate(ref, registry, candidate)) names.add(candidate.name);
+    if (matchesCandidate(ref, registry, candidate)) {
+      keys.add(artifactKey(candidate.kind, candidate.name));
+    }
   }
-  return names;
+  return keys;
 }
 
 /**
  * `undefined` covers everything the job does. Throws when any ref reached
  * nothing, so a run cannot report success for work it never looked at.
  */
-export function scopedNames(
+export function scopedKeys(
   refs: RunScope,
   scan: Scan,
   registry: string,
 ): ReadonlySet<string> | undefined {
   if (refs === undefined) return undefined;
-  const names = new Set<string>();
+  const keys = new Set<string>();
   const missed: string[] = [];
   for (const raw of refs) {
     const found = reached(raw, registry, scan);
@@ -97,8 +112,8 @@ export function scopedNames(
       missed.push(raw);
       continue;
     }
-    for (const name of found) names.add(name);
+    for (const key of found) keys.add(key);
   }
   if (missed.length > 0) throw new RunScopeError(missed);
-  return names;
+  return keys;
 }

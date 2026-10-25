@@ -22,6 +22,12 @@ interface Claimed {
 /** `.agents/skills/pdf` or `.claude/agents/review.md`: the name a part is installed under. */
 const partName = (path: string) => (path.split(/[\\/]/).at(-1) ?? path).replace(/\.(md|toml)$/, "");
 
+/** Where `item` would link this run, before any other artifact claims a path. */
+export function wantedLinks(item: Selected, build: BuildState): PlannedLink[] {
+  const wrapped = build.wrapping.has(item.source);
+  return linksFor(item, "", build.options, wrapped, build.crowded);
+}
+
 /** The links this item may take, first come first served, recording what another holds. */
 function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const skipped = new Set<string>();
@@ -38,20 +44,33 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
     if (!build.clashes.some((clash) => clash.dropped === address && clash.kept === kept)) {
       // A plugin's parts each land under a name of their own, which is the one that collided.
       const name = item.kind === "plugin" ? partName(link.relative) : item.name;
-      build.clashes.push({ name, kept, dropped: address, at: link.relative });
+      const container = link.shared === true ? { container: true as const } : {};
+      build.clashes.push({ name, kept, dropped: address, at: link.relative, ...container });
     }
   };
   // A path the lockfile gives another artifact stays its own, though this one comes first, as a
-  // plugin linked beside it may. A plugin's own folder is shared, so it is never held this way.
+  // plugin linked beside it may.
   const open = planned.filter((link) => {
-    if (link.shared === true || build.claimed.has(link.absolute)) return true;
+    if (build.claimed.has(link.absolute)) return true;
     const holder = build.recorded.get(link.absolute);
-    if (holder === undefined || holder === item.name) return true;
+    if (holder === undefined || holder === item.name || !holds(holder, link, build)) return true;
     collided(holder, link);
     return false;
   });
-  const links = claim(open, item.name, build.claimed, collided);
+  const links = claim(open, item.name, build.claimed, build.plugins, collided);
   return { links, skipped, blocked };
+}
+
+/**
+ * Whether the lockfile row recorded at this path still keeps it from `link`: only while that row
+ * links there this run, and a plugin directory never from its own namespace's artifacts.
+ */
+function holds(holder: string, link: PlannedLink, build: BuildState): boolean {
+  const wants = build.wants.get(holder);
+  if (wants === undefined) return true;
+  const wanted = wants.find((each) => each.absolute === link.absolute);
+  if (wanted === undefined) return false;
+  return link.shared !== true || wanted.content !== link.content;
 }
 
 /**

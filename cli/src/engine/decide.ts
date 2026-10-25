@@ -37,7 +37,7 @@ export interface SyncOutcome {
   detail?: string;
 }
 
-/** Wins over the policy mapping, for the named artifact only. */
+/** Keyed by `artifactKey`, and wins over the policy for that one artifact only. */
 export type Overrides = ReadonlyMap<string, SyncOperation>;
 
 export interface SyncExecution {
@@ -67,13 +67,27 @@ function relevant(mode: RunMode, disposition: Disposition): boolean {
   return (mode === "pull" ? PULL_DISPOSITIONS : PUBLISH_DISPOSITIONS).includes(disposition);
 }
 
-function decide(job: ScopeWork, overrides: Overrides, name: string, disposition: Disposition) {
-  return overrides.get(name) ?? operation(disposition, job.policy);
+function decide(
+  job: ScopeWork,
+  overrides: Overrides,
+  { kind, name }: { kind: ArtifactKind; name: string },
+  disposition: Disposition,
+) {
+  return overrides.get(artifactKey(kind, name)) ?? operation(disposition, job.policy);
 }
 
 const LOCAL_WRITES: readonly SyncOperation[] = ["pull", "remove-local", "forget"];
 
+/**
+ * What outcomes and the operations taken from them are keyed by: a skill and an
+ * agent may share a name, and what is chosen for one must never reach the other.
+ */
+export function artifactKey(kind: ArtifactKind, name: string): string {
+  return `${kind}:${name}`;
+}
+
 interface Classified {
+  /** Keyed by `artifactKey`. */
   outcomes: Map<string, SyncOutcome>;
   /** Settled in the same pass, so what a run reports and what it writes cannot drift apart. */
   writes: Set<string>;
@@ -81,11 +95,11 @@ interface Classified {
   mutates: boolean;
 }
 
-/** `undefined` is everything the job covers; otherwise the names `scopedNames` reached. */
+/** `undefined` is everything the job covers; otherwise the keys `scopedKeys` reached. */
 export type Scoped = ReadonlySet<string> | undefined;
 
-function selected(scoped: Scoped, name: string): boolean {
-  return scoped === undefined || scoped.has(name);
+function selected(scoped: Scoped, kind: ArtifactKind, name: string): boolean {
+  return scoped === undefined || scoped.has(artifactKey(kind, name));
 }
 
 /** Local artifacts the registry does not carry yet. Returns whether one will be published. */
@@ -100,16 +114,13 @@ function adopt(
   let mutates = false;
   const takesNone = !SCANNED_KINDS.some((kind) => publishable(kind));
   for (const candidate of scan.local) {
-    if (!selected(scoped, candidate.name)) continue;
+    if (!selected(scoped, candidate.kind, candidate.name)) continue;
     // A registry that takes no publishes at all, such as a git one, is not waiting
     // on this, so it is skipped rather than reported every run.
     const chosen = takesNone
       ? "ignore"
-      : withoutPublishing(
-          decide(job, overrides, candidate.name, "adopt"),
-          publishable(candidate.kind),
-        );
-    outcomes.set(candidate.name, {
+      : withoutPublishing(decide(job, overrides, candidate, "adopt"), publishable(candidate.kind));
+    outcomes.set(artifactKey(candidate.kind, candidate.name), {
       artifact: candidate.name,
       kind: candidate.kind,
       disposition: "adopt",
@@ -202,9 +213,9 @@ export function classify(
   // Unless the job claims copies, a folder of yours wins over a registry's of the same name.
   const shadowed = job.policy.claim === "on" ? new Set<string>() : shadowedByYours(scan);
   for (const item of scan.items) {
-    if (item.source !== registry || !selected(scoped, item.name)) continue;
+    if (item.source !== registry || !selected(scoped, item.kind, item.name)) continue;
     if (shadowed.has(item.name)) {
-      outcomes.set(item.name, {
+      outcomes.set(artifactKey(item.kind, item.name), {
         artifact: item.name,
         kind: item.kind,
         disposition: item.disposition,
@@ -219,10 +230,10 @@ export function classify(
     if (owner !== undefined && owner !== registry) continue;
     if (!relevant(mode, item.disposition)) continue;
     const chosen = withoutPublishing(
-      decide(job, overrides, item.name, item.disposition),
+      decide(job, overrides, item, item.disposition),
       publishable(item.kind),
     );
-    outcomes.set(item.name, decided(item, chosen));
+    outcomes.set(artifactKey(item.kind, item.name), decided(item, chosen));
     if (LOCAL_WRITES.includes(chosen)) writes.add(item.name);
     if (item.disposition === "synced" && unrecorded(scan, item)) writes.add(item.name);
     if (chosen === "publish" || chosen === "archive") mutates = true;

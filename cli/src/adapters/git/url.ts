@@ -27,6 +27,11 @@ export interface SourceSpec {
   host: string | undefined;
   /** The folder inside the repository that holds the registry, from a pasted link. */
   path?: string | undefined;
+  /**
+   * The address names an account or a port of its own, which a fallback rebuilt from
+   * the host and slug would drop, so it is tried only as written.
+   */
+  exact?: boolean | undefined;
 }
 
 /**
@@ -128,14 +133,15 @@ export function parseSource(input: string, cwd = process.cwd()): SourceSpec {
 
   const scp = SCP_LOCATION.exec(address);
   if (scp !== null) {
-    const [, , host, path] = scp;
+    const [, user, host, path] = scp;
     return {
-      location: `git@${host}:${path}`,
+      location: `${user ?? "git"}@${host}:${path}`,
       kind: "git",
       ref,
       alias: registryNameFromLocation(path ?? address, "registry"),
       slug: (path ?? "").replace(/\.git$/, ""),
       host,
+      exact: user !== undefined && user !== "git",
     };
   }
 
@@ -164,7 +170,14 @@ export function parseSource(input: string, cwd = process.cwd()): SourceSpec {
     alias: registryNameFromLocation(path, "registry"),
     slug: path.split("/").length === 2 ? path : undefined,
     host: url.hostname,
+    exact:
+      (url.port !== "" && !(url.protocol === "ssh:" && url.port === "22")) || namesSshUser(url),
   };
+}
+
+// `cloneUrl` keeps a user only for ssh:, so elsewhere the user is not part of the address tried.
+function namesSshUser(url: URL): boolean {
+  return url.protocol === "ssh:" && url.username !== "" && url.username !== "git";
 }
 
 /** file:// is a git transport, not a directory read: `./dir` is the latter. */

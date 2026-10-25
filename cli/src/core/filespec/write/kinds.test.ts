@@ -1,10 +1,14 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { test } from "#test/kit/fixtures.ts";
 import {
   check,
   envelopeSpec,
   fileProblems,
   type KindManifest,
   kindsOf,
+  manifestProblems,
   primaryFiles,
 } from "./kinds.ts";
 
@@ -147,5 +151,55 @@ describe("native kind contracts", async () => {
     expect(check(skill, { ...spec, description: "😀".repeat(1024) })).toEqual([]);
     expect(check(skill, { ...spec, description: "😀".repeat(1025) })).not.toEqual([]);
     expect(check(skill, { ...spec, custom: true })).not.toEqual([]);
+  });
+});
+
+/** A registry root that lists `kinds` and serves `note`'s manifest with these file rules. */
+async function servingNote(root: string, kinds: unknown[], files: unknown): Promise<void> {
+  await mkdir(join(root, "kinds"), { recursive: true });
+  await writeFile(join(root, "registry.json"), JSON.stringify({ name: "team", kinds }));
+  const manifest = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: "kinds/note.json",
+    title: "note",
+    type: "object",
+    "x-registry-schema-version": 1,
+    "x-registry-files": files,
+  };
+  await writeFile(join(root, "kinds", "note.json"), JSON.stringify(manifest));
+}
+
+describe("a kind manifest a registry serves", () => {
+  test("is refused when any alternative names a file outside the version", async ({ tmp }) => {
+    const note = [{ name: "note", manifest_url: "kinds/note.json" }];
+    await servingNote(tmp, note, { one_of: [[{ path: "NOTE.md" }], [{ path: "../x.md" }]] });
+    expect(await kindsOf(tmp)).not.toHaveProperty("note");
+    expect(await manifestProblems(tmp)).toEqual([
+      {
+        path: "kinds/note.json",
+        message: expect.stringContaining(
+          'names the file "../x.md", which is not a path inside a version',
+        ),
+      },
+    ]);
+  });
+
+  test("is refused, with its command, when registry.json lists it under no kind name", async ({
+    tmp,
+  }) => {
+    await servingNote(
+      tmp,
+      [{ name: "../note", manifest_url: "kinds/note.json" }, { name: "skill" }],
+      {
+        required: [{ path: "NOTE.md" }],
+      },
+    );
+    expect(Object.keys(await kindsOf(tmp))).toEqual(["skill"]);
+    expect(await manifestProblems(tmp)).toEqual([
+      {
+        path: "registry.json",
+        message: 'lists "../note", which is not a kind name, so it is not used',
+      },
+    ]);
   });
 });

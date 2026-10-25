@@ -4,10 +4,11 @@ import { readFileSync, realpathSync, rmSync } from "node:fs";
 import { mkdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { assertUnredirected } from "#adapter/files.ts";
+import { redirection } from "#adapter/files.ts";
 import { quoted } from "#adapter/text.ts";
 import { shortHash } from "#core/fs/hash.ts";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
+import { posixRelative } from "#core/fs/path.ts";
 import { ensureHome, leasesDir, type Roots, type Scope } from "#core/store/paths.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import { processAlive } from "./process.ts";
@@ -121,22 +122,46 @@ function leaseDir(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.ProcessEnv):
   return join(parentOf(roots, env), `${leaseKey(roots)}.lease`);
 }
 
+/** Refuses a path the lease would write or remove through a link. */
+type Guard = (path: string) => Promise<void>;
+
 /**
- * A project's `.registry/` is committed, so its lease folder ignores itself, and a
- * `.registry` link out of the project is refused as every other scope write refuses it.
+ * A link from `.registry` down to the lease would carry its writes and removals out of the
+ * project. The user scope's leases live in `AIREG_HOME`, which `ensureHome` sets up.
  */
+function containment(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.ProcessEnv): Guard {
+  if (roots.scope === "user") return async () => {};
+  const folder = dirname(resolve(roots.lock));
+  const registry = dirname(parentOf(roots, env));
+  return async (path) => {
+    // The scope folder alone: a symlinked route to the project itself is still one project.
+    refuseLink(folder, folder);
+    refuseLink(registry, path);
+  };
+}
+
+/** A committed link on the way to the lease is the project's to replace, so it is named. */
+function refuseLink(root: string, path: string): void {
+  const found = redirection(root, path);
+  if (found === undefined) return;
+  const what = found.problem === "symlink" ? "a symlink" : "not a directory";
+  throw new AiregError(`${found.at} is ${what} in a managed path.`, {
+    code: ErrorCode.Invalid,
+    hint: `Replace ${posixRelative(dirname(root), found.at)} with a real folder.`,
+  });
+}
+
+/** A project's `.registry/` is committed, so its lease folder ignores itself. */
 async function prepare(
   roots: Pick<Roots, "scope" | "lock">,
-  parent: string,
+  dir: string,
+  guard: Guard,
   env: NodeJS.ProcessEnv,
 ): Promise<void> {
   const user = roots.scope === "user";
   if (user) ensureHome(env);
-  else {
-    // The scope folder alone: a symlinked route to the project itself is still one project.
-    const folder = dirname(resolve(roots.lock));
-    await assertUnredirected(folder, folder);
-  }
+  await guard(dir);
+  const parent = dirname(dir);
   await mkdir(parent, { recursive: true });
   if (user) return;
   await writeFile(join(parent, ".gitignore"), "*\n", { flag: "wx" }).catch((error: unknown) => {
@@ -235,7 +260,11 @@ function stillFailing(failing: Failing): boolean {
 }
 
 /** One try at the coordination folder: entered, try again now, or wait a poll first. */
-async function enterOnce(dir: string, failing: Failing): Promise<"entered" | "retry" | "wait"> {
+async function enterOnce(
+  dir: string,
+  failing: Failing,
+  guard: Guard,
+): Promise<"entered" | "retry" | "wait"> {
   try {
     await mkdir(dir);
     return "entered";
@@ -245,6 +274,7 @@ async function enterOnce(dir: string, failing: Failing): Promise<"entered" | "re
     if ((error as NodeJS.ErrnoException).code !== "EEXIST" && !stillFailing(failing)) throw error;
     const age = await dirAgeMs(dir);
     if (age === undefined || age <= COORDINATION_STALE_MS) return "wait";
+    await guard(dir);
     if (await removeDir(dir)) return "retry";
     if (!stillFailing(failing)) throw stuckError(dir, "lease_coordination_stuck");
     return "wait";
@@ -252,12 +282,17 @@ async function enterOnce(dir: string, failing: Failing): Promise<"entered" | "re
 }
 
 /** Short-held, so create-versus-reclaim cannot interleave. */
-async function withCoordination<T>(parent: string, run: () => Promise<T>): Promise<T> {
+async function withCoordination<T>(
+  parent: string,
+  guard: Guard,
+  run: () => Promise<T>,
+): Promise<T> {
   const dir = join(parent, ".coordination");
+  await guard(dir);
   await mkdir(parent, { recursive: true });
   const failing: Failing = {};
   for (;;) {
-    const step = await enterOnce(dir, failing);
+    const step = await enterOnce(dir, failing, guard);
     if (step === "entered") break;
     if (step === "wait") await new Promise((wake) => setTimeout(wake, POLL_MS));
   }
@@ -265,18 +300,22 @@ async function withCoordination<T>(parent: string, run: () => Promise<T>): Promi
     return await run();
   } finally {
     // A leftover lock goes stale and is reclaimed, so it must not fail finished work.
-    await removeDir(dir).catch(() => false);
+    await guard(dir)
+      .then(() => removeDir(dir))
+      .catch(() => false);
   }
 }
 
 type Claim = "taken" | "held" | "unremovable";
 
-async function claim(dir: string, holder: LeaseHolder): Promise<Claim> {
+async function claim(dir: string, holder: LeaseHolder, guard: Guard): Promise<Claim> {
+  await guard(dir);
   try {
     await mkdir(dir);
   } catch (error) {
     if (!taken(error)) throw error;
     if (!(await stale(dir))) return "held";
+    await guard(dir);
     if (!(await removeDir(dir))) return "unremovable";
     // Another claimant can get there between the remove and this, so it reads as held.
     const made = await mkdir(dir).then(
@@ -322,10 +361,14 @@ export function releaseLeasesOnInterrupt(alsoStop: () => void): void {
   process.once("SIGTERM", interrupted);
 }
 
-function beat(dir: string): NodeJS.Timeout {
+function beat(dir: string, id: string, guard: Guard): NodeJS.Timeout {
   const timer = setInterval(() => {
     const now = new Date();
-    void utimes(metaPath(dir), now, now).catch(() => {});
+    // A lease reclaimed meanwhile is its new holder's to keep alive, not this one's.
+    void guard(dir)
+      .then(() => readHolder(dir))
+      .then((holder) => (holder?.id === id ? utimes(metaPath(dir), now, now) : undefined))
+      .catch(() => {});
   }, HEARTBEAT_MS);
   // Never the reason a one-shot command stays alive.
   timer.unref();
@@ -349,12 +392,21 @@ export async function assertLeasesHeld(): Promise<void> {
   for (const owned of fences.getStore() ?? []) await owned();
 }
 
-async function releaseOwned(dir: string, id: string, timer: NodeJS.Timeout): Promise<void> {
+async function releaseOwned(
+  dir: string,
+  id: string,
+  timer: NodeJS.Timeout,
+  guard: Guard,
+): Promise<void> {
   clearInterval(timer);
   // A stale reclaim may have handed the scope to someone else meanwhile.
   const holder = await readHolder(dir);
   // Without a heartbeat a leftover goes stale and is reclaimed, so it must not fail finished work.
-  if (holder?.id === id) await removeDir(dir).catch(() => false);
+  if (holder?.id === id) {
+    await guard(dir)
+      .then(() => removeDir(dir))
+      .catch(() => false);
+  }
   // Held until it is gone, so an interrupt mid-release still removes it.
   held.delete(dir);
 }
@@ -365,7 +417,8 @@ export async function acquire(
 ): Promise<Lease> {
   const env = options.env ?? process.env;
   const dir = leaseDir(roots, env);
-  await prepare(roots, dirname(dir), env);
+  const guard = containment(roots, env);
+  await prepare(roots, dir, guard, env);
   const holder: LeaseHolder = {
     id: randomUUID(),
     scope: roots.scope,
@@ -379,10 +432,10 @@ export async function acquire(
   let failingSince: number | undefined;
   for (;;) {
     options.signal?.throwIfAborted();
-    const claimed = await withCoordination(dirname(dir), () => claim(dir, holder));
+    const claimed = await withCoordination(dirname(dir), guard, () => claim(dir, holder, guard));
     if (claimed === "taken") {
-      const timer = beat(dir);
-      return { id: holder.id, release: () => releaseOwned(dir, holder.id, timer) };
+      const timer = beat(dir, holder.id, guard);
+      return { id: holder.id, release: () => releaseOwned(dir, holder.id, timer, guard) };
     }
     const current = await readHolder(dir);
     if (options.wait !== true) throw new LeaseBusyError(current, roots.scope);
@@ -428,15 +481,19 @@ export async function breakLease(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<LeaseHolder> {
   const dir = leaseDir(roots, env);
+  // Breaking a lease removes a folder, so it is held to the same containment as taking one.
+  const guard = containment(roots, env);
+  await guard(dir);
   const holder = await readHolder(dir);
   const again = `Run ${unlockCommand(roots.scope)} to see the current one.`;
   if (holder === undefined) throw new LeaseError("Nothing is locked.");
   if (holder.id !== id) {
     throw new LeaseError(`No lock with id ${quoted(id)}.`, undefined, again);
   }
-  await withCoordination(dirname(dir), async () => {
+  await withCoordination(dirname(dir), guard, async () => {
     const current = await readHolder(dir);
     if (current?.id !== id) throw new LeaseError("That lock changed.", undefined, again);
+    await guard(dir);
     await rm(dir, { recursive: true, force: true });
   });
   return holder;

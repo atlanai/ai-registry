@@ -14,7 +14,7 @@ import {
   keep,
   namespaceWants,
 } from "#core/plan/build/carry.ts";
-import { placeLinks, updateLinks } from "#core/plan/build/links.ts";
+import { placeLinks, updateLinks, wantedLinks } from "#core/plan/build/links.ts";
 import { keepUnmovedRevisions, lockRow, rewrittenFrom } from "#core/plan/build/lock-row.ts";
 import { carriedOut, renamesFor } from "#core/plan/build/rename.ts";
 import { planCopy, restages } from "#core/plan/build/restage.ts";
@@ -94,6 +94,8 @@ function planWith(
     warnings,
     rewritten: [],
     claimed: new Map(),
+    plugins: new Map(),
+    wants: new Map(),
     recorded: new Map(),
     linked: new Set(),
     // Namespaces wrap only at user scope, as the adapter contract says, whoever loads plugins.
@@ -120,6 +122,7 @@ function planWith(
   const carried = carryUnopened(state);
   const held = heldElsewhere(state, manifest, acquired, carried);
   state.crowded = crowdedContainers(namespaceWants(selected, carried, held, state), options);
+  for (const item of selected) state.wants.set(item.name, wantedLinks(item, state));
   // Links go first come, first served, and what is installed already comes first: adding
   // another artifact under its name never unlinks it.
   const linkedFirst = [...selected].sort(

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Candidate } from "#core/sync/adopt.ts";
 import type { SyncItem } from "#core/sync/model.ts";
+import { artifactKey } from "./decide.ts";
 import type { Scan } from "./scan.ts";
-import { RunScopeError, scopedNames } from "./scope.ts";
+import { RunScopeError, scopedKeys } from "./scope.ts";
 
 const REGISTRY = "shop";
 
@@ -30,51 +31,74 @@ const catalog = scanOf(
   [candidate("written-here")],
 );
 
-describe("scopedNames", () => {
+describe("scopedKeys", () => {
   it("covers everything the job does when no refs were asked for", () => {
-    expect(scopedNames(undefined, catalog, REGISTRY)).toBeUndefined();
+    expect(scopedKeys(undefined, catalog, REGISTRY)).toBeUndefined();
   });
 
   it.each([
-    ["the catalog name", "sales/deploy", ["sales/deploy"]],
-    ["the address grammar manifest.yml uses", "shop/sales/skill/deploy", ["sales/deploy"]],
-    ["a whole namespace", "shop/sales", ["sales/deploy", "sales/lint"]],
-    ["one of two kinds that share a name", "shop/engineering/agent/lint", ["engineering/lint"]],
+    ["the catalog name", "sales/deploy", [artifactKey("skill", "sales/deploy")]],
+    [
+      "the address grammar manifest.yml uses",
+      "shop/sales/skill/deploy",
+      [artifactKey("skill", "sales/deploy")],
+    ],
+    [
+      "a whole namespace",
+      "shop/sales",
+      [artifactKey("skill", "sales/deploy"), artifactKey("skill", "sales/lint")],
+    ],
+    [
+      "one of two kinds that share a name",
+      "shop/engineering/agent/lint",
+      [artifactKey("agent", "engineering/lint")],
+    ],
     [
       "an address with no namespace, wherever it is",
       "shop/skill/lint",
-      ["engineering/lint", "sales/lint"],
+      [artifactKey("skill", "engineering/lint"), artifactKey("skill", "sales/lint")],
     ],
     [
       "a local artifact the registry does not carry yet",
       "shop/skill/written-here",
-      ["written-here"],
+      [artifactKey("skill", "written-here")],
     ],
   ])("resolves %s", (_, ref, expected) => {
-    expect([...(scopedNames([ref], catalog, REGISTRY) ?? [])].sort()).toEqual(expected);
+    expect([...(scopedKeys([ref], catalog, REGISTRY) ?? [])].sort()).toEqual(expected);
+  });
+
+  it("reaches an installed artifact by the namespace its lock row records", () => {
+    const installed = {
+      items: [item("lint")],
+      local: [],
+      undeclared: [],
+      pinned: { registries: {}, artifacts: { lint: { name: "lint", namespace: "engineering" } } },
+    } as unknown as Scan;
+
+    expect([...(scopedKeys(["shop/engineering/skill/lint"], installed, REGISTRY) ?? [])]).toEqual([
+      artifactKey("skill", "lint"),
+    ]);
   });
 
   it("reaches the whole registry, and only this job's", () => {
-    const scoped = scopedNames(["shop"], catalog, REGISTRY);
-    expect([...(scoped ?? [])]).not.toContain("other/deploy");
-    expect([...(scoped ?? [])]).toContain("loose");
+    const scoped = scopedKeys(["shop"], catalog, REGISTRY);
+    expect([...(scoped ?? [])]).not.toContain(artifactKey("skill", "other/deploy"));
+    expect([...(scoped ?? [])]).toContain(artifactKey("skill", "loose"));
   });
 
   it("refuses a ref that reaches nothing rather than running empty", () => {
-    expect(() => scopedNames(["shop/sales/skill/absent"], catalog, REGISTRY)).toThrow(
-      RunScopeError,
-    );
+    expect(() => scopedKeys(["shop/sales/skill/absent"], catalog, REGISTRY)).toThrow(RunScopeError);
   });
 
   it("refuses an address whose registry is not this job's", () => {
-    expect(() => scopedNames(["elsewhere/other/skill/deploy"], catalog, REGISTRY)).toThrow(
+    expect(() => scopedKeys(["elsewhere/other/skill/deploy"], catalog, REGISTRY)).toThrow(
       RunScopeError,
     );
   });
 
   it("names every ref that missed, so one call fixes them all", () => {
     try {
-      scopedNames(["sales/deploy", "nope", "also/nope"], catalog, REGISTRY);
+      scopedKeys(["sales/deploy", "nope", "also/nope"], catalog, REGISTRY);
       expect.unreachable("should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(RunScopeError);
