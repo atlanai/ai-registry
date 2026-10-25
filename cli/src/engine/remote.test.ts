@@ -4,6 +4,7 @@ import { expect, vi } from "vitest";
 import type { PublishInput } from "#adapter/index.ts";
 import { roots as makeRoots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { artifactKey } from "./decide.ts";
 import { mutateRemote } from "./remote.ts";
 import type { Scan } from "./scan.ts";
 
@@ -94,8 +95,8 @@ test("fails only the installed copy reached through a symlinked namespace folder
     { config: {} } as never,
     { id: "acc_1", registry: "acme" },
     new Map([
-      ["lint", "publish"],
-      ["deploy", "publish"],
+      [artifactKey("skill", "lint"), "publish"],
+      [artifactKey("skill", "deploy"), "publish"],
     ]),
     new AbortController().signal,
     { event: () => {}, failed: (name) => failed.push(name) },
