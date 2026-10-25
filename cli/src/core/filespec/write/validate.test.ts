@@ -145,17 +145,18 @@ const CASES: Case[] = [
     message: 'is not valid JSON, so "skill" is checked against the one aireg bundles',
   },
   {
-    name: "a kind manifest the registry serves with a pattern aireg cannot run",
+    name: "a custom kind's manifest with a pattern aireg cannot run",
     edit: async (root) => {
       const document = JSON.parse(await readFile(join(root, "registry.json"), "utf8"));
-      const kinds = [{ name: "skill", manifest_url: "kinds/skill.json" }, { name: "agent" }];
+      const prompt = { name: "prompt", manifest_url: "kinds/prompt.json" };
+      const kinds = [{ name: "skill" }, { name: "agent" }, prompt];
       await writeFile(join(root, "registry.json"), JSON.stringify({ ...document, kinds }));
       const name = { ...skill.properties.name, pattern: "^(?!draft-)[a-z-]+$" };
       const manifest = { ...skill, properties: { ...skill.properties, name } };
-      await put(root, "kinds/skill.json", JSON.stringify(manifest));
+      await put(root, "kinds/prompt.json", JSON.stringify(manifest));
     },
-    path: "kinds/skill.json",
-    message: `has an invalid kind schema: pattern "^(?!draft-)[a-z-]+$" uses syntax aireg does not support: invalid or unsupported Perl syntax at (?!, so "skill" is checked against the one aireg bundles`,
+    path: "kinds/prompt.json",
+    message: `has an invalid kind schema: pattern "^(?!draft-)[a-z-]+$" uses syntax aireg does not support: invalid or unsupported Perl syntax at (?!, so "prompt" is left out and its artifacts fail`,
   },
   {
     name: "a kind manifest the registry serves with a named backreference",

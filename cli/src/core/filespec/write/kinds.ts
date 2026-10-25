@@ -86,13 +86,15 @@ export async function kindsOf(root: string | undefined): Promise<Record<string, 
   return kinds;
 }
 
-/** Each manifest `registry.json` names in the root that cannot be used, and what is checked instead. */
+/** Each manifest `registry.json` names in the root that cannot be used, and what becomes of its kind. */
 export async function manifestProblems(root: string): Promise<{ path: string; message: string }[]> {
   return (await listedKinds(root)).flatMap(({ name, url, served }) => {
     if (url === undefined || served === undefined || !("problem" in served)) return [];
     const instead =
-      BUNDLED[name] === undefined ? "not checked" : "checked against the one aireg bundles";
-    return [{ path: url, message: `${served.problem}, so ${quoted(name)} is ${instead}` }];
+      BUNDLED[name] === undefined
+        ? "is left out and its artifacts fail"
+        : "is checked against the one aireg bundles";
+    return [{ path: url, message: `${served.problem}, so ${quoted(name)} ${instead}` }];
   });
 }
 
