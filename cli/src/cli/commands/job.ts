@@ -98,11 +98,11 @@ function policy(own: Own): Record<string, string> {
 async function refsFrom(
   common: CommonOptions,
   alias: string,
-  source: RegistrySource,
+  registries: Readonly<Record<string, RegistrySource>>,
   base: string,
 ): Promise<string[] | undefined> {
   if (common.select === undefined || common.select.includes("*")) return undefined;
-  const read = await probeAddress(throughManifest(alias, { [alias]: source }, {}), base, []);
+  const read = await probeAddress(throughManifest(alias, registries, {}), base, []);
   try {
     const addresses = qualify(common.select, alias, read.catalog.entries, false, alias);
     return addresses.map((address) => `${alias}/${address}`);
@@ -227,7 +227,7 @@ async function plannedJob(
     );
     if (!adapter.capabilities.publish) throw cannotPublish(adapter, alias);
   }
-  const refs = await refsFrom(common, alias, source, jobRoot);
+  const refs = await refsFrom(common, alias, manifest.registries, jobRoot);
   return { origins, alias, scope, jobRoot, source, refs, policy: policy(own) };
 }
 

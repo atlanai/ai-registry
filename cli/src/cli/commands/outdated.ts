@@ -83,7 +83,12 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
 
   const location = expandLocation(declared.location, base);
   try {
-    const credential = await credentialFor(alias, declared, location);
+    const credential = await credentialFor(
+      alias,
+      declared,
+      location,
+      Object.keys(manifest.registries),
+    );
     const open = await connectSource(
       {
         alias,

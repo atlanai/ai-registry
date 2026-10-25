@@ -34,7 +34,7 @@ export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
               isLink: state.isLink,
               target: state.target,
               mode: link.mode,
-              ...(copied ? { digest: await digest(full) } : {}),
+              ...(copied ? { digest: await digest(full, link.digest) } : {}),
             };
           }),
         );
@@ -52,7 +52,7 @@ export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
 
         artifacts[name] = {
           staged: present,
-          digest: present ? await digest(copy) : undefined,
+          digest: present ? await digest(copy, entry.digest) : undefined,
           links,
         };
       }),

@@ -6,8 +6,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NAME } from "#core/product.ts";
 import type { RunEvent } from "#core/run/model.ts";
+import { homeTest } from "#test/kit/fixtures.ts";
 import { cliClient, followRun, RpcClient, RpcClientError, withFreshConfig } from "./client.ts";
 import { RpcErrorCode } from "./codes.ts";
+import { daemonProof } from "./endpoint.ts";
 import { FrameDecoder } from "./frames.ts";
 import { encodeMessage, PROTOCOL_VERSION } from "./protocol.ts";
 import { RpcServer } from "./server.ts";
@@ -25,7 +27,7 @@ describe.skipIf(process.platform === "win32")("rpc handshake", () => {
     for (const path of paths.splice(0)) await rm(path, { force: true });
   });
 
-  it("waits for a daemon at its client limit instead of failing", async () => {
+  homeTest("waits for a daemon at its client limit instead of failing", async () => {
     const server = new RpcServer();
     server.method("initialize", async () => ({
       protocolVersion: PROTOCOL_VERSION,
@@ -56,21 +58,24 @@ describe.skipIf(process.platform === "win32")("rpc handshake", () => {
     }
   });
 
-  it("refuses a daemon whose protocol matches but whose initialize omits server.version", async () => {
-    const server = new RpcServer();
-    server.method("initialize", async () => ({
-      protocolVersion: PROTOCOL_VERSION,
-      server: { name: "aireg" },
-      daemon: { instanceId: "d", startedAtMs: 1, serverNowMs: 2 },
-    }));
-    const path = endpoint();
-    await server.listen(path);
-    try {
-      await expect(RpcClient.connect(path, cliClient("1.0.0"))).rejects.toThrow(/incompatible/);
-    } finally {
-      await server.close();
-    }
-  });
+  homeTest(
+    "refuses a daemon whose protocol matches but whose initialize omits server.version",
+    async () => {
+      const server = new RpcServer();
+      server.method("initialize", async () => ({
+        protocolVersion: PROTOCOL_VERSION,
+        server: { name: "aireg" },
+        daemon: { instanceId: "d", startedAtMs: 1, serverNowMs: 2 },
+      }));
+      const path = endpoint();
+      await server.listen(path);
+      try {
+        await expect(RpcClient.connect(path, cliClient("1.0.0"))).rejects.toThrow(/incompatible/);
+      } finally {
+        await server.close();
+      }
+    },
+  );
 
   it("sends nothing to a socket another user owns", async () => {
     const server = new RpcServer();
@@ -94,20 +99,30 @@ describe.skipIf(process.platform === "win32")("rpc handshake", () => {
   });
 });
 
-it("closes its connection without waiting for the peer to close", async () => {
-  const name = `rpc-close-${randomUUID().slice(0, 8)}`;
+interface BareDaemon {
+  path: string;
+  methods: string[];
+  close(): Promise<void>;
+}
+
+/** Answers initialize as the daemon does, signing the client's challenge with `sign`. */
+async function bareDaemon(sign: (challenge: unknown) => string | undefined): Promise<BareDaemon> {
+  const name = `rpc-bare-${randomUUID().slice(0, 8)}`;
   const path =
     process.platform === "win32" ? `\\\\.\\pipe\\${name}` : join(tmpdir(), `${name}.sock`);
   const peers: Socket[] = [];
+  const methods: string[] = [];
   const server = createServer({ allowHalfOpen: true }, (socket) => {
     peers.push(socket);
     const decoder = new FrameDecoder("the test client");
     socket.on("data", (chunk) => {
       const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
       for (const message of decoder.push(bytes)) {
+        if ("method" in message) methods.push(message.method);
         if (!("id" in message) || !("method" in message) || message.method !== "initialize") {
           continue;
         }
+        const { challenge } = message.params as { challenge?: unknown };
         socket.write(
           encodeMessage({
             jsonrpc: "2.0",
@@ -116,6 +131,7 @@ it("closes its connection without waiting for the peer to close", async () => {
               protocolVersion: PROTOCOL_VERSION,
               server: { name: NAME, version: "1.0.0" },
               daemon: { instanceId: "d", startedAtMs: 1, serverNowMs: 2 },
+              proof: sign(challenge),
             },
           }),
         );
@@ -126,9 +142,24 @@ it("closes its connection without waiting for the peer to close", async () => {
     server.once("error", reject);
     server.listen(path, resolve);
   });
+  return {
+    path,
+    methods,
+    async close() {
+      for (const socket of peers) socket.destroy();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error === undefined ? resolve() : reject(error)));
+      });
+      if (process.platform !== "win32") await rm(path, { force: true });
+    },
+  };
+}
+
+homeTest("closes its connection without waiting for the peer to close", async () => {
+  const daemon = await bareDaemon(daemonProof);
   let client: RpcClient | undefined;
   try {
-    client = await RpcClient.connect(path, cliClient("1.0.0"));
+    client = await RpcClient.connect(daemon.path, cliClient("1.0.0"));
     const closed = vi.fn();
     client.onClose(closed);
     const pending = client.request("state.snapshot", {});
@@ -137,12 +168,20 @@ it("closes its connection without waiting for the peer to close", async () => {
     await vi.waitFor(() => expect(closed).toHaveBeenCalledOnce());
     await expect(pending).rejects.toThrow();
   } finally {
-    for (const socket of peers) socket.destroy();
     client?.close();
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => (error === undefined ? resolve() : reject(error)));
-    });
-    if (process.platform !== "win32") await rm(path, { force: true });
+    await daemon.close();
+  }
+});
+
+homeTest("sends nothing more to a daemon that cannot prove it runs as you", async () => {
+  const daemon = await bareDaemon(() => "0".repeat(64));
+  try {
+    await expect(RpcClient.connect(daemon.path, cliClient("1.0.0"))).rejects.toThrow(
+      "could not prove it runs as you",
+    );
+    expect(daemon.methods).toEqual(["initialize"]);
+  } finally {
+    await daemon.close();
   }
 });
 

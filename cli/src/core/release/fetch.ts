@@ -32,7 +32,12 @@ export async function fetchManifest(
       code: ErrorCode.Unavailable,
     });
   const body = await fetchOriginBytes(url, MAX_MANIFEST_BYTES, $fetch, signal);
-  return verifyManifest(new TextDecoder().decode(body), stamp.keys, stamp.channel);
+  const manifest = verifyManifest(new TextDecoder().decode(body), stamp.keys, stamp.channel);
+  if (manifest.adapter !== undefined)
+    throw new AiregError(`The release server offered adapter ${manifest.adapter}, not ${NAME}.`, {
+      code: ErrorCode.Integrity,
+    });
+  return manifest;
 }
 
 export function manifestPlan(stamp: ReleaseStamp, manifest: ReleaseManifest): ManifestPlan {

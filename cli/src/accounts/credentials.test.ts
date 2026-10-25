@@ -57,7 +57,7 @@ describe("credentials", () => {
     await declareForUser(home, { acme: SIGNED_IN });
     await signIn({ id: "acc_one", registry: "acme" });
 
-    expect(await credentialFor("acme", SIGNS_IN, SIGNED_IN)).toEqual({
+    expect(await credentialFor("acme", SIGNS_IN, SIGNED_IN, ["acme"])).toEqual({
       type: "bearer",
       accessToken: STORED,
     });
@@ -100,9 +100,11 @@ describe("credentials", () => {
     vi.stubEnv("AIREG_TOKEN_ACME", FROM_ENV);
 
     expect(
-      await credentialFor("acme", RECOGNISED, "https://github.com/acme/ai-registry"),
+      await credentialFor("acme", RECOGNISED, "https://github.com/acme/ai-registry", ["acme"]),
     ).toBeUndefined();
-    expect(await credentialFor("acme", RECOGNISED, join(home, "registry"))).toBeUndefined();
+    expect(
+      await credentialFor("acme", RECOGNISED, join(home, "registry"), ["acme"]),
+    ).toBeUndefined();
   });
 
   test("sends AIREG_TOKEN_<NAME> to the registry the current scope declares", async () => {
@@ -112,7 +114,7 @@ describe("credentials", () => {
     // Only the project declares acme, as on CI.
     const token = { type: "bearer", accessToken: FROM_ENV };
     expect(await credentialsForManifest(project(ELSEWHERE), home)).toEqual({ acme: token });
-    expect(await credentialFor("acme", SIGNS_IN, ELSEWHERE)).toEqual(token);
+    expect(await credentialFor("acme", SIGNS_IN, ELSEWHERE, ["acme"])).toEqual(token);
   });
 
   test("never sends AIREG_TOKEN_<NAME> to an address nothing declares under that name", async () => {
@@ -138,7 +140,7 @@ describe("credentials", () => {
     await signIn({ id: "acc_one", registry: "acme" });
 
     const token = { type: "bearer", accessToken: FROM_ENV };
-    expect(await credentialFor("acme", SIGNS_IN, SIGNED_IN)).toEqual(token);
+    expect(await credentialFor("acme", SIGNS_IN, SIGNED_IN, ["acme"])).toEqual(token);
     // A project that moves acme gets the token it was given, never the stored one.
     expect(await credentialsForManifest(project(ELSEWHERE), home)).toEqual({ acme: token });
   });
@@ -149,9 +151,19 @@ describe("credentials", () => {
     await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
     await declareForUser(home, { "my--reg": SIGNED_IN, my__reg: SAME_ORIGIN });
 
-    await expect(credentialFor("my__reg", SIGNS_IN, SAME_ORIGIN)).rejects.toThrow(
+    await expect(credentialFor("my__reg", SIGNS_IN, SAME_ORIGIN, ["my__reg"])).rejects.toThrow(
       "AIREG_TOKEN_MY__REG names both my__reg and my--reg",
     );
+  });
+
+  test("refuses an environment token two aliases only the project declares share", async () => {
+    vi.stubEnv("AIREG_TOKEN_MY__REG", FROM_ENV);
+    await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
+
+    // The user scope declares neither, so only the project's names can show the clash.
+    await expect(
+      credentialFor("my__reg", SIGNS_IN, SAME_ORIGIN, ["my--reg", "my__reg"]),
+    ).rejects.toThrow("AIREG_TOKEN_MY__REG names both my__reg and my--reg");
   });
 
   // Windows keeps no permission bits to refuse a readable file by.

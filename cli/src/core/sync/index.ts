@@ -39,7 +39,7 @@ async function compare(
 ): Promise<Digests> {
   const base =
     previous?.digest === undefined || previous.digest === "" ? undefined : previous.digest;
-  const local = (await exists(staged)) ? await digest(staged) : undefined;
+  const local = (await exists(staged)) ? await digest(staged, base) : undefined;
 
   if (item === undefined) return { base, local, upstream: undefined };
 
@@ -49,7 +49,11 @@ async function compare(
     item.contentId === previous.content;
   if (unmoved && base !== undefined) return { base, local, upstream: base };
 
-  return { base, local, upstream: await digest((await content(item.source, item.path)).path) };
+  return {
+    base,
+    local,
+    upstream: await digest((await content(item.source, item.path)).path, base),
+  };
 }
 
 /**

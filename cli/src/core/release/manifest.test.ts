@@ -170,6 +170,22 @@ describe("verifyManifest", () => {
   });
 });
 
+describe("a release that names its adapter", () => {
+  it("signs the name, so it cannot be changed to another adapter", () => {
+    const keyring = signer();
+    const raw = JSON.stringify(
+      document(
+        { adapter: "acme" },
+        keyring.sign(canonicalPayload({ ...manifest, adapter: "other" })),
+      ),
+    );
+    expect(failure(() => verifyManifest(raw, keyring.keys, "stable"))).toMatchObject({
+      code: ErrorCode.Integrity,
+      message: expect.stringMatching(/signature verification failed/),
+    });
+  });
+});
+
 describe("canonicalPayload", () => {
   it("covers only what the client acts on, so `url` cannot be signed into it", () => {
     const payload = new TextDecoder().decode(canonicalPayload(manifest));

@@ -10,7 +10,7 @@ import {
   type TrustedKeys,
   verifyEd25519,
 } from "./keyring.ts";
-import { type Channel, isChannel } from "./origin.ts";
+import { type Channel, isAdapterId, isChannel } from "./origin.ts";
 
 export const MANIFEST_SCHEMA = `${NAME}-manifest.v1`;
 export const MAX_MANIFEST_BYTES = 1 << 20;
@@ -28,6 +28,7 @@ const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 /** Strict on the way in: an unknown field is refused, not ignored. */
 const MANIFEST_KEYS = [
   "schema",
+  "adapter",
   "channel",
   "version",
   "minimum_version",
@@ -46,6 +47,8 @@ export interface ManifestArtifact {
 }
 
 export interface ReleaseManifest {
+  /** Absent for aireg's own releases. */
+  readonly adapter?: string;
   readonly channel: Channel;
   readonly version: string;
   readonly minimumVersion: string | undefined;
@@ -66,6 +69,8 @@ export function canonicalPayload(manifest: ReleaseManifest): Uint8Array {
   return new TextEncoder().encode(
     JSON.stringify({
       schema: MANIFEST_SCHEMA,
+      // Omitted when absent, so releases signed before the field still verify.
+      ...(manifest.adapter === undefined ? {} : { adapter: manifest.adapter }),
       channel: manifest.channel,
       version: manifest.version,
       minimum_version: manifest.minimumVersion ?? null,
@@ -148,6 +153,9 @@ function verifySignatures(
 
 function parseManifestBody(doc: Fields): ReleaseManifest | undefined {
   if (doc.schema !== MANIFEST_SCHEMA) return undefined;
+  const { adapter } = doc;
+  if (adapter !== undefined && (typeof adapter !== "string" || !isAdapterId(adapter)))
+    return undefined;
   if (typeof doc.channel !== "string" || !isChannel(doc.channel)) return undefined;
   const version = exactVersion(doc.version);
   if (version === undefined) return undefined;
@@ -159,6 +167,7 @@ function parseManifestBody(doc: Fields): ReleaseManifest | undefined {
   const artifacts = parseArtifacts(doc.artifacts);
   if (artifacts === undefined) return undefined;
   return {
+    ...(adapter === undefined ? {} : { adapter }),
     channel: doc.channel,
     version,
     minimumVersion,

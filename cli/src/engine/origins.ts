@@ -145,8 +145,8 @@ async function settle(origin: Origin, lock: Lock): Promise<OriginOutcome> {
   if (refused !== undefined) {
     return { origin, state: "refused", digest: undefined, reason: refusedAt(origin, refused) };
   }
-  const now = await authoredDigest(origin.from);
   const recorded = lock.artifacts[originKey(origin)];
+  const now = await authoredDigest(origin.from, recorded?.digest);
   const unchanged = recorded?.origin !== undefined && recorded.digest === now;
   return { origin, state: unchanged ? "unchanged" : "refreshed", digest: now };
 }

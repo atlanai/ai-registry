@@ -10,7 +10,7 @@ import { isMissing } from "#core/fs/path.ts";
 import { type Logger, nullLogger } from "#core/log/index.ts";
 import { settledWithin } from "#daemon/settled.ts";
 import { RpcErrorCode } from "./codes.ts";
-import { listening } from "./endpoint.ts";
+import { daemonProof, listening } from "./endpoint.ts";
 import { rpcError } from "./errors.ts";
 import { FrameDecoder, MAX_RPC_FRAME_BYTES, MAX_RPC_FRAME_SHOWN } from "./frames.ts";
 import {
@@ -93,6 +93,12 @@ function sendFrame(socket: Socket, frame: string, queued = MAX_QUEUED_BYTES): bo
   }
   socket.write(frame);
   return true;
+}
+
+/** A client trusts the daemon with credentials only once it answers the client's challenge. */
+function proven(result: unknown, params: unknown): unknown {
+  const proof = isRecord(params) ? daemonProof(params.challenge) : undefined;
+  return proof === undefined || !isRecord(result) ? result : { ...result, proof };
 }
 
 /** Separates a socket another daemon answers on from every other reason listening failed. */
@@ -368,7 +374,8 @@ export class RpcServer {
       return;
     }
     try {
-      const result = await handler(message.params ?? {}, { signal });
+      const answer = await handler(message.params ?? {}, { signal });
+      const result = message.method === "initialize" ? proven(answer, message.params) : answer;
       if (requestId !== undefined) send({ jsonrpc: "2.0", id: requestId, result });
     } catch (error) {
       const mapped = rpcError(error);

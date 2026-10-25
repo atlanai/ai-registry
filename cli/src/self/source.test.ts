@@ -61,6 +61,7 @@ function document(
 ): string {
   return JSON.stringify({
     schema: "aireg-manifest.v1",
+    adapter: manifest.adapter,
     channel: manifest.channel,
     version: manifest.version,
     minimum_version: manifest.minimumVersion,
@@ -165,6 +166,16 @@ describe("resolveRelease from the signed channel", () => {
     const body = document(manifest, keys.sign(canonicalPayload(manifest)));
     await expect(resolveRelease({}, origin(body, payload, []))).rejects.toThrow(
       new RegExp(`has no ${BINARY}`),
+    );
+  });
+
+  it("refuses an adapter's release served as its own", async () => {
+    const keys = stamped();
+    stub.stamp = keys.stamp;
+    const manifest = manifestOf({ adapter: "acme" });
+    const body = document(manifest, keys.sign(canonicalPayload(manifest)));
+    await expect(resolveRelease({}, origin(body, payload, []))).rejects.toThrow(
+      /offered adapter acme, not aireg/,
     );
   });
 });

@@ -89,24 +89,36 @@ vi.mock("./local.ts", () => ({ applyLocal }));
 const load = vi.hoisted(() => vi.fn());
 vi.mock("./pipeline.ts", () => ({ load }));
 // A token named after the place it was released for, so a test can see where each one went.
+const releaseCredentials = vi.hoisted(() =>
+  vi.fn(
+    async (
+      registries: Record<string, { location: string }>,
+      _cwd: string,
+      _signal?: AbortSignal,
+      only: readonly string[] = Object.keys(registries),
+    ) =>
+      Object.fromEntries(
+        Object.entries(registries)
+          .filter(([alias]) => only.includes(alias))
+          .map(([alias, { location }]) => [
+            alias,
+            { type: "bearer", accessToken: `released for ${location}` },
+          ]),
+      ),
+  ),
+);
 vi.mock("#accounts/credentials.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("#accounts/credentials.ts")>()),
-  credentialsForManifest: async (registries: Record<string, { location: string }>) =>
-    Object.fromEntries(
-      Object.entries(registries).map(([alias, { location }]) => [
-        alias,
-        { type: "bearer", accessToken: `released for ${location}` },
-      ]),
-    ),
+  credentialsForManifest: releaseCredentials,
 }));
 // Only for a test that runs the real publish: where it opens, and what it is handed.
 const offered = vi.hoisted(() => [] as PublishInput[]);
-vi.mock("#accounts/service.ts", () => ({
-  AccountService: class {
-    async resolve() {
-      return { location: ENDPOINT, source: { location: ENDPOINT, adapter: "acme" } };
-    }
-  },
+vi.mock("#accounts/registry.ts", () => ({
+  readRootManifest: async () => ({ registries: { [REGISTRY]: { location: ENDPOINT } } }),
+  resolveRegistry: async () => ({
+    location: ENDPOINT,
+    source: { location: ENDPOINT, adapter: "acme" },
+  }),
 }));
 vi.mock("#core/adapter/source.ts", () => ({
   connectSource: async () => ({
@@ -584,4 +596,16 @@ test("stops when the reload no longer declares the registry, sending nothing", a
   ).rejects.toThrow(`No registry named "${REGISTRY}"`);
   expect(scan).toHaveBeenCalledTimes(1);
   expect(mutateRemote).not.toHaveBeenCalled();
+});
+
+test("checks every declared registry for a shared token when it releases a sync's", async () => {
+  const other = { location: ELSEWHERE, adapter: "acme", config: {} };
+  const registries = { ...loaded.manifest.registries, other };
+  load.mockResolvedValue({ ...loaded, manifest: { registries } } as unknown as Loaded);
+  scan.mockResolvedValue(scanOf([item("alpha", "pull")]));
+  mutateRemote.mockResolvedValue({ published: new Set<string>(), archived: new Set<string>() });
+
+  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+
+  expect(Object.keys(releaseCredentials.mock.calls[0]?.[0] ?? {})).toEqual([REGISTRY, "other"]);
 });

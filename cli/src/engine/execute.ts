@@ -93,10 +93,12 @@ async function executeScanned(
   // Only this job's registry: opening another account's lets two organizations on one tree
   // fail each other's runs.
   const aliases = [account.registry];
-  // Released for the manifest each scan reads: the one read again under the lease may declare
-  // this registry somewhere else, and a token released for the old place must not go there.
-  const released = () =>
-    credentialsForManifest({ [account.registry]: registryOf(loaded, account) }, job.root, signal);
+  // Released for the manifest each scan reads, which a reload may change, and checked against
+  // every declared alias, since two can read one token variable.
+  const released = () => {
+    registryOf(loaded, account);
+    return credentialsForManifest(loaded.manifest.registries, job.root, signal, [account.registry]);
+  };
   const rescan = async () =>
     scanning(loaded, common, { aliases, credentials: await released(), signal, onDownload });
   let current = await rescan();

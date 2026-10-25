@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from "node:fs";
-import { appendFile, lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { beforeAll, describe, expect } from "vitest";
 import { registry } from "#test/kit/builders/registry.ts";
@@ -107,6 +107,36 @@ describe("consuming a registry like a package manager", () => {
     const listed = await aireg(["list"]);
     expect(listed.stdout).toMatch(/ changelog\s+skill/);
     expect(listed.stdout).toMatch(/ lint\s+skill\s+1\.0\.0 pinned\s+acme/);
+  });
+
+  test("moves the registry to an address that serves what is installed, and to no other", async () => {
+    const mirror = join(root, "mirror");
+    await cp(market, mirror, { recursive: true });
+    const edited = join(root, "edited");
+    await registry(edited, { name: "acme", slug: "acme" })
+      .skill("platform/lint@1.0.0", { body: "lint, edited\n" })
+      .write();
+    const refused = await aireg(["registry", "add", edited, "--as", "acme"]);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain(
+      "it has no acme/platform/skill/changelog@0.1.0, and it serves acme/platform/skill/lint@1.0.0 with other content.",
+    );
+    const planned = await aireg(["registry", "add", mirror, "--as", "acme", "--dry-run"]);
+    expect(planned.stdout).toContain(`Would move registry acme from ${market} to ${mirror}`);
+    expect(await read(".registry/manifest.yml")).toContain(`acme: ${market}`);
+
+    const moved = await aireg(["registry", "add", mirror, "--as", "acme"]);
+    expect(moved.code, moved.stderr).toBe(0);
+    expect(await read(".registry/manifest.lock.yml")).toContain(`source: ${mirror}`);
+    const installed = await aireg(["install"]);
+    expect(`${installed.stdout}${installed.stderr}`).toContain("Already up to date");
+    expect((await aireg(["list"])).stdout).toMatch(/ lint\s+skill\s+1\.0\.0 pinned\s+acme/);
+    // Back where the rest of this suite publishes.
+    expect((await aireg(["registry", "add", market, "--as", "acme"])).code).toBe(0);
+    const respelled = await aireg(["registry", "add", `${market}/`, "--as", "acme"]);
+    expect(respelled.code, respelled.stderr).toBe(0);
+    expect(respelled.stdout).not.toContain("Moved");
+    expect((await aireg(["install", "--frozen"])).code).toBe(0);
   });
 
   test("reports an edit to an installed skill, and publishes it only when the run opts in", async () => {

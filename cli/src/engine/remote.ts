@@ -1,5 +1,5 @@
 import { credentialFor } from "#accounts/credentials.ts";
-import { AccountService } from "#accounts/service.ts";
+import { readRootManifest, resolveRegistry } from "#accounts/registry.ts";
 import type { PublishInput, SourceHandle, UnpublishInput } from "#adapter/index.ts";
 import { bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { declaredLayout } from "#core/adapter/registry.ts";
@@ -83,11 +83,13 @@ async function openForMutation(
   account: Account,
   signal: AbortSignal,
 ) {
-  const resolved = await new AccountService().resolve(account, roots.scope, roots.cwd);
+  const manifest = await readRootManifest(roots.scope, roots.cwd);
+  const resolved = await resolveRegistry(manifest, account.registry, roots.scope, roots.cwd);
   const credential = await credentialFor(
     account.registry,
     resolved.source,
     resolved.location,
+    Object.keys(manifest.registries),
     signal,
   );
   return connectSource(

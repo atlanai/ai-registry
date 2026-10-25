@@ -549,12 +549,7 @@ async function plan(
       base: roots.base,
       aliases: only,
       onStep: (message) => printer.step(message),
-      credentials: await credentialsForManifest(
-        Object.fromEntries(
-          Object.entries(manifest.registries).filter(([alias]) => only.includes(alias)),
-        ),
-        cwd,
-      ),
+      credentials: await credentialsForManifest(manifest.registries, cwd, undefined, only),
       locked: { lock, moving, held: hooks.held === true },
       needs,
     });

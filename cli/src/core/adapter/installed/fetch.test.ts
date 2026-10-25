@@ -1,5 +1,6 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { ErrorCode } from "#core/errors.ts";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { RELEASE_ADAPTER_FILE } from "#core/product.ts";
 import { decodeTrustedKeys } from "#core/release/keyring.ts";
@@ -27,6 +28,7 @@ function stamped(): { stamp: ReleaseStamp; sign: (bytes: Uint8Array) => string }
 
 function manifestOf(over: Partial<ReleaseManifest> = {}): ReleaseManifest {
   return {
+    adapter: "acme",
     channel: "stable",
     version: "1.4.0",
     minimumVersion: undefined,
@@ -41,6 +43,7 @@ function manifestOf(over: Partial<ReleaseManifest> = {}): ReleaseManifest {
 function document(manifest: ReleaseManifest, signature: string, url = ARTIFACT): string {
   return JSON.stringify({
     schema: "aireg-manifest.v1",
+    adapter: manifest.adapter,
     channel: manifest.channel,
     version: manifest.version,
     minimum_version: manifest.minimumVersion,
@@ -134,5 +137,52 @@ describe("resolveAdapter", () => {
     );
     const release = await resolveAdapter({ id: "acme", version: undefined }, keys.stamp, $fetch);
     expect(release.version).toBe("1.4.0");
+  });
+
+  it("refuses another adapter's signed release before downloading it", async () => {
+    const keys = stamped();
+    const manifest = manifestOf({ adapter: "other" });
+    const seen: string[] = [];
+    const $fetch = origin(
+      { [CHANNEL]: document(manifest, keys.sign(canonicalPayload(manifest))) },
+      payload,
+      seen,
+    );
+    await expect(
+      resolveAdapter({ id: "acme", version: undefined }, keys.stamp, $fetch),
+    ).rejects.toMatchObject({
+      code: ErrorCode.Integrity,
+      message: "The release server offered adapter other, not acme.",
+    });
+    expect(seen).toEqual([CHANNEL]);
+  });
+
+  it("refuses a release that names no adapter", async () => {
+    const keys = stamped();
+    const { adapter: _, ...manifest } = manifestOf();
+    const $fetch = origin(
+      { [CHANNEL]: document(manifest, keys.sign(canonicalPayload(manifest))) },
+      payload,
+      [],
+    );
+    await expect(
+      resolveAdapter({ id: "acme", version: undefined }, keys.stamp, $fetch),
+    ).rejects.toMatchObject({
+      code: ErrorCode.Integrity,
+      message: "The release server offered a release that names no adapter, not acme.",
+    });
+  });
+
+  it("accepts atlan's releases, which were signed before releases named their adapter", async () => {
+    const keys = stamped();
+    const { adapter: _, ...manifest } = manifestOf();
+    const url = `${ORIGIN}/adapters/atlan/channels/stable/manifest.json`;
+    const $fetch = origin(
+      { [url]: document(manifest, keys.sign(canonicalPayload(manifest))) },
+      payload,
+      [],
+    );
+    const release = await resolveAdapter({ id: "atlan", version: undefined }, keys.stamp, $fetch);
+    expect(release).toMatchObject({ id: "atlan", version: "1.4.0" });
   });
 });
