@@ -1,7 +1,16 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { collidingPaths, expandHome, isSafePath, onPath, withAbsolutePath } from "./paths.ts";
+import { test as withTmp } from "#test/kit/fixtures.ts";
+import {
+  collidingPaths,
+  expandHome,
+  isSafePath,
+  onPath,
+  programPath,
+  withAbsolutePath,
+} from "./paths.ts";
 
 describe("isSafePath", () => {
   test.each([
@@ -105,5 +114,32 @@ describe("onPath", () => {
     const bin = join("node_modules", ".bin");
     expect(onPath("vitest", { PATH: join(process.cwd(), bin) })).toBe(true);
     expect(onPath("vitest", { PATH: bin })).toBe(false);
+  });
+});
+
+describe("programPath", () => {
+  async function folderWith(dir: string, file: string): Promise<string> {
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, file), "");
+    return dir;
+  }
+
+  withTmp("finds a Windows program on PATH, never in the working folder", async ({ tmp }) => {
+    const work = await folderWith(join(tmp, "work"), "tool.exe");
+    const bin = await folderWith(join(tmp, "bin"), "tool.exe");
+    const env = { Path: [work, bin].join(delimiter) };
+    expect(asWindows(() => programPath("tool", env, work))).toBe(join(bin, "tool.exe"));
+    expect(asWindows(() => programPath("tool", { Path: work }, work))).toBeUndefined();
+  });
+
+  withTmp("runs Windows' own helpers from System32, whatever PATH holds", async ({ tmp }) => {
+    const bin = await folderWith(tmp, "reg.exe");
+    const env = { SystemRoot: "D:\\Windows", PATH: bin };
+    expect(asWindows(() => programPath("reg", env))).toBe(
+      join("D:\\Windows", "System32", "reg.exe"),
+    );
+    expect(asWindows(() => programPath("reg", { ...env, SystemRoot: "Windows" }))).toBe(
+      join("C:\\Windows", "System32", "reg.exe"),
+    );
   });
 });

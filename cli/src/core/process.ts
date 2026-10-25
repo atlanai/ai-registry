@@ -7,7 +7,7 @@ import {
 } from "node:child_process";
 import { constants } from "node:os";
 import { isAbsolute } from "node:path";
-import { withAbsolutePath } from "#adapter/paths.ts";
+import { programPath, withAbsolutePath } from "#adapter/paths.ts";
 import { launchArgv } from "#core/release/launch.ts";
 
 /** True while `pid` runs; EPERM means it runs as another user, which still counts. */
@@ -26,7 +26,9 @@ export function spawnDetached(
   args: readonly string[],
   options: { stdio?: StdioOptions; env?: NodeJS.ProcessEnv } = {},
 ): ChildProcess {
-  const child = spawn(command, [...args], {
+  const program = programPath(command, options.env ?? process.env);
+  if (program === undefined) throw new Error(`${command} was not found.`);
+  const child = spawn(program, [...args], {
     detached: true,
     stdio: options.stdio ?? "ignore",
     ...(options.env === undefined ? {} : { env: options.env }),
@@ -82,10 +84,30 @@ function failed(
   return { code: typeof error.code === "number" ? error.code : 1 };
 }
 
+function launchable(
+  command: string,
+  given: NodeJS.ProcessEnv,
+  cwd: string | undefined,
+): { program: string; env: NodeJS.ProcessEnv } | string {
+  let env: NodeJS.ProcessEnv;
+  try {
+    env = withAbsolutePath(given);
+  } catch (error) {
+    // Found without PATH, so it runs; its own children get no PATH to search.
+    env = Object.fromEntries(Object.entries(given).filter(([key]) => key.toUpperCase() !== "PATH"));
+    const program = programPath(command, env, cwd);
+    return program !== undefined && isAbsolute(program)
+      ? { program, env }
+      : (error as Error).message;
+  }
+  const program = programPath(command, env, cwd);
+  return program === undefined ? `${command} was not found.` : { program, env };
+}
+
 /**
  * Runs a command to completion without a shell. A non-zero exit, a timeout, a signal,
  * output past the limit or a missing binary is a `code` to read, never a throw. A command
- * named without a folder is missing too when no folder on PATH is absolute.
+ * found only through PATH is missing too when no folder on PATH is absolute.
  */
 export function exec(
   command: string,
@@ -93,22 +115,14 @@ export function exec(
   options: ExecOptions,
 ): Promise<ExecResult> {
   return new Promise((resolve, reject) => {
-    const given = options.env ?? process.env;
-    let env: NodeJS.ProcessEnv;
-    try {
-      env = withAbsolutePath(given);
-    } catch (error) {
-      if (!isAbsolute(command)) {
-        resolve({ code: 127, stdout: "", stderr: (error as Error).message });
-        return;
-      }
-      // Found without PATH, so it runs; its own children get no PATH to search.
-      env = Object.fromEntries(
-        Object.entries(given).filter(([key]) => key.toUpperCase() !== "PATH"),
-      );
+    const ready = launchable(command, options.env ?? process.env, options.cwd);
+    if (typeof ready === "string") {
+      resolve({ code: 127, stdout: "", stderr: ready });
+      return;
     }
+    const { program, env } = ready;
     execFile(
-      command,
+      program,
       [...args],
       {
         encoding: "utf8",
