@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import type { Harnesses, RegisterEntry, Target } from "#core/harness/contract.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { applyRegister } from "./index.ts";
+import { applyRegister, type Where } from "./index.ts";
 
 let dir: string;
 let home: string;
@@ -15,7 +15,7 @@ test.beforeEach(async ({ tmp }) => {
   root = join(dir, ".tool");
   await mkdir(join(home, "artifacts"), { recursive: true });
 });
-function harness(register: RegisterEntry[], place?: "copy"): Harnesses {
+function harness(register: RegisterEntry[], place?: "copy", scope?: "user"): Harnesses {
   const target: Target = {
     name: "tool",
     displayName: "Tool",
@@ -30,6 +30,7 @@ function harness(register: RegisterEntry[], place?: "copy"): Harnesses {
         shape: "directory",
         register,
         ...(place === undefined ? {} : { place }),
+        ...(scope === undefined ? {} : { scope }),
       },
     },
     reads: {},
@@ -44,6 +45,11 @@ function harness(register: RegisterEntry[], place?: "copy"): Harnesses {
 }
 
 const placement = (source: string, name: string) => join(root, "plugins", source, name);
+
+/** The user scope, where `harness()` keeps its root. */
+const user = (): Where => ({ scope: "user", cwd: dir });
+/** The project in `dir`, whose `.tool` folder is the same root. */
+const project = (): Where => ({ scope: "project", cwd: dir });
 
 /** A placement of ours: a link into the scope's folder. */
 async function place(source: string, name: string): Promise<string> {
@@ -98,7 +104,12 @@ describe("applyRegister", () => {
     await mkdir(root, { recursive: true });
     await writeFile(join(root, "settings.json"), '{"theme":"dark","enabledPlugins":{"x@y":false}}');
     const sales = await place("acme", "sales");
-    const kept = await applyRegister([{ path: sales, harness: "tool" }], harness([SETTINGS]), home);
+    const kept = await applyRegister(
+      [{ path: sales, harness: "tool" }],
+      harness([SETTINGS]),
+      user(),
+      home,
+    );
     expect(kept).toEqual([]);
     expect(JSON.parse(await readFile(join(root, "settings.json"), "utf8"))).toEqual({
       theme: "dark",
@@ -106,7 +117,7 @@ describe("applyRegister", () => {
     });
 
     await rm(sales);
-    await applyRegister([{ path: sales, harness: undefined }], harness([SETTINGS]), home);
+    await applyRegister([{ path: sales, harness: undefined }], harness([SETTINGS]), user(), home);
     expect(JSON.parse(await readFile(join(root, "settings.json"), "utf8"))).toEqual({
       theme: "dark",
       enabledPlugins: { "x@y": false },
@@ -116,13 +127,18 @@ describe("applyRegister", () => {
   test("registers nothing for a path that is not a link of ours", async () => {
     const theirs = placement("acme", "sales");
     await mkdir(theirs, { recursive: true });
-    await applyRegister([{ path: theirs, harness: "tool" }], harness([SETTINGS]), home);
+    await applyRegister([{ path: theirs, harness: "tool" }], harness([SETTINGS]), user(), home);
     await expect(readFile(join(root, "settings.json"), "utf8")).rejects.toThrow();
   });
 
   test("ignores a path no kind of the harness places", async () => {
     const elsewhere = join(dir, "other", "sales");
-    await applyRegister([{ path: elsewhere, harness: undefined }], harness([SETTINGS]), home);
+    await applyRegister(
+      [{ path: elsewhere, harness: undefined }],
+      harness([SETTINGS]),
+      user(),
+      home,
+    );
     await expect(readFile(join(root, "settings.json"), "utf8")).rejects.toThrow();
   });
 
@@ -131,7 +147,7 @@ describe("applyRegister", () => {
     await writeFile(join(root, "settings.json"), "{ not json");
     const sales = await place("acme", "sales");
     await expect(
-      applyRegister([{ path: sales, harness: "tool" }], harness([SETTINGS]), home),
+      applyRegister([{ path: sales, harness: "tool" }], harness([SETTINGS]), user(), home),
     ).rejects.toThrow(/not valid JSON/);
   });
 
@@ -144,6 +160,7 @@ describe("applyRegister", () => {
         { path: ops, harness: "tool" },
       ],
       harness([GROUP]),
+      user(),
       home,
     );
     const config = join(root, "config.toml");
@@ -152,11 +169,11 @@ describe("applyRegister", () => {
     );
 
     await rm(ops);
-    await applyRegister([{ path: ops, harness: undefined }], harness([GROUP]), home);
+    await applyRegister([{ path: ops, harness: undefined }], harness([GROUP]), user(), home);
     expect(await readFile(config, "utf8")).toContain("[sources.acme]");
 
     await rm(sales);
-    await applyRegister([{ path: sales, harness: undefined }], harness([GROUP]), home);
+    await applyRegister([{ path: sales, harness: undefined }], harness([GROUP]), user(), home);
     expect(await readFile(config, "utf8")).toBe("");
   });
 
@@ -164,17 +181,17 @@ describe("applyRegister", () => {
     const made = { ...GROUP, init: {} };
     const sales = await place("acme", "sales");
     const config = join(root, "config.toml");
-    await applyRegister([{ path: sales, harness: "tool" }], harness([made]), home);
+    await applyRegister([{ path: sales, harness: "tool" }], harness([made]), user(), home);
     expect(await readFile(config, "utf8")).toContain("[sources.acme]");
     await rm(sales);
-    await applyRegister([{ path: sales, harness: undefined }], harness([made]), home);
+    await applyRegister([{ path: sales, harness: undefined }], harness([made]), user(), home);
     await expect(readFile(config, "utf8")).rejects.toThrow();
 
     await writeFile(config, '# model = "big"\n');
     const ops = await place("acme", "ops");
-    await applyRegister([{ path: ops, harness: "tool" }], harness([made]), home);
+    await applyRegister([{ path: ops, harness: "tool" }], harness([made]), user(), home);
     await rm(ops);
-    await applyRegister([{ path: ops, harness: undefined }], harness([made]), home);
+    await applyRegister([{ path: ops, harness: undefined }], harness([made]), user(), home);
     expect(await readFile(config, "utf8")).toBe('# model = "big"\n');
   });
 
@@ -183,17 +200,23 @@ describe("applyRegister", () => {
     await writeConfig(before);
     const sales = await copy("sales");
     const ops = await copy("ops");
-    await applyRegister(placed(sales, ops), harness([LIST], "copy"), home, new Set([sales, ops]));
+    await applyRegister(
+      placed(sales, ops),
+      harness([LIST], "copy"),
+      user(),
+      home,
+      new Set([sales, ops]),
+    );
     expect(await readFile(config(), "utf8")).toBe(
       `${before}skills:\n  dirs:\n    - ${join(root, "plugins", "acme")} # aireg\n`,
     );
 
     await rm(ops, { recursive: true });
-    await applyRegister(gone(ops), harness([LIST], "copy"), home, new Set([sales]));
+    await applyRegister(gone(ops), harness([LIST], "copy"), user(), home, new Set([sales]));
     expect(await readFile(config(), "utf8")).toContain("dirs:");
 
     await rm(sales, { recursive: true });
-    await applyRegister(gone(sales), harness([LIST], "copy"), home, new Set());
+    await applyRegister(gone(sales), harness([LIST], "copy"), user(), home, new Set());
     expect(await readFile(config(), "utf8")).toBe(before);
   });
 
@@ -201,17 +224,17 @@ describe("applyRegister", () => {
     const before = `skills:\n  dirs:\n    - ${join(root, "plugins", "acme")} # mine too\n`;
     await writeConfig(before);
     const sales = await copy("sales");
-    await applyRegister(placed(sales), harness([LIST], "copy"), home, new Set([sales]));
+    await applyRegister(placed(sales), harness([LIST], "copy"), user(), home, new Set([sales]));
     expect(await readFile(config(), "utf8")).toBe(before);
     await rm(sales, { recursive: true });
-    await applyRegister(gone(sales), harness([LIST], "copy"), home, new Set());
+    await applyRegister(gone(sales), harness([LIST], "copy"), user(), home, new Set());
     expect(await readFile(config(), "utf8")).toBe(before);
   });
 
   test("adds to a YAML file of comments alone, keeping them", async () => {
     await writeConfig("# model: big\n");
     const sales = await copy("sales");
-    await applyRegister(placed(sales), harness([LIST], "copy"), home, new Set([sales]));
+    await applyRegister(placed(sales), harness([LIST], "copy"), user(), home, new Set([sales]));
     const text = await readFile(config(), "utf8");
     expect(text).toMatch(/^# model: big\n/);
     expect(text).toContain(`- ${join(root, "plugins", "acme")} # aireg`);
@@ -219,7 +242,7 @@ describe("applyRegister", () => {
 
   test("registers no copy of a kind not placed as copies", async () => {
     const sales = await copy("sales");
-    await applyRegister(placed(sales), harness([LIST]), home, new Set([sales]));
+    await applyRegister(placed(sales), harness([LIST]), user(), home, new Set([sales]));
     await expect(readFile(config(), "utf8")).rejects.toThrow();
   });
 
@@ -236,7 +259,7 @@ describe("applyRegister", () => {
       await symlink(real, config);
 
       const sales = await place("acme", "sales");
-      await applyRegister([{ path: sales, harness: "tool" }], harness([GROUP]), home);
+      await applyRegister([{ path: sales, harness: "tool" }], harness([GROUP]), user(), home);
 
       expect((await lstat(config)).isSymbolicLink()).toBe(true);
       expect(await readFile(real, "utf8")).toContain("[sources.acme]");
@@ -248,7 +271,7 @@ describe("applyRegister", () => {
     "creates a config only its owner can read",
     async () => {
       const sales = await place("acme", "sales");
-      await applyRegister([{ path: sales, harness: "tool" }], harness([GROUP]), home);
+      await applyRegister([{ path: sales, harness: "tool" }], harness([GROUP]), user(), home);
       expect((await stat(join(root, "config.toml"))).mode & 0o777).toBe(0o600);
     },
   );
@@ -262,10 +285,106 @@ describe("applyRegister", () => {
       await symlink(real, join(root, "config.toml"));
 
       const sales = await place("acme", "sales");
-      await applyRegister([{ path: sales, harness: "tool" }], harness([GROUP]), home);
+      await applyRegister([{ path: sales, harness: "tool" }], harness([GROUP]), user(), home);
 
       expect((await lstat(join(root, "config.toml"))).isSymbolicLink()).toBe(true);
       expect((await stat(real)).mode & 0o777).toBe(0o600);
+    },
+  );
+});
+
+/** SETTINGS, kept in a folder below the harness root. */
+const settingsIn = (folder: string): RegisterEntry => ({
+  ...SETTINGS,
+  file: `${folder}/settings.json`,
+});
+
+describe("applyRegister, kept to the run's harness roots", () => {
+  test("registers no kind another scope loads", async () => {
+    const sales = await place("acme", "sales");
+    const userOnly = harness([SETTINGS], undefined, "user");
+
+    // The project's harness root is this same folder, but the kind is the user scope's.
+    await applyRegister([{ path: sales, harness: "tool" }], userOnly, project(), home);
+    await expect(readFile(join(root, "settings.json"), "utf8")).rejects.toThrow();
+
+    await applyRegister([{ path: sales, harness: "tool" }], userOnly, user(), home);
+    expect(await readFile(join(root, "settings.json"), "utf8")).toContain("sales@acme");
+  });
+
+  test("edits no config beside a path that only ends the way a placement does", async () => {
+    const elsewhere = join(dir, "other");
+    const at = join(elsewhere, "plugins", "acme", "sales");
+    await mkdir(join(at, ".."), { recursive: true });
+    await mkdir(join(home, "artifacts", "sales"), { recursive: true });
+    await symlink(join(home, "artifacts", "sales"), at);
+
+    await applyRegister([{ path: at, harness: "tool" }], harness([SETTINGS]), user(), home);
+    await expect(readFile(join(elsewhere, "settings.json"), "utf8")).rejects.toThrow();
+  });
+
+  test("cleans up a removal only for the harness the lockfile recorded it for", async () => {
+    const sales = await place("acme", "sales");
+    await applyRegister([{ path: sales, harness: "tool" }], harness([SETTINGS]), user(), home);
+    await rm(sales);
+    const settings = join(root, "settings.json");
+
+    const other = { path: sales, harness: undefined, recorded: "other" };
+    await applyRegister([other], harness([SETTINGS]), user(), home);
+    expect(await readFile(settings, "utf8")).toContain("sales@acme");
+
+    const ours = { path: sales, harness: undefined, recorded: "tool" };
+    await applyRegister([ours], harness([SETTINGS]), user(), home);
+    expect(await readFile(settings, "utf8")).not.toContain("sales@acme");
+  });
+
+  test.skipIf(process.platform === "win32")(
+    "edits no config through a project's harness root that links out of it",
+    async () => {
+      const victim = join(dir, "victim");
+      await mkdir(join(victim, "plugins", "acme"), { recursive: true });
+      const config = '{"enabledPlugins":{"sales@acme":true}}';
+      await writeFile(join(victim, "settings.json"), config);
+      await symlink(victim, root);
+      const sales = placement("acme", "sales");
+
+      const kept = await applyRegister(
+        [{ path: sales, harness: undefined, recorded: "tool" }],
+        harness([SETTINGS]),
+        project(),
+        home,
+      );
+
+      expect(await readFile(join(victim, "settings.json"), "utf8")).toBe(config);
+      expect(kept).toEqual([
+        expect.objectContaining({ path: join(root, "settings.json"), reason: expect.any(String) }),
+      ]);
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "edits no config through a link below the harness root, and still through a linked root",
+    async () => {
+      const dotfiles = join(dir, "dotfiles");
+      const outside = join(dir, "outside");
+      await mkdir(dotfiles, { recursive: true });
+      await mkdir(outside, { recursive: true });
+      await symlink(dotfiles, root);
+      await symlink(outside, join(dotfiles, "nested"));
+      const sales = await place("acme", "sales");
+
+      const kept = await applyRegister(
+        [{ path: sales, harness: "tool" }],
+        harness([settingsIn("real"), settingsIn("nested")]),
+        user(),
+        home,
+      );
+
+      expect(await readFile(join(dotfiles, "real", "settings.json"), "utf8")).toContain(
+        "sales@acme",
+      );
+      await expect(readFile(join(outside, "settings.json"), "utf8")).rejects.toThrow();
+      expect(kept.map((entry) => entry.path)).toEqual([join(root, "nested", "settings.json")]);
     },
   );
 });

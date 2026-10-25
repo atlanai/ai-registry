@@ -14,7 +14,7 @@ import { describeFile } from "#adapter/spec/envelope.ts";
 import { quoted } from "#adapter/text.ts";
 import { frontmatterRecord, ownDescription } from "#core/catalog/frontmatter.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { authored, isDirectory, refusal } from "#core/fs/tree.ts";
+import { authoredArtifact, isDirectory, refusal } from "#core/fs/tree.ts";
 import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import { CONCURRENCY, limiter } from "#core/limit.ts";
 import { envelopeSpec } from "./kinds.ts";
@@ -94,14 +94,19 @@ function firstOf<T extends { path: string }>(kind: ArtifactKind, files: readonly
 }
 
 async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFile[]> {
-  if (!(await isDirectory(path))) {
+  // Read without following the root itself, so a link named like an artifact sends nothing.
+  const all = await authoredArtifact(path);
+  const root = all.irregular.find((entry) => entry.path === "");
+  if (root !== undefined) {
+    throw new AiregError(`${basename(path)} ${refusal(root)}.`, { code: ErrorCode.Invalid });
+  }
+  if (all.files.length === 1 && all.files[0]?.path === "") {
     const content = await readFile(path);
     if (target.kind === "agent" && target.asAgentDocument === true) {
       return [agentDocument(content, target)];
     }
     return [{ path: basename(path), content, executable: false }];
   }
-  const all = await authored(path);
 
   const only =
     target.files === undefined

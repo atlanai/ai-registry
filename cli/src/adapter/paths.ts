@@ -81,19 +81,38 @@ export function expandHome(path: string, home = homedir()): string {
   return typed ? join(home, path.slice(2)) : path;
 }
 
-/**
- * `env` with PATH reduced to its absolute folders. A spawn resolves an empty or relative entry
- * against the child's working folder, which may be a checkout a registry wrote.
- */
-export function withAbsolutePath(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  if (env.PATH === undefined) return env;
-  const folders = env.PATH.split(delimiter).filter((folder) => isAbsolute(folder));
-  return { ...env, PATH: folders.join(delimiter) };
+/** The names `env` gives PATH: on Windows, where names ignore case, `Path` too. */
+function pathKeys(env: NodeJS.ProcessEnv): string[] {
+  const windows = process.platform === "win32";
+  return Object.keys(env).filter(
+    (key) => env[key] !== undefined && (windows ? key.toUpperCase() === "PATH" : key === "PATH"),
+  );
 }
 
-/** Cheap `which`: no subprocess, and the same lookup rules the shell uses. */
+function absoluteFolders(path: string | undefined): string[] {
+  return (path ?? "").split(delimiter).filter((folder) => isAbsolute(folder));
+}
+
+/**
+ * `env` with PATH reduced to its absolute folders. A spawn resolves an empty or relative entry
+ * against the child's working folder, which may be a checkout a registry wrote. A PATH with no
+ * absolute folder throws rather than empties, since an empty PATH searches that folder too.
+ */
+export function withAbsolutePath(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const kept = { ...env };
+  for (const key of pathKeys(env)) {
+    const folders = absoluteFolders(env[key]);
+    if (folders.length === 0) {
+      throw new Error("No folder on PATH is absolute, so aireg runs no program from it.");
+    }
+    kept[key] = folders.join(delimiter);
+  }
+  return kept;
+}
+
+/** Cheap `which`: no subprocess, and only the folders a spawn would search. */
 export function onPath(binary: string, env: NodeJS.ProcessEnv = process.env): boolean {
-  const paths = (env.PATH ?? "").split(delimiter).filter(Boolean);
+  const paths = pathKeys(env).flatMap((key) => absoluteFolders(env[key]));
   const suffixes = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
   return paths.some((entry) => suffixes.some((ext) => existsSync(join(entry, binary + ext))));
 }

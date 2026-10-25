@@ -87,3 +87,11 @@ describe("sshUrl", () => {
     expect(sshUrl(parseSource("github.com/acme/kit"))).toBe("git@github.com:acme/kit.git");
   });
 });
+
+describe("an scp-style address", () => {
+  it("keeps the user it names", () => {
+    expect(parseSource("org-123@github.com:acme/kit.git").location).toBe(
+      "org-123@github.com:acme/kit.git",
+    );
+  });
+});

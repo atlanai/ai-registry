@@ -81,9 +81,19 @@ export function tokenVariable(alias: string): string {
   return `${TOKEN_PREFIX}${alias.toUpperCase().replaceAll(/[^A-Z0-9]/g, "_")}`;
 }
 
+// Windows reads aireg_token_acme as AIREG_TOKEN_ACME, so the prefix matches in any case.
+function isTokenVariable(name: string): boolean {
+  return name.toUpperCase().startsWith(TOKEN_PREFIX);
+}
+
 /** `env` with no `AIREG_TOKEN_<NAME>` in it. */
 export function withoutTokens(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith(TOKEN_PREFIX)));
+  return Object.fromEntries(Object.entries(env).filter(([name]) => !isTokenVariable(name)));
+}
+
+/** Deletes every `AIREG_TOKEN_<NAME>` from this process's environment, for one that must hold none. */
+export function removeTokens(): void {
+  for (const name of Object.keys(process.env)) if (isTokenVariable(name)) delete process.env[name];
 }
 
 const supplied = new AsyncLocalStorage<Readonly<Record<string, string>>>();

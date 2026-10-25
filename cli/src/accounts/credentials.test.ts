@@ -143,13 +143,14 @@ describe("credentials", () => {
     expect(await credentialsForManifest(project(ELSEWHERE), home)).toEqual({ acme: token });
   });
 
+  // `my--reg` and `my__reg` get separate folders but share one token variable.
   test("refuses an environment token two declared aliases share", async () => {
-    vi.stubEnv("AIREG_TOKEN_MY_REG", FROM_ENV);
+    vi.stubEnv("AIREG_TOKEN_MY__REG", FROM_ENV);
     await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
-    await declareForUser(home, { "my-reg": SIGNED_IN, "my.reg": SAME_ORIGIN });
+    await declareForUser(home, { "my--reg": SIGNED_IN, my__reg: SAME_ORIGIN });
 
-    await expect(credentialFor("my.reg", SIGNS_IN, SAME_ORIGIN)).rejects.toThrow(
-      "AIREG_TOKEN_MY_REG names both my.reg and my-reg",
+    await expect(credentialFor("my__reg", SIGNS_IN, SAME_ORIGIN)).rejects.toThrow(
+      "AIREG_TOKEN_MY__REG names both my__reg and my--reg",
     );
   });
 

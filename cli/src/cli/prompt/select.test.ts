@@ -91,6 +91,25 @@ describe("select", () => {
     expect((await pick(scope, [ctrlC])).value).toBe(CANCEL);
   });
 
+  it("draws registry text in its options as inert text, answering with the value as it is", async () => {
+    const hostile = "kit\u001B]8;;https://example.test/\u0007x\u001B]8;;\u0007\u001B[8mhidden";
+    const term = terminal();
+    const run = select(
+      {
+        message: "Pick",
+        style: new Styler({ isTTY: false }, {}, "always"),
+        options: [{ value: hostile, label: hostile, hint: `at ${hostile}` }],
+      },
+      term.io,
+    );
+    await term.press(enter);
+    expect(await run).toBe(hostile);
+    expect(term.written()).not.toContain("\u001B]8;");
+    expect(term.written()).not.toContain("\u001B[8m");
+    expect(term.written()).toContain("\u001B[32m");
+    expect(term.screen()).toEqual(["◇  Pick  kitxhidden"]);
+  });
+
   it("moves to an option by its letter, in either case", async () => {
     const lettered = {
       message: "Pick",

@@ -2,6 +2,7 @@ import type { NameCollision } from "#core/config/model.ts";
 import type { Harnesses } from "#core/harness/index.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Acquired, Action, Clash, Rewritten, Survey, Warning } from "#core/plan/model.ts";
+import type { PlannedLink } from "#core/plan/projection.ts";
 import type { Roots } from "#core/store/paths.ts";
 
 export interface BuildOptions {
@@ -47,6 +48,10 @@ export interface BuildState {
   rewritten: Rewritten[];
   /** Plugin parts can collide in one harness path: the first writer wins, loudly. */
   claimed: Map<string, string>;
+  /** Plugin directories claimed, by the namespace content each links: its artifacts share it. */
+  plugins: Map<string, string>;
+  /** By installed name, where each artifact of this run would link before any claim. */
+  wants: Map<string, readonly PlannedLink[]>;
   /** Harness paths the lockfile records for this run's artifacts, by the one that holds each. */
   recorded: Map<string, string>;
   /** One link action per destination: a plugin is shared by its whole namespace. */

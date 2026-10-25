@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { glob, readFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
@@ -13,6 +13,7 @@ import { gitIn } from "#core/git.ts";
 import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Export, ExportFile } from "#core/manifest.ts";
+import { refuseRedirectedCopy } from "#core/store/managed-paths.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/pipeline.ts";
@@ -43,19 +44,25 @@ export interface Exported extends Export {
 const SHAPE_HINT =
   "Name a skill folder that holds SKILL.md, an agent's folder that holds AGENT.md, or an agent's .md file.";
 
+function copyPath(key: string, entry: LockArtifact, loaded: Loaded): string {
+  return artifactPath(
+    loaded.roots,
+    entry.registry,
+    entry.namespace,
+    entry.kind,
+    copyLeaf(key, entry.name),
+    // A watched row has no address yet; its recorded path still carries the extension.
+    entry.address ?? entry.path,
+  );
+}
+
 function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
+  const path = copyPath(key, entry, loaded);
+  refuseRedirectedCopy(key, path, loaded.roots);
   return {
     name: entry.name,
     kind: entry.kind,
-    path: artifactPath(
-      loaded.roots,
-      entry.registry,
-      entry.namespace,
-      entry.kind,
-      copyLeaf(key, entry.name),
-      // A watched row has no address yet; its recorded path still carries the extension.
-      entry.address ?? entry.path,
-    ),
+    path,
     description: undefined,
     home: { registry: entry.registry, namespace: entry.namespace },
     row: key,
@@ -143,9 +150,35 @@ export async function fromArgs(
         hint: "Name a path, a glob such as 'skills/*', or an installed artifact.",
       });
     }
-    for (const path of paths) works.push(await fromPath(path));
+    for (const path of paths) {
+      const target = linkTarget(path);
+      if (target === undefined) {
+        works.push(await fromPath(path));
+        continue;
+      }
+      // A harness folder links each installed copy; publishing the link publishes that row.
+      const row = Object.entries(rows).find(([name, entry]) => {
+        const copy = copyPath(name, entry, loaded);
+        return existsSync(copy) && realpathSync(copy) === target;
+      });
+      if (row === undefined) throw linkedRoot(path, target);
+      works.push(installed(row[0], row[1], loaded));
+    }
   }
   return works;
+}
+
+/** Where `path` leads when it is itself a link, else undefined. */
+function linkTarget(path: string): string | undefined {
+  if (!lstatSync(path).isSymbolicLink()) return undefined;
+  return existsSync(path) ? realpathSync(path) : undefined;
+}
+
+function linkedRoot(path: string, target: string): AiregError {
+  return new AiregError(`${basename(path)} is a symlink; an artifact holds regular files only.`, {
+    code: ErrorCode.Invalid,
+    hint: `Publish the folder it points to: \`aireg publish ${quoted(target)}\`.`,
+  });
 }
 
 /** Only the work whose files differ from `rev`, so a push publishes what it changed. */

@@ -1,10 +1,12 @@
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { redirection } from "#adapter/files.ts";
 import { parseVersion } from "#adapter/semver.ts";
 import { plural, quoted } from "#adapter/text.ts";
 import { parseAdapterId } from "#core/adapter/installed/want.ts";
 import { isBuiltinAdapter } from "#core/adapter/registry.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { writeAtomic } from "#core/fs/atomic.ts";
 import type { HostCommandContext } from "#core/host/extend.ts";
 import { NAME, PACKAGE } from "#core/product.ts";
 import { NODE_REQUIREMENT, VERSION } from "#core/version.ts";
@@ -25,6 +27,33 @@ function contractRange(): string {
 
 function json(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+/**
+ * The folder may be one a cloned repository ships: a link anywhere from it down to a
+ * file, the folder itself included, would put that file somewhere else.
+ */
+function refuseRedirect(dir: string, path: string): void {
+  const found = redirection(dir, path);
+  if (found === undefined) return;
+  const what = found.problem === "symlink" ? "a symlink" : "not a folder";
+  throw new AiregError(`${found.at} is ${what}, so nothing was written through it.`, {
+    code: ErrorCode.Invalid,
+    hint: "Remove it, or choose another folder with `--dir`.",
+  });
+}
+
+// Exclusive create: a file that appears after the emptiness check is reported, not replaced.
+async function writeFresh(path: string, body: string): Promise<void> {
+  try {
+    await writeFile(path, body, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    throw new AiregError(`${path} already exists.`, {
+      code: ErrorCode.Conflict,
+      hint: "Pass `--force` to overwrite it.",
+    });
+  }
 }
 
 // Everything below is generated code for a package outside this repository.
@@ -169,6 +198,7 @@ export async function initAdapter(
   }
   const dir = resolve(context.cwd, own.dir ?? id);
   const planned = files(id);
+  for (const path of Object.keys(planned)) refuseRedirect(dir, join(dir, path));
   if (!common.force) {
     const existing = await readdir(dir).catch(() => undefined);
     if (existing !== undefined && existing.length > 0) {
@@ -192,8 +222,11 @@ export async function initAdapter(
     return;
   }
   for (const [path, body] of Object.entries(planned)) {
-    await mkdir(dirname(join(dir, path)), { recursive: true });
-    await writeFile(join(dir, path), body, "utf8");
+    const target = join(dir, path);
+    await mkdir(dirname(target), { recursive: true });
+    // `--force` replaces the file itself, never what it may point to.
+    if (common.force) await writeAtomic(target, body);
+    else await writeFresh(target, body);
   }
   if (context.printer.format === "json") {
     context.printer.json({

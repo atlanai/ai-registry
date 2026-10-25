@@ -15,11 +15,16 @@ export function settleCollisions(context: { printer: Printer; exit?: ExitCode },
     const why = `${leafOf(artifact)} is taken by ${shownAddress(by)}`;
     printer.note("renamed", `${shownAddress(artifact)} to ${as}, because ${why}`);
   }
-  for (const { name, kept, dropped } of plan.clashes) {
-    const why = `${leafOf(name)} is taken by ${shownAddress(kept)}`;
-    printer.note("skipped", `${shownAddress(dropped)}, because ${why}`);
+  for (const { name, kept, dropped, at, container } of plan.clashes) {
+    const taken = container === true ? `the plugin folder ${at}` : leafOf(name);
+    printer.note(
+      "skipped",
+      `${shownAddress(dropped)}, because ${taken} is taken by ${shownAddress(kept)}`,
+    );
   }
-  if (plan.renamed.length > 0 || plan.clashes.length > 0) printer.hint(NAME_COLLISION_HINT);
+  // Renaming an artifact never frees a plugin folder, so the setting is no fix for that clash.
+  const renameable = plan.clashes.some((clash) => clash.container !== true);
+  if (plan.renamed.length > 0 || renameable) printer.hint(NAME_COLLISION_HINT);
 }
 
 /** The same, for `--json`: `renamed`, and `unlinked` for what was left out. */

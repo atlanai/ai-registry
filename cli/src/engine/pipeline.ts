@@ -229,11 +229,11 @@ export async function run(
   report: PlanReport,
   edit: (loaded: Loaded) => RunHooks | Promise<RunHooks> = () => ({}),
 ): Promise<RunResult> {
-  return withScope(
-    roots,
-    async (loaded) => write(loaded, common, printer, cwd, report, await edit(loaded)),
-    printer,
-  );
+  const body = async (loaded: Loaded) =>
+    write(loaded, common, printer, cwd, report, await edit(loaded));
+  // A dry run writes nothing to the scope, so it takes no lease and leaves no lease folder behind.
+  if (common.dryRun) return body(await read(roots));
+  return withScope(roots, body, printer);
 }
 
 /** Said at once, without --verbose: a silent wait reads as a hang. */
@@ -643,20 +643,22 @@ export function appliedNotices(
       hint: "Edits to the project's copy will not reach those harnesses until you sync.",
     });
   }
-  for (const { name, path, reason } of applied.kept) {
-    notices.push({
-      message:
-        reason === undefined
-          ? keptMessage(roots, name, path, "Did not")
-          : `Did not install ${name} at ${displayPath(roots, path)}: ${sanitizeText(reason)}.`,
-    });
-  }
+  for (const kept of applied.kept) notices.push({ message: keptNotice(roots, kept) });
   for (const { name, harness, reason } of applied.unrendered) {
     notices.push({
       message: `Did not install ${name} for ${displayName(harnesses, harness)}: ${reason}.`,
     });
   }
   return notices;
+}
+
+function keptNotice(roots: Roots, kept: ApplyResult["kept"][number]): string {
+  const { name, path, reason, config } = kept;
+  if (reason === undefined) return keptMessage(roots, name, path, "Did not");
+  const shown = displayPath(roots, path);
+  // Registration runs for removals too, so it names the file it left rather than an install.
+  if (config === true) return `Left ${shown} as it is for ${name}: ${sanitizeText(reason)}.`;
+  return `Did not install ${name} at ${shown}: ${sanitizeText(reason)}.`;
 }
 
 function keptMessage(roots: Roots, name: string, path: string, verb: string): string {
@@ -681,9 +683,13 @@ function warn(printer: Printer, notices: readonly ApplyNotice[]): void {
   }
 }
 
-export async function prepareWrite({ manifest, roots, lock }: Loaded): Promise<Recovered> {
+export async function prepareWrite(
+  { manifest, roots, lock }: Loaded,
+  dryRun = false,
+): Promise<Recovered> {
   refuseOldCli(manifest.engine);
-  return recover(roots, lock);
+  // Recovery removes files, which only a run holding the lease may do; the next real run recovers.
+  return dryRun ? { removed: [], skipped: [] } : recover(roots, lock);
 }
 
 /** The refusals every plan passes before a single byte is written. */
@@ -739,7 +745,7 @@ async function write(
 ): Promise<RunResult> {
   const { roots, manifest, lock, harnesses } = loaded;
 
-  warn(printer, recoveredNotices(roots, await prepareWrite(loaded)));
+  warn(printer, recoveredNotices(roots, await prepareWrite(loaded, common.dryRun)));
 
   const targets = resolveTargets(manifest, harnesses, common);
   // Reports name every tool picked, including those an entry's own `harnesses:` adds.

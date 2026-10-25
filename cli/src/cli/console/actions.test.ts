@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { actionOf, builtin } from "#cli/commands/index.ts";
-import { parse } from "#cli/options.ts";
+import { parse, takeGlobals } from "#cli/options.ts";
 import { isStepPolicy } from "#core/config/model.ts";
 import * as actions from "#core/console/actions.ts";
 
@@ -38,5 +38,23 @@ describe("console actions", () => {
   it.each(commands)("$display is a command aireg takes", (command) => {
     expect(command.display).toBe(`aireg ${command.argv.join(" ")}`);
     accepted(command.argv);
+  });
+
+  it("passes a name spelled like an option as data", () => {
+    for (const [built, words] of [
+      [actions.publish(["-g"], undefined, "project"), ["-g"]],
+      [actions.pullLatest("-g", "project"), ["-g"]],
+      [actions.runJob("-g"), ["start", "-g"]],
+      [actions.setJobEnabled("-g", false), ["disable", "-g"]],
+      [actions.retryRun("-g"), ["retry", "-g"]],
+    ] as const) {
+      const [command = "", ...rest] = built.argv;
+      const { positionals, common } = parse<Record<string, unknown>>(
+        takeGlobals(rest, builtin(command)).argv,
+        builtin(command),
+      );
+      expect(positionals, built.display).toEqual(words);
+      expect(common.scope, built.display).toBeUndefined();
+    }
   });
 });

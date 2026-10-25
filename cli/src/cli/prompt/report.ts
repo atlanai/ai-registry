@@ -1,3 +1,4 @@
+import { sanitizeText } from "#adapter/text.ts";
 import { isCI } from "#core/env.ts";
 import type { Styler } from "#core/output.ts";
 import { displayWidth } from "#core/term/format.ts";
@@ -20,7 +21,7 @@ export function note(io: PromptIo, style: Styler, title: string, body: readonly 
     ...body.map((line) => `${bar}  ${line}`),
     style.dim(GLYPH.end + GLYPH.rule.repeat(Math.min(width, 60))),
   ];
-  io.output.write(`${lines.join("\n")}\n`);
+  io.output.write(style.inert(`${lines.join("\n")}\n`));
 }
 
 const FRAMES = ["◒", "◐", "◓", "◑"] as const;
@@ -47,7 +48,7 @@ export function spinner(io: PromptIo, style: Styler): Spinner {
 
   return {
     update(next) {
-      message = next;
+      message = sanitizeText(next);
       if (timer === undefined) {
         paint();
         timer = setInterval(paint, INTERVAL_MS);
@@ -58,7 +59,7 @@ export function spinner(io: PromptIo, style: Styler): Spinner {
       if (timer !== undefined) clearInterval(timer);
       timer = undefined;
       write("\u001B[2K\r");
-      if (final !== undefined) write(`${style.green(GLYPH.submit)}  ${final}\n`);
+      if (final !== undefined) write(`${style.green(GLYPH.submit)}  ${sanitizeText(final)}\n`);
     },
   };
 }

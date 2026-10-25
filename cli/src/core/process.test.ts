@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -54,5 +54,29 @@ describe.skipIf(process.platform === "win32")("exec", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("runs nothing when no folder on PATH is absolute", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "aireg-path-"));
+    try {
+      const marker = join(dir, "planted.ran");
+      // A redirect, which needs nothing on PATH, so the marker shows any run.
+      await writeFile(join(dir, "planted"), `#!/bin/sh\n: > "${marker}"\n`, { mode: 0o755 });
+      const ran = await exec("planted", [], { timeoutMs: 5_000, cwd: dir, env: { PATH: "." } });
+      expect(ran).toEqual({
+        code: 127,
+        stdout: "",
+        stderr: "No folder on PATH is absolute, so aireg runs no program from it.",
+      });
+      await expect(access(marker)).rejects.toThrow();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs a command named by its absolute path when no folder on PATH is absolute", async () => {
+    const [command, args] = node("process.stdout.write(String(process.env.PATH))");
+    const ran = await exec(command, args, { timeoutMs: 10_000, env: { PATH: "." } });
+    expect(ran).toEqual({ code: 0, stdout: "undefined", stderr: "" });
   });
 });

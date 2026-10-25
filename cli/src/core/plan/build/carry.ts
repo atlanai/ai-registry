@@ -4,7 +4,7 @@ import type { LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
 import type { Closure } from "#core/plan/depends.ts";
 import type { Acquired, Kept, Selected } from "#core/plan/model.ts";
-import { type NamespaceWant, namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
+import { type NamespaceWant, namespaceOf, pluginLinkAt, rowPlugin } from "#core/plan/projection.ts";
 import { addressOf, type Untrusted } from "#core/plan/select.ts";
 import { type Unlisted, unlistedRows } from "#core/plan/unlisted.ts";
 import type { BuildState } from "./state.ts";
@@ -13,7 +13,12 @@ import type { BuildState } from "./state.ts";
 export function keep(build: BuildState, name: string, entry: LockArtifact): void {
   build.next.artifacts[name] = entry;
   for (const link of entry.links) {
-    build.claimed.set(resolve(build.options.roots.base, link.path), name);
+    const at = resolve(build.options.roots.base, link.path);
+    build.claimed.set(at, name);
+    // Its namespace's plugin directory stays open to the namespace's other artifacts.
+    const plugin = rowPlugin(name, entry, link, build.options);
+    if (plugin === undefined) build.plugins.delete(at);
+    else build.plugins.set(at, plugin);
   }
 }
 
