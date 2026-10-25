@@ -41,7 +41,7 @@ export async function moveOf(
   );
   if (rows.length > 0 && source === undefined) {
     throw new AiregError(
-      `Cannot read ${to}, so cannot check it serves the ${plural(rows.length, "artifact")} registry ${alias} installed.`,
+      `Cannot read ${to}, so cannot check that it serves the ${plural(rows.length, "artifact")} installed from registry ${alias}.`,
       {
         code: ErrorCode.Unauthorized,
         hint: `Declare it under another name to sign in: \`aireg registry add ${to} --as <name>\`, then \`aireg auth login <name>\`.`,
@@ -67,7 +67,7 @@ export async function moveOf(
       ...(changed.length === 0 ? [] : [`it serves ${listOf(changed)} with other content`]),
     ];
     throw new AiregError(
-      `${to} does not serve what registry ${alias} installed: ${differences.join(", and ")}.`,
+      `${to} does not serve what was installed from registry ${alias}: ${differences.join(", and ")}.`,
       {
         code: ErrorCode.Conflict,
         hint: `Move ${alias} to an address that serves them, or remove them first with \`aireg remove\`.`,

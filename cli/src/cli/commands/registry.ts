@@ -196,7 +196,7 @@ async function declare(
   if (move !== undefined) await recordMove(roots, lock, alias, declared, move);
 }
 
-/** What it serves was checked, so what was installed from it stays as it is. */
+/** Reports a move. Nothing installed is touched, since the new address was checked to serve it. */
 async function moved(
   context: CommandContext,
   roots: Roots,
@@ -215,10 +215,10 @@ async function moved(
   context.printer.success(`Moved ${what}.`);
   context.printer.note("kept", kept);
   if (await signInLeftBehind(roots, alias, declared, move)) {
-    context.printer.note(
-      "next",
-      `aireg auth login ${alias}, as your sign-in is for the old address`,
+    context.printer.warning(
+      `Your sign-in to ${alias} is for its old address, so it does not reach the new one.`,
     );
+    context.printer.note("next", `aireg auth login ${alias}`);
   }
 }
 
