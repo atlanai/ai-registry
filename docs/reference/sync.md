@@ -25,7 +25,7 @@ aireg sync resolve <name> --mine | --theirs [-g]
 | `--adopt` | You wrote a skill or agent here that no registry publishes yet. | follows `--publish` |
 | `--claim` | A folder of yours holds exactly what the registry publishes, so aireg could manage it. | `off` |
 
-`on` makes the change, `report` lists it as needing your attention, and `off` ignores it. An artifact its registry stops listing isn't a change to pull: a listing cut short or emptied reads the same, so `sync` keeps the artifact, reports it as needing your attention, and names the `aireg remove <name>` that takes it out. So by default `sync` takes what moved in the registry and reports what you changed, without publishing anything. A registry in a git repository is only reported to, since aireg doesn't push to git. A conflict, where both sides changed, is always reported and never decided for you.
+`on` makes the change, `report` lists it as needing your attention, and `off` ignores it. An artifact its registry stops listing isn't a change to pull: a listing cut short or emptied reads the same, so `sync` keeps the artifact, reports it as needing your attention, and names the `aireg remove <name>` that takes it out. When the registry's adapter says it read the whole listing, `sync` treats the artifact as deleted from the registry instead, as [`install`](install.md) describes. So by default `sync` takes what moved in the registry and reports what you changed, without publishing anything. A registry in a git repository is only reported to, since aireg doesn't push to git. A conflict, where both sides changed, is always reported and never decided for you.
 
 Name a registry to sync only that one, and pass `-s` to sync only some artifacts.
 

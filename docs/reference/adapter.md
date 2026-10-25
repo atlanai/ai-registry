@@ -71,7 +71,7 @@ An id that is built in, `git`, `local` or `well-known`, is refused.
 
 - `dispatch` in `src/index.ts` names the hosts, URL schemes, sites or local paths whose addresses aireg would send to the adapter.
 - `connect` in `src/connect.ts` returns a handle. `resolve` lists each artifact with the file list that describes it, and `fetch` returns one file's bytes, which must match the digest that list gives.
-- An adapter that knows it read a whole listing to its end, such as one that paged to the total its server reported, returns `complete: true` from `resolve` under `all`. aireg then removes what a whole registry or namespace entry installed and the listing no longer holds, where it would otherwise keep it.
+- An adapter that read the whole listing to its end, such as by paging to the total its server reported, returns `complete: true` from `resolve` under `all`, so aireg removes what the listing no longer holds, as [`install`](install.md) describes.
 - `capabilities` turns on publishing and sign-in.
 
 ### The adapter contract

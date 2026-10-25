@@ -25,7 +25,7 @@ aireg job cancel <run>
 
 A job keeps one scope in sync with one registry in the background, on a schedule. It does the same work as [`aireg sync`](sync.md), in aireg's background daemon. Each time a job runs is a run.
 
-A run never removes an artifact because its registry stopped listing it, since a listing cut short or emptied reads the same: the run ends needing your attention, and names the `aireg remove <name>` that takes it out.
+A run never removes an artifact because its registry stopped listing it, since a listing cut short or emptied reads the same: the run ends needing your attention, and names the `aireg remove <name>` that takes it out. The exception is a registry whose adapter says it read the whole listing, as [`install`](install.md) describes.
 
 Jobs are saved in aireg's `config.yml`, and the daemon runs them. A command that needs the daemon starts it. To start it when you log in, run [`aireg daemon autostart on`](daemon.md#aireg-daemon-autostart).
 

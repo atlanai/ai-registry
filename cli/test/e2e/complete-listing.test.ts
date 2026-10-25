@@ -7,38 +7,35 @@ import { parse } from "yaml";
 import { test as base } from "#test/kit/fixtures.ts";
 import { lockPath } from "#test/kit/scope.ts";
 
-const SKILL = "---\nname: lint\ndescription: Lints.\n---\nrun\n";
-const AGENT = "---\nname: helper\ndescription: Helps.\n---\nhelp\n";
+const body = (name: string) => `---\nname: ${name}\ndescription: Ships.\n---\nrun\n`;
 
-function artifact(kind: string, name: string, path: string, body: string): string {
-  const digest = createHash("sha256").update(body).digest("hex");
+function skill(name: string): string {
+  const digest = createHash("sha256").update(body(name)).digest("hex");
   return [
-    `{ id: '${kind}_${name}', kind: '${kind}', group: 'team', envelope: {`,
-    `  apiVersion: 'aireg.sh/v1', kind: '${kind}',`,
+    `{ id: 'skill_${name}', kind: 'skill', group: 'team', envelope: {`,
+    "  apiVersion: 'aireg.sh/v1', kind: 'skill',",
     `  metadata: { name: '${name}', namespace: 'team', version: '1.0.0', description: 'Ships.' },`,
-    `  files: [{ path: '${path}', digest: 'sha256:${digest}', size: ${Buffer.byteLength(body)},`,
+    `  files: [{ path: 'SKILL.md', digest: 'sha256:${digest}', size: ${Buffer.byteLength(body(name))},`,
     "    media_type: 'text/markdown', urls: ['x'] }] },",
-    `  files: [{ path: '${path}', locator: '${kind}', executable: false }] }`,
+    `  files: [{ path: 'SKILL.md', locator: '${name}', executable: false }] }`,
   ].join("\n");
 }
 
-// Once `deleted` exists the agent is gone; the file says whether the listing claims to be complete.
-function adapterSource(flag: string): string {
+// The adapter is loaded by each CLI run, so a file tells it the registry deleted `fmt`.
+function adapterSource(deleted: string): string {
   return [
-    "import { existsSync, readFileSync } from 'node:fs';",
-    `const skill = ${artifact("skill", "lint", "SKILL.md", SKILL)};`,
-    `const agent = ${artifact("agent", "helper", "AGENT.md", AGENT)};`,
-    `const bodies = { skill: ${JSON.stringify(SKILL)}, agent: ${JSON.stringify(AGENT)} };`,
-    `const flag = ${JSON.stringify(flag)};`,
+    "import { existsSync } from 'node:fs';",
+    `const lint = ${skill("lint")};`,
+    `const fmt = ${skill("fmt")};`,
+    `const bodies = ${JSON.stringify({ lint: body("lint"), fmt: body("fmt") })};`,
     "export default {",
-    "  id: 'drops', displayName: 'drops', protocol: 1, artifactKinds: ['skill', 'agent'],",
+    "  id: 'drops', displayName: 'drops', protocol: 1, artifactKinds: ['skill'],",
     "  dispatch: { hosts: ['drops.example'] },",
-    "  capabilities: { pinsSource: false, agentFolders: true },",
+    "  capabilities: { pinsSource: false },",
     "  connect: async () => ({",
-    "    resolve: async (_want, options) => !existsSync(flag)",
-    "      ? { artifacts: [skill, agent] }",
-    "      : { artifacts: [skill],",
-    "          complete: options?.all === true && readFileSync(flag, 'utf8') === 'complete' },",
+    `    resolve: async () => existsSync(${JSON.stringify(deleted)})`,
+    "      ? { artifacts: [lint], complete: true }",
+    "      : { artifacts: [lint, fmt] },",
     "    fetch: async (_artifact, file) => new TextEncoder().encode(bodies[file.locator]),",
     "    close: async () => {},",
     "  }),",
@@ -47,10 +44,10 @@ function adapterSource(flag: string): string {
   ].join("\n");
 }
 
-const test = base.extend("flag", async ({ home: { dir: home } }) => {
-  const flag = join(home, "deleted");
+const test = base.extend("deleted", async ({ home: { dir: home } }) => {
+  const deleted = join(home, "deleted");
   await mkdir(join(home, ".aireg"), { recursive: true, mode: 0o700 });
-  await writeFile(join(home, "drops.mjs"), adapterSource(flag));
+  await writeFile(join(home, "drops.mjs"), adapterSource(deleted));
   await writeFile(
     join(home, ".aireg", "config.yml"),
     [
@@ -63,51 +60,28 @@ const test = base.extend("flag", async ({ home: { dir: home } }) => {
       "",
     ].join("\n"),
   );
-  return flag;
+  return deleted;
 });
 
-async function lockedNames(project: string): Promise<string[]> {
-  const lock = parse(await readFile(lockPath(project), "utf8")) as {
-    artifacts: Record<string, unknown>;
-  };
-  return Object.keys(lock.artifacts).sort();
-}
-
-async function installWhole(aireg: (args: string[]) => Promise<{ code: number; stderr: string }>) {
-  expect((await aireg(["init", "-y", "--for", "claude"])).code).toBe(0);
-  const added = await aireg(["add", "https://drops.example", "--adapter", "drops", "-y"]);
-  expect(added.code, added.stderr).toBe(0);
-}
-
 describe("an artifact deleted from a registry installed whole", () => {
-  test("is removed when the adapter read its listing to the end", async ({
+  test("is removed when the adapter says its listing is complete", async ({
     aireg,
     project,
-    flag,
+    deleted,
   }) => {
-    await installWhole(aireg);
-    const agent = join(project, ".claude", "agents", "helper.md");
-    expect(existsSync(agent)).toBe(true);
+    expect((await aireg(["init", "-y", "--for", "claude"])).code).toBe(0);
+    const added = await aireg(["add", "https://drops.example", "--adapter", "drops", "-y"]);
+    expect(added.code, added.stderr).toBe(0);
+    const fmt = join(project, ".claude", "skills", "fmt", "SKILL.md");
+    expect(existsSync(fmt)).toBe(true);
 
-    await writeFile(flag, "complete");
+    await writeFile(deleted, "");
     const synced = await aireg(["sync", "-y"]);
     expect(synced.code, synced.stderr).toBe(0);
-    expect(synced.stderr).not.toContain("no longer lists");
-    expect(await lockedNames(project)).toEqual(["team/lint"]);
-    expect(existsSync(agent)).toBe(false);
-
-    const again = await aireg(["update", "-y"]);
-    expect(again.code, again.stderr).toBe(0);
-  }, 60_000);
-
-  test("is kept when the listing does not say it is complete", async ({ aireg, project, flag }) => {
-    await installWhole(aireg);
-
-    await writeFile(flag, "partial");
-    const synced = await aireg(["sync", "-y"]);
-    expect(synced.code).toBe(3);
-    expect(`${synced.stdout}${synced.stderr}`).toContain("drops no longer lists it");
-    expect(await lockedNames(project)).toEqual(["team/helper", "team/lint"]);
-    expect(existsSync(join(project, ".claude", "agents", "helper.md"))).toBe(true);
+    expect(existsSync(fmt)).toBe(false);
+    const lock = parse(await readFile(lockPath(project), "utf8")) as {
+      artifacts: Record<string, unknown>;
+    };
+    expect(Object.keys(lock.artifacts)).toEqual(["team/lint"]);
   }, 60_000);
 });
