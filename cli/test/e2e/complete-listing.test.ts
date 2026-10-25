@@ -21,8 +21,8 @@ function skill(name: string): string {
   ].join("\n");
 }
 
-// The adapter is loaded by each CLI run, so a file tells it the registry deleted `fmt`.
-function adapterSource(deleted: string): string {
+// The adapter is loaded by each CLI run, so a file beside it says the registry deleted `fmt`.
+function adapterSource(): string {
   return [
     "import { existsSync } from 'node:fs';",
     `const lint = ${skill("lint")};`,
@@ -33,7 +33,7 @@ function adapterSource(deleted: string): string {
     "  dispatch: { hosts: ['drops.example'] },",
     "  capabilities: { pinsSource: false },",
     "  connect: async () => ({",
-    `    resolve: async () => existsSync(${JSON.stringify(deleted)})`,
+    "    resolve: async () => existsSync(new URL('deleted', import.meta.url))",
     "      ? { artifacts: [lint], complete: true }",
     "      : { artifacts: [lint, fmt] },",
     "    fetch: async (_artifact, file) => new TextEncoder().encode(bodies[file.locator]),",
@@ -47,7 +47,7 @@ function adapterSource(deleted: string): string {
 const test = base.extend("deleted", async ({ home: { dir: home } }) => {
   const deleted = join(home, "deleted");
   await mkdir(join(home, ".aireg"), { recursive: true, mode: 0o700 });
-  await writeFile(join(home, "drops.mjs"), adapterSource(deleted));
+  await writeFile(join(home, "drops.mjs"), adapterSource());
   await writeFile(
     join(home, ".aireg", "config.yml"),
     [
