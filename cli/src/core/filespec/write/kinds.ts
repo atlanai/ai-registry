@@ -98,6 +98,19 @@ export async function manifestProblems(root: string): Promise<{ path: string; me
   });
 }
 
+/** Where a kind `registry.json` names is served, and why it is left out, when it is. */
+export async function leftOutKind(
+  root: string,
+  name: string,
+): Promise<{ path: string; problem: string } | undefined> {
+  if (BUNDLED[name] !== undefined) return undefined;
+  const found = (await listedKinds(root)).find((kind) => kind.name === name);
+  if (found?.url === undefined || found.served === undefined || !("problem" in found.served)) {
+    return undefined;
+  }
+  return { path: found.url, problem: found.served.problem };
+}
+
 async function served(root: string, url: string): Promise<Served> {
   if (url.startsWith("/") || url.split(posix.sep).includes("..")) {
     return { problem: "is not a path inside the registry" };
