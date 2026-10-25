@@ -241,18 +241,17 @@ export function pluginLinkAt(
   return at === bare || at === qualified ? { bare, qualified } : undefined;
 }
 
-/** The namespace content a lockfile row's link holds as its plugin, and where that plugin may sit. */
+/** The namespace content a lockfile row's link holds as its plugin, if it is one. */
 export function rowPlugin(
   name: string,
   entry: LockArtifact,
   link: { harness: string; path: string },
   options: Pick<ProjectionOptions, "roots" | "harnesses">,
-): { content: string; bare: string; qualified: string } | undefined {
+): string | undefined {
   const source = entry.registry;
   const namespace = namespaceOf({ kind: entry.kind, name, group: entry.namespace, source });
-  const at = pluginLinkAt(link, namespace, source, options);
-  if (at === undefined) return undefined;
-  return { ...at, content: namespaceDir(options.roots, source, namespace) };
+  if (pluginLinkAt(link, namespace, source, options) === undefined) return undefined;
+  return namespaceDir(options.roots, source, namespace);
 }
 
 type Unreadable = (harness: string, kind: ArtifactKind) => void;

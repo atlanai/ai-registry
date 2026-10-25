@@ -289,6 +289,33 @@ describe("registries whose plugin names meet once qualified", () => {
     expect(plan.clashes).toEqual([]);
   });
 
+  it("frees a folder an installed artifact moves out of in the same run", () => {
+    // Installed flat before `t` wrapped namespaces: `other/team` holds `.claude/skills/team`.
+    const lock = emptyLock();
+    installedAt(lock, { alias: "t", namespace: "other", skill: "team" }).links = [
+      { harness: "claude", path: ".claude/skills/team", mode: "symlink" },
+    ];
+    installedAt(lock, { alias: "t", namespace: "team", skill: "deploy" }).links = [
+      { harness: "claude", path: ".claude/skills/deploy", mode: "symlink" },
+    ];
+    const [wrapped] = wrapping(
+      acquired([
+        entry({ name: "team", path: "other/skills/team", group: "other" }),
+        entry({ name: "deploy", path: "team/skills/deploy", group: "team" }),
+      ]),
+    );
+    if (wrapped === undefined) throw new Error("no source");
+    const at = location("t");
+    const t = {
+      ...wrapped,
+      alias: "t",
+      origin: { ...wrapped.origin, location: at, declared: at, key: "t" },
+    };
+    const plan = build(declaring(["t"]), lock, [t], { artifacts: {} }, options);
+    expect(linkFrom(plan, claudeSkills("team"))).toEqual([projectionDir(USER, "t", "team")]);
+    expect(plan.clashes).toEqual([]);
+  });
+
   it("leaves the plugin directory the lockfile gives another registry's namespace to it", () => {
     // `one` holds `a-b-c` already; `three`, planned first, moves there from `b-c` now `y` has one.
     const lock = emptyLock();

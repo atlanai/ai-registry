@@ -18,7 +18,7 @@ export function keep(build: BuildState, name: string, entry: LockArtifact): void
     // Its namespace's plugin directory stays open to the namespace's other artifacts.
     const plugin = rowPlugin(name, entry, link, build.options);
     if (plugin === undefined) build.plugins.delete(at);
-    else build.plugins.set(at, plugin.content);
+    else build.plugins.set(at, plugin);
   }
 }
 

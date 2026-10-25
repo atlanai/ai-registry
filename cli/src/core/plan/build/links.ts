@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { list, quoted } from "#adapter/text.ts";
 import type { LinkMode, LockArtifact } from "#core/lock.ts";
 import { type Action, type ArtifactSurvey, copyEdited, type Selected } from "#core/plan/model.ts";
-import { claim, linksFor, type PlannedLink, rowPlugin } from "#core/plan/projection.ts";
+import { claim, linksFor, type PlannedLink } from "#core/plan/projection.ts";
 import { removal } from "#core/plan/removable.ts";
 import { addressOf } from "#core/plan/select.ts";
 import { renamedTo } from "./rename.ts";
@@ -21,6 +21,12 @@ interface Claimed {
 
 /** `.agents/skills/pdf` or `.claude/agents/review.md`: the name a part is installed under. */
 const partName = (path: string) => (path.split(/[\\/]/).at(-1) ?? path).replace(/\.(md|toml)$/, "");
+
+/** Where `item` would link this run, before any other artifact claims a path. */
+export function wantedLinks(item: Selected, build: BuildState): PlannedLink[] {
+  const wrapped = build.wrapping.has(item.source);
+  return linksFor(item, "", build.options, wrapped, build.crowded);
+}
 
 /** The links this item may take, first come first served, recording what another holds. */
 function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
@@ -56,19 +62,15 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
 }
 
 /**
- * Whether the lockfile row recorded at this path still keeps it from `link`: a plugin directory is
- * held only by its own namespace, while the naming rule still puts it there.
+ * Whether the lockfile row recorded at this path still keeps it from `link`: only while that row
+ * links there this run, and a plugin directory never from its own namespace's artifacts.
  */
 function holds(holder: string, link: PlannedLink, build: BuildState): boolean {
-  if (link.shared !== true) return true;
-  const entry = build.lock.artifacts[holder];
-  const { base } = build.options.roots;
-  const recorded = entry?.links.find((each) => resolve(base, each.path) === link.absolute);
-  if (entry === undefined || recorded === undefined) return true;
-  const plugin = rowPlugin(holder, entry, recorded, build.options);
-  if (plugin === undefined) return true;
-  if (plugin.content === link.content) return false;
-  return (build.crowded.has(plugin.bare) ? plugin.qualified : plugin.bare) === link.absolute;
+  const wants = build.wants.get(holder);
+  if (wants === undefined) return true;
+  const wanted = wants.find((each) => each.absolute === link.absolute);
+  if (wanted === undefined) return false;
+  return link.shared !== true || wanted.content !== link.content;
 }
 
 /**
