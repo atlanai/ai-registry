@@ -1,6 +1,6 @@
 import { list as listOf, plural, withoutCredentials } from "#adapter/text.ts";
 import type { Probed } from "#cli/source.ts";
-import { sourceKey } from "#core/adapter/identity.ts";
+import { comparableLocation, sourceKey } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { credentialOrigin } from "#core/credentials/origin.ts";
@@ -32,7 +32,8 @@ export async function moveOf(
   source: Probed | undefined,
 ): Promise<Move | undefined> {
   const existing = manifest.registries[alias];
-  const at = (location: string) => expandLocation(location, roots.base);
+  // Compared as the lockfile keys a registry, so a second spelling of one address is no move.
+  const at = (location: string) => comparableLocation(expandLocation(location, roots.base));
   if (existing === undefined || at(existing.location) === at(declared.location)) return undefined;
 
   const to = withoutCredentials(declared.location);

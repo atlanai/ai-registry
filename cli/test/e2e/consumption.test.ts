@@ -133,6 +133,9 @@ describe("consuming a registry like a package manager", () => {
     expect((await aireg(["list"])).stdout).toMatch(/ lint\s+skill\s+1\.0\.0 pinned\s+acme/);
     // Back where the rest of this suite publishes.
     expect((await aireg(["registry", "add", market, "--as", "acme"])).code).toBe(0);
+    const respelled = await aireg(["registry", "add", `${market}/`, "--as", "acme"]);
+    expect(respelled.code, respelled.stderr).toBe(0);
+    expect(respelled.stdout).not.toContain("Moved");
   });
 
   test("reports an edit to an installed skill, and publishes it only when the run opts in", async () => {
