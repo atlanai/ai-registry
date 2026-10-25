@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
@@ -83,5 +83,23 @@ describe("an artifact deleted from a registry installed whole", () => {
       artifacts: Record<string, unknown>;
     };
     expect(Object.keys(lock.artifacts)).toEqual(["team/lint"]);
+  }, 60_000);
+
+  test("is kept as a conflict when edited here", async ({ aireg, project, deleted }) => {
+    expect((await aireg(["init", "-y", "--for", "claude"])).code).toBe(0);
+    expect((await aireg(["add", "https://drops.example", "--adapter", "drops", "-y"])).code).toBe(
+      0,
+    );
+    const fmt = join(project, ".claude", "skills", "fmt", "SKILL.md");
+    await appendFile(fmt, "mine\n");
+
+    await writeFile(deleted, "");
+    const synced = await aireg(["sync", "-y"]);
+    const output = `${synced.stdout}${synced.stderr}`;
+    expect(synced.code, output).toBe(3);
+    expect(existsSync(fmt)).toBe(true);
+    expect(output).toContain("edited here and deleted from the registry");
+    // The adapter cannot publish and names nowhere else, so the hint offers a registry of your own.
+    expect(output).toContain("keep yours by publishing it to a registry of your own");
   }, 60_000);
 });
