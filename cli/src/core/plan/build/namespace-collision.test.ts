@@ -248,7 +248,7 @@ describe("registries whose plugin names meet once qualified", () => {
   ];
 
   it("links one registry's plugin where two qualified names meet, and reports the other", () => {
-    // `six` shares `three`'s plugin directory; only the other namespace's `one` is refused.
+    // `six` is a second skill in `three`'s namespace.
     const sources = [
       ...SOURCES.filter((each) => each.alias !== "a"),
       source("a", "b-c", "three", "six"),
