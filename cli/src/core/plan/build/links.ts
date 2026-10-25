@@ -38,7 +38,8 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
     if (!build.clashes.some((clash) => clash.dropped === address && clash.kept === kept)) {
       // A plugin's parts each land under a name of their own, which is the one that collided.
       const name = item.kind === "plugin" ? partName(link.relative) : item.name;
-      build.clashes.push({ name, kept, dropped: address, at: link.relative });
+      const container = link.shared === true ? { container: true as const } : {};
+      build.clashes.push({ name, kept, dropped: address, at: link.relative, ...container });
     }
   };
   // A path the lockfile gives another artifact stays its own, though this one comes first, as a

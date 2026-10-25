@@ -182,7 +182,12 @@ describe("two registries with a namespace of the same name", () => {
 // A qualified name is the registry's alias and the namespace joined, so two pairs can spell one.
 describe("registries whose plugin names meet once qualified", () => {
   const USER = roots("user", "/work");
-  const options: BuildOptions = { ...PLAN_OPTIONS, roots: USER, targets: ["claude"] };
+  const options: BuildOptions = {
+    ...PLAN_OPTIONS,
+    roots: USER,
+    targets: ["claude"],
+    nameCollision: "rename",
+  };
   const claudeSkills = (name: string) => join(homedir(), ".claude", "skills", name);
   const location = (alias: string) => `https://github.com/acme/${alias}.git`;
 
@@ -262,6 +267,7 @@ describe("registries whose plugin names meet once qualified", () => {
         kept: "a/b-c/skill/three",
         dropped: "a-b/c/skill/one",
         at: ".claude/skills/a-b-c",
+        container: true,
       },
     ]);
   });
@@ -306,6 +312,7 @@ describe("registries whose plugin names meet once qualified", () => {
         kept: "a-b/c/skill/one",
         dropped: "a/b-c/skill/three",
         at: ".claude/skills/a-b-c",
+        container: true,
       },
     ]);
   });
