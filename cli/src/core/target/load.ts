@@ -131,8 +131,14 @@ function schemaProblems(document: unknown): string[] {
   return [...new Set([...said, ...rest])];
 }
 
-/** A file's own problems, before it is compared with any other definition. */
-function readOne(path: string, text: string): TargetFile | SkippedFile {
+/** Where a file was found: `earlier` is the folder aireg 0.1 read. */
+type Folder = "current" | "earlier";
+
+/**
+ * A file's own problems, before it is compared with any other definition. One found in a
+ * folder must be named for the id it defines.
+ */
+function readOne(path: string, text: string, folder?: Folder): TargetFile | SkippedFile {
   let document: unknown;
   try {
     document = JSON.parse(text);
@@ -150,8 +156,30 @@ function readOne(path: string, text: string): TargetFile | SkippedFile {
     overrides?: boolean;
   };
   const { definition, warnings, problems: earlier } = upgraded(written);
-  problems.push(...earlier, ...builtinProblems(definition, overrides === true));
-  return problems.length > 0 ? { path, problems } : { path, definition, warnings };
+  const named = folder === "earlier" ? earlierNamed(definition) : definition;
+  if (named !== definition) warnings.push(renameWarning(definition.id, named.id));
+  problems.push(...earlier, ...builtinProblems(named, overrides === true));
+  if (problems.length > 0) return { path, problems };
+  if (folder !== undefined && basename(path) !== `${definition.id}.json`) {
+    return { path, problems: [`It defines ${quoted(definition.id)}, not its own name.`] };
+  }
+  return { path, definition: withBuiltinAliases(named), warnings };
+}
+
+/** aireg 0.1 named a built-in by the id that is now its alias, so such a file replaces it. */
+function earlierNamed(definition: TargetDefinition): TargetDefinition {
+  const named = BUILTIN_TARGETS.find((each) => each.aliases?.includes(definition.id));
+  return named === undefined ? definition : { ...definition, id: named.id };
+}
+
+const renameWarning = (was: string, id: string) =>
+  `It defines ${quoted(was)}, the earlier id of ${quoted(id)}; set its id to ${quoted(id)} and name it ${id}.json.`;
+
+/** A file that replaces a built-in keeps answering to its other ids unless it names its own. */
+function withBuiltinAliases(definition: TargetDefinition): TargetDefinition {
+  if (definition.aliases !== undefined) return definition;
+  const aliases = BUILTIN_TARGETS.find((each) => each.id === definition.id)?.aliases;
+  return aliases === undefined ? definition : { ...definition, aliases };
 }
 
 const CATEGORY_OF: Readonly<Record<string, TargetCategory>> = {
@@ -235,7 +263,7 @@ export function checkTargetText(
 const cache = new Map<string, { stamp: string; read: TargetFile | SkippedFile }>();
 
 /** Read once per change, since every command resolves the targets more than once. */
-function cachedRead(path: string): TargetFile | SkippedFile {
+function cachedRead(path: string, folder: Folder): TargetFile | SkippedFile {
   let stamp: string;
   try {
     const info = statSync(path);
@@ -247,7 +275,7 @@ function cachedRead(path: string): TargetFile | SkippedFile {
   if (held?.stamp === stamp) return held.read;
   let read: TargetFile | SkippedFile;
   try {
-    read = readOne(path, readFileSync(path, "utf8"));
+    read = readOne(path, readFileSync(path, "utf8"), folder);
   } catch {
     read = { path, problems: ["It could not be read."] };
   }
@@ -301,14 +329,9 @@ function readFolder(
       skipped.push({ path, problems: ["It links to a file outside your targets folder."] });
       continue;
     }
-    const one = cachedRead(path);
+    const one = cachedRead(path, moveTo === undefined ? "current" : "earlier");
     if ("problems" in one) skipped.push(one);
-    else if (`${one.definition.id}.json` !== basename(path)) {
-      skipped.push({
-        path,
-        problems: [`It defines ${quoted(one.definition.id)}, not its own name.`],
-      });
-    } else if (moveTo === undefined) read.push(one);
+    else if (moveTo === undefined) read.push(one);
     else {
       const moved = `It is in ${dir}, the targets folder's earlier name; move it to ${moveTo}.`;
       read.push({ ...one, warnings: [...one.warnings, moved] });

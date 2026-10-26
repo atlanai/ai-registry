@@ -132,6 +132,42 @@ describe("target files", () => {
     expect(canonicalId(resolveTargets(env), "claude")).toBe("claude-code");
   });
 
+  test("let a sibling read a replaced built-in by an id the replacement inherits", async () => {
+    await save("claude-code.json", { ...TOOL, id: "claude-code", overrides: true });
+    await save("tool.json", { ...TOOL, reads: { skill: ["claude", "tool"] } });
+    expect(problems()).toEqual([]);
+    expect(resolveTargets(env).tool?.reads.skill).toEqual(["claude-code", "tool"]);
+  });
+
+  test("replace a built-in from a 0.1 file named by its earlier id, with a warning", async () => {
+    const legacy = join(env.AIREG_HOME as string, "harnesses");
+    await mkdir(legacy, { recursive: true });
+    await writeFile(
+      join(legacy, "claude.json"),
+      JSON.stringify({ ...TOOL, id: "claude", overrides: true }),
+    );
+    expect(problems()).toEqual([]);
+    const table = resolveTargets(env);
+    expect(table["claude-code"]).toMatchObject({
+      displayName: "Tool",
+      aliases: ["claude"],
+      origin: join(legacy, "claude.json"),
+    });
+    expect(table.claude).toBeUndefined();
+    expect(loadTargetFiles(env).files[0]?.warnings).toEqual([
+      'It defines "claude", the earlier id of "claude-code"; set its id to "claude-code" and name it claude-code.json.',
+      `It is in ${legacy}, the targets folder's earlier name; move it to ${dir}.`,
+    ]);
+  });
+
+  test("still refuse a built-in's earlier id in the targets folder", async () => {
+    await save("claude.json", { ...TOOL, id: "claude", overrides: true });
+    expect(problems()).toEqual([
+      '"claude" is another name for the built-in target "claude-code"; name the file claude-code.json and its id "claude-code" to replace it.',
+    ]);
+    expect(resolveTargets(env)["claude-code"]?.origin).toBe("built-in");
+  });
+
   test("resolve a JSON copy of a built-in to the same target", async () => {
     const { default: _, importable: __, ...definition } = codex;
     const { caller: ___, ...detect } = definition.detect as Exclude<

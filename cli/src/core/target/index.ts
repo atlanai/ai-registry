@@ -173,13 +173,7 @@ export function resolveTargets(env: NodeJS.ProcessEnv = process.env): Targets {
     definitions.set(definition.id, { definition, origin: BUILT_IN });
   }
   for (const file of loadTargetFiles(env).files) {
-    // A file that replaces a built-in keeps answering to its other ids unless it names its own.
-    const replaced = definitions.get(file.definition.id)?.definition;
-    const aliases = file.definition.aliases ?? replaced?.aliases;
-    definitions.set(file.definition.id, {
-      definition: aliases === undefined ? file.definition : { ...file.definition, aliases },
-      origin: file.path,
-    });
+    definitions.set(file.definition.id, { definition: file.definition, origin: file.path });
   }
   const out: Targets = {};
   for (const { definition, origin } of definitions.values()) {
