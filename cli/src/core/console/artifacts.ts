@@ -74,12 +74,15 @@ async function row(
     changedAtMs: await changedAt(copy),
     links: entry.links.map((link) => {
       const seen = observed?.links[link.path];
-      const target = seen?.target === undefined ? undefined : resolve(seen.target);
+      const destination = seen?.target === undefined ? undefined : resolve(seen.target);
       return {
         target: link.target,
         path: link.path,
         present: seen?.present === true,
-        ok: seen?.present === true && (link.mode === "copy" || seen.isLink) && target !== undefined,
+        ok:
+          seen?.present === true &&
+          (link.mode === "copy" || seen.isLink) &&
+          destination !== undefined,
       };
     }),
   };

@@ -81,6 +81,7 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
   const ordered = [...tools, ...rows.filter((item) => item.target.shared)];
 
   if (context.printer.format === "json") {
+    const { files, skipped } = loadTargetFiles();
     context.printer.json({
       ok: true,
       data: {
@@ -93,9 +94,9 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
           by: item.by,
           origin: item.target.origin,
         })),
-        skipped: loadTargetFiles().skipped,
-        warnings: loadTargetFiles()
-          .files.filter((file) => file.warnings.length > 0)
+        skipped,
+        warnings: files
+          .filter((file) => file.warnings.length > 0)
           .map(({ path, warnings }) => ({ path, warnings })),
       },
     });
