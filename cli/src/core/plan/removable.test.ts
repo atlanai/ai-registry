@@ -40,7 +40,7 @@ describe("removal inside a project", () => {
   });
 });
 
-describe("removal through a harness directory that is a link", () => {
+describe("removal through a target directory that is a link", () => {
   test("unlinks its own link there, and only unlinks it", async () => {
     await symlink(outside, join(project, ".claude"));
     const copy = join(roots.artifacts, "kit", "kit", "skills", "lint");
@@ -64,7 +64,7 @@ describe("removal through a harness directory that is a link", () => {
     expect(await exists(join(outside, "skills", "keys", "id"))).toBe(true);
   });
 
-  test("refuses every path through a harness the manifest does not target, `.cursor/skills -> /`", async () => {
+  test("refuses every path through a target the manifest does not target, `.cursor/skills -> /`", async () => {
     await mkdir(join(project, ".cursor"));
     await symlink("/", join(project, ".cursor", "skills"));
     const keys = join(outside, "skills", "keys");
@@ -93,7 +93,7 @@ describe("removal in the user scope", () => {
     expect(await exists(join(keys, "id"))).toBe(true);
   });
 
-  test("resolves a harness root that is itself a link once, as a dotfiles setup has", async () => {
+  test("resolves a target root that is itself a link once, as a dotfiles setup has", async () => {
     await symlink(outside, join(root, ".claude"));
     const keys = join(root, ".claude", "skills", "keys");
     expect(how(keys, user)).toBe("remove");

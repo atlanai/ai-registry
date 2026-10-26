@@ -13,21 +13,52 @@ vi.mock("#core/version.ts", async (importOriginal) => ({
 }));
 
 describe("manifest keys", () => {
-  test("reads `harnesses:` as the selection and `registries:` as the sources", () => {
+  test("reads `targets:` as the selection and `registries:` as the sources", () => {
     const manifest = parseManifest(
       [
-        "harnesses: [claude, codex]",
+        "targets: [claude, codex]",
         "registries:",
         "  kit: acme/kit",
         "artifacts:",
         "  - ref: kit/lint",
-        "    harnesses: [claude]",
+        "    targets: [claude]",
         "",
       ].join("\n"),
     );
     expect(manifest.targets).toEqual(["claude", "codex"]);
     expect(Object.keys(manifest.registries)).toEqual(["kit"]);
     expect(manifest.artifacts[0]?.targets).toEqual(["claude"]);
+  });
+
+  test("reads `harnesses:`, the earlier name of `targets:`, and writes `targets:`", () => {
+    const manifest = parseManifest(
+      [
+        "harnesses: [claude]",
+        "registries:",
+        "  kit: acme/kit",
+        "artifacts:",
+        "  - ref: kit/lint",
+        "    harnesses: [codex]",
+        "",
+      ].join("\n"),
+    );
+    expect(manifest.targets).toEqual(["claude"]);
+    expect(manifest.artifacts[0]?.targets).toEqual(["codex"]);
+    const written = formatManifest(manifest);
+    expect(written).toContain("targets:\n  - claude\n");
+    expect(written).toContain("    targets:\n      - codex\n");
+    expect(written).not.toContain("harnesses");
+  });
+
+  test("refuses `targets:` beside `harnesses:`, naming both", () => {
+    expect(() => parseManifest("targets: [claude]\nharnesses: [codex]\n")).toThrow(
+      "manifest.yml: The manifest has both `targets:` and `harnesses:`, which is its earlier name.",
+    );
+    expect(() =>
+      parseManifest(
+        "registries: { kit: acme/kit }\nartifacts:\n  - { ref: kit/lint, targets: [a], harnesses: [b] }\n",
+      ),
+    ).toThrow('Artifact "kit/lint" has both `targets:` and `harnesses:`');
   });
 
   test("keeps `copy: true` on an entry, and writes it back", () => {
@@ -432,7 +463,7 @@ describe("writeManifest", () => {
     "# Agent artifacts for this project.",
     "",
     "# AI coding tools to install into.",
-    "harnesses:",
+    "targets:",
     "  - claude # we only use claude",
     "",
     "# Each registry is one source.",
@@ -465,6 +496,17 @@ describe("writeManifest", () => {
     expect(text).toContain("registries:\n  acme: ../acme\n  # acme:\n");
     expect(text).toContain("\n\n# `acme` for all of it.\nartifacts:\n  - acme/skill/lint@1.0.0\n");
     expect(await readManifest(path)).toEqual(removed);
+  });
+
+  test("rewrites `harnesses:` as `targets:`, keeping its comment", async () => {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, "# Tools to install into.\nharnesses:\n  - claude\nregistries: {}\n");
+    const manifest = await readManifest(path);
+    manifest.registries.acme = { location: "../acme", adapter: undefined, config: {} };
+    await writeManifest(project, manifest);
+    expect(await readFile(path, "utf8")).toBe(
+      "# Tools to install into.\ntargets:\n  - claude\nregistries:\n  acme: ../acme\nartifacts: []\n",
+    );
   });
 
   test("keeps `exports:` and `publish:`, with their comments, through add and remove", async () => {
@@ -531,22 +573,22 @@ describe("writeManifest", () => {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(
       path,
-      "harnesses: [claude, codex]\nregistries:\n  kit: acme/kit\nartifacts:\n  - kit/skill/lint@1.0.0 # held back\n",
+      "targets: [claude, codex]\nregistries:\n  kit: acme/kit\nartifacts:\n  - kit/skill/lint@1.0.0 # held back\n",
     );
     const manifest = await readManifest(path);
     manifest.artifacts = [parseRef("kit/skill/lint@1.1.0")];
     await writeManifest(project, manifest);
 
     expect(await readFile(path, "utf8")).toBe(
-      "harnesses: [claude, codex]\nregistries:\n  kit: acme/kit\nartifacts:\n  - kit/skill/lint@1.1.0 # held back\n",
+      "targets: [claude, codex]\nregistries:\n  kit: acme/kit\nartifacts:\n  - kit/skill/lint@1.1.0 # held back\n",
     );
   });
 
   // A command reads the manifest before it takes the lease, so it must never see one half written.
   test("replaces the file instead of truncating it, and leaves nothing beside it", async () => {
-    await writeManifest(project, parseManifest("harnesses: [claude]\n"));
+    await writeManifest(project, parseManifest("targets: [claude]\n"));
     const first = (await stat(path)).ino;
-    await writeManifest(project, parseManifest("harnesses: [codex]\n"));
+    await writeManifest(project, parseManifest("targets: [codex]\n"));
     expect((await stat(path)).ino).not.toBe(first);
     expect(await readdir(dirname(path))).toEqual(["manifest.yml"]);
   });
@@ -567,7 +609,7 @@ describe("writeManifest", () => {
     const elsewhere = join(await realpath(tmp), "elsewhere");
     await mkdir(elsewhere);
     await symlink(elsewhere, dirname(path));
-    await expect(writeManifest(project, parseManifest("harnesses: [claude]\n"))).rejects.toThrow(
+    await expect(writeManifest(project, parseManifest("targets: [claude]\n"))).rejects.toThrow(
       "is a symlink in a managed path",
     );
     expect(await readdir(elsewhere)).toEqual([]);

@@ -1,10 +1,10 @@
 import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Target } from "#core/harness/index.ts";
 import { emptyLock } from "#core/lock.ts";
 import { build } from "#core/plan/build.ts";
 import type { Action } from "#core/plan/model.ts";
 import { artifactPath, projectionDir, roots, stagingPath } from "#core/store/paths.ts";
+import type { Target } from "#core/target/index.ts";
 import { acquired, entry, kitManifest, PLAN_OPTIONS, wrapping } from "#test/kit/builders/plan.ts";
 
 const OPTIONS = { ...PLAN_OPTIONS, targets: ["claude", "codex"] };
@@ -57,7 +57,7 @@ describe("a namespaced skill, projected", () => {
     const at = { ...OPTIONS, roots: roots("user", "/work") };
     const links = linksOf(planned(ENTRIES, at, true).actions);
     const froms = links
-      .filter((link) => link.harness === "claude")
+      .filter((link) => link.target === "claude")
       .map((link) => link.from)
       .sort();
     expect(froms).toEqual(
@@ -68,24 +68,22 @@ describe("a namespaced skill, projected", () => {
     );
     expect(links.some((link) => link.to.includes(".claude-plugin"))).toBe(false);
 
-    const codex = links.filter((link) => link.harness === "codex");
+    const codex = links.filter((link) => link.target === "codex");
     expect(codex.map((link) => link.from).sort()).toEqual(froms);
     expect(codex.map((link) => link.to.split(sep).at(-2)).sort()).toEqual(["engineering", "sales"]);
     expect(codex.every((link) => link.to.endsWith(`${sep}local`) && link.fan === true)).toBe(true);
     // Codex has the namespace as a plugin, so it needs no flat copy as well.
-    expect(links.some((link) => link.harness === "agents")).toBe(false);
+    expect(links.some((link) => link.target === "agents")).toBe(false);
   });
 
   // A namespace is where a skill comes from, not a plugin, unless its source declares it one.
   it("places a skill as itself at user scope, where Claude and Codex read it", () => {
     const at = { ...OPTIONS, roots: roots("user", "/work") };
     const links = linksOf(planned(ENTRIES.slice(0, 1), at).actions);
-    expect(links.map((link) => [link.harness, link.to.split(/[\\/]/).slice(-3).join("/")])).toEqual(
-      [
-        ["agents", ".agents/skills/lint"],
-        ["claude", ".claude/skills/lint"],
-      ],
-    );
+    expect(links.map((link) => [link.target, link.to.split(/[\\/]/).slice(-3).join("/")])).toEqual([
+      ["agents", ".agents/skills/lint"],
+      ["claude", ".claude/skills/lint"],
+    ]);
     expect(links.every((link) => link.plugin === false && link.fan === undefined)).toBe(true);
     expect(links.some((link) => link.from.includes(".projections"))).toBe(false);
   });
@@ -103,34 +101,34 @@ describe("a namespaced skill, projected", () => {
 
   it("keeps a project's Codex skills flat, where Codex reads them", () => {
     const links = linksOf(planned(ENTRIES.slice(0, 1)).actions);
-    const flat = links.filter((link) => link.harness === "agents");
+    const flat = links.filter((link) => link.target === "agents");
     expect(flat.map((link) => link.to)).toEqual([join("/work", ".agents", "skills", "lint")]);
     expect(links.some((link) => link.fan === true)).toBe(false);
   });
 
-  it("gives a harness with no plugin folder a folder it reads when Claude's holds plugins", () => {
-    const cursor = PLAN_OPTIONS.harnesses.cursor as Target;
-    const harnesses = {
-      ...PLAN_OPTIONS.harnesses,
+  it("gives a target with no plugin folder a folder it reads when Claude's holds plugins", () => {
+    const cursor = PLAN_OPTIONS.targetTable.cursor as Target;
+    const targetTable = {
+      ...PLAN_OPTIONS.targetTable,
       cursor: { ...cursor, kinds: { ...cursor.kinds, plugin: { shape: "contents" as const } } },
     };
     const at = {
       ...OPTIONS,
-      harnesses,
+      targetTable,
       roots: roots("user", "/work"),
       targets: ["claude", "cursor"],
     };
     const flat = linksOf(planned(ENTRIES.slice(0, 1), at, true).actions).filter(
-      (link) => link.harness !== "claude",
+      (link) => link.target !== "claude",
     );
     expect(
-      flat.map((link) => [link.harness, link.to.endsWith(join("/.agents", "skills", "lint"))]),
+      flat.map((link) => [link.target, link.to.endsWith(join("/.agents", "skills", "lint"))]),
     ).toEqual([["agents", true]]);
   });
 
   it("lets Cursor read Claude's folder when it holds the skill as itself", () => {
     const at = { ...OPTIONS, roots: roots("user", "/work"), targets: ["claude", "cursor"] };
     const links = linksOf(planned(ENTRIES.slice(0, 1), at).actions);
-    expect(links.map((link) => link.harness)).toEqual(["claude"]);
+    expect(links.map((link) => link.target)).toEqual(["claude"]);
   });
 });

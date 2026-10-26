@@ -212,7 +212,7 @@ describe("validateRoot", () => {
 
   test("keeps taking an agent released with a runtime block", async ({ root }) => {
     const agent =
-      "---\nname: reviewer\ndescription: Reviews.\nruntime:\n  harness: claude-code\n---\nReview.\n";
+      "---\nname: reviewer\ndescription: Reviews.\nruntime:\n  target: claude-code\n---\nReview.\n";
     await registry(root, { name: "team" })
       .agent("eng/reviewer@0.3.0", { description: "Reviews.", files: { "AGENT.md": agent } })
       .write();

@@ -37,7 +37,7 @@ describe("fan-out links", () => {
     expect((await lstat(skills)).isSymbolicLink()).toBe(true);
     expect(await readlink(skills)).not.toMatch(/^\//);
     expect(await realpath(skills)).toBe(join(source, "skills"));
-    // A harness may refuse a manifest it reaches through a link.
+    // A target may refuse a manifest it reaches through a link.
     for (const manifest of ["plugin.json", ".manifest", join(".manifest", "plugin.json")]) {
       expect((await lstat(join(to, manifest))).isSymbolicLink()).toBe(false);
     }
@@ -53,7 +53,7 @@ describe("fan-out links", () => {
     expect(await readFile(join(to, "plugin.json"), "utf8")).toBe('{"version":"2"}');
   });
 
-  // A harness reading the plugin during a refresh must not find an entry missing.
+  // A target reading the plugin during a refresh must not find an entry missing.
   test("leaves an entry that is already right in place", async () => {
     const source = await projection();
     const to = join(root, "cache", "acme", "sales", "local");

@@ -6,7 +6,7 @@ import { LOCK_VERSION } from "#core/lock.ts";
 
 const Link = Type.Object(
   {
-    harness: Type.String({ minLength: 1, description: "Harness name." }),
+    target: Type.String({ minLength: 1, description: "Target name." }),
     path: Type.String({
       minLength: 1,
       description: "Relative to the scope base, so a committed lock is machine-independent.",
@@ -20,7 +20,7 @@ const Link = Type.Object(
     digest: Type.Optional(
       Type.String({
         pattern: "^sha256:[0-9a-f]{64}$",
-        description: "A copy's digest as written, so an edit to the harness's own copy is seen.",
+        description: "A copy's digest as written, so an edit to the target's own copy is seen.",
       }),
     ),
   },
@@ -29,7 +29,7 @@ const Link = Type.Object(
 
 const Blocked = Type.Object(
   {
-    harness: Type.String({ minLength: 1, description: "Harness name." }),
+    target: Type.String({ minLength: 1, description: "Target name." }),
     path: Type.String({ minLength: 1, description: "Relative to the scope base." }),
     by: Type.Optional(Type.String({ minLength: 1, description: "What is at the path instead." })),
   },
@@ -64,7 +64,7 @@ const Registry = Type.Object(
 
 const Origin = Type.Object(
   {
-    harness: Type.String({ minLength: 1, description: "Whose folder conventions it follows." }),
+    target: Type.String({ minLength: 1, description: "Whose folder conventions it follows." }),
     path: Type.String({ minLength: 1, description: "Relative to the scope base." }),
     step: Type.Optional(Type.String({ minLength: 1, description: "The step that claimed it." })),
   },
@@ -109,7 +109,7 @@ const Artifact = Type.Object(
       Type.String({
         pattern: "^sha256:[0-9a-f]{64}$",
         description:
-          "A digest of what a plugin has a harness start, so a background job sees it change.",
+          "A digest of what a plugin has a target start, so a background job sees it change.",
       }),
     ),
     path: Type.Optional(

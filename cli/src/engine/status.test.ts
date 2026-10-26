@@ -7,12 +7,12 @@ const close = vi.hoisted(() => vi.fn(async () => {}));
 
 vi.mock("./inspect.ts", () => ({
   inspect: async () => ({
-    loaded: { roots: { base: "/project" }, manifest: { registries: {} }, harnesses: {} },
+    loaded: { roots: { base: "/project" }, manifest: { registries: {} }, targetTable: {} },
     common: { targets: undefined },
     found: { items: [], local: [], undeclared: [], acquired: [{ alias: "shop", close }] },
   }),
 }));
-vi.mock("./pipeline.ts", () => ({ resolveTargets: () => [] }));
+vi.mock("./pipeline.ts", () => ({ selectTargets: () => [] }));
 
 test("closes the sources its scan opened, since status is asked for often", async () => {
   const job = { id: "job-1", root: "/project", policy: {} } as unknown as ScopeWork;

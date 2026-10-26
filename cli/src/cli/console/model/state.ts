@@ -13,7 +13,6 @@ import {
   upstreamFacts,
 } from "#core/console/runs.ts";
 import { dict } from "#core/fields.ts";
-import { resolveHarnesses } from "#core/harness/index.ts";
 import type { HostCommandContext } from "#core/host/extend.ts";
 import { contributedPanels } from "#core/host/load.ts";
 import { emptyLock, type Lock, readLock } from "#core/lock.ts";
@@ -26,6 +25,7 @@ import type { RunCounts, RunRecord } from "#core/run/model.ts";
 import { isActive, type RunMode } from "#core/run/model.ts";
 import { roots as makeRoots, type Roots, scopeFor } from "#core/store/paths.ts";
 import { policyOf } from "#core/sync/policy.ts";
+import { resolveTargets } from "#core/target/index.ts";
 import { readDaemonPid } from "#daemon/pidfile.ts";
 import { readAccounts } from "./accounts.ts";
 import { localWork } from "./local.ts";
@@ -76,7 +76,7 @@ export async function collect(
   if (manifest === undefined) problems.push(`Cannot read ${roots.manifest}.`);
   const resolved: Manifest = manifest ?? emptyManifest();
 
-  const harnesses = resolveHarnesses();
+  const targetTable = resolveTargets();
   const lock = await readLock(roots).catch((error: Error) => {
     problems.push(error.message);
     return emptyLock();
@@ -132,20 +132,20 @@ export async function collect(
       roots,
       upstream: upstreamFacts(syncEvents),
       defaultNamespace: account?.defaultNamespace,
-      local: await localWork(roots, harnesses, mine, declaredNames(resolved), carried),
+      local: await localWork(roots, targetTable, mine, declaredNames(resolved), carried),
     });
 
     // Named as they were chosen, by the module every listing uses.
-    const scope = scopeTargets(resolved, harnesses);
+    const scope = scopeTargets(resolved, targetTable);
     for (const row of groups.flatMap((group) => group.rows)) {
       const entry = mine.artifacts[row.key];
       if (entry === undefined) continue;
       row.targets = loadedBy(
-        harnesses,
+        targetTable,
         chosenFor(resolved, scope, entry),
         entry.kind,
         row.targets,
-      ).map((name) => toolName(harnesses, name));
+      ).map((name) => toolName(targetTable, name));
     }
 
     // A panel that throws is reported, not fatal.
@@ -156,7 +156,7 @@ export async function collect(
           context,
           config,
           manifest: resolved,
-          harnesses,
+          targetTable,
           account,
           jobs,
           runs: ours,

@@ -471,7 +471,7 @@ async function moveClaimedAside(
 }
 
 /**
- * Already-published folders in a harness directory, when the job claims them: a differing copy
+ * Already-published folders in a target directory, when the job claims them: a differing copy
  * is held for a person, and identical ones are moved aside once the registry's copy is pulled.
  */
 async function claims(

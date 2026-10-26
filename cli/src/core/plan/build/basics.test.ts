@@ -19,7 +19,7 @@ import {
   SYNCED,
 } from "#test/kit/builders/plan.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { withoutKind } from "#test/kit/harness.ts";
+import { withoutKind } from "#test/kit/target.ts";
 
 describe("build", () => {
   test("stages and links on a fresh install", () => {
@@ -31,13 +31,13 @@ describe("build", () => {
       PLAN_OPTIONS,
     );
     // The mirror, this scope's copy inside the plugin, and the one link that
-    // points the harness at that plugin.
+    // points the target at that plugin.
     expect(kinds(plan)).toEqual(["stage", "clone", "link", "record"]);
   });
 
   test("takes back the links an install gave a row of yours, and keeps the row", () => {
     const lock = installed();
-    const origin = { harness: "claude", path: ".claude/skills/my-lint", step: "origins" };
+    const origin = { target: "claude", path: ".claude/skills/my-lint", step: "origins" };
     lock.artifacts.lint = { ...(lock.artifacts.lint as LockArtifact), origin };
     const plan = build(kitManifest([]), lock, acquired([entry()]), SYNCED, PLAN_OPTIONS);
     const unlinked = plan.actions.flatMap((action) =>
@@ -53,7 +53,7 @@ describe("build", () => {
 
   test("never links over the folder of yours a row came from", () => {
     const lock = installed();
-    const origin = { harness: "claude", path: ".claude/skills/lint", step: "onboarding" };
+    const origin = { target: "claude", path: ".claude/skills/lint", step: "onboarding" };
     lock.artifacts.lint = { ...(lock.artifacts.lint as LockArtifact), origin, links: [] };
     const plan = build(kitManifest(), lock, acquired([entry()]), SYNCED, PLAN_OPTIONS);
     expect(plan.actions.filter((action) => action.kind === "link")).toEqual([]);
@@ -64,7 +64,7 @@ describe("build", () => {
 
   test("keeps a row of yours on what it last sent when the registry moves, unless forced", () => {
     const lock = installed();
-    const origin = { harness: "claude", path: ".claude/skills/lint", step: "onboarding" };
+    const origin = { target: "claude", path: ".claude/skills/lint", step: "onboarding" };
     lock.artifacts.lint = { ...(lock.artifacts.lint as LockArtifact), origin, links: [] };
     const moved = acquired([entry()], "c2", new Map([["skills/lint", "sha256:t2"]]));
     const plan = build(kitManifest(), lock, moved, SYNCED, PLAN_OPTIONS);
@@ -101,7 +101,7 @@ describe("build", () => {
       content: "sha256:r1",
       version: undefined,
       digest: "sha256:2",
-      links: [{ harness: "claude", path: ".claude/skills/review", mode: "symlink" }],
+      links: [{ target: "claude", path: ".claude/skills/review", mode: "symlink" }],
     };
     const survey: Survey = {
       artifacts: {
@@ -219,13 +219,13 @@ describe("build", () => {
     ]);
   });
 
-  test("keeps an edited harness copy, and its lock row, on the version it was edited from", () => {
+  test("keeps an edited target copy, and its lock row, on the version it was edited from", () => {
     const lock = installed();
     const row = lock.artifacts.lint;
     if (row === undefined) throw new Error("no locked artifact");
     row.version = "0.1.0";
     row.links = [
-      { harness: "claude", path: ".claude/skills/lint", mode: "copy", digest: "sha256:w" },
+      { target: "claude", path: ".claude/skills/lint", mode: "copy", digest: "sha256:w" },
     ];
     const sources = acquired([entry()], "c2", new Map([["skills/lint", "sha256:t2"]]));
     sources[0]?.placements.set("skills/lint", {
@@ -352,7 +352,7 @@ describe("build", () => {
       SYNCED,
       PLAN_OPTIONS,
     );
-    // The link the harness held, and this scope's copy. The mirror is shared
+    // The link the target held, and this scope's copy. The mirror is shared
     // across scopes and reclaimed by `aireg cache prune`, not by this plan.
     expect(kinds(plan)).toEqual(["unlink", "unlink", "record"]);
   });
@@ -437,7 +437,7 @@ describe("build", () => {
         [name]: {
           ...row,
           name: published,
-          links: links.map((path) => ({ harness: "claude", path, mode: "symlink" as const })),
+          links: links.map((path) => ({ target: "claude", path, mode: "symlink" as const })),
         },
       };
       return lock;
@@ -484,7 +484,7 @@ describe("build", () => {
     // The checks above are on the path alone; these folders are links on disk.
     // Links to "../.." and "/" are POSIX fixtures.
     test.skipIf(process.platform === "win32")(
-      "never unlinks through a harness folder that is a symlink",
+      "never unlinks through a target folder that is a symlink",
       async ({ tmp }) => {
         const dir = tmp;
         const project = join(dir, "proj");
@@ -516,7 +516,7 @@ describe("build", () => {
       },
     );
 
-    test("never writes a link through a harness folder that is a symlink", async ({ tmp }) => {
+    test("never writes a link through a target folder that is a symlink", async ({ tmp }) => {
       const dir = tmp;
       const project = join(dir, "proj");
       await mkdir(join(project, ".claude"), { recursive: true });
@@ -548,7 +548,7 @@ describe("build", () => {
     });
   });
 
-  test("warns rather than guessing when a harness cannot hold the kind", () => {
+  test("warns rather than guessing when a target cannot hold the kind", () => {
     const plan = build(
       kitManifest(["kit/agent/lint"]),
       emptyLock(),
@@ -557,7 +557,7 @@ describe("build", () => {
       {
         ...PLAN_OPTIONS,
         targets: ["codex"],
-        harnesses: withoutKind(PLAN_OPTIONS.harnesses, "codex", "agent"),
+        targetTable: withoutKind(PLAN_OPTIONS.targetTable, "codex", "agent"),
       },
     );
     expect(plan.actions.filter((a) => a.kind === "link")).toHaveLength(0);

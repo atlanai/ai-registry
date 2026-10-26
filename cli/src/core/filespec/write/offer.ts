@@ -73,7 +73,7 @@ function edgesOf(target: OfferTarget): PublishRelationship[] {
   });
 }
 
-/** A harness's agent file may omit the name a registry agent requires; the artifact's name supplies it. */
+/** A target's agent file may omit the name a registry agent requires; the artifact's name supplies it. */
 function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
   const text = content.toString("utf8");
   const record = frontmatterRecord(text);
@@ -158,7 +158,7 @@ export async function offerFrom(
     describeFile(file.path, sha256(file.content), file.content.byteLength),
   );
   const description = target.description ?? ownDescription(bytes, target.name);
-  // An explicitly supplied native agent file is its entry, even when the harness
+  // An explicitly supplied native agent file is its entry, even when the target
   // names it reviewer.md. Registry directories still use only declared entries.
   const [entry] = files;
   const nativeAgent = target.kind === "agent" && path.endsWith(".md") && !(await isDirectory(path));

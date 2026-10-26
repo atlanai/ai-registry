@@ -30,7 +30,7 @@ export interface Selector {
   /** Absent means every kind, including kinds added later. */
   kinds?: readonly ArtifactKind[];
   /** For steps that care whose folder conventions apply. */
-  harness?: readonly string[];
+  target?: readonly string[];
 }
 
 /** What a step does when it would change something, stored as a person types it. */

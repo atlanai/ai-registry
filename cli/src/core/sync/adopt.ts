@@ -5,23 +5,23 @@ import { isWithin } from "#adapter/paths.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { inspect } from "#core/fs/link.ts";
 import { posixRelative } from "#core/fs/path.ts";
-import { type Harnesses, type KindMapping, targetRoot } from "#core/harness/index.ts";
 import { type ArtifactKind, KIND_SPECS, SCANNED_KINDS } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { entriesIn } from "#core/sync/scan.ts";
+import { type KindMapping, type Targets, targetRoot } from "#core/target/index.ts";
 
 export interface Candidate {
   name: string;
   kind: ArtifactKind;
   /** Absolute path to the content a person wrote. */
   from: string;
-  /** Harness it was found in, so a report can say where. */
+  /** Target it was found in, so a report can say where. */
   target: string;
   /** Where it would sit in a registry laid out the standard way. */
   suggestedPath: string;
   description: string | undefined;
-  /** The same artifact in the other harness directories, which a report names once. */
+  /** The same artifact in the other target directories, which a report names once. */
   elsewhere: { from: string; target: string }[];
 }
 
@@ -34,7 +34,7 @@ export function registryPath(kind: ArtifactKind, name: string, from: string): st
   return posix.join(spec.dir, `${name}${extension}`);
 }
 
-/** The kind's own entry file, where it declares one; a harness lays out the rest. */
+/** The kind's own entry file, where it declares one; a target lays out the rest. */
 function entryOf(kind: ArtifactKind): { entry?: string } {
   const entry = KIND_SPECS[kind].entry;
   return entry === undefined ? {} : { entry };
@@ -58,7 +58,7 @@ async function holdsStagedLink(roots: Roots, full: string): Promise<boolean> {
   return false;
 }
 
-/** Everything of one kind sitting in a harness directory that is neither claimed nor assembled by us. */
+/** Everything of one kind sitting in a target directory that is neither claimed nor assembled by us. */
 async function collectKindCandidates(
   roots: Roots,
   root: string,
@@ -124,7 +124,7 @@ function claimedPaths(roots: Roots, lock: Lock): Set<string> {
       claimed.add(join(canonical(dirname(path)), basename(path)));
     }
     // A row authored here has no link - the folder it came from is already
-    // where the harness reads it - so its origin is what marks it as spoken for.
+    // where the target reads it - so its origin is what marks it as spoken for.
     if (entry.origin !== undefined) {
       claimed.add(canonical(resolve(roots.base, entry.origin.path)));
     }
@@ -133,7 +133,7 @@ function claimedPaths(roots: Roots, lock: Lock): Set<string> {
 }
 
 /**
- * A report lists everything a harness loads, links of yours and files in its own
+ * A report lists everything a target loads, links of yours and files in its own
  * format included; adoption reads only what it could publish.
  */
 interface ScanOptions {
@@ -149,21 +149,21 @@ interface KindDir {
 
 function kindDirs(
   roots: Roots,
-  harnesses: Harnesses,
+  targetTable: Targets,
   targets: readonly string[],
   report: boolean,
 ): KindDir[] {
   const dirs: KindDir[] = [];
   for (const name of targets) {
-    const target = harnesses[name];
+    const target = targetTable[name];
     if (target === undefined) continue;
     const root = targetRoot(target, roots.scope, roots.cwd);
-    // `SCANNED_KINDS`, not every kind: a harness may keep plugins and skills in
+    // `SCANNED_KINDS`, not every kind: a target may keep plugins and skills in
     // one folder, so walking both would report every skill twice.
     for (const kind of SCANNED_KINDS) {
       const mapping = target.kinds[kind];
       if (mapping?.subdir === undefined) continue;
-      // A file in the harness's own format cannot be published as it is.
+      // A file in the target's own format cannot be published as it is.
       if (mapping.codec !== undefined && !report) continue;
       dirs.push({ target: name, root, kind, mapping: mapping as KindDir["mapping"] });
     }
@@ -172,12 +172,12 @@ function kindDirs(
 }
 
 /**
- * The reverse of projection: anything in a harness directory that is not a link
+ * The reverse of projection: anything in a target directory that is not a link
  * into this scope's own trees, and that the lock does not claim, is local work.
  */
 export async function candidates(
   roots: Roots,
-  harnesses: Harnesses,
+  targetTable: Targets,
   targets: readonly string[],
   lock: Lock,
   /**
@@ -190,7 +190,7 @@ export async function candidates(
   const claimed = claimedPaths(roots, lock);
   const found = new Map<string, Candidate>();
 
-  for (const { target, root, kind, mapping } of kindDirs(roots, harnesses, targets, report)) {
+  for (const { target, root, kind, mapping } of kindDirs(roots, targetTable, targets, report)) {
     const items = await collectKindCandidates(roots, root, target, kind, mapping, claimed, report);
     for (const item of items) {
       const key = `${kind}:${item.name}`;
@@ -221,14 +221,14 @@ async function reachable(path: string): Promise<boolean> {
 export interface DanglingLink {
   path: string;
   /** What the link names, as written. */
+  linksTo: string;
   target: string;
-  harness: string;
 }
 
-/** Links of yours in a harness folder whose target is gone: the harness cannot load them. */
+/** Links of yours in a target folder whose target is gone: the target cannot load them. */
 export async function danglingLinks(
   roots: Roots,
-  harnesses: Harnesses,
+  targetTable: Targets,
   targets: readonly string[],
   lock: Lock,
 ): Promise<DanglingLink[]> {
@@ -236,7 +236,7 @@ export async function danglingLinks(
   const store = canonical(roots.artifacts);
   const seen = new Set<string>();
   const found: DanglingLink[] = [];
-  for (const { target, root, mapping } of kindDirs(roots, harnesses, targets, true)) {
+  for (const { target, root, mapping } of kindDirs(roots, targetTable, targets, true)) {
     const dir = join(root, mapping.subdir);
     if (seen.has(dir)) continue;
     seen.add(dir);
@@ -253,7 +253,7 @@ export async function danglingLinks(
       if (claimed.has(join(canonical(dir), item.name)) || (await reachable(path))) continue;
       const points = await readlink(path).catch(() => undefined);
       if (points === undefined || isWithin(store, resolve(canonical(dir), points))) continue;
-      found.push({ path, target: points, harness: target });
+      found.push({ path, linksTo: points, target });
     }
   }
   return found.sort((a, b) => a.path.localeCompare(b.path));

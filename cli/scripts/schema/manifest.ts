@@ -1,8 +1,19 @@
 import { Type } from "@sinclair/typebox";
 import { LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
-import { DEFAULT_TARGETS } from "#core/harness/index.ts";
+import { LEGACY_TARGETS_KEY } from "#core/manifest.ts";
+import { DEFAULT_TARGETS } from "#core/target/index.ts";
 
 /** The shape of `manifest.yml`. The parser stays the authority on what is accepted. */
+
+/** The earlier name of `targets`, which an editor marks as deprecated. */
+const Legacy = (minItems: number) =>
+  Type.Optional(
+    Type.Array(Type.String({ minLength: 1 }), {
+      ...(minItems > 0 ? { minItems } : {}),
+      deprecated: true,
+      description: "The earlier name of `targets`, still read; aireg rewrites it as `targets`.",
+    }),
+  );
 
 /** What each layout reads, which an editor shows beside the value it offers. */
 const LAYOUT_READS: Record<LayoutId, string> = {
@@ -100,16 +111,17 @@ const DetailedReference = Type.Object(
           "Members a whole registry or namespace leaves out, relative to `ref`, such as `skill/lint`.",
       }),
     ),
-    harnesses: Type.Optional(
+    targets: Type.Optional(
       Type.Array(Type.String({ minLength: 1 }), {
         minItems: 1,
-        description: "Harnesses this entry projects into, narrowing the manifest's `harnesses:`.",
+        description: "Targets this entry projects into, narrowing the manifest's `targets:`.",
       }),
     ),
+    [LEGACY_TARGETS_KEY]: Legacy(1),
     copy: Type.Optional(
       Type.Boolean({
         description:
-          "Copy into each harness folder rather than linking, as `aireg add --copy` records.",
+          "Copy into each target folder rather than linking, as `aireg add --copy` records.",
       }),
     ),
     trust: Type.Optional(
@@ -250,11 +262,12 @@ export const Manifest = Type.Object(
         { additionalProperties: false },
       ),
     ),
-    harnesses: Type.Optional(
+    targets: Type.Optional(
       Type.Array(Type.String({ minLength: 1 }), {
-        description: `Harnesses to install into, by name. Absent or empty means ${DEFAULT_TARGETS.join(" and ")}.`,
+        description: `Targets to install into, by name. Absent or empty means ${DEFAULT_TARGETS.join(" and ")}.`,
       }),
     ),
+    [LEGACY_TARGETS_KEY]: Legacy(0),
     registries: Type.Optional(
       Type.Record(Type.String(), AnyRegistry, {
         description: "Where artifacts come from, keyed by the alias a reference uses.",
@@ -263,7 +276,7 @@ export const Manifest = Type.Object(
     artifacts: Type.Optional(
       Type.Array(Type.Union([Reference, DetailedReference]), {
         description:
-          "A string reference, or `{ ref, as, exclude, harnesses, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
+          "A string reference, or `{ ref, as, exclude, targets, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
       }),
     ),
     exports: Type.Optional(
@@ -286,7 +299,7 @@ export const Manifest = Type.Object(
     $id: "manifest.schema.json",
     title: "manifest.yml",
     description:
-      "A project's manifest: the registries it installs from, the artifacts it wants, and the harnesses it projects into. Where this schema and the CLI disagree, the CLI is authoritative.",
+      "A project's manifest: the registries it installs from, the artifacts it wants, and the targets it projects into. Where this schema and the CLI disagree, the CLI is authoritative.",
     additionalProperties: false,
   },
 );

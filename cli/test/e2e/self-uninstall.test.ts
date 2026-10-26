@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect } from "vitest";
 import { gitRegistry } from "#test/kit/builders/registry.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { projected } from "#test/kit/harness.ts";
+import { projected } from "#test/kit/target.ts";
 
 // Startup files and POSIX service managers; on Windows PATH is the user's registry, which CI's
 // standalone install covers rather than a test on a developer's machine.

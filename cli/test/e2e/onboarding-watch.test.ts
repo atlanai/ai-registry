@@ -84,7 +84,7 @@ describe("setting up a project in one command", () => {
     };
     expect(listed.data.artifacts.find((row) => row.name === "platform/probe")).toMatchObject({
       ref: "0.1.0",
-      watched: { harness: "cursor", path: ".cursor/skills/probe" },
+      watched: { target: "cursor", path: ".cursor/skills/probe" },
     });
 
     await mkdir(join(root, "elsewhere", "probe"), { recursive: true });

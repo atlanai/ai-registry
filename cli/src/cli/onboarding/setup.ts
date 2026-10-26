@@ -9,7 +9,6 @@ import { underHome } from "#cli/render/home.ts";
 import { inGitHubActions, isCI, isSet } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
-import { detectAll, resolveHarnesses } from "#core/harness/index.ts";
 import { readManifest, writeManifest } from "#core/manifest.ts";
 import { Printer } from "#core/output.ts";
 import {
@@ -24,6 +23,7 @@ import { handOff } from "#core/process.ts";
 import { binDir, shimPath } from "#core/release/layout.ts";
 import { BINARY_NAME } from "#core/release/urls.ts";
 import { roots } from "#core/store/paths.ts";
+import { detectAll, resolveTargets } from "#core/target/index.ts";
 import { VERSION } from "#core/version.ts";
 import { probeDaemon, recycleDaemon } from "#daemon/service.ts";
 import { installBinaryFrom } from "#self/install.ts";
@@ -78,13 +78,13 @@ async function offerSkills(
   const manifest = await readManifest(user.manifest);
   if (manifest.registries[OWN_SKILLS_ALIAS] !== undefined) return;
 
-  const harnesses = resolveHarnesses();
-  const found = detectAll(harnesses, context.cwd).filter(
+  const targetTable = resolveTargets();
+  const found = detectAll(targetTable, context.cwd).filter(
     (item) => item.detected && !item.target.shared,
   );
   const names = list(found.map((item) => item.target.displayName));
   if (found.length === 0) {
-    const known = Object.values(harnesses).filter((target) => !target.shared);
+    const known = Object.values(targetTable).filter((target) => !target.shared);
     printer.info(
       `No ${list(
         known.map((target) => target.displayName),
@@ -128,8 +128,8 @@ async function offerSkills(
   };
   const spin = canAnimate(process.stderr) ? spinner(defaultIo(), printer.errStyle) : undefined;
   spin?.update(`Installing the aireg skills for ${names}`);
-  // A user scope with no harnesses yet takes the ones found here, so later -g installs reach
-  // them too; one someone already set is left, and only this entry names the harnesses.
+  // A user scope with no targets yet takes the ones found here, so later -g installs reach
+  // them too; one someone already set is left, and only this entry names the targets.
   const wanted = found.map((item) => item.target.name);
   const defaulted = manifest.targets.length === 0;
   if (defaulted) await writeManifest(user, { ...manifest, targets: wanted });

@@ -38,7 +38,7 @@ describe("the command surface", () => {
     expect(shown.stderr).toContain("Removed terminal control characters");
   });
 
-  test("says what a plugin would have a harness start", async ({ aireg, tmp: root }) => {
+  test("says what a plugin would have a target start", async ({ aireg, tmp: root }) => {
     const dir = join(root, "tools");
     await mkdir(join(dir, "hooks"), { recursive: true });
     await writeFile(join(dir, "README.md"), "# tools\n");
@@ -109,7 +109,7 @@ describe("the command surface", () => {
       aireg(["remove", "lint", "-y", "-v"]),
       aireg(["registry", "init", join(root, "dash"), "--description", "-h x"]),
       aireg(["add", "-h", "-v"]),
-      aireg(["harnesses", "-yq"]),
+      aireg(["targets", "-yq"]),
     ]);
     for (const [at, argv] of misplaced.entries()) {
       expect(ran[at]?.code, argv.join(" ")).toBe(2);

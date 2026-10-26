@@ -91,7 +91,7 @@ describe("applyLocal", () => {
   });
 
   it.skipIf(process.getuid?.() === 0 || process.platform === "win32")(
-    "refuses a harness folder it cannot write into before writing anything",
+    "refuses a target folder it cannot write into before writing anything",
     async () => {
       await mkdir(join(project, ".claude"), { recursive: true });
       await chmod(join(project, ".claude"), 0o555);

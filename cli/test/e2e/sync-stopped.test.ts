@@ -19,7 +19,7 @@ describe("a sync whose run is canceled before it finishes", () => {
     await registry(market).skill("acme/lint@1.0.0").write();
     await writeManifestIn(
       project,
-      `harnesses:\n  - claude\nregistries:\n  kit: ${JSON.stringify(market)}\nartifacts:\n  - kit/acme/skill/lint\n`,
+      `targets:\n  - claude\nregistries:\n  kit: ${JSON.stringify(market)}\nartifacts:\n  - kit/acme/skill/lint\n`,
     );
     expect((await aireg(["install"])).code).toBe(0);
     await registry(market).skill("acme/lint@1.0.0").skill("acme/lint@1.1.0").write();

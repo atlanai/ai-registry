@@ -38,8 +38,8 @@ const lock: Lock = {
       version: undefined,
       digest: "sha256:1",
       links: [
-        { harness: "claude", path: INSIDE, mode: "symlink" },
-        { harness: "claude", path: AT, mode: "symlink" },
+        { target: "claude", path: INSIDE, mode: "symlink" },
+        { target: "claude", path: AT, mode: "symlink" },
       ],
     },
   },
@@ -93,7 +93,7 @@ describe("status", () => {
     expect(status(lock, yours, base)[0]).toMatchObject({
       state: "dangling",
       detail: "claude: replaced by something of yours",
-      harnesses: { claude: "replaced" },
+      targets: { claude: "replaced" },
     });
   });
 
@@ -111,8 +111,8 @@ describe("status", () => {
   it("takes the worst state across artifacts", () => {
     expect(
       worstState([
-        { name: "a", state: "ok", detail: undefined, harnesses: {} },
-        { name: "b", state: "edited", detail: undefined, harnesses: {} },
+        { name: "a", state: "ok", detail: undefined, targets: {} },
+        { name: "b", state: "edited", detail: undefined, targets: {} },
       ]),
     ).toBe("edited");
   });
@@ -127,14 +127,14 @@ describe("links that could not be made", () => {
 
   it("are missing, naming what holds the path", () => {
     const [mine] = status(
-      blockedLock([{ harness: "codex", path: ".agents/skills/lint" }]),
+      blockedLock([{ target: "codex", path: ".agents/skills/lint" }]),
       survey(),
       base,
     );
     expect(mine).toMatchObject({ state: "missing", blocked: true });
     expect(mine?.detail).toBe("codex: something of yours is at .agents/skills/lint");
     const [theirs] = status(
-      blockedLock([{ harness: "codex", path: ".agents/skills/lint", by: "kit/other/skill/lint" }]),
+      blockedLock([{ target: "codex", path: ".agents/skills/lint", by: "kit/other/skill/lint" }]),
       survey(),
       base,
     );

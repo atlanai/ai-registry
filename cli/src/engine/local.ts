@@ -20,7 +20,7 @@ import {
   recoveredNotices,
   refuseBlocked,
   refusePlan,
-  resolveTargets,
+  selectTargets,
   unstagedNotices,
 } from "./pipeline.ts";
 import { narrowToRelinks, relinksIn } from "./relink.ts";
@@ -134,7 +134,7 @@ export async function applyLocal(
   if (recording.size === 0 && relinks.size === 0) return { changed: 0, notices: [] };
   // The caller holds the lease: it has to cover the publish that precedes this.
   const notices = recoveredNotices(loaded.roots, await prepareWrite(loaded));
-  const targets = resolveTargets(loaded.manifest, loaded.harnesses, common);
+  const targets = selectTargets(loaded.manifest, loaded.targetTable, common);
   const followed = followPublished(loaded, scan, published);
   const { restate } = followed;
   const plan = build(
@@ -145,7 +145,7 @@ export async function applyLocal(
     {
       roots: loaded.roots,
       targets,
-      harnesses: loaded.harnesses,
+      targetTable: loaded.targetTable,
       force,
       restate,
       copy: false,
@@ -175,7 +175,7 @@ export async function applyLocal(
   }
   notices.push(...followed.notices);
   notices.push(
-    ...appliedNotices(loaded.roots, result, loaded.harnesses),
+    ...appliedNotices(loaded.roots, result, loaded.targetTable),
     ...unstagedNotices(result.unstaged),
   );
   return {

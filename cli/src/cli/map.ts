@@ -29,7 +29,7 @@ export const ROOT_USAGE: readonly string[] = [
   "aireg help <command> [<action>]",
 ];
 /** What aireg is, in the one line `--help`, the bare command and `--map` open with. */
-export const ROOT_SUMMARY = "Install agent artifacts from any registry into any agent harness.";
+export const ROOT_SUMMARY = "Install agent artifacts from any registry into any coding agent.";
 
 export const ISSUES_URL = pkg.bugs.url;
 

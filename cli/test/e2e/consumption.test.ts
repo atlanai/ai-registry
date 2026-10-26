@@ -80,7 +80,7 @@ describe("consuming a registry like a package manager", () => {
     expect(added.code, added.stderr).toBe(0);
     expect(existsSync(join(project, "src", ".registry"))).toBe(false);
     expect(await read(".registry/manifest.yml")).toContain(`acme: ${market}`);
-    // Harnesses look one level deep, so a namespaced skill is linked flat.
+    // Targets look one level deep, so a namespaced skill is linked flat.
     expect((await lstat(join(project, ".claude", "skills", "lint"))).isSymbolicLink()).toBe(true);
   });
 

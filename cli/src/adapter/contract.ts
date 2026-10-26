@@ -152,7 +152,7 @@ export interface Capabilities {
   /** `publish` writes the file spec's own layout, so an agent travels as its folder's `AGENT.md`. */
   fileSpec?: boolean;
   /**
-   * Each namespace the source lists is one plugin: at user scope, a harness that loads plugins
+   * Each namespace the source lists is one plugin: at user scope, a target that loads plugins
    * gets the namespace as one, named after it, rather than each artifact on its own.
    */
   namespacePlugins?: boolean;

@@ -14,7 +14,6 @@ import {
 import { readConfig, writeConfig } from "#core/config/repository.ts";
 import { tokenVariable } from "#core/env.ts";
 import { ErrorCode } from "#core/errors.ts";
-import { DEFAULT_TARGETS } from "#core/harness/index.ts";
 import { stepContribution, stepOn } from "#core/host/load.ts";
 import { withLease } from "#core/lease.ts";
 import {
@@ -28,6 +27,7 @@ import { formatAddress, formatRef, parseRef, type Ref } from "#core/ref.ts";
 import { type Roots, roots, type Scope, scopeFor } from "#core/store/paths.ts";
 import type { SyncPolicy } from "#core/sync/policy.ts";
 import { OPTIONAL_AXES } from "#core/sync/policy.ts";
+import { DEFAULT_TARGETS } from "#core/target/index.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { ProtocolError } from "#daemon/rpc/protocol.ts";
 import { FOREGROUND_POLICY } from "#engine/foreground.ts";

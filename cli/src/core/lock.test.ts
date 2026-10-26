@@ -38,7 +38,7 @@ function lock(): Lock {
         content: "sha256:r",
         version: undefined,
         digest: "sha256:1",
-        links: [{ harness: "claude", path: ".claude/skills/review", mode: "symlink" }],
+        links: [{ target: "claude", path: ".claude/skills/review", mode: "symlink" }],
       },
       lint: {
         registry: "kit",
@@ -126,7 +126,7 @@ describe("parseLock", () => {
     expect(() => parseLock(row(""))).toThrow(/artifact "lint" it cannot read/);
     const linked = (mode: string) =>
       row(
-        `    kind: skill\n    links:\n      - {harness: claude, path: .claude/skills/lint, mode: ${mode}}\n`,
+        `    kind: skill\n    links:\n      - {target: claude, path: .claude/skills/lint, mode: ${mode}}\n`,
       );
     expect(parseLock(linked("copy")).artifacts.lint?.links[0]?.mode).toBe("copy");
     expect(() => parseLock(linked("hardlink"))).toThrow(/artifact "lint" it cannot read/);
@@ -149,12 +149,44 @@ describe("parseLock", () => {
       row("..", "    name: lint\n"),
       at("    path: ../outside\n"),
       at("    path: /etc\n"),
-      at("    links:\n      - {harness: claude, path: ../../.claude/skills/x, mode: symlink}\n"),
-      at("    links:\n      - {harness: claude, path: /abs/x, mode: symlink}\n"),
-      at("    origin: {harness: claude, path: .claude\\skills\\x, step: s}\n"),
+      at("    links:\n      - {target: claude, path: ../../.claude/skills/x, mode: symlink}\n"),
+      at("    links:\n      - {target: claude, path: /abs/x, mode: symlink}\n"),
+      at("    origin: {target: claude, path: .claude\\skills\\x, step: s}\n"),
     ]) {
       expect(() => parseLock(text), text).toThrow(/it cannot read/);
     }
+  });
+});
+
+describe("a lock an earlier aireg wrote", () => {
+  test("reads each `harness:` as `target:`, and writes `target:`", () => {
+    const text = [
+      "version: 1",
+      "registries:",
+      "  kit: { source: acme/kit, adapter: git, key: sha256:kit }",
+      "artifacts:",
+      "  lint:",
+      "    registry: kit",
+      "    name: lint",
+      "    kind: skill",
+      "    path: artifacts/lint",
+      "    digest: sha256:1",
+      "    origin: { harness: claude, path: .claude/skills/lint }",
+      "    links:",
+      "      - { harness: claude, path: .claude/skills/lint, mode: symlink }",
+      "    blocked:",
+      "      - { harness: codex, path: .agents/skills/lint }",
+      "",
+    ].join("\n");
+    const row = parseLock(text).artifacts.lint;
+    expect(row?.origin).toEqual({ target: "claude", path: ".claude/skills/lint", step: "" });
+    expect(row?.links).toEqual([
+      { target: "claude", path: ".claude/skills/lint", mode: "symlink" },
+    ]);
+    expect(row?.blocked).toEqual([{ target: "codex", path: ".agents/skills/lint" }]);
+    const written = formatLock(parseLock(text));
+    expect(written).not.toContain("harness");
+    expect(written).toContain("- target: claude\n");
   });
 });
 
@@ -197,7 +229,7 @@ describe("reading a lock", () => {
     '    content: "sha256:2222222222222222222222222222222222222222222222222222222222222222"',
     '    digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"',
     "    links:",
-    "      - harness: claude",
+    "      - target: claude",
     "        path: .claude/skills/lint",
     "        mode: symlink",
     "",

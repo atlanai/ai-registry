@@ -59,7 +59,7 @@ describe("moved", () => {
       kind: "skill",
       name: "probe",
       namespace: "team",
-      origin: { harness: "cursor", path: ".cursor/skills/probe", step: "origins" },
+      origin: { target: "cursor", path: ".cursor/skills/probe", step: "origins" },
     } as LockArtifact;
     const listed = [{ kind: "skill", name: "probe", group: "team", path: row.address }];
     expect(moved(serving([at("sha256:after", "4")], listed), yours)).toBe(true);

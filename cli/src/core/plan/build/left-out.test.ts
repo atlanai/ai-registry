@@ -32,13 +32,13 @@ describe("a version holding more files than it installs as", () => {
       {
         name: "helper",
         message:
-          "helper installs as its AGENT.md alone, since a harness takes an agent as one file, so notes.md is left out.",
+          "helper installs as its AGENT.md alone, since a target takes an agent as one file, so notes.md is left out.",
       },
     ]);
     const many = ["a.md", "b.md", "c.md", "d.md", "e.md", "f.md", "g.md"];
     const plan = build(manifest, emptyLock(), withLeftOut(many), { artifacts: {} }, PLAN_OPTIONS);
     expect(plan.warnings.map((warning) => warning.message)).toEqual([
-      "helper installs as its AGENT.md alone, since a harness takes an agent as one file, so a.md, b.md, c.md, d.md, e.md and 2 more files are left out.",
+      "helper installs as its AGENT.md alone, since a target takes an agent as one file, so a.md, b.md, c.md, d.md, e.md and 2 more files are left out.",
     ]);
   });
 });

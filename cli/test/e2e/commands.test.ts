@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { gitRegistry } from "#test/kit/builders/registry.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { projected } from "#test/kit/harness.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
+import { projected } from "#test/kit/target.ts";
 
 describe("a first-run mistake", () => {
   test("says a path for show does not exist", async ({ aireg, tmp }) => {
@@ -33,18 +33,18 @@ describe("a first-run mistake", () => {
     expect(fixed.code, fixed.stderr).toBe(0);
   });
 
-  test("refuses a harness it does not know, and installs into the ones it does", async ({
+  test("refuses a target it does not know, and installs into the ones it does", async ({
     aireg,
     git,
     project,
     tmp,
   }) => {
     const repo = await gitRegistry(git, join(tmp, "kit"));
-    const manifest = (harnesses: string) =>
+    const manifest = (targets: string) =>
       writeManifestIn(
         project,
         [
-          `harnesses: [${harnesses}]`,
+          `targets: [${targets}]`,
           `registries: { kit: { source: ${JSON.stringify(`file://${repo}`)}, ref: v1 } }`,
           "artifacts: [kit/skill/lint]",
           "",
@@ -54,7 +54,7 @@ describe("a first-run mistake", () => {
     await manifest("myagent");
     const refused = await aireg(["install"]);
     expect(refused.code).not.toBe(0);
-    expect(refused.stderr).toContain('No harness named "myagent".');
+    expect(refused.stderr).toContain('No target named "myagent".');
     expect(refused.stderr).toContain(
       "Use agents, claude, codex, copilot, cursor, gemini or opencode",
     );

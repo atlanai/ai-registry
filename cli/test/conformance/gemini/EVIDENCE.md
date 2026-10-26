@@ -1,12 +1,12 @@
 # Gemini CLI evidence
 
-Every path, variable, detection signal, file format and command in `src/harnesses/gemini.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
+Every path, variable, detection signal, file format and command in `src/targets/gemini.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
 
-1. the harness's official documentation: the exact sentence, its URL and the date it was read;
-2. the harness's public source, where the documentation is silent: repository, file, line and commit;
-3. a real install of the harness: the command run, the harness version and its output.
+1. the target's official documentation: the exact sentence, its URL and the date it was read;
+2. the target's public source, where the documentation is silent: repository, file, line and commit;
+3. a real install of the target: the command run, the target version and its output.
 
-A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/harnesses/gemini.json` and `gemini.test.ts` match this file exactly.
+A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/targets/gemini.json` and `gemini.test.ts` match this file exactly.
 
 Every page below was read on 2026-10-19, as the Markdown copy the site serves at the URL given. Source lines are in https://github.com/google-gemini/gemini-cli at tag `v0.63.0`, commit `573846625af9e93b3b968e0e0b86bb093a4c9b16`, the release tested. Install output comes from Gemini CLI 0.63.0 run with `HOME` and `GEMINI_CLI_HOME` set to a sandbox folder (`<sandbox>` below), with no account.
 
@@ -56,7 +56,7 @@ Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 
 ## L2 probes
 
-The harness's own commands that list what aireg placed, and what each printed. `gemini.test.ts` runs both after installing the fixtures in the project and in the user scope, with `GEMINI_CLI_HOME` set to the sandbox home.
+The target's own commands that list what aireg placed, and what each printed. `gemini.test.ts` runs both after installing the fixtures in the project and in the user scope, with `GEMINI_CLI_HOME` set to the sandbox home.
 
 - `gemini skills list`, from the home folder (https://geminicli.com/docs/cli/cli-reference.md, "List all discovered agent skills"). It needs no account. It also loads every agent as the CLI starts and prints each one it fails to load, so the test checks it printed none:
   ```text
@@ -82,7 +82,7 @@ Not available:
 
 ## Left out
 
-- **`plugin` as an extension.** Gemini CLI loads a linked `~/.gemini/extensions/<plugin>/` with a `gemini-extension.json` (aireg's manifest plus a fixed `version`), but it reads the extension's `agents/` as written, linked or copied (`place: "copy"` copies the same folder), beside the copy the agent codec writes to `~/.gemini/agents/`, and warns of a duplicate agent; an agent with keys Gemini CLI does not read would fail to load there. Until aireg leaves out of a plugin folder the kinds a harness rewrites, a namespace lands as its parts (`shape: "contents"`): its skills in `~/.gemini/skills/`, its agents in `~/.gemini/agents/`.
-- **`.agents` before `.gemini` for skills.** Gemini CLI reads both, but finds the user `.agents` folder under `GEMINI_CLI_HOME`, which the shared `~/.agents` folder does not follow. So a skill for Gemini CLI alone lands in `.gemini/skills/`, and only one shared with a harness that reads `.agents` alone lands in `.agents/skills/`; with `GEMINI_CLI_HOME` set to another folder, Gemini CLI does not see that shared user copy.
+- **`plugin` as an extension.** Gemini CLI loads a linked `~/.gemini/extensions/<plugin>/` with a `gemini-extension.json` (aireg's manifest plus a fixed `version`), but it reads the extension's `agents/` as written, linked or copied (`place: "copy"` copies the same folder), beside the copy the agent codec writes to `~/.gemini/agents/`, and warns of a duplicate agent; an agent with keys Gemini CLI does not read would fail to load there. Until aireg leaves out of a plugin folder the kinds a target rewrites, a namespace lands as its parts (`shape: "contents"`): its skills in `~/.gemini/skills/`, its agents in `~/.gemini/agents/`.
+- **`.agents` before `.gemini` for skills.** Gemini CLI reads both, but finds the user `.agents` folder under `GEMINI_CLI_HOME`, which the shared `~/.agents` folder does not follow. So a skill for Gemini CLI alone lands in `.gemini/skills/`, and only one shared with a target that reads `.agents` alone lands in `.agents/skills/`; with `GEMINI_CLI_HOME` set to another folder, Gemini CLI does not see that shared user copy.
 - **The project agent acknowledgement.** Gemini CLI asks for it in a session, for each agent and again after each change to its file; no command takes it, so it is described, not a `trust` entry.
-- **`restrictions` on the agent codec.** Gemini CLI reads `tools`, the one key that limits an agent here, so the codec keeps it as written. The keys other harnesses limit an agent with (`allowed-tools`, `disallowedTools`, `permissionMode`, `permission`) are ones Gemini CLI cannot read, and the codec refuses to drop them by default, so an agent that sets one is not written for Gemini CLI.
+- **`restrictions` on the agent codec.** Gemini CLI reads `tools`, the one key that limits an agent here, so the codec keeps it as written. The keys other targets limit an agent with (`allowed-tools`, `disallowedTools`, `permissionMode`, `permission`) are ones Gemini CLI cannot read, and the codec refuses to drop them by default, so an agent that sets one is not written for Gemini CLI.

@@ -12,7 +12,7 @@ const test = base.extend("kit", async ({ tmp }) =>
 
 describe("the tools a result names", () => {
   // Cursor reads both from folders Claude Code and Codex get, so nothing is written for it.
-  test("include one an entry's own harnesses add, though it needed no folder", async ({
+  test("include one an entry's own targets add, though it needed no folder", async ({
     aireg,
     kit,
   }) => {

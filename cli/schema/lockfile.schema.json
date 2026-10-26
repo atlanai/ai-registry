@@ -131,7 +131,7 @@
             },
             "carried": {
               "pattern": "^sha256:[0-9a-f]{64}$",
-              "description": "A digest of what a plugin has a harness start, so a background job sees it change.",
+              "description": "A digest of what a plugin has a target start, so a background job sees it change.",
               "type": "string"
             },
             "path": {
@@ -149,11 +149,11 @@
               "additionalProperties": false,
               "type": "object",
               "required": [
-                "harness",
+                "target",
                 "path"
               ],
               "properties": {
-                "harness": {
+                "target": {
                   "minLength": 1,
                   "description": "Whose folder conventions it follows.",
                   "type": "string"
@@ -177,14 +177,14 @@
                 "additionalProperties": false,
                 "type": "object",
                 "required": [
-                  "harness",
+                  "target",
                   "path",
                   "mode"
                 ],
                 "properties": {
-                  "harness": {
+                  "target": {
                     "minLength": 1,
-                    "description": "Harness name.",
+                    "description": "Target name.",
                     "type": "string"
                   },
                   "path": {
@@ -214,7 +214,7 @@
                   },
                   "digest": {
                     "pattern": "^sha256:[0-9a-f]{64}$",
-                    "description": "A copy's digest as written, so an edit to the harness's own copy is seen.",
+                    "description": "A copy's digest as written, so an edit to the target's own copy is seen.",
                     "type": "string"
                   }
                 }
@@ -237,13 +237,13 @@
                 "additionalProperties": false,
                 "type": "object",
                 "required": [
-                  "harness",
+                  "target",
                   "path"
                 ],
                 "properties": {
-                  "harness": {
+                  "target": {
                     "minLength": 1,
-                    "description": "Harness name.",
+                    "description": "Target name.",
                     "type": "string"
                   },
                   "path": {

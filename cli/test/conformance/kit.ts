@@ -6,13 +6,13 @@ import { join, relative, sep } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { onPath } from "#adapter/paths.ts";
-import { resolveHarnesses } from "#core/harness/index.ts";
+import { resolveTargets } from "#core/target/index.ts";
 import { registry } from "#test/kit/builders/registry.ts";
 import { homeEnv } from "#test/kit/home.ts";
 import { runCli } from "#test/kit/run.ts";
 import { testRoot } from "#test/kit/temp.ts";
 
-/** One command of the harness's own that lists what it loaded, and what its output holds. */
+/** One command of the target's own that lists what it loaded, and what its output holds. */
 export interface Probe {
   /** Run from the project for `project`, from the home folder for `user`. */
   scope: "project" | "user";
@@ -20,12 +20,12 @@ export interface Probe {
   expect: (string | RegExp)[];
 }
 
-/** What a conformance test knows about one harness, each part as its EVIDENCE.md records it. */
+/** What a conformance test knows about one target, each part as its EVIDENCE.md records it. */
 export interface Conformance {
   id: string;
-  /** Variables the harness reads to find its folders, each pointed into the sandbox's home. */
+  /** Variables the target reads to find its folders, each pointed into the sandbox's home. */
   env?: (home: string) => Record<string, string>;
-  /** A harness file to define it with, for one that is not built in. */
+  /** A target file to define it with, for one that is not built in. */
   file?: unknown;
   /** L2: runs only with AIREG_CONFORMANCE=1 and `argv[0]` on PATH. */
   probes?: Probe[];
@@ -43,12 +43,12 @@ const AGENT = "---\nname: reviewer\ndescription: Reviews a change.\n---\n\nRevie
 const PLANNER = "---\nname: planner\ndescription: Plans a change.\n---\n\nPlan the work.\n";
 const SHIP = "---\nname: ship\ndescription: Ships a change.\n---\n\nShip it.\n";
 
-/** Folders aireg keeps for itself, which no harness reads. */
+/** Folders aireg keeps for itself, which no target reads. */
 const OWN = [".aireg", ".registry", ".run", "fixtures", join("project", ".registry")];
 
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 
-/** An adapter serving the namespace `kit`, which a harness that takes plugins loads as one. */
+/** An adapter serving the namespace `kit`, which a target that takes plugins loads as one. */
 function pluginAdapter(): string {
   const artifact = (kind: string, name: string, body: string) => ({
     id: `${kind}_${name}`,
@@ -94,10 +94,10 @@ async function sandbox(spec: Conformance): Promise<Sandbox> {
   const env = { ...homeEnv(home), ...spec.env?.(home) };
   await mkdir(project, { recursive: true });
   await mkdir(env.XDG_RUNTIME_DIR as string, { recursive: true, mode: 0o700 });
-  await mkdir(join(env.AIREG_HOME as string, "harnesses"), { recursive: true, mode: 0o700 });
+  await mkdir(join(env.AIREG_HOME as string, "targets"), { recursive: true, mode: 0o700 });
   if (spec.file !== undefined) {
     await writeFile(
-      join(env.AIREG_HOME as string, "harnesses", `${spec.id}.json`),
+      join(env.AIREG_HOME as string, "targets", `${spec.id}.json`),
       JSON.stringify(spec.file),
     );
   }
@@ -123,7 +123,7 @@ async function must(ran: ReturnType<Sandbox["aireg"]>): Promise<void> {
   expect(code, `${stdout}\n${stderr}`).toBe(0);
 }
 
-/** Every path the harness could read, with what each holds, sandbox paths written as `~`. */
+/** Every path the target could read, with what each holds, sandbox paths written as `~`. */
 function tree(home: string): string {
   const lines: string[] = [];
   const redact = (text: string) => text.replaceAll(home, "~");
@@ -156,7 +156,7 @@ async function installUser(box: Sandbox, id: string): Promise<void> {
   await must(box.aireg([...plugin, "--for", id, "--no-auto-update", "-y"]));
 }
 
-/** Registers L1 for a harness, and L2 where its program is installed and asked for. */
+/** Registers L1 for a target, and L2 where its program is installed and asked for. */
 export function conformance(spec: Conformance): void {
   const golden = (scope: string) => join(import.meta.dirname, spec.id, `${scope}.tree`);
   const probes = spec.probes ?? [];
@@ -167,9 +167,9 @@ export function conformance(spec: Conformance): void {
   const programs = [...new Set(probes.map((probe) => probe.argv[0]))].join(", ");
   // A skipped test shows only its name, so the name says what would run it.
   const l2 = live
-    ? "L2: the harness lists what aireg placed"
+    ? "L2: the target lists what aireg placed"
     : probes.length === 0
-      ? "L2: not run, since no command of the harness lists what it loaded"
+      ? "L2: not run, since no command of the target lists what it loaded"
       : `L2: runs with AIREG_CONFORMANCE=1 and ${programs} on PATH`;
 
   // Windows places a link as a junction or a copy, so its trees differ by design.
@@ -184,15 +184,15 @@ export function conformance(spec: Conformance): void {
 
     test.afterAll(() => dispose(box));
 
-    // A built-in harness has a JSON copy, which proves a file can say all it does.
-    test.skipIf(spec.file !== undefined)("its JSON twin resolves to the same harness", async () => {
+    // A built-in target has a JSON copy, which proves a file can say all it does.
+    test.skipIf(spec.file !== undefined)("its JSON twin resolves to the same target", async () => {
       const env = { HOME: box.home, AIREG_HOME: join(box.home, "twin") };
-      const builtIn = resolveHarnesses(env)[spec.id];
-      await mkdir(join(env.AIREG_HOME, "harnesses"), { recursive: true });
-      const twin = join(import.meta.dirname, "..", "fixtures", "harnesses", `${spec.id}.json`);
+      const builtIn = resolveTargets(env)[spec.id];
+      await mkdir(join(env.AIREG_HOME, "targets"), { recursive: true });
+      const twin = join(import.meta.dirname, "..", "fixtures", "targets", `${spec.id}.json`);
       try {
-        await copyFile(twin, join(env.AIREG_HOME, "harnesses", `${spec.id}.json`));
-        expect({ ...resolveHarnesses(env)[spec.id], origin: "built-in" }).toEqual(builtIn);
+        await copyFile(twin, join(env.AIREG_HOME, "targets", `${spec.id}.json`));
+        expect({ ...resolveTargets(env)[spec.id], origin: "built-in" }).toEqual(builtIn);
       } finally {
         await rm(env.AIREG_HOME, { recursive: true, force: true });
       }
@@ -208,13 +208,13 @@ export function conformance(spec: Conformance): void {
       await expect(tree(box.home)).toMatchFileSnapshot(golden("user"));
     });
 
-    // A harness's own root stays, emptied, as it does for a folder the harness made itself.
+    // A target's own root stays, emptied, as it does for a folder the target made itself.
     test("L1: remove takes back every file and link it placed", async () => {
       await removeAll(box);
       expect(placed(tree(box.home))).toEqual(placed(before));
     });
 
-    // A sandbox of its own: the harness may write its own state as it runs.
+    // A sandbox of its own: the target may write its own state as it runs.
     test.skipIf(!live)(
       l2,
       async () => {
@@ -227,7 +227,7 @@ export function conformance(spec: Conformance): void {
             const cwd = probe.scope === "project" ? own.project : own.home;
             const { stdout, stderr } = await run(program, args, {
               cwd,
-              env: { ...harnessEnv(process.env), ...own.env },
+              env: { ...targetEnv(process.env), ...own.env },
               timeout: 60_000,
             });
             for (const want of probe.expect) expect(`${stdout}${stderr}`).toMatch(want);
@@ -244,7 +244,7 @@ export function conformance(spec: Conformance): void {
 const run = promisify(execFile);
 
 /** A probe never signs in, and runs without this machine's credentials or the runner's variables. */
-function harnessEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+function targetEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const kept = (name: string) =>
     !/token|key|secret|password|auth|askpass|cred/i.test(name) && !name.startsWith("VITEST");
   return Object.fromEntries(Object.entries(env).filter(([name]) => kept(name)));

@@ -34,7 +34,7 @@ async function landing(path: string): Promise<string> {
 }
 
 /**
- * For a person's own file, such as a harness config: written through a link, so one a
+ * For a person's own file, such as a target config: written through a link, so one a
  * dotfiles manager placed stays linked, and with the mode it has. A new one is owner-only.
  */
 export async function rewriteAtomic(path: string, contents: string): Promise<void> {

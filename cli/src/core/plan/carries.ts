@@ -11,7 +11,7 @@ import type { Roots } from "#core/store/paths.ts";
 import type { Plan } from "./model.ts";
 
 /**
- * What a harness starts on its own from a plugin it loads: commands that run as you, not
+ * What a target starts on its own from a plugin it loads: commands that run as you, not
  * instructions an agent reads. Named by the plugin manifest key that declares each.
  */
 export type Carried = "hooks" | "mcpServers" | "lspServers" | "monitors" | "bin";
@@ -46,7 +46,7 @@ function declared(manifest: Record<string, unknown>): Carried[] {
   );
 }
 
-/** What the plugin at `root` would have a harness start; empty for anything that is not a folder. */
+/** What the plugin at `root` would have a target start; empty for anything that is not a folder. */
 export async function carries(root: string): Promise<Carried[]> {
   const dir = await realpath(root).catch(() => undefined);
   if (dir === undefined || !(await isDirectory(dir))) return [];
@@ -54,7 +54,7 @@ export async function carries(root: string): Promise<Carried[]> {
   const verified = new Set<string>();
   for (const [path, what] of FILES) {
     const file = await readRegular(dir, path, verified);
-    // A harness follows a link where this read does not, so a linked file still counts.
+    // A target follows a link where this read does not, so a linked file still counts.
     if (file.kind === "file" || (file.kind === "refused" && file.reason === "is a symlink")) {
       found.add(what);
     }
@@ -67,13 +67,13 @@ export async function carries(root: string): Promise<Carried[]> {
       const manifest: unknown = JSON.parse(file.bytes.toString("utf8"));
       if (isRecord(manifest)) for (const what of declared(manifest)) found.add(what);
     } catch {
-      // A harness refuses a manifest it cannot parse, so it starts nothing from it.
+      // A target refuses a manifest it cannot parse, so it starts nothing from it.
     }
   }
   return ORDER.filter((what) => found.has(what));
 }
 
-/** Whether a plugin file is one a harness starts or puts on the PATH, which a fingerprint covers. */
+/** Whether a plugin file is one a target starts or puts on the PATH, which a fingerprint covers. */
 function carrying(path: string): Carried | undefined {
   const named = FILES.find(([file]) => file === path)?.[1];
   if (named !== undefined) return named;
@@ -84,7 +84,7 @@ function carrying(path: string): Carried | undefined {
 }
 
 /**
- * What a plugin would have a harness start, read from its envelope and the manifest it is
+ * What a plugin would have a target start, read from its envelope and the manifest it is
  * placed by, before any of it is fetched; and a digest of those parts, which moves when they do.
  */
 export function carriedIn(
@@ -113,7 +113,7 @@ export function describeCarried(carried: readonly Carried[]): string {
   return list(carried.map((what) => WORDS[what]));
 }
 
-/** Plugins this plan installs or updates that carry something a harness starts on its own. */
+/** Plugins this plan installs or updates that carry something a target starts on its own. */
 export async function carriedBy(
   plan: Plan,
   lock: Lock | undefined,

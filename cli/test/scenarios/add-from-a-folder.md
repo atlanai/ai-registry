@@ -17,7 +17,7 @@ $ aireg add ../kit/artifacts/kit/skill/lint/1.0.0 -y
 ...
 $ aireg list
 1 installed in this project
-  artifact  kind   version       from  harnesses
+  artifact  kind   version       from  targets
   lint      skill  1.0.0 pinned  kit   Claude Code, Codex
 ```
 
@@ -39,7 +39,7 @@ $ aireg add [ROOT]/kit/artifacts/kit/skill/deploy -y
 ...
 $ aireg list
 2 installed in this project
-  artifact  kind   version       from  harnesses
+  artifact  kind   version       from  targets
   deploy    skill  1.0.0         kit   Claude Code, Codex
   lint      skill  1.0.0 pinned  kit   Claude Code, Codex
 ```

@@ -48,13 +48,13 @@ async function holdsOnly(to: string, rendered: { file: string; text: string }): 
   return (await readFile(rendered.file, "utf8").catch(() => undefined)) === rendered.text;
 }
 
-/** Filed by harness and the directory it sat in, the layout a claimed folder uses too. */
+/** Filed by target and the directory it sat in, the layout a claimed folder uses too. */
 export async function backUp(
   to: string,
-  harness: string,
+  target: string,
   roots: RemovableRoots,
   stamp: string,
 ): Promise<string> {
   await assertRemovable(to, roots);
-  return moveToBackup(to, roots, stamp, join(harness, basename(dirname(to)), basename(to)));
+  return moveToBackup(to, roots, stamp, join(target, basename(dirname(to)), basename(to)));
 }

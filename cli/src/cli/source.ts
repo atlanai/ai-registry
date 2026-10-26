@@ -70,7 +70,7 @@ export interface Probed {
   versionOf: (entry: Entry) => string | undefined;
   /** The spec's indexable string pairs on an entry, which a search reads as tags. */
   labelsOf: (entry: Entry) => Readonly<Record<string, string>> | undefined;
-  /** What a plugin from a source that is not a registry would have a harness start. */
+  /** What a plugin from a source that is not a registry would have a target start. */
   carriesOf: (entry: Entry) => readonly Carried[];
   /** The bytes an entry names, fetched now if they are not already here. */
   content: (entry: Entry) => Promise<string>;

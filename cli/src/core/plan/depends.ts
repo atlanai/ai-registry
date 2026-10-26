@@ -226,7 +226,7 @@ function descendants(start: string, forward: ReadonlyMap<string, readonly string
 }
 
 /**
- * A dependency lands in the harnesses its dependents were narrowed to: the union
+ * A dependency lands in the targets its dependents were narrowed to: the union
  * over every manifest artifact that reaches it, or the scope's own when one is not narrowed.
  */
 function inheritTargets(
@@ -238,7 +238,7 @@ function inheritTargets(
   for (const [to, froms] of neededBy) {
     for (const from of froms) forward.set(from, [...(forward.get(from) ?? []), to]);
   }
-  // Undefined is the scope's harnesses, which nothing narrower can add to.
+  // Undefined is the scope's targets, which nothing narrower can add to.
   const narrowed = new Map<string, readonly string[] | undefined>();
   for (const item of top) {
     for (const id of descendants(selectedId(item), forward)) {

@@ -68,7 +68,7 @@ const add = (id: string, skill: string) => [
 ];
 
 describe("a source that declares its namespaces plugins", () => {
-  test("installs its namespace as one plugin per harness, with a row per skill", async ({
+  test("installs its namespace as one plugin per target, with a row per skill", async ({
     aireg,
     adapters: home,
     tmp,
@@ -96,7 +96,7 @@ describe("a source that declares its namespaces plugins", () => {
 });
 
 describe("a source that does not", () => {
-  test("installs each skill as itself, where each harness reads it", async ({
+  test("installs each skill as itself, where each target reads it", async ({
     aireg,
     adapters: home,
     tmp,

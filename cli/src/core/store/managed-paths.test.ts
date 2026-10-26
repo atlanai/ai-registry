@@ -60,7 +60,7 @@ test("refuses a redirected projection before assembling it", async () => {
   plan.actions.push({
     kind: "link",
     name: "demo",
-    harness: "claude",
+    target: "claude",
     from: join(projection, "demo"),
     to: join(roots.cwd, ".claude", "skills", "demo"),
     copy: false,
@@ -146,15 +146,15 @@ test("refuses redirected staging before starting a fetch", async () => {
   expect(await exists(roots.applyJournal)).toBe(false);
 });
 
-test("keeps a shared harness root and an explicitly selected user scope working", async () => {
+test("keeps a shared target root and an explicitly selected user scope working", async () => {
   const scope = join(home, "user-scope");
   await mkdir(scope);
   const alias = join(home, "scope-alias");
   await symlink(scope, alias);
   roots = makeRoots("user", roots.cwd, { AIREG_USER_SCOPE: alias });
   const copy = join(roots.artifacts, "demo");
-  const harness = join(home, "shared-harness");
-  await symlink(outside, harness);
+  const target = join(home, "shared-target");
+  await symlink(outside, target);
   const plan = emptyPlan();
   plan.actions.push(
     { kind: "stage", name: "demo", source: "acme", path: "skill/demo", to: source },
@@ -162,9 +162,9 @@ test("keeps a shared harness root and an explicitly selected user scope working"
     {
       kind: "link",
       name: "demo",
-      harness: "claude",
+      target: "claude",
       from: copy,
-      to: join(harness, "demo"),
+      to: join(target, "demo"),
       copy: false,
     },
   );

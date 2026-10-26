@@ -52,7 +52,7 @@ function lockWith(): Lock {
     content: "sha256:c",
     version: "1",
     digest: "sha256:d",
-    links: [{ harness: "agents", path: ".agents/skills/hello", mode: "symlink" }],
+    links: [{ target: "agents", path: ".agents/skills/hello", mode: "symlink" }],
   };
   return lock;
 }
@@ -67,7 +67,7 @@ function linkPlan(recorded?: LinkMode, copy = false): { plan: Plan; lock: Lock }
         {
           kind: "link",
           name: "ws/hello",
-          harness: "agents",
+          target: "agents",
           from: store,
           to: join(root, ".agents", "skills", "hello"),
           copy,
@@ -134,7 +134,7 @@ describe("a link over something already at its destination", () => {
   });
 });
 
-describe("a destination reached through a harness folder that is a link", () => {
+describe("a destination reached through a target folder that is a link", () => {
   const outside = () => join(root, "outside");
 
   beforeEach(async () => {
@@ -157,7 +157,7 @@ describe("a destination reached through a harness folder that is a link", () => 
     expect(result.kept).toHaveLength(1);
   });
 
-  test("still replaces its own link there, as a shared harness folder has", async () => {
+  test("still replaces its own link there, as a shared target folder has", async () => {
     await rm(join(outside(), "hello"), { recursive: true });
     await symlink(store, join(outside(), "hello"));
     const result = await apply(linkPlan("symlink").plan, roots, fetch);
@@ -173,9 +173,7 @@ describe("a recorded link going away", () => {
   function unlinkPlan(mode: LinkMode): Plan {
     return {
       ...emptyPlan(),
-      actions: [
-        { kind: "unlink", name: "ws/hello", to: dest(), link: { harness: "agents", mode } },
-      ],
+      actions: [{ kind: "unlink", name: "ws/hello", to: dest(), link: { target: "agents", mode } }],
     };
   }
 

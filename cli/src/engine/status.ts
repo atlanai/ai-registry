@@ -4,7 +4,7 @@ import { type Candidate, displayPath } from "#core/sync/adopt.ts";
 import type { Disposition } from "#core/sync/model.ts";
 import { operation, type SyncOperation } from "#core/sync/policy.ts";
 import { inspect } from "./inspect.ts";
-import { resolveTargets } from "./pipeline.ts";
+import { selectTargets } from "./pipeline.ts";
 import { closeScan } from "./scan.ts";
 import type { ScopeWork } from "./work.ts";
 
@@ -70,6 +70,6 @@ export async function watchStatus(
       })),
     local: found.local.map(place),
     undeclared: found.undeclared.map(place),
-    targets: resolveTargets(loaded.manifest, loaded.harnesses, common),
+    targets: selectTargets(loaded.manifest, loaded.targetTable, common),
   };
 }

@@ -2,10 +2,10 @@ import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import { registerBuiltinAdapters } from "#adapters/index.ts";
-import { resolveHarnesses } from "#core/harness/index.ts";
 import { Printer } from "#core/output.ts";
 import type { TrustedKeys } from "#core/release/keyring.ts";
 import type { ReleaseStamp } from "#core/release/stamp.ts";
+import { resolveTargets } from "#core/target/index.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { run } from "./doctor.ts";
 import type { CommandContext } from "./index.ts";
@@ -66,14 +66,14 @@ describe("doctor", () => {
     stub.stamp = undefined;
   });
 
-  test("checks the machine, and lists no harnesses", async () => {
+  test("checks the machine, and lists no targets", async () => {
     const writes: string[] = [];
     await run(context(cwd, writes));
     const payload = JSON.parse(writes.join("")) as { data: { checks: { name: string }[] } };
     const names = payload.data.checks.map((check) => check.name);
     expect(names).toContain("symlinks");
-    // `aireg harnesses` is the one place tools are listed.
-    for (const harness of Object.keys(resolveHarnesses())) expect(names).not.toContain(harness);
+    // `aireg targets` is the one place tools are listed.
+    for (const target of Object.keys(resolveTargets())) expect(names).not.toContain(target);
   });
 
   // Windows keeps no POSIX permission bits for the owner-only check to read.

@@ -19,7 +19,7 @@ const RANKS: Record<string, number> = {
   accounts: 3,
   adapters: 3,
   core: 2,
-  harnesses: 1,
+  targets: 1,
   adapter: 0,
 };
 
@@ -96,11 +96,11 @@ function layerRefusal(from: string, to: string): string | undefined {
   if (to === "main.ts") return "main.ts is the entry point, imported by nobody";
   if (under(from, "adapter") && !under(to, "adapter")) return "the adapter contract stands alone";
 
-  if (under(from, "harnesses") && !under(to, "harnesses")) {
-    // The contract sits in core, which loads the built-in harnesses.
-    return to === "core/harness/contract.ts"
+  if (under(from, "targets") && !under(to, "targets")) {
+    // The contract sits in core, which loads the built-in targets.
+    return to === "core/target/contract.ts"
       ? undefined
-      : "a harness definition imports only the harness contract";
+      : "a target definition imports only the target contract";
   }
 
   const adapter = child(from, "adapters");

@@ -159,7 +159,7 @@ function heldBack(
 }
 
 /**
- * A plugin whose new version adds or changes what a harness runs as you waits for a person,
+ * A plugin whose new version adds or changes what a target runs as you waits for a person,
  * even trusted: a sync, and a background job above all, never applies that on its own.
  */
 function carriesMoved(item: Selected, previous: LockArtifact | undefined): string | undefined {

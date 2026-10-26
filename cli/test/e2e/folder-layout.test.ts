@@ -40,7 +40,7 @@ function kit(root: string) {
 }
 
 describe("a folder of skills on this machine", () => {
-  test("installs into every harness, under plain names, and records and names its layout", async ({
+  test("installs into every target, under plain names, and records and names its layout", async ({
     aireg,
     initialised,
     project,

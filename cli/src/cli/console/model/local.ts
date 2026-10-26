@@ -4,10 +4,10 @@ import type { ArtifactRow } from "#core/console/model.ts";
 import { LOCAL_SOURCE } from "#core/console/model.ts";
 import type { Carrier } from "#core/console/runs.ts";
 import { canonical } from "#core/fs/canonical.ts";
-import type { Harnesses } from "#core/harness/contract.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { candidates } from "#core/sync/adopt.ts";
+import type { Targets } from "#core/target/contract.ts";
 
 /** Folders an adapter job already carries, by path, from its newest finished run. */
 export type Carried = ReadonlyMap<string, Carrier>;
@@ -97,7 +97,7 @@ function classify(
  */
 export async function localWork(
   roots: Roots,
-  harnesses: Harnesses,
+  targetTable: Targets,
   lock: Lock,
   /** The names the manifest asks for. */
   declared: ReadonlySet<string> = new Set(),
@@ -109,7 +109,7 @@ export async function localWork(
   for (const entry of Object.values(lock.artifacts)) {
     tracked.set(entry.name, { from: addressOf(entry) });
   }
-  const found = await candidates(roots, harnesses, Object.keys(harnesses), lock);
+  const found = await candidates(roots, targetTable, Object.keys(targetTable), lock);
   const rows: ArtifactRow[] = [];
   for (const item of [...found.local, ...found.undeclared]) {
     const carrier = carriers.get(canonical(item.from));

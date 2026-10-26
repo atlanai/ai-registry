@@ -8,7 +8,7 @@ import { isSha256Hex, sha256Hex, shortHash } from "#core/fs/hash.ts";
 import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { homeDir } from "#core/fs/path.ts";
 import { type ArtifactKind, kindDir, stagedLeaf } from "#core/kinds.ts";
-import { HOME_DIR } from "#core/product.ts";
+import { HOME_DIR, LEGACY_TARGETS_DIR, TARGETS_DIR } from "#core/product.ts";
 
 /** Where a command installs: this project, or `-g` for the user. */
 export const SCOPES = ["user", "project"] as const;
@@ -74,9 +74,14 @@ export function adaptersDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), "adapters");
 }
 
-/** Harness definitions of your own, one JSON file each. */
-export function harnessesDir(env: NodeJS.ProcessEnv = process.env): string {
-  return join(toolHome(env), "harnesses");
+/** Target definitions of your own, one JSON file each. */
+export function targetsDir(env: NodeJS.ProcessEnv = process.env): string {
+  return join(toolHome(env), TARGETS_DIR);
+}
+
+/** Where target definitions were kept before, still read beside `targetsDir`. */
+export function legacyTargetsDir(env: NodeJS.ProcessEnv = process.env): string {
+  return join(toolHome(env), LEGACY_TARGETS_DIR);
 }
 
 /**

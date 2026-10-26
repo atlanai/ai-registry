@@ -66,7 +66,7 @@ export function heldElsewhere(
   );
 }
 
-/** Every namespace this plan holds, per harness: what it installs and what others hold. */
+/** Every namespace this plan holds, per target: what it installs and what others hold. */
 export function namespaceWants(
   selected: readonly Selected[],
   carried: ReadonlyMap<string, string>,
@@ -78,8 +78,8 @@ export function namespaceWants(
     if (carried.has(item.name)) continue;
     if (item.kind !== "plugin" && !build.wrapping.has(item.source)) continue;
     const namespace = namespaceOf(item);
-    for (const harness of item.targets ?? build.options.targets) {
-      wants.push({ harness, namespace, source: item.source });
+    for (const target of item.targets ?? build.options.targets) {
+      wants.push({ target, namespace, source: item.source });
     }
   }
   for (const [name, entry] of held) {
@@ -95,8 +95,8 @@ export function namespaceWants(
         entry.kind === "plugin" ||
         pluginLinkAt(link, namespace, entry.registry, build.options) !== undefined,
     );
-    for (const harness of new Set(holding.map((link) => link.harness))) {
-      wants.push({ harness, namespace, source: entry.registry });
+    for (const target of new Set(holding.map((link) => link.target))) {
+      wants.push({ target, namespace, source: entry.registry });
     }
   }
   return wants;

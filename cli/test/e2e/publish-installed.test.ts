@@ -42,7 +42,7 @@ describe("publishing an installed copy", () => {
     expect((await aireg(["status"], { cwd: project })).code).toBe(0);
   });
 
-  test("publishes an installed copy named by its harness link", async ({ aireg, project }) => {
+  test("publishes an installed copy named by its target link", async ({ aireg, project }) => {
     await appendFile(join(project, ".claude", "skills", "deploy", "SKILL.md"), "Roll back.\n");
 
     const sent = await aireg(["publish", ".claude/skills/deploy", "--yes"], { cwd: project });

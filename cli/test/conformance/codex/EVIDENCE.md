@@ -1,12 +1,12 @@
 # Codex evidence
 
-Every path, variable, detection signal, file format and command in `src/harnesses/codex.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
+Every path, variable, detection signal, file format and command in `src/targets/codex.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
 
-1. the harness's official documentation: the exact sentence, its URL and the date it was read;
-2. the harness's public source, where the documentation is silent: repository, file, line and commit;
-3. a real install of the harness: the command run, the harness version and its output.
+1. the target's official documentation: the exact sentence, its URL and the date it was read;
+2. the target's public source, where the documentation is silent: repository, file, line and commit;
+3. a real install of the target: the command run, the target version and its output.
 
-A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/harnesses/codex.json` and `codex.test.ts` match this file exactly.
+A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/targets/codex.json` and `codex.test.ts` match this file exactly.
 
 ## Versions tested
 
@@ -59,7 +59,7 @@ Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 
 ## L2 probes
 
-The harness's own commands that list what aireg placed, and what each printed. `codex.test.ts` runs the first three with `CODEX_HOME=<home>/codex-home`; none needs an account.
+The target's own commands that list what aireg placed, and what each printed. `codex.test.ts` runs the first three with `CODEX_HOME=<home>/codex-home`; none needs an account.
 
 - `codex debug prompt-input`, from the project, prints the skills Codex offers the model. The plugin's skill root is where its linked `skills` folder leads:
 
@@ -94,5 +94,5 @@ After `aireg remove ns/lint` in each scope, both `codex debug prompt-input` prob
 - **A plugin in a project.** Codex installs every plugin into the user cache. A project can turn a plugin on in its own `.codex/config.toml` only once Codex trusts the project, with the plugin offered by a marketplace in the repository, so aireg installs plugins in your user scope alone.
 - **The portable root `plugin.json`.** Codex reads it ahead of `.codex-plugin/plugin.json` and then skips every linked skill in the plugin.
 - **`policy` and `category` in the marketplace entry.** Codex loads the plugin without them, and no value for `category` follows from what aireg installs.
-- **`reload`.** Codex needs a new session for a new plugin or agent, but sees skill changes on its own; a harness's `reload` is printed after every change.
+- **`reload`.** Codex needs a new session for a new plugin or agent, but sees skill changes on its own; a target's `reload` is printed after every change.
 - **Agent probes in `codex.test.ts`.** No Codex command lists agents without a model session.

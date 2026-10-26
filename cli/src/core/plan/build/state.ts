@@ -1,23 +1,23 @@
 import type { NameCollision } from "#core/config/model.ts";
-import type { Harnesses } from "#core/harness/index.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Acquired, Action, Clash, Rewritten, Survey, Warning } from "#core/plan/model.ts";
 import type { PlannedLink } from "#core/plan/projection.ts";
 import type { Roots } from "#core/store/paths.ts";
+import type { Targets } from "#core/target/index.ts";
 
 export interface BuildOptions {
   roots: Roots;
-  /** Harness names to project into, already resolved from manifest or detection. */
+  /** Target names to project into, already resolved from manifest or detection. */
   targets: readonly string[];
-  /** The built-in harness table. */
-  harnesses: Harnesses;
+  /** The built-in target table. */
+  targetTable: Targets;
   /** Overwrite or remove a project copy that was edited after installation. */
   force: boolean;
   /** Rows whose local edits this run may delete: what `remove` was told to take. */
   discard?: ReadonlySet<string>;
   /** Rows whose copy this run published and the source now serves, so its copy replaces them. */
   restate?: ReadonlySet<string>;
-  /** Place real copies instead of links, for harnesses that will not follow them. */
+  /** Place real copies instead of links, for targets that will not follow them. */
   copy: boolean;
   /**
    * Re-read every source rather than trusting the lock. A source that reports
@@ -48,13 +48,13 @@ export interface BuildState {
   next: Lock;
   warnings: Warning[];
   rewritten: Rewritten[];
-  /** Plugin parts can collide in one harness path: the first writer wins, loudly. */
+  /** Plugin parts can collide in one target path: the first writer wins, loudly. */
   claimed: Map<string, string>;
   /** Plugin directories claimed, by the namespace content each links: its artifacts share it. */
   plugins: Map<string, string>;
   /** By installed name, where each artifact of this run would link before any claim. */
   wants: Map<string, readonly PlannedLink[]>;
-  /** Harness paths the lockfile records for this run's artifacts, by the one that holds each. */
+  /** Target paths the lockfile records for this run's artifacts, by the one that holds each. */
   recorded: Map<string, string>;
   /** One link action per destination: a plugin is shared by its whole namespace. */
   linked: Set<string>;

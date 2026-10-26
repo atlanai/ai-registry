@@ -140,7 +140,7 @@ function report(context: CommandContext, done: Found): void {
   else if (done.daemon) printer.success("Stopped the daemon.");
   else if (done.autostart) printer.success("Turned off autostart.");
   if (done.links.length > 0) {
-    printer.success(`Removed ${plural(done.links.length, "link")} from harness folders.`);
+    printer.success(`Removed ${plural(done.links.length, "link")} from target folders.`);
     for (const link of done.links) printer.info(`  ${underHome(link)}`);
   }
   if (done.startupFiles.length > 0) {

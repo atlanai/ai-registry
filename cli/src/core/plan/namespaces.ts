@@ -13,7 +13,7 @@ export function wrapsNamespaces(adapter: Pick<SourceAdapter, "capabilities">): b
  */
 export function wrappedInLock(
   rows: readonly (readonly [string, LockArtifact])[],
-  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+  options: Pick<ProjectionOptions, "roots" | "targetTable">,
 ): boolean {
   return rows.some(
     ([name, row]) =>

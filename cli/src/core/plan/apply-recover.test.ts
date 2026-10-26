@@ -32,7 +32,7 @@ function locked(): Lock {
     content: "sha256:upstream",
     version: undefined,
     digest: "sha256:1",
-    links: [{ harness: "claude", path: ".claude/skills/lint", mode: "symlink" }],
+    links: [{ target: "claude", path: ".claude/skills/lint", mode: "symlink" }],
   };
   return lock;
 }

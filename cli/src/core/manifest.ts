@@ -74,7 +74,7 @@ export interface Manifest {
   description: string | undefined;
   /** Oldest aireg CLI that can read this file. Plain SemVer, meaning >=. */
   engine: string | undefined;
-  /** `harnesses:`, the harnesses to project into. Empty means every harness detected. */
+  /** `targets:`, the targets to project into. Empty means every target detected. */
   targets: string[];
   /** `registries:`, keyed by the name a reference uses. */
   registries: Record<string, RegistrySource>;
@@ -116,13 +116,17 @@ export type ExportDependency = { type: "local"; path: string } | { type: "remote
 export { type ExportFile, isGlob } from "./export-fields.ts";
 export { ManifestError } from "./manifest-error.ts";
 
+/** The earlier name of `targets:`, still read and rewritten as `targets:`. */
+export const LEGACY_TARGETS_KEY = "harnesses";
+
 /** The published schema is held to this list. */
 export const MANIFEST_KEYS = [
   "$schema",
   "name",
   "description",
   "engines",
-  "harnesses",
+  "targets",
+  LEGACY_TARGETS_KEY,
   "registries",
   "artifacts",
   "exports",
@@ -144,7 +148,15 @@ export const EXPORT_KEYS = [
 /** Every transport's keys; which are legal together is checked below. */
 export const REGISTRY_KEYS = ["source", "adapter", "ref", "path", "layout", "config"] as const;
 
-const ARTIFACT_KEYS = ["ref", "as", "exclude", "harnesses", "copy", "trust"] as const;
+const ARTIFACT_KEYS = [
+  "ref",
+  "as",
+  "exclude",
+  "targets",
+  LEGACY_TARGETS_KEY,
+  "copy",
+  "trust",
+] as const;
 
 /**
  * One failure for a registry a scope does not declare, wherever it is looked
@@ -286,12 +298,25 @@ function parseSource(alias: string, raw: unknown): RegistrySource {
   };
 }
 
-// Names are checked against the harness table, which the parser does not load.
+/** `targets:`, or the earlier `harnesses:`; a mapping with both is ambiguous. */
+function selectionOf(entry: Record<string, unknown>, where: string): unknown {
+  const current = entry.targets;
+  const legacy = entry[LEGACY_TARGETS_KEY];
+  if (current != null && legacy != null) {
+    throw new ManifestError(
+      `${where} has both \`targets:\` and \`${LEGACY_TARGETS_KEY}:\`, which is its earlier name.`,
+      `Keep \`targets:\` and delete \`${LEGACY_TARGETS_KEY}:\`.`,
+    );
+  }
+  return current ?? legacy;
+}
+
+// Names are checked against the target table, which the parser does not load.
 function parseSelection(raw: unknown, key: string): string[] {
   if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw)) throw new ManifestError(`\`${key}:\` must be a list of harness names.`);
+  if (!Array.isArray(raw)) throw new ManifestError(`\`${key}:\` must be a list of target names.`);
   return raw.map((entry) => {
-    if (typeof entry !== "string") throw new ManifestError(`\`${key}:\` must list harness names.`);
+    if (typeof entry !== "string") throw new ManifestError(`\`${key}:\` must list target names.`);
     return entry;
   });
 }
@@ -307,7 +332,7 @@ function artifactRef(raw: unknown): Ref {
   if (text === undefined) throw new ManifestError("An `artifacts:` entry has no `ref`.");
   const localName = optionalString(entry, "as");
   const exclude = stringList(entry.exclude, text, "exclude");
-  const targets = stringList(entry.harnesses, text, "harnesses");
+  const targets = stringList(selectionOf(entry, `Artifact ${quoted(text)}`), text, "targets");
   const trust = stringList(entry.trust, text, "trust");
   if (entry.copy !== undefined && typeof entry.copy !== "boolean") {
     throw new ManifestError(`\`copy\` of artifact ${quoted(text)} must be true or false.`);
@@ -622,7 +647,7 @@ function parseFields(root: Record<string, unknown>): Manifest {
 function parseKnownFields(root: Record<string, unknown>): Manifest {
   onlyKnown(root, MANIFEST_KEYS, "The manifest");
   const registries = parseRegistries(root);
-  const targets = parseSelection(root.harnesses, "harnesses");
+  const targets = parseSelection(selectionOf(root, "The manifest"), "targets");
 
   const artifacts: Ref[] = [];
   if (root.artifacts !== undefined && root.artifacts !== null) {
@@ -680,7 +705,7 @@ function manifestData(manifest: Manifest): Record<string, unknown> {
   if (manifest.name !== undefined) doc.name = manifest.name;
   if (manifest.description !== undefined) doc.description = manifest.description;
   if (manifest.engine !== undefined) doc.engines = { [NAME]: manifest.engine };
-  if (manifest.targets.length > 0) doc.harnesses = manifest.targets;
+  if (manifest.targets.length > 0) doc.targets = manifest.targets;
 
   const registries: Record<string, unknown> = {};
   for (const alias of Object.keys(manifest.registries).sort()) {
@@ -702,7 +727,7 @@ function manifestData(manifest: Manifest): Record<string, unknown> {
       ref: formatRef(ref),
       as: ref.localName,
       exclude: ref.exclude,
-      harnesses: ref.targets,
+      targets: ref.targets,
       copy: ref.copy === true ? true : undefined,
       trust: ref.trust?.length ? [...ref.trust].sort() : undefined,
     });
@@ -843,10 +868,23 @@ function separateSections(doc: Document): void {
   }
 }
 
+/** `harnesses:` renamed where it stands, so its comments move with it. */
+function renameLegacyKeys(doc: Document): void {
+  const maps: unknown[] = [doc.contents];
+  const artifacts = isMap(doc.contents) ? doc.contents.get("artifacts") : undefined;
+  if (isSeq(artifacts)) maps.push(...artifacts.items);
+  for (const map of maps) {
+    if (!isMap(map)) continue;
+    const pair = map.items.find((item) => keyOf(item.key) === LEGACY_TARGETS_KEY);
+    if (pair !== undefined && isScalar(pair.key)) pair.key.value = "targets";
+  }
+}
+
 /** Edited in place, so a person's comments and blank lines survive. */
 function editManifest(text: string, manifest: Manifest): string {
   const doc: Document = parseDocument(text);
   if (doc.errors.length > 0) return formatManifest(manifest);
+  renameLegacyKeys(doc);
   separateSections(doc);
   doc.contents = merged(doc, doc.contents, manifestData(manifest)) as Document["contents"];
   const first = isMap(doc.contents) ? doc.contents.items[0]?.key : undefined;

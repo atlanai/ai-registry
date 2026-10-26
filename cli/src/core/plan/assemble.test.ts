@@ -17,7 +17,7 @@ async function publish(kindDir: string, leaf: string): Promise<void> {
   await writeFile(join(dir, leaf), "body\n");
 }
 
-// One directory serves every harness only if every kind the namespace publishes is linked.
+// One directory serves every target only if every kind the namespace publishes is linked.
 describe("assembling a projection", () => {
   test("links every kind directory the namespace publishes", async () => {
     await publish("skills", "lint");
@@ -67,7 +67,7 @@ describe("assembling a projection", () => {
     expect(await readFile(mcp, "utf8")).toBe('{"mcpServers":{}}\n');
   });
 
-  test("writes one manifest per harness that reads it, and no portable root", async () => {
+  test("writes one manifest per target that reads it, and no portable root", async () => {
     await publish("skills", "lint");
     await assemble(projection(), content(), ["claude", "codex"]);
 
@@ -79,7 +79,7 @@ describe("assembling a projection", () => {
       await readFile(join(projection(), ".claude-plugin", "plugin.json"), "utf8"),
     ) as { name: string };
     // Named after the projection, not the content: two registries' `engineering` namespaces
-    // assemble into differently named projections, and a harness keys plugins by name.
+    // assemble into differently named projections, and a target keys plugins by name.
     expect(manifest.name).toBe("projection");
     const codex = join(projection(), ".codex-plugin", "plugin.json");
     expect(JSON.parse(await readFile(codex, "utf8"))).toEqual({

@@ -34,7 +34,7 @@ export function changesFrom(held: Side | undefined, sent: Side): Changes {
   const heldFiles = held?.files ?? [];
   const [entry] = heldFiles;
   const [sole] = sent.files;
-  // A sole file on each side is the entry, which a harness may name <name>.md and a registry AGENT.md.
+  // A sole file on each side is the entry, which a target may name <name>.md and a registry AGENT.md.
   const compared =
     heldFiles.length === 1 && sent.files.length === 1 && entry && sole
       ? [{ path: sole.path, digest: entry.digest }]

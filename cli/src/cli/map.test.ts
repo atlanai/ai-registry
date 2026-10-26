@@ -88,7 +88,7 @@ describe("runMap", () => {
     expect(code).toBe(ExitCode.Ok);
     const text = out.join("");
     expect(text).toContain(
-      "aireg\tInstall agent artifacts from any registry into any agent harness.",
+      "aireg\tInstall agent artifacts from any registry into any coding agent.",
     );
     expect(text).toContain("  aireg add\tInstall artifacts from a registry");
     expect(text).toContain("    aireg registry add");

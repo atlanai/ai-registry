@@ -17,7 +17,7 @@ import { builtin, type CommandContext } from "./index.ts";
 
 export async function run(context: CommandContext): Promise<void> {
   const { common, positionals } = parse(context.argv, builtin("list"));
-  const { roots, manifest, harnesses, lock } = await load(common, context.cwd, "user");
+  const { roots, manifest, targetTable, lock } = await load(common, context.cwd, "user");
 
   // Naming one asks where it came from, which is the only question left once
   // you can already see it in the list.
@@ -37,12 +37,12 @@ export async function run(context: CommandContext): Promise<void> {
   }
 
   // Named as they were chosen, not by the folders that serve them: JSON keeps the folders.
-  const scope = scopeTargets(manifest, harnesses);
+  const scope = scopeTargets(manifest, targetTable);
   const tools = (row: Installed): string => {
     const entry = lock.artifacts[row.name];
     if (entry === undefined) return row.targets.join(", ");
-    return loadedBy(harnesses, chosenFor(manifest, scope, entry), entry.kind, row.targets)
-      .map((name) => toolName(harnesses, name))
+    return loadedBy(targetTable, chosenFor(manifest, scope, entry), entry.kind, row.targets)
+      .map((name) => toolName(targetTable, name))
       .join(", ");
   };
 
@@ -52,14 +52,14 @@ export async function run(context: CommandContext): Promise<void> {
     [
       ...identity(context.printer, (row: Installed) => row),
       {
-        header: "harnesses",
+        header: "targets",
         value: (row: Installed) =>
           context.printer.style.dim(
             row.targets.length > 0
               ? tools(row)
               : row.watched !== undefined
-                ? `${toolName(harnesses, row.watched.harness)} (watched)`
-                : "in no harness",
+                ? `${toolName(targetTable, row.watched.target)} (watched)`
+                : "in no target",
           ),
       },
     ],
@@ -139,9 +139,9 @@ async function detail(
   // an edit changes.
   rows.push(["copy", copy]);
   if (entry.origin !== undefined)
-    rows.push(["watched", `${entry.origin.path} (${entry.origin.harness})`]);
+    rows.push(["watched", `${entry.origin.path} (${entry.origin.target})`]);
   add("needed by", entry.neededBy?.join(", "));
-  for (const link of entry.links) rows.push([link.harness, `${link.path} (${link.mode})`]);
+  for (const link of entry.links) rows.push([link.target, `${link.path} (${link.mode})`]);
 
   context.printer.info(
     `${context.printer.style.bold(name)}  ${context.printer.style.dim(entry.kind)}`,

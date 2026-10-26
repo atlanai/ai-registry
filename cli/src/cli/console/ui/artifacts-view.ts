@@ -195,7 +195,7 @@ export function artifactsView(props: {
     box(
       { marginTop: 1 },
       faint(
-        `  ${pad("NAME", cols.name)}${pad("VERSION", cols.version)}${pad("HARNESSES", cols.targets)}` +
+        `  ${pad("NAME", cols.name)}${pad("VERSION", cols.version)}${pad("TARGETS", cols.targets)}` +
           `${pad("STATE", cols.state)}${pad("CHANGED", cols.changed)}`,
       ),
     ),

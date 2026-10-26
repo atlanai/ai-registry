@@ -6,8 +6,8 @@ import { descriptionText, frontmatter } from "#core/catalog/frontmatter.ts";
 import type { Entry } from "#core/catalog/model.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { isDirectory } from "#core/fs/tree.ts";
-import { readTable } from "#core/harness/register/toml.ts";
 import type { ArtifactKind, KindSpec } from "#core/kinds.ts";
+import { readTable } from "#core/target/register/toml.ts";
 
 type KindDir = KindSpec & { kind: ArtifactKind };
 
@@ -35,7 +35,7 @@ async function describe(
   }
 }
 
-/** A harness's own TOML, such as a Codex agent: its name and description are top-level keys. */
+/** A target's own TOML, such as a Codex agent: its name and description are top-level keys. */
 async function describeToml(
   file: string,
   fallback: string,
@@ -61,7 +61,7 @@ async function directoryEntry(
   spec: Omit<KindDir, "dir">,
   group: string | undefined,
 ): Promise<Entry | undefined> {
-  // Harnesses keep folders of their own beside artifacts; one without the
+  // Targets keep folders of their own beside artifacts; one without the
   // entry file its kind declares is not that kind, and a publish is refused.
   const marker = spec.entry === undefined ? undefined : join(full, spec.entry);
   if (marker !== undefined && !(await isFile(marker))) return undefined;
@@ -116,7 +116,7 @@ async function linked(path: string): Promise<Stats | undefined> {
   }
 }
 
-/** Scan one kind directory using the same naming rules for sources and harnesses. */
+/** Scan one kind directory using the same naming rules for sources and targets. */
 export async function entriesIn(
   root: string,
   dir: string,

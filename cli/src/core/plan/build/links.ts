@@ -13,7 +13,7 @@ type Blocked = NonNullable<LockArtifact["blocked"]>[number];
 
 interface Claimed {
   links: PlannedLink[];
-  /** Harnesses, by display name, that cannot load this kind. */
+  /** Targets, by display name, that cannot load this kind. */
   skipped: Set<string>;
   /** Paths another artifact already holds. */
   blocked: Blocked[];
@@ -35,12 +35,12 @@ function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const address = addressOf({ ...item, name: item.upstreamName }, item.source);
   build.addresses.set(item.name, address);
   const wrapped = build.wrapping.has(item.source);
-  const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (harness) => {
-    skipped.add(build.options.harnesses[harness]?.displayName ?? harness);
+  const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (target) => {
+    skipped.add(build.options.targetTable[target]?.displayName ?? target);
   });
   const collided = (owner: string, link: PlannedLink) => {
     const kept = build.addresses.get(owner) ?? owner;
-    blocked.push({ harness: link.harness, path: link.relative, by: kept });
+    blocked.push({ target: link.target, path: link.relative, by: kept });
     if (!build.clashes.some((clash) => clash.dropped === address && clash.kept === kept)) {
       // A plugin's parts each land under a name of their own, which is the one that collided.
       const name = item.kind === "plugin" ? partName(link.relative) : item.name;
@@ -88,7 +88,7 @@ export function placeLinks(
   let refused = false;
   let yours = false;
   const links = claimed.links.filter((link) => {
-    // The folder of yours this row came from is already there, and its harness loads it.
+    // The folder of yours this row came from is already there, and its target loads it.
     if (link.relative === previous?.origin?.path) {
       yours = true;
       return false;
@@ -108,11 +108,11 @@ export function placeLinks(
   if (links.length === 0 && claimed.blocked.length === 0 && !refused && !yours) {
     const why =
       claimed.skipped.size === 0
-        ? `no selected harness accepts a ${item.kind}`
+        ? `no selected target accepts a ${item.kind}`
         : `${list([...claimed.skipped])} cannot load ${item.kind}s`;
     build.warnings.push({
       name: item.name,
-      message: `${quoted(item.name)} was fetched but installed into no harness: ${why}.`,
+      message: `${quoted(item.name)} was fetched but installed into no target: ${why}.`,
     });
   }
   return { links, blocked: claimed.blocked };
@@ -177,7 +177,7 @@ function linkAction(
   return {
     kind: "link",
     name: item.name,
-    harness: link.harness,
+    target: link.target,
     from: link.from,
     to: link.absolute,
     copy: how.copy,
@@ -211,7 +211,7 @@ function inPlace(
   );
 }
 
-/** A harness's own copy that was edited stays as it is unless forced; planning has said so. */
+/** A target's own copy that was edited stays as it is unless forced; planning has said so. */
 function keepsEditedCopy(
   prior: LockArtifact["links"][number] | undefined,
   state: ArtifactSurvey | undefined,
@@ -230,6 +230,6 @@ function noteRenamed(
   if (link.renamed === undefined || recorded !== undefined) return;
   build.warnings.push({
     name: item.name,
-    message: `The namespace ${quoted(link.renamed.namespace)} is also published by another registry, so ${link.harness} loads the one from ${item.source} as ${quoted(link.renamed.name)}.`,
+    message: `The namespace ${quoted(link.renamed.namespace)} is also published by another registry, so ${link.target} loads the one from ${item.source} as ${quoted(link.renamed.name)}.`,
   });
 }

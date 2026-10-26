@@ -4,10 +4,10 @@ import { dirname } from "node:path";
 import { isAbsent } from "#core/fs/path.ts";
 import type { Plan } from "./model.ts";
 
-/** A harness a plan would write into, and the directory that would refuse it. */
+/** A target a plan would write into, and the directory that would refuse it. */
 export interface BlockedTarget {
-  /** Harness table id, such as `cursor`. */
-  harness: string;
+  /** Target table id, such as `cursor`. */
+  target: string;
   /** The nearest existing directory above the link, which is what refuses. */
   path: string;
 }
@@ -44,16 +44,16 @@ async function writable(path: string): Promise<boolean> {
 }
 
 /**
- * The harnesses a plan cannot be applied into. `apply` creates each link's
+ * The targets a plan cannot be applied into. `apply` creates each link's
  * parent as it goes, so an unwritable root fails partway on a bare errno.
  */
 export async function blockedTargets(plan: Plan): Promise<BlockedTarget[]> {
   const blocked = new Map<string, BlockedTarget>();
   for (const action of plan.actions) {
-    if (action.kind !== "link" || blocked.has(action.harness)) continue;
+    if (action.kind !== "link" || blocked.has(action.target)) continue;
     const ancestor = await existingAncestor(dirname(action.to));
     if (ancestor === undefined || (await writable(ancestor))) continue;
-    blocked.set(action.harness, { harness: action.harness, path: ancestor });
+    blocked.set(action.target, { target: action.target, path: ancestor });
   }
-  return [...blocked.values()].sort((left, right) => left.harness.localeCompare(right.harness));
+  return [...blocked.values()].sort((left, right) => left.target.localeCompare(right.target));
 }

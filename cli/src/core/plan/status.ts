@@ -11,7 +11,7 @@ const STATES = ["ok", "missing", "dangling", "edited"] as const;
 
 export type State = (typeof STATES)[number];
 
-/** How one harness sees an artifact; a harness reached by several links takes the worst. */
+/** How one target sees an artifact; a target reached by several links takes the worst. */
 export type LinkState = "linked" | "missing" | "replaced" | "foreign";
 
 const LINK_STATES: readonly LinkState[] = ["linked", "missing", "replaced", "foreign"];
@@ -20,7 +20,7 @@ export interface ArtifactStatus {
   name: string;
   state: State;
   detail: string | undefined;
-  harnesses: Record<string, LinkState>;
+  targets: Record<string, LinkState>;
   /** A requested link that `install` cannot make while something else holds the path. */
   blocked?: true;
   /** Another artifact holds it, rather than a folder of yours. */
@@ -51,11 +51,11 @@ export function status(lock: Lock, survey: Survey, roots: Roots): ArtifactStatus
       detail = "edited after installation";
     }
 
-    const harnesses: Record<string, LinkState> = {};
-    const see = (harness: string, seen: LinkState): void => {
-      const before = harnesses[harness];
+    const targets: Record<string, LinkState> = {};
+    const see = (target: string, seen: LinkState): void => {
+      const before = targets[target];
       if (before === undefined || LINK_STATES.indexOf(seen) > LINK_STATES.indexOf(before)) {
-        harnesses[harness] = seen;
+        targets[target] = seen;
       }
     };
 
@@ -66,21 +66,21 @@ export function status(lock: Lock, survey: Survey, roots: Roots): ArtifactStatus
         worst = worse(worst, found.state);
         detail ??= found.detail;
       }
-      see(link.harness, found.seen);
+      see(link.target, found.seen);
     }
 
     const [held] = entry.blocked ?? [];
     if (held !== undefined) {
       worst = worse(worst, "missing");
       detail ??= blockedDetail(held);
-      for (const each of entry.blocked ?? []) see(each.harness, "missing");
+      for (const each of entry.blocked ?? []) see(each.target, "missing");
     }
 
     out.push({
       name,
       state: worst,
       detail,
-      harnesses,
+      targets,
       ...((entry.blocked?.length ?? 0) > 0 ? { blocked: true as const } : {}),
       ...(entry.blocked?.some((held) => held.by !== undefined) ? { taken: true as const } : {}),
     });
@@ -94,13 +94,13 @@ export function worstState(statuses: readonly ArtifactStatus[]): State {
 }
 
 /** What holds a path a link needed: a folder of yours, or another artifact. */
-function blockedDetail(held: { harness: string; path: string; by?: string | undefined }): string {
+function blockedDetail(held: { target: string; path: string; by?: string | undefined }): string {
   return held.by === undefined
-    ? `${held.harness}: something of yours is at ${held.path}`
-    : `${held.harness}: ${held.by} is installed at ${held.path}`;
+    ? `${held.target}: something of yours is at ${held.path}`
+    : `${held.target}: ${held.by} is installed at ${held.path}`;
 }
 
-/** How one recorded link looks on disk: the state it adds, why, and what its harness sees. */
+/** How one recorded link looks on disk: the state it adds, why, and what its target sees. */
 function linkFinding(
   link: Lock["artifacts"][string]["links"][number],
   state: Survey["artifacts"][string] | undefined,
@@ -108,14 +108,14 @@ function linkFinding(
 ): { state: State; detail?: string; seen: LinkState } {
   const observed = state?.links[link.path];
   if (observed?.present !== true) {
-    return { state: "missing", detail: `${link.harness}: not installed`, seen: "missing" };
+    return { state: "missing", detail: `${link.target}: not installed`, seen: "missing" };
   }
   // A copy is a real file by definition. Anywhere else a real file means the
-  // link was replaced, and the harness is served content we do not own.
+  // link was replaced, and the target is served content we do not own.
   if (link.mode !== "copy" && !observed.isLink) {
     return {
       state: "dangling",
-      detail: `${link.harness}: replaced by something of yours`,
+      detail: `${link.target}: replaced by something of yours`,
       seen: "replaced",
     };
   }
@@ -125,14 +125,14 @@ function linkFinding(
   if (target !== undefined && !isWithin(ours, target)) {
     return {
       state: "dangling",
-      detail: `${link.harness}: links to ${sanitizeText(target)}, not to ${NAME}'s copy`,
+      detail: `${link.target}: links to ${sanitizeText(target)}, not to ${NAME}'s copy`,
       seen: "foreign",
     };
   }
   if (copyEdited(link, state)) {
     return {
       state: "edited",
-      detail: `${link.harness}: its copy was edited after installation`,
+      detail: `${link.target}: its copy was edited after installation`,
       seen: "linked",
     };
   }

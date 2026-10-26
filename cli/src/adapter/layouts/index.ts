@@ -48,7 +48,7 @@ function layoutOf(id: LayoutId): Layout | undefined {
 
 /**
  * What the source lists, narrowed to the wants; a want it does not list is left to the caller.
- * A plugin brings its members, which is what a harness without plugins installs instead.
+ * A plugin brings its members, which is what a target without plugins installs instead.
  */
 function chosen(found: readonly Artifact[], wanted: readonly Want[], all: boolean): Artifact[] {
   if (all || wanted.length === 0) return [...found];

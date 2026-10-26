@@ -5,9 +5,9 @@ import type { SourceConfig } from "#core/adapter/identity.ts";
 import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import type { Codec, KeyFile } from "#core/harness/contract.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
+import type { Codec, KeyFile } from "#core/target/contract.ts";
 import type { Carried } from "./carries.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
 import type { Untrusted } from "./select.ts";
@@ -131,19 +131,19 @@ export type Action =
   /** Fetch and stage content only when this action is applied. */
   | { kind: "stage"; name: string; source: string; path: string; to: string }
   /**
-   * This scope's own writable copy of a staged version directory. A harness is
+   * This scope's own writable copy of a staged version directory. A target is
    * pointed at the copy, never at the mirror, so an edit stops in this scope.
    */
   | { kind: "clone"; name: string; from: string; to: string }
   | {
       kind: "link";
       name: string;
-      /** Harness name, as on `LockLink`. */
-      harness: string;
+      /** Target name, as on `LockLink`. */
+      target: string;
       from: string;
       to: string;
       copy: boolean;
-      /** Points the harness at a whole plugin, which has to be assembled. */
+      /** Points the target at a whole plugin, which has to be assembled. */
       plugin?: boolean;
       /** The content this projection links to. Present with `plugin`. */
       content?: string;
@@ -155,13 +155,13 @@ export type Action =
       recorded?: LinkMode;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
-      /** Written in the harness's own format. */
+      /** Written in the target's own format. */
       codec?: Codec;
       /** A plugin's command, written as a skill a person invokes under this name. */
       command?: string;
-      /** Front-matter keys a harness reading this folder does not read as written. */
+      /** Front-matter keys a target reading this folder does not read as written. */
       keys?: Record<string, KeyRule>;
-      /** The kind of the plugin part this places, where a harness takes the plugin as its parts. */
+      /** The kind of the plugin part this places, where a target takes the plugin as its parts. */
       part?: ArtifactKind;
       /** Written as a real folder holding this file. */
       entry?: string;
@@ -174,8 +174,8 @@ export type Action =
       to: string;
       /** This scope's copy, holding edits made after installation. */
       edited?: boolean;
-      /** The harness link the lock recorded here, when this is one. */
-      link?: { harness: string; mode: LinkMode };
+      /** The target link the lock recorded here, when this is one. */
+      link?: { target: string; mode: LinkMode };
     }
   | { kind: "record"; lock: Lock };
 
@@ -265,7 +265,7 @@ export interface Survey {
   artifacts: Record<string, ArtifactSurvey>;
 }
 
-/** A harness's copy that no longer matches what was written there. */
+/** A target's copy that no longer matches what was written there. */
 export function copyEdited(
   link: { path: string; mode: LinkMode; digest?: string | undefined },
   state: ArtifactSurvey | undefined,
@@ -292,7 +292,7 @@ export function editedHere(
   );
 }
 
-/** Edited in this scope's copy or in a harness's own copy, so not ours to replace unasked. */
+/** Edited in this scope's copy or in a target's own copy, so not ours to replace unasked. */
 export function editedAnywhere(
   entry: LockArtifact | undefined,
   state: ArtifactSurvey | undefined,
@@ -306,7 +306,7 @@ export interface Contained {
   kind: ArtifactKind;
   /** Path within the plugin directory, POSIX separators. */
   within: string;
-  /** A command file, which a harness without plugins gets as a skill rendered from it. */
+  /** A command file, which a target without plugins gets as a skill rendered from it. */
   command?: boolean;
 }
 
@@ -314,11 +314,11 @@ export interface Contained {
 export interface PluginDocument {
   name: string;
   description?: string | undefined;
-  /** The manifest a harness loads it by, which a plugin without its own gets written for it. */
+  /** The manifest a target loads it by, which a plugin without its own gets written for it. */
   manifest?: Record<string, unknown> | undefined;
   /** Its command files, by command name, relative to the plugin. */
   commands: readonly { name: string; path: string }[];
-  /** What a harness that loads it would start on its own, which needs a person's yes. */
+  /** What a target that loads it would start on its own, which needs a person's yes. */
   carries: readonly Carried[];
   /** A digest of those parts, so a change to what runs is seen without fetching. */
   fingerprint?: string | undefined;
@@ -344,17 +344,17 @@ export interface Selected {
   /** The commit it was read at, where that is its own rather than the registry's. */
   revision?: string | undefined;
   /**
-   * What a plugin holds, so a harness with no plugin directory can be given
+   * What a plugin holds, so a target with no plugin directory can be given
    * its parts. Empty for every other kind.
    */
   contents: Contained[];
   /** The plugin that publishes this, when one does. */
   group: string | undefined;
-  /** Harnesses the manifest narrowed this artifact to. */
+  /** Targets the manifest narrowed this artifact to. */
   targets?: readonly string[] | undefined;
   /** The manifest names it, rather than taking it with a whole namespace or registry. */
   named?: boolean;
-  /** Copied into each harness folder rather than linked. */
+  /** Copied into each target folder rather than linked. */
   copy?: boolean;
   /** Its name was written with `as:`, so it is never renamed for it. */
   aliased?: boolean;
@@ -370,7 +370,7 @@ export interface Clash {
   name: string;
   kept: string;
   dropped: string;
-  /** The harness path both would take, when they differ in name but not in where they land. */
+  /** The target path both would take, when they differ in name but not in where they land. */
   at?: string;
   /** `at` is a namespace's plugin directory, which no rename of the artifact frees. */
   container?: true;

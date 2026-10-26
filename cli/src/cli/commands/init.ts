@@ -10,14 +10,14 @@ import { isNamespaceAddress } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { gitIn } from "#core/git.ts";
-import { IMPORTABLE_HARNESSES, placementFor, resolveHarnesses } from "#core/harness/index.ts";
 import { KINDS } from "#core/kinds.ts";
 import { emptyManifest, formatManifest, readManifest } from "#core/manifest.ts";
 import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { roots as makeRoots, userScopeDir } from "#core/store/paths.ts";
+import { IMPORTABLE_TARGETS, placementFor, resolveTargets } from "#core/target/index.ts";
 import { table } from "#core/term/table.ts";
-import { resolveTargets } from "#engine/pipeline.ts";
+import { selectTargets } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
 /**
@@ -70,12 +70,12 @@ function publishTarget(value: string | undefined): string | undefined {
 
 function requestedImports(value: string | undefined): string[] {
   if (value === undefined) return [];
-  const requested = value === "all" ? [...IMPORTABLE_HARNESSES] : value.split(",");
-  const allowed = new Set<string>(IMPORTABLE_HARNESSES);
+  const requested = value === "all" ? [...IMPORTABLE_TARGETS] : value.split(",");
+  const allowed = new Set<string>(IMPORTABLE_TARGETS);
   if (requested.length === 0 || requested.some((name) => !allowed.has(name))) {
     throw new AiregError(`Unknown --import value ${quoted(value)}.`, {
       code: ErrorCode.Usage,
-      hint: `Pass ${list([...IMPORTABLE_HARNESSES, "all"], "or")}.`,
+      hint: `Pass ${list([...IMPORTABLE_TARGETS, "all"], "or")}.`,
     });
   }
   return [...new Set(requested)];
@@ -96,21 +96,21 @@ function report(
     context.printer.info(`Imported ${plural(imported, "artifact")} into .registry.`);
   context.printer.info(
     chosen.length === 0
-      ? "No harness was detected, so edit `harnesses:` in the manifest before you sync."
+      ? "No target was detected, so edit `targets:` in the manifest before you sync."
       : `Installs for ${list(chosen)}, into ${list(foldersFor(chosen))}.`,
   );
 }
 
 /**
- * The project folders those harnesses read, which `aireg list` and `aireg status` name:
- * a shared one such as `.agents` stands in for every harness that reads it.
+ * The project folders those targets read, which `aireg list` and `aireg status` name:
+ * a shared one such as `.agents` stands in for every target that reads it.
  */
 function foldersFor(chosen: readonly string[]): string[] {
-  const harnesses = resolveHarnesses();
+  const targetTable = resolveTargets();
   const placed = new Set(
-    KINDS.flatMap((kind) => placementFor(kind, chosen, harnesses, "project").targets),
+    KINDS.flatMap((kind) => placementFor(kind, chosen, targetTable, "project").targets),
   );
-  return [...placed].sort().map((name) => harnesses[name]?.projectRoot ?? name);
+  return [...placed].sort().map((name) => targetTable[name]?.projectRoot ?? name);
 }
 
 const NEXT = ["aireg registry add <address> --as <name>", "aireg add <name>/<namespace>"] as const;
@@ -159,9 +159,9 @@ export async function run(context: CommandContext): Promise<void> {
     });
   }
 
-  // Detection is the default, not the rule: someone who names harnesses is saying
+  // Detection is the default, not the rule: someone who names targets is saying
   // what this project projects into, and writing something else hides that.
-  const chosen = resolveTargets(emptyManifest(), resolveHarnesses(), common);
+  const chosen = selectTargets(emptyManifest(), resolveTargets(), common);
 
   const imports = requestedImports(own.import);
   const namespace = publishTarget(own["publish-to"]);

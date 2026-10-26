@@ -6,10 +6,10 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { isMissing, isStrictlyWithin, posixRelative } from "#core/fs/path.ts";
 import { present, remove } from "#core/fs/tree.ts";
-import { resolveHarnesses, targetRoot } from "#core/harness/index.ts";
-import { fixedPrefix } from "#core/harness/template.ts";
 import { NAME } from "#core/product.ts";
 import { type Roots, scopeName, stagingDir, toolHome, toolHomeRoot } from "#core/store/paths.ts";
+import { resolveTargets, targetRoot } from "#core/target/index.ts";
+import { fixedPrefix } from "#core/target/template.ts";
 
 export type RemovableRoots = Pick<Roots, "scope" | "cwd" | "artifacts">;
 
@@ -29,7 +29,7 @@ function boundaries(roots: RemovableRoots, env: NodeJS.ProcessEnv): Boundary[] {
     { anchor: scope, dir: relative(scope, roots.artifacts) },
     { anchor: home, dir: relative(toolHome(env), stagingDir(env)) },
   ];
-  for (const target of Object.values(resolveHarnesses(env))) {
+  for (const target of Object.values(resolveTargets(env))) {
     const root = targetRoot(target, roots.scope, roots.cwd, env);
     const anchor = project ? roots.cwd : root;
     for (const mapping of Object.values(target.kinds)) {
@@ -68,7 +68,7 @@ export function removal(
   env: NodeJS.ProcessEnv = process.env,
 ): Removal {
   const target = resolve(roots.cwd, path);
-  // A harness home set through its env var is canonical, while the lock spells paths as typed.
+  // A target home set through its env var is canonical, while the lock spells paths as typed.
   const targets = [target, join(canonical(dirname(target)), basename(target))];
   for (const { anchor, dir } of boundaries(roots, env)) {
     const real = canonical(anchor);

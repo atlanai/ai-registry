@@ -1,5 +1,5 @@
 aireg [VERSION]
-Install agent artifacts from any registry into any agent harness.
+Install agent artifacts from any registry into any coding agent.
 
 Usage: aireg <command> [options]
        aireg help <command> [<action>]
@@ -33,7 +33,7 @@ Check:
   status     Check installed artifacts against the lockfile, and list the ones nothing manages
   list       List what is installed
   outdated   Check each registry for newer versions of what is installed
-  harnesses  List the harnesses aireg can install into, and which this machine has
+  targets  List the targets aireg can install into, and which this machine has
              show  check
 
 Share:

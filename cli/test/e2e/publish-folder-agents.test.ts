@@ -153,7 +153,7 @@ describe("publishing a folder agent", () => {
     const added = await aireg(["add", "maker/marketing/agent/websiteclaw", "-y"]);
     expect(added.code, added.stderr).toBe(0);
     expect(added.stderr).toContain(
-      "marketing/websiteclaw 0.1.1 installs as its AGENT.md alone, since a harness takes an agent as one file, so identity/SOUL.md, workspace/AGENTS.md and workspace/TOOLS.md are left out.",
+      "marketing/websiteclaw 0.1.1 installs as its AGENT.md alone, since a target takes an agent as one file, so identity/SOUL.md, workspace/AGENTS.md and workspace/TOOLS.md are left out.",
     );
     expect(await readFile(join(project, ".claude", "agents", "websiteclaw.md"), "utf8")).toBe(
       await readFile(agent("AGENT.md"), "utf8"),

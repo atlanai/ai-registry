@@ -44,9 +44,7 @@ describe("a plugin, projected at user scope", () => {
     expect(linksTo(plan.actions, "codex")).toEqual([
       join(home, ".codex", "plugins", "cache", "kit", "toolkit", "local"),
     ]);
-    const link = plan.actions.find(
-      (action) => action.kind === "link" && action.harness === "codex",
-    );
+    const link = plan.actions.find((action) => action.kind === "link" && action.target === "codex");
     expect(link?.kind === "link" ? link.fan : undefined).toBe(true);
   });
 
@@ -59,7 +57,7 @@ describe("a plugin, projected at user scope", () => {
         .filter((action): action is Extract<Action, { kind: "clone" }> => action.kind === "clone")
         .map((action) => [action.from, action.to]),
     ).toEqual([[staged, copy]]);
-    // The harness is pointed at the projection, which links back to `copy`:
+    // The target is pointed at the projection, which links back to `copy`:
     // the content tree carries no manifests, so it is never linked directly.
     const froms = plan.actions
       .filter((action): action is Extract<Action, { kind: "link" }> => action.kind === "link")

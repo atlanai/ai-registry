@@ -1,5 +1,5 @@
 import { frontmatterRecord, markdownBody } from "#core/catalog/frontmatter.ts";
-import type { Rendered } from "#core/harness/codecs/index.ts";
+import type { Rendered } from "#core/target/codecs/index.ts";
 
 /** The longest description a skill takes, as the Agent Skills spec sets it. */
 const MAX_DESCRIPTION = 1024;

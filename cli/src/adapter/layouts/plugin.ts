@@ -86,7 +86,7 @@ function listOf(value: unknown): unknown[] {
 }
 
 /**
- * The manifest a harness loads: the entry alone when the plugin has none, else the plugin's own
+ * The manifest a target loads: the entry alone when the plugin has none, else the plugin's own
  * with the entry's components appended, which `strict: false` refuses.
  */
 function effectiveManifest(own: Json | undefined, entry: Json | undefined): Json | "conflict" {
@@ -234,7 +234,7 @@ function namesOf(manifest: Json, input: PluginInput): { name: string; manifestNa
 
 /**
  * One plugin, whole, as a `plugin` artifact, followed by its skills and agents on their own, so
- * a harness without plugins gets its parts and `-s` can take one. Undefined when it is skipped.
+ * a target without plugins gets its parts and `-s` can take one. Undefined when it is skipped.
  */
 export async function readPlugin(
   tree: Tree,

@@ -41,9 +41,9 @@ export interface ArtifactRow {
   diskDigest: string | undefined;
   state: ArtifactState;
   detail: string | undefined;
-  /** Harnesses this is projected into, by name. */
+  /** Targets this is projected into, by name. */
   targets: string[];
-  /** Absolute path of the writable copy a harness is served. */
+  /** Absolute path of the writable copy a target is served. */
   copy: string;
   /** mtime of that copy, which is when you last changed it. */
   changedAtMs: number | undefined;

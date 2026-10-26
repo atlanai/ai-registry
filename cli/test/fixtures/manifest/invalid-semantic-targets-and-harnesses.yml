@@ -1,0 +1,6 @@
+targets:
+  - claude
+harnesses:
+  - codex
+registries:
+  acme: github.com/acme/registry

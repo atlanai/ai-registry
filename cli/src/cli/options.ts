@@ -17,9 +17,9 @@ export const USER: OptionSpec = {
 };
 export const FOR: OptionSpec = {
   flag: "--for",
-  value: "<harness>",
+  value: "<target>",
   multiple: true,
-  describe: "The harnesses to install into, comma-separated, or * for all of them",
+  describe: "The targets to install into, comma-separated, or * for all of them",
 };
 export const SELECT: OptionSpec = {
   flag: "--select",
@@ -36,7 +36,7 @@ const YES: OptionSpec = {
 export const ALL: OptionSpec = { flag: "--all", describe: "Act on everything, without asking" };
 export const COPY: OptionSpec = {
   flag: "--copy",
-  describe: "Copy into each harness folder instead of linking",
+  describe: "Copy into each target folder instead of linking",
 };
 export const DRY_RUN: OptionSpec = {
   flag: "--dry-run",

@@ -472,7 +472,7 @@ export function heldUnlisted(error: unknown, alias: string, items: readonly Plan
 function sameFiles(held: Current, offered: Awaited<ReturnType<typeof offerFrom>>): boolean {
   const sameDigests = held.digests.join() === offered.digests.join();
   if (held.files === undefined) return sameDigests;
-  // A harness may name an agent's sole entry <name>.md while a registry calls it AGENT.md.
+  // A target may name an agent's sole entry <name>.md while a registry calls it AGENT.md.
   if (offered.input.kind === "agent" && held.files.length === 1 && offered.files.length === 1) {
     return sameDigests;
   }

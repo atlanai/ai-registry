@@ -45,10 +45,10 @@ describe("two registries with a namespace of the same name", () => {
     };
     return declared;
   }
-  function linkOf(plan: { actions: Action[] }, harness: string, to: string) {
+  function linkOf(plan: { actions: Action[] }, target: string, to: string) {
     return plan.actions.find(
       (action): action is Extract<Action, { kind: "link" }> =>
-        action.kind === "link" && action.harness === harness && action.to === to,
+        action.kind === "link" && action.target === target && action.to === to,
     );
   }
   function installedRow(alias: "kit" | "far", skill: string, link: string): LockArtifact {
@@ -64,7 +64,7 @@ describe("two registries with a namespace of the same name", () => {
       content: "sha256:t1",
       version: undefined,
       digest: "sha256:3",
-      links: [{ harness: "claude", path: link, mode: "symlink" }],
+      links: [{ target: "claude", path: link, mode: "symlink" }],
     };
   }
   function lockSource(alias: "kit" | "far") {
@@ -293,10 +293,10 @@ describe("registries whose plugin names meet once qualified", () => {
     // Installed flat before `t` wrapped namespaces: `other/team` holds `.claude/skills/team`.
     const lock = emptyLock();
     installedAt(lock, { alias: "t", namespace: "other", skill: "team" }).links = [
-      { harness: "claude", path: ".claude/skills/team", mode: "symlink" },
+      { target: "claude", path: ".claude/skills/team", mode: "symlink" },
     ];
     installedAt(lock, { alias: "t", namespace: "team", skill: "deploy" }).links = [
-      { harness: "claude", path: ".claude/skills/deploy", mode: "symlink" },
+      { target: "claude", path: ".claude/skills/deploy", mode: "symlink" },
     ];
     const [wrapped] = wrapping(
       acquired([
@@ -320,10 +320,10 @@ describe("registries whose plugin names meet once qualified", () => {
     // `one` holds `a-b-c` already; `three`, planned first, moves there from `b-c` now `y` has one.
     const lock = emptyLock();
     installedAt(lock, { alias: "a-b", namespace: "c", skill: "one" }).links = [
-      { harness: "claude", path: ".claude/skills/a-b-c", mode: "symlink" },
+      { target: "claude", path: ".claude/skills/a-b-c", mode: "symlink" },
     ];
     installedAt(lock, { alias: "a", namespace: "b-c", skill: "three" }).links = [
-      { harness: "claude", path: ".claude/skills/b-c", mode: "symlink" },
+      { target: "claude", path: ".claude/skills/b-c", mode: "symlink" },
     ];
     const plan = build(
       declaring(["a-b", "x", "a", "y"]),

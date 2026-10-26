@@ -1,10 +1,10 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveHarnesses } from "#core/harness/index.ts";
 import type { Lock } from "#core/lock.ts";
 import { Printer } from "#core/output.ts";
 import type { ApplyResult } from "#core/plan/apply.ts";
 import { type Action, emptyPlan } from "#core/plan/model.ts";
+import { resolveTargets } from "#core/target/index.ts";
 import { planReport, summarize } from "./plan.ts";
 
 function printed(
@@ -12,7 +12,7 @@ function printed(
   applied: Partial<ApplyResult>,
   before: Record<string, unknown> = {},
   targets: string[] = ["claude", "codex"],
-  harnesses = resolveHarnesses({ HOME: "/home/dev" }),
+  targetTable = resolveTargets({ HOME: "/home/dev" }),
 ): string[] {
   const lines: string[] = [];
   const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
@@ -32,16 +32,16 @@ function printed(
     applied: result,
     before: { artifacts: before, registries: {} } as unknown as Lock,
     targets,
-    harnesses,
+    targetTable,
     scope: "project",
   });
   return lines;
 }
 
-const link = (name: string, harness: string) =>
-  ({ kind: "link", name, harness, from: "f", to: `t/${harness}/${name}`, copy: false }) as Action;
+const link = (name: string, target: string) =>
+  ({ kind: "link", name, target, from: "f", to: `t/${target}/${name}`, copy: false }) as Action;
 
-const at = (harness: string) => ({ harness, path: "p", mode: "symlink" });
+const at = (target: string) => ({ target, path: "p", mode: "symlink" });
 
 describe("summarize", () => {
   it("names the tools that load what was installed, not the folders or the steps", () => {
@@ -71,7 +71,7 @@ describe("summarize", () => {
 
   it("names every member of a new namespace as installed, though one link carries them", () => {
     const clone = (name: string) => ({ kind: "clone", name, from: "f", to: `c/${name}` }) as Action;
-    const row = (harness: string) => ({ links: [{ harness, path: "p", mode: "symlink" }] });
+    const row = (target: string) => ({ links: [{ target, path: "p", mode: "symlink" }] });
     const lock = { artifacts: { add: row("claude"), new: row("claude"), publish: row("claude") } };
     const actions = [link("add", "claude"), clone("add"), clone("new"), clone("publish")];
     const applied = {
@@ -85,7 +85,7 @@ describe("summarize", () => {
     ]);
   });
 
-  it("says which harnesses start a plugin's hooks and MCP servers", () => {
+  it("says which targets start a plugin's hooks and MCP servers", () => {
     const actions = [link("tools", "claude"), link("tools", "codex")];
     const applied = {
       performed: { link: 2 } as never,
@@ -99,10 +99,10 @@ describe("summarize", () => {
     ]);
   });
 
-  it("says once what a harness asks of a person before it loads what was placed", () => {
-    const harnesses = resolveHarnesses({ HOME: "/home/dev" });
-    harnesses.claude = {
-      ...harnesses.claude!,
+  it("says once what a target asks of a person before it loads what was placed", () => {
+    const targetTable = resolveTargets({ HOME: "/home/dev" });
+    targetTable.claude = {
+      ...targetTable.claude!,
       trust: { skill: { run: "tool trust" }, agent: { run: "tool trust --agents", scope: "user" } },
       reload: "Run `/reload` in Claude Code.",
     };
@@ -120,7 +120,7 @@ describe("summarize", () => {
       added: ["lint", "fmt", "reviewer"],
       lock: lock as never,
     };
-    expect(printed(actions, applied, {}, ["claude"], harnesses)).toEqual([
+    expect(printed(actions, applied, {}, ["claude"], targetTable)).toEqual([
       "✓ Installed lint, fmt and reviewer for Claude Code.",
       "hint: Claude Code loads skills here only once you trust them: run `tool trust`.",
       "hint: Run `/reload` in Claude Code.",
@@ -184,14 +184,14 @@ describe("summarize", () => {
     ];
     const lock = { artifacts: { lint: { version: "0.2.0", links: [] } } };
     const applied = { performed: { link: 1, clone: 1 } as never, lock: lock as never };
-    const before = { lint: { version: "0.1.0", links: [{ harness: "claude" }] } };
+    const before = { lint: { version: "0.1.0", links: [{ target: "claude" }] } };
     expect(printed(actions, applied, before)).toEqual(["✓ Updated lint 0.1.0 → 0.2.0."]);
   });
 
   it("calls a link put back at the same version a restore, not an update", () => {
     const lock = { artifacts: { lint: { version: "0.1.0", links: [] } } };
     const applied = { performed: { link: 1 } as never, lock: lock as never };
-    const before = { lint: { version: "0.1.0", links: [{ harness: "claude" }] } };
+    const before = { lint: { version: "0.1.0", links: [{ target: "claude" }] } };
     expect(printed([link("lint", "claude")], applied, before)).toEqual([
       "✓ Restored lint for Claude Code.",
     ]);
@@ -204,11 +204,11 @@ describe("summarize", () => {
     ];
     const lock = { artifacts: { lint: { version: "0.1.0", links: [] } } };
     const applied = { performed: { stage: 1, clone: 1 } as never, lock: lock as never };
-    const before = { lint: { version: "0.1.0", links: [{ harness: "claude" }] } };
+    const before = { lint: { version: "0.1.0", links: [{ target: "claude" }] } };
     expect(printed(actions, applied, before)).toEqual(["✓ Restored lint for Claude Code."]);
   });
 
-  it("names a row of yours whose harness links went as removed, though the row stays", () => {
+  it("names a row of yours whose target links went as removed, though the row stays", () => {
     const gone = [{ kind: "unlink", name: "lint", to: "x" } as Action];
     const lock = { artifacts: { lint: { links: [] } } };
     const applied = { performed: { unlink: 1 } as never, removed: ["lint"], lock: lock as never };
@@ -223,8 +223,8 @@ describe("summarize", () => {
 });
 
 describe("planReport", () => {
-  const harnesses = resolveHarnesses({ HOME: "/home/dev" });
-  const chosen = { targets: ["claude", "codex"], harnesses };
+  const targetTable = resolveTargets({ HOME: "/home/dev" });
+  const chosen = { targets: ["claude", "codex"], targetTable };
   const plan = {
     ...emptyPlan(),
     actions: [
@@ -251,9 +251,9 @@ describe("planReport", () => {
     return lines.join("\n").split("\n");
   }
 
-  it("names the harnesses each link is for, not the folder it is in", () => {
+  it("names the targets each link is for, not the folder it is in", () => {
     const lines = report(false);
-    expect(lines).toContain("  action   artifact   harnesses    path");
+    expect(lines).toContain("  action   artifact   targets      path");
     expect(lines).toContain(
       `  install  pr-review  Codex        ${join("t", "agents", "pr-review")}`,
     );

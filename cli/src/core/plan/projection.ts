@@ -1,19 +1,19 @@
 import { dirname, join, posix, resolve } from "node:path";
 import { sanitizeName } from "#adapter/text.ts";
 import { posixRelative } from "#core/fs/path.ts";
-import type { Codec } from "#core/harness/contract.ts";
-import {
-  type Harnesses,
-  placementFor,
-  pluginProjection,
-  projectionPath,
-  readsFor,
-  takesPlugin,
-} from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
+import type { Codec } from "#core/target/contract.ts";
+import {
+  placementFor,
+  pluginProjection,
+  projectionPath,
+  readsFor,
+  type Targets,
+  takesPlugin,
+} from "#core/target/index.ts";
 import type { KeyRule, PluginDocument, Selected } from "./model.ts";
 
 export interface ProjectionOptions {
@@ -24,12 +24,12 @@ export interface ProjectionOptions {
     artifacts: string;
   };
   targets: readonly string[];
-  harnesses: Harnesses;
+  targetTable: Targets;
 }
 
 export interface PlannedLink {
-  /** Harness name, the same concept the lock records on a link. */
-  harness: string;
+  /** Target name, the same concept the lock records on a link. */
+  target: string;
   absolute: string;
   relative: string;
   from: string;
@@ -37,37 +37,37 @@ export interface PlannedLink {
   shared?: boolean;
   /** The content the projection links to, when this link is a projection. */
   content?: string;
-  /** Placed as a real directory of links, for a harness that will not load a linked plugin. */
+  /** Placed as a real directory of links, for a target that will not load a linked plugin. */
   fan?: boolean;
   /** The plugin name, when it had to differ from the namespace it holds. */
   renamed?: { namespace: string; name: string };
-  /** Written in the harness's own format. */
+  /** Written in the target's own format. */
   codec?: Codec;
   /** Written as a real folder holding this file. */
   entry?: string;
-  /** Written as a real copy, for a harness that rewrites or refuses links. */
+  /** Written as a real copy, for a target that rewrites or refuses links. */
   copy?: boolean;
   /** A plugin's command, written as a skill a person invokes under this name. */
   command?: string;
   /** The plugin's own account of itself, for the manifests its projection gets. */
   document?: PluginDocument;
-  /** The kind of the plugin part this places, where a harness takes the plugin as its parts. */
+  /** The kind of the plugin part this places, where a target takes the plugin as its parts. */
   part?: ArtifactKind;
-  /** Front-matter keys a harness reading this folder does not read as written. */
+  /** Front-matter keys a target reading this folder does not read as written. */
   keys?: Record<string, KeyRule>;
 }
 
-/** The key rules of every selected harness that reads `folder`. */
+/** The key rules of every selected target that reads `folder`. */
 function keysAt(
   folder: string,
   kind: ArtifactKind,
   selected: readonly string[],
-  harnesses: Harnesses,
+  targetTable: Targets,
 ): { keys?: Record<string, KeyRule> } {
   const keys: Record<string, KeyRule> = {};
   for (const reader of new Set(selected)) {
-    if (!readsFor(harnesses, reader, kind).includes(folder)) continue;
-    const target = harnesses[reader];
+    if (!readsFor(targetTable, reader, kind).includes(folder)) continue;
+    const target = targetTable[reader];
     for (const [key, how] of Object.entries(target?.kinds[kind]?.keys ?? {})) {
       const rule = keys[key] ?? { files: [], refusedBy: [] };
       keys[key] = rule;
@@ -85,9 +85,9 @@ function plannedLink(
   options: ProjectionOptions,
   kind?: ArtifactKind,
 ): PlannedLink {
-  const mapping = kind === undefined ? undefined : options.harnesses[name]?.kinds[kind];
+  const mapping = kind === undefined ? undefined : options.targetTable[name]?.kinds[kind];
   return {
-    harness: name,
+    target: name,
     absolute: path,
     relative: posixRelative(options.roots.base, path),
     from,
@@ -106,9 +106,9 @@ export function namespaceOf(item: Pick<Selected, "kind" | "name" | "group" | "so
   return item.group ?? item.source;
 }
 
-/** One registry's namespace, as a harness would hold it. */
+/** One registry's namespace, as a target would hold it. */
 export interface NamespaceWant {
-  harness: string;
+  target: string;
   namespace: string;
   source: string;
 }
@@ -119,12 +119,12 @@ export interface NamespaceWant {
  */
 export function crowdedContainers(
   wants: Iterable<NamespaceWant>,
-  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+  options: Pick<ProjectionOptions, "roots" | "targetTable">,
 ): Set<string> {
   const { scope, cwd } = options.roots;
   const places: { bare: string; qualified: string | undefined; owner: string }[] = [];
   for (const want of wants) {
-    const target = options.harnesses[want.harness];
+    const target = options.targetTable[want.target];
     if (target === undefined || !takesPlugin(target, scope)) continue;
     const at = (name: string) =>
       pluginProjection(target, name, scope, cwd, process.env, want.source);
@@ -178,7 +178,7 @@ export function projectionsOf(
  */
 export function movedPluginLinks(
   lock: Lock,
-  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+  options: Pick<ProjectionOptions, "roots" | "targetTable">,
   opened?: ReadonlySet<string>,
 ): Set<string> {
   const { base } = options.roots;
@@ -194,8 +194,8 @@ export function movedPluginLinks(
   }));
   const crowded = crowdedContainers(
     rows.flatMap(({ entry, namespace }) =>
-      [...new Set(entry.links.map((link) => link.harness))].map((harness) => ({
-        harness,
+      [...new Set(entry.links.map((link) => link.target))].map((target) => ({
+        target,
         namespace,
         source: entry.registry,
       })),
@@ -219,13 +219,13 @@ export function movedPluginLinks(
 
 /** Where a recorded link sits, when it is a namespace's plugin directory under either name. */
 export function pluginLinkAt(
-  link: { harness: string; path: string },
+  link: { target: string; path: string },
   namespace: string,
   source: string,
-  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+  options: Pick<ProjectionOptions, "roots" | "targetTable">,
 ): { bare: string; qualified: string } | undefined {
   const { scope, cwd, base } = options.roots;
-  const target = options.harnesses[link.harness];
+  const target = options.targetTable[link.target];
   if (target === undefined || !takesPlugin(target, scope)) return undefined;
   const bare = pluginProjection(target, namespace, scope, cwd, process.env, source);
   const qualified = pluginProjection(
@@ -245,8 +245,8 @@ export function pluginLinkAt(
 export function rowPlugin(
   name: string,
   entry: LockArtifact,
-  link: { harness: string; path: string },
-  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+  link: { target: string; path: string },
+  options: Pick<ProjectionOptions, "roots" | "targetTable">,
 ): string | undefined {
   const source = entry.registry;
   const namespace = namespaceOf({ kind: entry.kind, name, group: entry.namespace, source });
@@ -254,16 +254,16 @@ export function rowPlugin(
   return namespaceDir(options.roots, source, namespace);
 }
 
-type Unreadable = (harness: string, kind: ArtifactKind) => void;
+type Unreadable = (target: string, kind: ArtifactKind) => void;
 
 /**
- * A harness that loads plugins is pointed at the whole namespace: one entry in a
+ * A target that loads plugins is pointed at the whole namespace: one entry in a
  * directory we do not own, holding the layout it already reads.
  */
 function pluginLink(
   item: Selected,
   name: string,
-  target: Harnesses[string],
+  target: Targets[string],
   options: ProjectionOptions,
   crowded: ReadonlySet<string>,
 ): PlannedLink | undefined {
@@ -306,7 +306,7 @@ function pluginLinks(
   const links: PlannedLink[] = [];
   const rest: string[] = [];
   for (const name of selected) {
-    const target = options.harnesses[name];
+    const target = options.targetTable[name];
     if (target === undefined) continue;
     if (!takesPlugin(target, scope)) {
       rest.push(name);
@@ -316,17 +316,17 @@ function pluginLinks(
     if (link !== undefined) links.push(link);
   }
   for (const kind of new Set(item.contents.map((leaf) => leaf.kind))) {
-    const placed = placementFor(kind, rest, options.harnesses, scope, true);
-    for (const harness of placed.unreadable) onUnreadable(harness, kind);
+    const placed = placementFor(kind, rest, options.targetTable, scope, true);
+    for (const target of placed.unreadable) onUnreadable(target, kind);
     for (const name of placed.targets) {
-      const target = options.harnesses[name] as Harnesses[string];
+      const target = options.targetTable[name] as Targets[string];
       for (const leaf of item.contents.filter((each) => each.kind === kind)) {
         const path = projectionPath(target, leaf.kind, leaf.name, scope, cwd);
         if (path === undefined) continue;
         const from = join(copy, ...leaf.within.split(posix.sep));
         const link = {
           ...plannedLink(name, path, from, options, leaf.kind),
-          ...keysAt(name, leaf.kind, selected, options.harnesses),
+          ...keysAt(name, leaf.kind, selected, options.targetTable),
           part: leaf.kind,
         };
         links.push(
@@ -341,7 +341,7 @@ function pluginLinks(
 
 /**
  * A plugin installs as one, and so does a namespace whose source wraps it; anything else
- * is placed as itself, in the fewest folders that reach every harness able to read its kind.
+ * is placed as itself, in the fewest folders that reach every target able to read its kind.
  */
 export function linksFor(
   item: Selected,
@@ -360,7 +360,7 @@ export function linksFor(
   const links: PlannedLink[] = [];
   const rest: string[] = [];
   for (const name of new Set(selected)) {
-    const target = options.harnesses[name];
+    const target = options.targetTable[name];
     if (target === undefined) continue;
     // Its plugins carry only kinds it places as they are; the rest are placed flat or not at all.
     const mapping = target.kinds[item.kind];
@@ -372,15 +372,15 @@ export function linksFor(
     const link = pluginLink(item, name, target, options, crowded);
     if (link !== undefined) links.push(link);
   }
-  const placed = placementFor(item.kind, rest, options.harnesses, scope, wrapped);
-  for (const harness of placed.unreadable) onUnreadable(harness, item.kind);
+  const placed = placementFor(item.kind, rest, options.targetTable, scope, wrapped);
+  for (const target of placed.unreadable) onUnreadable(target, item.kind);
   for (const name of placed.targets) {
-    const target = options.harnesses[name] as Harnesses[string];
+    const target = options.targetTable[name] as Targets[string];
     const own = projectionPath(target, item.kind, item.name, scope, cwd);
     if (own === undefined) continue;
     links.push({
       ...plannedLink(name, own, copy, options, item.kind),
-      ...keysAt(name, item.kind, selected, options.harnesses),
+      ...keysAt(name, item.kind, selected, options.targetTable),
     });
   }
   return links;
@@ -418,23 +418,23 @@ export function claim(
 }
 
 /**
- * The folders a harness would load these items from, were it picked beside `chosen`:
+ * The folders a target would load these items from, were it picked beside `chosen`:
  * the plugin directory it takes them in, else the first folder it reads each kind from.
  */
 export function loadsFrom(
-  harness: string,
+  target: string,
   chosen: readonly string[],
   items: readonly Selected[],
-  options: Pick<ProjectionOptions, "roots" | "harnesses">,
+  options: Pick<ProjectionOptions, "roots" | "targetTable">,
   wrapped = false,
 ): string[] {
-  const targets = [...new Set([...chosen, harness])];
+  const targets = [...new Set([...chosen, target])];
   const folders = items.flatMap((item) => {
     const links = linksFor(item, "", { ...options, targets }, wrapped);
-    const own = links.find((link) => link.harness === harness);
+    const own = links.find((link) => link.target === target);
     if (own !== undefined) return [own.shared === true ? own.absolute : dirname(own.absolute)];
-    const read = readsFor(options.harnesses, harness, item.kind)
-      .map((folder) => links.find((link) => link.harness === folder && link.shared !== true))
+    const read = readsFor(options.targetTable, target, item.kind)
+      .map((folder) => links.find((link) => link.target === folder && link.shared !== true))
       .find((link) => link !== undefined);
     return read === undefined ? [] : [dirname(read.absolute)];
   });

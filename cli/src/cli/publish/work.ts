@@ -156,7 +156,7 @@ export async function fromArgs(
         works.push(await fromPath(path));
         continue;
       }
-      // A harness folder links each installed copy; publishing the link publishes that row.
+      // A target folder links each installed copy; publishing the link publishes that row.
       const row = Object.entries(rows).find(([name, entry]) => {
         const copy = copyPath(name, entry, loaded);
         return existsSync(copy) && realpathSync(copy) === target;

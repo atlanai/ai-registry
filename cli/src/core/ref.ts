@@ -23,9 +23,9 @@ export interface Ref {
   localName?: string | undefined;
   /** Members a whole registry or namespace leaves out, as addresses relative to it. */
   exclude?: string[] | undefined;
-  /** Harnesses this entry projects into, when it narrows the scope's. */
+  /** Targets this entry projects into, when it narrows the scope's. */
   targets?: string[] | undefined;
-  /** Copied into each harness folder rather than linked. */
+  /** Copied into each target folder rather than linked. */
   copy?: boolean | undefined;
   /**
    * Plugins from a source that is not a registry, by name, that a person agreed may install

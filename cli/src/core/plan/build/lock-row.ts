@@ -58,7 +58,7 @@ export function lockRow({
       const mode = modeOf(link, previous);
       const written = previous?.links.find((old) => old.path === link.relative)?.digest;
       return {
-        harness: link.harness,
+        target: link.target,
         path: link.relative,
         mode,
         ...(mode === "copy" && written !== undefined ? { digest: written } : {}),

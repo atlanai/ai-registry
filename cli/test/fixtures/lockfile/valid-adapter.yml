@@ -17,6 +17,6 @@ artifacts:
     version: 2.2.0
     digest: "sha256:4444444444444444444444444444444444444444444444444444444444444444"
     links:
-      - harness: claude
+      - target: claude
         path: .claude/skills/pr-review
         mode: symlink

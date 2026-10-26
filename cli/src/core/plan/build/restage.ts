@@ -112,7 +112,7 @@ export function restages(
 }
 
 /**
- * Staged bytes are upstream's; the copy is this scope's, and everything a harness sees is
+ * Staged bytes are upstream's; the copy is this scope's, and everything a target sees is
  * projected from it, so an edit never reaches what upstream published.
  */
 export function planCopy(item: Selected, copy: string, build: BuildState): void {

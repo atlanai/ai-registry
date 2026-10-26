@@ -18,7 +18,7 @@ async function installed(aireg: Aireg, project: string, market: string): Promise
   // What `init --for claude` and `registry add` write, without running either.
   await writeManifestIn(
     project,
-    `harnesses:\n  - claude\nregistries:\n  acme: ${JSON.stringify(market)}\nartifacts: []\n`,
+    `targets:\n  - claude\nregistries:\n  acme: ${JSON.stringify(market)}\nartifacts: []\n`,
   );
   for (const address of ["acme/skill/lint", "acme/tools"]) {
     const added = await aireg(["add", address, "-y"]);

@@ -66,7 +66,7 @@ describe("an origins step", () => {
     await runOnce(lock);
 
     const row = lock.artifacts["mine/my-helper"];
-    expect(row?.origin).toMatchObject({ harness: "claude", step: "mine" });
+    expect(row?.origin).toMatchObject({ target: "claude", step: "mine" });
     expect(row?.kind).toBe("skill");
     // Upstream assigns these on the first publish; before that there are none.
     expect(row?.id).toBeUndefined();
@@ -133,7 +133,7 @@ describe("an origins step", () => {
       path: ".registry/artifacts/other/eng/skills/stamp",
       digest: "sha256:0",
       origin: undefined,
-      links: [{ harness: "claude", path: ".claude/skills/eng", mode: "copy" }],
+      links: [{ target: "claude", path: ".claude/skills/eng", mode: "copy" }],
     };
 
     const outcomes = await surveyOrigins([step()], lock, roots);
@@ -165,7 +165,7 @@ describe("forgetOrigins", () => {
     await mkdir(join(link, ".."), { recursive: true });
     await symlink(join(copy(), ".."), link);
     lock.artifacts["mine/my-helper"]?.links.push({
-      harness: "agents",
+      target: "agents",
       path: ".agents/skills/my-helper",
       mode: "symlink",
     });

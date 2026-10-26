@@ -1,4 +1,4 @@
-/** Where detection found a harness, in a person's words. */
+/** Where detection found a target, in a person's words. */
 export function foundBy(by: string | undefined): string {
   switch (by) {
     case "env":

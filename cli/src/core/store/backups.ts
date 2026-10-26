@@ -32,7 +32,7 @@ export async function moveToBackup(
   within: string,
 ): Promise<string> {
   const base = backupsDir(roots);
-  // A profile's harness id, such as `tool:work`, holds a colon a Windows path cannot.
+  // A profile's target id, such as `tool:work`, holds a colon a Windows path cannot.
   const at = within.replaceAll(":", "-");
   let to = join(base, stamp, at);
   for (let next = 2; await taken(to); next += 1) to = join(base, `${stamp}-${next}`, at);

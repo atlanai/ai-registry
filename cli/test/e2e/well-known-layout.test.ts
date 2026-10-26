@@ -152,7 +152,7 @@ describe("a site's Agent Skills index", () => {
     await serving(served, async (url) => {
       await writeManifestIn(
         project,
-        `harnesses: [claude]\nregistries:\n  kit: ${url}/kit\nartifacts: []\n`,
+        `targets: [claude]\nregistries:\n  kit: ${url}/kit\nartifacts: []\n`,
       );
       const shown = await aireg(["registry", "show", "kit"]);
       expect(shown.code, shown.stderr).toBe(0);

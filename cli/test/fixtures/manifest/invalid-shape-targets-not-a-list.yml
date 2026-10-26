@@ -1,0 +1,3 @@
+targets: claude
+registries:
+  kit: acme/agent-kit

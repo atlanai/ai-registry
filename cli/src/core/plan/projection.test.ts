@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { resolveHarnesses } from "#core/harness/index.ts";
 import { emptyLock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
+import { resolveTargets } from "#core/target/index.ts";
 import { movedPluginLinks } from "./projection.ts";
 
 describe("movedPluginLinks", () => {
   const USER = roots("user", "/work");
-  const scope = { roots: USER, harnesses: resolveHarnesses() };
-  function lockWith(rows: Record<string, { registry: string; link: string; harness?: string }>) {
+  const scope = { roots: USER, targetTable: resolveTargets() };
+  function lockWith(rows: Record<string, { registry: string; link: string; target?: string }>) {
     const lock = emptyLock();
     for (const [name, row] of Object.entries(rows)) {
       lock.artifacts[name] = {
@@ -22,7 +22,7 @@ describe("movedPluginLinks", () => {
         content: undefined,
         version: undefined,
         digest: "",
-        links: [{ harness: row.harness ?? "claude", path: row.link, mode: "symlink" }],
+        links: [{ target: row.target ?? "claude", path: row.link, mode: "symlink" }],
       };
     }
     return lock;
@@ -49,17 +49,17 @@ describe("movedPluginLinks", () => {
     expect([...movedPluginLinks(lock, scope, new Set(["kit"]))]).toEqual(["lint"]);
   });
 
-  it("leaves a harness that already keys plugins by registry alone", () => {
+  it("leaves a target that already keys plugins by registry alone", () => {
     const lock = lockWith({
       fmt: {
         registry: "far",
         link: ".codex/plugins/cache/far/engineering/local",
-        harness: "codex",
+        target: "codex",
       },
       lint: {
         registry: "kit",
         link: ".codex/plugins/cache/kit/engineering/local",
-        harness: "codex",
+        target: "codex",
       },
     });
     expect([...movedPluginLinks(lock, scope)]).toEqual([]);

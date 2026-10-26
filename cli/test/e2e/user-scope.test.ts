@@ -6,7 +6,7 @@ import { test } from "#test/kit/fixtures.ts";
 import { tree } from "#test/kit/tree.ts";
 
 // Both are documented settings, and a user lock is never committed, so its paths may leave HOME.
-test("reads its own lock back when the user scope and a harness home are outside HOME", async ({
+test("reads its own lock back when the user scope and a target home are outside HOME", async ({
   aireg,
   tmp,
 }) => {

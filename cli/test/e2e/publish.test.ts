@@ -5,7 +5,7 @@ import { fileTest as test } from "#test/kit/fixtures.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
 let registryRoot: string;
-/** Where the artifacts being published are written, outside any harness folder. */
+/** Where the artifacts being published are written, outside any target folder. */
 let work: string;
 
 const versions = async (namespace: string, kind: string, name: string) =>

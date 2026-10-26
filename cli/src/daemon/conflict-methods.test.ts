@@ -9,7 +9,7 @@ import type { RpcClient } from "#daemon/rpc/client.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { ADAPTER, ENDPOINT, finished, jobStatus, NAMESPACE, testClient } from "#test/kit/daemon.ts";
 import { test as base } from "#test/kit/fixtures.ts";
-import { projected } from "#test/kit/harness.ts";
+import { projected } from "#test/kit/target.ts";
 import { resolvable } from "./conflict-methods.ts";
 
 const WATCH = "watch_dev";

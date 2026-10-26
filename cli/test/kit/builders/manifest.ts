@@ -26,7 +26,7 @@ class ManifestBuilder {
     return this;
   }
 
-  harnesses(...names: string[]): this {
+  targets(...names: string[]): this {
     this.#manifest.targets.push(...names);
     return this;
   }

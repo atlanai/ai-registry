@@ -22,7 +22,7 @@ import { editedAnywhere } from "#core/plan/model.ts";
 import { survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
-import { load, resolveTargets, run as runPipeline } from "#engine/pipeline.ts";
+import { load, run as runPipeline, selectTargets } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
 /**
@@ -114,11 +114,11 @@ export async function run(context: CommandContext): Promise<void> {
           kind: entry?.kind ?? "",
           source: entry?.registry ?? "",
           targets: loadedBy(
-            loaded.harnesses,
-            resolveTargets(loaded.manifest, loaded.harnesses, common),
+            loaded.targetTable,
+            selectTargets(loaded.manifest, loaded.targetTable, common),
             entry?.kind,
-            (entry?.links ?? []).map((linked) => linked.harness),
-          ).map((name) => toolName(loaded.harnesses, name)),
+            (entry?.links ?? []).map((linked) => linked.target),
+          ).map((name) => toolName(loaded.targetTable, name)),
         };
       }),
     );
@@ -174,7 +174,7 @@ export async function run(context: CommandContext): Promise<void> {
           approved = await confirmPlan(step, plan, {
             verb: "Remove",
             targets,
-            harnesses: fresh.harnesses,
+            targetTable: fresh.targetTable,
           });
           return approved;
         },

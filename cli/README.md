@@ -78,7 +78,7 @@ aireg sync resolve pr-review --theirs           # after sync reports a conflict:
 documents each one.
 
 `-g` (`--user`) acts on your user scope instead of the project, `--for claude,cursor` picks
-the harnesses, `--json` works everywhere, and nothing prompts in CI or inside an agent. Your
+the targets, `--json` works everywhere, and nothing prompts in CI or inside an agent. Your
 user scope needs no setup: the first `-g` install creates it, and `aireg init -g` is refused.
 A released version is never rewritten. How registries, sign-in and pins are stored is in
 [storage-spec.md](storage-spec.md).
@@ -86,8 +86,8 @@ A released version is never rewritten. How registries, sign-in and pins are stor
 ## Files
 
 ```yaml
-# .registry/manifest.yml, committed: which harnesses, registries and artifacts
-harnesses:
+# .registry/manifest.yml, committed: which targets, registries and artifacts
+targets:
   - claude
   - codex
 registries:
@@ -102,14 +102,14 @@ is `.registry/`:
 ```
 <repo>/.registry/         this project
 ├── .gitignore            written by aireg
-├── manifest.yml          committed: harnesses, registries, artifacts
+├── manifest.yml          committed: targets, registries, artifacts
 ├── manifest.lock.yml     committed: exact versions and digests
 ├── artifacts/            installed copies, committed by default
 ├── backups/              your own files aireg moved aside; never committed
 └── leases/               which process is writing to the project; never committed
 ```
 
-Harness folders such as `.claude/skills/` link to the copies in `artifacts/`, so a fresh
+Target folders such as `.claude/skills/` link to the copies in `artifacts/`, so a fresh
 clone works without running aireg. To stop committing the copies, uncomment `artifacts/` in
 `.registry/.gitignore`; `aireg install` then restores them from the lock. aireg never edits
 the project's own `.gitignore`.

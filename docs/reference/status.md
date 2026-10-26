@@ -49,7 +49,7 @@ In a project, `status` also warns about an artifact installed in both the projec
 }}
 ```
 
-In JSON, `harnesses` is keyed by folder, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's path, the target it names, as written, and its harness. `needsApproval` lists each harness that loads the artifact only after a [trust step](harnesses.md#trust-and-reload-steps), with the command to run; aireg never runs it.
+In JSON, `harnesses` is keyed by folder, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's path, the target it names, as written, and its harness. `needsApproval` lists each harness that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
 
 ## Exit status
 

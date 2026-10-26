@@ -1,6 +1,6 @@
 name: demo
 description: One of each kind of source, all on one shape.
-harnesses:
+targets:
   - claude
   - codex
 registries:

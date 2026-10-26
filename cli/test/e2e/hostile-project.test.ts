@@ -6,7 +6,7 @@ import { test } from "#test/kit/fixtures.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
 
 // A cloned project brings its own `.claude/skills` link and `.registry` folder.
-test("removes nothing outside a cloned project that ships a harness link and a journal", async ({
+test("removes nothing outside a cloned project that ships a target link and a journal", async ({
   aireg,
   tmp,
 }) => {

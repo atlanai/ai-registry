@@ -1,5 +1,4 @@
 import type { Entry } from "#core/catalog/model.ts";
-import { resolveHarnesses } from "#core/harness/index.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest.ts";
 import type { BuildOptions } from "#core/plan/build.ts";
@@ -12,6 +11,7 @@ import type {
   Survey,
 } from "#core/plan/model.ts";
 import { roots } from "#core/store/paths.ts";
+import { resolveTargets } from "#core/target/index.ts";
 import { lock } from "./lock.ts";
 import { manifest } from "./manifest.ts";
 
@@ -22,7 +22,7 @@ const KIT = "https://github.com/acme/kit.git";
 export const PLAN_OPTIONS: BuildOptions = {
   roots: roots("project", "/work"),
   targets: ["claude"],
-  harnesses: resolveHarnesses(),
+  targetTable: resolveTargets(),
   force: false,
   copy: false,
 };
@@ -105,7 +105,7 @@ export function installed(over: { digest?: string; content?: string } = {}): Loc
       path: "artifacts/copy",
       content: over.content ?? "sha256:t1",
       digest: over.digest ?? "sha256:1",
-      links: [{ harness: "claude", path: ".claude/skills/lint", mode: "symlink" }],
+      links: [{ target: "claude", path: ".claude/skills/lint", mode: "symlink" }],
     })
     .build();
 }
@@ -133,11 +133,11 @@ export const DRIFTED: Survey = {
 
 export const kinds = (plan: { actions: Action[] }) => plan.actions.map((a) => a.kind);
 
-/** Where a plan links one harness, sorted. */
+/** Where a plan links one target, sorted. */
 export function linksTo(actions: readonly Action[], target: string): string[] {
   return actions
     .filter((action): action is Extract<Action, { kind: "link" }> => action.kind === "link")
-    .filter((action) => action.harness === target)
+    .filter((action) => action.target === target)
     .map((action) => action.to)
     .sort();
 }

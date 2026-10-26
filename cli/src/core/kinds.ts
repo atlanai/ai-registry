@@ -45,7 +45,7 @@ export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
 /** Kinds the registry scanner walks; `plugin` is found by its manifest. */
 export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter((kind) => kind !== "plugin");
 
-/** Harness-shaped and plural: what the writable copy and every harness use. */
+/** Target-shaped and plural: what the writable copy and every target use. */
 export function kindDir(kind: ArtifactKind): string {
   return KIND_SPECS[kind].dir;
 }

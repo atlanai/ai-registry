@@ -21,7 +21,7 @@ interface Found {
   occurrences: readonly Candidate[];
 }
 
-/** What `init --import` found in the harness folders, checked before anything is written. */
+/** What `init --import` found in the target folders, checked before anything is written. */
 export interface ImportPlan {
   root: string;
   scope: Scope;
@@ -55,14 +55,14 @@ function common(scope: Scope): CommonOptions {
 
 export async function planImport(
   root: string,
-  harnesses: readonly string[],
+  targets: readonly string[],
   scope: Scope,
 ): Promise<ImportPlan> {
   const loaded = await load(common(scope), root);
   const groups = new Map<string, Candidate[]>();
-  for (const harness of harnesses) {
-    const found = await candidates(loaded.roots, loaded.harnesses, [harness], emptyLock());
-    for (const item of found.local.filter(({ target }) => target === harness)) {
+  for (const id of targets) {
+    const found = await candidates(loaded.roots, loaded.targetTable, [id], emptyLock());
+    for (const item of found.local.filter(({ target }) => target === id)) {
       const key = `${item.kind}:${item.name}`;
       groups.set(key, [...(groups.get(key) ?? []), item]);
     }
@@ -77,7 +77,7 @@ export async function planImport(
       const where = occurrences.map(({ from }) => displayPath(loaded.roots, from));
       throw new AiregError(`Found different copies of ${quoted(first.name)}.`, {
         code: ErrorCode.Conflict,
-        hint: `Make ${list(where)} match, or import from one harness with \`--import <harness>\`.`,
+        hint: `Make ${list(where)} match, or import from one target with \`--import <target>\`.`,
       });
     }
     artifacts.push({
@@ -177,7 +177,7 @@ async function copyAll(
       path: posixRelative(loaded.roots.base, copy),
       digest: artifact.digest,
       origin: {
-        harness: source.target,
+        target: source.target,
         path: posixRelative(loaded.roots.base, source.from),
         step: "onboarding",
       },

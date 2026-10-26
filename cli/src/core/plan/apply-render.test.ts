@@ -48,7 +48,7 @@ function renderPlan(recorded?: LinkMode, entry?: { to: string; entry: string }):
     content: "sha256:c",
     version: undefined,
     digest: "sha256:d",
-    links: [{ harness: "codex", path: ".codex/agents/reviewer.toml", mode: "symlink" }],
+    links: [{ target: "codex", path: ".codex/agents/reviewer.toml", mode: "symlink" }],
   };
   return {
     ...emptyPlan(),
@@ -56,7 +56,7 @@ function renderPlan(recorded?: LinkMode, entry?: { to: string; entry: string }):
       {
         kind: "link",
         name: "reviewer",
-        harness: "codex",
+        target: "codex",
         from: copy,
         to: target,
         copy: true,
@@ -86,7 +86,7 @@ describe("a rendered placement", () => {
     await writeFile(copy, "---\nname: reviewer\n---\nReview it.\n");
     const applied = await apply(renderPlan(), roots, () => Promise.reject(new Error("no fetch")));
     expect(applied.unrendered).toEqual([
-      { name: "reviewer", harness: "codex", reason: "it has no description" },
+      { name: "reviewer", target: "codex", reason: "it has no description" },
     ]);
     expect(applied.lock?.artifacts.reviewer?.links).toEqual([]);
     expect(applied.lock?.artifacts.reviewer?.blocked).toBeUndefined();

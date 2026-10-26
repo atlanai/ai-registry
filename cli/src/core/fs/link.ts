@@ -54,7 +54,7 @@ export async function link(source: string, linkPath: string, copyOnly = false): 
 }
 
 /**
- * A file or dot-directory in a plugin is the manifest a harness reads itself,
+ * A file or dot-directory in a plugin is the manifest a target reads itself,
  * and some refuse one reached through a link; content directories stay links.
  */
 async function isManifest(path: string, entry: string): Promise<boolean> {

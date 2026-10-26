@@ -1,9 +1,9 @@
 import { isCI, present } from "#core/env.ts";
-import { CALLER_SIGNALS } from "#core/harness/index.ts";
+import { CALLER_SIGNALS } from "#core/target/index.ts";
 
 /**
- * Agents that run aireg without being a harness it installs into. One that
- * becomes a harness takes its variables into its own definition.
+ * Agents that run aireg without being a target it installs into. One that
+ * becomes a target takes its variables into its own definition.
  */
 const OTHER_SIGNALS: readonly { agent: string; env: readonly string[] }[] = [
   { agent: "antigravity", env: ["ANTIGRAVITY_AGENT"] },

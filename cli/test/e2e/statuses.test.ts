@@ -45,7 +45,7 @@ const test = base
 const declare = (project: string, market: string) =>
   writeManifestIn(
     project,
-    `harnesses:\n  - claude\nregistries:\n  acme: ${JSON.stringify(market)}\nartifacts: []\n`,
+    `targets:\n  - claude\nregistries:\n  acme: ${JSON.stringify(market)}\nartifacts: []\n`,
   );
 
 async function versions(project: string): Promise<Record<string, string | undefined>> {

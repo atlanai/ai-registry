@@ -27,12 +27,12 @@ function unlink(
     name,
     to,
     ...(how.edited === true ? { edited: true } : {}),
-    ...(how.link === undefined ? {} : { link: { harness: how.link.harness, mode: how.link.mode } }),
+    ...(how.link === undefined ? {} : { link: { target: how.link.target, mode: how.link.mode } }),
   });
   return true;
 }
 
-/** A harness link the lock recorded, which apply takes back only if it is still ours. */
+/** A target link the lock recorded, which apply takes back only if it is still ours. */
 export function unlinkRecorded(
   build: BuildState,
   name: string,

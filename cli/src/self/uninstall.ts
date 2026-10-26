@@ -7,7 +7,6 @@ import { isWithin } from "#adapter/paths.ts";
 import { dict } from "#core/fields.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { homeDir } from "#core/fs/path.ts";
-import { resolveHarnesses } from "#core/harness/index.ts";
 import { withLease } from "#core/lease.ts";
 import { readLock } from "#core/lock.ts";
 import { readManifest } from "#core/manifest.ts";
@@ -18,12 +17,13 @@ import { spawnDetached } from "#core/process.ts";
 import { NAME } from "#core/product.ts";
 import { runningEntry } from "#core/release/launch.ts";
 import { type Roots, roots, toolHome, userScopeDir } from "#core/store/paths.ts";
+import { resolveTargets } from "#core/target/index.ts";
 import { onPathIn } from "./path-setup.ts";
 import { REMOVE_AFTER_FLAG, removeTree } from "./remove-after.ts";
 
 /** The files aireg put on this machine outside projects, as `aireg self uninstall` finds them. */
 export interface Footprint {
-  /** What your user scope placed in harness folders. */
+  /** What your user scope placed in target folders. */
   links: string[];
   startupFiles: string[];
   folders: string[];
@@ -39,11 +39,11 @@ async function teardownPlan(scope: Roots): Promise<Plan> {
     await readLock(scope),
     [],
     { artifacts: dict() },
-    { roots: scope, targets: [], harnesses: resolveHarnesses(), force: false, copy: false },
+    { roots: scope, targets: [], targetTable: resolveTargets(), force: false, copy: false },
   );
 }
 
-/** The links in harness folders; the copies they point at go with the scope's folder. */
+/** The links in target folders; the copies they point at go with the scope's folder. */
 function linksOf(plan: Plan, env: NodeJS.ProcessEnv): string[] {
   const dir = userScopeDir(env);
   return plan.actions.flatMap((action) =>

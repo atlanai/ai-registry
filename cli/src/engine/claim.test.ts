@@ -102,7 +102,7 @@ describe("surveyClaims", () => {
 });
 
 describe("moveAside", () => {
-  test("moves each copy under the backups, by harness and kind, and a link as a link", async () => {
+  test("moves each copy under the backups, by target and kind, and a link as a link", async () => {
     const claude = await skill(join(root, ".claude/skills/hello"), "same\n");
     const target = await skill(join(root, "dev/hello"), "same\n");
     const linked = join(root, ".agents/skills/hello");
@@ -129,7 +129,7 @@ describe("moveAside", () => {
     expect((await lstat(join(target, "SKILL.md"))).isFile()).toBe(true);
   });
 
-  test("leaves a copy reached through a harness folder that is a link", async () => {
+  test("leaves a copy reached through a target folder that is a link", async () => {
     const outside = await skill(join(root, "outside/hello"), "same\n");
     await mkdir(join(root, ".claude"), { recursive: true });
     await symlink(join(root, "outside"), join(root, ".claude/skills"));

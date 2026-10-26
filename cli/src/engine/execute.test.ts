@@ -28,7 +28,7 @@ const loaded = {
     registries: { [REGISTRY]: { location: ENDPOINT, adapter: "acme", config: {} } },
   },
   lock: { registries: {}, artifacts: {} },
-  harnesses: {},
+  targetTable: {},
 } as unknown as Loaded;
 
 const job: ScopeWork = {

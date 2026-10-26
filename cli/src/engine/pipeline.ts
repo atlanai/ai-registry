@@ -13,8 +13,6 @@ import { dict } from "#core/fields.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { homeDir, readTextIfPresent } from "#core/fs/path.ts";
-import { DEFAULT_TARGETS, type Harnesses, names, resolveHarnesses } from "#core/harness/index.ts";
-import { loadHarnessFiles } from "#core/harness/load.ts";
 import { runPipelineHooks } from "#core/hook/run.ts";
 import { type LeaseHolder, withLease } from "#core/lease.ts";
 import { type Lock, lockChanges, readLock } from "#core/lock.ts";
@@ -43,6 +41,8 @@ import {
   userScopeDir,
 } from "#core/store/paths.ts";
 import { displayPath } from "#core/sync/adopt.ts";
+import { DEFAULT_TARGETS, names, resolveTargets, type Targets } from "#core/target/index.ts";
+import { loadTargetFiles } from "#core/target/load.ts";
 import { VERSION } from "#core/version.ts";
 import type { CommonOptions } from "./options.ts";
 
@@ -102,7 +102,7 @@ export interface Loaded {
   manifest: Manifest;
   lock: Lock;
   /** The built-in table; nothing a project or user writes changes it. */
-  harnesses: Harnesses;
+  targetTable: Targets;
   /** The manifest as loaded, so a run that did not edit it leaves the file alone. */
   manifestAsRead: string;
 }
@@ -139,34 +139,34 @@ export async function withScope<T>(
 async function read(roots: Roots): Promise<Loaded> {
   const lock = await readLock(roots);
   const manifest = await readManifest(roots.manifest);
-  const harnesses = resolveHarnesses();
-  return { roots, manifest, lock, harnesses, manifestAsRead: formatManifest(manifest) };
+  const targetTable = resolveTargets();
+  return { roots, manifest, lock, targetTable, manifestAsRead: formatManifest(manifest) };
 }
 
 /** Explicit flag wins, then the manifest, then what is installed on the machine. */
-export function resolveTargets(
+export function selectTargets(
   manifest: Manifest,
-  harnesses: Harnesses,
+  targetTable: Targets,
   common: CommonOptions,
 ): string[] {
   const wanted = common.targets ?? (manifest.targets.length > 0 ? manifest.targets : undefined);
   if (wanted === undefined) return [...DEFAULT_TARGETS];
-  if (wanted.includes("*")) return names(harnesses);
+  if (wanted.includes("*")) return names(targetTable);
 
-  const known = new Set(names(harnesses));
+  const known = new Set(names(targetTable));
   const unknown = wanted.filter((name) => !known.has(name));
   if (unknown.length > 0) {
     // From --for it is the command line; from the manifest it is file content.
     // A file of yours that would define one, but was skipped, is the likelier story.
-    const skipped = loadHarnessFiles().skipped.filter((file) =>
+    const skipped = loadTargetFiles().skipped.filter((file) =>
       unknown.some((name) => basename(file.path) === `${name}.json`),
     );
-    throw new AiregError(`No harness named ${list(unknown.map(quoted), "or")}.`, {
+    throw new AiregError(`No target named ${list(unknown.map(quoted), "or")}.`, {
       code: common.targets === undefined ? ErrorCode.Invalid : ErrorCode.Usage,
       hint:
         skipped.length > 0
-          ? `aireg skipped ${list(skipped.map((file) => file.path))}: run \`aireg harnesses\` to see why.`
-          : `Use ${list(names(harnesses), "or")}, or run \`aireg harnesses\` to see which this machine has.`,
+          ? `aireg skipped ${list(skipped.map((file) => file.path))}: run \`aireg targets\` to see why.`
+          : `Use ${list(names(targetTable), "or")}, or run \`aireg targets\` to see which this machine has.`,
     });
   }
   return wanted;
@@ -178,9 +178,9 @@ export interface RunResult {
   applied: ApplyResult | undefined;
   /** The lockfile as the run found it, so a report can say what moved. */
   before: Lock;
-  /** The harnesses this run installed for, so a report names them as they were chosen. */
+  /** The targets this run installed for, so a report names them as they were chosen. */
   targets: readonly string[];
-  harnesses: Harnesses;
+  targetTable: Targets;
   scope: Scope;
 }
 
@@ -206,10 +206,10 @@ export interface RunHooks {
   adopt?: ReadonlySet<string>;
 }
 
-/** The harnesses a run installs for, so a report can name them as they were chosen. */
+/** The targets a run installs for, so a report can name them as they were chosen. */
 export interface Chosen {
   targets: readonly string[];
-  harnesses: Harnesses;
+  targetTable: Targets;
 }
 
 /** How a run is shown, which the caller decides: the engine only says what happens. */
@@ -481,7 +481,7 @@ function trustHint(untrusted: readonly Untrusted[]): string {
 }
 
 /**
- * A plugin from a source that is not a registry carrying what a harness runs as you installs only
+ * A plugin from a source that is not a registry carrying what a target runs as you installs only
  * once trusted by name; one left out fails the run after the rest is in.
  */
 function refuseUntrusted(untrusted: readonly Untrusted[]): void {
@@ -511,7 +511,7 @@ async function plan(
   targets: readonly string[],
   nameCollision: NameCollision,
 ): Promise<{ planned: Plan; acquired: Acquired[] }> {
-  const { roots, manifest, lock, harnesses } = loaded;
+  const { roots, manifest, lock, targetTable } = loaded;
   const aliases = Object.keys(manifest.registries);
   // Carried rows are planned from the lock alone, so their copies are not hashed.
   const opened = hooks.aliases === undefined ? undefined : new Set(hooks.aliases);
@@ -539,7 +539,7 @@ async function plan(
     const namespacePlugins =
       roots.scope === "user" &&
       (await loadAdapter(source.origin.adapter).then(wrapsNamespaces, () =>
-        wrappedInLock(view.rows(alias), { roots, harnesses }),
+        wrappedInLock(view.rows(alias), { roots, targetTable }),
       ));
     settled.set(alias, { ...source, namespacePlugins });
   }
@@ -560,7 +560,7 @@ async function plan(
       build(manifest, lock, sources, state, {
         roots,
         targets,
-        harnesses,
+        targetTable,
         force: common.force,
         copy: common.copy,
         refresh: hooks.refresh === true,
@@ -622,7 +622,7 @@ export function recoveredNotices(roots: Roots, recovered: Recovered): ApplyNotic
 export function appliedNotices(
   roots: Roots,
   applied: ApplyResult,
-  harnesses: Harnesses,
+  targetTable: Targets,
 ): ApplyNotice[] {
   const notices: ApplyNotice[] = applied.backedUp.map((moved) => ({
     message: `Moved your ${moved.what} ${displayPath(roots, moved.path)} to ${displayPath(roots, moved.to)}.`,
@@ -635,13 +635,13 @@ export function appliedNotices(
   if (applied.degraded.length > 0) {
     notices.push({
       message: `Copied into ${list(applied.degraded)} instead of linking, because this platform refused a symlink.`,
-      hint: "Edits to the project's copy will not reach those harnesses until you sync.",
+      hint: "Edits to the project's copy will not reach those targets until you sync.",
     });
   }
   for (const kept of applied.kept) notices.push({ message: keptNotice(roots, kept) });
-  for (const { name, harness, reason } of applied.unrendered) {
+  for (const { name, target, reason } of applied.unrendered) {
     notices.push({
-      message: `Did not install ${name} for ${displayName(harnesses, harness)}: ${reason}.`,
+      message: `Did not install ${name} for ${displayName(targetTable, target)}: ${reason}.`,
     });
   }
   return notices;
@@ -661,9 +661,9 @@ function keptMessage(roots: Roots, name: string, path: string, verb: string): st
 }
 
 /** A tool by its name, and a shared folder by its path, as the summary names them. */
-function displayName(harnesses: Harnesses, harness: string): string {
-  const target = harnesses[harness];
-  if (target === undefined) return harness;
+function displayName(targetTable: Targets, name: string): string {
+  const target = targetTable[name];
+  if (target === undefined) return name;
   return target.shared ? target.projectRoot : target.displayName;
 }
 
@@ -696,15 +696,15 @@ export function refusePlan(plan: Plan, acquired: readonly Acquired[], lock: Lock
 }
 
 /**
- * A harness root the run cannot write into fails partway through `apply`,
- * with an errno naming a path but not the harness. Asking first leaves it untouched.
+ * A target root the run cannot write into fails partway through `apply`,
+ * with an errno naming a path but not the target. Asking first leaves it untouched.
  */
 export async function refuseBlocked(plan: Plan): Promise<void> {
   const blocked = await blockedTargets(plan);
   if (blocked.length === 0) return;
-  const folders = blocked.map((item) => `${item.harness} (${item.path})`);
+  const folders = blocked.map((item) => `${item.target} (${item.path})`);
   throw new AiregError(`Cannot write into the folder for ${list(folders)}.`, {
-    hint: "Fix the folder's ownership or permissions, or leave the harness out with `--for`.",
+    hint: "Fix the folder's ownership or permissions, or leave the target out with `--for`.",
   });
 }
 
@@ -738,16 +738,18 @@ async function write(
   report: PlanReport,
   hooks: RunHooks,
 ): Promise<RunResult> {
-  const { roots, manifest, lock, harnesses } = loaded;
+  const { roots, manifest, lock, targetTable } = loaded;
 
   warn(printer, recoveredNotices(roots, await prepareWrite(loaded, common.dryRun)));
 
-  const targets = resolveTargets(manifest, harnesses, common);
-  // Reports name every tool picked, including those an entry's own `harnesses:` adds.
+  const targets = selectTargets(manifest, targetTable, common);
+  // Reports name every tool picked, including those an entry's own `targets:` adds.
   const named = [
     ...new Set([
       ...targets,
-      ...manifest.artifacts.flatMap((ref) => ref.targets ?? []).filter((name) => name in harnesses),
+      ...manifest.artifacts
+        .flatMap((ref) => ref.targets ?? [])
+        .filter((name) => name in targetTable),
     ]),
   ];
   const collision = nameCollisionOf(await readConfig());
@@ -775,7 +777,7 @@ async function write(
         if (action.kind === "link" && guards.get(action.to) === "keep")
           printer.warning(keptMessage(roots, action.name, action.to, "Would not"));
       }
-      report.plan(planned, roots, aside, { targets: named, harnesses });
+      report.plan(planned, roots, aside, { targets: named, targetTable });
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
       refuseUnlisted(planned.unlisted, printer, undefined);
       if (planned.untrusted.length > 0) {
@@ -787,7 +789,7 @@ async function write(
         applied: undefined,
         before: lock,
         targets: named,
-        harnesses,
+        targetTable,
         scope: roots.scope,
       };
     }
@@ -800,7 +802,7 @@ async function write(
         applied: undefined,
         before: lock,
         targets: named,
-        harnesses,
+        targetTable,
         scope: roots.scope,
       };
     }
@@ -814,7 +816,7 @@ async function write(
       planned,
       acquired,
       targets,
-      (action) => report.step(action, planned, { targets: named, harnesses }),
+      (action) => report.step(action, planned, { targets: named, targetTable }),
       async () => {
         // Nothing was recorded, so the manifest must not ask for it.
         if (edited && (await unrecorded(roots, lock)))
@@ -822,7 +824,7 @@ async function write(
       },
     );
 
-    warn(printer, appliedNotices(roots, applied, harnesses));
+    warn(printer, appliedNotices(roots, applied, targetTable));
 
     const landed = applied.installed.length > 0;
     // An edit none of whose artifacts landed, whether unstaged or left out for want of trust,
@@ -833,7 +835,14 @@ async function write(
     refuseWithheld(planned, printer, hooks.moving);
     refuseUnlisted(planned.unlisted, printer, hooks.moving);
     refuseUntrusted(planned.untrusted);
-    return { plan: planned, applied, before: lock, targets: named, harnesses, scope: roots.scope };
+    return {
+      plan: planned,
+      applied,
+      before: lock,
+      targets: named,
+      targetTable,
+      scope: roots.scope,
+    };
   } finally {
     await closeAll(acquired);
   }

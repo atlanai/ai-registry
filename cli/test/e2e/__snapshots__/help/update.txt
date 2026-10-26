@@ -5,8 +5,8 @@ Aliases: aireg upgrade
 
 Options:
       --frozen         Fail with exit status 3 if the lockfile or the manifest would change
-      --for <harness>  The harnesses to install into, comma-separated, or * for all of them
-      --copy           Copy into each harness folder instead of linking
+      --for <target>  The targets to install into, comma-separated, or * for all of them
+      --copy           Copy into each target folder instead of linking
       --dry-run        Print what would change without changing it
   -g, --user           Act on your user scope instead of this project
 

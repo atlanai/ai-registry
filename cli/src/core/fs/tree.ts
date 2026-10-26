@@ -264,7 +264,7 @@ export async function remove(path: string): Promise<void> {
 }
 
 /**
- * Only the immediate parent, since a harness root holds the tool's settings;
+ * Only the immediate parent, since a target root holds the tool's settings;
  * below `ours` every empty folder is aireg's, so those go too.
  */
 export async function pruneEmptyParent(path: string, ours?: string): Promise<void> {

@@ -16,7 +16,6 @@ import {
 import { unknownAction } from "#cli/suggest.ts";
 import { DEFAULT_INTERVAL_SECONDS, STEP_POLICIES } from "#core/config/model.ts";
 import type { ExitCode } from "#core/errors.ts";
-import { IMPORTABLE_HARNESSES } from "#core/harness/index.ts";
 import type {
   CommandContribution,
   Example,
@@ -27,6 +26,7 @@ import { contributedCommands } from "#core/host/load.ts";
 import { KINDS } from "#core/kinds.ts";
 import type { Printer } from "#core/output.ts";
 import { RUN_MODES } from "#core/run/model.ts";
+import { IMPORTABLE_TARGETS } from "#core/target/index.ts";
 import { MAX_PAGE_SIZE } from "#daemon/rpc/protocol.ts";
 
 export type CommandContext = HostCommandContext & {
@@ -61,6 +61,8 @@ export interface ActionSpec {
 export interface CommandSpec {
   name: string;
   aliases?: string[];
+  /** Earlier names it still answers to, which help never lists. */
+  formerly?: string[];
   summary: string;
   group: Group;
   usage: readonly string[];
@@ -114,7 +116,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: "Set up a project (creates .registry/manifest.yml)",
     group: "Set up",
     usage: [
-      "aireg init [--for <harness>,...] [--force]",
+      "aireg init [--for <target>,...] [--force]",
       "aireg init --registry <registry> [--as <name>] [--watch] [options]",
     ],
     examples: [
@@ -142,8 +144,8 @@ export const COMMANDS: readonly CommandSpec[] = [
       { flag: "--watch", describe: "Keep the project in sync with the registry in the background" },
       {
         flag: "--import",
-        value: "<harness>",
-        describe: `Import what these harness folders hold: ${list([...IMPORTABLE_HARNESSES, "all"], "or")}`,
+        value: "<target>",
+        describe: `Import what these target folders hold: ${list([...IMPORTABLE_TARGETS, "all"], "or")}`,
       },
       ADAPTER,
       TOKEN_STDIN,
@@ -485,30 +487,31 @@ export const COMMANDS: readonly CommandSpec[] = [
     load: () => import("./outdated.ts"),
   },
   {
-    name: "harnesses",
-    summary: "List the harnesses aireg can install into, and which this machine has",
+    name: "targets",
+    formerly: ["harnesses"],
+    summary: "List the targets aireg can install into, and which this machine has",
     group: "Check",
-    usage: ["aireg harnesses [--all]", "aireg harnesses show <id>", "aireg harnesses check <file>"],
-    examples: [{ command: "aireg harnesses", what: "which coding agents this machine has" }],
-    docs: "harnesses",
-    options: [{ ...ALL, describe: "List every harness aireg supports, not only those found" }],
+    usage: ["aireg targets [--all]", "aireg targets show <id>", "aireg targets check <file>"],
+    examples: [{ command: "aireg targets", what: "which coding agents this machine has" }],
+    docs: "targets",
+    options: [{ ...ALL, describe: "List every target aireg supports, not only those found" }],
     actions: [
       {
         name: "show",
-        summary: "Print where a harness takes each kind, as aireg resolved it",
-        usage: ["aireg harnesses show <id>"],
+        summary: "Print where a target takes each kind, as aireg resolved it",
+        usage: ["aireg targets show <id>"],
         maxArguments: 1,
-        examples: [{ command: "aireg harnesses show codex", what: "where Codex gets each kind" }],
+        examples: [{ command: "aireg targets show codex", what: "where Codex gets each kind" }],
       },
       {
         name: "check",
-        summary: "Check a harness file before you use it",
-        usage: ["aireg harnesses check <file>"],
+        summary: "Check a target file before you use it",
+        usage: ["aireg targets check <file>"],
         maxArguments: 1,
-        examples: [{ command: "aireg harnesses check tool.json", what: "is this file usable?" }],
+        examples: [{ command: "aireg targets check tool.json", what: "is this file usable?" }],
       },
     ],
-    load: () => import("./harnesses.ts"),
+    load: () => import("./targets.ts"),
   },
 
   {
@@ -1049,7 +1052,9 @@ export function runAction(
 }
 
 function lookupBuiltin(name: string): CommandSpec | undefined {
-  return COMMANDS.find((c) => c.name === name || c.aliases?.includes(name) === true);
+  return COMMANDS.find(
+    (c) => c.name === name || c.aliases?.includes(name) === true || c.formerly?.includes(name),
+  );
 }
 
 function asGroup(group: string): Group {
@@ -1078,7 +1083,7 @@ function fromContribution(command: CommandContribution): CommandSpec {
 /** Names aireg's own commands answer to, so a kind or an adapter's command cannot have them. */
 export const RESERVED: ReadonlySet<string> = new Set([
   "help",
-  ...COMMANDS.flatMap((c) => [c.name, ...(c.aliases ?? [])]),
+  ...COMMANDS.flatMap((c) => [c.name, ...(c.aliases ?? []), ...(c.formerly ?? [])]),
 ]);
 
 /** A kind or an adapter's command that a command with the same name hides. */

@@ -28,23 +28,23 @@ describe("aireg status, for what nothing manages", () => {
     expect(out).toMatch(/triage\s+agent\s+Claude Code\s+~\/\.claude\/agents\/triage\.md/);
   });
 
-  test("follows a link to a skill kept elsewhere, and names each harness linking it", async ({
+  test("follows a link to a skill kept elsewhere, and names each target linking it", async ({
     status,
     home,
   }) => {
     const kept = join(home.dir, "kept", "course");
     await mkdir(kept, { recursive: true });
     await writeFile(join(kept, "SKILL.md"), "---\nname: course\ndescription: A course.\n---\n");
-    for (const harness of [".claude", ".cursor"]) {
-      await mkdir(join(home.dir, harness, "skills"), { recursive: true });
-      await symlink(kept, join(home.dir, harness, "skills", "course"));
+    for (const target of [".claude", ".cursor"]) {
+      await mkdir(join(home.dir, target, "skills"), { recursive: true });
+      await symlink(kept, join(home.dir, target, "skills", "course"));
     }
     const { data } = JSON.parse(await status(["--json"]));
     const course = data.unmanaged.find((item: { name: string }) => item.name === "course");
-    expect(course).toMatchObject({ kind: "skill", harnesses: ["claude", "cursor"] });
+    expect(course).toMatchObject({ kind: "skill", targets: ["claude", "cursor"] });
   });
 
-  test("names a harness once, and the real folder rather than a link to it", async ({
+  test("names a target once, and the real folder rather than a link to it", async ({
     status,
     home,
   }) => {
@@ -56,7 +56,7 @@ describe("aireg status, for what nothing manages", () => {
     }
     const { data } = JSON.parse(await status(["--json"]));
     const course = data.unmanaged.find((item: { name: string }) => item.name === "course");
-    expect(course).toMatchObject({ harnesses: ["claude", "cursor"], path: real });
+    expect(course).toMatchObject({ targets: ["claude", "cursor"], path: real });
   });
 
   test("reads Codex's own agent files, and names a link whose target is gone", async ({
@@ -73,12 +73,12 @@ describe("aireg status, for what nothing manages", () => {
     await symlink(join(home.dir, "nowhere.md"), gone);
 
     const { data } = JSON.parse(await status(["--json"]));
-    const harnessesOf = (name: string) =>
-      data.unmanaged.find((item: { name: string }) => item.name === name)?.harnesses;
-    expect(harnessesOf("triage")).toEqual(["claude", "codex"]);
-    expect(harnessesOf("solo")).toEqual(["codex"]);
+    const targetsOf = (name: string) =>
+      data.unmanaged.find((item: { name: string }) => item.name === name)?.targets;
+    expect(targetsOf("triage")).toEqual(["claude", "codex"]);
+    expect(targetsOf("solo")).toEqual(["codex"]);
     expect(data.dangling).toEqual([
-      { path: gone, target: join(home.dir, "nowhere.md"), harness: "claude" },
+      { path: gone, linksTo: join(home.dir, "nowhere.md"), target: "claude" },
     ]);
 
     const text = await status([]);

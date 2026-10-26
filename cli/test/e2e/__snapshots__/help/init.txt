@@ -1,16 +1,16 @@
 Set up a project (creates .registry/manifest.yml)
 
-Usage: aireg init [--for <harness>,...] [--force]
+Usage: aireg init [--for <target>,...] [--force]
        aireg init --registry <registry> [--as <name>] [--watch] [options]
 
 Options:
-      --for <harness>                      The harnesses to install into, comma-separated, or * for all of them
+      --for <target>                      The targets to install into, comma-separated, or * for all of them
       --force                              Replace an existing manifest, keeping the registries it declares
       --registry <registry>                The registry to set the project up from
       --as <name>                          The name to save the registry under
       --publish-to <registry>/<namespace>  Where aireg publish sends work when --to is not given
       --watch                              Keep the project in sync with the registry in the background
-      --import <harness>                   Import what these harness folders hold: agents, claude, codex or all
+      --import <target>                   Import what these target folders hold: agents, claude, codex or all
       --adapter <id>                       The adapter that reads the registry, when aireg cannot tell
       --token-stdin                        Read the registry's token from standard input
 

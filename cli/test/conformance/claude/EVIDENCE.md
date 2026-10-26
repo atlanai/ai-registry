@@ -1,12 +1,12 @@
 # Claude Code evidence
 
-Every path, variable, detection signal, file format and command in `src/harnesses/claude.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
+Every path, variable, detection signal, file format and command in `src/targets/claude.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
 
-1. the harness's official documentation: the exact sentence, its URL and the date it was read;
-2. the harness's public source, where the documentation is silent: repository, file, line and commit;
-3. a real install of the harness: the command run, the harness version and its output.
+1. the target's official documentation: the exact sentence, its URL and the date it was read;
+2. the target's public source, where the documentation is silent: repository, file, line and commit;
+3. a real install of the target: the command run, the target version and its output.
 
-A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/harnesses/claude.json` and `claude.test.ts` match this file exactly.
+A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/targets/claude.json` and `claude.test.ts` match this file exactly.
 
 Every page below was read on 2026-10-19, and the plugin loading and security pages again on 2026-10-20. Every command ran with `HOME` and `CLAUDE_CONFIG_DIR` inside a sandbox, no account and no credentials.
 
@@ -53,7 +53,7 @@ Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 
 ## L2 probes
 
-The harness's own commands that list what aireg placed, and what each printed. `claude.test.ts` runs the first three after installing the fixtures in the project and in the user scope.
+The target's own commands that list what aireg placed, and what each printed. `claude.test.ts` runs the first three after installing the fixtures in the project and in the user scope.
 
 - `claude plugin list --json`, from the home folder (https://code.claude.com/docs/en/plugins/cli-reference, "plugin list"):
   ```json
@@ -85,6 +85,6 @@ The harness's own commands that list what aireg placed, and what each printed. `
 
 ## Left out
 
-- **`reload`.** It is printed after every change to a harness, but Claude Code picks up skill and agent changes on its own, and only a plugin change needs `/reload-plugins`.
+- **`reload`.** It is printed after every change to a target, but Claude Code picks up skill and agent changes on its own, and only a plugin change needs `/reload-plugins`.
 - **`CLAUDE_CODE`** as a caller variable: Claude Code 2.1.296 does not set it.
 - **A shared copy for `.claude/skills` and `.agents/skills`.** When both get a skill, aireg already links both folders to the one copy in the scope's `.registry/`, so there is one copy on disk, and Claude Code loads the linked folder and loads the skill once. With `--copy`, each folder gets its own real copy, as that option asks.

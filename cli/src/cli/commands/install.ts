@@ -24,7 +24,7 @@ export async function run(context: CommandContext): Promise<void> {
         approved = await confirmIfDestructive(step, plan, {
           verb: "Update",
           targets,
-          harnesses: loaded.harnesses,
+          targetTable: loaded.targetTable,
         });
         return approved;
       },

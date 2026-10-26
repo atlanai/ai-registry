@@ -1,7 +1,7 @@
 import { conformance } from "#test/conformance/kit.ts";
 
 // Copy to `test/conformance/<id>.test.ts` and fill in each part from `<id>/EVIDENCE.md`.
-// This copy defines a harness by file, so the kit runs on a harness no tool installs.
+// This copy defines a target by file, so the kit runs on a target no tool installs.
 conformance({
   id: "example",
   file: {

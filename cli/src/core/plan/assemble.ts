@@ -4,16 +4,16 @@ import { assertUnredirected, readRegular } from "#adapter/files.ts";
 import { isRecord } from "#core/fields.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { exists } from "#core/fs/tree.ts";
-import { resolveHarnesses } from "#core/harness/index.ts";
-import { expandValue } from "#core/harness/template.ts";
+import { resolveTargets } from "#core/target/index.ts";
+import { expandValue } from "#core/target/template.ts";
 import type { PluginDocument } from "./model.ts";
 
-/** Folders a harness reads under another name; one folder serves every harness, as it ignores the rest. */
+/** Folders a target reads under another name; one folder serves every target, as it ignores the rest. */
 const ALIASES: Readonly<Record<string, readonly string[]>> = {
   commands: ["prompts"],
 };
 
-/** Where harnesses read a plugin's manifest: written into the projection, never linked from content. */
+/** Where targets read a plugin's manifest: written into the projection, never linked from content. */
 const MANIFESTS = new Set([".claude-plugin", ".codex-plugin", "plugin.json"]);
 
 /** The manifest Claude Code reads, which a plugin's own document fills when it has none of its own. */
@@ -31,7 +31,7 @@ async function pointAt(from: string, to: string): Promise<void> {
   else await copyFile(to, from);
 }
 
-/** What every harness's plugin manifest says, before any keys of its own. */
+/** What every target's plugin manifest says, before any keys of its own. */
 const DOCUMENT = { name: "{name}", description: "{description}" };
 
 async function names(dir: string): Promise<string[]> {
@@ -59,14 +59,14 @@ function named(bytes: Buffer, name: string): Buffer | string {
 async function writePluginManifest(
   dir: string,
   content: string,
-  harnesses: Iterable<string>,
+  targets: Iterable<string>,
   document: PluginDocument | undefined,
 ): Promise<void> {
-  const table = resolveHarnesses();
+  const table = resolveTargets();
   const name = basename(dir);
   const description = document?.description ?? `Artifacts the ${name} namespace publishes.`;
-  for (const harness of harnesses) {
-    for (const manifest of table[harness]?.kinds.plugin?.manifest ?? []) {
+  for (const target of targets) {
+    for (const manifest of table[target]?.kinds.plugin?.manifest ?? []) {
       const file = join(dir, manifest.path);
       await assertUnredirected(dir, file);
       const own = await readRegular(content, manifest.path);
@@ -98,7 +98,7 @@ async function writePluginManifest(
 export async function assemble(
   projection: string,
   content: string,
-  harnesses: Iterable<string>,
+  targets: Iterable<string>,
   document?: PluginDocument,
 ): Promise<void> {
   await mkdir(projection, { recursive: true });
@@ -114,5 +114,5 @@ export async function assemble(
       await pointAt(join(projection, at), join(content, entry));
     }
   }
-  await writePluginManifest(projection, content, harnesses, document);
+  await writePluginManifest(projection, content, targets, document);
 }

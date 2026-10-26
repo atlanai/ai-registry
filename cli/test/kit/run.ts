@@ -28,7 +28,7 @@ export interface Ran {
 
 export interface RunOptions {
   cwd: string;
-  /** Stands in for the user's home, so no real harness or aireg state is read or written. */
+  /** Stands in for the user's home, so no real target or aireg state is read or written. */
   home: string;
   env?: NodeJS.ProcessEnv;
   /** Flags for node itself, ahead of the entry point. */

@@ -2,7 +2,7 @@
   "name": "@atlanai/aireg",
   "version": "0.1.7",
   "private": true,
-  "description": "Install agent artifacts from any registry into any agent harness.",
+  "description": "Install agent artifacts from any registry into any coding agent.",
   "keywords": [
     "agent",
     "skills",
@@ -44,7 +44,7 @@
     "#core/*": "./src/core/*",
     "#daemon/*": "./src/daemon/*",
     "#engine/*": "./src/engine/*",
-    "#harnesses/*": "./src/harnesses/*",
+    "#targets/*": "./src/targets/*",
     "#self/*": "./src/self/*",
     "#schema/*": "./schema/*",
     "#scripts/*": "./scripts/*",

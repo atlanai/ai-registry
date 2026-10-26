@@ -14,6 +14,10 @@ export const SERVICE = {
   runKey: `${NAME[0]?.toUpperCase()}${NAME.slice(1)}Daemon`,
 } as const;
 
+/** Your own target definitions under the home; the second is the folder's earlier name, still read. */
+export const TARGETS_DIR = "targets";
+export const LEGACY_TARGETS_DIR = "harnesses";
+
 /** Files under the home whose names carry the tool's. */
 export const DATABASE_FILE = `${NAME}.db`;
 export const LOG_FILE = `${NAME}.log`;

@@ -12,7 +12,7 @@ let home: string;
 let roots: Roots;
 let config: string;
 
-// The test home sets CODEX_HOME, and removal is confined to the harness folders it names.
+// The test home sets CODEX_HOME, and removal is confined to the target folders it names.
 test.beforeEach(async ({ home: made }) => {
   home = made.dir;
   roots = makeRoots("user", home);
@@ -37,7 +37,7 @@ function linkTo(source: string, plugin: string, from: string): Extract<Action, {
   return {
     kind: "link",
     name: `${source}/${plugin}/skill/hello`,
-    harness: "codex",
+    target: "codex",
     from,
     to: join(cache(source), plugin, "local"),
     copy: false,
@@ -140,7 +140,7 @@ describe("codex plugins as a local marketplace", () => {
       path: `artifacts/acme-prod/sales/skills/${name}`,
       digest: "",
       origin: undefined,
-      links: [{ harness: "codex", path: relative(roots.base, local), mode: "copy" }],
+      links: [{ target: "codex", path: relative(roots.base, local), mode: "copy" }],
     });
     const lock: Lock = emptyLock();
     lock.artifacts["acme-prod/sales/skill/hello"] = row("hello");

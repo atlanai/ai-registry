@@ -20,16 +20,16 @@ export interface Installed {
   neededBy?: string[] | undefined;
 }
 
-/** The folder a watched row is published from, where its harness reads it; nothing is linked. */
+/** The folder a watched row is published from, where its target reads it; nothing is linked. */
 export interface Watched {
-  harness: string;
+  target: string;
   path: string;
 }
 
 export function watchedFrom(entry: LockArtifact | undefined): Watched | undefined {
   return entry?.origin === undefined
     ? undefined
-    : { harness: entry.origin.harness, path: entry.origin.path };
+    : { target: entry.origin.target, path: entry.origin.path };
 }
 
 export function installed(lock: Lock, manifest: Manifest): Installed[] {
@@ -53,9 +53,9 @@ export function installed(lock: Lock, manifest: Manifest): Installed[] {
             ? ""
             : abbreviate(source.revision)),
         pinned: entry !== undefined && pinOf(manifest, entry) !== undefined,
-        // One harness, however many links it took to reach it: a plugin harness
+        // One target, however many links it took to reach it: a plugin target
         // gets a link inside the projection as well as the one pointing at it.
-        targets: [...new Set((entry?.links ?? []).map((link) => link.harness))].sort(),
+        targets: [...new Set((entry?.links ?? []).map((link) => link.target))].sort(),
         watched: watchedFrom(entry),
         neededBy:
           entry === undefined || asksFor(manifest, entry)

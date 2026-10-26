@@ -4,8 +4,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test as base } from "#test/kit/fixtures.ts";
-import { projected } from "#test/kit/harness.ts";
 import { lockPath, manifestPath, writeManifestIn } from "#test/kit/scope.ts";
+import { projected } from "#test/kit/target.ts";
 
 /** A project, and a home whose config registers an adapter serving one skill. */
 const test = base.extend("hosted", async ({ home: { dir: home }, project }) => {

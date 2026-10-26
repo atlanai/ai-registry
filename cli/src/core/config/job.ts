@@ -62,7 +62,7 @@ function schedule(read: Readers, value: unknown, where: string): Schedule {
 
 function selector(read: Readers, value: unknown, where: string): Selector {
   const entry = read.record(value, where);
-  read.onlyKnown(entry, ["from", "match", "kinds", "harness"], where);
+  read.onlyKnown(entry, ["from", "match", "kinds", "target", "harness"], where);
   const selected: Selector = {
     from: absolute(read, read.text(entry, "from", where), `${where}.from`),
   };
@@ -75,9 +75,25 @@ function selector(read: Readers, value: unknown, where: string): Selector {
     }
     selected.kinds = kinds.filter(isKind);
   }
-  if (entry.harness !== undefined)
-    selected.harness = read.textList(entry.harness, `${where}.harness`);
+  const target = selectedTargets(read, entry, where);
+  if (target !== undefined) selected.target = target;
   return selected;
+}
+
+/** `harness` is the key's earlier name, still read. */
+function selectedTargets(
+  read: Readers,
+  entry: Record<string, unknown>,
+  where: string,
+): readonly string[] | undefined {
+  if (entry.target !== undefined && entry.harness !== undefined) {
+    throw read.fail(
+      `\`${where}\` has both \`target\` and \`harness\`, its earlier name; keep \`target\`.`,
+    );
+  }
+  if (entry.target !== undefined) return read.textList(entry.target, `${where}.target`);
+  if (entry.harness !== undefined) return read.textList(entry.harness, `${where}.harness`);
+  return undefined;
 }
 
 function step(read: Readers, value: unknown, where: string): Step {

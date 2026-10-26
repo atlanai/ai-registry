@@ -3,4 +3,4 @@ registries:
 artifacts:
   - kit/skill/lint@1.2.0
   - ref: kit/agent/triage@0.3.0
-    harnesses: [claude]
+    targets: [claude]

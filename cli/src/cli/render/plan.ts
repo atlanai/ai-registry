@@ -1,6 +1,5 @@
 import { relative } from "node:path";
 import { list, plural } from "#adapter/text.ts";
-import { type Harnesses, trustFor } from "#core/harness/index.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
@@ -9,6 +8,7 @@ import { describeCarried } from "#core/plan/carries.ts";
 import type { Action, Plan } from "#core/plan/model.ts";
 import { olderThan } from "#core/semver.ts";
 import type { Roots } from "#core/store/paths.ts";
+import { type Targets, trustFor } from "#core/target/index.ts";
 import { table } from "#core/term/table.ts";
 import { GLYPH } from "#core/term/theme.ts";
 import type { Chosen, PlanReport, RunResult } from "#engine/pipeline.ts";
@@ -26,17 +26,17 @@ const VERB: Record<Shown["kind"], string> = {
   unlink: "uninstall",
 };
 
-/** The kind the plan records for an artifact, which says which harnesses load it. */
+/** The kind the plan records for an artifact, which says which targets load it. */
 function kindIn(plan: Plan, name: string): ArtifactKind | undefined {
   const record = plan.actions.find((action) => action.kind === "record");
   return record?.kind === "record" ? record.lock.artifacts[name]?.kind : undefined;
 }
 
-/** One line per action as it happens, naming the harnesses so four links read apart. */
+/** One line per action as it happens, naming the targets so four links read apart. */
 function describeAction(action: Shown, plan: Plan, chosen: Chosen): string {
   if (action.kind === "link") {
     const kind = kindIn(plan, action.name);
-    return `install ${action.name} for ${linkLoadedBy(chosen.harnesses, chosen.targets, kind, action.harness)}`;
+    return `install ${action.name} for ${linkLoadedBy(chosen.targetTable, chosen.targets, kind, action.target)}`;
   }
   if (action.kind === "clone") return `copy ${action.name} into this project`;
   return `${VERB[action.kind]} ${action.name}`;
@@ -86,14 +86,14 @@ function renderPlan(
       },
       { header: "artifact", value: (action: Shown) => action.name },
       {
-        header: "harnesses",
+        header: "targets",
         value: (action: Shown) =>
           action.kind === "link"
             ? linkLoadedBy(
-                chosen.harnesses,
+                chosen.targetTable,
                 chosen.targets,
                 kindIn(plan, action.name),
-                action.harness,
+                action.target,
               )
             : "",
         optional: true,
@@ -146,36 +146,36 @@ function unchanged(printer: Printer, plan: Plan): void {
   );
 }
 
-/** The harnesses some artifacts went to, named as chosen; `folders` narrows where each went. */
+/** The targets some artifacts went to, named as chosen; `folders` narrows where each went. */
 type Tools = (names: readonly string[], folders?: (name: string) => string[]) => string;
 
 /** An applied run: the plan, what apply did, and the lockfile it started from. */
-export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "harnesses" | "scope"> & {
+export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "targetTable" | "scope"> & {
   applied: ApplyResult;
 };
 
-function harnessOf(action: Shown): string | undefined {
-  if (action.kind === "link") return action.harness;
-  return action.kind === "unlink" ? action.link?.harness : undefined;
+function targetOf(action: Shown): string | undefined {
+  if (action.kind === "link") return action.target;
+  return action.kind === "unlink" ? action.link?.target : undefined;
 }
 
-/** What a harness asks of a person once it was given something; printed, never run. */
+/** What a target asks of a person once it was given something; printed, never run. */
 function followUps(
   printer: Printer,
   shown: readonly Shown[],
   kindOf: (name: string) => ArtifactKind | undefined,
-  harnesses: Harnesses,
+  targetTable: Targets,
   scope: Ran["scope"],
 ): void {
-  // One line per harness and command, naming every kind that waits on it.
-  const steps = new Map<string, { harness: string; run: string; kinds: Set<string> }>();
+  // One line per target and command, naming every kind that waits on it.
+  const steps = new Map<string, { target: string; run: string; kinds: Set<string> }>();
   const reloads = new Set<string>();
   for (const action of shown) {
-    const harness = harnessOf(action);
-    const target = harness === undefined ? undefined : harnesses[harness];
+    const id = targetOf(action);
+    const target = id === undefined ? undefined : targetTable[id];
     if (target === undefined) continue;
     if (target.reload !== undefined) reloads.add(target.reload);
-    // A plugin a harness takes as its parts asks for each part's step, not the plugin's.
+    // A plugin a target takes as its parts asks for each part's step, not the plugin's.
     const placed =
       action.kind !== "link" ? undefined : action.plugin === true ? "plugin" : action.part;
     const kind = placed ?? kindOf(action.name);
@@ -183,14 +183,14 @@ function followUps(
       action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
     if (run !== undefined && kind !== undefined) {
       const key = `${target.name}\0${run}`;
-      const step = steps.get(key) ?? { harness: target.displayName, run, kinds: new Set() };
+      const step = steps.get(key) ?? { target: target.displayName, run, kinds: new Set() };
       step.kinds.add(`${kind}s`);
       steps.set(key, step);
     }
   }
-  for (const { harness, run, kinds } of steps.values()) {
+  for (const { target, run, kinds } of steps.values()) {
     printer.hint(
-      `${harness} loads ${list([...kinds])} here only once you trust them: run \`${run}\`.`,
+      `${target} loads ${list([...kinds])} here only once you trust them: run \`${run}\`.`,
     );
   }
   for (const reload of reloads) printer.hint(reload);
@@ -202,7 +202,7 @@ function followUps(
  */
 export function summarize(
   printer: Printer,
-  { plan, applied, before, targets, harnesses, scope }: Ran,
+  { plan, applied, before, targets, targetTable, scope }: Ran,
   told: ReadonlySet<string> = new Set(),
 ): void {
   const shown = plan.actions.filter(
@@ -212,23 +212,23 @@ export function summarize(
     new Set(shown.flatMap((action) => (kinds.includes(action.kind) ? [action.name] : [])));
   const held = applied.lock?.artifacts;
   // A namespace installs through one link, so the lock, not the link, says where each one went.
-  const harnessesOf = (name: string) =>
-    held?.[name]?.links.map((item) => item.harness) ??
+  const targetsOf = (name: string) =>
+    held?.[name]?.links.map((item) => item.target) ??
     shown.flatMap((action) =>
-      action.kind === "link" && action.name === name ? [action.harness] : [],
+      action.kind === "link" && action.name === name ? [action.target] : [],
     );
   // Named as they were chosen: one folder can serve several tools.
-  const toolsOf = (name: string, folders = harnessesOf(name)): string[] => {
+  const toolsOf = (name: string, folders = targetsOf(name)): string[] => {
     const kind = held?.[name]?.kind ?? before.artifacts[name]?.kind;
-    return loadedBy(harnesses, targets, kind, folders);
+    return loadedBy(targetTable, targets, kind, folders);
   };
   const tools: Tools = (names, folders) =>
     list(
       [...new Set(names.flatMap((name) => toolsOf(name, folders?.(name))))].map((tool) =>
-        toolName(harnesses, tool),
+        toolName(targetTable, tool),
       ),
     );
-  const installed = applied.added.filter((name) => harnessesOf(name).length > 0);
+  const installed = applied.added.filter((name) => targetsOf(name).length > 0);
   const changed = [...touched("clone", "link", "unlink")].filter(
     (name) => !applied.added.includes(name) && !applied.removed.includes(name),
   );
@@ -253,13 +253,13 @@ export function summarize(
   for (const name of plan.pruned) {
     if (acted.has(name)) printer.note("gone", `${name}, which is no longer needed`);
   }
-  // Instructions wait for an agent to read them; these run as you once a harness loads them.
+  // Instructions wait for an agent to read them; these run as you once a target loads them.
   for (const { name, carries } of applied.carried) {
-    if (told.has(name) || harnessesOf(name).length === 0) continue;
-    // A harness given only the plugin's skills and agents starts none of what it carries.
+    if (told.has(name) || targetsOf(name).length === 0) continue;
+    // A target given only the plugin's skills and agents starts none of what it carries.
     const whole = plan.actions.flatMap((action) =>
       action.kind === "link" && action.name === name && action.plugin === true
-        ? [action.harness]
+        ? [action.target]
         : [],
     );
     const where = tools([name], whole.length > 0 ? () => whole : undefined);
@@ -270,14 +270,14 @@ export function summarize(
     printer,
     shown.filter((action) => acted.has(action.name)),
     kindOf,
-    harnesses,
+    targetTable,
     scope,
   );
 }
 
 /**
  * What happened to installed artifacts a run changed: a new version, links into a
- * harness only put back, or anything else.
+ * target only put back, or anything else.
  */
 function changeLines(
   names: readonly string[],
@@ -306,19 +306,19 @@ function changeLines(
         (action) =>
           action.kind === "stage" ||
           action.kind === "clone" ||
-          (action.kind === "link" && from?.links.some((link) => link.harness === action.harness)),
+          (action.kind === "link" && from?.links.some((link) => link.target === action.target)),
       );
     (from !== undefined && puts ? restored : updated).push(name);
   }
-  // The links put back, not every harness the artifact is in; content fetched
-  // again with its links intact is restored for every harness it is linked in.
+  // The links put back, not every target the artifact is in; content fetched
+  // again with its links intact is restored for every target it is linked in.
   const relinked = tools(restored, (name) => {
     const put = shown.flatMap((action) =>
-      action.kind === "link" && action.name === name ? [action.harness] : [],
+      action.kind === "link" && action.name === name ? [action.target] : [],
     );
     const links = after?.[name]?.links ?? [];
     const held = (links.length > 0 ? links : (before.artifacts[name]?.links ?? [])).map(
-      (link) => link.harness,
+      (link) => link.target,
     );
     return [...new Set(put.length > 0 ? put : held)];
   });

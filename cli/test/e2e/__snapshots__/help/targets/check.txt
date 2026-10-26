@@ -1,0 +1,10 @@
+Check a target file before you use it
+
+Usage: aireg targets check <file>
+
+Examples:
+  $ aireg targets check tool.json  is this file usable?
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/targets/

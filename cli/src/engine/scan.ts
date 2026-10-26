@@ -1,13 +1,13 @@
 import type { Artifact, Credential, Want } from "#adapter/index.ts";
-import { readTargets } from "#core/harness/index.ts";
 import { cloneLock, type Lock } from "#core/lock.ts";
 import { acquire } from "#core/plan/acquire.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { type Candidate, candidates } from "#core/sync/adopt.ts";
 import { reconcile } from "#core/sync/index.ts";
 import type { SyncItem } from "#core/sync/model.ts";
+import { readTargets } from "#core/target/index.ts";
 import type { CommonOptions } from "./options.ts";
-import { type Loaded, resolveTargets } from "./pipeline.ts";
+import { type Loaded, selectTargets } from "./pipeline.ts";
 
 export interface Scan {
   items: SyncItem[];
@@ -68,11 +68,11 @@ export async function scan(
     }
   }
 
-  const targets = resolveTargets(loaded.manifest, loaded.harnesses, common);
+  const targets = selectTargets(loaded.manifest, loaded.targetTable, common);
   const discovered = await candidates(
     loaded.roots,
-    loaded.harnesses,
-    readTargets(targets, loaded.harnesses),
+    loaded.targetTable,
+    readTargets(targets, loaded.targetTable),
     pinned,
     new Set(publisher.keys()),
   );

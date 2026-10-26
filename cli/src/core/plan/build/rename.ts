@@ -2,7 +2,7 @@ import { isArtifactName, isDeviceName } from "#adapter/filespec/names.ts";
 import type { Clash, Renamed, Selected } from "#core/plan/model.ts";
 import { addressOf } from "#core/plan/select.ts";
 
-/** Kinds whose name a harness reads from front matter, which a rename rewrites. */
+/** Kinds whose name a target reads from front matter, which a rename rewrites. */
 const RENAMEABLE = new Set(["skill", "agent"]);
 
 /** How a person reads an address: `ops/review`, without the registry or the kind. */
@@ -15,14 +15,14 @@ export function shownAddress(address: string): string {
 export const NAME_COLLISION_HINT =
   "To change the default, run `aireg config set defaults.name-collision <rename|report|fail>`.";
 
-/** The name a harness folder shows: the last segment of an installed name. */
+/** The name a target folder shows: the last segment of an installed name. */
 export function leafOf(name: string): string {
   return name.split("/").at(-1) ?? name;
 }
 
 /**
- * The name a harness copy's front matter takes, when it installs under one not its own. A
- * folder and its `name:` must agree, or the harness shows two artifacts under one name.
+ * The name a target copy's front matter takes, when it installs under one not its own. A
+ * folder and its `name:` must agree, or the target shows two artifacts under one name.
  */
 export function renamedTo(
   item: Pick<Selected, "kind" | "name" | "upstreamName">,
@@ -39,7 +39,7 @@ function candidates(item: Selected): string[] {
 }
 
 /**
- * A name for each artifact a harness path clash left out. One the person named with `as:`,
+ * A name for each artifact a target path clash left out. One the person named with `as:`,
  * or with no free valid name, stays left out.
  */
 export function renamesFor(

@@ -50,7 +50,7 @@ describe("a sync that reads one registry and names none", () => {
       content: "sha256:t1",
       version: undefined,
       digest: "sha256:3",
-      links: [{ harness: "claude", path: ".claude/skills/engineering", mode: "symlink" }],
+      links: [{ target: "claude", path: ".claude/skills/engineering", mode: "symlink" }],
     };
     return lock;
   }
@@ -83,7 +83,7 @@ describe("a sync that reads one registry and names none", () => {
     const fmt = lock.artifacts.fmt as LockArtifact;
     lock.artifacts.fmt = {
       ...fmt,
-      origin: { harness: "claude", path: ".claude/skills", step: "" },
+      origin: { target: "claude", path: ".claude/skills", step: "" },
     };
     const plan = build(
       declaringFar(["kit"]),

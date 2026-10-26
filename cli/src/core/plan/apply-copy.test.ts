@@ -11,7 +11,7 @@ import type { Action } from "./model.ts";
 
 let roots: Roots;
 
-// The test home sets CLAUDE_CONFIG_DIR, and removal is confined to the harness folders it names.
+// The test home sets CLAUDE_CONFIG_DIR, and removal is confined to the target folders it names.
 test.beforeEach(async ({ home }) => {
   roots = makeRoots("user", home.dir);
 });
@@ -27,7 +27,7 @@ describe("a plugin placed as a copy", () => {
     const link: Action = {
       kind: "link",
       name: "kit/ship",
-      harness: "claude",
+      target: "claude",
       from: projection,
       to,
       copy: true,

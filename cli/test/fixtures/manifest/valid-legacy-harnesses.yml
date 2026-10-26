@@ -1,0 +1,8 @@
+harnesses:
+  - claude
+registries:
+  acme: github.com/acme/registry
+artifacts:
+  - ref: acme/skill/lint
+    harnesses:
+      - codex

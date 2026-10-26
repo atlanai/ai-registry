@@ -3,14 +3,6 @@ import { list, plural } from "#adapter/text.ts";
 import { underHome } from "#cli/render/home.ts";
 import { loadedBy, skipLine, toolName, unhandled } from "#cli/render/tools.ts";
 import type { Entry } from "#core/catalog/model.ts";
-import {
-  DEFAULT_TARGETS,
-  detectAll,
-  type Harnesses,
-  readsFor,
-  type Target,
-  targetRoot,
-} from "#core/harness/index.ts";
 import { type ArtifactKind, KINDS, kindDir } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
@@ -18,6 +10,14 @@ import type { Plan, Selected } from "#core/plan/model.ts";
 import { loadsFrom, type ProjectionOptions } from "#core/plan/projection.ts";
 import { NAME } from "#core/product.ts";
 import type { Scope } from "#core/store/paths.ts";
+import {
+  DEFAULT_TARGETS,
+  detectAll,
+  readsFor,
+  type Target,
+  type Targets,
+  targetRoot,
+} from "#core/target/index.ts";
 import { tableLines } from "#core/term/table.ts";
 import { blocker, explain } from "./caller.ts";
 import { type Choice, multiselect } from "./multiselect.ts";
@@ -169,40 +169,40 @@ const SELECT_ALL_LIMIT = 50;
 
 export async function chooseTargets(
   step: Interaction,
-  harnesses: Harnesses,
+  targetTable: Targets,
   roots: ProjectionOptions["roots"],
   preselected: readonly string[],
-  /** What is being installed, so each harness can show where it would load it from. */
+  /** What is being installed, so each target can show where it would load it from. */
   items: readonly Selected[],
   /** Its source installs each namespace as a plugin in the user scope. */
   wrapped = false,
 ): Promise<string[] | Canceled> {
   // A shared folder is where tools read from, not a tool to pick: choosing a
   // tool reaches it. One a manifest already names is kept as it was.
-  const all = detectAll(harnesses, roots.cwd).filter((item) => !item.target.shared);
-  const kept = preselected.filter((name) => harnesses[name]?.shared === true);
+  const all = detectAll(targetTable, roots.cwd).filter((item) => !item.target.shared);
+  const kept = preselected.filter((name) => targetTable[name]?.shared === true);
   const show = (path: string): string =>
     roots.scope === "user" ? underHome(path) : relative(roots.cwd, path) || path;
   const folders = (name: string, chosen: readonly string[]): string[] =>
-    loadsFrom(name, chosen, items, { roots, harnesses }, wrapped);
+    loadsFrom(name, chosen, items, { roots, targetTable }, wrapped);
 
   const choices: Choice<string>[] = all.map((item) => ({
     value: item.target.name,
     label: item.target.displayName,
   }));
 
-  // The scope's own harnesses, or the defaults every scope starts with, so the
+  // The scope's own targets, or the defaults every scope starts with, so the
   // answer a person accepts is the one a command without --for would take.
   const selectable = new Set(all.map((item) => item.target.name));
   const remembered = preselected.filter((name) => selectable.has(name));
   const wanted =
     remembered.length > 0 ? remembered : DEFAULT_TARGETS.filter((name) => selectable.has(name));
-  // A harness that would load none of it is left for a person to pick on purpose.
+  // A target that would load none of it is left for a person to pick on purpose.
   const initial = wanted.filter((name) => folders(name, wanted).length > 0);
 
   const picked = await multiselect(
     {
-      message: "Which harnesses should they install into?",
+      message: "Which targets should they install into?",
       choices,
       style: step.printer.errStyle,
       initial,
@@ -219,7 +219,7 @@ export async function chooseTargets(
 /** Group removal choices by their registry. */
 export async function chooseRemovals(
   step: Interaction,
-  /** `targets` are the harnesses that load each one, by name. */
+  /** `targets` are the targets that load each one, by name. */
   installed: readonly { name: string; kind: string; source: string; targets: string[] }[],
 ): Promise<string[] | Canceled> {
   return await multiselect(
@@ -233,7 +233,7 @@ export async function chooseRemovals(
         detail:
           entry.targets.length > 0
             ? `Installed for ${list(entry.targets)}.`
-            : "Fetched, but installed into no harness.",
+            : "Fetched, but installed into no target.",
       })),
       style: step.printer.errStyle,
       required: true,
@@ -271,14 +271,14 @@ export async function chooseScope(step: Interaction, initial: Scope): Promise<Sc
 
 /** Offer projection methods only when selected targets resolve to multiple roots. */
 export function methodIsMeaningful(
-  harnesses: Harnesses,
+  targetTable: Targets,
   targets: readonly string[],
   scope: Scope,
   cwd: string,
   kinds: readonly ArtifactKind[] = [],
 ): boolean {
   const chosen = targets
-    .map((name) => harnesses[name])
+    .map((name) => targetTable[name])
     .filter((target): target is Target => target !== undefined)
     .filter(
       (target) => kinds.length === 0 || kinds.some((kind) => target.kinds[kind] !== undefined),
@@ -321,11 +321,11 @@ export async function confirmIfDestructive(
 export interface PlanContext {
   /** What confirming does, which titles the question: `Install 2 artifacts?`. */
   verb?: "Install" | "Remove" | "Update" | undefined;
-  /** Harnesses this run was asked to write to. */
+  /** Targets this run was asked to write to. */
   targets?: readonly string[] | undefined;
-  /** Kinds being installed, used to explain a harness that gets nothing. */
+  /** Kinds being installed, used to explain a target that gets nothing. */
   kinds?: readonly ArtifactKind[] | undefined;
-  harnesses?: Harnesses | undefined;
+  targetTable?: Targets | undefined;
 }
 
 /** Asked for each plugin that runs things as you; no is the default, and the answer without a terminal. */
@@ -337,7 +337,7 @@ export async function confirmTrust(
   if (!interactive(step)) return false;
   const answer = await confirm(
     {
-      message: `${name} carries ${carries}, which a harness that loads it runs as you. Install it?`,
+      message: `${name} carries ${carries}, which a target that loads it runs as you. Install it?`,
       style: step.printer.errStyle,
       initial: false,
     },
@@ -387,22 +387,22 @@ function planQuestion(plan: Plan, verb: "Install" | "Remove" | "Update"): string
   return `${said} ${plural(count, "artifact")}?`;
 }
 
-/** Chosen harnesses the plan places nothing in, so the review can warn before it applies. */
-export function unreached(plan: Plan, targets: readonly string[], harnesses?: Harnesses): string[] {
+/** Chosen targets the plan places nothing in, so the review can warn before it applies. */
+export function unreached(plan: Plan, targets: readonly string[], targetTable?: Targets): string[] {
   const reached = new Set<string>();
   for (const action of plan.actions) {
-    if (action.kind === "link") reached.add(action.harness);
+    if (action.kind === "link") reached.add(action.target);
   }
-  // A harness that reads another's folder is reached through it.
+  // A target that reads another's folder is reached through it.
   const reads = (name: string) =>
-    harnesses === undefined
+    targetTable === undefined
       ? [name]
-      : [name, ...KINDS.flatMap((kind) => readsFor(harnesses, name, kind))];
+      : [name, ...KINDS.flatMap((kind) => readsFor(targetTable, name, kind))];
   return targets.filter((name) => !reads(name).some((read) => reached.has(read))).sort();
 }
 
 /**
- * A plugin is one plan entry but one link per member per harness, so a harness
+ * A plugin is one plan entry but one link per member per target, so a target
  * is named once however many members point there.
  */
 export function linkedTargets(plan: Plan): Map<string, string[]> {
@@ -410,8 +410,8 @@ export function linkedTargets(plan: Plan): Map<string, string[]> {
   for (const action of plan.actions) {
     if (action.kind !== "link") continue;
     const seen = linked.get(action.name);
-    if (seen === undefined) linked.set(action.name, [action.harness]);
-    else if (!seen.includes(action.harness)) seen.push(action.harness);
+    if (seen === undefined) linked.set(action.name, [action.target]);
+    else if (!seen.includes(action.target)) seen.push(action.target);
   }
   return linked;
 }
@@ -430,8 +430,8 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
       removed.add(action.name);
       if (action.edited === true) edited.add(action.name);
     }
-    // A clone is this scope's own copy, not a placement in someone's harness,
-    // and a link is summarized by harness below, so neither gets its own line.
+    // A clone is this scope's own copy, not a placement in someone's target,
+    // and a link is summarized by target below, so neither gets its own line.
   }
   const linked = linkedTargets(plan);
 
@@ -440,18 +440,18 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
   const folders = (name: string): string[] => [
     ...new Set([
       ...(linked.get(name) ?? []),
-      ...(recorded?.artifacts[name]?.links.map((link) => link.harness) ?? []),
+      ...(recorded?.artifacts[name]?.links.map((link) => link.target) ?? []),
     ]),
   ];
   const chosen = context.targets ?? [];
   // The tools a person picked, not the folders written for them: one folder can
   // serve several tools, and a tool can read from another's folder.
   const loading = (name: string): string[] | undefined =>
-    context.harnesses === undefined || chosen.length === 0
+    context.targetTable === undefined || chosen.length === 0
       ? undefined
-      : loadedBy(context.harnesses, chosen, recorded?.artifacts[name]?.kind, folders(name));
+      : loadedBy(context.targetTable, chosen, recorded?.artifacts[name]?.kind, folders(name));
 
-  // What a person decides on: which version, into which harnesses. Store paths are ours.
+  // What a person decides on: which version, into which targets. Store paths are ours.
   const lines =
     names.length === 0
       ? []
@@ -467,12 +467,12 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
                 ),
             },
             {
-              header: "harnesses",
+              header: "targets",
               value: (name: string) => {
                 const tools = loading(name);
                 return tools === undefined
                   ? folders(name).sort().join(", ")
-                  : tools.map((tool) => toolName(context.harnesses, tool)).join(", ");
+                  : tools.map((tool) => toolName(context.targetTable, tool)).join(", ");
               },
               optional: true,
             },
@@ -501,7 +501,7 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
   }
 
   if (names.length > 0) {
-    const missed = unreached(plan, chosen, context.harnesses);
+    const missed = unreached(plan, chosen, context.targetTable);
     const notes = [
       ...explainMissed(missed, context),
       ...explainSkipped(skipped(names, chosen, missed, loading, folders), recorded, context),
@@ -538,8 +538,8 @@ function explainSkipped(
   recorded: Lock | undefined,
   context: PlanContext,
 ): string[] {
-  const { harnesses } = context;
-  if (harnesses === undefined) return [];
+  const { targetTable } = context;
+  if (targetTable === undefined) return [];
   return [...skips.entries()].map(([tool, names]) => {
     const kinds = [
       ...new Set(
@@ -549,25 +549,25 @@ function explainSkipped(
         }),
       ),
     ];
-    return skipLine(harnesses, tool, names, kinds);
+    return skipLine(targetTable, tool, names, kinds);
   });
 }
 
-/** Group unreached harnesses by unsupported kinds for concise reporting. */
+/** Group unreached targets by unsupported kinds for concise reporting. */
 function explainMissed(missed: readonly string[], context: PlanContext): string[] {
   if (missed.length === 0) return [];
-  const { harnesses, kinds } = context;
-  const named = (targets: readonly string[]) => list(targets.map((t) => toolName(harnesses, t)));
+  const { targetTable, kinds } = context;
+  const named = (targets: readonly string[]) => list(targets.map((t) => toolName(targetTable, t)));
   const receive = (targets: readonly string[]) => (targets.length === 1 ? "receives" : "receive");
   const vague = (targets: readonly string[]): string =>
     `${named(targets)} ${receive(targets)} nothing from this selection.`;
-  if (harnesses === undefined || kinds === undefined || kinds.length === 0) {
+  if (targetTable === undefined || kinds === undefined || kinds.length === 0) {
     return [vague(missed)];
   }
 
   const byReason = new Map<string, string[]>();
   for (const target of missed) {
-    const reason = unhandled(harnesses, target, kinds).sort().join(",");
+    const reason = unhandled(targetTable, target, kinds).sort().join(",");
     byReason.set(reason, [...(byReason.get(reason) ?? []), target]);
   }
 

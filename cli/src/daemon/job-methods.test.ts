@@ -7,7 +7,7 @@ import { writeConfig } from "#core/config/repository.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { ADAPTER, ENDPOINT, finished, jobStatus, NAMESPACE, testClient } from "#test/kit/daemon.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { projected } from "#test/kit/harness.ts";
+import { projected } from "#test/kit/target.ts";
 
 const CLIENT = testClient("watch_test");
 

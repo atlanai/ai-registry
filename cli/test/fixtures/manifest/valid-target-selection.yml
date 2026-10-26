@@ -1,0 +1,10 @@
+targets:
+  - claude
+  - codex
+registries:
+  kit: acme/agent-kit
+artifacts:
+  - kit/format
+  - ref: kit/lint
+    targets:
+      - claude

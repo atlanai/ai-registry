@@ -148,7 +148,7 @@ async function showFolder(context: CommandContext, input: string): Promise<void>
 function disclose(context: CommandContext, name: string, carried: readonly Carried[]): void {
   if (carried.length === 0) return;
   context.printer.warning(
-    `${name} carries ${describeCarried(carried)}, which a harness that loads it runs as you.`,
+    `${name} carries ${describeCarried(carried)}, which a target that loads it runs as you.`,
   );
 }
 

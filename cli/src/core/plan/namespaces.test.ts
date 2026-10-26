@@ -8,14 +8,14 @@ import { wrappedInLock } from "./namespaces.ts";
 
 describe("wrappedInLock", () => {
   const user = roots("user", "/work");
-  const options = { roots: user, harnesses: PLAN_OPTIONS.harnesses };
+  const options = { roots: user, targetTable: PLAN_OPTIONS.targetTable };
   const row = (path: string): readonly [string, LockArtifact] => [
     "engineering/lint",
     {
       registry: "kit",
       kind: "skill",
       namespace: "engineering",
-      links: [{ harness: "claude", path: relative(user.base, path), mode: "symlink" }],
+      links: [{ target: "claude", path: relative(user.base, path), mode: "symlink" }],
     } as unknown as LockArtifact,
   ];
 

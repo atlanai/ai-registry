@@ -14,7 +14,7 @@ import { parseYaml } from "./yaml.ts";
 
 export const LOCK_VERSION = 1;
 
-/** `fanout` is a real directory of links, for a harness that will not follow a linked one. */
+/** `fanout` is a real directory of links, for a target that will not follow a linked one. */
 const LINK_MODES = ["symlink", "junction", "copy", "fanout"] as const;
 export type LinkMode = (typeof LINK_MODES)[number];
 
@@ -24,7 +24,7 @@ function isLinkMode(value: string): value is LinkMode {
 
 /**
  * A project's lockfile is committed, so a clone chooses it: its paths stay relative and below
- * the scope. The user's own lock may name a scope or harness home outside HOME.
+ * the scope. The user's own lock may name a scope or target home outside HOME.
  */
 function scopePathOf(value: unknown, scope: Scope): string | undefined {
   const path = textOf(value);
@@ -50,11 +50,11 @@ export interface LockRegistry {
 }
 
 interface LockLink {
-  harness: string;
+  target: string;
   /** Relative to the scope base, so a committed lock is machine-independent. */
   path: string;
   mode: LinkMode;
-  /** A copy's digest as written, so an edit to the harness's own copy is seen. */
+  /** A copy's digest as written, so an edit to the target's own copy is seen. */
   digest?: string | undefined;
 }
 
@@ -63,7 +63,7 @@ interface LockLink {
  * presence is what makes a row yours: `publish` sends only these.
  */
 interface LockOrigin {
-  harness: string;
+  target: string;
   /** Relative to the scope base, so the lock stays portable. */
   path: string;
   /** The step that claimed it, so a report can name what to re-run. */
@@ -92,7 +92,7 @@ export interface LockArtifact {
   revision?: string | undefined;
   /** Where our copy lives, relative to the scope base. */
   path: string;
-  /** Did you edit it? Digest of this scope's own copy, which is what a harness loads. */
+  /** Did you edit it? Digest of this scope's own copy, which is what a target loads. */
   digest: string;
   /** Set when the bytes come from a folder here, absent when they came from upstream. */
   origin: LockOrigin | undefined;
@@ -104,7 +104,7 @@ export interface LockArtifact {
    * Links asked for but not made, because something of yours is at the path.
    * Read by status, never by prune: nothing listed here is ours to remove.
    */
-  blocked?: { harness: string; path: string; by?: string | undefined }[] | undefined;
+  blocked?: { target: string; path: string; by?: string | undefined }[] | undefined;
 }
 
 /**
@@ -151,14 +151,19 @@ function optional<K extends string>(key: K, value: string | undefined): { [P in 
   return (value === undefined ? {} : { [key]: value }) as { [P in K]?: string };
 }
 
+/** `harness` is the field's earlier name, still read; a row is always written with `target`. */
+function targetOf(entry: Record<string, unknown>): string | undefined {
+  return textOf(entry.target) ?? textOf(entry.harness);
+}
+
 function parseBlocked(raw: unknown, scope: Scope): LockArtifact["blocked"] {
   const held = (Array.isArray(raw) ? raw : []).flatMap((item) => {
     const entry = (item ?? {}) as Record<string, unknown>;
-    const harness = textOf(entry.harness);
+    const target = targetOf(entry);
     const path = scopePathOf(entry.path, scope);
-    if (harness === undefined || path === undefined) return [];
+    if (target === undefined || path === undefined) return [];
     const by = textOf(entry.by);
-    return [{ harness, path, ...(by === undefined ? {} : { by }) }];
+    return [{ target, path, ...(by === undefined ? {} : { by }) }];
   });
   return held.length === 0 ? undefined : held;
 }
@@ -170,13 +175,13 @@ function parseLinks(raw: unknown, scope: Scope): LockLink[] | undefined {
   const links: LockLink[] = [];
   for (const item of raw) {
     if (!isRecord(item)) return undefined;
-    const harness = textOf(item.harness);
+    const target = targetOf(item);
     const path = scopePathOf(item.path, scope);
     const mode = textOf(item.mode);
     const digest = textOf(item.digest);
-    if (harness === undefined || path === undefined) return undefined;
+    if (target === undefined || path === undefined) return undefined;
     if (mode === undefined || !isLinkMode(mode)) return undefined;
-    links.push({ harness, path, mode, ...(digest === undefined ? {} : { digest }) });
+    links.push({ target, path, mode, ...(digest === undefined ? {} : { digest }) });
   }
   return links;
 }
@@ -189,10 +194,10 @@ function parseNames(raw: unknown): string[] | undefined {
 
 function parseOrigin(entry: unknown, scope: Scope): LockOrigin | undefined {
   if (!isRecord(entry)) return undefined;
-  const harness = textOf(entry.harness);
+  const target = targetOf(entry);
   const path = scopePathOf(entry.path, scope);
-  if (harness === undefined || path === undefined) return undefined;
-  return { harness, path, step: textOf(entry.step) ?? "" };
+  if (target === undefined || path === undefined) return undefined;
+  return { target, path, step: textOf(entry.step) ?? "" };
 }
 
 function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
@@ -332,14 +337,14 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
       artifact.origin === undefined
         ? undefined
         : withoutUndefined({
-            harness: artifact.origin.harness,
+            target: artifact.origin.target,
             path: artifact.origin.path,
             step: artifact.origin.step === "" ? undefined : artifact.origin.step,
           }),
     links: [...artifact.links]
       .sort((a, b) => a.path.localeCompare(b.path))
       .map((link) => ({
-        harness: link.harness,
+        target: link.target,
         path: link.path,
         mode: link.mode,
         digest: link.mode === "copy" ? link.digest : undefined,

@@ -1,0 +1,19 @@
+List the targets aireg can install into, and which this machine has
+
+Usage: aireg targets [--all]
+       aireg targets show <id>
+       aireg targets check <file>
+
+Actions:
+  show   Print where a target takes each kind, as aireg resolved it
+  check  Check a target file before you use it
+
+Options:
+      --all  List every target aireg supports, not only those found
+
+Examples:
+  $ aireg targets  which coding agents this machine has
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/targets/

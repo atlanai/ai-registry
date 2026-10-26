@@ -1,13 +1,13 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Harness } from "./harness.ts";
 import { Lockfile } from "./lockfile.ts";
 import { Manifest } from "./manifest.ts";
+import { Target } from "./target.ts";
 
 export const GENERATED = {
   "manifest.schema.json": Manifest,
   "lockfile.schema.json": Lockfile,
-  "harness.schema.json": Harness,
+  "target.schema.json": Target,
 } as const;
 
 /** Published, so the generated documents live apart from the definitions. */

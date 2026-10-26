@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { CALLER_SIGNALS } from "#core/harness/index.ts";
+import { CALLER_SIGNALS } from "#core/target/index.ts";
 import { blocker, callingAgent, explain, SIGNALS } from "./caller.ts";
 
 const DOCS = readFileSync(
@@ -39,7 +39,7 @@ describe("callingAgent", () => {
   it.each([
     ["gemini", "GEMINI_CLI"],
     ["opencode", "OPENCODE"],
-  ])("takes %s's variable from its harness definition alone", (agent, variable) => {
+  ])("takes %s's variable from its target definition alone", (agent, variable) => {
     expect(CALLER_SIGNALS).toContainEqual({ agent, env: [variable] });
     expect(SIGNALS.filter((signal) => signal.agent === agent)).toHaveLength(1);
     expect(callingAgent({ [variable]: "1" })).toBe(agent);

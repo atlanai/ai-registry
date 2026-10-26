@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { gitRegistry, registry } from "#test/kit/builders/registry.ts";
 import { fileTest } from "#test/kit/fixtures.ts";
-import { HARNESS_ROOTS, projected } from "#test/kit/harness.ts";
 import { makeHome } from "#test/kit/home.ts";
 import { lockPath, writeManifestIn } from "#test/kit/scope.ts";
+import { projected, TARGET_ROOTS } from "#test/kit/target.ts";
 
 const test = fileTest.extend("repo", { scope: "file" }, ({ git, tmp }) =>
   gitRegistry(git, join(tmp, "kit")),
@@ -17,7 +17,7 @@ describe("the git route, end to end", () => {
     await mkdir(join(project, ".claude"), { recursive: true });
     const started = await aireg(["init"]);
     expect(started.code, started.stderr).toBe(0);
-    // No --for: the manifest's `harnesses:` governs, so add and sync agree.
+    // No --for: the manifest's `targets:` governs, so add and sync agree.
     const added = await aireg(["add", `file://${repo}@v1`]);
     expect(added.code, added.stderr).toBe(0);
 
@@ -37,7 +37,7 @@ describe("the git route, end to end", () => {
   });
 
   test("reports an edit and exits 3, then repairs under --force", async ({ aireg, project }) => {
-    // Edited where a person edits it: through the harness, which links into
+    // Edited where a person edits it: through the target, which links into
     // the plugin, which links into the mirror.
     await writeFile(projected(project, "lint"), "edited", "utf8");
 
@@ -125,7 +125,7 @@ describe("the git route, end to end", () => {
   }) => {
     const removed = await aireg(["remove", "-g", "--all"]);
     expect(removed.code, removed.stderr).toBe(0);
-    const left = [...HARNESS_ROOTS, join(".registry", "artifacts")].flatMap((dir) =>
+    const left = [...TARGET_ROOTS, join(".registry", "artifacts")].flatMap((dir) =>
       existsSync(join(home, dir))
         ? readdirSync(join(home, dir), { recursive: true, withFileTypes: true })
             .filter((entry) => !entry.isDirectory())
@@ -208,7 +208,7 @@ describe("the git route, end to end", () => {
         "  - kit/skill/lint",
       ].join("\n"),
     );
-    // One named harness, so which links exist does not depend on what the
+    // One named target, so which links exist does not depend on what the
     // machine running this happens to have installed.
     expect((await aireg(["install", "--for", "claude"], { cwd })).code).toBe(0);
     expect((await aireg(["status"], { cwd })).code).toBe(0);

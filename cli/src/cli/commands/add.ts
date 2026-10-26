@@ -76,8 +76,8 @@ import {
   locate,
   type RunResult,
   resolveScope,
-  resolveTargets,
   run as runPipeline,
+  selectTargets,
 } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
@@ -310,10 +310,10 @@ async function addAddress(
         approve: async (plan, targets) => {
           approved = await confirmPlan(asking, plan, {
             verb: "Install",
-            // The harnesses picked for this add, which an entry may narrow from the scope's.
+            // The targets picked for this add, which an entry may narrow from the scope's.
             targets: choices.targets ?? targets,
             kinds: choices.kinds,
-            harnesses: fresh.harnesses,
+            targetTable: fresh.targetTable,
           });
           return approved;
         },
@@ -447,7 +447,7 @@ type AddFlags = SourceFlags & {
 };
 
 /**
- * Plugins this add may install although a harness that loads them runs what they carry as you:
+ * Plugins this add may install although a target that loads them runs what they carry as you:
  * named with `--trust`, trusted by the manifest already, or agreed to here on a terminal.
  */
 async function trustFor(
@@ -605,8 +605,8 @@ function narrowedTargets(
   picked: string[] | undefined,
 ): string[] | "scope" | undefined {
   if (picked === undefined) return undefined;
-  const wanted = resolveTargets(loaded.manifest, loaded.harnesses, { ...common, targets: picked });
-  const scope = resolveTargets(loaded.manifest, loaded.harnesses, {
+  const wanted = selectTargets(loaded.manifest, loaded.targetTable, { ...common, targets: picked });
+  const scope = selectTargets(loaded.manifest, loaded.targetTable, {
     ...common,
     targets: undefined,
   });
@@ -799,14 +799,14 @@ async function gather(
 
   // Loaded under the chosen scope, so the paths shown in the prompt are real.
   const loaded = await load({ ...common, scope }, cwd);
-  const { manifest, harnesses } = loaded;
+  const { manifest, targetTable } = loaded;
   const chosen = chosenEntries(picked.addresses, all);
   let targets = common.targets;
   if (targets === undefined && interactive(step)) {
     const items = chosen.map((entry) => asSelected(entry, alias));
     const picked = await chooseTargets(
       step,
-      harnesses,
+      targetTable,
       loaded.roots,
       manifest.targets,
       items,
@@ -821,7 +821,7 @@ async function gather(
   if (
     !copy &&
     interactive(step) &&
-    methodIsMeaningful(harnesses, targets ?? [], scope, cwd, kinds)
+    methodIsMeaningful(targetTable, targets ?? [], scope, cwd, kinds)
   ) {
     const picked = await chooseMethod(step, copy);
     if (canceled(picked)) return undefined;
@@ -885,7 +885,7 @@ function chosenEntries(addresses: readonly string[] | undefined, all: readonly E
   );
 }
 
-/** A catalog entry as the plan would place it, for showing where each harness loads it from. */
+/** A catalog entry as the plan would place it, for showing where each target loads it from. */
 function asSelected(entry: Entry, alias: string): Selected {
   return {
     name: entry.name,

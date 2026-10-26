@@ -6,7 +6,7 @@ import { parseRef } from "#core/ref.ts";
 import { acquired, entry, kitManifest, PLAN_OPTIONS } from "#test/kit/builders/plan.ts";
 
 describe("dependencies", () => {
-  it("land in the harnesses their dependent was narrowed to", () => {
+  it("land in the targets their dependent was narrowed to", () => {
     const reviewer = "artifacts/eng/agent/reviewer.md";
     const lint = "artifacts/eng/skill/lint";
     const [source] = acquired([
@@ -41,7 +41,7 @@ describe("dependencies", () => {
       },
     );
     const into = plan.actions.flatMap((action) =>
-      action.kind === "link" && action.name === "lint" ? [action.harness] : [],
+      action.kind === "link" && action.name === "lint" ? [action.target] : [],
     );
     expect(into).toEqual(["claude"]);
     expect(plan.neededBy).toEqual({ lint: ["reviewer"] });

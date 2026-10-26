@@ -9,7 +9,7 @@ function scopeRoot(roots: Roots): string {
   return roots.scope === "project" ? roots.cwd : dirname(roots.artifacts);
 }
 
-/** Harness roots may be shared; only scope-owned and staging trees are guarded here. */
+/** Target roots may be shared; only scope-owned and staging trees are guarded here. */
 export async function guardManagedPath(
   path: string,
   roots: Roots,

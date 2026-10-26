@@ -14,13 +14,13 @@ test.beforeEach(async ({ tmp }) => {
   home = tmp;
 });
 
-function planning(links: readonly { harness: string; to: string }[]): Plan {
+function planning(links: readonly { target: string; to: string }[]): Plan {
   return {
     ...emptyPlan(),
-    actions: links.map(({ harness, to }) => ({
+    actions: links.map(({ target, to }) => ({
       kind: "link" as const,
       name: "lint",
-      harness,
+      target,
       from: join(home, "from"),
       to,
       copy: false,
@@ -46,48 +46,48 @@ const modesIgnored = (() => {
 })();
 
 describe("blockedTargets", () => {
-  test.skipIf(modesIgnored)("names a harness whose root cannot be written into", async () => {
+  test.skipIf(modesIgnored)("names a target whose root cannot be written into", async () => {
     const root = join(home, ".cursor");
     await mkdir(root);
     await chmod(root, 0o555);
 
     const blocked = await blockedTargets(
-      planning([{ harness: "cursor", to: join(root, "skills", "lint") }]),
+      planning([{ target: "cursor", to: join(root, "skills", "lint") }]),
     );
 
-    expect(blocked).toEqual([{ harness: "cursor", path: root }]);
+    expect(blocked).toEqual([{ target: "cursor", path: root }]);
   });
 
   test("is empty when the parents do not exist yet under a writable directory", async () => {
     // The ordinary case: ~/.pi/agent/skills is created by the apply, and its
     // absence must not read as a problem.
     const blocked = await blockedTargets(
-      planning([{ harness: "pi", to: join(home, ".pi", "agent", "skills", "lint") }]),
+      planning([{ target: "pi", to: join(home, ".pi", "agent", "skills", "lint") }]),
     );
 
     expect(blocked).toEqual([]);
   });
 
-  test("names a harness whose root is a file, which no directory can be made in", async () => {
+  test("names a target whose root is a file, which no directory can be made in", async () => {
     const root = join(home, ".cursor");
     await writeFile(root, "not a directory\n");
 
     const blocked = await blockedTargets(
-      planning([{ harness: "cursor", to: join(root, "skills", "lint") }]),
+      planning([{ target: "cursor", to: join(root, "skills", "lint") }]),
     );
 
-    expect(blocked).toEqual([{ harness: "cursor", path: root }]);
+    expect(blocked).toEqual([{ target: "cursor", path: root }]);
   });
 
-  test.skipIf(modesIgnored)("checks a harness once, however many artifacts it takes", async () => {
+  test.skipIf(modesIgnored)("checks a target once, however many artifacts it takes", async () => {
     const root = join(home, ".cursor");
     await mkdir(root);
     await chmod(root, 0o555);
 
     const blocked = await blockedTargets(
       planning([
-        { harness: "cursor", to: join(root, "skills", "lint") },
-        { harness: "cursor", to: join(root, "skills", "review") },
+        { target: "cursor", to: join(root, "skills", "lint") },
+        { target: "cursor", to: join(root, "skills", "review") },
       ]),
     );
 

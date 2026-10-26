@@ -148,7 +148,7 @@ async function writeFiles(
   if (absent.size === 0) return { kept: landed, missing: [], reasons: why };
 
   // Everything else the member published goes with it: half a skill reads as a
-  // whole one to the harness that loads it.
+  // whole one to the target that loads it.
   const missing = [...absent].sort();
   const kept = landed.filter((descriptor) => !absent.has(memberOf(descriptor.path)));
   if (kept.length === 0) {

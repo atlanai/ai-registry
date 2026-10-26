@@ -59,4 +59,4 @@ aireg doctor
 
 ## See also
 
-[`aireg harnesses`](harnesses.md), [`aireg logs`](logs.md), [CLI reference](index.md)
+[`aireg harnesses`](targets.md), [`aireg logs`](logs.md), [CLI reference](index.md)

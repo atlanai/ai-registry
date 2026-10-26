@@ -13,7 +13,7 @@ export interface Copy {
 }
 
 /**
- * A folder in a harness directory holding an artifact the registry already
+ * A folder in a target directory holding an artifact the registry already
  * publishes, as a person who uploaded it before this machine synced it has.
  */
 export interface Claim {
@@ -61,7 +61,7 @@ export async function surveyClaims(
   return claims;
 }
 
-/** Filed by harness and kind under one run's stamp; a copy reached through a link stays. */
+/** Filed by target and kind under one run's stamp; a copy reached through a link stays. */
 export async function moveAside(
   kind: ArtifactKind,
   name: string,

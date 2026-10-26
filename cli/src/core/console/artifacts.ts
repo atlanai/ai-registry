@@ -69,14 +69,14 @@ async function row(
     diskDigest: observed?.digest,
     state: stateOf(key, status, upstream),
     detail: upstream.failed.get(key) ?? status?.detail,
-    targets: [...new Set(entry.links.map((link) => link.harness))].sort(),
+    targets: [...new Set(entry.links.map((link) => link.target))].sort(),
     copy,
     changedAtMs: await changedAt(copy),
     links: entry.links.map((link) => {
       const seen = observed?.links[link.path];
       const target = seen?.target === undefined ? undefined : resolve(seen.target);
       return {
-        target: link.harness,
+        target: link.target,
         path: link.path,
         present: seen?.present === true,
         ok: seen?.present === true && (link.mode === "copy" || seen.isLink) && target !== undefined,

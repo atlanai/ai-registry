@@ -10,8 +10,6 @@ import { fanOut, inspect, link } from "#core/fs/link.ts";
 import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { entries, exists, present, pruneEmptyParent, remove, unseal } from "#core/fs/tree.ts";
-import { applyCodec, type Rendered } from "#core/harness/codecs/index.ts";
-import type { KeyFile } from "#core/harness/contract.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import { assertLeasesHeld } from "#core/lease.ts";
 import { type LinkMode, type Lock, readLock, writeLock } from "#core/lock.ts";
@@ -19,6 +17,8 @@ import { backupStamp } from "#core/store/backups.ts";
 import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { PROJECTIONS_DIR, type Roots } from "#core/store/paths.ts";
+import { applyCodec, type Rendered } from "#core/target/codecs/index.ts";
+import type { KeyFile } from "#core/target/contract.ts";
 import { assemble } from "./assemble.ts";
 import { type Carried, carriedBy } from "./carries.ts";
 import { commandSkill } from "./command-skill.ts";
@@ -105,16 +105,16 @@ type Performed = Record<Exclude<Action["kind"], "record">, number>;
 export interface ApplyResult {
   /** What ran: a link kept back for a person's own file, or never made, is not counted. */
   performed: Performed;
-  /** Artifacts this run linked into a harness. */
+  /** Artifacts this run linked into a target. */
   installed: string[];
-  /** Artifacts the lock holds now that no harness had before this run. */
+  /** Artifacts the lock holds now that no target had before this run. */
   added: string[];
-  /** Artifacts some harness had before this run that none has now. */
+  /** Artifacts some target had before this run that none has now. */
   removed: string[];
   lock: Lock | undefined;
   /**
-   * Harnesses that asked for a symlink and got a copy. Worth reporting: an edit
-   * to the project's artifact no longer reaches that harness.
+   * Targets that asked for a symlink and got a copy. Worth reporting: an edit
+   * to the project's artifact no longer reaches that target.
    */
   degraded: string[];
   /**
@@ -133,10 +133,10 @@ export interface ApplyResult {
     /** What it was, so the report can name it the way the person knows it. */
     what: "folder" | "file" | "link";
   }[];
-  /** Plugins this run installed or updated that carry something a harness starts on its own. */
+  /** Plugins this run installed or updated that carry something a target starts on its own. */
   carried: { name: string; carries: Carried[] }[];
   /** Rendered placements skipped because the artifact could not fill one. */
-  unrendered: { name: string; harness: string; reason: string }[];
+  unrendered: { name: string; target: string; reason: string }[];
 }
 
 /** What a stage's content is keyed by, written once so both readers agree. */
@@ -217,7 +217,7 @@ interface Run {
   /** Projections to rebuild once every clone has landed: dir -> content, readers. */
   plugins: Map<
     string,
-    { content: string; harnesses: Set<string>; document?: PluginDocument | undefined }
+    { content: string; targets: Set<string>; document?: PluginDocument | undefined }
   >;
   /** Fan-out directories to refresh once their projections are final: dir -> projection. */
   fanned: Map<string, string>;
@@ -305,7 +305,7 @@ async function stage(run: Run, action: ActionOf<"stage">): Promise<void> {
     return;
   }
   // A collection that lost a member still installs; say which and why,
-  // because the harness will simply not have that skill.
+  // because the target will simply not have that skill.
   for (const { member, reason, error } of from.dropped) {
     run.unstaged.set(`${action.name}/${member}`, { reason, error });
   }
@@ -337,19 +337,19 @@ async function cloneInto(run: Run, action: ActionOf<"clone">): Promise<void> {
   run.performed.clone += 1;
 }
 
-/** Pointing a harness at a whole namespace is what makes that directory a plugin. */
+/** Pointing a target at a whole namespace is what makes that directory a plugin. */
 async function assemblePlugin(run: Run, action: ActionOf<"link">): Promise<void> {
   if (action.plugin !== true || action.content === undefined) return;
   if (!(await exists(action.content))) return;
   const found = run.plugins.get(action.from) ?? {
     content: action.content,
-    harnesses: new Set<string>(),
+    targets: new Set<string>(),
     document: action.document,
   };
-  found.harnesses.add(action.harness);
+  found.targets.add(action.target);
   run.plugins.set(action.from, found);
   await guardManagedPath(action.from, run.roots);
-  await assemble(action.from, action.content, found.harnesses, found.document);
+  await assemble(action.from, action.content, found.targets, found.document);
 }
 
 /** Whether aireg writes this placement's file itself, rather than linking or copying a tree. */
@@ -373,14 +373,14 @@ async function rendering(action: ActionOf<"link">): Promise<Rendered | undefined
   return applyCodec(action.codec, source);
 }
 
-/** A copy under a name not its own says that name, so the harness shows it as installed. */
+/** A copy under a name not its own says that name, so the target shows it as installed. */
 async function renameCopy(to: string, name: string): Promise<void> {
   const file = (await lstat(to)).isDirectory() ? join(to, SKILL_ENTRY) : to;
   const text = await readFile(file, "utf8").catch(() => undefined);
   if (text !== undefined) await writeAtomic(file, withName(text, name));
 }
 
-/** Never linked: a harness reading its own format may refuse a link. */
+/** Never linked: a target reading its own format may refuse a link. */
 async function writeRendered(
   run: Run,
   action: ActionOf<"link">,
@@ -388,7 +388,7 @@ async function writeRendered(
 ): Promise<LinkMode | undefined> {
   if (rendered === undefined || "problem" in rendered) {
     const reason = rendered?.problem ?? "its file could not be read";
-    run.unrendered.push({ name: action.name, harness: action.harness, reason });
+    run.unrendered.push({ name: action.name, target: action.target, reason });
     return undefined;
   }
   await remove(action.to);
@@ -397,7 +397,7 @@ async function writeRendered(
   return "copy";
 }
 
-/** The files its keys add; undefined once it is left out for a harness that cannot keep one. */
+/** The files its keys add; undefined once it is left out for a target that cannot keep one. */
 async function keyFiles(
   run: Run,
   action: ActionOf<"link">,
@@ -411,7 +411,7 @@ async function keyFiles(
   if ("files" in needs) return needs.files;
   run.unrendered.push({
     name: action.command ?? action.name,
-    harness: action.harness,
+    target: action.target,
     reason: needs.refused,
   });
   run.skipped.add(key);
@@ -473,10 +473,10 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   // Whatever is there is about to go, so it is checked again now.
   await assertRemovable(action.to, roots);
   if (guard === "backup") {
-    await moveAside(run, action.to, action.harness);
+    await moveAside(run, action.to, action.target);
     run.guards.set(action.to, "replace");
   }
-  // A harness that will not load a linked plugin gets a real directory of links instead.
+  // A target that will not load a linked plugin gets a real directory of links instead.
   const fan = action.fan === true && !action.copy;
   // A file a key adds goes into a copy, never into the store a link would lead to.
   const copy = action.copy || files.length > 0;
@@ -493,7 +493,7 @@ async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
   run.modes.set(key, mode);
   run.pathModes.set(action.to, mode);
   if (mode === "copy") run.copies.set(action.to, await digest(action.to));
-  if (!copy && mode === "copy") run.degraded.add(action.harness);
+  if (!copy && mode === "copy") run.degraded.add(action.target);
   run.performed.link += 1;
   run.installed.add(action.name);
 }
@@ -528,14 +528,14 @@ async function adoptOrKeep(run: Run, action: ActionOf<"link">, key: string): Pro
 }
 
 /** A person's own file or folder where the lockfile recorded a link goes to backups, never away. */
-async function moveAside(run: Run, path: string, harness: string): Promise<void> {
+async function moveAside(run: Run, path: string, target: string): Promise<void> {
   const { roots } = run;
   const info = await lstat(path);
   run.stamp ??= backupStamp();
   await guardManagedPath(roots.artifacts, roots);
   run.backedUp.push({
     path,
-    to: await backUp(path, harness, roots, run.stamp),
+    to: await backUp(path, target, roots, run.stamp),
     what: info.isSymbolicLink() ? "link" : info.isDirectory() ? "folder" : "file",
   });
 }
@@ -543,7 +543,7 @@ async function moveAside(run: Run, path: string, harness: string): Promise<void>
 async function unlink(run: Run, action: ActionOf<"unlink">): Promise<void> {
   if (run.guards.get(action.to) === "backup" && action.link !== undefined) {
     await assertRemovable(action.to, run.roots);
-    await moveAside(run, action.to, action.link.harness);
+    await moveAside(run, action.to, action.link.target);
   } else {
     await removeContained(action.to, run.roots);
   }
@@ -580,10 +580,7 @@ function patchRow(run: Run, name: string, entry: Lock["artifacts"][string]): voi
   const blocked = entry.links.filter((item) =>
     run.kept.some((held) => held.name === name && held.path === resolve(roots.base, item.path)),
   );
-  const held = [
-    ...(entry.blocked ?? []),
-    ...blocked.map(({ harness, path }) => ({ harness, path })),
-  ];
+  const held = [...(entry.blocked ?? []), ...blocked.map(({ target, path }) => ({ target, path }))];
   entry.blocked = held.length === 0 ? undefined : held;
   entry.links = entry.links.filter(
     (item) => !run.skipped.has(linkKey(name, resolve(roots.base, item.path))),
@@ -640,9 +637,9 @@ function perform(run: Run, action: Action): Promise<void> {
 async function finish(run: Run, plan: Plan): Promise<void> {
   const { roots } = run;
   // At link time a projection would see only the kind whose artifact happened to be first.
-  for (const [dir, { content, harnesses, document }] of run.plugins) {
+  for (const [dir, { content, targets, document }] of run.plugins) {
     await guardManagedPath(dir, roots);
-    await assemble(dir, content, harnesses, document);
+    await assemble(dir, content, targets, document);
   }
   for (const [to, from] of run.fanned) {
     await assertRemovable(to, roots);

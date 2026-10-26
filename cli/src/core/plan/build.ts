@@ -243,7 +243,7 @@ function heldClash(item: Selected, holder: Lock["artifacts"][string]): Clash {
   };
 }
 
-/** Two artifacts that would take one installed name, or one path in a harness folder. */
+/** Two artifacts that would take one installed name, or one path in a target folder. */
 export function clashMessage({ name, kept, dropped, at }: Clash): string {
   return at === undefined
     ? `${dropped} and ${kept} would both install as "${name}"`
@@ -263,6 +263,6 @@ function warnLeftOut(item: Selected, previous: LockArtifact | undefined, build: 
   const files = rest === 0 ? list(named) : `${named.join(", ")} and ${plural(rest, "more file")}`;
   build.warnings.push({
     name: item.name,
-    message: `${shown}${at} installs as its ${sanitizeText(leftOut.entry)} alone, since a harness takes ${item.kind === "agent" ? "an" : "a"} ${item.kind} as one file, so ${files} ${leftOut.files.length === 1 ? "is" : "are"} left out.`,
+    message: `${shown}${at} installs as its ${sanitizeText(leftOut.entry)} alone, since a target takes ${item.kind === "agent" ? "an" : "a"} ${item.kind} as one file, so ${files} ${leftOut.files.length === 1 ? "is" : "are"} left out.`,
   });
 }

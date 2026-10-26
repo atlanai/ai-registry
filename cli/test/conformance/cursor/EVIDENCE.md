@@ -1,12 +1,12 @@
 # Cursor evidence
 
-Every path, variable, detection signal, file format and command in `src/harnesses/cursor.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
+Every path, variable, detection signal, file format and command in `src/targets/cursor.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
 
-1. the harness's official documentation: the exact sentence, its URL and the date it was read;
-2. the harness's public source, where the documentation is silent: repository, file, line and commit;
-3. a real install of the harness: the command run, the harness version and its output.
+1. the target's official documentation: the exact sentence, its URL and the date it was read;
+2. the target's public source, where the documentation is silent: repository, file, line and commit;
+3. a real install of the target: the command run, the target version and its output.
 
-A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/harnesses/cursor.json` and `cursor.test.ts` match this file exactly.
+A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/targets/cursor.json` and `cursor.test.ts` match this file exactly.
 
 Every page below was read on 2026-10-19, as the Markdown copy the site serves at the URL given. Cursor publishes no source for its editor or CLI, so where the documentation is silent the evidence is the installed CLI: its own commands, and its installed files searched with `grep` (`$D` is `~/.local/share/cursor-agent/versions/2026.10.12-d47ca18` in the install's home).
 
@@ -62,7 +62,7 @@ Not available. No command of the CLI lists skills, agents or plugins without sig
 - `agent acp`, the Agent Client Protocol server, whose sessions report the commands a session offers, answered `initialize` with one auth method, `cursor_login`, and `session/new` with `{"code":-32000,"message":"Authentication required"}`.
 - The CLI's other commands, listed by its `--help` and its bundled `index.js`, manage sessions, cloud agents, MCP servers, marketplaces and the account; none reads local skills, agents or plugins.
 
-So `cursor.test.ts` has no probes, and this harness is checked at L1 only.
+So `cursor.test.ts` has no probes, and this target is checked at L1 only.
 
 ## Left out
 

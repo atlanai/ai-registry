@@ -39,7 +39,7 @@ export function isMissing(error: unknown): boolean {
 
 /**
  * Your home folder as `env` names it, canonical: the user scope's base and every
- * harness root under it then compare alike, even with the home behind a symlink.
+ * target root under it then compare alike, even with the home behind a symlink.
  */
 export function homeDir(env: NodeJS.ProcessEnv = process.env): string {
   return canonical(userHome(env));

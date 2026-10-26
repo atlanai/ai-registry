@@ -1,12 +1,12 @@
 # OpenCode evidence
 
-Every path, variable, detection signal, file format and command in `src/harnesses/opencode.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
+Every path, variable, detection signal, file format and command in `src/targets/opencode.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
 
-1. the harness's official documentation: the exact sentence, its URL and the date it was read;
-2. the harness's public source, where the documentation is silent: repository, file, line and commit;
-3. a real install of the harness: the command run, the harness version and its output.
+1. the target's official documentation: the exact sentence, its URL and the date it was read;
+2. the target's public source, where the documentation is silent: repository, file, line and commit;
+3. a real install of the target: the command run, the target version and its output.
 
-A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/harnesses/opencode.json` and `opencode.test.ts` match this file exactly.
+A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/targets/opencode.json` and `opencode.test.ts` match this file exactly.
 
 Every page below was read on 2026-10-20. Source lines are in https://github.com/anomalyco/opencode, the repository whose homepage is https://opencode.ai, at tag `v1.19.0`, commit `733b2c627e5aec39cb33cc22373bdce33053ef2c`, the release tested. Install output comes from OpenCode 1.19.0 run with `HOME` set to a sandbox folder (`<sandbox>` below), `OPENCODE_DISABLE_AUTOUPDATE=1`, no credentials in its environment, and no account.
 
@@ -53,5 +53,5 @@ Every page below was read on 2026-10-20. Source lines are in https://github.com/
 ## Left out
 
 - **A plugin of OpenCode's own:** its plugins are code, so a plugin lands as its skills and agents.
-- **Agent keys beyond `description`:** a value OpenCode reads differently from the harness the agent was written for stops OpenCode loading any configuration.
+- **Agent keys beyond `description`:** a value OpenCode reads differently from the target the agent was written for stops OpenCode loading any configuration.
 - **`reload`:** the docs say nothing about when OpenCode picks up a change.

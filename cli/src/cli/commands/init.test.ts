@@ -39,7 +39,7 @@ describe("init", () => {
     vi.unstubAllEnvs();
   });
 
-  test("takes * for every harness aireg knows", async () => {
+  test("takes * for every target aireg knows", async () => {
     const cwd = await mkdtemp(join(scratch, "aireg-init-"));
     vi.stubEnv("AIREG_USER_SCOPE", join(cwd, "user"));
     const writes: string[] = [];
@@ -71,12 +71,12 @@ describe("init", () => {
     );
   });
 
-  test("writes the manifest with the harnesses it chose and nothing else", async () => {
+  test("writes the manifest with the targets it chose and nothing else", async () => {
     const cwd = await mkdtemp(join(scratch, "aireg-init-"));
     vi.stubEnv("AIREG_USER_SCOPE", join(cwd, "user"));
     await run(context(cwd, ["--for", "claude,codex"], []));
     expect(await readFile(join(cwd, ".registry", "manifest.yml"), "utf8")).toBe(
-      "harnesses:\n  - claude\n  - codex\nregistries: {}\nartifacts: []\n",
+      "targets:\n  - claude\n  - codex\nregistries: {}\nartifacts: []\n",
     );
   });
 

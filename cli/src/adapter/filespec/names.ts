@@ -11,7 +11,7 @@ export const INDEX_DOCUMENT = "index.json";
 export const VERSIONS_DOCUMENT = "versions.json";
 /**
  * The spec reserves this name in a version directory, so it can never be
- * authored content: it stays out of digests and out of any copy a harness loads.
+ * authored content: it stays out of digests and out of any copy a target loads.
  */
 export const ENVELOPE = "artifact.json";
 

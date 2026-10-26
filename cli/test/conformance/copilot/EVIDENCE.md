@@ -1,12 +1,12 @@
 # GitHub Copilot evidence
 
-Every path, variable, detection signal, file format and command in `src/harnesses/copilot.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
+Every path, variable, detection signal, file format and command in `src/targets/copilot.ts` is a claim, and each has a row here. A claim counts only when one of these settles it:
 
-1. the harness's official documentation: the exact sentence, its URL and the date it was read;
-2. the harness's public source, where the documentation is silent: repository, file, line and commit;
-3. a real install of the harness: the command run, the harness version and its output.
+1. the target's official documentation: the exact sentence, its URL and the date it was read;
+2. the target's public source, where the documentation is silent: repository, file, line and commit;
+3. a real install of the target: the command run, the target version and its output.
 
-A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/harnesses/copilot.json` and `copilot.test.ts` match this file exactly.
+A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/targets/copilot.json` and `copilot.test.ts` match this file exactly.
 
 Every page below was read on 2026-10-19. Every command ran in a sandbox with `HOME` (and `COPILOT_HOME` where a row says so) inside it, `COPILOT_AUTO_UPDATE=false`, no account and no credentials. The definition follows Copilot CLI, the one Copilot program that installs on its own; Copilot in VS Code reads the same folders, as its rows say.
 
@@ -66,7 +66,7 @@ Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 
 ## L2 probes
 
-The harness's own commands that list what aireg placed, and what each printed. `copilot.test.ts` runs both after installing the fixtures in the project and in the user scope, with `COPILOT_HOME=<sandbox>/.copilot`. Neither needs an account (reference, "Managing skills non-interactively": "`list [--json]` \| List all discovered skills.").
+The target's own commands that list what aireg placed, and what each printed. `copilot.test.ts` runs both after installing the fixtures in the project and in the user scope, with `COPILOT_HOME=<sandbox>/.copilot`. Neither needs an account (reference, "Managing skills non-interactively": "`list [--json]` \| List all discovered skills.").
 
 - `copilot skill list --json`, from the project:
   ```json
@@ -86,7 +86,7 @@ Copilot CLI has no command that lists agents outside a session (`/agent` and `/e
 
 ## Left out
 
-- **`reads`.** Copilot CLI also reads `.agents/skills`, `.claude/skills` and `.claude/agents` in a project, and `~/.agents/skills` in your user scope, but `reads` names a folder for every scope: it would let aireg place user skills in `~/.agents/skills`, which Copilot skips once `COPILOT_HOME` is set, and user agents in `~/.claude/agents`, which it never reads. aireg places into Copilot's own folders, which it reads at every scope; a skill another harness also gets in a shared folder loads once.
+- **`reads`.** Copilot CLI also reads `.agents/skills`, `.claude/skills` and `.claude/agents` in a project, and `~/.agents/skills` in your user scope, but `reads` names a folder for every scope: it would let aireg place user skills in `~/.agents/skills`, which Copilot skips once `COPILOT_HOME` is set, and user agents in `~/.claude/agents`, which it never reads. aireg places into Copilot's own folders, which it reads at every scope; a skill another target also gets in a shared folder loads once.
 - **A native plugin.** Copilot loads one only after `copilot plugin install` records it in `config.json`, or through `enabledPlugins` in the JSONC `settings.json`; aireg edits neither. A plugin lands as its skills and agents.
 - **`trust`.** The folder trust prompt has no command, and aireg never writes `trustedFolders`. The docs page names the prompt.
 - **`code`** as a detection signal, **`VSCODE_AGENT`**, **`COPILOT_MODEL`** and **`COPILOT_ALLOW_ALL`** as caller variables, as the claims say.

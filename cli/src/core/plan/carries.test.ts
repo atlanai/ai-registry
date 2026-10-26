@@ -16,7 +16,7 @@ describe("carries", () => {
     expect(await carries(tmp)).toEqual([]);
   });
 
-  test("finds what a harness starts from the plugin's own files", async ({ tmp }) => {
+  test("finds what a target starts from the plugin's own files", async ({ tmp }) => {
     await put(tmp, "hooks/hooks.json", '{"hooks":{}}');
     await put(tmp, ".mcp.json", '{"mcpServers":{}}');
     await put(tmp, ".lsp.json", "{}");

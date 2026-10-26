@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "manifest.schema.json",
   "title": "manifest.yml",
-  "description": "A project's manifest: the registries it installs from, the artifacts it wants, and the harnesses it projects into. Where this schema and the CLI disagree, the CLI is authoritative.",
+  "description": "A project's manifest: the registries it installs from, the artifacts it wants, and the targets it projects into. Where this schema and the CLI disagree, the CLI is authoritative.",
   "additionalProperties": false,
   "type": "object",
   "properties": {
@@ -28,8 +28,17 @@
         }
       }
     },
+    "targets": {
+      "description": "Targets to install into, by name. Absent or empty means claude and codex.",
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
     "harnesses": {
-      "description": "Harnesses to install into, by name. Absent or empty means claude and codex.",
+      "deprecated": true,
+      "description": "The earlier name of `targets`, still read; aireg rewrites it as `targets`.",
       "type": "array",
       "items": {
         "minLength": 1,
@@ -117,7 +126,7 @@
       }
     },
     "artifacts": {
-      "description": "A string reference, or `{ ref, as, exclude, harnesses, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
+      "description": "A string reference, or `{ ref, as, exclude, targets, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
       "type": "array",
       "items": {
         "anyOf": [
@@ -155,9 +164,19 @@
                   "type": "string"
                 }
               },
+              "targets": {
+                "minItems": 1,
+                "description": "Targets this entry projects into, narrowing the manifest's `targets:`.",
+                "type": "array",
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
               "harnesses": {
                 "minItems": 1,
-                "description": "Harnesses this entry projects into, narrowing the manifest's `harnesses:`.",
+                "deprecated": true,
+                "description": "The earlier name of `targets`, still read; aireg rewrites it as `targets`.",
                 "type": "array",
                 "items": {
                   "minLength": 1,
@@ -165,7 +184,7 @@
                 }
               },
               "copy": {
-                "description": "Copy into each harness folder rather than linking, as `aireg add --copy` records.",
+                "description": "Copy into each target folder rather than linking, as `aireg add --copy` records.",
                 "type": "boolean"
               },
               "trust": {

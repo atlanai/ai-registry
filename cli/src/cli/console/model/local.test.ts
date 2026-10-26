@@ -2,16 +2,16 @@ import { mkdir, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import type { Carrier } from "#core/console/runs.ts";
-import type { Harnesses } from "#core/harness/contract.ts";
 import { emptyLock, type Lock } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
+import type { Targets } from "#core/target/contract.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { type Carried, localWork } from "./local.ts";
 
 let root: string;
 
-/** One harness whose skills live in `skills/`, which is all this reads. */
-function harnesses(): Harnesses {
+/** One target whose skills live in `skills/`, which is all this reads. */
+function targetTable(): Targets {
   return {
     claude: {
       name: "claude",
@@ -38,7 +38,7 @@ async function skill(name: string): Promise<void> {
   await writeFile(join(root, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
 }
 
-/** Your user scope, rooted where these harness folders are. */
+/** Your user scope, rooted where these target folders are. */
 function scope(): Roots {
   return {
     scope: "user",
@@ -84,28 +84,28 @@ test.beforeEach(async ({ tmp }) => {
 describe("localWork", () => {
   test("reads work nothing knows about as never sent", async () => {
     await skill("mine");
-    const [row] = await localWork(scope(), harnesses(), emptyLock());
+    const [row] = await localWork(scope(), targetTable(), emptyLock());
     expect(row?.state).toBe("unpublished");
   });
 
   // The state a push leaves behind.
   test("reads work the manifest declares as published and waiting to be tracked", async () => {
     await skill("mine");
-    const [row] = await localWork(scope(), harnesses(), emptyLock(), new Set(["mine"]));
+    const [row] = await localWork(scope(), targetTable(), emptyLock(), new Set(["mine"]));
     expect(row?.state).toBe("pending");
     expect(row?.detail).toContain("run `aireg install`");
   });
 
   test("lets the lock win once the artifact is installed under its namespace", async () => {
     await skill("mine");
-    const [row] = await localWork(scope(), harnesses(), locked("mine"), new Set(["mine"]));
+    const [row] = await localWork(scope(), targetTable(), locked("mine"), new Set(["mine"]));
     expect(row?.state).toBe("duplicate");
     expect(row?.detail).toContain("same name as acme/");
   });
 
   test("offers nothing for a name a registry already publishes", async () => {
     await skill("mine");
-    const [row] = await localWork(scope(), harnesses(), locked("mine"));
+    const [row] = await localWork(scope(), targetTable(), locked("mine"));
     expect(row?.state).toBe("duplicate");
     expect(row?.detail).toContain("rename this folder to publish it");
   });
@@ -113,14 +113,14 @@ describe("localWork", () => {
   // Every lock row comes from a registry, whatever name it was declared under.
   test("names a registry aliased local like any other", async () => {
     await skill("mine");
-    const [row] = await localWork(scope(), harnesses(), locked("mine", "local"));
+    const [row] = await localWork(scope(), targetTable(), locked("mine", "local"));
     expect(row?.detail).toContain("same name as local/");
     expect(row?.detail).not.toContain("local folder");
   });
 
   test("reads a folder a job already carries as imported, not as never sent", async () => {
     await skill("mine");
-    const [row] = await localWork(scope(), harnesses(), emptyLock(), new Set(), carried("mine"));
+    const [row] = await localWork(scope(), targetTable(), emptyLock(), new Set(), carried("mine"));
     expect(row?.state).toBe("imported");
     expect(row?.carriedBy).toBe("job_import");
     expect(row?.detail).toBe("carried by job import-local");
@@ -134,7 +134,7 @@ describe("localWork", () => {
     await writeFile(join(root, "skills", "mine", "notes.md"), "edited after the run\n");
     const [row] = await localWork(
       scope(),
-      harnesses(),
+      targetTable(),
       emptyLock(),
       new Set(),
       carried("mine", { settledAtMs }),
@@ -148,7 +148,7 @@ describe("localWork", () => {
     await skill("mine");
     const [row] = await localWork(
       scope(),
-      harnesses(),
+      targetTable(),
       emptyLock(),
       new Set(),
       carried("mine", { outcome: "attention", detail: "held for review" }),
@@ -173,20 +173,26 @@ describe("localWork", () => {
         },
       ],
     ]);
-    const [row] = await localWork(scope(), harnesses(), emptyLock(), new Set(), via);
+    const [row] = await localWork(scope(), targetTable(), emptyLock(), new Set(), via);
     expect(row?.state).toBe("imported");
   });
 
   test("still lets the lock win over a job that carries the folder", async () => {
     await skill("mine");
-    const [row] = await localWork(scope(), harnesses(), locked("mine"), new Set(), carried("mine"));
+    const [row] = await localWork(
+      scope(),
+      targetTable(),
+      locked("mine"),
+      new Set(),
+      carried("mine"),
+    );
     expect(row?.state).toBe("duplicate");
   });
 
   test("leaves a folder no job carries as never sent", async () => {
     await skill("mine");
     await skill("other");
-    const rows = await localWork(scope(), harnesses(), emptyLock(), new Set(), carried("mine"));
+    const rows = await localWork(scope(), targetTable(), emptyLock(), new Set(), carried("mine"));
     expect(rows.map((row) => [row.name, row.state])).toEqual([
       ["mine", "imported"],
       ["other", "unpublished"],

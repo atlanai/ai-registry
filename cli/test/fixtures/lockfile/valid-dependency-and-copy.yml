@@ -16,16 +16,16 @@ artifacts:
     path: .registry/skills/lint
     digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
     links:
-      - harness: claude
+      - target: claude
         path: .claude/skills/lint
         mode: copy
         digest: "sha256:4444444444444444444444444444444444444444444444444444444444444444"
-      - harness: codex
+      - target: codex
         path: .agents/skills/lint
         mode: symlink
     needed_by:
       - reviewer
     blocked:
-      - harness: cursor
+      - target: cursor
         path: .cursor/skills/lint
         by: your folder

@@ -28,8 +28,8 @@ const trusted = fileTest.extend("mkt", { scope: "file" }, ({ tmp }) =>
   marketplace(join(tmp, "mkt")).write(),
 );
 
-const init = async (aireg: Aireg, harnesses = "claude,codex,cursor,agents") =>
-  expect((await aireg(["init", "--for", harnesses])).code).toBe(0);
+const init = async (aireg: Aireg, targets = "claude,codex,cursor,agents") =>
+  expect((await aireg(["init", "--for", targets])).code).toBe(0);
 
 const read = (path: string) => readFile(path, "utf8");
 
@@ -39,7 +39,7 @@ const locked = async (project: string) =>
   ).sort();
 
 describe("a plugin marketplace", () => {
-  test("installs each plugin whole where a harness loads plugins, and as parts elsewhere", async ({
+  test("installs each plugin whole where a target loads plugins, and as parts elsewhere", async ({
     aireg,
     project,
     tmp,
@@ -86,14 +86,14 @@ describe("a plugin marketplace", () => {
     expect(await read(manifestPath(project))).toContain("layout: marketplace");
   });
 
-  test("leaves a command out for a harness that would run it on its own, and says so", async ({
+  test("leaves a command out for a target that would run it on its own, and says so", async ({
     aireg,
     home,
     project,
     tmp,
   }) => {
     const root = await marketplace(join(tmp, "mkt")).write();
-    await mkdir(join(home.aireg, "harnesses"), { recursive: true });
+    await mkdir(join(home.aireg, "targets"), { recursive: true });
     const tool = {
       id: "tool",
       displayName: "Tool",
@@ -107,7 +107,7 @@ describe("a plugin marketplace", () => {
         },
       },
     };
-    await writeFile(join(home.aireg, "harnesses", "tool.json"), JSON.stringify(tool));
+    await writeFile(join(home.aireg, "targets", "tool.json"), JSON.stringify(tool));
     await init(aireg, "tool");
     const added = await aireg(["add", root, "--all", "--trust", "deploy-kit"]);
     expect(added.code, added.stderr).toBe(0);
@@ -143,7 +143,7 @@ describe("a plugin marketplace", () => {
     tmp,
   }) => {
     const root = await marketplace(join(tmp, "mkt")).write();
-    await mkdir(join(home.aireg, "harnesses"), { recursive: true });
+    await mkdir(join(home.aireg, "targets"), { recursive: true });
     const tool = {
       id: "tool",
       displayName: "Tool",
@@ -158,7 +158,7 @@ describe("a plugin marketplace", () => {
         },
       },
     };
-    await writeFile(join(home.aireg, "harnesses", "tool.json"), JSON.stringify(tool));
+    await writeFile(join(home.aireg, "targets", "tool.json"), JSON.stringify(tool));
     await init(aireg, "tool");
     const added = await aireg(["add", root, "--all", "--trust", "deploy-kit"]);
     expect(added.code, added.stderr).toBe(0);

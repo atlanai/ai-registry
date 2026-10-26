@@ -40,7 +40,7 @@ function contentsOf(
       within: withinPlugin(plugin, entry) ?? `${kindDir(entry.kind)}${posix.sep}${leaf}`,
     });
   }
-  // A harness without plugins runs a command as a skill, named for its plugin.
+  // A target without plugins runs a command as a skill, named for its plugin.
   for (const command of document?.commands ?? []) {
     const name = sanitizeName(`${plugin.name}-${command.name}`);
     contents.push({ name, kind: "skill", within: command.path, command: true });

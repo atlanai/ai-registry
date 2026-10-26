@@ -27,7 +27,7 @@ export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
           entry.links.map(async (link) => {
             const full = resolve(roots.base, link.path);
             const state = await inspect(full);
-            // A copy is the harness's own; hashing it is the only way to see it edited.
+            // A copy is the target's own; hashing it is the only way to see it edited.
             const copied = link.mode === "copy" && state.exists && !state.isLink;
             links[link.path] = {
               present: state.exists,
