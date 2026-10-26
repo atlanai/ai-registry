@@ -688,8 +688,24 @@
         }
       }
     },
+    "profiles": {
+      "additionalProperties": false,
+      "description": "Profiles of one installation, each a target `<id>:<profile>`.",
+      "type": "object",
+      "required": [
+        "root"
+      ],
+      "properties": {
+        "root": {
+          "pattern": "^~/.*\\{profile\\}[^/]*$",
+          "type": "string"
+        }
+      }
+    },
     "instances": {
       "additionalProperties": false,
+      "description": "The earlier name of `profiles`, still read; use `profiles`.",
+      "deprecated": true,
       "type": "object",
       "required": [
         "root"

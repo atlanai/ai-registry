@@ -84,9 +84,9 @@ function toTarget(
 /** A profile name as both its folder and a target id can carry it. */
 const PROFILE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
-/** Each profile folder its `instances` root finds, as a target of its own. */
-function instancesOf(definition: TargetDefinition, env: NodeJS.ProcessEnv, origin: string) {
-  const root = definition.instances?.root;
+/** Each profile folder its `profiles` root finds, as a target of its own. */
+function profilesOf(definition: TargetDefinition, env: NodeJS.ProcessEnv, origin: string) {
+  const root = definition.profiles?.root;
   if (root === undefined) return [];
   const pattern = expandUserPath(root, env);
   const [prefix, suffix] = basename(pattern).split("{profile}") as [string, string];
@@ -143,7 +143,7 @@ export function resolveTargets(env: NodeJS.ProcessEnv = process.env): Targets {
   const out: Targets = {};
   for (const { definition, origin } of definitions.values()) {
     out[definition.id] = toTarget(definition, env, origin);
-    for (const instance of instancesOf(definition, env, origin)) out[instance.name] = instance;
+    for (const profile of profilesOf(definition, env, origin)) out[profile.name] = profile;
   }
   for (const target of Object.values(out)) {
     for (const [kind, reads] of Object.entries(target.reads) as [ArtifactKind, string[]][]) {

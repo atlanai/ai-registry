@@ -94,6 +94,13 @@ const Register = Type.Object(
   },
 );
 
+/** A user root per profile; `{profile}` in its last segment names each one. */
+const Profiles = (description: string, deprecated = false) =>
+  Type.Object(
+    { root: Type.String({ pattern: "^~/.*\\{profile\\}[^/]*$" }) },
+    { additionalProperties: false, description, ...(deprecated ? { deprecated } : {}) },
+  );
+
 const Scope = Type.Optional(
   Type.Literal("user", { description: "Read from the user installation alone." }),
 );
@@ -268,11 +275,11 @@ export const Target = Type.Object(
         ),
       ),
     ),
+    profiles: Type.Optional(
+      Profiles("Profiles of one installation, each a target `<id>:<profile>`."),
+    ),
     instances: Type.Optional(
-      Type.Object(
-        { root: Type.String({ pattern: "^~/.*\\{profile\\}[^/]*$" }) },
-        { additionalProperties: false },
-      ),
+      Profiles("The earlier name of `profiles`, still read; use `profiles`.", true),
     ),
     reload: Type.Optional(Text),
   },

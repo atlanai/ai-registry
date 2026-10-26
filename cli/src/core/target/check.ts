@@ -45,8 +45,8 @@ export function targetProblems(
     ) {
       report('a shared folder is never detected, so detect must be "never".');
     }
-    const instances = definition.instances?.root;
-    if (instances !== undefined) instanceProblems(instances, report);
+    const profiles = definition.profiles?.root;
+    if (profiles !== undefined) profileProblems(profiles, report);
     for (const kind of KINDS) {
       const mapping = definition.kinds[kind];
       if (mapping !== undefined) mappingProblems(kind, mapping, report);
@@ -86,15 +86,15 @@ function aliasProblems(
   }
 }
 
-function instanceProblems(root: string, report: Report) {
-  if (!root.startsWith("~/")) report("the instances root is not under ~/.");
+function profileProblems(root: string, report: Report) {
+  if (!root.startsWith("~/")) report("the profiles root is not under ~/.");
   pathProblem(root.slice(2), ["profile"], report);
   const segments = root.split("/");
   if (!segments.at(-1)?.includes("{profile}") || segments.slice(0, -1).join("/").includes("{")) {
-    report("the instances root names {profile} only in its last segment.");
+    report("the profiles root names {profile} only in its last segment.");
   }
   if (segments.length === 2 && segments[1] === "{profile}") {
-    report("the instances root would make every folder in your home folder a profile.");
+    report("the profiles root would make every folder in your home folder a profile.");
   }
 }
 

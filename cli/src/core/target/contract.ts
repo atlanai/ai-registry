@@ -162,7 +162,7 @@ interface Detect {
 }
 
 /** Profiles of one installation, each installed into as its own target, `<id>:<profile>`. */
-interface Instances {
+interface Profiles {
   /** A profile's user root, under `~/`; `{profile}` in its last segment names each one. */
   root: string;
 }
@@ -207,7 +207,7 @@ export interface TargetDefinition {
   verified?: { command: string[]; range: string } | undefined;
   /** A command a person runs before the target loads a kind it was given; printed, never run. */
   trust?: Partial<Record<ArtifactKind, Trust>> | undefined;
-  instances?: Instances | undefined;
+  profiles?: Profiles | undefined;
   /** What to do after a change for the target to see it; printed, never run. */
   reload?: string | undefined;
 }

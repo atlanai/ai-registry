@@ -149,27 +149,37 @@ function readOne(path: string, text: string): TargetFile | SkippedFile {
     $schema?: string;
     overrides?: boolean;
   };
-  const { definition, warnings } = upgraded(written);
-  problems.push(...builtinProblems(definition, overrides === true));
+  const { definition, warnings, problems: earlier } = upgraded(written);
+  problems.push(...earlier, ...builtinProblems(definition, overrides === true));
   return problems.length > 0 ? { path, problems } : { path, definition, warnings };
 }
 
 /** Keys a file may still carry from before, read as what took their place. */
-type Earlier = TargetDefinition & { kind?: string };
+type Earlier = TargetDefinition & { kind?: string; instances?: TargetDefinition["profiles"] };
 
-function upgraded({ kind, ...definition }: Earlier): {
+function upgraded({ kind, instances, ...definition }: Earlier): {
   definition: TargetDefinition;
   warnings: string[];
+  problems: string[];
 } {
-  if (kind === undefined) return { definition, warnings: [] };
-  return {
-    definition: kind === "shared" ? { ...definition, shared: true } : definition,
-    warnings: [
+  const warnings: string[] = [];
+  const problems: string[] = [];
+  let upgrade = definition;
+  if (kind !== undefined) {
+    if (kind === "shared") upgrade = { ...upgrade, shared: true };
+    warnings.push(
       kind === "shared"
         ? 'It sets "kind": "shared", the earlier way to say "shared": true; set that instead.'
         : `It sets "kind": ${quoted(kind)}, which aireg no longer reads; delete it.`,
-    ],
-  };
+    );
+  }
+  if (instances !== undefined && definition.profiles !== undefined) {
+    problems.push('It sets both "profiles" and "instances", its earlier name; keep "profiles".');
+  } else if (instances !== undefined) {
+    upgrade = { ...upgrade, profiles: instances };
+    warnings.push('It sets "instances", the earlier name of "profiles"; rename it.');
+  }
+  return { definition: upgrade, warnings, problems };
 }
 
 /** A built-in's id is yours only to replace it; its other ids are never yours. */

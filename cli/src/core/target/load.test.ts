@@ -143,7 +143,7 @@ describe("target files", () => {
   });
 
   test("give each profile folder a target of its own", async () => {
-    await save("tool.json", { ...TOOL, instances: { root: "~/.tool/profiles/{profile}" } });
+    await save("tool.json", { ...TOOL, profiles: { root: "~/.tool/profiles/{profile}" } });
     await mkdir(join(env.HOME as string, ".tool", "profiles", "work"), { recursive: true });
     await mkdir(join(env.HOME as string, ".tool", "profiles", "Not A Name"), { recursive: true });
     const targetTable = resolveTargets(env);
@@ -159,8 +159,28 @@ describe("target files", () => {
     expect(targetTable["tool:work"]?.kinds.skill?.scope).toBe("user");
   });
 
+  test("read `instances`, the earlier name of `profiles`, with a warning", async () => {
+    await save("tool.json", { ...TOOL, instances: { root: "~/.tool/profiles/{profile}" } });
+    await mkdir(join(env.HOME as string, ".tool", "profiles", "work"), { recursive: true });
+    expect(loadTargetFiles(env).files[0]?.warnings).toEqual([
+      'It sets "instances", the earlier name of "profiles"; rename it.',
+    ]);
+    expect(resolveTargets(env)["tool:work"]?.userRoot).toBe(
+      join(env.HOME as string, ".tool", "profiles", "work"),
+    );
+  });
+
   test.each([
     ["is not JSON", "{ id: tool", /not valid JSON/],
+    [
+      "sets both `profiles` and `instances`",
+      {
+        ...TOOL,
+        profiles: { root: "~/.tool/a/{profile}" },
+        instances: { root: "~/.tool/b/{profile}" },
+      },
+      /both "profiles" and "instances", its earlier name/,
+    ],
     ["has an unknown key", { ...TOOL, colour: "red" }, /unknown key "colour"/],
     [
       "names a codec that is not built in",

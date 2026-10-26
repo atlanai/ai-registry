@@ -92,12 +92,12 @@ describe("targetProblems", () => {
     ],
     [
       "profiles that are every folder in the home folder",
-      [target({ instances: { root: "~/{profile}" } })],
+      [target({ profiles: { root: "~/{profile}" } })],
       /every folder in your home folder/,
     ],
     [
       "profiles named outside the last segment",
-      [target({ instances: { root: "~/.tool/{profile}/home" } })],
+      [target({ profiles: { root: "~/.tool/{profile}/home" } })],
       /only in its last segment/,
     ],
     [
