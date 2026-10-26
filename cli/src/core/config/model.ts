@@ -31,7 +31,7 @@ export interface Selector {
   kinds?: readonly ArtifactKind[];
   /** For steps that care whose folder conventions apply. */
   target?: readonly string[];
-  /** @deprecated `target` under its aireg 0.1 name, which adapters built against it read. */
+  /** @deprecated `target` by aireg 0.1's ids, set on read for adapters built against 0.1. */
   harness?: readonly string[];
 }
 

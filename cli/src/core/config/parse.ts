@@ -2,9 +2,10 @@ import { stringify } from "yaml";
 import { quoted } from "#adapter/text.ts";
 import { isRecord } from "#core/fields.ts";
 import { isAdapterId } from "#core/release/origin.ts";
+import { resolveTargets, type Targets } from "#core/target/index.ts";
 import { parseYaml } from "#core/yaml.ts";
 import { isHookStage, type PipelineHook } from "./hook-stages.ts";
-import { parseJob } from "./job.ts";
+import { earlierIds, parseJob } from "./job.ts";
 import {
   CONFIG_SCHEMA_VERSION,
   type Defaults,
@@ -153,25 +154,30 @@ function parseDocument(document: unknown): RegistryConfig {
   };
 }
 
-/** Targets under `harness`, the key an adapter built against aireg 0.1 reads the file with. */
-function writtenSelector({ target, harness, ...rest }: Selector): Record<string, unknown> {
-  const named = target ?? harness;
-  return named === undefined ? { ...rest } : { ...rest, harness: [...named] };
+/** Targets under `harness`, by their 0.1 ids: an adapter built against 0.1 reads only those. */
+function writtenSelector(
+  { target, harness: _, ...rest }: Selector,
+  targetTable: Targets,
+): Record<string, unknown> {
+  return target === undefined ? { ...rest } : { ...rest, harness: earlierIds(targetTable, target) };
 }
 
 /** Steps carry an `extra` bag aireg never names; it is spread back out. */
-function written(step: Step): Record<string, unknown> {
+function written(step: Step, targetTable: Targets): Record<string, unknown> {
   const { extra, ...rest } = step;
   const entry: Record<string, unknown> = { name: rest.name, kind: rest.kind };
   if (rest.needs.length > 0) entry.needs = [...rest.needs];
   if (rest.root !== undefined) entry.root = rest.root;
   if (rest.to !== undefined) entry.to = rest.to;
-  if (rest.select.length > 0) entry.select = rest.select.map(writtenSelector);
+  if (rest.select.length > 0) {
+    entry.select = rest.select.map((item) => writtenSelector(item, targetTable));
+  }
   if (rest.policy !== "on") entry.policy = rest.policy;
   return { ...entry, ...extra };
 }
 
 export function formatConfig(config: RegistryConfig): string {
+  const targetTable = resolveTargets();
   const document = {
     ...config,
     accounts: config.accounts.map(({ id, registry, ...rest }) => ({
@@ -184,7 +190,7 @@ export function formatConfig(config: RegistryConfig): string {
       ...(job.name === undefined ? {} : { name: job.name }),
       account: job.account,
       schedule: { every: job.schedule.every, enabled: job.schedule.enabled },
-      steps: job.steps.map(written),
+      steps: job.steps.map((step) => written(step, targetTable)),
     })),
   };
   return stringify(document, { indent: 2, defaultStringType: "PLAIN", lineWidth: 0 });

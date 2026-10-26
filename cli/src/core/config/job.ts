@@ -3,6 +3,7 @@ import { expandHome } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { parseDuration, type Readers } from "#core/fields.ts";
 import { isKind } from "#core/kinds.ts";
+import { canonicalIds, earlierId, resolveTargets, type Targets } from "#core/target/index.ts";
 import {
   DEFAULT_INTERVAL_SECONDS,
   isBuiltinStepKind,
@@ -75,29 +76,42 @@ function selector(read: Readers, value: unknown, where: string): Selector {
     }
     selected.kinds = kinds.filter(isKind);
   }
-  const target = selectedTargets(read, entry, where);
-  if (target !== undefined) {
-    selected.target = target;
-    selected.harness = target;
-  }
-  return selected;
+  return { ...selected, ...selectedTargets(read, entry, where) };
 }
 
-/** Reads `harness`, the key aireg 0.1 writes, as `target`. */
+/** Each id as aireg 0.1 knew it, which is what an adapter built against it reads. */
+export function earlierIds(targetTable: Targets, ids: readonly string[]): string[] {
+  return ids.map((id) => earlierId(targetTable, id));
+}
+
+/**
+ * Reads `harness`, the key aireg 0.1 writes, as `target`. A job read back from the daemon
+ * carries both, so both are taken when they name the same targets.
+ */
 function selectedTargets(
   read: Readers,
   entry: Record<string, unknown>,
   where: string,
-): readonly string[] | undefined {
-  if (entry.target !== undefined && entry.harness !== undefined) {
+): Pick<Selector, "target" | "harness"> {
+  if (entry.target === undefined && entry.harness === undefined) return {};
+  const targetTable = resolveTargets();
+  const named = (key: "target" | "harness") =>
+    entry[key] === undefined
+      ? undefined
+      : canonicalIds(targetTable, read.textList(entry[key], `${where}.${key}`));
+  const target = named("target");
+  const harness = named("harness");
+  if (target !== undefined && harness !== undefined && !sameIds(target, harness)) {
     throw read.fail(
-      `\`${where}\` has both \`target\` and \`harness\`, its earlier name; keep \`target\`.`,
+      `\`${where}\` names different targets under \`target\` and \`harness\`, its earlier name; keep \`target\`.`,
     );
   }
-  if (entry.target !== undefined) return read.textList(entry.target, `${where}.target`);
-  if (entry.harness !== undefined) return read.textList(entry.harness, `${where}.harness`);
-  return undefined;
+  const ids = target ?? harness ?? [];
+  return { target: ids, harness: earlierIds(targetTable, ids) };
 }
+
+const sameIds = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((id) => b.includes(id));
 
 function step(read: Readers, value: unknown, where: string): Step {
   const entry = read.record(value, where);

@@ -35,6 +35,20 @@ describe("job input", () => {
     expect(job({ ...VALID, sneaked: "value" })).toEqual(VALID);
   });
 
+  it("takes back a job as the daemon hands it out, a selector's targets under both keys", () => {
+    const stored = job({
+      ...VALID,
+      steps: [{ ...STEP, select: [{ from: "/tmp/s", harness: ["claude"] }] }],
+    });
+    const echoed = JSON.parse(JSON.stringify(stored));
+    expect(echoed.steps[0].select).toEqual([
+      { from: "/tmp/s", target: ["claude-code"], harness: ["claude"] },
+    ]);
+    expect(job(echoed)).toEqual(stored);
+    const disabled = { ...echoed, schedule: { ...echoed.schedule, enabled: false } };
+    expect(job(disabled).schedule.enabled).toBe(false);
+  });
+
   it("keeps a step's own fields, which aireg never names", () => {
     const parsed = job({
       ...VALID,

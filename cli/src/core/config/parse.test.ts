@@ -44,19 +44,35 @@ describe("parseConfig", () => {
       - { name: mine, kind: origins, to: acme/ws, select: ${select} }
 `);
     for (const key of ["target", "harness"]) {
-      const parsed = parseConfig(step(`{ from: /tmp/skills, ${key}: [claude] }`));
-      expect(parsed.jobs[0]?.steps[0]?.select[0]).toEqual({
-        from: "/tmp/skills",
-        target: ["claude"],
-        harness: ["claude"],
-      });
-      expect(formatConfig(parsed)).toContain("harness:");
-      expect(formatConfig(parsed)).not.toContain("target");
-      expect(parseConfig(formatConfig(parsed))).toEqual(parsed);
+      for (const id of ["claude", "claude-code"]) {
+        const parsed = parseConfig(step(`{ from: /tmp/skills, ${key}: [${id}] }`));
+        expect(parsed.jobs[0]?.steps[0]?.select[0]).toEqual({
+          from: "/tmp/skills",
+          target: ["claude-code"],
+          harness: ["claude"],
+        });
+        expect(formatConfig(parsed)).toContain("harness:\n              - claude\n");
+        expect(formatConfig(parsed)).not.toContain("target");
+        expect(parseConfig(formatConfig(parsed))).toEqual(parsed);
+      }
     }
     expect(() =>
       parseConfig(step("{ from: /tmp/skills, target: [claude], harness: [codex] }")),
-    ).toThrow("has both `target` and `harness`");
+    ).toThrow("names different targets under `target` and `harness`");
+  });
+
+  it("takes a selector with both keys when they name the same targets, as the daemon hands it out", () => {
+    const parsed = parseConfig(
+      config(`  - id: job_1
+    account: acc_1
+    steps:
+      - { name: mine, kind: origins, to: acme/ws, select: { from: /tmp/skills, target: [claude-code, universal], harness: [agents, claude] } }
+`),
+    );
+    expect(parsed.jobs[0]?.steps[0]?.select[0]).toMatchObject({
+      target: ["claude-code", "universal"],
+      harness: ["claude", "agents"],
+    });
   });
 
   it("takes a duration in seconds, minutes or hours", () => {

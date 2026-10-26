@@ -220,3 +220,36 @@ describe("a job that also declares artifacts with -s", () => {
     expect(listed.code, listed.stderr).toBe(0);
   });
 });
+
+describe("a job whose selector names a target by its aireg 0.1 id", () => {
+  test("is disabled and enabled again, and keeps its selector", async ({ aireg, home, tmp }) => {
+    const skills = join(tmp, "skills");
+    await mkdir(skills, { recursive: true });
+    const config = join(home.aireg, "config.yml");
+    await mkdir(home.aireg, { recursive: true });
+    await writeFile(
+      config,
+      [
+        "schemaVersion: 1",
+        "revision: 0",
+        "accounts:",
+        "  - { id: acc_local, registry: local }",
+        "jobs:",
+        "  - id: job_watch",
+        "    account: acc_local",
+        "    schedule: { every: 3600, enabled: false }",
+        "    steps:",
+        `      - { name: mine, kind: origins, to: local/mine, select: [{ from: ${JSON.stringify(skills)}, harness: [claude] }] }`,
+        "",
+      ].join("\n"),
+    );
+    for (const action of ["enable", "disable"]) {
+      const changed = await aireg(["job", action, "job_watch"], { cwd: tmp });
+      expect(changed.code, changed.stderr).toBe(0);
+    }
+    const written = await readFile(config, "utf8");
+    expect(written).toContain("harness:\n              - claude\n");
+    expect(written).not.toContain("target");
+    expect(written).toContain("enabled: false");
+  }, 60_000);
+});

@@ -129,6 +129,8 @@ Stops a run that is queued or running.
 
 With `runs --follow --json`, each event prints as its own line.
 
+A step's `select` entry names the targets whose folders it reads twice: `target` with the current ids, and `harness` with the ids aireg 0.1 knows, kept for compatibility. A job sent back with both is taken when they name the same targets.
+
 ## Exit status
 
 - `0`: success.
