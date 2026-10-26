@@ -1,8 +1,8 @@
 import { rm } from "node:fs/promises";
-import { CHECKOUT_CONFIG, gitEnv, transportEnv } from "./env.ts";
-import { GitError, type GitLimits, gh, git } from "./exec.ts";
+import { CHECKOUT_CONFIG, transportEnv } from "./env.ts";
+import { GitError, type GitLimits, git } from "./exec.ts";
 import { SHA } from "./resolve.ts";
-import { type Attempt, attempts, describeFailure } from "./transport.ts";
+import { type Attempt, overLadder } from "./transport.ts";
 import type { SourceSpec } from "./url.ts";
 
 /** A server on git's dumb http protocol has no history to cut short, so it is cloned whole. */
@@ -11,7 +11,7 @@ function cannotShallow(error: unknown): boolean {
 }
 
 async function cloneShallow(
-  url: string,
+  { url, config }: Attempt,
   dest: string,
   ref: string | undefined,
   limits: GitLimits,
@@ -21,6 +21,7 @@ async function cloneShallow(
     git(
       [
         ...CHECKOUT_CONFIG,
+        ...config,
         "clone",
         ...depth,
         "--no-tags",
@@ -43,7 +44,7 @@ async function cloneShallow(
 
 /** A bare sha is not reachable through `--branch`; fetch it into an empty repo. */
 async function cloneCommit(
-  url: string,
+  { url, config }: Attempt,
   dest: string,
   commit: string,
   limits: GitLimits,
@@ -51,7 +52,7 @@ async function cloneCommit(
   await git([...CHECKOUT_CONFIG, "init", "--quiet", dest], limits);
   await git(["remote", "add", "origin", "--", url], { ...limits, cwd: dest });
   const fetch = (depth: readonly string[]) =>
-    git([...CHECKOUT_CONFIG, "fetch", ...depth, "origin", "--end-of-options", commit], {
+    git([...CHECKOUT_CONFIG, ...config, "fetch", ...depth, "origin", "--end-of-options", commit], {
       ...limits,
       cwd: dest,
       env: transportEnv(url),
@@ -63,22 +64,6 @@ async function cloneCommit(
   await git([...CHECKOUT_CONFIG, "checkout", "--quiet", "FETCH_HEAD"], { ...limits, cwd: dest });
 }
 
-async function cloneViaGh(
-  slug: string,
-  dest: string,
-  ref: string | undefined,
-  limits: GitLimits,
-): Promise<void> {
-  // After `--` these go to git clone, whose -c sets them before the checkout.
-  const flags = [...CHECKOUT_CONFIG, "--depth=1", ...(ref === undefined ? [] : ["--branch", ref])];
-  const { code, stderr } = await gh(["repo", "clone", slug, dest, "--", ...flags], {
-    ...limits,
-    // gh runs git, which must keep the same protocol and prompt limits.
-    env: gitEnv(),
-  });
-  if (code !== 0) throw new Error(stderr.trim() || `gh repo clone failed with exit code ${code}.`);
-}
-
 async function attempt(
   a: Attempt,
   dest: string,
@@ -86,43 +71,25 @@ async function attempt(
   limits: GitLimits,
 ): Promise<void> {
   await rm(dest, { recursive: true, force: true });
-  if (a.viaGh) {
-    await cloneViaGh(a.url, dest, ref, limits);
-    return;
-  }
   if (ref !== undefined && SHA.test(ref)) {
-    await cloneCommit(a.url, dest, ref.toLowerCase(), limits);
+    await cloneCommit(a, dest, ref.toLowerCase(), limits);
     return;
   }
-  await cloneShallow(a.url, dest, ref, limits);
+  await cloneShallow(a, dest, ref, limits);
 }
 
-/**
- * A ladder entry that fails for a reason retrying cannot fix - the repository
- * does not exist - ends the walk immediately.
- */
 export async function clone(
   spec: SourceSpec,
   ref: string | undefined,
   dest: string,
   limits: GitLimits,
 ): Promise<void> {
-  const ladder = attempts(spec);
-  let last: unknown;
-
-  for (const a of ladder) {
-    try {
-      await attempt(a, dest, ref, limits);
-      return;
-    } catch (error) {
-      last = error;
-      if (limits.signal?.aborted === true) break;
-      if (error instanceof GitError && error.failure === "not_found") break;
-    }
+  try {
+    await overLadder(spec, limits, (a) => attempt(a, dest, ref, limits));
+  } catch (error) {
+    await rm(dest, { recursive: true, force: true }).catch(() => {});
+    throw error;
   }
-
-  await rm(dest, { recursive: true, force: true }).catch(() => {});
-  throw describeFailure(last, spec, ladder);
 }
 
 /** Commit currently checked out; the pin recorded in the lock. */

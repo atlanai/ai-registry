@@ -1,7 +1,10 @@
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
+import { gitEnv } from "./env.ts";
 import { attempts } from "./transport.ts";
 import { parseSource } from "./url.ts";
 
@@ -44,7 +47,7 @@ describe("an address naming its own account or port", () => {
   ] as const)("is tried only as written, for %s", async ([, input, label], { tmp }) => {
     const env = await withGh(tmp);
     const spec = parseSource(input);
-    expect(attempts(spec, env)).toEqual([{ label, url: spec.location, viaGh: false }]);
+    expect(attempts(spec, env)).toEqual([{ label, url: spec.location, config: [] }]);
   });
 
   test.for([
@@ -58,7 +61,37 @@ describe("an address naming its own account or port", () => {
 
   test("hands gh the whole github.com URL", async ({ tmp }) => {
     const env = await withGh(tmp);
-    const gh = attempts(parseSource("github.com/acme/kit"), env).find((a) => a.viaGh);
+    const gh = attempts(parseSource("github.com/acme/kit"), env).find((a) => a.label === "gh");
     expect(gh?.url).toBe("https://github.com/acme/kit");
+  });
+});
+
+// Real git, asked for the credential the gh rung would send, so the helper line is proven to parse.
+describe.skipIf(process.platform === "win32")("the gh rung", () => {
+  test("signs git in with gh alone, never a gh planted where git works", async ({ tmp }) => {
+    const bin = join(tmp, "bin");
+    await mkdir(bin);
+    const gh =
+      '#!/bin/sh\n[ "$*" = "auth git-credential get" ] && printf "username=x\\npassword=from-gh\\n"\n';
+    await writeFile(join(bin, "gh"), gh);
+    await writeFile(join(tmp, "gh"), `#!/bin/sh\ntouch "${join(tmp, "planted.ran")}"\n`);
+    await chmod(join(bin, "gh"), 0o755);
+    await chmod(join(tmp, "gh"), 0o755);
+    const global = join(tmp, "gitconfig");
+    await writeFile(
+      global,
+      '[credential]\n\thelper = "!f() { echo username=stale; echo password=from-store; }; f"\n',
+    );
+    const env = { PATH: ["", ".", bin, process.env.PATH ?? ""].join(delimiter) };
+    const rung = attempts(parseSource("github.com/acme/kit"), env).find((a) => a.label === "gh");
+    const filled = spawnSync("git", [...(rung?.config ?? []), "credential", "fill"], {
+      cwd: tmp,
+      input: "protocol=https\nhost=github.com\npath=acme/kit\n\n",
+      encoding: "utf8",
+      env: gitEnv({ ...env, GIT_CONFIG_GLOBAL: global, GIT_CONFIG_NOSYSTEM: "1" }),
+    });
+    expect(filled.stdout).toContain("password=from-gh");
+    expect(filled.stdout).not.toContain("from-store");
+    expect(existsSync(join(tmp, "planted.ran"))).toBe(false);
   });
 });

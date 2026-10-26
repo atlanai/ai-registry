@@ -1,9 +1,9 @@
-import { chmod, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
-import { peel, type RemoteRef, resolveRef } from "./resolve.ts";
-import type { SourceSpec } from "./url.ts";
+import { lsRemote, peel, type RemoteRef, resolveRef } from "./resolve.ts";
+import { parseSource, type SourceSpec } from "./url.ts";
 
 const PEELED = "a496748000000000000000000000000000000bbb";
 
@@ -63,6 +63,47 @@ describe("resolveRef", () => {
       } finally {
         vi.unstubAllEnvs();
       }
+    },
+  );
+});
+
+describe("lsRemote", () => {
+  // A stand-in git that answers only when gh signs it in, as a private repository does.
+  test.skipIf(process.platform === "win32")(
+    "tries the gh rung when https is refused",
+    async ({ tmp }) => {
+      const bin = join(tmp, "bin");
+      const log = join(tmp, "calls.log");
+      await mkdir(bin);
+      await writeFile(
+        join(bin, "git"),
+        [
+          "#!/bin/sh",
+          `echo "$*" >> "${log}"`,
+          `case "$*" in *"credential.helper=!'gh' auth git-credential"*)`,
+          `  printf '%s\\tHEAD\\n' ${PEELED}; exit 0;;`,
+          "esac",
+          "echo \"fatal: Authentication failed for 'https://github.com/acme/kit.git/'\" >&2",
+          "exit 128",
+        ].join("\n"),
+      );
+      await writeFile(join(bin, "gh"), "#!/bin/sh\nexit 1\n");
+      await chmod(join(bin, "git"), 0o755);
+      await chmod(join(bin, "gh"), 0o755);
+      vi.stubEnv("PATH", `${bin}${delimiter}${process.env.PATH ?? ""}`);
+      try {
+        const refs = await lsRemote(parseSource("https://github.com/acme/kit"), ["HEAD"], {
+          timeoutMs: 60_000,
+        });
+        expect(refs).toEqual([{ commit: PEELED, name: "HEAD" }]);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+      const calls = (await readFile(log, "utf8")).trim().split("\n");
+      expect(calls).toEqual([
+        "ls-remote -- https://github.com/acme/kit.git HEAD",
+        "-c credential.helper= -c credential.helper=!'gh' auth git-credential ls-remote -- https://github.com/acme/kit HEAD",
+      ]);
     },
   );
 });

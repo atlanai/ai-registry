@@ -13,7 +13,7 @@ import {
 import { transportEnv } from "./env.ts";
 import { GitError, type GitLimits, git } from "./exec.ts";
 import { lsRemote, peel } from "./resolve.ts";
-import { attempts, describeFailure } from "./transport.ts";
+import { overLadder } from "./transport.ts";
 import type { SourceSpec } from "./url.ts";
 
 // A git source that is not a registry has no versions.json: its versions are its tags, and a
@@ -228,52 +228,45 @@ export class GitVersions {
   async #fetchHistory(): Promise<string> {
     const { spec, limits } = this.#context;
     const dir = join(this.#context.cacheDir(), "history", historyKey(spec));
-    return this.#context.exclusive(dir, async () => {
-      const ladder = attempts(spec).filter((attempt) => !attempt.viaGh);
-      let last: unknown;
-      for (const attempt of ladder) {
+    return this.#context.exclusive(dir, () =>
+      overLadder(spec, limits, async (attempt) => {
         const env = transportEnv(attempt.url);
-        try {
-          if (existsSync(join(dir, "HEAD"))) {
-            await git(["remote", "set-url", "origin", "--", attempt.url], { ...limits, cwd: dir });
-            await git(
-              [
-                "fetch",
-                "--quiet",
-                "--force",
-                "--prune",
-                "--tags",
-                "origin",
-                "+refs/heads/*:refs/heads/*",
-              ],
-              { ...limits, cwd: dir, env },
-            );
-          } else {
-            await rm(dir, { recursive: true, force: true });
-            await mkdir(dirname(dir), { recursive: true });
-            // Commits only: the history answers which tags a commit descends from, never what it holds.
-            await git(
-              [
-                "clone",
-                "--bare",
-                "--quiet",
-                "--filter=tree:0",
-                "--end-of-options",
-                attempt.url,
-                dir,
-              ],
-              { ...limits, env },
-            );
-          }
-          return dir;
-        } catch (error) {
-          last = error;
-          if (limits.signal?.aborted === true) break;
-          if (error instanceof GitError && error.failure === "not_found") break;
+        if (existsSync(join(dir, "HEAD"))) {
+          await git(["remote", "set-url", "origin", "--", attempt.url], { ...limits, cwd: dir });
+          await git(
+            [
+              ...attempt.config,
+              "fetch",
+              "--quiet",
+              "--force",
+              "--prune",
+              "--tags",
+              "origin",
+              "+refs/heads/*:refs/heads/*",
+            ],
+            { ...limits, cwd: dir, env },
+          );
+        } else {
+          await rm(dir, { recursive: true, force: true });
+          await mkdir(dirname(dir), { recursive: true });
+          // Commits only: the history answers which tags a commit descends from, never what it holds.
+          await git(
+            [
+              ...attempt.config,
+              "clone",
+              "--bare",
+              "--quiet",
+              "--filter=tree:0",
+              "--end-of-options",
+              attempt.url,
+              dir,
+            ],
+            { ...limits, env },
+          );
         }
-      }
-      throw describeFailure(last, spec, ladder);
-    });
+        return dir;
+      }),
+    );
   }
 }
 

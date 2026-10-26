@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { AdapterError, type Failure, programPath, withAbsolutePath } from "#adapter/index.ts";
+import { AdapterError, type Failure, programPath } from "#adapter/index.ts";
 import { gitEnv } from "./env.ts";
 import { ID } from "./errors.ts";
 
@@ -137,24 +137,13 @@ async function inNetworkSlot<T>(task: () => Promise<T>): Promise<T> {
   }
 }
 
-function spawnTool(
-  binary: "git" | "gh",
-  args: readonly string[],
-  options: GitOptions,
-  timeout: number,
-): Promise<Ran> {
-  const network = binary === "gh" || args.some((arg) => NETWORK.has(arg));
-  const run = () => spawnOne(binary, args, options, timeout);
-  return network ? inNetworkSlot(run) : run();
+function spawnTool(args: readonly string[], options: GitOptions, timeout: number): Promise<Ran> {
+  const run = () => spawnOne(args, options, timeout);
+  return args.some((arg) => NETWORK.has(arg)) ? inNetworkSlot(run) : run();
 }
 
-/** Subprocess handling is confined to this module: git, and `gh` where it clones. */
-function spawnOne(
-  binary: "git" | "gh",
-  args: readonly string[],
-  options: GitOptions,
-  timeout: number,
-): Promise<Ran> {
+/** Subprocess handling is confined to this module. */
+function spawnOne(args: readonly string[], options: GitOptions, timeout: number): Promise<Ran> {
   const { signal } = options;
   return new Promise((resolve, reject) => {
     if (signal?.aborted === true) {
@@ -163,7 +152,7 @@ function spawnOne(
     }
     let env: NodeJS.ProcessEnv;
     try {
-      env = binary === "git" ? gitEnv(options.env) : withAbsolutePath(options.env ?? process.env);
+      env = gitEnv(options.env);
     } catch (error) {
       // An empty PATH would find a program in the checkout git works in.
       reject(
@@ -171,14 +160,14 @@ function spawnOne(
           "invalid",
           (error as Error).message,
           "",
-          `Set PATH to the absolute folders that hold ${binary}, then run the command again.`,
+          "Set PATH to the absolute folders that hold git, then run the command again.",
         ),
       );
       return;
     }
-    const program = programPath(binary, env, options.cwd);
+    const program = programPath("git", env, options.cwd);
     if (program === undefined) {
-      reject(Object.assign(new Error(`spawn ${binary} ENOENT`), { code: "ENOENT" }));
+      reject(Object.assign(new Error("spawn git ENOENT"), { code: "ENOENT" }));
       return;
     }
     const child = spawn(program, [...args], {
@@ -248,7 +237,7 @@ export async function git(args: readonly string[], options: GitOptions): Promise
   const timeout = options.timeoutMs;
   let ran: Ran;
   try {
-    ran = await spawnTool("git", args, options, timeout);
+    ran = await spawnTool(args, options, timeout);
   } catch (error) {
     if (options.signal?.aborted === true) throw error;
     if (error instanceof GitError) throw error;
@@ -279,7 +268,7 @@ export interface GitAttempt {
 export async function gitTry(args: readonly string[], options: GitOptions): Promise<GitAttempt> {
   let ran: Ran;
   try {
-    ran = await spawnTool("git", args, options, options.timeoutMs);
+    ran = await spawnTool(args, options, options.timeoutMs);
   } catch (error) {
     if (options.signal?.aborted === true) throw error;
     throw notInstalled(error) ?? error;
@@ -294,13 +283,4 @@ export async function gitVersion(): Promise<string | undefined> {
   } catch {
     return undefined;
   }
-}
-
-/** `gh` run the way git is, with its exit status as data. */
-export async function gh(
-  args: readonly string[],
-  options: GitOptions,
-): Promise<{ code: number; stderr: string }> {
-  const ran = await spawnTool("gh", args, options, options.timeoutMs);
-  return { code: ran.timedOut ? 1 : (ran.code ?? 1), stderr: ran.stderr };
 }

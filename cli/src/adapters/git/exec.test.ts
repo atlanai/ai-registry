@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
-import { GitError, gh, git, gitTry, stopGit } from "./exec.ts";
+import { GitError, git, gitTry, stopGit } from "./exec.ts";
 
 const unix = describe.skipIf(process.platform === "win32");
 
@@ -93,21 +93,16 @@ unix("git", () => {
 
   // Node resolves an empty or relative PATH entry against the child's working folder,
   // which for a fresh checkout is content the registry wrote.
-  test("never runs a git or gh planted in the folder it works in", async ({ tmp }) => {
-    for (const tool of ["git", "gh"]) {
-      await writeFile(join(tmp, tool), `#!/bin/sh\ntouch "${join(tmp, `${tool}.ran`)}"\n`);
-      await chmod(join(tmp, tool), 0o755);
-    }
+  test("never runs a git planted in the folder it works in", async ({ tmp }) => {
+    await writeFile(join(tmp, "git"), `#!/bin/sh\ntouch "${join(tmp, "git.ran")}"\n`);
+    await chmod(join(tmp, "git"), 0o755);
     vi.stubEnv("PATH", ["", ".", "bin", process.env.PATH ?? ""].join(delimiter));
     try {
       await gitTry(["--version"], { cwd: tmp, timeoutMs: 60_000 }).catch(() => undefined);
-      await gh(["--version"], { cwd: tmp, timeoutMs: 60_000 }).catch(() => undefined);
     } finally {
       vi.unstubAllEnvs();
     }
-    for (const tool of ["git", "gh"]) {
-      await expect(access(join(tmp, `${tool}.ran`)), tool).rejects.toThrow();
-    }
+    await expect(access(join(tmp, "git.ran"))).rejects.toThrow();
   });
 
   test("refuses to run git when no folder on PATH is absolute", async ({ tmp }) => {

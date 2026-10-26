@@ -1,7 +1,7 @@
 import { quoted } from "#adapter/index.ts";
 import { transportEnv } from "./env.ts";
 import { GitError, type GitLimits, git } from "./exec.ts";
-import { attempts, describeFailure } from "./transport.ts";
+import { overLadder } from "./transport.ts";
 import type { SourceSpec } from "./url.ts";
 
 export interface ResolvedRef {
@@ -27,25 +27,12 @@ export async function lsRemote(
   patterns: string[],
   limits: GitLimits,
 ): Promise<RemoteRef[]> {
-  let last: unknown;
-  let out: string | undefined;
-  const ladder = attempts(spec);
-
-  for (const attempt of ladder) {
-    if (attempt.viaGh) continue;
-    try {
-      out = await git(["ls-remote", "--", attempt.url, ...patterns], {
-        ...limits,
-        env: transportEnv(attempt.url),
-      });
-      break;
-    } catch (error) {
-      last = error;
-      if (limits.signal?.aborted === true) break;
-      if (error instanceof GitError && error.failure === "not_found") break;
-    }
-  }
-  if (out === undefined) throw describeFailure(last, spec, ladder);
+  const out = await overLadder(spec, limits, (attempt) =>
+    git([...attempt.config, "ls-remote", "--", attempt.url, ...patterns], {
+      ...limits,
+      env: transportEnv(attempt.url),
+    }),
+  );
 
   return out
     .split("\n")
