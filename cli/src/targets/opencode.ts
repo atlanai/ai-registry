@@ -3,6 +3,7 @@ import { defineTarget } from "#core/target/contract.ts";
 export const opencode = defineTarget({
   id: "opencode",
   displayName: "OpenCode",
+  category: "coding-agent",
   roots: {
     project: ".opencode",
     user: { default: "~/.config/opencode", env: "XDG_CONFIG_HOME", within: "opencode" },

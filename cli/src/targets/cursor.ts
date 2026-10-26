@@ -3,6 +3,7 @@ import { defineTarget } from "#core/target/contract.ts";
 export const cursor = defineTarget({
   id: "cursor",
   displayName: "Cursor",
+  category: "coding-agent",
   roots: { project: ".cursor", user: { default: "~/.cursor" } },
   // `agent`, the CLI's primary name, is too common a name to mean Cursor on its own.
   detect: { binary: ["cursor", "cursor-agent"], caller: ["CURSOR_AGENT"] },

@@ -3,6 +3,7 @@ import { defineTarget } from "#core/target/contract.ts";
 export const codex = defineTarget({
   id: "codex",
   displayName: "Codex",
+  category: "coding-agent",
   default: true,
   importable: true,
   roots: { project: ".codex", user: { default: "~/.codex", env: "CODEX_HOME" } },

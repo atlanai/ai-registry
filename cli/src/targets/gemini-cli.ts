@@ -4,6 +4,7 @@ export const geminiCli = defineTarget({
   id: "gemini-cli",
   aliases: ["gemini"],
   displayName: "Gemini CLI",
+  category: "coding-agent",
   roots: {
     project: ".gemini",
     user: { default: "~/.gemini", env: "GEMINI_CLI_HOME", within: ".gemini" },

@@ -4,6 +4,7 @@ export const githubCopilot = defineTarget({
   id: "github-copilot",
   aliases: ["copilot"],
   displayName: "GitHub Copilot",
+  category: "coding-agent",
   roots: { project: ".github", user: { default: "~/.copilot", env: "COPILOT_HOME" } },
   // Most GitHub repositories hold `.github` for their workflows, so it proves nothing.
   detect: {

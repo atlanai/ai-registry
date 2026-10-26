@@ -4,6 +4,7 @@ export const claudeCode = defineTarget({
   id: "claude-code",
   aliases: ["claude"],
   displayName: "Claude Code",
+  category: "coding-agent",
   default: true,
   importable: true,
   roots: { project: ".claude", user: { default: "~/.claude", env: "CLAUDE_CONFIG_DIR" } },
