@@ -4,12 +4,12 @@ Usage: aireg install [options]
 Aliases: aireg i
 
 Options:
-      --frozen         Fail with exit status 3 if the lockfile or the manifest would change
-      --force          Overwrite artifacts edited after they were installed
+      --frozen        Fail with exit status 3 if the lockfile or the manifest would change
+      --force         Overwrite artifacts edited after they were installed
       --for <target>  The targets to install into, comma-separated, or * for all of them
-      --copy           Copy into each target folder instead of linking
-      --dry-run        Print what would change without changing it
-  -g, --user           Act on your user scope instead of this project
+      --copy          Copy into each target folder instead of linking
+      --dry-run       Print what would change without changing it
+  -g, --user          Act on your user scope instead of this project
 
 Examples:
   $ aireg install           what the manifest names, after a clone

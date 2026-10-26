@@ -4,18 +4,18 @@ Usage: aireg init [--for <target>,...] [--force]
        aireg init --registry <registry> [--as <name>] [--watch] [options]
 
 Options:
-      --for <target>                      The targets to install into, comma-separated, or * for all of them
+      --for <target>                       The targets to install into, comma-separated, or * for all of them
       --force                              Replace an existing manifest, keeping the registries it declares
       --registry <registry>                The registry to set the project up from
       --as <name>                          The name to save the registry under
       --publish-to <registry>/<namespace>  Where aireg publish sends work when --to is not given
       --watch                              Keep the project in sync with the registry in the background
-      --import <target>                   Import what these target folders hold: agents, claude, codex or all
+      --import <target>                    Import what these target folders hold: claude-code, codex, universal or all
       --adapter <id>                       The adapter that reads the registry, when aireg cannot tell
       --token-stdin                        Read the registry's token from standard input
 
 Examples:
-  $ aireg init --for claude,cursor                                       a project for Claude Code and Cursor
+  $ aireg init --for claude-code,cursor                                  a project for Claude Code and Cursor
   $ aireg init --registry github.com/acme/ai-registry --as acme --watch  set up from a team registry, kept in sync
 
 Learn more:

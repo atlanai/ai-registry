@@ -16,7 +16,7 @@ Options:
       --claim <policy>             Whether to manage a folder that matches the registry: on, report or off
   -s, --select <name>              Also add these artifacts to the manifest
   -g, --user                       Act on your user scope instead of this project
-      --for <target>              The targets to install into, comma-separated, or * for all of them
+      --for <target>               The targets to install into, comma-separated, or * for all of them
       --account <account>          The account an adapter's job type runs as
       --kind <kind>                A job type an installed adapter adds
 

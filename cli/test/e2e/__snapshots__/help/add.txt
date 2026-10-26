@@ -9,7 +9,7 @@ Usage: aireg add <registry>[/<namespace>[/[<kind>/]<name>[@<version>]]] [options
 Options:
   -s, --select <name>         The artifacts or namespaces to act on
       --all                   Act on everything, without asking
-      --for <target>         The targets to install into, comma-separated, or * for all of them
+      --for <target>          The targets to install into, comma-separated, or * for all of them
       --copy                  Copy into each target folder instead of linking
       --as <name>             The name to save the registry under
   -r, --registry <registry>   The registry to install from, by name or address
