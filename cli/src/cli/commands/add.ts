@@ -72,6 +72,7 @@ import { withFreshConfig } from "#daemon/rpc/client.ts";
 import { withDaemon } from "#daemon/service.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import {
+  type Loaded,
   load,
   locate,
   type RunResult,
@@ -153,23 +154,55 @@ async function addFrom(context: CommandContext, parsed: Parsed, from: string): P
   }
 }
 
+/** Saves the registry under `alias` in this scope, refusing a name another address holds. */
+function recordRegistry(
+  fresh: Loaded,
+  alias: string,
+  known: Readonly<Record<string, RegistrySource>>,
+  source: Probed,
+  resolved: Resolved,
+): { introduced: boolean; copied: boolean; recorded: RegistrySource } {
+  const { manifest, roots } = fresh;
+  const holder = manifest.registries[alias] ?? known[alias];
+  if (
+    !resolved.declared &&
+    holder !== undefined &&
+    !sameLocation(expandLocation(holder.location, roots.base), source.declared.location)
+  ) {
+    throw new AiregError(
+      `The name ${quoted(alias)} is already taken by ${withoutCredentials(holder.location)}.`,
+      {
+        code: ErrorCode.Usage,
+        hint: "Pass `--as <name>` to save this registry under another name.",
+      },
+    );
+  }
+  const introduced = manifest.registries[alias] === undefined && known[alias] === undefined;
+  const copied =
+    roots.scope !== "user" &&
+    manifest.registries[alias] === undefined &&
+    known[alias] !== undefined;
+  const recorded = rememberSource(holder, {
+    ...source.declared,
+    location: recordedLocation(resolved.input, source.declared.location, roots),
+  });
+  manifest.registries[alias] = recorded;
+  return { introduced, copied, recorded };
+}
+
 type Parsed = ReturnType<typeof parse<AddFlags>>;
 
-async function addAddress(
+/** The address read and what it offers, before anything is asked; undefined when canceled. */
+async function openAddress(
   context: CommandContext,
   { positionals, common, own }: Parsed,
-  adopt?: ReadonlySet<string>,
-): Promise<void> {
-  const step = interaction(context.printer, defaultIo(), common.yes);
-
+  step: Interaction,
+) {
   // An address may name a registry this scope declares, or one declared for
   // the user; a project that installs through a user alias records it as its own.
   const known = await knownRegistries(common, context.cwd);
   const typed = own.registry ?? positionals[0] ?? (await chooseRegistry(step, known));
-  if (typed === undefined) {
-    cancel(step);
-    return;
-  }
+  if (typed === undefined) return undefined;
   const address = await commandLineAddress(own, positionals, typed, known, common, context.cwd);
   const { input, inside: within, exact, picks } = address;
   let { resolved } = address;
@@ -196,6 +229,62 @@ async function addAddress(
   }
   const { catalogAlias, entries } = entriesFor(source, resolved, partial, namespace);
 
+  // An address the manifest already resolves keeps the alias it was declared
+  // under; anything else is named after the source it came from.
+  const alias = resolved.declared
+    ? aliasFor(input, true, known, source)
+    : (own.as ?? aliasFor(input, false, known, source));
+  return {
+    alias,
+    known,
+    input,
+    within,
+    resolved,
+    asked,
+    partial,
+    asking,
+    source,
+    catalogAlias,
+    entries,
+  };
+}
+
+/**
+ * Taking everything an address names is the address itself, not the whole
+ * registry: `add acme/my-team --all` must not drag in every other team.
+ */
+function requestedRefs(
+  resolved: Resolved,
+  input: string,
+  alias: string,
+  within: string | undefined,
+  select: readonly string[] | undefined,
+): string[] {
+  const whole = resolved.declared ? input : [alias, within].filter(Boolean).join("/");
+  if (select === undefined) return [whole];
+  return select.map((qualified) => {
+    const address = `${alias}/${qualified}`;
+    const leaf = qualified.split("/").at(-1);
+    return resolved.version !== undefined && leaf === resolved.name
+      ? `${address}@${resolved.version}`
+      : address;
+  });
+}
+
+async function addAddress(
+  context: CommandContext,
+  { positionals, common, own }: Parsed,
+  adopt?: ReadonlySet<string>,
+): Promise<void> {
+  const step = interaction(context.printer, defaultIo(), common.yes);
+  const opened = await openAddress(context, { positionals, common, own }, step);
+  if (opened === undefined) {
+    cancel(step);
+    return;
+  }
+  const { known, input, within, resolved, asked, partial, asking, source, alias } = opened;
+  const { catalogAlias, entries } = opened;
+
   const gathered = await gather(
     asking,
     asked,
@@ -212,11 +301,6 @@ async function addAddress(
   }
   const { choices, loaded } = gathered;
 
-  // An address the manifest already resolves keeps the alias it was declared
-  // under; anything else is named after the source it came from.
-  const alias = resolved.declared
-    ? aliasFor(input, true, known, source)
-    : (own.as ?? aliasFor(input, false, known, source));
   // Trust is asked on a terminal however exactly the address says what to install: naming a
   // plugin is not agreeing to what it runs. Only `--yes` or no terminal leaves it to `--trust`.
   const trust = await trustFor(
@@ -227,26 +311,7 @@ async function addAddress(
     loaded.manifest.artifacts.flatMap((ref) => (ref.registry === alias ? (ref.trust ?? []) : [])),
   );
 
-  // Taking everything an address names is the address itself, not the whole
-  // registry: `add acme/my-team --all` must not drag in every other team.
-  const whole = resolved.declared ? input : [alias, within].filter(Boolean).join("/");
-  const refs = choices.select === undefined ? [whole] : choices.select.map((n) => pin(alias, n));
-
-  function pin(registry: string, qualified: string): string {
-    const address = `${registry}/${qualified}`;
-    const leaf = qualified.split("/").at(-1);
-    return resolved.version !== undefined && leaf === resolved.name
-      ? `${address}@${resolved.version}`
-      : address;
-  }
-
-  const effective: CommonOptions = {
-    ...asked,
-    scope: choices.scope,
-    targets: undefined,
-    // `--copy` is recorded on the entries this adds, so the rest of the scope is not copied.
-    copy: false,
-  };
+  const refs = requestedRefs(resolved, input, alias, within, choices.select);
 
   let approved = true;
   let introduced = false;
@@ -255,36 +320,15 @@ async function addAddress(
   let { location, config } = source.declared;
   const result = await runPipeline(
     loaded.roots,
-    effective,
+    // `--copy` and `--for` are recorded on the entries this adds, not applied to the whole scope.
+    { ...asked, scope: choices.scope, targets: undefined, copy: false },
     context.printer,
     context.cwd,
     planReport(context.printer),
     (fresh) => {
-      const { manifest, roots } = fresh;
-      const holder = manifest.registries[alias] ?? known[alias];
-      if (
-        !resolved.declared &&
-        holder !== undefined &&
-        !sameLocation(expandLocation(holder.location, roots.base), source.declared.location)
-      ) {
-        throw new AiregError(
-          `The name ${quoted(alias)} is already taken by ${withoutCredentials(holder.location)}.`,
-          {
-            code: ErrorCode.Usage,
-            hint: "Pass `--as <name>` to save this registry under another name.",
-          },
-        );
-      }
-      introduced = manifest.registries[alias] === undefined && known[alias] === undefined;
-      copied =
-        roots.scope !== "user" &&
-        manifest.registries[alias] === undefined &&
-        known[alias] !== undefined;
-      const recorded = rememberSource(holder, {
-        ...source.declared,
-        location: recordedLocation(resolved.input, source.declared.location, roots),
-      });
-      manifest.registries[alias] = recorded;
+      const { manifest } = fresh;
+      let recorded: RegistrySource;
+      ({ introduced, copied, recorded } = recordRegistry(fresh, alias, known, source, resolved));
       ({ location, config } = recorded);
 
       const narrowed = narrowedTargets(fresh, asked, choices.targets);

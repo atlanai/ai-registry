@@ -144,6 +144,17 @@ export function renderStatus(
   if (attention < statuses.length) printer.info(printer.style.dim(`ok  ${STATE_MEANING.ok}`));
   printer.info(`${plural(attention, "artifact")} need${attention === 1 ? "s" : ""} attention.`);
 
+  repairHint(printer, statuses, scope, chosen, kindOf);
+}
+
+/** What to run next: `install --force` for a copy aireg wrote, `sync` for an edit, else `install`. */
+function repairHint(
+  printer: Printer,
+  statuses: readonly ArtifactStatus[],
+  scope: Scope,
+  chosen: Chosen,
+  kindOf: (item: ArtifactStatus) => ArtifactKind | undefined,
+): void {
   // An edit is the one state `install` will not repair: it refuses to overwrite
   // an edit, so point at `sync`, which reconciles one.
   const flag = scope === "user" ? " -g" : "";
