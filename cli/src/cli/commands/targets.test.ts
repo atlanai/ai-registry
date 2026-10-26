@@ -164,14 +164,21 @@ describe("targets", () => {
     await mkdir(dir, { recursive: true });
     await writeFile(
       join(dir, "tool.json"),
-      JSON.stringify({ ...TOOL, kind: "shared", detect: "never" }),
+      JSON.stringify({
+        ...TOOL,
+        kind: "shared",
+        detect: "never",
+        profiles: { root: "~/.tool/{profile}" },
+      }),
     );
+    await mkdir(join(cwd, ".tool", "work"), { recursive: true });
     const writes: string[] = [];
     await run(context(cwd, writes, "text"));
     expect(writes.join("")).toContain(
       'warning: Read ~/.aireg/targets/tool.json, but it sets "kind": "shared", the earlier way to say "shared": true; set that instead.',
     );
     expect(writes.join("")).toContain("hint: Use `--for tool` for the shared .tool folder.");
+    expect(writes.join("")).not.toContain("--for tool:work");
   });
 
   test("shows a target by its id or an alias", async () => {

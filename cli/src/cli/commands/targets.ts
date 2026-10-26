@@ -114,7 +114,10 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
   if (shown.length < tools.length) {
     context.printer.hint("Run `aireg targets --all` to see every one.");
   }
-  for (const { target } of rows.filter((item) => item.target.shared)) {
+  // A profile is a folder of its definition's, so the definition's hint covers it.
+  for (const { target } of rows.filter(
+    (item) => item.target.shared && !item.target.name.includes(":"),
+  )) {
     context.printer.hint(sharedHint(target));
   }
   warnFiles(context);
