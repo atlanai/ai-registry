@@ -16,6 +16,7 @@ import {
   mergedVersions,
   type OfferedVersion,
   type PublishInput,
+  type PublishRefusal,
   quoted,
   REGISTRY_DOCUMENT,
   type ReadPath,
@@ -29,11 +30,13 @@ import {
   versionsPath,
   writeAtomic,
 } from "#adapter/index.ts";
-import { fail } from "./errors.ts";
+import { fail, translated } from "./errors.ts";
 
 export interface WrittenOffer {
   /** Every version offered already sat in the root with this exact digest. */
   unchanged: boolean;
+  /** Only when asked for `partial`: the changes not written, by position. */
+  refused: PublishRefusal[];
 }
 
 function destination(change: PublishInput): { namespace: string; version: string; at: string } {
@@ -120,46 +123,63 @@ async function listedDigest(
   return typeof row?.digest === "string" ? row.digest : undefined;
 }
 
-/** One writer per registry folder, so two publishes never write one version at once. */
+async function checkChange(read: ReadPath, change: PublishInput) {
+  const { namespace, version, at } = destination(change);
+  const { envelope, digest } = sealed(change, descriptorsOf(change));
+  const existing =
+    (await existingDigest(read, at)) ?? (await listedDigest(read, change, namespace, version));
+  // A released version is never rewritten, nor quietly offered as another: the caller
+  // reports the version it asked for, so different bytes there are refused.
+  if (existing !== undefined && existing !== digest) {
+    throw fail(
+      "conflict",
+      `${namespace}/${change.kind}/${change.name}@${version} is already published with other content.`,
+      change.name,
+      "A published version is never rewritten; publish this one as a new version.",
+    );
+  }
+  return { change, namespace, version, at, envelope, digest, unchanged: existing === digest };
+}
+
+/**
+ * One writer per registry folder, so two publishes never write one version at once.
+ * With `partial`, a refused change is returned by position and the rest are written.
+ */
 export function writeOffer(
   root: string,
   changes: readonly PublishInput[],
   publishedAt: string,
   exclusive: SourceContext["exclusive"],
+  partial = false,
 ): Promise<WrittenOffer> {
-  return exclusive(join(root, REGISTRY_DOCUMENT), () => writeOfferNow(root, changes, publishedAt));
+  return exclusive(join(root, REGISTRY_DOCUMENT), () =>
+    writeOfferNow(root, changes, publishedAt, partial),
+  );
 }
 
 async function writeOfferNow(
   root: string,
   changes: readonly PublishInput[],
   publishedAt: string,
+  partial: boolean,
 ): Promise<WrittenOffer> {
   const read = rootReader(root);
   const latest = new Map<string, OfferedVersion>();
-  let unchanged = true;
 
   // Every change is checked before any is written: a refusal partway through
   // would leave an earlier artifact's versions.json ahead of the index.
   const checked = [];
-  for (const change of changes) {
-    const { namespace, version, at } = destination(change);
-    const { envelope, digest } = sealed(change, descriptorsOf(change));
-    const existing =
-      (await existingDigest(read, at)) ?? (await listedDigest(read, change, namespace, version));
-    // A released version is never rewritten, nor quietly offered as another: the caller
-    // reports the version it asked for, so different bytes there are refused.
-    if (existing !== undefined && existing !== digest) {
-      throw fail(
-        "conflict",
-        `${namespace}/${change.kind}/${change.name}@${version} is already published with other content.`,
-        change.name,
-        "A published version is never rewritten; publish this one as a new version.",
-      );
+  const refused: PublishRefusal[] = [];
+  for (const [index, change] of changes.entries()) {
+    try {
+      checked.push(await checkChange(read, change));
+    } catch (error) {
+      if (!partial) throw error;
+      refused.push({ index, error: translated(error) });
     }
-    if (existing !== digest) unchanged = false;
-    checked.push({ change, namespace, version, at, envelope, digest });
   }
+  // Nothing left to write, so the catalog is not rewritten either.
+  if (checked.length === 0 && refused.length > 0) return { unchanged: false, refused };
 
   for (const { change, namespace, version, at, envelope, digest } of checked) {
     await rm(under(root, at), { recursive: true, force: true });
@@ -191,5 +211,5 @@ async function writeOfferNow(
   );
   await writeAtomic(under(root, INDEX_DOCUMENT), specJson(index));
 
-  return { unchanged };
+  return { unchanged: checked.every((each) => each.unchanged), refused };
 }

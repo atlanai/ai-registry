@@ -190,6 +190,18 @@ describe("writeOffer", () => {
     await expect(readFile(join(root, "index.json"))).rejects.toThrow();
   });
 
+  test("with partial, returns the placeless change by position and writes the rest", async () => {
+    const placeless = offer({ name: "fresh", namespace: undefined });
+    const written = await writeOffer(root, [placeless, offer()], "x", alone, true);
+    expect(written.refused).toHaveLength(1);
+    expect(written.refused[0]).toMatchObject({
+      index: 0,
+      error: { failure: "invalid", message: expect.stringMatching(/fresh has no namespace/) },
+    });
+    expect((await readVersions(read(root), "house", "skill", "lint")).latest).toBe("1.0.0");
+    expect((await readIndex(read(root))).map((each) => each.name)).toEqual(["lint"]);
+  });
+
   test("refuses a segment Windows reserves for a device", async () => {
     for (const change of [{ name: "con" }, { namespace: "aux" }, { name: "lpt9" }]) {
       await expect(writeOffer(root, [offer(change)], "x", alone)).rejects.toThrow(

@@ -3,6 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   type PublishInput,
+  type PublishOptions,
   type PublishResult,
   REGISTRY_DOCUMENT,
   type Resolution,
@@ -85,7 +86,10 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
     fetch: (artifact, file) => translating(() => files.fetch(artifact, file)),
 
     /** Written in place, and read by the next resolve. */
-    async publish(changes: readonly PublishInput[]): Promise<PublishResult> {
+    async publish(
+      changes: readonly PublishInput[],
+      options?: PublishOptions,
+    ): Promise<PublishResult> {
       return translating(async () => {
         // Refused before anything is written: aireg only reads a folder of skills.
         const layout = forced ?? (await detectLayout(root).catch(() => undefined));
@@ -102,9 +106,11 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
           changes,
           new Date().toISOString(),
           context.exclusive,
+          options?.partial === true,
         );
         files.forget();
-        return { unchanged: written.unchanged, location: root };
+        const { unchanged, refused } = written;
+        return { unchanged, location: root, ...(refused.length === 0 ? {} : { refused }) };
       });
     },
 
