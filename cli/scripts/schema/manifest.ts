@@ -5,13 +5,13 @@ import { DEFAULT_TARGETS } from "#core/target/index.ts";
 
 /** The shape of `manifest.yml`. The parser stays the authority on what is accepted. */
 
-/** `harnesses`, as aireg 0.1 spells `targets`, which an editor marks as deprecated. */
+/** `harnesses`, as aireg 0.1 spells `targets`, which aireg still writes so that version reads it. */
 const Legacy = (minItems: number) =>
   Type.Optional(
     Type.Array(Type.String({ minLength: 1 }), {
       ...(minItems > 0 ? { minItems } : {}),
-      deprecated: true,
-      description: "The earlier name of `targets`, still read; aireg rewrites it as `targets`.",
+      description:
+        "`targets` by the name aireg 0.1 reads, which aireg writes unless the manifest says `targets`.",
     }),
   );
 

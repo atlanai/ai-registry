@@ -16,10 +16,9 @@ const read = (project: string, file: string) => readFile(join(project, ".registr
 
 describe("a target's earlier id", () => {
   test("installs as the id it has now, into the same folders", async ({ aireg, kit, project }) => {
-    expect((await aireg(["init", "-y", "--for", "claude,agents"])).code).toBe(0);
-    expect(await read(project, "manifest.yml")).toContain(
-      "targets:\n  - claude-code\n  - universal\n",
-    );
+    expect((await aireg(["init", "-y", "--for", "claude-code,agents"])).code).toBe(0);
+    // aireg 0.1 refuses `targets:` and today's ids, so a new manifest keeps its names.
+    expect(await read(project, "manifest.yml")).toContain("harnesses:\n  - claude\n  - agents\n");
     const added = await aireg(["add", kit, "--all", "--for", "claude,agents", "--yes"]);
     expect(added.code, added.stderr).toBe(0);
     expect(existsSync(join(project, ".claude", "skills", "lint", "SKILL.md"))).toBe(true);
@@ -28,7 +27,7 @@ describe("a target's earlier id", () => {
     expect(lock).toContain("- target: claude-code\n");
     expect(lock).toContain("- target: universal\n");
     expect(lock).not.toMatch(/target: (claude|agents)\n/);
-    expect(await read(project, "manifest.yml")).not.toMatch(/\b(claude|agents)\b(?!-)/);
+    expect(await read(project, "manifest.yml")).not.toMatch(/targets|claude-code|universal/);
   });
 
   test("shows the same target by either id", async ({ aireg }) => {
@@ -60,20 +59,13 @@ describe("a project an earlier aireg wrote", () => {
     expect(added.code, added.stderr).toBe(0);
     const manifest = join(project, ".registry", "manifest.yml");
     const lockfile = join(project, ".registry", "manifest.lock.yml");
-    const text = await readFile(manifest, "utf8");
-    await writeFile(
-      manifest,
-      text
-        .replaceAll("targets:", "harnesses:")
-        .replaceAll("claude-code", "claude")
-        .replaceAll("universal", "agents"),
-    );
+    expect(await readFile(manifest, "utf8")).toContain("harnesses:\n  - claude\n  - agents\n");
     const lock = await readFile(lockfile, "utf8");
     await writeFile(lockfile, lock.replaceAll(/target: [^\n]+\n\s*harness:/g, "harness:"));
     return { manifest, lockfile };
   }
 
-  test("reads clean, installs frozen, and moves to today's names with the next change", async ({
+  test("reads clean, installs frozen, and keeps its names through the next change", async ({
     aireg,
     kit,
     project,
@@ -93,9 +85,9 @@ describe("a project an earlier aireg wrote", () => {
 
     const more = await aireg(["add", `${kit}`, "-s", "fmt", "-y"]);
     expect(more.code, more.stderr).toBe(0);
-    const rewritten = await readFile(manifest, "utf8");
-    expect(rewritten).toContain("targets:\n  - claude-code\n  - universal\n");
-    expect(rewritten).not.toContain("harnesses");
+    const edited = await readFile(manifest, "utf8");
+    expect(edited).toContain("harnesses:\n  - claude\n  - agents\n");
+    expect(edited).not.toMatch(/targets|claude-code|universal/);
     // `harness:` beside each `target:`, so a teammate still on aireg 0.1 reads the lock.
     const lock = await readFile(lockfile, "utf8");
     expect(lock).toContain("version: 1\n");
@@ -103,17 +95,31 @@ describe("a project an earlier aireg wrote", () => {
     expect(lock).toContain("- target: universal\n        harness: agents\n");
   });
 
-  test("moves the manifest over on an install that changes the lock", async ({
+  test("leaves the manifest as it is on an install that changes the lock", async ({
     aireg,
     kit,
     project,
   }) => {
     const { manifest, lockfile } = await earlierProject(aireg, `${kit}`, project);
+    const before = await readFile(manifest, "utf8");
     await rm(lockfile);
     const installed = await aireg(["install"]);
     expect(installed.code, installed.stderr).toBe(0);
-    expect(await readFile(manifest, "utf8")).toContain(
-      "targets:\n  - claude-code\n  - universal\n",
-    );
+    expect(await readFile(manifest, "utf8")).toBe(before);
+  });
+
+  test("keeps `targets:` and today's ids once someone writes `targets:`", async ({
+    aireg,
+    kit,
+    project,
+  }) => {
+    const { manifest } = await earlierProject(aireg, `${kit}`, project);
+    const text = await readFile(manifest, "utf8");
+    await writeFile(manifest, text.replace("harnesses:", "targets:"));
+    const more = await aireg(["add", `${kit}`, "-s", "fmt", "-y"]);
+    expect(more.code, more.stderr).toBe(0);
+    const edited = await readFile(manifest, "utf8");
+    expect(edited).toContain("targets:\n  - claude-code\n  - universal\n");
+    expect(edited).not.toContain("harnesses");
   });
 });

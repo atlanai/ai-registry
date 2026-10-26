@@ -13,7 +13,6 @@ import { entries, exists, present, pruneEmptyParent, remove, unseal } from "#cor
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import { assertLeasesHeld } from "#core/lease.ts";
 import { type LinkMode, type Lock, readLock, writeLock } from "#core/lock.ts";
-import { migrateManifest } from "#core/manifest.ts";
 import { backupStamp } from "#core/store/backups.ts";
 import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
@@ -615,8 +614,7 @@ async function record(run: Run, action: ActionOf<"record">): Promise<void> {
   for (const [name, entry] of Object.entries(action.lock.artifacts)) {
     if (!run.unstaged.has(name)) patchRow(run, name, entry);
   }
-  // Only with a real change: a run that changes nothing leaves a project aireg 0.1 wrote as it is.
-  if (await writeLock(run.roots, action.lock)) await migrateManifest(run.roots);
+  await writeLock(run.roots, action.lock);
   run.recorded = action.lock;
 }
 

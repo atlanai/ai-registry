@@ -71,12 +71,12 @@ describe("init", () => {
     );
   });
 
-  test("writes the manifest with the targets it chose, by id, and nothing else", async () => {
+  test("writes the manifest with the targets it chose, as aireg 0.1 names them", async () => {
     const cwd = await mkdtemp(join(scratch, "aireg-init-"));
     vi.stubEnv("AIREG_USER_SCOPE", join(cwd, "user"));
-    await run(context(cwd, ["--for", "claude,codex"], []));
+    await run(context(cwd, ["--for", "claude-code,codex"], []));
     expect(await readFile(join(cwd, ".registry", "manifest.yml"), "utf8")).toBe(
-      "targets:\n  - claude-code\n  - codex\nregistries: {}\nartifacts: []\n",
+      "harnesses:\n  - claude\n  - codex\nregistries: {}\nartifacts: []\n",
     );
   });
 

@@ -37,8 +37,7 @@
       }
     },
     "harnesses": {
-      "deprecated": true,
-      "description": "The earlier name of `targets`, still read; aireg rewrites it as `targets`.",
+      "description": "`targets` by the name aireg 0.1 reads, which aireg writes unless the manifest says `targets`.",
       "type": "array",
       "items": {
         "minLength": 1,
@@ -175,8 +174,7 @@
               },
               "harnesses": {
                 "minItems": 1,
-                "deprecated": true,
-                "description": "The earlier name of `targets`, still read; aireg rewrites it as `targets`.",
+                "description": "`targets` by the name aireg 0.1 reads, which aireg writes unless the manifest says `targets`.",
                 "type": "array",
                 "items": {
                   "minLength": 1,
