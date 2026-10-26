@@ -39,7 +39,7 @@ export function targetProblems(
     aliasProblems(definition, owners, report);
     rootProblems(definition, report);
     if (
-      definition.shared === true &&
+      definition.category === "shared-folder" &&
       definition.detect !== undefined &&
       definition.detect !== "never"
     ) {

@@ -48,21 +48,46 @@ describe("target files", () => {
     expect(resolveTargets(env).tool?.origin).toBe(join(legacy, "tool.json"));
   });
 
-  test('read `kind: "shared"` as `shared: true`, and any other `kind` as nothing, with a warning', async () => {
+  test("read `category`, `coding-agent` when absent, and refuse `shared`", async () => {
+    await save("tool.json", { ...TOOL, category: "personal-agent" });
+    await save("other.json", { ...TOOL, id: "other" });
+    await save("folder.json", { ...TOOL, id: "folder", shared: true });
+    const table = resolveTargets(env);
+    expect(table.tool?.category).toBe("personal-agent");
+    expect(table.other?.category).toBe("coding-agent");
+    expect(table.other?.shared).toBe(false);
+    expect(table.folder).toBeUndefined();
+    expect(table["claude-code"]?.category).toBe("coding-agent");
+    expect(table.universal).toMatchObject({ category: "shared-folder", shared: true });
+  });
+
+  test("read `kind`, the earlier name of `category`, with a warning", async () => {
     await save("tool.json", { ...TOOL, kind: "shared", detect: "never" });
-    await save("other.json", { ...TOOL, id: "other", kind: "personal" });
+    await save("coder.json", { ...TOOL, id: "coder", kind: "coding" });
+    await save("helper.json", { ...TOOL, id: "helper", kind: "personal" });
+    await save("other.json", { ...TOOL, id: "other", kind: "toString" });
     const { files } = loadTargetFiles(env);
+    const earlier = (kind: string, category: string) =>
+      `It sets "kind": "${kind}", the earlier way to say "category": "${category}"; set that instead.`;
     expect(files.map(({ definition, warnings }) => [definition.id, warnings])).toEqual([
-      ["other", ['It sets "kind": "personal", which aireg no longer reads; delete it.']],
-      [
-        "tool",
-        ['It sets "kind": "shared", the earlier way to say "shared": true; set that instead.'],
-      ],
+      ["coder", [earlier("coding", "coding-agent")]],
+      ["helper", [earlier("personal", "personal-agent")]],
+      ["other", ['It sets "kind": "toString", which aireg no longer reads; delete it.']],
+      ["tool", [earlier("shared", "shared-folder")]],
     ]);
     const table = resolveTargets(env);
-    expect(table.tool?.shared).toBe(true);
-    expect(table.other?.shared).toBe(false);
+    expect(table.tool).toMatchObject({ category: "shared-folder", shared: true });
+    expect(table.coder?.category).toBe("coding-agent");
+    expect(table.helper?.category).toBe("personal-agent");
+    expect(table.other?.category).toBe("coding-agent");
     expect(table.tool).not.toHaveProperty("kind");
+  });
+
+  test("refuse a file with both `kind` and `category`, naming both", async () => {
+    await save("tool.json", { ...TOOL, kind: "personal", category: "personal-agent" });
+    expect(problems()).toEqual([
+      'It sets both "category" and "kind", its earlier name; keep "category".',
+    ]);
   });
 
   test("say to move a file from the folder's earlier name", async () => {

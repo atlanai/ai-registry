@@ -8,7 +8,14 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { codecOf } from "#core/target/codecs/index.ts";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
-import type { EarlierTarget, KindMapping, Target, TargetDefinition, Targets } from "./contract.ts";
+import type {
+  EarlierTarget,
+  KindMapping,
+  Target,
+  TargetCategory,
+  TargetDefinition,
+  Targets,
+} from "./contract.ts";
 import { BUILT_IN, loadTargetFiles } from "./load.ts";
 
 export type { EarlierTarget, KindMapping, Target, Targets } from "./contract.ts";
@@ -37,6 +44,12 @@ export function earlierId(id: string): string {
   return at === -1 ? was : `${was}${id.slice(at)}`;
 }
 
+const EARLIER_KINDS = {
+  "coding-agent": "coding",
+  "personal-agent": "personal",
+  "shared-folder": "shared",
+} as const satisfies Record<TargetCategory, EarlierTarget["kind"]>;
+
 /**
  * The table keyed and named by `earlierId`, for adapters built against aireg 0.1.
  * A target whose own id is an earlier one keeps it, as `canonicalId` does.
@@ -46,7 +59,7 @@ export function earlierTable(targetTable: Targets): Record<string, EarlierTarget
   for (const target of Object.values(targetTable)) {
     const name = earlierId(target.name);
     if (name !== target.name && Object.hasOwn(targetTable, name)) continue;
-    out[name] = { ...target, name, kind: target.shared ? "shared" : "coding" };
+    out[name] = { ...target, name, kind: EARLIER_KINDS[target.category] };
   }
   return out;
 }
@@ -80,6 +93,7 @@ function toTarget(
   origin: string = BUILT_IN,
 ): Target {
   const detect = definition.detect ?? {};
+  const category = definition.category ?? "coding-agent";
   return {
     name: definition.id,
     aliases: [...(definition.aliases ?? [])],
@@ -99,7 +113,8 @@ function toTarget(
           },
     kinds: kindsOf(definition),
     reads: { ...definition.reads },
-    shared: definition.shared === true,
+    category,
+    shared: category === "shared-folder",
     verified: definition.verified === undefined ? undefined : structuredClone(definition.verified),
     trust: { ...definition.trust },
     reload: definition.reload,

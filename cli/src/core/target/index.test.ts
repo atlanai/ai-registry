@@ -21,6 +21,14 @@ describe("resolveTargets", () => {
     expect(table["claude-code"]?.shared).toBe(false);
   });
 
+  it("files every built-in as a coding agent but the shared folder", () => {
+    const table = resolveTargets();
+    const others = Object.values(table).filter((target) => target.category !== "coding-agent");
+    expect(others.map(({ name, category, shared }) => [name, category, shared])).toEqual([
+      ["universal", "shared-folder", true],
+    ]);
+  });
+
   it("keys each built-in by its industry id, with its earlier id as an alias", () => {
     const table = resolveTargets();
     expect(
@@ -61,6 +69,12 @@ describe("earlierTable", () => {
     );
     expect(table.agents?.kind).toBe("shared");
     expect(table.codex?.kind).toBe("coding");
+    const helper = {
+      ...(table.codex as Target),
+      name: "helper",
+      category: "personal-agent" as const,
+    };
+    expect(earlierTable({ helper }).helper?.kind).toBe("personal");
   });
 
   it("leaves an earlier id to a target that has it as its own", () => {

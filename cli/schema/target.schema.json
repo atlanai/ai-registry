@@ -459,14 +459,18 @@
       "description": "Replaces the built-in target with this id.",
       "type": "boolean"
     },
-    "shared": {
-      "description": "A folder several tools read rather than a tool: never detected, never a default.",
-      "const": true,
-      "type": "boolean"
+    "category": {
+      "type": "string",
+      "enum": [
+        "coding-agent",
+        "personal-agent",
+        "shared-folder"
+      ],
+      "description": "Groups targets; `coding-agent` when absent. A `shared-folder` is never detected and never a default."
     },
     "kind": {
       "deprecated": true,
-      "description": "Read as `\"shared\": true` when \"shared\", and otherwise ignored; use `shared`.",
+      "description": "The earlier name of `category`: `coding`, `personal` or `shared`; use `category`.",
       "type": "string"
     },
     "roots": {

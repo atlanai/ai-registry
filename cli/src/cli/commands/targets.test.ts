@@ -159,7 +159,7 @@ describe("targets", () => {
     expect(text).toContain("Skipped ~/.aireg/targets/broken.json: it is not valid JSON.");
   });
 
-  test("warns of a file that still says `kind`, which it reads as `shared`", async () => {
+  test("warns of a file that still says `kind`, which it reads as `category`", async () => {
     const dir = join(cwd, ".aireg", "targets");
     await mkdir(dir, { recursive: true });
     await writeFile(
@@ -175,7 +175,7 @@ describe("targets", () => {
     const writes: string[] = [];
     await run(context(cwd, writes, "text"));
     expect(writes.join("")).toContain(
-      'warning: Read ~/.aireg/targets/tool.json, but it sets "kind": "shared", the earlier way to say "shared": true; set that instead.',
+      'warning: Read ~/.aireg/targets/tool.json, but it sets "kind": "shared", the earlier way to say "category": "shared-folder"; set that instead.',
     );
     expect(writes.join("")).toContain("hint: Use `--for tool` for the shared .tool folder.");
     expect(writes.join("")).not.toContain("--for tool:work");
@@ -199,6 +199,7 @@ describe("targets", () => {
       origin: "built-in",
       projectRoot: ".codex",
     });
+    expect(data.target).not.toHaveProperty("category");
     await expect(run(context(cwd, [], "json", ["show", "ghost"]))).rejects.toThrow(
       'No target named "ghost".',
     );

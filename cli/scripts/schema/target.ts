@@ -195,16 +195,19 @@ export const Target = Type.Object(
     overrides: Type.Optional(
       Type.Boolean({ description: "Replaces the built-in target with this id." }),
     ),
-    shared: Type.Optional(
-      Type.Literal(true, {
+    category: Type.Optional(
+      Type.Unsafe<string>({
+        type: "string",
+        enum: ["coding-agent", "personal-agent", "shared-folder"],
         description:
-          "A folder several tools read rather than a tool: never detected, never a default.",
+          "Groups targets; `coding-agent` when absent. A `shared-folder` is never detected and never a default.",
       }),
     ),
     kind: Type.Optional(
       Type.String({
         deprecated: true,
-        description: 'Read as `"shared": true` when "shared", and otherwise ignored; use `shared`.',
+        description:
+          "The earlier name of `category`: `coding`, `personal` or `shared`; use `category`.",
       }),
     ),
     roots: Type.Object(

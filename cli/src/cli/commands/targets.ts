@@ -173,11 +173,13 @@ async function show(context: CommandContext, id: string): Promise<void> {
       hint: "Run `aireg targets` to see every target and its id.",
     });
   }
+  // `category` is internal; `shared` already says what a person needs of it.
+  const { category: _, ...shown } = target;
   if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { target } });
+    context.printer.json({ ok: true, data: { target: shown } });
     return;
   }
-  const { name, displayName, origin: from, ...rest } = target;
+  const { name, displayName, origin: from, ...rest } = shown;
   context.printer.info(`${displayName} (${name}), ${origin(from)}`);
   context.printer.info(stringify(rest, { lineWidth: 0 }).trimEnd());
 }

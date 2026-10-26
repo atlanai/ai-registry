@@ -8,7 +8,7 @@ import { legacyTargetsDir, targetsDir } from "#core/store/paths.ts";
 import schema from "#schema/target.schema.json" with { type: "json" };
 import { BUILTIN_TARGETS } from "#targets/index.ts";
 import { targetProblems } from "./check.ts";
-import type { TargetDefinition } from "./contract.ts";
+import type { TargetCategory, TargetDefinition } from "./contract.ts";
 
 /** Where a target that no file defines comes from. */
 export const BUILT_IN = "built-in";
@@ -154,6 +154,12 @@ function readOne(path: string, text: string): TargetFile | SkippedFile {
   return problems.length > 0 ? { path, problems } : { path, definition, warnings };
 }
 
+const CATEGORY_OF: Readonly<Record<string, TargetCategory>> = {
+  coding: "coding-agent",
+  personal: "personal-agent",
+  shared: "shared-folder",
+};
+
 /** Keys a file written for aireg 0.1 may carry, read as what replaced them. */
 type Earlier = TargetDefinition & { kind?: string; instances?: TargetDefinition["profiles"] };
 
@@ -165,12 +171,15 @@ function upgraded({ kind, instances, ...definition }: Earlier): {
   const warnings: string[] = [];
   const problems: string[] = [];
   let upgrade = definition;
-  if (kind !== undefined) {
-    if (kind === "shared") upgrade = { ...upgrade, shared: true };
+  if (kind !== undefined && definition.category !== undefined) {
+    problems.push('It sets both "category" and "kind", its earlier name; keep "category".');
+  } else if (kind !== undefined) {
+    const category = Object.hasOwn(CATEGORY_OF, kind) ? CATEGORY_OF[kind] : undefined;
+    if (category !== undefined) upgrade = { ...upgrade, category };
     warnings.push(
-      kind === "shared"
-        ? 'It sets "kind": "shared", the earlier way to say "shared": true; set that instead.'
-        : `It sets "kind": ${quoted(kind)}, which aireg no longer reads; delete it.`,
+      category === undefined
+        ? `It sets "kind": ${quoted(kind)}, which aireg no longer reads; delete it.`
+        : `It sets "kind": ${quoted(kind)}, the earlier way to say "category": ${quoted(category)}; set that instead.`,
     );
   }
   if (instances !== undefined && definition.profiles !== undefined) {

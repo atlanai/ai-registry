@@ -64,7 +64,7 @@ This target reads skills from the shared `.agents` folder and agents from `.tool
 
 An alias is a lowercase name that isn't another target's id or alias. A file can't take a built-in alias as its id: to replace Claude Code, name the file `claude-code.json`, not `claude.json`, and set `"overrides": true`. A file that replaces a built-in target and sets no `aliases` keeps the built-in's.
 
-`"shared": true` marks a folder several tools read rather than a coding agent, like the shared `.agents` folder. aireg never detects a shared folder and never installs into one by default.
+`category` groups targets: `coding-agent`, the default, `personal-agent`, or `shared-folder` for a folder several tools read, like the shared `.agents` folder. aireg never detects a shared folder and never installs into one by default.
 
 `profiles` finds the profiles of one installation, such as `{ "root": "~/.tool/profiles/{profile}" }`, where `{profile}` in the last segment names each one. Each profile folder found is a target of its own, `<id>:<profile>`, in your user scope only.
 
@@ -82,7 +82,7 @@ Files written for an earlier aireg keep loading, and a project stays readable by
 - aireg reads a manifest's target list as `targets:` or `harnesses:`, and writes it as `harnesses:` with the ids aireg 0.1 knows unless the manifest says `targets:`: see [`--for`](options.md#targets).
 
 - aireg still reads `~/.aireg/harnesses/`, the folder's earlier name. A target id defined in both folders is refused, naming both files, and neither file is used.
-- A file's `kind` is read only as `"kind": "shared"`, which means `"shared": true`; other values are ignored. `aireg targets` and `aireg targets check` warn about a file that sets it.
+- A file's `kind` is read as the earlier name of `category`: `coding`, `personal` and `shared` mean `coding-agent`, `personal-agent` and `shared-folder`, and other values are ignored. A file that sets both is refused. `aireg targets` and `aireg targets check` warn about a file that sets `kind`.
 - `instances` is read as the earlier name of `profiles`, with a warning.
 
 ### Trust and reload steps

@@ -70,7 +70,7 @@ describe("targetProblems", () => {
     ],
     [
       "a shared folder that is detected",
-      [target({ shared: true, detect: { binary: ["tool"] } })],
+      [target({ category: "shared-folder", detect: { binary: ["tool"] } })],
       /never detected/,
     ],
     [

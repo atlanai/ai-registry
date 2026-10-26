@@ -173,14 +173,17 @@ interface Trust {
   scope?: "project" | "user" | undefined;
 }
 
+/** What a target is; a `shared-folder` is several tools' folder, never detected nor a default. */
+export type TargetCategory = "coding-agent" | "personal-agent" | "shared-folder";
+
 /** One target aireg installs into, as its module under `src/targets` defines it. */
 export interface TargetDefinition {
   id: string;
   /** Other ids it answers to wherever an id is read, such as an earlier one; output names `id`. */
   aliases?: string[] | undefined;
   displayName: string;
-  /** A folder several tools read rather than a tool: never detected and never a default. */
-  shared?: true | undefined;
+  /** `coding-agent` when absent. */
+  category?: TargetCategory | undefined;
   /**
    * Installed into when a manifest names none. Fixed rather than detected, so
    * teammates with different tools still write the same lock.
@@ -234,6 +237,8 @@ export interface Target {
   kinds: Partial<Record<ArtifactKind, KindMapping>>;
   /** Only the kinds whose reads differ from this target's own folder. */
   reads: Partial<Record<ArtifactKind, string[]>>;
+  category: TargetCategory;
+  /** A `shared-folder`, which is what most callers ask. */
   shared: boolean;
   verified: { command: string[]; range: string } | undefined;
   trust: Partial<Record<ArtifactKind, Trust>>;

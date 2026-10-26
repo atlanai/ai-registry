@@ -7,7 +7,7 @@ export const universal = defineTarget({
   aliases: ["agents"],
   displayName: "Shared .agents folder",
   importable: true,
-  shared: true,
+  category: "shared-folder",
   roots: { project: ".agents", user: { default: "~/.agents" } },
   detect: "never",
   kinds: {
