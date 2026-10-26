@@ -147,11 +147,11 @@ describe("closure", () => {
     const narrowed = closure(
       [
         selected("agent", "reviewer", "0.3.0", { targets: ["codex"] }),
-        selected("agent", "helper", "1.0.0", { targets: ["claude"] }),
+        selected("agent", "helper", "1.0.0", { targets: ["claude-code"] }),
       ],
       published,
     );
-    expect(narrowed.refs[0]?.targets).toEqual(["claude", "codex"]);
+    expect(narrowed.refs[0]?.targets).toEqual(["claude-code", "codex"]);
 
     // One dependent the scope's own targets reach, so the dependency goes there too.
     const scoped = closure(

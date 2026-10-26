@@ -179,6 +179,11 @@ export const Target = Type.Object(
       Type.String({ description: "Ignored by the CLI; lets an editor find this schema." }),
     ),
     id: Type.String({ pattern: "^[a-z][a-z0-9-]{0,63}$", description: "The name `--for` takes." }),
+    aliases: Type.Optional(
+      Type.Array(Type.String({ pattern: "^[a-z][a-z0-9-]{0,63}$" }), {
+        description: "Other ids it answers to wherever an id is read, such as an earlier one.",
+      }),
+    ),
     displayName: Text,
     overrides: Type.Optional(
       Type.Boolean({ description: "Replaces the built-in target with this id." }),

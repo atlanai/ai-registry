@@ -22,7 +22,7 @@ describe("movedPluginLinks", () => {
         content: undefined,
         version: undefined,
         digest: "",
-        links: [{ target: row.target ?? "claude", path: row.link, mode: "symlink" }],
+        links: [{ target: row.target ?? "claude-code", path: row.link, mode: "symlink" }],
       };
     }
     return lock;

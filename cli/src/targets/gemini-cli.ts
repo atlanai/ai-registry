@@ -1,7 +1,8 @@
 import { defineTarget } from "#core/target/contract.ts";
 
-export const gemini = defineTarget({
-  id: "gemini",
+export const geminiCli = defineTarget({
+  id: "gemini-cli",
+  aliases: ["gemini"],
   displayName: "Gemini CLI",
   roots: {
     project: ".gemini",
@@ -9,7 +10,7 @@ export const gemini = defineTarget({
   },
   detect: { env: ["GEMINI_CLI_HOME"], binary: ["gemini"], caller: ["GEMINI_CLI"] },
   // Its own folder first: its user `.agents` moves with GEMINI_CLI_HOME, the shared one does not.
-  reads: { skill: ["gemini", "agents"] },
+  reads: { skill: ["gemini-cli", "universal"] },
   kinds: {
     // An extension would also carry its agents as written, beside the ones the codec writes.
     plugin: { shape: "contents" },

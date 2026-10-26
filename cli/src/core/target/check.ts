@@ -32,9 +32,11 @@ export function targetProblems(
     seen.add(definition.id);
     byId.set(definition.id, definition);
   }
+  const owners = ownersOf([...byId.values()]);
   for (const definition of definitions) {
     const report = (problem: string) => problems.push(`${definition.id}: ${problem}`);
-    if (!/^[a-z][a-z0-9-]{0,63}$/.test(definition.id)) report("the id is not a lowercase name.");
+    if (!ID.test(definition.id)) report("the id is not a lowercase name.");
+    aliasProblems(definition, owners, report);
     rootProblems(definition, report);
     if (
       definition.kind === "shared" &&
@@ -49,10 +51,39 @@ export function targetProblems(
       const mapping = definition.kinds[kind];
       if (mapping !== undefined) mappingProblems(kind, mapping, report);
       for (const read of definition.reads?.[kind] ?? [])
-        readProblem(kind, byId.get(read), read, report);
+        readProblem(kind, owners.get(read)?.[0], read, report);
     }
   }
   return problems;
+}
+
+const ID = /^[a-z][a-z0-9-]{0,63}$/;
+
+/** Every id and alias, with each definition that answers to it. */
+function ownersOf(definitions: readonly TargetDefinition[]): Map<string, TargetDefinition[]> {
+  const owners = new Map<string, TargetDefinition[]>();
+  for (const definition of definitions) {
+    for (const name of new Set([definition.id, ...(definition.aliases ?? [])])) {
+      owners.set(name, [...(owners.get(name) ?? []), definition]);
+    }
+  }
+  return owners;
+}
+
+/** An alias is read wherever an id is, so it must name this definition alone. */
+function aliasProblems(
+  definition: TargetDefinition,
+  owners: ReadonlyMap<string, TargetDefinition[]>,
+  report: Report,
+) {
+  for (const alias of definition.aliases ?? []) {
+    if (!ID.test(alias)) report(`the alias ${quoted(alias)} is not a lowercase name.`);
+    if (alias === definition.id) report(`the alias ${quoted(alias)} is its own id.`);
+    const other = owners.get(alias)?.find((each) => each !== definition);
+    if (other !== undefined) {
+      report(`the alias ${quoted(alias)} already names the target ${quoted(other.id)}.`);
+    }
+  }
 }
 
 function instanceProblems(root: string, report: Report) {

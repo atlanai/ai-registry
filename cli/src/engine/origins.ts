@@ -14,6 +14,7 @@ import { listedAt } from "#core/plan/model.ts";
 import { removeContained } from "#core/plan/removable.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { artifactPath, type Roots } from "#core/store/paths.ts";
+import { canonicalId, resolveTargets } from "#core/target/index.ts";
 import { moveAside } from "./claim.ts";
 import type { Scan } from "./scan.ts";
 
@@ -101,6 +102,8 @@ async function found(step: Step, selector: Selector): Promise<Origin[]> {
   }
 
   const shape = KIND_SPECS[kind].shape;
+  // A selector may name an alias, and `.claude` names the folder of the target it is one for.
+  const target = canonicalId(resolveTargets(), selector.target?.[0] ?? targetOf(selector.from));
   const origins: Origin[] = [];
   for (const entry of entries) {
     if (entry.startsWith(".")) continue;
@@ -115,7 +118,7 @@ async function found(step: Step, selector: Selector): Promise<Origin[]> {
       namespace,
       registry,
       from: join(selector.from, entry),
-      target: selector.target?.[0] ?? targetOf(selector.from),
+      target,
       step: step.name,
     });
   }

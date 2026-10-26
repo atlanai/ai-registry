@@ -4,7 +4,10 @@
   "overrides": true,
   "roots": { "project": ".cursor", "user": { "default": "~/.cursor" } },
   "detect": { "binary": ["cursor", "cursor-agent"] },
-  "reads": { "skill": ["agents", "cursor", "claude", "codex"], "agent": ["cursor", "claude"] },
+  "reads": {
+    "skill": ["universal", "cursor", "claude-code", "codex"],
+    "agent": ["cursor", "claude-code"]
+  },
   "kinds": {
     "plugin": {
       "shape": "directory",

@@ -1,10 +1,12 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveTargets } from "./index.ts";
+import { canonicalId, canonicalIds, resolveTargets } from "./index.ts";
 
 describe("resolveTargets", () => {
   it("expands each user root against HOME", () => {
-    expect(resolveTargets({ HOME: "/home/u" }).claude?.userRoot).toBe(join("/home/u", ".claude"));
+    expect(resolveTargets({ HOME: "/home/u" })["claude-code"]?.userRoot).toBe(
+      join("/home/u", ".claude"),
+    );
   });
 
   it("fills the defaults an entry leaves out", () => {
@@ -14,7 +16,47 @@ describe("resolveTargets", () => {
       binary: ["cursor", "cursor-agent"],
       paths: [],
     });
-    expect(table.claude?.reads).toEqual({});
-    expect(table.claude?.shared).toBe(false);
+    expect(table["claude-code"]?.reads).toEqual({});
+    expect(table["claude-code"]?.shared).toBe(false);
+  });
+
+  it("keys each built-in by its industry id, with its earlier id as an alias", () => {
+    const table = resolveTargets();
+    expect(
+      Object.fromEntries(Object.values(table).map((each) => [each.name, each.aliases])),
+    ).toEqual({
+      "claude-code": ["claude"],
+      codex: [],
+      cursor: [],
+      "github-copilot": ["copilot"],
+      "gemini-cli": ["gemini"],
+      opencode: [],
+      universal: ["agents"],
+    });
+  });
+});
+
+describe("canonicalId", () => {
+  const table = resolveTargets();
+
+  it.each([
+    ["claude", "claude-code"],
+    ["claude-code", "claude-code"],
+    ["copilot", "github-copilot"],
+    ["gemini", "gemini-cli"],
+    ["agents", "universal"],
+    ["codex", "codex"],
+    ["claude:work", "claude-code:work"],
+    ["ghost", "ghost"],
+    ["*", "*"],
+  ])("reads %s as %s", (id, canonical) => {
+    expect(canonicalId(table, id)).toBe(canonical);
+  });
+
+  it("names each target once, in the order given", () => {
+    expect(canonicalIds(table, ["claude", "codex", "claude-code"])).toEqual([
+      "claude-code",
+      "codex",
+    ]);
   });
 });

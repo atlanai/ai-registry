@@ -26,7 +26,7 @@ function candidate(name: string, from: string, elsewhere: Candidate["elsewhere"]
     name,
     kind: "skill",
     from,
-    target: "claude",
+    target: "claude-code",
     suggestedPath: `skills/${name}`,
     description: undefined,
     elsewhere,
@@ -68,7 +68,7 @@ describe("surveyClaims", () => {
     const claims = await surveyClaims(
       [
         candidate("hello", claude, [
-          { from: agents, target: "agents" },
+          { from: agents, target: "universal" },
           { from: codex, target: "codex" },
         ]),
       ],
@@ -81,8 +81,8 @@ describe("surveyClaims", () => {
         kind: "skill",
         entries: ["ws/skills/hello"],
         identical: [
-          { from: claude, target: "claude" },
-          { from: agents, target: "agents" },
+          { from: claude, target: "claude-code" },
+          { from: agents, target: "universal" },
         ],
         different: [{ from: codex, target: "codex" }],
       },
@@ -112,20 +112,20 @@ describe("moveAside", () => {
       "skill",
       "hello",
       [
-        { from: claude, target: "claude" },
-        { from: linked, target: "agents" },
+        { from: claude, target: "claude-code" },
+        { from: linked, target: "universal" },
       ],
       roots,
       "20260924T120000Z",
     );
     const at = join(root, ".registry", "backups", "20260924T120000Z");
     expect(moved).toEqual([
-      { from: claude, to: join(at, "claude/skills/hello") },
-      { from: linked, to: join(at, "agents/skills/hello") },
+      { from: claude, to: join(at, "claude-code/skills/hello") },
+      { from: linked, to: join(at, "universal/skills/hello") },
     ]);
     await expect(lstat(claude)).rejects.toThrow();
-    expect((await lstat(join(at, "claude/skills/hello/SKILL.md"))).isFile()).toBe(true);
-    expect(await readlink(join(at, "agents/skills/hello"))).toBe(target);
+    expect((await lstat(join(at, "claude-code/skills/hello/SKILL.md"))).isFile()).toBe(true);
+    expect(await readlink(join(at, "universal/skills/hello"))).toBe(target);
     expect((await lstat(join(target, "SKILL.md"))).isFile()).toBe(true);
   });
 
@@ -136,7 +136,7 @@ describe("moveAside", () => {
     const moved = await moveAside(
       "skill",
       "hello",
-      [{ from: join(root, ".claude/skills/hello"), target: "claude" }],
+      [{ from: join(root, ".claude/skills/hello"), target: "claude-code" }],
       roots,
       "20260924T120000Z",
     );

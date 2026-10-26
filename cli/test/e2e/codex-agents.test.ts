@@ -40,7 +40,7 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir, home: { dir: homeDir } })
     .agent("eng/reviewer@1.0.0", { files: { "AGENT.md": AGENT } })
     .write();
   await mkdir(join(project, ".claude"), { recursive: true });
-  expect((await aireg(["init", "-y", "--for", "claude,codex"])).code).toBe(0);
+  expect((await aireg(["init", "-y", "--for", "claude-code,codex"])).code).toBe(0);
   expect((await aireg(["registry", "add", market, "--as", "acme"])).code).toBe(0);
   expect((await aireg(["registry", "add", market, "--as", "acme", "-g"])).code).toBe(0);
 });

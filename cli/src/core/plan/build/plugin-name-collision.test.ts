@@ -26,7 +26,7 @@ describe("two plugins publishing the same name", () => {
     );
 
     // `fmt` is published by both, so only one link to it may exist. Cursor reads the shared folder.
-    const fmt = linksTo(plan.actions, "agents").filter((to) => /[\\/]skills[\\/]fmt$/.test(to));
+    const fmt = linksTo(plan.actions, "universal").filter((to) => /[\\/]skills[\\/]fmt$/.test(to));
     expect(fmt).toHaveLength(1);
     expect(plan.clashes).toHaveLength(1);
     expect(plan.clashes[0]?.at).toBe(".agents/skills/fmt");

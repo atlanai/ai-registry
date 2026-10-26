@@ -60,7 +60,7 @@ test("refuses a redirected projection before assembling it", async () => {
   plan.actions.push({
     kind: "link",
     name: "demo",
-    target: "claude",
+    target: "claude-code",
     from: join(projection, "demo"),
     to: join(roots.cwd, ".claude", "skills", "demo"),
     copy: false,
@@ -162,7 +162,7 @@ test("keeps a shared target root and an explicitly selected user scope working",
     {
       kind: "link",
       name: "demo",
-      target: "claude",
+      target: "claude-code",
       from: copy,
       to: join(target, "demo"),
       copy: false,

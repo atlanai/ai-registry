@@ -77,7 +77,7 @@ aireg sync resolve pr-review --theirs           # after sync reports a conflict:
 `aireg --help` lists every command, and the [CLI reference](../docs/reference/index.md)
 documents each one.
 
-`-g` (`--user`) acts on your user scope instead of the project, `--for claude,cursor` picks
+`-g` (`--user`) acts on your user scope instead of the project, `--for claude-code,cursor` picks
 the targets, `--json` works everywhere, and nothing prompts in CI or inside an agent. Your
 user scope needs no setup: the first `-g` install creates it, and `aireg init -g` is refused.
 A released version is never rewritten. How registries, sign-in and pins are stored is in
@@ -88,7 +88,7 @@ A released version is never rewritten. How registries, sign-in and pins are stor
 ```yaml
 # .registry/manifest.yml, committed: which targets, registries and artifacts
 targets:
-  - claude
+  - claude-code
   - codex
 registries:
   acme: github.com/acme/ai-registry

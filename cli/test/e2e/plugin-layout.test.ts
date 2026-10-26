@@ -10,13 +10,13 @@ import { projectTemplate } from "#test/kit/template.ts";
 
 const test = base
   .extend("initialised", { scope: "file" }, ({ fileTmp }) =>
-    projectTemplate(join(fileTmp, "initialised"), [["init", "--for", "claude"]]),
+    projectTemplate(join(fileTmp, "initialised"), [["init", "--for", "claude-code"]]),
   )
   /** A project for Claude Code that declares the stock marketplace, which no test changes. */
   .extend("declared", { scope: "file" }, async ({ fileTmp }) => {
     const root = await marketplace(join(fileTmp, "mkt")).write();
     return projectTemplate(join(fileTmp, "declared"), [
-      ["init", "--for", "claude"],
+      ["init", "--for", "claude-code"],
       ["registry", "add", root],
     ]);
   });
@@ -82,7 +82,7 @@ describe("-s on a plugin", () => {
   }) => {
     const mine = await skillsFolder(join(tmp, "mine")).skill("skills/pdf").write();
     const root = await marketplace(join(tmp, "mkt")).write();
-    expect((await aireg(["init", "--for", "agents"])).code).toBe(0);
+    expect((await aireg(["init", "--for", "universal"])).code).toBe(0);
     expect((await aireg(["add", mine, "--all"])).code).toBe(0);
     expect((await aireg(["registry", "add", root])).code).toBe(0);
     const added = await aireg(["add", "acme-tools/docs-kit", "-y"]);

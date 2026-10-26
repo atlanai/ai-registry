@@ -8,7 +8,7 @@ import { renderStatus } from "./status.ts";
 
 const chosen = {
   targetTable: resolveTargets({ HOME: "/home/dev" }),
-  for: () => ["claude", "codex"],
+  for: () => ["claude-code", "codex"],
 };
 
 function rendered(statuses: ArtifactStatus[], rows: Installed[], targetTable = chosen.targetTable) {
@@ -33,7 +33,7 @@ const row = (name: string, kind: string, extra: Partial<Installed> = {}): Instal
 
 describe("renderStatus", () => {
   it("shows a watched artifact under the target whose folder it is", () => {
-    const watched = { target: "claude", path: "~/.claude/skills/lint" };
+    const watched = { target: "claude-code", path: "~/.claude/skills/lint" };
     const lines = rendered(
       [{ name: "lint", state: "ok", detail: undefined, targets: {} }],
       [row("lint", "skill", { watched })],
@@ -49,9 +49,14 @@ describe("renderStatus", () => {
           name: "pr-review",
           state: "ok",
           detail: undefined,
-          targets: { agents: "linked", claude: "linked" },
+          targets: { universal: "linked", "claude-code": "linked" },
         },
-        { name: "reviewer", state: "missing", detail: undefined, targets: { claude: "missing" } },
+        {
+          name: "reviewer",
+          state: "missing",
+          detail: undefined,
+          targets: { "claude-code": "missing" },
+        },
       ],
       [row("pr-review", "skill"), row("reviewer", "agent")],
     );
@@ -66,10 +71,10 @@ describe("renderStatus", () => {
         {
           name: "pr-review",
           state: "dangling",
-          detail: "claude: replaced by something of yours",
-          targets: { agents: "linked", claude: "replaced" },
+          detail: "claude-code: replaced by something of yours",
+          targets: { universal: "linked", "claude-code": "replaced" },
         },
-        { name: "reviewer", state: "ok", detail: undefined, targets: { claude: "linked" } },
+        { name: "reviewer", state: "ok", detail: undefined, targets: { "claude-code": "linked" } },
       ],
       [row("pr-review", "skill"), row("reviewer", "agent")],
       withoutKind(chosen.targetTable, "codex", "agent"),
@@ -93,19 +98,19 @@ describe("renderStatus", () => {
       "hint: Codex reads a copy aireg writes from the agent: run `aireg install --force` to write it again, and change the agent in its registry.",
     );
     const both = rendered(
-      [edited("reviewer", "codex"), edited("lint", "claude")],
+      [edited("reviewer", "codex"), edited("lint", "claude-code")],
       [row("reviewer", "agent"), row("lint", "skill")],
     );
     expect(both.join("\n")).toContain("Run `aireg sync` to compare the edits with the registry.");
   });
 
   it("points an edit to a skill a target takes as a copy at install --force", () => {
-    const claude = chosen.targetTable.claude;
+    const claude = chosen.targetTable["claude-code"];
     const skill = claude?.kinds.skill;
     if (claude === undefined || skill?.shape !== "directory") throw new Error("no claude skill");
     const targetTable = {
       ...chosen.targetTable,
-      claude: {
+      "claude-code": {
         ...claude,
         kinds: { ...claude.kinds, skill: { ...skill, place: "copy" as const } },
       },
@@ -115,8 +120,8 @@ describe("renderStatus", () => {
         {
           name: "lint",
           state: "edited",
-          detail: "claude: its copy was edited after installation",
-          targets: { claude: "linked" },
+          detail: "claude-code: its copy was edited after installation",
+          targets: { "claude-code": "linked" },
         },
       ],
       [row("lint", "skill")],

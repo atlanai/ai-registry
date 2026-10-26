@@ -18,6 +18,7 @@ test.beforeEach(async ({ tmp }) => {
 function target(register: RegisterEntry[], place?: "copy", scope?: "user"): Targets {
   const tool: Target = {
     name: "tool",
+    aliases: [],
     displayName: "Tool",
     projectRoot: ".tool",
     userRoot: root,

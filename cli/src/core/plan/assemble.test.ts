@@ -23,7 +23,7 @@ describe("assembling a projection", () => {
     await publish("skills", "lint");
     await publish("agents", "rev.md");
 
-    await assemble(projection(), content(), ["claude"]);
+    await assemble(projection(), content(), ["claude-code"]);
 
     const inside = (await readdir(projection())).sort();
     expect(inside).toContain("skills");
@@ -33,22 +33,22 @@ describe("assembling a projection", () => {
 
   test("picks up a kind that arrived after the first assemble", async () => {
     await publish("skills", "lint");
-    await assemble(projection(), content(), ["claude"]);
+    await assemble(projection(), content(), ["claude-code"]);
     expect(await readdir(projection())).not.toContain("agents");
 
     // What a run does: the rest of the namespace clones, then it rebuilds.
     await publish("agents", "rev.md");
-    await assemble(projection(), content(), ["claude"]);
+    await assemble(projection(), content(), ["claude-code"]);
     expect(await readdir(projection())).toContain("agents");
   });
 
   test("stops linking a kind the namespace no longer publishes", async () => {
     await publish("skills", "lint");
     await publish("agents", "rev.md");
-    await assemble(projection(), content(), ["claude"]);
+    await assemble(projection(), content(), ["claude-code"]);
 
     await rm(join(content(), "agents"), { recursive: true, force: true });
-    await assemble(projection(), content(), ["claude"]);
+    await assemble(projection(), content(), ["claude-code"]);
     expect(await readdir(projection())).not.toContain("agents");
   });
 
@@ -58,7 +58,7 @@ describe("assembling a projection", () => {
     const platform = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
     Object.defineProperty(process, "platform", { value: "win32" });
     try {
-      await assemble(projection(), content(), ["claude"]);
+      await assemble(projection(), content(), ["claude-code"]);
     } finally {
       Object.defineProperty(process, "platform", platform);
     }
@@ -69,7 +69,7 @@ describe("assembling a projection", () => {
 
   test("writes one manifest per target that reads it, and no portable root", async () => {
     await publish("skills", "lint");
-    await assemble(projection(), content(), ["claude", "codex"]);
+    await assemble(projection(), content(), ["claude-code", "codex"]);
 
     const inside = await readdir(projection());
     expect(inside).toContain(".claude-plugin");
@@ -99,7 +99,7 @@ describe("assembling a projection", () => {
     const own = { name: "toolkit", version: "1.2.0", author: { name: "Example" } };
     await writeFile(join(content(), ".claude-plugin", "plugin.json"), JSON.stringify(own));
     const renamed = join(root, "kit-toolkit");
-    await assemble(renamed, content(), ["claude"]);
+    await assemble(renamed, content(), ["claude-code"]);
 
     const manifest = JSON.parse(
       await readFile(join(renamed, ".claude-plugin", "plugin.json"), "utf8"),

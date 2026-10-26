@@ -57,6 +57,7 @@ function toTarget(
   const kind = definition.kind ?? "coding";
   return {
     name: definition.id,
+    aliases: [...(definition.aliases ?? [])],
     displayName: definition.displayName,
     projectRoot: definition.roots.project,
     userRoot: expandUserPath(definition.roots.user.default, env),
@@ -115,6 +116,8 @@ function instancesOf(definition: TargetDefinition, env: NodeJS.ProcessEnv, origi
           ]),
         ),
         name: `${definition.id}:${profile}`,
+        // `<alias>:<profile>` reaches it through its definition's aliases.
+        aliases: [],
         displayName: `${definition.displayName} (${profile})`,
         userRoot: join(dirname(pattern), folder),
         envHome: undefined,
@@ -131,14 +134,40 @@ export function resolveTargets(env: NodeJS.ProcessEnv = process.env): Targets {
     definitions.set(definition.id, { definition, origin: BUILT_IN });
   }
   for (const file of loadTargetFiles(env).files) {
-    definitions.set(file.definition.id, { definition: file.definition, origin: file.path });
+    // A file that replaces a built-in keeps answering to its other ids unless it names its own.
+    const replaced = definitions.get(file.definition.id)?.definition;
+    const aliases = file.definition.aliases ?? replaced?.aliases;
+    definitions.set(file.definition.id, {
+      definition: aliases === undefined ? file.definition : { ...file.definition, aliases },
+      origin: file.path,
+    });
   }
   const out: Targets = {};
   for (const { definition, origin } of definitions.values()) {
     out[definition.id] = toTarget(definition, env, origin);
     for (const instance of instancesOf(definition, env, origin)) out[instance.name] = instance;
   }
+  for (const target of Object.values(out)) {
+    for (const [kind, reads] of Object.entries(target.reads) as [ArtifactKind, string[]][]) {
+      target.reads[kind] = canonicalIds(out, reads);
+    }
+  }
   return out;
+}
+
+/** The id an id or one of its aliases names, `<alias>:<profile>` included; any other as given. */
+export function canonicalId(targetTable: Targets, id: string): string {
+  if (Object.hasOwn(targetTable, id)) return id;
+  const at = id.indexOf(":");
+  const base = at === -1 ? id : id.slice(0, at);
+  const owner = Object.values(targetTable).find((target) => target.aliases.includes(base));
+  if (owner === undefined) return id;
+  return at === -1 ? owner.name : `${owner.name}${id.slice(at)}`;
+}
+
+/** Each as its canonical id, once, in the order given. */
+export function canonicalIds(targetTable: Targets, ids: readonly string[]): string[] {
+  return [...new Set(ids.map((id) => canonicalId(targetTable, id)))];
 }
 
 export function names(targetTable: Targets): string[] {

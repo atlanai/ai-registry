@@ -35,7 +35,7 @@ describe("a run that opened only some registries", () => {
       content: "sha256:f1",
       version: undefined,
       digest: "sha256:3",
-      links: [{ target: "claude", path: ".claude/skills/fmt", mode: "symlink" }],
+      links: [{ target: "claude-code", path: ".claude/skills/fmt", mode: "symlink" }],
     };
     return lock;
   }

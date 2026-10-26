@@ -20,10 +20,10 @@ describe("callingAgent", () => {
   });
 
   it("recognizes the signals the agents actually set", () => {
-    expect(callingAgent({ CLAUDECODE: "1" })).toBe("claude");
+    expect(callingAgent({ CLAUDECODE: "1" })).toBe("claude-code");
     expect(callingAgent({ CURSOR_AGENT: "1" })).toBe("cursor");
     expect(callingAgent({ CODEX_THREAD_ID: "abc" })).toBe("codex");
-    expect(callingAgent({ COPILOT_CLI: "1" })).toBe("copilot");
+    expect(callingAgent({ COPILOT_CLI: "1" })).toBe("github-copilot");
     expect(callingAgent({ REPL_ID: "abc" })).toBe("replit");
   });
 
@@ -37,7 +37,7 @@ describe("callingAgent", () => {
   });
 
   it.each([
-    ["gemini", "GEMINI_CLI"],
+    ["gemini-cli", "GEMINI_CLI"],
     ["opencode", "OPENCODE"],
   ])("takes %s's variable from its target definition alone", (agent, variable) => {
     expect(CALLER_SIGNALS).toContainEqual({ agent, env: [variable] });
@@ -67,7 +67,7 @@ describe("blocker", () => {
   it("refuses to prompt an agent that cannot answer", () => {
     expect(blocker({ ...human, env: { CLAUDECODE: "1" } })).toEqual({
       kind: "agent",
-      agent: "claude",
+      agent: "claude-code",
     });
   });
 

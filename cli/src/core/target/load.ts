@@ -147,13 +147,24 @@ function readOne(path: string, text: string): TargetFile | SkippedFile {
     $schema?: string;
     overrides?: boolean;
   };
-  const builtin = BUILTIN_TARGETS.some((each) => each.id === definition.id);
-  if (builtin && overrides !== true) {
-    problems.push(
-      `${quoted(definition.id)} is a built-in target; set "overrides": true to replace it.`,
-    );
-  }
+  problems.push(...builtinProblems(definition, overrides === true));
   return problems.length > 0 ? { path, problems } : { path, definition };
+}
+
+/** A built-in's id is yours only to replace it; its other ids are never yours. */
+function builtinProblems(definition: TargetDefinition, overrides: boolean): string[] {
+  const builtin = BUILTIN_TARGETS.find((each) => each.id === definition.id);
+  if (builtin !== undefined) {
+    return overrides
+      ? []
+      : [`${quoted(definition.id)} is a built-in target; set "overrides": true to replace it.`];
+  }
+  const named = BUILTIN_TARGETS.find((each) => each.aliases?.includes(definition.id));
+  return named === undefined
+    ? []
+    : [
+        `${quoted(definition.id)} is another name for the built-in target ${quoted(named.id)}; name the file ${named.id}.json and its id ${quoted(named.id)} to replace it.`,
+      ];
 }
 
 /** What only another definition shows: a read of a target that is not there, for one. */

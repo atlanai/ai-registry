@@ -11,7 +11,7 @@ export const codex = defineTarget({
     binary: ["codex"],
     caller: ["CODEX_SANDBOX", "CODEX_CI", "CODEX_THREAD_ID"],
   },
-  reads: { skill: ["agents"] },
+  reads: { skill: ["universal"] },
   kinds: {
     // Codex loads `plugin@marketplace` from its cache, only from the user
     // installation, and will not load a linked plugin directory.

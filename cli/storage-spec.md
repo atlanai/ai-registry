@@ -58,11 +58,11 @@ After `aireg add acme/engineering/hello-registry` in a project:
 .agents/skills/hello-registry -> ../../.registry/artifacts/acme/engineering/skills/hello-registry
 ```
 
-**`manifest.yml`** is what the scope asks for: the targets to install into, the registries it reads, and the artifacts it wants. aireg edits it on `registry add`, `add` and `remove`; after editing it by hand, `aireg install` makes the scope match. An unknown key is refused. Without `targets:`, aireg installs into Claude Code and Codex. `harnesses:`, the earlier name of `targets:` at either level, is still read, and the next command that edits the file renames it.
+**`manifest.yml`** is what the scope asks for: the targets to install into, the registries it reads, and the artifacts it wants. aireg edits it on `registry add`, `add` and `remove`; after editing it by hand, `aireg install` makes the scope match. An unknown key is refused. Without `targets:`, aireg installs into Claude Code and Codex. A target is named by its id, such as `claude-code`; an earlier id, such as `claude`, is read as an alias, and aireg writes the id. `harnesses:`, the earlier name of `targets:` at either level, is still read, and the next command that edits the file renames it.
 
 ```yaml
 targets:
-  - claude
+  - claude-code
   - codex
 registries:
   acme: github.com/acme/ai-registry
@@ -70,7 +70,7 @@ artifacts:
   - acme/engineering/skill/lint
   - ref: acme/engineering/skill/pr-review@1.2.0
     targets:
-      - claude
+      - claude-code
 ```
 
 **`manifest.lock.yml`** is what the scope resolved to. aireg writes it on every install and reads it back on the next one. It records each registry once, with the adapter that read it, a key for what was read and, for a git registry, the commit. Each artifact records its registry, version and the content digest that registry published, where the copy lives, a digest of that copy, and every link aireg made for it. A plugin fetched from a repository of its own also records that repository's commit as `revision`, and one that carries hooks, servers or executables records a digest of them as `carried`. Paths are relative to the project, or to your home folder for the user scope, and there are no timestamps, so two branches that add different artifacts merge without a conflict. A link, a blocked link or an origin names its target as `target`; aireg still reads `harness`, the field's earlier name, and writes `target` the next time it writes the lock.
@@ -97,7 +97,7 @@ artifacts:
     path: .registry/artifacts/acme/engineering/skills/pr-review
     digest: sha256:a321ddc8…
     links:
-      - target: claude
+      - target: claude-code
         path: .claude/skills/pr-review
         mode: symlink
 ```

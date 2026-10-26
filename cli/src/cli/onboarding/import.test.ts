@@ -20,7 +20,7 @@ const test = base.extend("project", async ({ home }) => {
 
 describe("applyImport", () => {
   test("waits for the scope's lease before writing the lock", async ({ project: base }) => {
-    const plan = await planImport(base, ["claude"], "project");
+    const plan = await planImport(base, ["claude-code"], "project");
     expect(plan.artifacts.map(({ name }) => name)).toEqual(["explain"]);
 
     const scope = roots("project", base);
@@ -50,7 +50,7 @@ describe("applyImport", () => {
       join(base, ".claude", "skills", "zz-late", "SKILL.md"),
       "---\nname: zz-late\n---\nlocal\n",
     );
-    const plan = await planImport(base, ["claude"], "project");
+    const plan = await planImport(base, ["claude-code"], "project");
     expect(plan.artifacts.map(({ name }) => name)).toEqual(["explain", "zz-late"]);
     // A link that appears after the plan was checked, as only a race makes one.
     await writeFile(join(base, "..", "outside.txt"), "CANARY");
@@ -72,7 +72,7 @@ describe("planImport", () => {
     await writeFile(outside, "CANARY");
     await symlink(outside, join(base, ".claude", "skills", "explain", "notes.md"));
 
-    await expect(planImport(base, ["claude"], "project")).rejects.toThrow(
+    await expect(planImport(base, ["claude-code"], "project")).rejects.toThrow(
       "Did not import .claude/skills/explain/notes.md: it is a symlink; an artifact holds regular files only.",
     );
     await expect(lstat(join(base, ".registry", "artifacts"))).rejects.toThrow();

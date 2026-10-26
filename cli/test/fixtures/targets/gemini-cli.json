@@ -1,5 +1,6 @@
 {
-  "id": "gemini",
+  "id": "gemini-cli",
+  "aliases": ["gemini"],
   "displayName": "Gemini CLI",
   "overrides": true,
   "roots": {
@@ -7,7 +8,7 @@
     "user": { "default": "~/.gemini", "env": "GEMINI_CLI_HOME", "within": ".gemini" }
   },
   "detect": { "env": ["GEMINI_CLI_HOME"], "binary": ["gemini"] },
-  "reads": { "skill": ["gemini", "agents"] },
+  "reads": { "skill": ["gemini-cli", "universal"] },
   "kinds": {
     "plugin": { "shape": "contents" },
     "skill": {

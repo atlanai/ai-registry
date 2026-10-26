@@ -117,7 +117,7 @@ describe("what an artifact depends on", () => {
     expect(removed.code).toBe(0);
     expect(removed.stderr).toContain("Kept pr-review: reviewer needs it.");
     expect(removed.stderr).toMatch(
-      /Moved your folder \.claude\/skills\/pr-review to \.registry\/backups\/\d{8}T\d{6}Z\/claude\/skills\/pr-review\./,
+      /Moved your folder \.claude\/skills\/pr-review to \.registry\/backups\/\d{8}T\d{6}Z\/claude-code\/skills\/pr-review\./,
     );
     expect(removed.stdout).not.toContain("Updated");
     expect((await lock())["pr-review"]?.needed_by).toEqual(["reviewer"]);

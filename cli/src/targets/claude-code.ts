@@ -1,7 +1,8 @@
 import { defineTarget } from "#core/target/contract.ts";
 
-export const claude = defineTarget({
-  id: "claude",
+export const claudeCode = defineTarget({
+  id: "claude-code",
+  aliases: ["claude"],
   displayName: "Claude Code",
   default: true,
   importable: true,

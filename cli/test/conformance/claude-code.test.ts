@@ -1,7 +1,7 @@
 import { conformance } from "#test/conformance/kit.ts";
 
 conformance({
-  id: "claude",
+  id: "claude-code",
   env: (home) => ({ CLAUDE_CONFIG_DIR: `${home}/.claude` }),
   probes: [
     { scope: "user", argv: ["claude", "plugin", "list", "--json"], expect: [/"kit@skills-dir"/] },

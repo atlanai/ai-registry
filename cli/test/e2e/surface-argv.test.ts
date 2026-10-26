@@ -40,7 +40,7 @@ describe("the command line", () => {
     ]);
     for (const [at, argv] of taken.entries()) {
       expect(ran[at]?.code, argv.join(" ")).toBe(0);
-      expect(ran[at]?.stdout, argv.join(" ")).toContain("claude");
+      expect(ran[at]?.stdout, argv.join(" ")).toContain("claude-code");
     }
     for (const [at, [argv, refusal]] of refused.entries()) {
       expect(refusals[at]?.code, argv.join(" ")).toBe(2);
@@ -87,7 +87,7 @@ describe("the command line", () => {
   test("refuses an option the command or action does not take", async ({ aireg }) => {
     const unknown = [
       ["list", "--frozen"],
-      ["doctor", "--for", "claude"],
+      ["doctor", "--for", "claude-code"],
       ["logs", "--dry-run"],
       ["daemon", "status", "--frozen"],
     ];

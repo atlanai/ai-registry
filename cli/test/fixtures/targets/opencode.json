@@ -7,7 +7,7 @@
     "user": { "default": "~/.config/opencode", "env": "XDG_CONFIG_HOME", "within": "opencode" }
   },
   "detect": { "env": ["OPENCODE_CONFIG_DIR"], "binary": ["opencode"] },
-  "reads": { "skill": ["agents", "opencode", "claude"] },
+  "reads": { "skill": ["universal", "opencode", "claude-code"] },
   "kinds": {
     "plugin": { "shape": "contents" },
     "skill": {

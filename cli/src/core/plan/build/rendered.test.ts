@@ -15,7 +15,7 @@ describe("an agent for a target that reads its own format", () => {
       emptyLock(),
       wrapping(acquired([REVIEWER], "c1", new Map([["agents/reviewer.md", "sha256:a1"]]))),
       { artifacts: {} },
-      { ...PLAN_OPTIONS, roots: roots("user", "/work"), targets: ["claude", "codex"] },
+      { ...PLAN_OPTIONS, roots: roots("user", "/work"), targets: ["claude-code", "codex"] },
     );
     const codex = plan.actions.flatMap((action) =>
       action.kind === "link" && action.target === "codex" ? [relative("/work", action.to)] : [],
@@ -28,8 +28,8 @@ describe("an agent for a target that reads its own format", () => {
 describe("a target that places a kind as a folder of its own", () => {
   it("writes an agent into its own folder, never through the plugin its namespace becomes", () => {
     const targetTable = resolveTargets();
-    const claude = targetTable.claude as Target;
-    targetTable.claude = {
+    const claude = targetTable["claude-code"] as Target;
+    targetTable["claude-code"] = {
       ...claude,
       kinds: {
         ...claude.kinds,
@@ -41,7 +41,7 @@ describe("a target that places a kind as a folder of its own", () => {
       emptyLock(),
       wrapping(acquired([REVIEWER], "c1", new Map([["agents/reviewer.md", "sha256:a1"]]))),
       { artifacts: {} },
-      { ...PLAN_OPTIONS, targetTable, roots: roots("user", "/work"), targets: ["claude"] },
+      { ...PLAN_OPTIONS, targetTable, roots: roots("user", "/work"), targets: ["claude-code"] },
     );
     const links = plan.actions.filter((action) => action.kind === "link");
     expect(links).toHaveLength(1);
@@ -51,9 +51,9 @@ describe("a target that places a kind as a folder of its own", () => {
 
   it("copies a plugin folder for a target that will not load a linked one", () => {
     const targetTable = resolveTargets();
-    const claude = targetTable.claude as Target;
+    const claude = targetTable["claude-code"] as Target;
     const plugin = claude.kinds.plugin as Extract<KindMapping, { shape: "directory" }>;
-    targetTable.claude = {
+    targetTable["claude-code"] = {
       ...claude,
       kinds: { ...claude.kinds, plugin: { ...plugin, place: "copy" } },
     };
@@ -62,7 +62,7 @@ describe("a target that places a kind as a folder of its own", () => {
       emptyLock(),
       wrapping(acquired([REVIEWER], "c1", new Map([["agents/reviewer.md", "sha256:a1"]]))),
       { artifacts: {} },
-      { ...PLAN_OPTIONS, targetTable, roots: roots("user", "/work"), targets: ["claude"] },
+      { ...PLAN_OPTIONS, targetTable, roots: roots("user", "/work"), targets: ["claude-code"] },
     );
     expect(plan.actions.find((action) => action.kind === "link")).toMatchObject({
       plugin: true,

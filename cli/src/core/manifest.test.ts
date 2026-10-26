@@ -464,7 +464,7 @@ describe("writeManifest", () => {
     "",
     "# AI coding tools to install into.",
     "targets:",
-    "  - claude # we only use claude",
+    "  - claude-code # we only use claude",
     "",
     "# Each registry is one source.",
     "registries: {}",
@@ -498,14 +498,14 @@ describe("writeManifest", () => {
     expect(await readManifest(path)).toEqual(removed);
   });
 
-  test("rewrites `harnesses:` as `targets:`, keeping its comment", async () => {
+  test("rewrites `harnesses:` as `targets:` and each alias as its id, keeping the comment", async () => {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, "# Tools to install into.\nharnesses:\n  - claude\nregistries: {}\n");
     const manifest = await readManifest(path);
     manifest.registries.acme = { location: "../acme", adapter: undefined, config: {} };
     await writeManifest(project, manifest);
     expect(await readFile(path, "utf8")).toBe(
-      "# Tools to install into.\ntargets:\n  - claude\nregistries:\n  acme: ../acme\nartifacts: []\n",
+      "# Tools to install into.\ntargets:\n  - claude-code\nregistries:\n  acme: ../acme\nartifacts: []\n",
     );
   });
 
@@ -573,14 +573,14 @@ describe("writeManifest", () => {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(
       path,
-      "targets: [claude, codex]\nregistries:\n  kit: acme/kit\nartifacts:\n  - kit/skill/lint@1.0.0 # held back\n",
+      "targets: [claude-code, codex]\nregistries:\n  kit: acme/kit\nartifacts:\n  - kit/skill/lint@1.0.0 # held back\n",
     );
     const manifest = await readManifest(path);
     manifest.artifacts = [parseRef("kit/skill/lint@1.1.0")];
     await writeManifest(project, manifest);
 
     expect(await readFile(path, "utf8")).toBe(
-      "targets: [claude, codex]\nregistries:\n  kit: acme/kit\nartifacts:\n  - kit/skill/lint@1.1.0 # held back\n",
+      "targets: [claude-code, codex]\nregistries:\n  kit: acme/kit\nartifacts:\n  - kit/skill/lint@1.1.0 # held back\n",
     );
   });
 

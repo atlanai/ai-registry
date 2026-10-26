@@ -17,7 +17,7 @@ const test = base
       .skill("misc/tools@1.0.0")
       .write();
     return projectTemplate(join(fileTmp, "declared"), [
-      ["init", "--for", "claude"],
+      ["init", "--for", "claude-code"],
       ["registry", "add", market, "--as", "acme"],
     ]);
   })

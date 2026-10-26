@@ -15,7 +15,12 @@ import { emptyManifest, formatManifest, readManifest } from "#core/manifest.ts";
 import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { roots as makeRoots, userScopeDir } from "#core/store/paths.ts";
-import { IMPORTABLE_TARGETS, placementFor, resolveTargets } from "#core/target/index.ts";
+import {
+  canonicalIds,
+  IMPORTABLE_TARGETS,
+  placementFor,
+  resolveTargets,
+} from "#core/target/index.ts";
 import { table } from "#core/term/table.ts";
 import { selectTargets } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
@@ -70,7 +75,8 @@ function publishTarget(value: string | undefined): string | undefined {
 
 function requestedImports(value: string | undefined): string[] {
   if (value === undefined) return [];
-  const requested = value === "all" ? [...IMPORTABLE_TARGETS] : value.split(",");
+  const requested =
+    value === "all" ? [...IMPORTABLE_TARGETS] : canonicalIds(resolveTargets(), value.split(","));
   const allowed = new Set<string>(IMPORTABLE_TARGETS);
   if (requested.length === 0 || requested.some((name) => !allowed.has(name))) {
     throw new AiregError(`Unknown --import value ${quoted(value)}.`, {

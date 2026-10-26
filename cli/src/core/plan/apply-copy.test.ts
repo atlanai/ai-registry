@@ -27,7 +27,7 @@ describe("a plugin placed as a copy", () => {
     const link: Action = {
       kind: "link",
       name: "kit/ship",
-      target: "claude",
+      target: "claude-code",
       from: projection,
       to,
       copy: true,

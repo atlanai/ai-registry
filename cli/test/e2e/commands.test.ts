@@ -56,10 +56,10 @@ describe("a first-run mistake", () => {
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('No target named "myagent".');
     expect(refused.stderr).toContain(
-      "Use agents, claude, codex, copilot, cursor, gemini or opencode",
+      "Use claude-code, codex, cursor, gemini-cli, github-copilot, opencode or universal",
     );
 
-    await manifest("claude");
+    await manifest("claude-code");
     const installed = await aireg(["install"]);
     expect(installed.code, installed.stderr).toBe(0);
     expect(projected(project, "lint").startsWith(join(project, ".claude"))).toBe(true);

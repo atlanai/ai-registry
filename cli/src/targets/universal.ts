@@ -2,8 +2,9 @@ import { defineTarget } from "#core/target/contract.ts";
 
 // A folder several tools read rather than a tool: project `.agents` pairs with
 // `~/.agents`, where most tools read skills from.
-export const agents = defineTarget({
-  id: "agents",
+export const universal = defineTarget({
+  id: "universal",
+  aliases: ["agents"],
   displayName: "Shared .agents folder",
   importable: true,
   kind: "shared",

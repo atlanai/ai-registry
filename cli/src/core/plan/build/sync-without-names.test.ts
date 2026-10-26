@@ -20,7 +20,7 @@ describe("a sync that reads one registry and names none", () => {
   // The daemon's path: it reads the job's registry and passes no `opened`.
   const USER = roots("user", "/work");
   const home = homedir();
-  const options: BuildOptions = { ...PLAN_OPTIONS, roots: USER, targets: ["claude"] };
+  const options: BuildOptions = { ...PLAN_OPTIONS, roots: USER, targets: ["claude-code"] };
   const claudeSkills = (name: string) => join(home, ".claude", "skills", name);
   function engineeringSource(alias: string, skill: string): Acquired {
     const [base] = wrapping(
@@ -50,7 +50,7 @@ describe("a sync that reads one registry and names none", () => {
       content: "sha256:t1",
       version: undefined,
       digest: "sha256:3",
-      links: [{ target: "claude", path: ".claude/skills/engineering", mode: "symlink" }],
+      links: [{ target: "claude-code", path: ".claude/skills/engineering", mode: "symlink" }],
     };
     return lock;
   }
@@ -74,7 +74,7 @@ describe("a sync that reads one registry and names none", () => {
       { artifacts: {} },
       options,
     );
-    expect(linksTo(plan.actions, "claude")).toEqual([claudeSkills("kit-engineering")]);
+    expect(linksTo(plan.actions, "claude-code")).toEqual([claudeSkills("kit-engineering")]);
     expect(unlinks(plan)).not.toContain(claudeSkills("engineering"));
   });
 
@@ -83,7 +83,7 @@ describe("a sync that reads one registry and names none", () => {
     const fmt = lock.artifacts.fmt as LockArtifact;
     lock.artifacts.fmt = {
       ...fmt,
-      origin: { target: "claude", path: ".claude/skills", step: "" },
+      origin: { target: "claude-code", path: ".claude/skills", step: "" },
     };
     const plan = build(
       declaringFar(["kit"]),
@@ -92,7 +92,7 @@ describe("a sync that reads one registry and names none", () => {
       { artifacts: {} },
       options,
     );
-    expect(linksTo(plan.actions, "claude")).toEqual([claudeSkills("kit-engineering")]);
+    expect(linksTo(plan.actions, "claude-code")).toEqual([claudeSkills("kit-engineering")]);
   });
 
   it("ignores the rows of a registry no longer declared", () => {
@@ -103,7 +103,7 @@ describe("a sync that reads one registry and names none", () => {
       { artifacts: {} },
       options,
     );
-    expect(linksTo(plan.actions, "claude")).toEqual([claudeSkills("engineering")]);
+    expect(linksTo(plan.actions, "claude-code")).toEqual([claudeSkills("engineering")]);
   });
 
   it("still removes what a run naming that registry dropped, though it read nothing", () => {

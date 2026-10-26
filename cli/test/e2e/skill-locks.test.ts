@@ -45,7 +45,7 @@ async function lockFile(dir: string, repo: string): Promise<string> {
 }
 
 const init = async (aireg: Aireg) =>
-  expect((await aireg(["init", "--for", "claude,agents"])).code).toBe(0);
+  expect((await aireg(["init", "--for", "claude-code,universal"])).code).toBe(0);
 
 describe("aireg add --from a skills lock file", () => {
   test("takes over a copy that matches, leaves an edited one, and reports what it cannot read", async ({

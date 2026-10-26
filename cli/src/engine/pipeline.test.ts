@@ -34,7 +34,7 @@ vi.mock("#core/plan/apply.ts", async (importOriginal) => ({
 
 const COMMON: CommonOptions = {
   scope: "project",
-  targets: ["claude"],
+  targets: ["claude-code"],
   select: undefined,
   yes: true,
   all: false,

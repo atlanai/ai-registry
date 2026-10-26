@@ -366,7 +366,7 @@ describe("sequential prompts", () => {
 
 describe("multiselect focus hint", () => {
   const tools: Choice<string>[] = [
-    { value: "claude", label: "Claude Code" },
+    { value: "claude-code", label: "Claude Code" },
     { value: "codex", label: "Codex" },
   ];
   const focusHint = (value: string, picked: ReadonlySet<string>) =>

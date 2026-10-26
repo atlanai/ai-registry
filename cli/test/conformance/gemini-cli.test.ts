@@ -3,7 +3,7 @@ import { conformance } from "#test/conformance/kit.ts";
 // Gemini CLI lists agents only in a signed-in session, but `skills list` loads them
 // and prints each one its strict loader refuses.
 conformance({
-  id: "gemini",
+  id: "gemini-cli",
   env: (home) => ({ GEMINI_CLI_HOME: home }),
   probes: [
     {

@@ -18,7 +18,7 @@ test("reads its own lock back when the user scope and a target home are outside 
   const at = { cwd: tmp, env };
   const skill = join(claude, "skills", "lint", "SKILL.md");
 
-  const added = await aireg(["add", "-g", market, "--all", "--yes", "--for", "claude"], at);
+  const added = await aireg(["add", "-g", market, "--all", "--yes", "--for", "claude-code"], at);
   expect(added.code, added.stderr).toBe(0);
   expect(existsSync(skill), `${added.stdout}\n${tree(claude)}`).toBe(true);
 

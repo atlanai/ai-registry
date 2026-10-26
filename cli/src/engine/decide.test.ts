@@ -108,7 +108,7 @@ describe("a folder of yours with a registry name", () => {
     name: "hello",
     kind: "skill",
     from: "/home/.claude/skills/hello",
-    target: "claude",
+    target: "claude-code",
     suggestedPath: "skills/hello",
     description: undefined,
     elsewhere: [],

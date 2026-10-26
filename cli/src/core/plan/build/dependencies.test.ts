@@ -28,7 +28,7 @@ describe("dependencies", () => {
       version: "1.0.0",
     });
     const wanted = kitManifest([]);
-    wanted.artifacts = [{ ...parseRef("kit/eng/agent/reviewer"), targets: ["claude"] }];
+    wanted.artifacts = [{ ...parseRef("kit/eng/agent/reviewer"), targets: ["claude-code"] }];
 
     const plan = build(
       wanted,
@@ -37,13 +37,13 @@ describe("dependencies", () => {
       { artifacts: {} },
       {
         ...PLAN_OPTIONS,
-        targets: ["claude", "codex"],
+        targets: ["claude-code", "codex"],
       },
     );
     const into = plan.actions.flatMap((action) =>
       action.kind === "link" && action.name === "lint" ? [action.target] : [],
     );
-    expect(into).toEqual(["claude"]);
+    expect(into).toEqual(["claude-code"]);
     expect(plan.neededBy).toEqual({ lint: ["reviewer"] });
   });
 });

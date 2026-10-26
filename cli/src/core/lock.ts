@@ -8,6 +8,7 @@ import { writeAtomic } from "#core/fs/atomic.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import type { Roots, Scope } from "#core/store/paths.ts";
+import { canonicalId, resolveTargets } from "#core/target/index.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import { dict, isRecord, textMapOf, textOf, withoutUndefined } from "./fields.ts";
 import { parseYaml } from "./yaml.ts";
@@ -420,5 +421,20 @@ export async function readLock(roots: Pick<Roots, "scope" | "lock">): Promise<Lo
       "Check that it is a file you can read.",
     );
   }
-  return parseLock(text, path, roots.scope);
+  return canonicalTargets(parseLock(text, path, roots.scope));
+}
+
+/** Each target by its canonical id, so a lock an earlier aireg wrote reads as this one writes it. */
+function canonicalTargets(lock: Lock): Lock {
+  const table = resolveTargets();
+  for (const row of Object.values(lock.artifacts)) {
+    for (const item of [
+      ...row.links,
+      ...(row.blocked ?? []),
+      ...(row.origin ? [row.origin] : []),
+    ]) {
+      item.target = canonicalId(table, item.target);
+    }
+  }
+  return lock;
 }

@@ -1,10 +1,18 @@
-import { agents } from "./agents.ts";
-import { claude } from "./claude.ts";
+import { claudeCode } from "./claude-code.ts";
 import { codex } from "./codex.ts";
-import { copilot } from "./copilot.ts";
 import { cursor } from "./cursor.ts";
-import { gemini } from "./gemini.ts";
+import { geminiCli } from "./gemini-cli.ts";
+import { githubCopilot } from "./github-copilot.ts";
 import { opencode } from "./opencode.ts";
+import { universal } from "./universal.ts";
 
 /** Every target aireg installs into; the order is the order defaults are listed in. */
-export const BUILTIN_TARGETS = [claude, codex, cursor, copilot, gemini, opencode, agents] as const;
+export const BUILTIN_TARGETS = [
+  claudeCode,
+  codex,
+  cursor,
+  githubCopilot,
+  geminiCli,
+  opencode,
+  universal,
+] as const;

@@ -179,6 +179,8 @@ interface Trust {
 /** One target aireg installs into, as its module under `src/targets` defines it. */
 export interface TargetDefinition {
   id: string;
+  /** Other ids it answers to wherever an id is read, such as an earlier one; output names `id`. */
+  aliases?: string[] | undefined;
   displayName: string;
   /** `coding` when absent. A `shared` folder is never detected and never a default. */
   kind?: TargetKind | undefined;
@@ -224,6 +226,7 @@ interface Signals {
 /** A definition with its user root expanded and every default filled in. Data only. */
 export interface Target {
   name: string;
+  aliases: string[];
   displayName: string;
   projectRoot: string;
   userRoot: string;

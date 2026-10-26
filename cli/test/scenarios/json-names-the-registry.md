@@ -28,8 +28,8 @@ $ aireg list --json
         "ref": "1.0.0",
         "pinned": false,
         "targets": [
-          "agents",
-          "claude"
+          "claude-code",
+          "universal"
         ]
       },
       {
@@ -41,8 +41,8 @@ $ aireg list --json
         "ref": "1.0.0",
         "pinned": false,
         "targets": [
-          "agents",
-          "claude"
+          "claude-code",
+          "universal"
         ]
       }
     ]

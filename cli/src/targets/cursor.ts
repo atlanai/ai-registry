@@ -6,7 +6,10 @@ export const cursor = defineTarget({
   roots: { project: ".cursor", user: { default: "~/.cursor" } },
   // `agent`, the CLI's primary name, is too common a name to mean Cursor on its own.
   detect: { binary: ["cursor", "cursor-agent"], caller: ["CURSOR_AGENT"] },
-  reads: { skill: ["agents", "cursor", "claude", "codex"], agent: ["cursor", "claude"] },
+  reads: {
+    skill: ["universal", "cursor", "claude-code", "codex"],
+    agent: ["cursor", "claude-code"],
+  },
   kinds: {
     // It loads a local plugin only as real files, never through a link.
     plugin: {

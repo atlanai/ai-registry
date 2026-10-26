@@ -15,7 +15,7 @@ describe("wrappedInLock", () => {
       registry: "kit",
       kind: "skill",
       namespace: "engineering",
-      links: [{ target: "claude", path: relative(user.base, path), mode: "symlink" }],
+      links: [{ target: "claude-code", path: relative(user.base, path), mode: "symlink" }],
     } as unknown as LockArtifact,
   ];
 

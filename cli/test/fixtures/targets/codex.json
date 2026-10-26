@@ -18,7 +18,7 @@
   },
   "reads": {
     "skill": [
-      "agents"
+      "universal"
     ]
   },
   "kinds": {

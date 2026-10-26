@@ -8,7 +8,7 @@ export const opencode = defineTarget({
     user: { default: "~/.config/opencode", env: "XDG_CONFIG_HOME", within: "opencode" },
   },
   detect: { env: ["OPENCODE_CONFIG_DIR"], binary: ["opencode"], caller: ["OPENCODE"] },
-  reads: { skill: ["agents", "opencode", "claude"] },
+  reads: { skill: ["universal", "opencode", "claude-code"] },
   kinds: {
     // Its plugins are code it runs, which a registry's plugin never is.
     plugin: { shape: "contents" },

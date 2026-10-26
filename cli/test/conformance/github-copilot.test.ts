@@ -1,7 +1,7 @@
 import { conformance } from "#test/conformance/kit.ts";
 
 conformance({
-  id: "copilot",
+  id: "github-copilot",
   // Without COPILOT_AUTO_UPDATE the target may fetch a newer version and run that instead.
   env: (home) => ({ COPILOT_HOME: `${home}/.copilot`, COPILOT_AUTO_UPDATE: "false" }),
   probes: [

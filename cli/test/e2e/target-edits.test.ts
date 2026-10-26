@@ -34,7 +34,7 @@ describe("a copy the target owns", () => {
   beforeAll(async () => {
     await mkdir(copied(), { recursive: true });
     await git.init(copied());
-    expect((await run(["init", "-y", "--for", "claude"])).code).toBe(0);
+    expect((await run(["init", "-y", "--for", "claude-code"])).code).toBe(0);
     expect((await run(["registry", "add", market, "--as", "acme"])).code).toBe(0);
     const added = await run(["add", "acme/platform/skill/lint@1.0.0", "--copy", "-y"]);
     expect(added.code, added.stderr).toBe(0);
@@ -72,7 +72,7 @@ describe("a folder of yours where a link would go", () => {
     await mkdir(join(blocked(), ".claude", "skills", "lint"), { recursive: true });
     await writeFile(join(blocked(), ".claude", "skills", "lint", "SKILL.md"), "mine\n");
     await git.init(blocked());
-    expect((await run(["init", "-y", "--for", "claude"])).code).toBe(0);
+    expect((await run(["init", "-y", "--for", "claude-code"])).code).toBe(0);
     expect((await run(["registry", "add", market, "--as", "acme"])).code).toBe(0);
   });
 
@@ -100,7 +100,7 @@ describe("a folder of yours where a link would go", () => {
     expect(seen.stdout).toMatch(/missing +something of yours is at \.claude\/skills\/lint/);
     const json = JSON.parse((await run(["status", "--json"])).stdout);
     expect(json.data.artifacts[0].detail).toBe(
-      "claude: something of yours is at .claude/skills/lint",
+      "claude-code: something of yours is at .claude/skills/lint",
     );
     expect(await readFile(join(blocked(), ".claude", "skills", "lint", "SKILL.md"), "utf8")).toBe(
       "mine\n",

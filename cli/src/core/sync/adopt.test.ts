@@ -43,7 +43,7 @@ describe("registryPath", () => {
 describe("candidates", () => {
   test("finds an artifact written into a target directory", async () => {
     await write(join(root, ".claude", "skills", "mine", "SKILL.md"), skill("mine"));
-    const found = await candidates(roots, targetTable, ["claude"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code"], emptyLock());
     expect(found.local.map((item) => item.name)).toEqual(["mine"]);
     expect(found.local[0]?.kind).toBe("skill");
     expect(found.local[0]?.suggestedPath).toBe("skills/mine");
@@ -58,7 +58,7 @@ describe("candidates", () => {
       skill("theirs"),
     );
     await mkdir(join(root, ".claude", "skills", "empty"), { recursive: true });
-    const found = await candidates(roots, targetTable, ["claude"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code"], emptyLock());
     expect(found.local.map((item) => item.name)).toEqual(["mine"]);
   });
 
@@ -71,7 +71,7 @@ describe("candidates", () => {
 
   test("reads its name from front matter, not from the directory", async () => {
     await write(join(root, ".claude", "skills", "dir-name", "SKILL.md"), skill("real-name"));
-    const found = await candidates(roots, targetTable, ["claude"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code"], emptyLock());
     expect(found.local.map((item) => item.name)).toEqual(["real-name"]);
   });
 
@@ -82,7 +82,7 @@ describe("candidates", () => {
     await write(join(staged, "SKILL.md"), skill("installed"));
     await mkdir(join(root, ".claude", "skills"), { recursive: true });
     await symlink(staged, join(root, ".claude", "skills", "installed"));
-    const found = await candidates(roots, targetTable, ["claude"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code"], emptyLock());
     expect(found.local).toEqual([]);
   });
 
@@ -94,7 +94,7 @@ describe("candidates", () => {
       join(staged, "SKILL.md"),
       join(root, ".claude", "skills", "projected", "SKILL.md"),
     );
-    const found = await candidates(roots, targetTable, ["claude"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code"], emptyLock());
     expect(found.local).toEqual([]);
   });
 
@@ -104,7 +104,7 @@ describe("candidates", () => {
     await write(join(elsewhere, "SKILL.md"), skill("mine"));
     await mkdir(join(root, ".claude", "skills"), { recursive: true });
     await symlink(elsewhere, join(root, ".claude", "skills", "mine"));
-    const found = await candidates(roots, targetTable, ["claude"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code"], emptyLock());
     expect(found.local).toEqual([]);
   });
 
@@ -123,9 +123,9 @@ describe("candidates", () => {
       content: "",
       version: undefined,
       digest: "",
-      links: [{ target: "claude", path: ".claude/skills/claimed", mode: "symlink" }],
+      links: [{ target: "claude-code", path: ".claude/skills/claimed", mode: "symlink" }],
     };
-    const found = await candidates(roots, targetTable, ["claude"], lock);
+    const found = await candidates(roots, targetTable, ["claude-code"], lock);
     expect(found.local).toEqual([]);
   });
 
@@ -136,7 +136,7 @@ describe("candidates", () => {
     const found = await candidates(
       roots,
       targetTable,
-      ["claude"],
+      ["claude-code"],
       emptyLock(),
       new Set(["skill:lint"]),
     );
@@ -146,7 +146,7 @@ describe("candidates", () => {
 
   test("finds a file-shaped kind too, and its own extension", async () => {
     await write(join(root, ".claude", "agents", "hotfix.md"), "---\ndescription: h\n---\nx\n");
-    const found = await candidates(roots, targetTable, ["claude"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code"], emptyLock());
     expect(found.local.map((item) => [item.name, item.kind, item.suggestedPath])).toEqual([
       ["hotfix", "agent", "agents/hotfix.md"],
     ]);
@@ -162,7 +162,7 @@ describe("candidates", () => {
   test("reports one artifact once, however many targets hold it, and where else it sits", async () => {
     await write(join(root, ".claude", "skills", "dup", "SKILL.md"), skill("dup"));
     await write(join(root, ".cursor", "skills", "dup", "SKILL.md"), skill("dup"));
-    const found = await candidates(roots, targetTable, ["claude", "cursor"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code", "cursor"], emptyLock());
     expect(found.local.map((item) => item.name)).toEqual(["dup"]);
     expect(found.local[0]?.elsewhere).toEqual([
       { from: join(root, ".cursor", "skills", "dup"), target: "cursor" },
@@ -170,7 +170,7 @@ describe("candidates", () => {
   });
 
   test("is empty when no target directory exists", async () => {
-    const found = await candidates(roots, targetTable, ["claude"], emptyLock());
+    const found = await candidates(roots, targetTable, ["claude-code"], emptyLock());
     expect(found).toEqual({ local: [], undeclared: [] });
   });
 });
@@ -184,7 +184,7 @@ describe("candidates, for a report", () => {
     await write(join(elsewhere, "SKILL.md"), skill("mine"));
     await mkdir(join(root, ".claude", "skills"), { recursive: true });
     await symlink(elsewhere, join(root, ".claude", "skills", "mine"));
-    const found = await report(["claude"]);
+    const found = await report(["claude-code"]);
     expect(found.local.map((item) => [item.name, item.from])).toEqual([
       ["mine", join(root, ".claude", "skills", "mine")],
     ]);
@@ -197,10 +197,10 @@ describe("candidates, for a report", () => {
       await mkdir(join(root, target, "skills"), { recursive: true });
       await symlink(shared, join(root, target, "skills", "shared"));
     }
-    const found = await report(["agents", "claude", "cursor"]);
+    const found = await report(["universal", "claude-code", "cursor"]);
     expect(found.local.map((item) => item.name)).toEqual(["shared"]);
-    expect(found.local[0]?.target).toBe("agents");
-    expect(found.local[0]?.elsewhere.map((item) => item.target)).toEqual(["claude", "cursor"]);
+    expect(found.local[0]?.target).toBe("universal");
+    expect(found.local[0]?.elsewhere.map((item) => item.target)).toEqual(["claude-code", "cursor"]);
   });
 
   test("still ignores a link into the staged tree, and one whose target is gone", async () => {
@@ -209,7 +209,7 @@ describe("candidates, for a report", () => {
     await mkdir(join(root, ".claude", "skills"), { recursive: true });
     await symlink(staged, join(root, ".claude", "skills", "installed"));
     await symlink(join(root, "gone"), join(root, ".claude", "skills", "gone"));
-    const found = await report(["claude"]);
+    const found = await report(["claude-code"]);
     expect(found.local).toEqual([]);
   });
 
@@ -219,9 +219,9 @@ describe("candidates, for a report", () => {
       'name = "critic"\ndescription = "Reviews code."\ndeveloper_instructions = "Be critical."\n',
     );
     await write(join(root, ".claude", "agents", "critic.md"), skill("critic"));
-    const found = await report(["claude", "codex"]);
+    const found = await report(["claude-code", "codex"]);
     expect(found.local.map((item) => [item.kind, item.name, item.target])).toEqual([
-      ["agent", "critic", "claude"],
+      ["agent", "critic", "claude-code"],
     ]);
     expect(found.local[0]?.elsewhere).toEqual([
       { from: join(root, ".codex", "agents", "file-name.toml"), target: "codex" },
@@ -257,11 +257,11 @@ describe("danglingLinks", () => {
       join(root, ".claude", "agents", "live.md"),
       join(root, ".claude", "agents", "ok.md"),
     );
-    expect(await danglingLinks(roots, targetTable, ["claude"], emptyLock())).toEqual([
+    expect(await danglingLinks(roots, targetTable, ["claude-code"], emptyLock())).toEqual([
       {
         path: join(root, ".claude", "agents", "gone.md"),
         linksTo: join(root, "nowhere.md"),
-        target: "claude",
+        target: "claude-code",
       },
     ]);
   });
@@ -282,9 +282,9 @@ describe("danglingLinks", () => {
       content: "",
       version: undefined,
       digest: "",
-      links: [{ target: "claude", path: ".claude/skills/lint", mode: "symlink" }],
+      links: [{ target: "claude-code", path: ".claude/skills/lint", mode: "symlink" }],
     };
-    expect(await danglingLinks(roots, targetTable, ["claude"], lock)).toEqual([]);
+    expect(await danglingLinks(roots, targetTable, ["claude-code"], lock)).toEqual([]);
   });
 
   test("knows a link aireg made when the project is reached through a link", async () => {
@@ -307,15 +307,15 @@ describe("danglingLinks", () => {
       content: "",
       version: undefined,
       digest: "",
-      links: [{ target: "claude", path: ".claude/skills/lint", mode: "symlink" }],
+      links: [{ target: "claude-code", path: ".claude/skills/lint", mode: "symlink" }],
     };
-    expect(await danglingLinks(through, targetTable, ["claude"], lock)).toEqual([]);
+    expect(await danglingLinks(through, targetTable, ["claude-code"], lock)).toEqual([]);
   });
 
   test("leaves a link into the store that the lock no longer names", async () => {
     await mkdir(join(root, ".claude", "skills"), { recursive: true });
     await mkdir(roots.artifacts, { recursive: true });
     await symlink(join(roots.artifacts, "gone"), join(root, ".claude", "skills", "stale"));
-    expect(await danglingLinks(roots, targetTable, ["claude"], emptyLock())).toEqual([]);
+    expect(await danglingLinks(roots, targetTable, ["claude-code"], emptyLock())).toEqual([]);
   });
 });

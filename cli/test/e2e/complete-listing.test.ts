@@ -69,7 +69,7 @@ describe("an artifact deleted from a registry installed whole", () => {
     project,
     deleted,
   }) => {
-    expect((await aireg(["init", "-y", "--for", "claude"])).code).toBe(0);
+    expect((await aireg(["init", "-y", "--for", "claude-code"])).code).toBe(0);
     const added = await aireg(["add", "https://drops.example", "--adapter", "drops", "-y"]);
     expect(added.code, added.stderr).toBe(0);
     const fmt = join(project, ".claude", "skills", "fmt", "SKILL.md");
@@ -86,7 +86,7 @@ describe("an artifact deleted from a registry installed whole", () => {
   });
 
   test("is kept as a conflict when edited here", async ({ aireg, project, deleted }) => {
-    expect((await aireg(["init", "-y", "--for", "claude"])).code).toBe(0);
+    expect((await aireg(["init", "-y", "--for", "claude-code"])).code).toBe(0);
     expect((await aireg(["add", "https://drops.example", "--adapter", "drops", "-y"])).code).toBe(
       0,
     );
@@ -108,7 +108,7 @@ describe("an artifact deleted from a registry installed whole", () => {
     project,
     deleted,
   }) => {
-    expect((await aireg(["init", "-y", "--for", "claude"])).code).toBe(0);
+    expect((await aireg(["init", "-y", "--for", "claude-code"])).code).toBe(0);
     expect((await aireg(["add", "https://drops.example", "--adapter", "drops", "-y"])).code).toBe(
       0,
     );

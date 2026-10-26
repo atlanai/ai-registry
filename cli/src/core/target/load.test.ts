@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 import { codex } from "#targets/codex.ts";
 import { test } from "#test/kit/fixtures.ts";
 import type { Target } from "./contract.ts";
-import { detectAll, resolveTargets, targetRoot } from "./index.ts";
+import { canonicalId, detectAll, resolveTargets, targetRoot } from "./index.ts";
 import { loadTargetFiles } from "./load.ts";
 
 let env: NodeJS.ProcessEnv;
@@ -37,7 +37,7 @@ describe("target files", () => {
       userRoot: join(env.HOME as string, ".tool"),
       origin: join(dir, "tool.json"),
     });
-    expect(targetTable.claude?.origin).toBe("built-in");
+    expect(targetTable["claude-code"]?.origin).toBe("built-in");
   });
 
   test("still load from the folder's earlier name, `harnesses/`", async () => {
@@ -60,6 +60,25 @@ describe("target files", () => {
       [`It defines "tool", as ${join(dir, "tool.json")} does too; keep one of them.`],
     ]);
     expect(resolveTargets(env).tool).toBeUndefined();
+  });
+
+  test("give a target other ids, and read the built-ins' earlier ids in `reads`", async () => {
+    await save("tool.json", {
+      ...TOOL,
+      aliases: ["old-tool"],
+      reads: { skill: ["agents", "tool"] },
+    });
+    const table = resolveTargets(env);
+    expect(problems()).toEqual([]);
+    expect(canonicalId(table, "old-tool")).toBe("tool");
+    expect(table.tool?.reads.skill).toEqual(["universal", "tool"]);
+  });
+
+  test("keep a built-in's other ids when a file replaces it without naming its own", async () => {
+    await save("claude-code.json", { ...TOOL, id: "claude-code", overrides: true });
+    expect(problems()).toEqual([]);
+    expect(resolveTargets(env)["claude-code"]?.aliases).toEqual(["claude"]);
+    expect(canonicalId(resolveTargets(env), "claude")).toBe("claude-code");
   });
 
   test("resolve a JSON copy of a built-in to the same target", async () => {
@@ -171,12 +190,22 @@ describe("target files", () => {
       { ...TOOL, verified: { command: "tool --version", range: ">=1" } },
       /never a shell command/,
     ],
-    ["takes a built-in id", { ...TOOL, id: "claude" }, /set "overrides": true/],
+    ["takes a built-in id", { ...TOOL, id: "claude-code" }, /set "overrides": true/],
+    [
+      "takes another name of a built-in",
+      { ...TOOL, id: "claude" },
+      /"claude" is another name for the built-in target "claude-code"; name the file claude-code\.json/,
+    ],
+    [
+      "gives itself another name a built-in has",
+      { ...TOOL, aliases: ["agents"] },
+      /the alias "agents" already names the target "universal"/,
+    ],
   ])("are skipped when one %s", async (_, body, problem) => {
     const id = typeof body === "string" ? "tool" : (body as { id: string }).id;
     await save(`${id}.json`, body);
     expect(problems().join("\n")).toMatch(problem);
-    expect(resolveTargets(env).claude?.origin).toBe("built-in");
+    expect(resolveTargets(env)["claude-code"]?.origin).toBe("built-in");
   });
 
   test("are skipped when one names an id other than its own", async () => {

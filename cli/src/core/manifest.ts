@@ -22,6 +22,7 @@ import { isMissing } from "#core/fs/path.ts";
 import { parseEngine, unmetEngine } from "#core/semver.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { type Roots, type Scope, scopeName } from "#core/store/paths.ts";
+import { canonicalIds, resolveTargets } from "#core/target/index.ts";
 import { VERSION } from "#core/version.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import {
@@ -892,9 +893,21 @@ function editManifest(text: string, manifest: Manifest): string {
   return doc.toString(FORMAT);
 }
 
+/** Each target by its canonical id, so a command never writes an alias back. */
+function canonicalTargets(manifest: Manifest): Manifest {
+  const table = resolveTargets();
+  return {
+    ...manifest,
+    targets: canonicalIds(table, manifest.targets),
+    artifacts: manifest.artifacts.map((ref) =>
+      ref.targets === undefined ? ref : { ...ref, targets: canonicalIds(table, ref.targets) },
+    ),
+  };
+}
+
 export async function readManifest(path: string): Promise<Manifest> {
   try {
-    return parseManifest(await readFile(path, "utf8"), path);
+    return canonicalTargets(parseManifest(await readFile(path, "utf8"), path));
   } catch (cause) {
     if (isMissing(cause)) return emptyManifest();
     throw cause;

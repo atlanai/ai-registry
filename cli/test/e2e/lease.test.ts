@@ -11,7 +11,7 @@ import { lockPath } from "#test/kit/scope.ts";
 /** A project that declares and installs a git registry, so `update` and `install` have work. */
 const test = base.extend("leased", async ({ aireg, git, project, tmp }) => {
   const repo = await gitRegistry(git, join(tmp, "kit"));
-  await aireg(["init", "--for", "claude"]);
+  await aireg(["init", "--for", "claude-code"]);
   const added = await aireg(["add", `file://${repo}`]);
   expect(added.code, added.stderr).toBe(0);
   // In the project, so a writer with another AIREG_HOME takes the same lease.

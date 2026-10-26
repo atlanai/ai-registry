@@ -14,7 +14,7 @@ import { scan } from "./scan.ts";
 
 const COMMON: CommonOptions = {
   scope: "project",
-  targets: ["claude"],
+  targets: ["claude-code"],
   select: undefined,
   yes: true,
   all: false,

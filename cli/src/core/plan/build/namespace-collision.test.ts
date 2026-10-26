@@ -21,7 +21,7 @@ import {
 describe("two registries with a namespace of the same name", () => {
   const USER = roots("user", "/work");
   const home = homedir();
-  const options: BuildOptions = { ...PLAN_OPTIONS, roots: USER, targets: ["claude", "codex"] };
+  const options: BuildOptions = { ...PLAN_OPTIONS, roots: USER, targets: ["claude-code", "codex"] };
   const claudeSkills = (name: string) => join(home, ".claude", "skills", name);
 
   function source(alias: "kit" | "far", skill: string): Acquired {
@@ -64,7 +64,7 @@ describe("two registries with a namespace of the same name", () => {
       content: "sha256:t1",
       version: undefined,
       digest: "sha256:3",
-      links: [{ target: "claude", path: link, mode: "symlink" }],
+      links: [{ target: "claude-code", path: link, mode: "symlink" }],
     };
   }
   function lockSource(alias: "kit" | "far") {
@@ -93,15 +93,15 @@ describe("two registries with a namespace of the same name", () => {
       options,
     );
     // Claude keys plugins by manifest name and loads only the first of two alike.
-    expect(linksTo(plan.actions, "claude")).toEqual([
+    expect(linksTo(plan.actions, "claude-code")).toEqual([
       claudeSkills("far-engineering"),
       claudeSkills("kit-engineering"),
     ]);
-    expect(linkOf(plan, "claude", claudeSkills("kit-engineering"))?.from).toBe(
+    expect(linkOf(plan, "claude-code", claudeSkills("kit-engineering"))?.from).toBe(
       projectionDir(USER, "kit", "kit-engineering"),
     );
     expect(plan.warnings.map((warning) => warning.message)).toContain(
-      'The namespace "engineering" is also published by another registry, so claude loads the one from kit as "kit-engineering".',
+      'The namespace "engineering" is also published by another registry, so claude-code loads the one from kit as "kit-engineering".',
     );
   });
 
@@ -119,7 +119,7 @@ describe("two registries with a namespace of the same name", () => {
     expect(linkOf(plan, "codex", cache("kit"))?.from).toBe(
       projectionDir(USER, "kit", "engineering"),
     );
-    expect(linksTo(plan.actions, "agents")).toEqual([]);
+    expect(linksTo(plan.actions, "universal")).toEqual([]);
   });
 
   it("keeps the bare name while only one registry publishes the namespace", () => {
@@ -130,7 +130,7 @@ describe("two registries with a namespace of the same name", () => {
       { artifacts: {} },
       options,
     );
-    expect(linksTo(plan.actions, "claude")).toEqual([claudeSkills("engineering")]);
+    expect(linksTo(plan.actions, "claude-code")).toEqual([claudeSkills("engineering")]);
     expect(plan.warnings.some((warning) => /another registry/.test(warning.message))).toBe(false);
   });
 
@@ -146,7 +146,7 @@ describe("two registries with a namespace of the same name", () => {
         opened: ["kit"],
       },
     );
-    expect(linksTo(plan.actions, "claude")).toEqual([claudeSkills("kit-engineering")]);
+    expect(linksTo(plan.actions, "claude-code")).toEqual([claudeSkills("kit-engineering")]);
     // `far` keeps its directory until its own run renames it.
     expect(
       plan.actions.some(
@@ -170,7 +170,7 @@ describe("two registries with a namespace of the same name", () => {
         opened: ["far"],
       },
     );
-    expect(linksTo(plan.actions, "claude")).toEqual([claudeSkills("far-engineering")]);
+    expect(linksTo(plan.actions, "claude-code")).toEqual([claudeSkills("far-engineering")]);
     expect(
       plan.actions.some(
         (action) => action.kind === "unlink" && action.to === claudeSkills("engineering"),
@@ -185,7 +185,7 @@ describe("registries whose plugin names meet once qualified", () => {
   const options: BuildOptions = {
     ...PLAN_OPTIONS,
     roots: USER,
-    targets: ["claude"],
+    targets: ["claude-code"],
     nameCollision: "rename",
   };
   const claudeSkills = (name: string) => join(homedir(), ".claude", "skills", name);
@@ -280,7 +280,7 @@ describe("registries whose plugin names meet once qualified", () => {
       { artifacts: {} },
       options,
     );
-    expect(linksTo(plan.actions, "claude")).toEqual([
+    expect(linksTo(plan.actions, "claude-code")).toEqual([
       claudeSkills("q-c"),
       claudeSkills("x-c"),
       claudeSkills("z-q-c"),
@@ -293,10 +293,10 @@ describe("registries whose plugin names meet once qualified", () => {
     // Installed flat before `t` wrapped namespaces: `other/team` holds `.claude/skills/team`.
     const lock = emptyLock();
     installedAt(lock, { alias: "t", namespace: "other", skill: "team" }).links = [
-      { target: "claude", path: ".claude/skills/team", mode: "symlink" },
+      { target: "claude-code", path: ".claude/skills/team", mode: "symlink" },
     ];
     installedAt(lock, { alias: "t", namespace: "team", skill: "deploy" }).links = [
-      { target: "claude", path: ".claude/skills/deploy", mode: "symlink" },
+      { target: "claude-code", path: ".claude/skills/deploy", mode: "symlink" },
     ];
     const [wrapped] = wrapping(
       acquired([
@@ -320,10 +320,10 @@ describe("registries whose plugin names meet once qualified", () => {
     // `one` holds `a-b-c` already; `three`, planned first, moves there from `b-c` now `y` has one.
     const lock = emptyLock();
     installedAt(lock, { alias: "a-b", namespace: "c", skill: "one" }).links = [
-      { target: "claude", path: ".claude/skills/a-b-c", mode: "symlink" },
+      { target: "claude-code", path: ".claude/skills/a-b-c", mode: "symlink" },
     ];
     installedAt(lock, { alias: "a", namespace: "b-c", skill: "three" }).links = [
-      { target: "claude", path: ".claude/skills/b-c", mode: "symlink" },
+      { target: "claude-code", path: ".claude/skills/b-c", mode: "symlink" },
     ];
     const plan = build(
       declaring(["a-b", "x", "a", "y"]),

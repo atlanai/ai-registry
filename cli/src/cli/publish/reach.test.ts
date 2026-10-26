@@ -153,7 +153,9 @@ describe("exportsOn", () => {
   test("never reaches what aireg installed there", async () => {
     const installed = lock()
       .registry("acme", { location: "github.com/acme/agent-registry" })
-      .artifact("style", { links: [{ target: "claude", path: "skills/style", mode: "symlink" }] })
+      .artifact("style", {
+        links: [{ target: "claude-code", path: "skills/style", mode: "symlink" }],
+      })
       .build();
     const { found } = await exportsOn(
       manifestWith("  - skills/*\n"),
@@ -636,7 +638,9 @@ describe("exportsOn, for a dependency no entry reaches", () => {
   test("refuses one aireg installed here", async () => {
     const installed = lock()
       .registry("acme", { location: "github.com/acme/agent-registry" })
-      .artifact("style", { links: [{ target: "claude", path: "skills/style", mode: "symlink" }] })
+      .artifact("style", {
+        links: [{ target: "claude-code", path: "skills/style", mode: "symlink" }],
+      })
       .build();
     await expect(
       exportsOn(
@@ -725,7 +729,9 @@ describe("exportsOn, for a dependency on a folder", () => {
     await git(base, "add", "skills/review", "skills/style", "agents");
     const installed = lock()
       .registry("acme", { location: "github.com/acme/agent-registry" })
-      .artifact("style", { links: [{ target: "claude", path: "skills/style", mode: "symlink" }] })
+      .artifact("style", {
+        links: [{ target: "claude-code", path: "skills/style", mode: "symlink" }],
+      })
       .build();
     const { found } = await exportsOn(
       agentNeeding("./skills"),

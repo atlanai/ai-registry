@@ -1,7 +1,8 @@
 import { defineTarget } from "#core/target/contract.ts";
 
-export const copilot = defineTarget({
-  id: "copilot",
+export const githubCopilot = defineTarget({
+  id: "github-copilot",
+  aliases: ["copilot"],
   displayName: "GitHub Copilot",
   roots: { project: ".github", user: { default: "~/.copilot", env: "COPILOT_HOME" } },
   // Most GitHub repositories hold `.github` for their workflows, so it proves nothing.

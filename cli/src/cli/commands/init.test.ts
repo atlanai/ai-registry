@@ -46,13 +46,13 @@ describe("init", () => {
     await run(context(cwd, ["--for", "*"], writes));
     const payload = JSON.parse(writes.join("")) as { data: { targets: string[] } };
     expect(payload.data.targets).toEqual([
-      "agents",
-      "claude",
+      "claude-code",
       "codex",
-      "copilot",
       "cursor",
-      "gemini",
+      "gemini-cli",
+      "github-copilot",
       "opencode",
+      "universal",
     ]);
   });
 
@@ -65,18 +65,18 @@ describe("init", () => {
       out: { write: (chunk: string) => writes.push(chunk), isTTY: false },
       err: { write: () => true, isTTY: false },
     });
-    await run({ ...context(cwd, ["--for", "claude,codex"], writes), printer });
+    await run({ ...context(cwd, ["--for", "claude-code,codex"], writes), printer });
     expect(writes.join("")).toContain(
-      "Installs for claude and codex, into .agents, .claude and .codex.",
+      "Installs for claude-code and codex, into .claude, .codex and .agents.",
     );
   });
 
-  test("writes the manifest with the targets it chose and nothing else", async () => {
+  test("writes the manifest with the targets it chose, by id, and nothing else", async () => {
     const cwd = await mkdtemp(join(scratch, "aireg-init-"));
     vi.stubEnv("AIREG_USER_SCOPE", join(cwd, "user"));
     await run(context(cwd, ["--for", "claude,codex"], []));
     expect(await readFile(join(cwd, ".registry", "manifest.yml"), "utf8")).toBe(
-      "targets:\n  - claude\n  - codex\nregistries: {}\nartifacts: []\n",
+      "targets:\n  - claude-code\n  - codex\nregistries: {}\nartifacts: []\n",
     );
   });
 

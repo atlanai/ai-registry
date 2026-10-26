@@ -14,55 +14,55 @@ Examples:
   $ aireg daemon status                                check background sync
 
 Set up:
-  init       Set up a project (creates .registry/manifest.yml)
-  registry   Declare the registries you install from, or create and check one of your own
-             add  list  show  remove  init  index  validate
-  auth       Sign in to your registries, and manage the accounts aireg uses
-             login  list  logout  remove
+  init      Set up a project (creates .registry/manifest.yml)
+  registry  Declare the registries you install from, or create and check one of your own
+            add  list  show  remove  init  index  validate
+  auth      Sign in to your registries, and manage the accounts aireg uses
+            login  list  logout  remove
 
 Install:
-  search     Find artifacts in the registries you have declared
-  add        Install artifacts from a registry
-  remove     Uninstall artifacts
-  install    Make this project match its manifest
-  update     Take the newest version each registry offers
-  show       Print an artifact without installing it
+  search    Find artifacts in the registries you have declared
+  add       Install artifacts from a registry
+  remove    Uninstall artifacts
+  install   Make this project match its manifest
+  update    Take the newest version each registry offers
+  show      Print an artifact without installing it
 
 Check:
-  console    Open a full-screen view of installed artifacts, jobs and registries
-  status     Check installed artifacts against the lockfile, and list the ones nothing manages
-  list       List what is installed
-  outdated   Check each registry for newer versions of what is installed
-  targets  List the targets aireg can install into, and which this machine has
-             show  check
+  console   Open a full-screen view of installed artifacts, jobs and registries
+  status    Check installed artifacts against the lockfile, and list the ones nothing manages
+  list      List what is installed
+  outdated  Check each registry for newer versions of what is installed
+  targets   List the targets aireg can install into, and which this machine has
+            show  check
 
 Share:
-  sync       Sync this project with its registries
-             resolve
-  publish    Publish artifacts to a registry, as new versions
-  watch      Publish a folder's skills and agents whenever they change
-             add  remove  list
-  skill      Create a skill, or start its next version
-             new  bump
-  agent      Create an agent, or start its next version
-             new  bump
+  sync      Sync this project with its registries
+            resolve
+  publish   Publish artifacts to a registry, as new versions
+  watch     Publish a folder's skills and agents whenever they change
+            add  remove  list
+  skill     Create a skill, or start its next version
+            new  bump
+  agent     Create an agent, or start its next version
+            new  bump
 
 Automate:
-  job        Manage background jobs and read their runs
-             add  list  remove  start  enable  disable  pause  resume  runs  retry  cancel
-  daemon     Start, stop or check the background daemon that runs jobs
-             start  stop  restart  status  autostart
+  job       Manage background jobs and read their runs
+            add  list  remove  start  enable  disable  pause  resume  runs  retry  cancel
+  daemon    Start, stop or check the background daemon that runs jobs
+            start  stop  restart  status  autostart
 
 Maintain:
-  config     Read and write aireg's own settings
-             list  get  set  unset  path
-  doctor     Check that this machine can install artifacts
-  unlock     Show or clear a stuck write lock
-  adapter    Install an adapter, or write a new one
-             install  list  remove  init
-  logs       Read aireg's diagnostic logs
-  self       Update aireg, or uninstall it
-             update  uninstall
+  config    Read and write aireg's own settings
+            list  get  set  unset  path
+  doctor    Check that this machine can install artifacts
+  unlock    Show or clear a stuck write lock
+  adapter   Install an adapter, or write a new one
+            install  list  remove  init
+  logs      Read aireg's diagnostic logs
+  self      Update aireg, or uninstall it
+            update  uninstall
 
 Options:
       --json               Machine-readable output

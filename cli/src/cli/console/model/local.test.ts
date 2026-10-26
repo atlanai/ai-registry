@@ -13,8 +13,9 @@ let root: string;
 /** One target whose skills live in `skills/`, which is all this reads. */
 function targetTable(): Targets {
   return {
-    claude: {
-      name: "claude",
+    "claude-code": {
+      name: "claude-code",
+      aliases: ["claude-code"],
       displayName: "Claude Code",
       projectRoot: join(root, "project"),
       userRoot: root,

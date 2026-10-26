@@ -1,5 +1,6 @@
 {
-  "id": "copilot",
+  "id": "github-copilot",
+  "aliases": ["copilot"],
   "displayName": "GitHub Copilot",
   "overrides": true,
   "roots": { "project": ".github", "user": { "default": "~/.copilot", "env": "COPILOT_HOME" } },

@@ -11,11 +11,11 @@ const test = base
     registry(join(fileTmp, "kit")).skill("kit/lint@1.0.0", { description: "Lint it." }).write(),
   )
   .extend("initialised", { scope: "file" }, ({ fileTmp }) =>
-    projectTemplate(join(fileTmp, "initialised"), [["init", "--for", "claude"]]),
+    projectTemplate(join(fileTmp, "initialised"), [["init", "--for", "claude-code"]]),
   )
   .extend("declared", { scope: "file" }, ({ fileTmp, kit }) =>
     projectTemplate(join(fileTmp, "declared"), [
-      ["init", "--for", "claude"],
+      ["init", "--for", "claude-code"],
       ["registry", "add", kit, "--as", "kit"],
     ]),
   );

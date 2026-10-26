@@ -15,7 +15,7 @@ describe("stopping the daemon", () => {
       await mkdir(bin, { recursive: true });
       await writeFile(join(bin, "git"), "#!/bin/sh\nexec sleep 30\n");
       await chmod(join(bin, "git"), 0o755);
-      await aireg(["init", "--for", "claude"]);
+      await aireg(["init", "--for", "claude-code"]);
       const added = await aireg(["add", `file://${repo}`, "--as", "kit"]);
       expect(added.code, added.stderr).toBe(0);
 
@@ -41,7 +41,7 @@ describe("background sync jobs", () => {
     const folders = [join(tmp, "jobs", "a"), join(tmp, "jobs", "b")];
     for (const cwd of folders) {
       await mkdir(cwd, { recursive: true });
-      await aireg(["init", "--for", "claude"], { cwd });
+      await aireg(["init", "--for", "claude-code"], { cwd });
       // Declared, not installed: a job is added for the registry, whatever it installs.
       const declared = await aireg(["registry", "add", `file://${repo}`, "--as", "kit"], { cwd });
       expect(declared.code, declared.stderr).toBe(0);
@@ -103,7 +103,7 @@ describe("removing a registry", () => {
     await mkdir(project, { recursive: true });
     const user = await aireg(["add", `file://${repo}`, "--as", "kit", "-g"], { cwd: tmp });
     expect(user.code, user.stderr).toBe(0);
-    await aireg(["init", "--for", "claude"], { cwd: project });
+    await aireg(["init", "--for", "claude-code"], { cwd: project });
     const declared = await aireg(["registry", "add", `file://${repo}`, "--as", "kit"], {
       cwd: project,
     });
@@ -164,7 +164,7 @@ describe("a job for a registry the project declares by a relative folder", () =>
       .skill("eng/pr-review@1.0.0")
       .write();
     await mkdir(project, { recursive: true });
-    await aireg(["init", "--for", "claude"], { cwd: project });
+    await aireg(["init", "--for", "claude-code"], { cwd: project });
     expect(
       (await aireg(["registry", "add", "../reg", "--as", "acme"], { cwd: project })).code,
     ).toBe(0);
@@ -191,7 +191,7 @@ describe("a job that also declares artifacts with -s", () => {
       .write();
     await mkdir(project, { recursive: true });
     const manifest = join(project, ".registry", "manifest.yml");
-    await aireg(["init", "--for", "claude"], { cwd: project });
+    await aireg(["init", "--for", "claude-code"], { cwd: project });
     expect(
       (await aireg(["add", "../reg", "--as", "acme", "-s", "lint"], { cwd: project })).code,
     ).toBe(0);

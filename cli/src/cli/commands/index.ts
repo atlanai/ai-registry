@@ -120,7 +120,10 @@ export const COMMANDS: readonly CommandSpec[] = [
       "aireg init --registry <registry> [--as <name>] [--watch] [options]",
     ],
     examples: [
-      { command: "aireg init --for claude,cursor", what: "a project for Claude Code and Cursor" },
+      {
+        command: "aireg init --for claude-code,cursor",
+        what: "a project for Claude Code and Cursor",
+      },
       {
         command: "aireg init --registry github.com/acme/ai-registry --as acme --watch",
         what: "set up from a team registry, kept in sync",

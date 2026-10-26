@@ -9,7 +9,7 @@ import { serveFolder, tarGz, wellKnownSite } from "#test/kit/site.ts";
 import { projectTemplate } from "#test/kit/template.ts";
 
 const test = base.extend("initialised", { scope: "file" }, ({ fileTmp }) =>
-  projectTemplate(join(fileTmp, "initialised"), [["init", "--for", "claude"]]),
+  projectTemplate(join(fileTmp, "initialised"), [["init", "--for", "claude-code"]]),
 );
 
 const fill = tarGz([

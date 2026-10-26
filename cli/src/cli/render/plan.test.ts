@@ -11,7 +11,7 @@ function printed(
   actions: Action[],
   applied: Partial<ApplyResult>,
   before: Record<string, unknown> = {},
-  targets: string[] = ["claude", "codex"],
+  targets: string[] = ["claude-code", "codex"],
   targetTable = resolveTargets({ HOME: "/home/dev" }),
 ): string[] {
   const lines: string[] = [];
@@ -45,8 +45,10 @@ const at = (target: string) => ({ target, path: "p", mode: "symlink" });
 
 describe("summarize", () => {
   it("names the tools that load what was installed, not the folders or the steps", () => {
-    const actions = [link("lint", "claude"), link("lint", "agents")];
-    const lock = { artifacts: { lint: { kind: "skill", links: [at("claude"), at("agents")] } } };
+    const actions = [link("lint", "claude-code"), link("lint", "universal")];
+    const lock = {
+      artifacts: { lint: { kind: "skill", links: [at("claude-code"), at("universal")] } },
+    };
     const applied = {
       performed: { link: 2 } as never,
       installed: ["lint"],
@@ -58,35 +60,37 @@ describe("summarize", () => {
   });
 
   it("names a shared folder by its path when no chosen tool reads it", () => {
-    const actions = [link("lint", "agents")];
-    const lock = { artifacts: { lint: { kind: "skill", links: [at("agents")] } } };
+    const actions = [link("lint", "universal")];
+    const lock = { artifacts: { lint: { kind: "skill", links: [at("universal")] } } };
     const applied = {
       performed: { link: 1 } as never,
       installed: ["lint"],
       added: ["lint"],
       lock: lock as never,
     };
-    expect(printed(actions, applied, {}, ["agents"])).toEqual(["✓ Installed lint for .agents."]);
+    expect(printed(actions, applied, {}, ["universal"])).toEqual(["✓ Installed lint for .agents."]);
   });
 
   it("names every member of a new namespace as installed, though one link carries them", () => {
     const clone = (name: string) => ({ kind: "clone", name, from: "f", to: `c/${name}` }) as Action;
     const row = (target: string) => ({ links: [{ target, path: "p", mode: "symlink" }] });
-    const lock = { artifacts: { add: row("claude"), new: row("claude"), publish: row("claude") } };
-    const actions = [link("add", "claude"), clone("add"), clone("new"), clone("publish")];
+    const lock = {
+      artifacts: { add: row("claude-code"), new: row("claude-code"), publish: row("claude-code") },
+    };
+    const actions = [link("add", "claude-code"), clone("add"), clone("new"), clone("publish")];
     const applied = {
       performed: { link: 1, clone: 3 } as never,
       installed: ["add"],
       added: ["add", "new", "publish"],
       lock: lock as never,
     };
-    expect(printed(actions, applied, {}, ["claude"])).toEqual([
+    expect(printed(actions, applied, {}, ["claude-code"])).toEqual([
       "✓ Installed add, new and publish for Claude Code.",
     ]);
   });
 
   it("says which targets start a plugin's hooks and MCP servers", () => {
-    const actions = [link("tools", "claude"), link("tools", "codex")];
+    const actions = [link("tools", "claude-code"), link("tools", "codex")];
     const applied = {
       performed: { link: 2 } as never,
       installed: ["tools"],
@@ -101,26 +105,30 @@ describe("summarize", () => {
 
   it("says once what a target asks of a person before it loads what was placed", () => {
     const targetTable = resolveTargets({ HOME: "/home/dev" });
-    targetTable.claude = {
-      ...targetTable.claude!,
+    targetTable["claude-code"] = {
+      ...targetTable["claude-code"]!,
       trust: { skill: { run: "tool trust" }, agent: { run: "tool trust --agents", scope: "user" } },
       reload: "Run `/reload` in Claude Code.",
     };
     const lock = {
       artifacts: {
-        lint: { kind: "skill", links: [at("claude")] },
-        fmt: { kind: "skill", links: [at("claude")] },
-        reviewer: { kind: "agent", links: [at("claude")] },
+        lint: { kind: "skill", links: [at("claude-code")] },
+        fmt: { kind: "skill", links: [at("claude-code")] },
+        reviewer: { kind: "agent", links: [at("claude-code")] },
       },
     };
-    const actions = [link("lint", "claude"), link("fmt", "claude"), link("reviewer", "claude")];
+    const actions = [
+      link("lint", "claude-code"),
+      link("fmt", "claude-code"),
+      link("reviewer", "claude-code"),
+    ];
     const applied = {
       performed: { link: 3 } as never,
       installed: ["lint", "fmt", "reviewer"],
       added: ["lint", "fmt", "reviewer"],
       lock: lock as never,
     };
-    expect(printed(actions, applied, {}, ["claude"], targetTable)).toEqual([
+    expect(printed(actions, applied, {}, ["claude-code"], targetTable)).toEqual([
       "✓ Installed lint, fmt and reviewer for Claude Code.",
       "hint: Claude Code loads skills here only once you trust them: run `tool trust`.",
       "hint: Run `/reload` in Claude Code.",
@@ -130,8 +138,8 @@ describe("summarize", () => {
   it("names in one line every kind that waits on the same trust step", () => {
     const lock = {
       artifacts: {
-        lint: { kind: "skill", links: [at("gemini")] },
-        reviewer: { kind: "agent", links: [at("gemini")] },
+        lint: { kind: "skill", links: [at("gemini-cli")] },
+        reviewer: { kind: "agent", links: [at("gemini-cli")] },
       },
     };
     const applied = {
@@ -140,9 +148,12 @@ describe("summarize", () => {
       added: ["lint", "reviewer"],
       lock: lock as never,
     };
-    const lines = printed([link("lint", "gemini"), link("reviewer", "gemini")], applied, {}, [
-      "gemini",
-    ]);
+    const lines = printed(
+      [link("lint", "gemini-cli"), link("reviewer", "gemini-cli")],
+      applied,
+      {},
+      ["gemini-cli"],
+    );
     expect(lines.filter((line) => line.includes("trust"))).toEqual([
       "hint: Gemini CLI loads skills and agents here only once you trust them: run `/permissions trust`.",
     ]);
@@ -150,11 +161,11 @@ describe("summarize", () => {
 
   it("says a plugin's hooks run only where it installs whole, not where its skills went", () => {
     const actions = [
-      { ...link("tools", "claude"), plugin: true } as Action,
-      link("tools", "agents"),
+      { ...link("tools", "claude-code"), plugin: true } as Action,
+      link("tools", "universal"),
     ];
     const lock = {
-      artifacts: { tools: { kind: "plugin", links: [at("claude"), at("agents")] } },
+      artifacts: { tools: { kind: "plugin", links: [at("claude-code"), at("universal")] } },
     };
     const applied = {
       performed: { link: 2 } as never,
@@ -163,7 +174,7 @@ describe("summarize", () => {
       lock: lock as never,
       carried: [{ name: "tools", carries: ["hooks"] }] as ApplyResult["carried"],
     };
-    expect(printed(actions, applied, {}, ["claude", "agents"])).toContain(
+    expect(printed(actions, applied, {}, ["claude-code", "universal"])).toContain(
       "  runs   hooks from tools, in Claude Code",
     );
   });
@@ -171,7 +182,7 @@ describe("summarize", () => {
   it("calls a new version of an installed artifact an update", () => {
     const actions = [
       { kind: "clone", name: "lint", from: "f", to: "c" } as Action,
-      link("lint", "claude"),
+      link("lint", "claude-code"),
     ];
     const applied = { performed: { link: 1, clone: 1 } as never, installed: ["lint"], added: [] };
     expect(printed(actions, applied)).toEqual(["✓ Updated lint."]);
@@ -180,19 +191,19 @@ describe("summarize", () => {
   it("says which version an update moved from and to", () => {
     const actions = [
       { kind: "clone", name: "lint", from: "f", to: "c" } as Action,
-      link("lint", "claude"),
+      link("lint", "claude-code"),
     ];
     const lock = { artifacts: { lint: { version: "0.2.0", links: [] } } };
     const applied = { performed: { link: 1, clone: 1 } as never, lock: lock as never };
-    const before = { lint: { version: "0.1.0", links: [{ target: "claude" }] } };
+    const before = { lint: { version: "0.1.0", links: [{ target: "claude-code" }] } };
     expect(printed(actions, applied, before)).toEqual(["✓ Updated lint 0.1.0 → 0.2.0."]);
   });
 
   it("calls a link put back at the same version a restore, not an update", () => {
     const lock = { artifacts: { lint: { version: "0.1.0", links: [] } } };
     const applied = { performed: { link: 1 } as never, lock: lock as never };
-    const before = { lint: { version: "0.1.0", links: [{ target: "claude" }] } };
-    expect(printed([link("lint", "claude")], applied, before)).toEqual([
+    const before = { lint: { version: "0.1.0", links: [{ target: "claude-code" }] } };
+    expect(printed([link("lint", "claude-code")], applied, before)).toEqual([
       "✓ Restored lint for Claude Code.",
     ]);
   });
@@ -204,7 +215,7 @@ describe("summarize", () => {
     ];
     const lock = { artifacts: { lint: { version: "0.1.0", links: [] } } };
     const applied = { performed: { stage: 1, clone: 1 } as never, lock: lock as never };
-    const before = { lint: { version: "0.1.0", links: [{ target: "claude" }] } };
+    const before = { lint: { version: "0.1.0", links: [{ target: "claude-code" }] } };
     expect(printed(actions, applied, before)).toEqual(["✓ Restored lint for Claude Code."]);
   });
 
@@ -224,13 +235,13 @@ describe("summarize", () => {
 
 describe("planReport", () => {
   const targetTable = resolveTargets({ HOME: "/home/dev" });
-  const chosen = { targets: ["claude", "codex"], targetTable };
+  const chosen = { targets: ["claude-code", "codex"], targetTable };
   const plan = {
     ...emptyPlan(),
     actions: [
-      link("pr-review", "agents"),
-      link("pr-review", "claude"),
-      link("reviewer", "claude"),
+      link("pr-review", "universal"),
+      link("pr-review", "claude-code"),
+      link("reviewer", "claude-code"),
       {
         kind: "record",
         lock: {
@@ -255,10 +266,10 @@ describe("planReport", () => {
     const lines = report(false);
     expect(lines).toContain("  action   artifact   targets      path");
     expect(lines).toContain(
-      `  install  pr-review  Codex        ${join("t", "agents", "pr-review")}`,
+      `  install  pr-review  Codex        ${join("t", "universal", "pr-review")}`,
     );
     expect(lines).toContain(
-      `  install  pr-review  Claude Code  ${join("t", "claude", "pr-review")}`,
+      `  install  pr-review  Claude Code  ${join("t", "claude-code", "pr-review")}`,
     );
   });
 

@@ -38,8 +38,8 @@ const lock: Lock = {
       version: undefined,
       digest: "sha256:1",
       links: [
-        { target: "claude", path: INSIDE, mode: "symlink" },
-        { target: "claude", path: AT, mode: "symlink" },
+        { target: "claude-code", path: INSIDE, mode: "symlink" },
+        { target: "claude-code", path: AT, mode: "symlink" },
       ],
     },
   },
@@ -79,7 +79,7 @@ describe("status", () => {
     });
     expect(status(lock, off, base)[0]).toMatchObject({
       state: "dangling",
-      detail: `claude: links to ${resolve("/elsewhere")}, not to aireg's copy`,
+      detail: `claude-code: links to ${resolve("/elsewhere")}, not to aireg's copy`,
     });
   });
 
@@ -92,8 +92,8 @@ describe("status", () => {
     });
     expect(status(lock, yours, base)[0]).toMatchObject({
       state: "dangling",
-      detail: "claude: replaced by something of yours",
-      targets: { claude: "replaced" },
+      detail: "claude-code: replaced by something of yours",
+      targets: { "claude-code": "replaced" },
     });
   });
 

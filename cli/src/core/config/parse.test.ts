@@ -44,7 +44,10 @@ describe("parseConfig", () => {
       - { name: mine, kind: origins, to: acme/ws, select: ${select} }
 `);
     const parsed = parseConfig(step("{ from: /tmp/skills, harness: [claude] }"));
-    expect(parsed.jobs[0]?.steps[0]?.select[0]).toEqual({ from: "/tmp/skills", target: ["claude"] });
+    expect(parsed.jobs[0]?.steps[0]?.select[0]).toEqual({
+      from: "/tmp/skills",
+      target: ["claude"],
+    });
     expect(formatConfig(parsed)).toContain("target:");
     expect(formatConfig(parsed)).not.toContain("harness");
     expect(() =>

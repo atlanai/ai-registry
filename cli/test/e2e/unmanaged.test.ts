@@ -41,7 +41,7 @@ describe("aireg status, for what nothing manages", () => {
     }
     const { data } = JSON.parse(await status(["--json"]));
     const course = data.unmanaged.find((item: { name: string }) => item.name === "course");
-    expect(course).toMatchObject({ kind: "skill", targets: ["claude", "cursor"] });
+    expect(course).toMatchObject({ kind: "skill", targets: ["claude-code", "cursor"] });
   });
 
   test("names a target once, and the real folder rather than a link to it", async ({
@@ -56,7 +56,7 @@ describe("aireg status, for what nothing manages", () => {
     }
     const { data } = JSON.parse(await status(["--json"]));
     const course = data.unmanaged.find((item: { name: string }) => item.name === "course");
-    expect(course).toMatchObject({ targets: ["claude", "cursor"], path: real });
+    expect(course).toMatchObject({ targets: ["claude-code", "cursor"], path: real });
   });
 
   test("reads Codex's own agent files, and names a link whose target is gone", async ({
@@ -75,10 +75,10 @@ describe("aireg status, for what nothing manages", () => {
     const { data } = JSON.parse(await status(["--json"]));
     const targetsOf = (name: string) =>
       data.unmanaged.find((item: { name: string }) => item.name === name)?.targets;
-    expect(targetsOf("triage")).toEqual(["claude", "codex"]);
+    expect(targetsOf("triage")).toEqual(["claude-code", "codex"]);
     expect(targetsOf("solo")).toEqual(["codex"]);
     expect(data.dangling).toEqual([
-      { path: gone, linksTo: join(home.dir, "nowhere.md"), target: "claude" },
+      { path: gone, linksTo: join(home.dir, "nowhere.md"), target: "claude-code" },
     ]);
 
     const text = await status([]);

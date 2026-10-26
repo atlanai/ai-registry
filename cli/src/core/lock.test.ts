@@ -38,7 +38,7 @@ function lock(): Lock {
         content: "sha256:r",
         version: undefined,
         digest: "sha256:1",
-        links: [{ target: "claude", path: ".claude/skills/review", mode: "symlink" }],
+        links: [{ target: "claude-code", path: ".claude/skills/review", mode: "symlink" }],
       },
       lint: {
         registry: "kit",
@@ -159,34 +159,44 @@ describe("parseLock", () => {
 });
 
 describe("a lock an earlier aireg wrote", () => {
+  const text = [
+    "version: 1",
+    "registries:",
+    "  kit: { source: acme/kit, adapter: git, key: sha256:kit }",
+    "artifacts:",
+    "  lint:",
+    "    registry: kit",
+    "    name: lint",
+    "    kind: skill",
+    "    path: artifacts/lint",
+    "    digest: sha256:1",
+    "    origin: { harness: claude, path: .claude/skills/lint }",
+    "    links:",
+    "      - { harness: claude, path: .claude/skills/lint, mode: symlink }",
+    "    blocked:",
+    "      - { harness: agents, path: .agents/skills/lint }",
+    "",
+  ].join("\n");
+
   test("reads each `harness:` as `target:`, and writes `target:`", () => {
-    const text = [
-      "version: 1",
-      "registries:",
-      "  kit: { source: acme/kit, adapter: git, key: sha256:kit }",
-      "artifacts:",
-      "  lint:",
-      "    registry: kit",
-      "    name: lint",
-      "    kind: skill",
-      "    path: artifacts/lint",
-      "    digest: sha256:1",
-      "    origin: { harness: claude, path: .claude/skills/lint }",
-      "    links:",
-      "      - { harness: claude, path: .claude/skills/lint, mode: symlink }",
-      "    blocked:",
-      "      - { harness: codex, path: .agents/skills/lint }",
-      "",
-    ].join("\n");
     const row = parseLock(text).artifacts.lint;
     expect(row?.origin).toEqual({ target: "claude", path: ".claude/skills/lint", step: "" });
     expect(row?.links).toEqual([
       { target: "claude", path: ".claude/skills/lint", mode: "symlink" },
     ]);
-    expect(row?.blocked).toEqual([{ target: "codex", path: ".agents/skills/lint" }]);
+    expect(row?.blocked).toEqual([{ target: "agents", path: ".agents/skills/lint" }]);
     const written = formatLock(parseLock(text));
     expect(written).not.toContain("harness");
     expect(written).toContain("- target: claude\n");
+  });
+
+  test("reads each target's earlier id as the id it has now", async ({ tmp }) => {
+    const path = join(tmp, "manifest.lock.yml");
+    await writeFile(path, text);
+    const row = (await readLock({ scope: "project", lock: path })).artifacts.lint;
+    expect(row?.origin?.target).toBe("claude-code");
+    expect(row?.links.map((link) => link.target)).toEqual(["claude-code"]);
+    expect(row?.blocked?.map((held) => held.target)).toEqual(["universal"]);
   });
 });
 

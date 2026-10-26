@@ -29,7 +29,7 @@
       }
     },
     "targets": {
-      "description": "Targets to install into, by name. Absent or empty means claude and codex.",
+      "description": "Targets to install into, by name. Absent or empty means claude-code and codex.",
       "type": "array",
       "items": {
         "minLength": 1,

@@ -21,7 +21,7 @@ const KIT = "https://github.com/acme/kit.git";
 /** A project at `/work` projecting into Claude Code. */
 export const PLAN_OPTIONS: BuildOptions = {
   roots: roots("project", "/work"),
-  targets: ["claude"],
+  targets: ["claude-code"],
   targetTable: resolveTargets(),
   force: false,
   copy: false,
@@ -105,7 +105,7 @@ export function installed(over: { digest?: string; content?: string } = {}): Loc
       path: "artifacts/copy",
       content: over.content ?? "sha256:t1",
       digest: over.digest ?? "sha256:1",
-      links: [{ target: "claude", path: ".claude/skills/lint", mode: "symlink" }],
+      links: [{ target: "claude-code", path: ".claude/skills/lint", mode: "symlink" }],
     })
     .build();
 }

@@ -1,13 +1,19 @@
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { stringify } from "yaml";
-import { plural, quoted } from "#adapter/text.ts";
+import { list as listed, plural, quoted } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import { foundBy } from "#cli/render/found.ts";
 import { underHome } from "#cli/render/home.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { targetsDir } from "#core/store/paths.ts";
-import { type Detection, detectAll, resolveTargets } from "#core/target/index.ts";
+import {
+  canonicalId,
+  type Detection,
+  detectAll,
+  resolveTargets,
+  type Target,
+} from "#core/target/index.ts";
 import { BUILT_IN, checkTargetText, loadTargetFiles } from "#core/target/load.ts";
 import { table } from "#core/term/table.ts";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
@@ -74,6 +80,7 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
       data: {
         targets: ordered.map((item) => ({
           name: item.target.name,
+          aliases: item.target.aliases,
           displayName: item.target.displayName,
           kind: item.target.kind,
           shared: item.target.shared,
@@ -99,7 +106,17 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
   if (shown.length < tools.length) {
     context.printer.hint("Run `aireg targets --all` to see every one.");
   }
+  for (const { target } of rows.filter((item) => item.target.shared)) {
+    context.printer.hint(sharedHint(target));
+  }
   warnSkipped(context);
+}
+
+/** A shared folder has no row, so its ids are said once below the table. */
+function sharedHint(target: Target): string {
+  const aliases = target.aliases.map((alias) => `\`${alias}\``);
+  const also = aliases.length === 0 ? "" : `, or ${listed(aliases, "or")},`;
+  return `Use \`--for ${target.name}\`${also} for the shared ${target.projectRoot} folder.`;
 }
 
 /** One row per coding agent; the shared folder is not a tool, so it has no row. */
@@ -111,6 +128,7 @@ function printTargets(context: CommandContext, rows: readonly Detection[]): void
     [
       { header: "target", value: (item: Detection) => item.target.displayName },
       { header: "id", value: (item: Detection) => style.dim(item.target.name) },
+      { header: "aliases", value: (item: Detection) => style.dim(item.target.aliases.join(", ")) },
       {
         header: "status",
         value: (item: Detection) => (item.detected ? style.green("found") : style.dim("not found")),
@@ -137,7 +155,7 @@ export function foundSummary(found: number, supported: number): string {
 /** The definition as aireg resolved it, after its defaults and your files. */
 async function show(context: CommandContext, id: string): Promise<void> {
   const targetTable = resolveTargets();
-  const target = targetTable[id];
+  const target = targetTable[canonicalId(targetTable, id)];
   if (target === undefined) {
     throw new AiregError(`No target named ${quoted(id)}.`, {
       code: ErrorCode.Usage,
@@ -145,7 +163,7 @@ async function show(context: CommandContext, id: string): Promise<void> {
     });
   }
   if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { target: target } });
+    context.printer.json({ ok: true, data: { target } });
     return;
   }
   const { name, displayName, origin: from, ...rest } = target;

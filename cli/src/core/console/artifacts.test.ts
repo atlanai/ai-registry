@@ -43,7 +43,7 @@ function lockWith(): Lock {
       content: "sha256:c",
       version,
       digest: "sha256:lock",
-      links: [{ target: "claude", path: `.claude/skills/${namespace}`, mode: "symlink" }],
+      links: [{ target: "claude-code", path: `.claude/skills/${namespace}`, mode: "symlink" }],
     };
   }
   return lock;
@@ -149,7 +149,7 @@ describe("groupArtifacts", () => {
         diskDigest: undefined,
         state: "duplicate",
         detail: "a registry already publishes this name",
-        targets: ["claude"],
+        targets: ["claude-code"],
         copy: "/home/.claude/skills/lint",
         changedAtMs: undefined,
         links: [],
@@ -175,7 +175,7 @@ describe("groupArtifacts", () => {
         diskDigest: undefined,
         state: "unpublished",
         detail: undefined,
-        targets: ["claude"],
+        targets: ["claude-code"],
         copy: "/home/.claude/skills/notes",
         changedAtMs: undefined,
         links: [],

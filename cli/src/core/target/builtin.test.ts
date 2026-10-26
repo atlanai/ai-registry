@@ -15,9 +15,9 @@ describe("built-in targets", () => {
   });
 });
 
-describe("claude", () => {
+describe("claude-code", () => {
   it("asks a person to trust a project before it loads the plugins placed there", () => {
-    const claude = resolveTargets({ HOME: "/tmp/home" }).claude!;
+    const claude = resolveTargets({ HOME: "/tmp/home" })["claude-code"]!;
     expect(trustFor(claude, "plugin", "project")).toBe("claude");
     expect(trustFor(claude, "plugin", "user")).toBeUndefined();
     expect(trustFor(claude, "skill", "project")).toBeUndefined();

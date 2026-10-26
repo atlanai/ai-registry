@@ -84,7 +84,7 @@ describe("the git route, end to end", () => {
 
     // What git exports to a pre-commit hook; the cold cache makes aireg clone.
     const cold = await makeHome(join(tmp, "cold-home"));
-    const added = await aireg(["add", `file://${repo}@v1`, "--for", "claude"], {
+    const added = await aireg(["add", `file://${repo}@v1`, "--for", "claude-code"], {
       cwd: hooked,
       env: {
         ...cold.env,
@@ -210,7 +210,7 @@ describe("the git route, end to end", () => {
     );
     // One named target, so which links exist does not depend on what the
     // machine running this happens to have installed.
-    expect((await aireg(["install", "--for", "claude"], { cwd })).code).toBe(0);
+    expect((await aireg(["install", "--for", "claude-code"], { cwd })).code).toBe(0);
     expect((await aireg(["status"], { cwd })).code).toBe(0);
 
     // A link removed, content untouched: only `status` models projection. In a
@@ -220,7 +220,7 @@ describe("the git route, end to end", () => {
     expect(broken.code).toBe(3);
     expect(broken.stdout).toMatch(/missing/);
     expect((await aireg(["sync"], { cwd })).code).toBe(0);
-    expect((await aireg(["install", "--for", "claude"], { cwd })).code).toBe(0);
+    expect((await aireg(["install", "--for", "claude-code"], { cwd })).code).toBe(0);
     expect((await aireg(["status"], { cwd })).code).toBe(0);
   });
 });

@@ -63,7 +63,7 @@ describe("a marketplace plugin fetched from another repository", () => {
       ref: "main",
       sha: plugin.first,
     });
-    expect((await aireg(["init", "--for", "claude"])).code).toBe(0);
+    expect((await aireg(["init", "--for", "claude-code"])).code).toBe(0);
     const added = await aireg(["add", mkt, "--all"]);
     expect(added.code, added.stderr).toBe(0);
     expect(await installed(project)).toContain("First.");
@@ -83,7 +83,7 @@ describe("a marketplace plugin fetched from another repository", () => {
       url: plugin.url,
       path: "tools/far",
     });
-    expect((await aireg(["init", "--for", "claude"])).code).toBe(0);
+    expect((await aireg(["init", "--for", "claude-code"])).code).toBe(0);
     expect((await aireg(["add", mkt, "--all"])).code).toBe(0);
     expect((await row(project))?.revision).toBe(plugin.second);
 
@@ -119,7 +119,7 @@ describe("a marketplace plugin fetched from another repository", () => {
       url: pathToFileURL(join(tmp, "far")).href,
       sha: "0123456789ab",
     });
-    expect((await aireg(["init", "--for", "claude"])).code).toBe(0);
+    expect((await aireg(["init", "--for", "claude-code"])).code).toBe(0);
     const added = await aireg(["add", mkt, "--all"]);
     expect(added.code).toBe(1);
     expect(added.stderr).toContain(

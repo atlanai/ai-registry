@@ -77,14 +77,34 @@ describe("targets", () => {
     // In the order the text lists them, with the shared folder last.
     const builtIn = { kind: "coding", shared: false, origin: "built-in" };
     expect(payload.data.targets).toEqual([
-      { name: "claude", displayName: "Claude Code", ...builtIn, detected: true, by: "env" },
-      { name: "codex", displayName: "Codex", ...builtIn, detected: false },
-      { name: "copilot", displayName: "GitHub Copilot", ...builtIn, detected: false },
-      { name: "cursor", displayName: "Cursor", ...builtIn, detected: false },
-      { name: "gemini", displayName: "Gemini CLI", ...builtIn, detected: false },
-      { name: "opencode", displayName: "OpenCode", ...builtIn, detected: false },
       {
-        name: "agents",
+        name: "claude-code",
+        aliases: ["claude"],
+        displayName: "Claude Code",
+        ...builtIn,
+        detected: true,
+        by: "env",
+      },
+      { name: "codex", aliases: [], displayName: "Codex", ...builtIn, detected: false },
+      { name: "cursor", aliases: [], displayName: "Cursor", ...builtIn, detected: false },
+      {
+        name: "gemini-cli",
+        aliases: ["gemini"],
+        displayName: "Gemini CLI",
+        ...builtIn,
+        detected: false,
+      },
+      {
+        name: "github-copilot",
+        aliases: ["copilot"],
+        displayName: "GitHub Copilot",
+        ...builtIn,
+        detected: false,
+      },
+      { name: "opencode", aliases: [], displayName: "OpenCode", ...builtIn, detected: false },
+      {
+        name: "universal",
+        aliases: ["agents"],
         displayName: "Shared .agents folder",
         kind: "shared",
         shared: true,
@@ -94,22 +114,28 @@ describe("targets", () => {
     ]);
   });
 
-  test("lists the coding agents this machine has, and every one with --all, but no folder", async () => {
+  test("lists the coding agents this machine has, and every one with --all, but no folder row", async () => {
     const found: string[] = [];
     await run(context(cwd, found, "text"));
     const lines = found.join("").split("\n");
-    expect(lines).toContain("  target       id      status  where");
-    expect(lines).toContain("  Claude Code  claude  found   from its environment variables");
+    expect(lines).toContain("  target       id           aliases  status  where");
+    expect(lines).toContain(
+      "  Claude Code  claude-code  claude   found   from its environment variables",
+    );
     expect(lines.some((line) => /^ +(Codex|Cursor|agents|Shared)/.test(line))).toBe(false);
     expect(lines).toContain("Found 1 of 6 supported targets on this machine.");
     expect(lines).toContain("hint: Run `aireg targets --all` to see every one.");
+    expect(lines).toContain(
+      "hint: Use `--for universal`, or `agents`, for the shared .agents folder.",
+    );
 
     const every: string[] = [];
     await run(context(cwd, every, "text", ["--all"]));
     const all = every.join("").split("\n");
     expect(every.join("")).toMatch(/^ +Cursor +cursor +not found$/m);
+    expect(every.join("")).toMatch(/^ +GitHub Copilot +github-copilot +copilot +not found$/m);
     expect(all.some((line) => line.includes("--all"))).toBe(false);
-    expect(all.some((line) => line.includes("shared"))).toBe(false);
+    expect(all.some((line) => /^ +Shared/.test(line))).toBe(false);
   });
 
   test("finds no GitHub Copilot from a project's .github folder alone", async () => {
@@ -119,7 +145,7 @@ describe("targets", () => {
     const { data } = JSON.parse(writes.join("")) as {
       data: { targets: { name: string; detected: boolean }[] };
     };
-    expect(data.targets.find((item) => item.name === "copilot")?.detected).toBe(false);
+    expect(data.targets.find((item) => item.name === "github-copilot")?.detected).toBe(false);
   });
 
   test("says which file defines a target, and skips a broken one with a warning", async () => {
@@ -132,6 +158,15 @@ describe("targets", () => {
     const text = writes.join("");
     expect(text).toMatch(/Tool +tool +not found +~\/\.aireg\/targets\/tool\.json/);
     expect(text).toContain("Skipped ~/.aireg/targets/broken.json: it is not valid JSON.");
+  });
+
+  test("shows a target by its id or an alias", async () => {
+    for (const id of ["claude", "claude-code"]) {
+      const writes: string[] = [];
+      await run(context(cwd, writes, "json", ["show", id]));
+      const { data } = JSON.parse(writes.join("")) as { data: { target: { name: string } } };
+      expect(data.target.name).toBe("claude-code");
+    }
   });
 
   test("shows a target as aireg resolved it", async () => {

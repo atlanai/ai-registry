@@ -10,7 +10,7 @@ describe("narrowToRelinks", () => {
     const kept = narrowToRelinks(
       plan([
         { kind: "stage", name: "moved", source: "acme", path: "p", to: "t" },
-        { kind: "link", name: "moved", target: "claude", from: "f", to: "new", copy: false },
+        { kind: "link", name: "moved", target: "claude-code", from: "f", to: "new", copy: false },
         { kind: "unlink", name: "moved", to: "old" },
         { kind: "stage", name: "other", source: "acme", path: "p", to: "t" },
       ]),
