@@ -42,16 +42,16 @@ In a project, `status` also warns about an artifact installed in both the projec
 ```json
 {"ok": true, "data": {
   "scope": "project",
-  "artifacts": [{"name": "engineering/pr-review", "state": "ok", "targets": {"claude-code": "linked", "universal": "linked"}, "needsApproval": [{"target": "tool", "run": "tool trust"}]}],
+  "artifacts": [{"name": "engineering/pr-review", "state": "ok", "targets": {"claude-code": "linked", "universal": "linked"}, "harnesses": {"claude": "linked", "agents": "linked"}, "needsApproval": [{"target": "tool", "harness": "tool", "run": "tool trust"}]}],
   "shadowed": [],
-  "unmanaged": [{"name": "lint", "kind": "skill", "targets": ["claude-code"], "path": "/home/me/project/.claude/skills/lint"}],
-  "dangling": [{"path": "/home/me/project/.claude/agents/old.md", "linksTo": "/home/me/agents/old.md", "target": "claude-code"}]
+  "unmanaged": [{"name": "lint", "kind": "skill", "targets": ["claude-code"], "harnesses": ["claude"], "path": "/home/me/project/.claude/skills/lint"}],
+  "dangling": [{"path": "/home/me/project/.claude/agents/old.md", "target": "/home/me/agents/old.md", "harness": "claude"}]
 }}
 ```
 
-In JSON, `targets` is keyed by target id, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's `path`, what it links to as written (`linksTo`), and its `target`. `needsApproval` lists each target that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
+In JSON, `targets` is keyed by target id, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's `path`, what it links to as written (`target`), and the target folder it is in (`harness`, by the id aireg 0.1 used). `needsApproval` lists each target that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
 
-Earlier versions of aireg said `harnesses` where this output says `targets`, `harness` where it says `target`, and `target` for a dangling link's `linksTo`.
+Each field that names a target is also printed under the name aireg 0.1 gave it, with the id that version knows, for scripts written against it: `harnesses` beside `targets`, and `harness` beside `target`, such as `claude` for `claude-code`. A `dangling` entry keeps exactly the shape aireg 0.1 printed. Read `targets` and `target`; the earlier names are kept for compatibility and will be removed in a later release.
 
 ## Exit status
 

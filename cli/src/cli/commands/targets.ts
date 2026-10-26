@@ -11,8 +11,12 @@ import {
   canonicalId,
   type Detection,
   detectAll,
+  type EarlierTarget,
+  earlierId,
+  earlierTable,
   resolveTargets,
   type Target,
+  type Targets,
 } from "#core/target/index.ts";
 import { BUILT_IN, checkTargetText, loadTargetFiles } from "#core/target/load.ts";
 import { table } from "#core/term/table.ts";
@@ -94,6 +98,7 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
           by: item.by,
           origin: item.target.origin,
         })),
+        harnesses: earlierRows(targetTable, ordered),
         skipped,
         warnings: files
           .filter((file) => file.warnings.length > 0)
@@ -122,6 +127,23 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
     context.printer.hint(sharedHint(target));
   }
   warnFiles(context);
+}
+
+/** The rows as aireg 0.1 printed them, under `harnesses`, for scripts written against it. */
+function earlierRows(targetTable: Targets, rows: readonly Detection[]) {
+  const earlier = earlierTable(targetTable);
+  return rows.map((item) => {
+    const was = earlier[earlierId(targetTable, item.target.name)] as EarlierTarget;
+    return {
+      name: was.name,
+      displayName: was.displayName,
+      kind: was.kind,
+      shared: was.shared,
+      detected: item.detected,
+      by: item.by,
+      origin: was.origin,
+    };
+  });
 }
 
 /** A shared folder has no row, so its ids are said once below the table. */
@@ -177,7 +199,9 @@ async function show(context: CommandContext, id: string): Promise<void> {
   // `category` is internal; `shared` already says what a person needs of it.
   const { category: _, ...shown } = target;
   if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { target: shown } });
+    const earlier = earlierTable(targetTable)[earlierId(targetTable, target.name)];
+    const { category: _category, aliases: _aliases, ...harness } = earlier as EarlierTarget;
+    context.printer.json({ ok: true, data: { target: shown, harness } });
     return;
   }
   const { name, displayName, origin: from, ...rest } = shown;

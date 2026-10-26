@@ -77,8 +77,11 @@ describe("aireg status, for what nothing manages", () => {
       data.unmanaged.find((item: { name: string }) => item.name === name)?.targets;
     expect(targetsOf("triage")).toEqual(["claude-code", "codex"]);
     expect(targetsOf("solo")).toEqual(["codex"]);
+    const triage = data.unmanaged.find((item: { name: string }) => item.name === "triage");
+    expect(triage.harnesses).toEqual(["claude", "codex"]);
+    // As aireg 0.1 printed it: `target` is where the link points.
     expect(data.dangling).toEqual([
-      { path: gone, linksTo: join(home.dir, "nowhere.md"), target: "claude-code" },
+      { path: gone, target: join(home.dir, "nowhere.md"), harness: "claude" },
     ]);
 
     const text = await status([]);

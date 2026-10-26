@@ -29,13 +29,15 @@ With a name, `list` shows where one installed artifact came from: its registry, 
 {"ok": true, "data": {"scope": "project", "artifacts": [{"name": "engineering/pr-review", "shown": "pr-review", "kind": "skill", "registry": "acme", "address": "github.com/acme/ai-registry", "ref": "0.1.0", "pinned": false, "targets": ["claude-code", "universal"]}]}}
 ```
 
-`name` is the artifact's name in the lockfile, and `shown` the name the table prints. `address` is where its registry lives. `targets` are the ids of the targets it is linked into, such as `universal`. `ref` is the version; an artifact with no version has its registry's short commit instead, or nothing when it comes from a watched folder. `watched` names the `target` and `path` of an artifact from a watched folder, and `neededBy` the artifacts that need one installed only for them.
+`name` is the artifact's name in the lockfile, and `shown` the name the table prints. `address` is where its registry lives. `targets` are the ids of the targets it is linked into, such as `universal`. `ref` is the version; an artifact with no version has its registry's short commit instead, or nothing when it comes from a watched folder. `watched` names the `target` and `path` of an artifact from a watched folder, and its `harness`, the target by the id aireg 0.1 used, kept for compatibility, and `neededBy` the artifacts that need one installed only for them.
 
 With a name, `data` is that one artifact instead: where it came from, its `version` and `content` digest, the stored `copy` you edit, and its `links` into each target folder.
 
 ```json
-{"ok": true, "data": {"name": "pr-review", "kind": "skill", "registry": "acme", "address": "github.com/acme/ai-registry", "adapter": "git", "registryKey": "sha256:...", "config": {}, "revision": "4e1d2c9...", "id": "artifacts/engineering/skill/pr-review/0.1.0", "upstreamName": "pr-review", "content": "sha256:...", "version": "0.1.0", "path": ".registry/artifacts/acme/engineering/skills/pr-review", "copy": ".registry/artifacts/acme/engineering/skills/pr-review", "links": [{"target": "claude-code", "path": ".claude/skills/pr-review", "mode": "symlink"}]}}
+{"ok": true, "data": {"name": "pr-review", "kind": "skill", "registry": "acme", "address": "github.com/acme/ai-registry", "adapter": "git", "registryKey": "sha256:...", "config": {}, "revision": "4e1d2c9...", "id": "artifacts/engineering/skill/pr-review/0.1.0", "upstreamName": "pr-review", "content": "sha256:...", "version": "0.1.0", "path": ".registry/artifacts/acme/engineering/skills/pr-review", "copy": ".registry/artifacts/acme/engineering/skills/pr-review", "links": [{"target": "claude-code", "harness": "claude", "path": ".claude/skills/pr-review", "mode": "symlink"}]}}
 ```
+
+Each link also names its target as `harness`, by the id aireg 0.1 used, for scripts written against it.
 
 ## Exit status
 

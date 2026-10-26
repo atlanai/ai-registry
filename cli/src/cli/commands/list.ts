@@ -11,6 +11,7 @@ import {
 import { chosenFor, loadedBy, scopeTargets, toolName } from "#cli/render/tools.ts";
 import type { LockArtifact, readLock } from "#core/lock.ts";
 import { artifactPath, copyLeaf, scopeName } from "#core/store/paths.ts";
+import { earlierId, type Targets } from "#core/target/index.ts";
 import { fields, table } from "#core/term/table.ts";
 import { load } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
@@ -22,9 +23,9 @@ export async function run(context: CommandContext): Promise<void> {
   // Naming one asks where it came from, which is the only question left once
   // you can already see it in the list.
   const wanted = positionals[0];
-  if (wanted !== undefined) return detail(context, lock, roots, wanted);
+  if (wanted !== undefined) return detail(context, lock, roots, targetTable, wanted);
 
-  const rows = installed(lock, manifest);
+  const rows = installed(lock, manifest, targetTable);
 
   if (context.printer.format === "json") {
     context.printer.json({ ok: true, data: { scope: roots.scope, artifacts: rows } });
@@ -72,6 +73,7 @@ async function detail(
   context: CommandContext,
   lock: Awaited<ReturnType<typeof readLock>>,
   roots: Awaited<ReturnType<typeof load>>["roots"],
+  targetTable: Targets,
   name: string,
 ): Promise<void> {
   const [key] = rowsNamed(name, lock);
@@ -108,8 +110,11 @@ async function detail(
         version: entry.version,
         path: entry.path,
         copy,
-        watched: watchedFrom(entry),
-        links: entry.links,
+        watched: watchedFrom(entry, targetTable),
+        links: entry.links.map((link) => ({
+          ...link,
+          harness: earlierId(targetTable, link.target),
+        })),
         neededBy: entry.neededBy,
       },
     });

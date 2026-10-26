@@ -43,7 +43,7 @@ A failure that came from a registry's adapter also names the `adapter`, and a `t
 Every command's `data` follows the same rules, so a script learns them once:
 
 - `data` is always an object. A list is a field in it, such as `{"targets": [...]}`.
-- A field that names a [target](targets.md) is `target`, or `targets` for several, and holds its id, such as `claude-code`, never an alias. Earlier versions of aireg named some of these fields `harness` and `harnesses`.
+- A field that names a [target](targets.md) is `target`, or `targets` for several, and holds its id, such as `claude-code`, never an alias. Where aireg 0.1 printed such a field as `harness` or `harnesses`, that field is printed beside it too, with the id aireg 0.1 knows, such as `claude`. The earlier field is kept for compatibility and will be removed in a later release. A dangling link in [`aireg status`](status.md#json-output) keeps the shape aireg 0.1 printed.
 - `registry` is a registry's name, as in `acme/engineering/pr-review`, and `address` is where the registry lives: a URL, a git address or a folder. The one exception is [`aireg search`](search.md), where each match's `address` is the artifact's full name, such as `acme/engineering/skill/pr-review`.
 - A command that takes `--dry-run` has a `dryRun` field, `true` on a dry run and `false` otherwise. A dry run fills the same fields a real run does, with what the command would do.
 - A command prints one JSON document, except `aireg logs --follow` and `aireg job runs --follow`, which print one per line as entries arrive.

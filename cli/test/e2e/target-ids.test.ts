@@ -56,6 +56,38 @@ describe("a target's earlier id", () => {
     expect(JSON.parse(listed.stdout).data.artifacts[0].targets).toEqual(["claude-code"]);
   });
 
+  test("prints each target under its aireg 0.1 key and id too", async ({ aireg, kit }) => {
+    expect((await aireg(["init", "-y", "--for", "gemini-cli,claude-code"])).code).toBe(0);
+    const added = await aireg(["add", kit, "-s", "lint", "-y"]);
+    expect(added.code, added.stderr).toBe(0);
+
+    const status = JSON.parse((await aireg(["status", "--json"])).stdout);
+    const [row] = status.data.artifacts;
+    expect(row.targets).toEqual({ "claude-code": "linked", "gemini-cli": "linked" });
+    expect(row.harnesses).toEqual({ claude: "linked", gemini: "linked" });
+    expect(row.needsApproval).toEqual([
+      { target: "gemini-cli", harness: "gemini", run: "/permissions trust" },
+    ]);
+
+    const detail = JSON.parse((await aireg(["list", "kit/lint", "--json"])).stdout);
+    expect(
+      detail.data.links.map(({ target, harness }: Record<string, string>) => [target, harness]),
+    ).toEqual([
+      ["claude-code", "claude"],
+      ["gemini-cli", "gemini"],
+    ]);
+
+    const listed = JSON.parse((await aireg(["targets", "--all", "--json"])).stdout).data;
+    expect(listed.targets.map((row: { name: string }) => row.name)).toContain("gemini-cli");
+    expect(listed.harnesses.find((row: { name: string }) => row.name === "gemini")).toMatchObject({
+      displayName: "Gemini CLI",
+      kind: "coding",
+    });
+    const shown = JSON.parse((await aireg(["targets", "show", "universal", "--json"])).stdout).data;
+    expect(shown.target.name).toBe("universal");
+    expect(shown.harness).toMatchObject({ name: "agents", kind: "shared" });
+  });
+
   test("shows the same target by either id", async ({ aireg }) => {
     const byAlias = await aireg(["targets", "show", "claude", "--json"]);
     const byId = await aireg(["targets", "show", "claude-code", "--json"]);

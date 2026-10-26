@@ -33,7 +33,7 @@ const row = (name: string, kind: string, extra: Partial<Installed> = {}): Instal
 
 describe("renderStatus", () => {
   it("shows a watched artifact under the target whose folder it is", () => {
-    const watched = { target: "claude-code", path: "~/.claude/skills/lint" };
+    const watched = { target: "claude-code", harness: "claude", path: "~/.claude/skills/lint" };
     const lines = rendered(
       [{ name: "lint", state: "ok", detail: undefined, targets: {} }],
       [row("lint", "skill", { watched })],

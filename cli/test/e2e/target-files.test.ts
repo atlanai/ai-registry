@@ -81,7 +81,7 @@ describe("a target a file of yours defines", () => {
     expect(
       status.data.artifacts.map(({ name, needsApproval }) => ({ name, needsApproval })),
     ).toEqual([
-      { name: "ns/lint", needsApproval: [{ target: "tool", run: "tool trust" }] },
+      { name: "ns/lint", needsApproval: [{ target: "tool", harness: "tool", run: "tool trust" }] },
       { name: "ns/reviewer", needsApproval: undefined },
     ]);
   });

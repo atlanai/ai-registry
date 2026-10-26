@@ -98,12 +98,12 @@ Some targets load what aireg placed only after you trust it. aireg never takes t
 ## JSON output
 
 ```json
-{"ok": true, "data": {"targets": [{"name": "claude-code", "aliases": ["claude"], "displayName": "Claude Code", "shared": false, "detected": true, "by": "binary", "origin": "built-in"}], "skipped": []}}
+{"ok": true, "data": {"targets": [{"name": "claude-code", "aliases": ["claude"], "displayName": "Claude Code", "shared": false, "detected": true, "by": "binary", "origin": "built-in"}], "harnesses": [{"name": "claude", "displayName": "Claude Code", "kind": "coding", "shared": false, "detected": true, "by": "binary", "origin": "built-in"}], "skipped": [], "warnings": []}}
 ```
 
-The targets are every one `--all` lists, in its order, plus the shared `.agents` folder, which the table leaves out; `shared` is true for it. `name` is the id, and `aliases` the other names it answers to. `by` is `env`, `binary`, `project` or `user`, and is left out when the target wasn't found. `origin` is `built-in` or the path of the file that defines the target. `skipped` lists each target file aireg refused, with its `path` and `problems`.
+The targets are every one `--all` lists, in its order, plus the shared `.agents` folder, which the table leaves out; `shared` is true for it. `name` is the id, and `aliases` the other names it answers to. `by` is `env`, `binary`, `project` or `user`, and is left out when the target wasn't found. `origin` is `built-in` or the path of the file that defines the target. `skipped` lists each target file aireg refused, with its `path` and `problems`. `warnings` lists each file aireg uses but would have you change, such as one in the folder's earlier name, with its `path` and `warnings`. `harnesses` is the same list as `aireg harnesses --json` printed it in aireg 0.1, named by the ids that version knows and with `kind`, kept for compatibility.
 
-`show` prints `{"target": {...}}`, the target as aireg resolved it. `check` prints `{"path": "...", "id": "tool", "problems": []}`, with `ok` false when it found a problem.
+`show` prints `{"target": {...}, "harness": {...}}`: the target as aireg resolved it, and again as aireg 0.1 printed it. `check` prints `{"path": "...", "id": "tool", "problems": [], "warnings": []}`, with `ok` false when it found a problem.
 
 ## Exit status
 

@@ -14,7 +14,7 @@ import { status, worstState } from "#core/plan/status.ts";
 import { survey } from "#core/plan/survey.ts";
 import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
 import { type Candidate, candidates, type DanglingLink, danglingLinks } from "#core/sync/adopt.ts";
-import { names, type Targets, trustFor } from "#core/target/index.ts";
+import { byEarlierIds, earlierId, names, type Targets, trustFor } from "#core/target/index.ts";
 import { table } from "#core/term/table.ts";
 import { load } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
@@ -43,8 +43,8 @@ function needsApproval(
   lock: Lock,
   roots: Roots,
   targetTable: Targets,
-): Map<string, { target: string; run: string }[]> {
-  const out = new Map<string, { target: string; run: string }[]>();
+): Map<string, { target: string; harness: string; run: string }[]> {
+  const out = new Map<string, { target: string; harness: string; run: string }[]>();
   for (const [name, entry] of Object.entries(lock.artifacts)) {
     const namespace = namespaceOf({
       kind: entry.kind,
@@ -57,7 +57,8 @@ function needsApproval(
       if (target === undefined) return [];
       const plugin = pluginLinkAt(link, namespace, entry.registry, { roots, targetTable });
       const run = trustFor(target, plugin === undefined ? entry.kind : "plugin", roots.scope);
-      return run === undefined ? [] : [{ target: link.target, run }];
+      if (run === undefined) return [];
+      return [{ target: link.target, harness: earlierId(targetTable, link.target), run }];
     });
     if (steps.length > 0) out.set(name, steps);
   }
@@ -136,7 +137,7 @@ export async function run(context: CommandContext): Promise<void> {
   });
   const dangling = await danglingLinks(roots, targetTable, names(targetTable), lock);
   const loose = await Promise.all(found.local.map(unmanaged));
-  const rows = installed(lock, manifest);
+  const rows = installed(lock, manifest, targetTable);
 
   if (context.printer.format === "json") {
     const neededBy = new Map(rows.map((row) => [row.name, row.neededBy]));
@@ -147,12 +148,21 @@ export async function run(context: CommandContext): Promise<void> {
         scope: roots.scope,
         artifacts: statuses.map((item) => ({
           ...item,
+          harnesses: byEarlierIds(targetTable, item.targets),
           neededBy: neededBy.get(item.name),
           needsApproval: approvals.get(item.name),
         })),
         shadowed: clashes,
-        unmanaged: loose,
-        dangling,
+        unmanaged: loose.map((item) => ({
+          ...item,
+          harnesses: item.targets.map((id) => earlierId(targetTable, id)),
+        })),
+        // As aireg 0.1 printed it, where `target` is the destination the link names.
+        dangling: dangling.map(({ path, linksTo, target }) => ({
+          path,
+          target: linksTo,
+          harness: earlierId(targetTable, target),
+        })),
       },
     });
   } else {

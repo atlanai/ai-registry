@@ -17,6 +17,7 @@ import { excluded } from "#core/plan/select.ts";
 import type { Ref } from "#core/ref.ts";
 import { olderThan } from "#core/semver.ts";
 import { scopeName } from "#core/store/paths.ts";
+import type { Targets } from "#core/target/index.ts";
 import { table } from "#core/term/table.ts";
 import { load } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
@@ -125,8 +126,14 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
   }
 }
 
-function row(name: string, entry: LockArtifact, found: Head, pinned: string | undefined): Row {
-  const base = { name, registry: entry.registry, pinned, watched: watchedFrom(entry) };
+function row(
+  name: string,
+  entry: LockArtifact,
+  found: Head,
+  pinned: string | undefined,
+  targetTable: Targets,
+): Row {
+  const base = { name, registry: entry.registry, pinned, watched: watchedFrom(entry, targetTable) };
   if (found.why !== undefined) {
     return { ...base, current: "", latest: "", moved: false, unchecked: found.why };
   }
@@ -250,7 +257,7 @@ function next(printer: Printer, moved: readonly Row[], scope: string): void {
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common } = parse(context.argv, builtin("outdated"));
   noArguments(positionals, "outdated");
-  const { roots, manifest, lock } = await load(common, context.cwd, "user");
+  const { roots, manifest, targetTable, lock } = await load(common, context.cwd, "user");
 
   const heads = new Map<string, Head>();
   for (const alias of new Set(Object.values(lock.artifacts).map((entry) => entry.registry))) {
@@ -270,6 +277,7 @@ export async function run(context: CommandContext): Promise<void> {
           why: "its registry could not be read",
         },
         pinOf(manifest, entry),
+        targetTable,
       ),
     );
   }
