@@ -22,7 +22,7 @@ import { isMissing } from "#core/fs/path.ts";
 import { parseEngine, unmetEngine } from "#core/semver.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { type Roots, type Scope, scopeName } from "#core/store/paths.ts";
-import { canonicalIds, earlierId, resolveTargets } from "#core/target/index.ts";
+import { canonicalId, canonicalIds, resolveTargets } from "#core/target/index.ts";
 import { VERSION } from "#core/version.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import {
@@ -117,7 +117,7 @@ export type ExportDependency = { type: "local"; path: string } | { type: "remote
 export { type ExportFile, isGlob } from "./export-fields.ts";
 export { ManifestError } from "./manifest-error.ts";
 
-/** The earlier name of `targets:`, still read, and kept by a manifest that uses it. */
+/** The earlier name of `targets:`, still read and rewritten as `targets:`. */
 export const LEGACY_TARGETS_KEY = "harnesses";
 
 /** The published schema is held to this list. */
@@ -869,42 +869,29 @@ function separateSections(doc: Document): void {
   }
 }
 
-/**
- * A manifest an earlier aireg could read: one that says `harnesses:`, or names no targets at
- * all. aireg 0.1 refuses `targets:` and the new ids, so a teammate on it keeps working.
- */
-function usesEarlierNames(doc: Document): boolean {
+/** The mappings that can hold a target list: the root, and each artifact entry. */
+function targetMaps(doc: Document): YAMLMap[] {
   const maps: unknown[] = [doc.contents];
   const artifacts = isMap(doc.contents) ? doc.contents.get("artifacts") : undefined;
   if (isSeq(artifacts)) maps.push(...artifacts.items);
-  const keys = maps.flatMap((map) => (isMap(map) ? map.items.map((item) => keyOf(item.key)) : []));
-  return keys.includes(LEGACY_TARGETS_KEY) || !keys.includes("targets");
+  return maps.filter((map): map is YAMLMap => isMap(map));
 }
 
-/** `targets:` under its earlier name, each id as aireg 0.1 knew it. */
-function inEarlierNames(data: Record<string, unknown>): Record<string, unknown> {
-  const rename = (entry: Record<string, unknown>): Record<string, unknown> => {
-    const { targets, ...rest } = entry;
-    if (!Array.isArray(targets)) return entry;
-    return { ...rest, [LEGACY_TARGETS_KEY]: targets.map((id) => earlierId(String(id))) };
-  };
-  const out = rename(data);
-  if (Array.isArray(out.artifacts))
-    out.artifacts = out.artifacts.map((ref) => (isRecord(ref) ? rename(ref) : ref));
-  return out;
+/** `harnesses:` renamed where it stands, so its comments move with it. */
+function renameLegacyKeys(doc: Document): void {
+  for (const map of targetMaps(doc)) {
+    const pair = map.items.find((item) => keyOf(item.key) === LEGACY_TARGETS_KEY);
+    if (pair !== undefined && isScalar(pair.key)) pair.key.value = "targets";
+  }
 }
 
 /** Edited in place, so a person's comments and blank lines survive. */
 function editManifest(text: string, manifest: Manifest): string {
   const doc: Document = parseDocument(text);
   if (doc.errors.length > 0) return formatManifest(manifest);
-  const data = manifestData(manifest);
+  renameLegacyKeys(doc);
   separateSections(doc);
-  doc.contents = merged(
-    doc,
-    doc.contents,
-    usesEarlierNames(doc) ? inEarlierNames(data) : data,
-  ) as Document["contents"];
+  doc.contents = merged(doc, doc.contents, manifestData(manifest)) as Document["contents"];
   const first = isMap(doc.contents) ? doc.contents.items[0]?.key : undefined;
   if (isNode(first)) first.spaceBefore = false;
   return doc.toString(FORMAT);
@@ -947,6 +934,28 @@ export async function writeManifest(roots: Roots, manifest: Manifest): Promise<s
   parseManifest(text, path);
   await writeAtomic(path, text);
   return text;
+}
+
+/** Whether it says `harnesses:` or names a target by an alias. */
+function usesEarlierNames(text: string, path: string): boolean {
+  if (targetMaps(parseDocument(text)).some((map) => map.has(LEGACY_TARGETS_KEY))) return true;
+  const raw = parseManifest(text, path);
+  const ids = [...raw.targets, ...raw.artifacts.flatMap((ref) => ref.targets ?? [])];
+  const table = resolveTargets();
+  return ids.some((id) => canonicalId(table, id) !== id);
+}
+
+/**
+ * Rewrites a manifest an earlier aireg wrote in today's names, and leaves any other alone.
+ * Run with each change to a scope, so a project moves over with its next install.
+ */
+export async function migrateManifest(roots: Roots): Promise<void> {
+  const text = await readFile(roots.manifest, "utf8").catch((cause: unknown) => {
+    if (isMissing(cause)) return undefined;
+    throw cause;
+  });
+  if (text === undefined || !usesEarlierNames(text, roots.manifest)) return;
+  await writeManifest(roots, await readManifest(roots.manifest));
 }
 
 /** The artifact a lock row installed, as far as a manifest pin can name it. */

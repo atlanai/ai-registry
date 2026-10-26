@@ -126,7 +126,7 @@ def fig_overview():
         box(o, x, 280, w, t, fill=GREYS if dash == "" else WHITE, stroke=LINES, tc=INK2, h=24, size=11, dash=dash)
     o.append(text(30, 342, "Teal: what the specification defines. Grey: your choice on both sides. Dashed: planned, or no client reads it yet.", size=11.5, fill=INK3))
     o.append(text(30, 359, "aireg reads a registry from a folder or a git repository.", size=11.5, fill=INK3))
-    return wrap(372, "One registry holding skills and agents, read by any client for any target, and stored on one storage: a folder or a git repository today, and later an object storage bucket or a hosted service.", o)
+    return wrap(372, "One registry holding skills and agents, read by any client for any agent, and stored on one storage: a folder or a git repository today, and later an object storage bucket or a hosted service.", o)
 
 
 # ---------------------------------------------------------------- use cases: teams, individuals

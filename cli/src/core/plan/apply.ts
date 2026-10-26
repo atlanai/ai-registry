@@ -13,6 +13,7 @@ import { entries, exists, present, pruneEmptyParent, remove, unseal } from "#cor
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import { assertLeasesHeld } from "#core/lease.ts";
 import { type LinkMode, type Lock, readLock, writeLock } from "#core/lock.ts";
+import { migrateManifest } from "#core/manifest.ts";
 import { backupStamp } from "#core/store/backups.ts";
 import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
@@ -614,7 +615,8 @@ async function record(run: Run, action: ActionOf<"record">): Promise<void> {
   for (const [name, entry] of Object.entries(action.lock.artifacts)) {
     if (!run.unstaged.has(name)) patchRow(run, name, entry);
   }
-  await writeLock(run.roots, action.lock);
+  // A real change also moves a manifest an earlier aireg wrote onto today's names.
+  if (await writeLock(run.roots, action.lock)) await migrateManifest(run.roots);
   run.recorded = action.lock;
 }
 

@@ -79,7 +79,7 @@ aireg skips a file, with a warning, when it isn't valid against the schema, name
 Files written for an earlier aireg keep loading, and a project stays readable by aireg 0.1:
 
 - The lockfile stays version 1. Each row names its target twice: `target:` with the current id, and `harness:` with the id aireg 0.1 reads, such as `claude` for `claude-code`. aireg 0.1 reads `harness:` and ignores `target:`; this version reads `target:`. A lock that needs no change is left byte for byte as it is.
-- A manifest keeps the name it uses: see [`--for`](options.md#targets).
+- A manifest moves to `targets:` and today's ids with the next change to its scope: see [`--for`](options.md#targets).
 
 - aireg still reads `~/.aireg/harnesses/`, the folder's earlier name. A target id defined in both folders is refused, naming both files, and neither file is used.
 - A file's `kind` is read only as `"kind": "shared"`, which means `"shared": true`; other values are ignored. `aireg targets` and `aireg targets check` warn about a file that sets it.

@@ -54,7 +54,7 @@ def draw(c, dy):
           f'<tspan fill="{TEAL}">ai</tspan><tspan fill="{INK}">-registry</tspan></text>')
     c.texts.append(("ai-registry", 62, INK, BG))
     c.text(1540, 70 + dy, "Manage the lifecycle of all your organisation's AI artifacts.", 26, INK2, anchor="end")
-    c.text(1540, 104 + dy, "Automatically sync changes to all users and targets.", 26, INK2, anchor="end")
+    c.text(1540, 104 + dy, "Automatically sync changes to all users and agents.", 26, INK2, anchor="end")
 
     # the registry: one row per team, only active versions sync
     rx, rw, top = 500, 520, 190 + dy
@@ -87,7 +87,7 @@ def draw(c, dy):
         c.raw(f'<circle cx="{rx}" cy="{y}" r="5" fill="{INK2}"/>')
     c.text(410, ys[0] - 18, "publish", 22, INK2, anchor="middle")
 
-    # active rows feed one line, which feeds every target
+    # active rows feed one line, which feeds every agent
     bus, hx, r = 1070, 1120, 16
     for y in ys[:2]:
         c.raw(f'<line x1="{rx + rw}" y1="{y}" x2="{hx}" y2="{y}" stroke="{TEAL}" stroke-width="2.5"/>')

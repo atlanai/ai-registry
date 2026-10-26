@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/readme-header.png" alt="ai-registry: every team publishes its skills and agents to one governed registry, and every target syncs from it" width="100%">
+  <img src="docs/assets/readme-header.png" alt="ai-registry: every team publishes its skills and agents to one governed registry, and every agent syncs from it" width="100%">
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@ An agent registry stores your organization's AI artifacts and manages their life
 
 **ai-registry is an open standard that enables anyone to build an open, interoperable agent registry.**
 
-- **Open format:** Today each registry, and each coding agent's own store, has its own format for versions, ownership and approvals, so every client needs a connector per registry. With an open specification, a client integrates once, reads any registry that implements it, and installs into any downstream target.
+- **Open format:** Today each registry, and each coding agent's own store, has its own format for versions, ownership and approvals, so every client needs a connector per registry. With an open specification, a client integrates once, reads any registry that implements it, and installs into any agent.
 - **Open storage:** Today a registry is tied to its own storage, so its records can only be read through that registry's software. With an open specification, a registry is just a set of files in a defined layout, so you can build one on infrastructure you already have, such as a git repository or an object storage bucket. The aireg CLI reads registries in folders and git repositories today.
 
 ### Why not just a git repository of skills, or a plugin marketplace?
