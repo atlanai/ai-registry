@@ -8,7 +8,7 @@ import { writeAtomic } from "#core/fs/atomic.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import type { Roots, Scope } from "#core/store/paths.ts";
-import { canonicalId, resolveTargets } from "#core/target/index.ts";
+import { canonicalId, earlierId, resolveTargets } from "#core/target/index.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import { dict, isRecord, textMapOf, textOf, withoutUndefined } from "./fields.ts";
 import { parseYaml } from "./yaml.ts";
@@ -152,7 +152,7 @@ function optional<K extends string>(key: K, value: string | undefined): { [P in 
   return (value === undefined ? {} : { [key]: value }) as { [P in K]?: string };
 }
 
-/** `harness` is the field's earlier name, still read; a row is always written with `target`. */
+/** `harness` is the field's earlier name; rows are written with both, and `target` wins. */
 function targetOf(entry: Record<string, unknown>): string | undefined {
   return textOf(entry.target) ?? textOf(entry.harness);
 }
@@ -320,6 +320,15 @@ function registryDoc(source: LockRegistry): Record<string, unknown> {
   });
 }
 
+function blockedDoc(item: NonNullable<LockArtifact["blocked"]>[number]): Record<string, unknown> {
+  return withoutUndefined({
+    target: item.target,
+    harness: earlierId(item.target),
+    path: item.path,
+    by: item.by,
+  });
+}
+
 function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
   return withoutUndefined({
     registry: artifact.registry,
@@ -339,6 +348,7 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
         ? undefined
         : withoutUndefined({
             target: artifact.origin.target,
+            harness: earlierId(artifact.origin.target),
             path: artifact.origin.path,
             step: artifact.origin.step === "" ? undefined : artifact.origin.step,
           }),
@@ -346,13 +356,14 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
       .sort((a, b) => a.path.localeCompare(b.path))
       .map((link) => ({
         target: link.target,
+        harness: earlierId(link.target),
         path: link.path,
         mode: link.mode,
         digest: link.mode === "copy" ? link.digest : undefined,
       })),
     needed_by: artifact.neededBy?.length ? [...artifact.neededBy].sort() : undefined,
     blocked: artifact.blocked?.length
-      ? [...artifact.blocked].sort((a, b) => a.path.localeCompare(b.path))
+      ? [...artifact.blocked].sort((a, b) => a.path.localeCompare(b.path)).map(blockedDoc)
       : undefined,
   });
 }

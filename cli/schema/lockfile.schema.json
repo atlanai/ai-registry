@@ -150,12 +150,18 @@
               "type": "object",
               "required": [
                 "target",
+                "harness",
                 "path"
               ],
               "properties": {
                 "target": {
                   "minLength": 1,
                   "description": "Whose folder conventions it follows.",
+                  "type": "string"
+                },
+                "harness": {
+                  "minLength": 1,
+                  "description": "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
                   "type": "string"
                 },
                 "path": {
@@ -178,6 +184,7 @@
                 "type": "object",
                 "required": [
                   "target",
+                  "harness",
                   "path",
                   "mode"
                 ],
@@ -185,6 +192,11 @@
                   "target": {
                     "minLength": 1,
                     "description": "Target name.",
+                    "type": "string"
+                  },
+                  "harness": {
+                    "minLength": 1,
+                    "description": "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
                     "type": "string"
                   },
                   "path": {
@@ -238,12 +250,18 @@
                 "type": "object",
                 "required": [
                   "target",
+                  "harness",
                   "path"
                 ],
                 "properties": {
                   "target": {
                     "minLength": 1,
                     "description": "Target name.",
+                    "type": "string"
+                  },
+                  "harness": {
+                    "minLength": 1,
+                    "description": "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
                     "type": "string"
                   },
                   "path": {

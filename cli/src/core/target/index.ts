@@ -25,6 +25,18 @@ export const IMPORTABLE_TARGETS: readonly string[] = BUILTIN_TARGETS.filter(
   .map((target) => target.id)
   .sort();
 
+/**
+ * The id aireg 0.1 knew a built-in by, its first alias, `<id>:<profile>` included; any other
+ * as given. A lock still records it, so a teammate on that version reads the lock.
+ */
+export function earlierId(id: string): string {
+  const at = id.indexOf(":");
+  const base = at === -1 ? id : id.slice(0, at);
+  const was = BUILTIN_TARGETS.find((target) => target.id === base)?.aliases?.[0];
+  if (was === undefined) return id;
+  return at === -1 ? was : `${was}${id.slice(at)}`;
+}
+
 /** Variables that name the target running this process, in the order they are checked. */
 export const CALLER_SIGNALS: readonly { agent: string; env: readonly string[] }[] =
   BUILTIN_TARGETS.flatMap((target) =>

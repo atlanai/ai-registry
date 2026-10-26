@@ -22,7 +22,7 @@ import { isMissing } from "#core/fs/path.ts";
 import { parseEngine, unmetEngine } from "#core/semver.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { type Roots, type Scope, scopeName } from "#core/store/paths.ts";
-import { canonicalIds, resolveTargets } from "#core/target/index.ts";
+import { canonicalIds, earlierId, resolveTargets } from "#core/target/index.ts";
 import { VERSION } from "#core/version.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import {
@@ -117,7 +117,7 @@ export type ExportDependency = { type: "local"; path: string } | { type: "remote
 export { type ExportFile, isGlob } from "./export-fields.ts";
 export { ManifestError } from "./manifest-error.ts";
 
-/** The earlier name of `targets:`, still read and rewritten as `targets:`. */
+/** The earlier name of `targets:`, still read, and kept by a manifest that uses it. */
 export const LEGACY_TARGETS_KEY = "harnesses";
 
 /** The published schema is held to this list. */
@@ -869,25 +869,42 @@ function separateSections(doc: Document): void {
   }
 }
 
-/** `harnesses:` renamed where it stands, so its comments move with it. */
-function renameLegacyKeys(doc: Document): void {
+/**
+ * A manifest an earlier aireg could read: one that says `harnesses:`, or names no targets at
+ * all. aireg 0.1 refuses `targets:` and the new ids, so a teammate on it keeps working.
+ */
+function usesEarlierNames(doc: Document): boolean {
   const maps: unknown[] = [doc.contents];
   const artifacts = isMap(doc.contents) ? doc.contents.get("artifacts") : undefined;
   if (isSeq(artifacts)) maps.push(...artifacts.items);
-  for (const map of maps) {
-    if (!isMap(map)) continue;
-    const pair = map.items.find((item) => keyOf(item.key) === LEGACY_TARGETS_KEY);
-    if (pair !== undefined && isScalar(pair.key)) pair.key.value = "targets";
-  }
+  const keys = maps.flatMap((map) => (isMap(map) ? map.items.map((item) => keyOf(item.key)) : []));
+  return keys.includes(LEGACY_TARGETS_KEY) || !keys.includes("targets");
+}
+
+/** `targets:` under its earlier name, each id as aireg 0.1 knew it. */
+function inEarlierNames(data: Record<string, unknown>): Record<string, unknown> {
+  const rename = (entry: Record<string, unknown>): Record<string, unknown> => {
+    const { targets, ...rest } = entry;
+    if (!Array.isArray(targets)) return entry;
+    return { ...rest, [LEGACY_TARGETS_KEY]: targets.map((id) => earlierId(String(id))) };
+  };
+  const out = rename(data);
+  if (Array.isArray(out.artifacts))
+    out.artifacts = out.artifacts.map((ref) => (isRecord(ref) ? rename(ref) : ref));
+  return out;
 }
 
 /** Edited in place, so a person's comments and blank lines survive. */
 function editManifest(text: string, manifest: Manifest): string {
   const doc: Document = parseDocument(text);
   if (doc.errors.length > 0) return formatManifest(manifest);
-  renameLegacyKeys(doc);
+  const data = manifestData(manifest);
   separateSections(doc);
-  doc.contents = merged(doc, doc.contents, manifestData(manifest)) as Document["contents"];
+  doc.contents = merged(
+    doc,
+    doc.contents,
+    usesEarlierNames(doc) ? inEarlierNames(data) : data,
+  ) as Document["contents"];
   const first = isMap(doc.contents) ? doc.contents.items[0]?.key : undefined;
   if (isNode(first)) first.spaceBefore = false;
   return doc.toString(FORMAT);

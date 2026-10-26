@@ -498,15 +498,52 @@ describe("writeManifest", () => {
     expect(await readManifest(path)).toEqual(removed);
   });
 
-  test("rewrites `harnesses:` as `targets:` and each alias as its id, keeping the comment", async () => {
+  test("keeps `harnesses:` and the earlier ids, so aireg 0.1 still reads the manifest", async () => {
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, "# Tools to install into.\nharnesses:\n  - claude\nregistries: {}\n");
-    const manifest = await readManifest(path);
-    manifest.registries.acme = { location: "../acme", adapter: undefined, config: {} };
-    await writeManifest(project, manifest);
-    expect(await readFile(path, "utf8")).toBe(
-      "# Tools to install into.\ntargets:\n  - claude-code\nregistries:\n  acme: ../acme\nartifacts: []\n",
+    await writeFile(
+      path,
+      [
+        "# Tools to install into.",
+        "harnesses:",
+        "  - claude",
+        "registries: { acme: ../acme }",
+        "artifacts:",
+        "  - { ref: acme/lint, harnesses: [copilot] }",
+        "",
+      ].join("\n"),
     );
+    const manifest = await readManifest(path);
+    expect(manifest.targets).toEqual(["claude-code"]);
+    expect(manifest.artifacts[0]?.targets).toEqual(["github-copilot"]);
+    manifest.targets = ["claude-code", "universal", "codex"];
+    await writeManifest(project, manifest);
+    const text = await readFile(path, "utf8");
+    expect(text).toContain(
+      "# Tools to install into.\nharnesses:\n  - claude\n  - agents\n  - codex\n",
+    );
+    expect(text).toContain("{ref: acme/lint, harnesses: [copilot]}");
+    expect(text).not.toContain("targets");
+    expect(await readManifest(path)).toEqual(manifest);
+  });
+
+  test("names targets under `harnesses:` in a manifest that names none yet", async () => {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, "registries: {}\n");
+    const manifest = await readManifest(path);
+    manifest.targets = ["gemini-cli"];
+    await writeManifest(project, manifest);
+    expect(await readFile(path, "utf8")).toContain("harnesses:\n  - gemini\n");
+  });
+
+  test("writes the ids under `targets:` once the manifest says `targets:`", async () => {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, "targets:\n  - claude\nregistries: {}\n");
+    const manifest = await readManifest(path);
+    manifest.targets = [...manifest.targets, "universal"];
+    await writeManifest(project, manifest);
+    const text = await readFile(path, "utf8");
+    expect(text).toContain("targets:\n  - claude-code\n  - universal\n");
+    expect(text).not.toContain("harnesses");
   });
 
   test("keeps `exports:` and `publish:`, with their comments, through add and remove", async () => {

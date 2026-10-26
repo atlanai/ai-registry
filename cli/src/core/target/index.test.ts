@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { canonicalId, canonicalIds, resolveTargets } from "./index.ts";
+import { canonicalId, canonicalIds, earlierId, resolveTargets } from "./index.ts";
 
 describe("resolveTargets", () => {
   it("expands each user root against HOME", () => {
@@ -33,6 +33,20 @@ describe("resolveTargets", () => {
       opencode: [],
       universal: ["agents"],
     });
+  });
+});
+
+describe("earlierId", () => {
+  it.each([
+    ["claude-code", "claude"],
+    ["github-copilot", "copilot"],
+    ["gemini-cli", "gemini"],
+    ["universal", "agents"],
+    ["codex", "codex"],
+    ["claude-code:work", "claude:work"],
+    ["mine", "mine"],
+  ])("records %s as %s, the id aireg 0.1 reads", (id, was) => {
+    expect(earlierId(id)).toBe(was);
   });
 });
 

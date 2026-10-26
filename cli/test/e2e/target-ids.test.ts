@@ -49,7 +49,7 @@ describe("a target's earlier id", () => {
 });
 
 describe("a project an earlier aireg wrote", () => {
-  test("reads clean, installs frozen, and is rewritten by the next change", async ({
+  test("reads clean, installs frozen, and stays readable by it after the next change", async ({
     aireg,
     kit,
     project,
@@ -63,11 +63,14 @@ describe("a project an earlier aireg wrote", () => {
     const earlier = (text: string) =>
       text
         .replaceAll("targets:", "harnesses:")
-        .replaceAll("target:", "harness:")
         .replaceAll("claude-code", "claude")
         .replaceAll("universal", "agents");
+    // A row's `target:` dropped, leaving the `harness:` written beside it.
+    const earlierLock = (text: string) =>
+      text.replaceAll(/target: [^\n]+\n\s*harness:/g, "harness:");
     await writeFile(manifest, earlier(await readFile(manifest, "utf8")));
-    await writeFile(lockfile, earlier(await readFile(lockfile, "utf8")));
+    await writeFile(lockfile, earlierLock(await readFile(lockfile, "utf8")));
+    expect(await readFile(lockfile, "utf8")).not.toContain("target:");
     expect(await readFile(lockfile, "utf8")).toContain("- harness: claude\n");
 
     const status = await aireg(["status", "--json"]);
@@ -81,11 +84,13 @@ describe("a project an earlier aireg wrote", () => {
 
     const more = await aireg(["add", `${kit}`, "-s", "fmt", "-y"]);
     expect(more.code, more.stderr).toBe(0);
+    // Still in the names aireg 0.1 reads: the manifest as its owner wrote it, the lock in both.
     const rewritten = await readFile(manifest, "utf8");
-    expect(rewritten).toContain("targets:\n  - claude-code\n  - universal\n");
-    expect(rewritten).not.toContain("harnesses");
+    expect(rewritten).toContain("harnesses:\n  - claude\n  - agents\n");
+    expect(rewritten).not.toContain("targets");
     const lock = await readFile(lockfile, "utf8");
-    expect(lock).not.toContain("harness");
-    expect(lock).toContain("- target: claude-code\n");
+    expect(lock).toContain("version: 1\n");
+    expect(lock).toContain("- target: claude-code\n        harness: claude\n");
+    expect(lock).toContain("- target: universal\n        harness: agents\n");
   });
 });

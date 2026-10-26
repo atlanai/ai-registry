@@ -180,16 +180,21 @@ describe("a lock an earlier aireg wrote", () => {
     "",
   ].join("\n");
 
-  test("reads each `harness:` as `target:`, and writes `target:`", () => {
+  test("reads each `harness:` as `target:`", () => {
     const row = parseLock(text).artifacts.lint;
     expect(row?.origin).toEqual({ target: "claude", path: ".claude/skills/lint", step: "" });
     expect(row?.links).toEqual([
       { target: "claude", path: ".claude/skills/lint", mode: "symlink" },
     ]);
     expect(row?.blocked).toEqual([{ target: "agents", path: ".agents/skills/lint" }]);
-    const written = formatLock(parseLock(text));
-    expect(written).not.toContain("harness");
-    expect(written).toContain("- target: claude\n");
+  });
+
+  test("prefers `target:` when a row has both", () => {
+    const both = text.replace(
+      "{ harness: claude, path: .claude/skills/lint, mode",
+      "{ target: claude-code, harness: claude, path: .claude/skills/lint, mode",
+    );
+    expect(parseLock(both).artifacts.lint?.links[0]?.target).toBe("claude-code");
   });
 
   test("is left as it is by a write that changes nothing, and rewritten by one that does", async ({
@@ -206,8 +211,15 @@ describe("a lock an earlier aireg wrote", () => {
     same.artifacts.lint = { ...lint, version: "0.2.0" };
     await writeLock(scope, same);
     const written = await readFile(path, "utf8");
-    expect(written).toContain("- target: claude-code\n");
-    expect(written).not.toContain("harness");
+    // `harness:` and the earlier ids beside `target:`, so aireg 0.1 still reads it.
+    expect(written).toContain("origin:\n      target: claude-code\n      harness: claude\n");
+    expect(written).toContain(
+      "- target: claude-code\n        harness: claude\n        path: .claude/skills/lint\n",
+    );
+    expect(written).toContain(
+      "- target: universal\n        harness: agents\n        path: .agents/skills/lint\n",
+    );
+    expect(written).toContain("version: 1\n");
   });
 
   test("reads each target's earlier id as the id it has now", async ({ tmp }) => {
