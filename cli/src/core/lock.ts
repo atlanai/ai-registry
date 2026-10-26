@@ -404,7 +404,11 @@ export function formatLock(lock: Lock): string {
 /** Atomic, so a killed write leaves the old lock or the new one; the caller holds the scope's lease. */
 export async function writeLock(roots: Roots, lock: Lock): Promise<void> {
   await guardManagedPath(roots.lock, roots);
-  await writeAtomic(roots.lock, formatLock(lock));
+  const text = formatLock(lock);
+  // One an earlier aireg wrote that already says this stays as it is, so it still reads it.
+  const held = await readLock(roots).catch(() => undefined);
+  if (held !== undefined && formatLock(held) === text) return;
+  await writeAtomic(roots.lock, text);
 }
 
 /** A missing lock is the one state that means nothing is installed. */

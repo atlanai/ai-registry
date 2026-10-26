@@ -1,6 +1,7 @@
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { describe, expect } from "vitest";
+import { roots } from "#core/store/paths.ts";
 import { test } from "#test/kit/fixtures.ts";
 import {
   emptyLock,
@@ -11,6 +12,7 @@ import {
   LockError,
   parseLock,
   readLock,
+  writeLock,
 } from "./lock.ts";
 
 function lock(): Lock {
@@ -188,6 +190,24 @@ describe("a lock an earlier aireg wrote", () => {
     const written = formatLock(parseLock(text));
     expect(written).not.toContain("harness");
     expect(written).toContain("- target: claude\n");
+  });
+
+  test("is left as it is by a write that changes nothing, and rewritten by one that does", async ({
+    tmp,
+  }) => {
+    const scope = roots("project", tmp);
+    const path = scope.lock;
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, text);
+    const same = await readLock(scope);
+    await writeLock(scope, same);
+    expect(await readFile(path, "utf8")).toBe(text);
+    const lint = same.artifacts.lint as LockArtifact;
+    same.artifacts.lint = { ...lint, version: "0.2.0" };
+    await writeLock(scope, same);
+    const written = await readFile(path, "utf8");
+    expect(written).toContain("- target: claude-code\n");
+    expect(written).not.toContain("harness");
   });
 
   test("reads each target's earlier id as the id it has now", async ({ tmp }) => {
