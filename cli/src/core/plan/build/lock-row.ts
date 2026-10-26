@@ -133,11 +133,14 @@ function unmoved(before: Lock, after: Lock, alias: string): boolean {
   );
 }
 
-/** The revision says what the lock was resolved at; serving the same rows again does not move it. */
+/**
+ * The revision says what the lock was resolved at; serving the same rows again does not move it.
+ * A registry at a new address is another source, with a revision of its own.
+ */
 export function keepUnmovedRevisions(before: Lock, next: Lock): void {
   for (const [alias, source] of Object.entries(next.registries)) {
     const held = before.registries[alias];
-    if (held !== undefined && unmoved(before, next, alias)) {
+    if (held !== undefined && held.key === source.key && unmoved(before, next, alias)) {
       next.registries[alias] = { ...source, revision: held.revision };
     }
   }

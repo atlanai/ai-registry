@@ -72,7 +72,14 @@ export { mergedIndex, mergedVersions, type OfferedVersion, specJson } from "./fi
 export { type ArtifactKind, isKind, KINDS } from "./kinds.ts";
 export type { LayoutId } from "./layouts/ids.ts";
 export { namesHost, registryNameFromLocation, SCP_LOCATION } from "./location.ts";
-export { expandHome, isLocalPath, isSafePath, onPath, withAbsolutePath } from "./paths.ts";
+export {
+  expandHome,
+  isLocalPath,
+  isSafePath,
+  onPath,
+  programPath,
+  withAbsolutePath,
+} from "./paths.ts";
 export {
   describeProblem,
   failureFromStatus,

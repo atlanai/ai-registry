@@ -75,11 +75,13 @@ interface RpcMethod<Params, Result> {
 
 export interface DaemonMethods {
   initialize: RpcMethod<
-    { protocolVersion: typeof PROTOCOL_VERSION; client: ClientInfo },
+    { protocolVersion: typeof PROTOCOL_VERSION; client: ClientInfo; challenge: string },
     {
       protocolVersion: typeof PROTOCOL_VERSION;
       server: { name: typeof NAME; version: string };
       daemon: DaemonInfo;
+      /** The challenge signed with this user's daemon key. */
+      proof?: string;
     }
   >;
   "state.snapshot": RpcMethod<

@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { createConnection, type Socket } from "node:net";
 import { plural } from "#adapter/text.ts";
 import type { RegistryConfig } from "#core/config/model.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isRecord } from "#core/fields.ts";
 import { NAME } from "#core/product.ts";
 import { isTerminal, type RunEvent } from "#core/run/model.ts";
 import { RpcErrorCode } from "./codes.ts";
-import { assertOwnSocket } from "./endpoint.ts";
+import { assertOwnSocket, daemonChallenge, provesDaemon } from "./endpoint.ts";
 import { FrameDecoder } from "./frames.ts";
 import {
   type ClientInfo,
@@ -62,6 +63,14 @@ function handshakeVersion(value: unknown): string | undefined {
   const server = (value as Record<string, unknown>).server;
   if (!isRecord(server) || server.name !== NAME) return undefined;
   return typeof server.version === "string" && server.version !== "" ? server.version : undefined;
+}
+
+/** What answered may be another user's process, or a daemon an older aireg started. */
+function unproven(): AiregError {
+  return new AiregError(
+    "The aireg daemon could not prove it runs as you, so aireg sent it nothing more.",
+    { code: ErrorCode.Integrity, hint: "Run `aireg daemon restart`." },
+  );
 }
 
 export function cliClient(version: string): ClientInfo {
@@ -148,9 +157,11 @@ export class RpcClient {
     });
     const client = new RpcClient(socket);
     try {
+      const challenge = daemonChallenge();
       const initialized = await client.request("initialize", {
         protocolVersion: PROTOCOL_VERSION,
         client: clientInfo,
+        challenge,
       });
       const version = handshakeVersion(initialized);
       if (version === undefined) {
@@ -159,6 +170,7 @@ export class RpcClient {
           "The running aireg daemon is incompatible with this CLI. Run `aireg daemon restart`.",
         );
       }
+      if (!provesDaemon(challenge, initialized.proof)) throw unproven();
       client.#serverVersion = version;
       client.#stopping = initialized.daemon.stopping === true;
       return client;

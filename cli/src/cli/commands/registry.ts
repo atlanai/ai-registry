@@ -23,6 +23,7 @@ import {
 } from "#adapter/text.ts";
 import { parseSource } from "#adapters/git/api.ts";
 import { jobsClause, registryJobs, removeJobs } from "#cli/commands/registry/jobs.ts";
+import { type Move, moveOf, recordMove, signInLeftBehind } from "#cli/commands/registry/move.ts";
 import { parse } from "#cli/options.ts";
 import { cancel, type Interaction, interaction, interactive } from "#cli/prompt/flow.ts";
 import { canceled, defaultIo, text } from "#cli/prompt/index.ts";
@@ -30,7 +31,13 @@ import { commitAndPush, releaseSubject } from "#cli/publish/target.ts";
 import { knownRegistries, undeclaredRegistry } from "#cli/registries.ts";
 import { underHome } from "#cli/render/home.ts";
 import { noteUserScope } from "#cli/render/where.ts";
-import { probe, type SourceFlags, sourceConfig, throughManifest } from "#cli/source.ts";
+import {
+  type Probed,
+  probe,
+  type SourceFlags,
+  sourceConfig,
+  throughManifest,
+} from "#cli/source.ts";
 import { workflowCommand } from "#cli/workflow-command.ts";
 import { expandLocation, recordedLocation } from "#core/adapter/location.ts";
 import { loadAdapter } from "#core/adapter/registry.ts";
@@ -57,7 +64,7 @@ import { formatRef, type Ref } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
 import { fields, table } from "#core/term/table.ts";
 import type { CommonOptions } from "#engine/options.ts";
-import { load } from "#engine/pipeline.ts";
+import { type Loaded, load, withScope } from "#engine/pipeline.ts";
 import {
   builtin,
   type CommandContext,
@@ -117,16 +124,21 @@ async function add(
   let label: string | undefined;
   let fromAddress = false;
   let readable = true;
+  let move: Move | undefined;
   try {
     const source = await probe(input, flags, context.cwd);
-    declared = {
-      ...source.declared,
-      location: recordedLocation(input, source.declared.location, loaded.roots),
-    };
-    alias = flags.as ?? source.alias;
-    label = source.label;
-    fromAddress = flags.as === undefined && source.named === "address";
-    await source.close();
+    try {
+      declared = {
+        ...source.declared,
+        location: recordedLocation(input, source.declared.location, loaded.roots),
+      };
+      alias = flags.as ?? source.alias;
+      label = source.label;
+      fromAddress = flags.as === undefined && source.named === "address";
+      ({ declared, move } = await settle(context, loaded, common.dryRun, alias, declared, source));
+    } finally {
+      await source.close();
+    }
   } catch (error) {
     if (!(error instanceof AiregError) || error.code !== ErrorCode.Unauthorized) throw error;
     // An adapter that brings its own credentials has no sign-in to finish later.
@@ -147,16 +159,18 @@ async function add(
     };
     alias = flags.as;
     readable = false;
+    ({ declared, move } = await settle(context, loaded, common.dryRun, alias, declared, undefined));
   }
 
-  await declare(loaded.roots, alias, declared, common.dryRun);
+  const movedFrom = move === undefined ? {} : { movedFrom: move.from, kept: move.kept };
   if (context.printer.format === "json") {
     context.printer.json({
       ok: true,
-      data: { ...described(alias, declared), readable, dryRun: common.dryRun },
+      data: { ...described(alias, declared), ...movedFrom, readable, dryRun: common.dryRun },
     });
     return;
   }
+  if (move !== undefined) return moved(context, loaded.roots, alias, declared, move, common.dryRun);
   if (common.dryRun) {
     context.printer.info(
       `Would add registry ${alias} at ${withoutCredentials(declared.location)}.`,
@@ -173,25 +187,64 @@ async function add(
   context.printer.note(readable ? "next" : "then", `aireg add ${g}${alias}/<namespace>`);
 }
 
-/** A dry run still refuses a clashing alias, so its preview is what a real run would do. */
-async function declare(
+/**
+ * Decided and written under the scope's lease, against the manifest and lock as they are then,
+ * so a command that writes the scope meanwhile is kept, not overwritten.
+ */
+async function settle(
+  context: CommandContext,
+  loaded: Loaded,
+  dryRun: boolean,
+  alias: string,
+  declared: RegistrySource,
+  source: Probed | undefined,
+): Promise<{ declared: RegistrySource; move: Move | undefined }> {
+  const decide = async ({ roots, manifest, lock }: Loaded) => {
+    const move = await moveOf(roots, manifest, lock, alias, declared, source);
+    const existing = manifest.registries[alias];
+    // Another spelling of the same registry keeps the one its lock rows were resolved at.
+    if (move !== undefined || existing === undefined) return { declared, move };
+    return { declared: { ...declared, location: existing.location }, move };
+  };
+  if (dryRun) return decide(loaded);
+  return withScope(
+    loaded.roots,
+    async (state) => {
+      const settled = await decide(state);
+      state.manifest.registries[alias] = settled.declared;
+      await writeManifest(state.roots, state.manifest);
+      if (settled.move !== undefined)
+        await recordMove(state.roots, state.lock, alias, settled.declared, settled.move);
+      return settled;
+    },
+    context.printer,
+  );
+}
+
+/** Reports a move. Nothing installed is touched, since the new address was checked to serve it. */
+async function moved(
+  context: CommandContext,
   roots: Roots,
   alias: string,
   declared: RegistrySource,
+  move: Move,
   dryRun: boolean,
 ): Promise<void> {
-  const manifest = await readManifest(roots.manifest);
-  const existing = manifest.registries[alias];
-  const at = (location: string) => expandLocation(location, roots.base);
-  if (existing !== undefined && at(existing.location) !== at(declared.location)) {
-    throw new AiregError(`The name ${quoted(alias)} already belongs to ${existing.location}.`, {
-      code: ErrorCode.Usage,
-      hint: `Choose another name with \`--as\`, or run \`aireg registry remove ${alias}\` first.`,
-    });
+  const what = `registry ${alias} from ${withoutCredentials(move.from)} to ${withoutCredentials(declared.location)}`;
+  const kept = plural(move.kept, "installed artifact");
+  if (dryRun) {
+    context.printer.info(`Would move ${what}, keeping ${kept}.`);
+    context.printer.info(context.printer.style.dim("Dry run. Nothing was changed."));
+    return;
   }
-  if (dryRun) return;
-  manifest.registries[alias] = declared;
-  await writeManifest(roots, manifest);
+  context.printer.success(`Moved ${what}.`);
+  context.printer.note("kept", kept);
+  if (await signInLeftBehind(roots, alias, declared, move)) {
+    context.printer.warning(
+      `Your sign-in to ${alias} is for its old address, so it does not reach the new one.`,
+    );
+    context.printer.note("next", `aireg auth login ${alias}`);
+  }
 }
 
 /** A registry is created where you are, as files; publishing it is your version control's job. */
@@ -587,7 +640,7 @@ async function show(
     const unknown = await undeclaredRegistry(target, known, common, context.cwd);
     if (unknown !== undefined) throw unknown;
   }
-  const source = await probe(resolved.input, resolved.flags, context.cwd, [], resolved.alias);
+  const source = await probe(resolved.input, resolved.flags, context.cwd, [], resolved);
   const catalog = source.catalog;
 
   if (context.printer.format === "json") {

@@ -1,4 +1,4 @@
-import { access, chmod, readFile, writeFile } from "node:fs/promises";
+import { access, chmod, copyFile, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -125,5 +125,14 @@ unix("git", () => {
       vi.unstubAllEnvs();
     }
     await expect(access(join(tmp, "git.ran"))).rejects.toThrow();
+  });
+});
+
+describe.runIf(process.platform === "win32")("git on Windows", () => {
+  // Node stands in for a planted git.
+  test("never runs a git planted in the folder it works in", async ({ tmp }) => {
+    await copyFile(process.execPath, join(tmp, "git.exe"));
+    const attempt = await gitTry(["--version"], { cwd: tmp, timeoutMs: 60_000 });
+    expect(attempt.stdout).toMatch(/^git version/);
   });
 });

@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { linkSync, lstatSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { lstat, mkdir } from "node:fs/promises";
 import { createConnection } from "node:net";
@@ -54,11 +54,11 @@ function socketName(env: NodeJS.ProcessEnv): string {
   return `${NAME}-${user()}-${homeIdentity(toolHome(env))}.sock`;
 }
 
-const PIPE_SECRET = /^[0-9a-f]{32}$/;
+const SECRET = /^[0-9a-f]{32}$/;
 
-/** The random part of this home's pipe name, written whole and then linked into place. */
-function pipeSecret(env: NodeJS.ProcessEnv): string {
-  const path = join(toolHome(env), "state", "pipe-name");
+/** A random value kept in this home, written whole and then linked into place. */
+function homeSecret(env: NodeJS.ProcessEnv, file: string): string {
+  const path = join(toolHome(env), "state", file);
   try {
     return readSecret(path);
   } catch (error) {
@@ -82,16 +82,39 @@ function pipeSecret(env: NodeJS.ProcessEnv): string {
 
 function readSecret(path: string): string {
   const secret = readFileSync(path, "utf8").trim();
-  if (!PIPE_SECRET.test(secret)) {
-    throw new Error(`${path} does not hold a pipe name. Delete it and try again.`);
+  if (!SECRET.test(secret)) {
+    throw new Error(`${path} is not what aireg wrote there. Delete it and try again.`);
   }
   return secret;
 }
 
-// Pipe names are machine-wide: a guessable one could be taken first. Node cannot check a
-// pipe server's owner, so a name listed while the daemon runs can still be taken once it stops.
+const CHALLENGE = /^[0-9a-f]{64}$/;
+
+export function daemonChallenge(): string {
+  return randomBytes(32).toString("hex");
+}
+
+/**
+ * Signed with a key only this user's home holds, so a process of another user
+ * that took the endpoint first cannot answer it.
+ */
+export function daemonProof(challenge: unknown): string | undefined {
+  if (typeof challenge !== "string" || !CHALLENGE.test(challenge)) return undefined;
+  const key = homeSecret(process.env, "daemon-key");
+  return createHmac("sha256", key).update(challenge).digest("hex");
+}
+
+export function provesDaemon(challenge: string, proof: unknown): boolean {
+  const expected = daemonProof(challenge);
+  if (expected === undefined || typeof proof !== "string") return false;
+  const given = Buffer.from(proof);
+  return given.length === expected.length && timingSafeEqual(given, Buffer.from(expected));
+}
+
+// Pipe names are machine-wide: a guessable one could be taken first. Node cannot check a pipe
+// server's owner, and a name listed while the daemon runs can be taken once it stops: hence the proof.
 function pipeName(env: NodeJS.ProcessEnv): string {
-  return `\\\\.\\pipe\\${NAME}-${homeIdentity(toolHome(env))}-${pipeSecret(env)}`;
+  return `\\\\.\\pipe\\${NAME}-${homeIdentity(toolHome(env))}-${homeSecret(env, "pipe-name")}`;
 }
 
 /**

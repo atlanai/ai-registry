@@ -44,6 +44,7 @@ describe("the published adapter contract", () => {
       "parseVersion",
       "plural",
       "problemFromFailure",
+      "programPath",
       "quoted",
       "readIndex",
       "readJson",

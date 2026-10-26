@@ -52,11 +52,21 @@ Declares a registry. aireg reads it first, to check it can, then records it in t
 | `--layout <layout>` | How to read the source, `registry`, `marketplace`, `well-known` or `folder`, instead of telling from what it holds. Recorded in the manifest. |
 | `--config <key>=<value>` | A setting for that adapter, recorded with the registry in the manifest. Repeat it for more than one. A setting the adapter doesn't take is refused: git takes `ref` and `path`, and a local folder takes none. |
 | `-g` | Declare it in your user scope. Outside a project, the user scope is used anyway, and aireg says so. |
-| `--dry-run` | Print what would be declared, and change nothing. |
+| `--dry-run` | Print what would be declared or moved, and change nothing. A move is still checked against the new address. |
 
-Declaring a name that already belongs to another address fails; choose another with `--as`, or remove the old one first.
+JSON output: `{"ok": true, "data": {"registry": "acme", "address": "github.com/acme/ai-registry", "config": {}, "readable": true, "dryRun": false}}`. `readable` is `false` when the registry could not be read before you sign in. A move also has `movedFrom`, the old address, and `kept`, how many installed artifacts the new address serves.
 
-JSON output: `{"ok": true, "data": {"registry": "acme", "address": "github.com/acme/ai-registry", "config": {}, "readable": true, "dryRun": false}}`. `readable` is `false` when the registry could not be read before you sign in.
+### Moving a registry
+
+Declaring a name that already belongs to another address moves that registry there, such as when a team's registry leaves a shared folder for a git repository:
+
+```bash
+aireg registry add github.com/acme/ai-registry --as acme
+```
+
+aireg first checks that the new address serves every artifact installed from the registry, at the installed version and with the same content. If it does, the manifest and lockfile take the new address; pins, links and background jobs refer to the registry by name, so they stay as they are. If it doesn't, nothing changes, and aireg names each artifact the new address lacks or serves with other content. Remove those first with [`aireg remove`](remove.md), or use `--as` to declare the new address beside the old one.
+
+A sign-in is for one host. If you signed in to the registry and its new address is on another host, aireg says so and suggests `aireg auth login <name>`.
 
 ## aireg registry list
 
@@ -153,8 +163,9 @@ JSON output: `{"ok": true, "data": {"name": "acme", "namespaces": 1, "artifacts"
 ## Exit status
 
 - `0`: success. For `validate`, the registry has no problems.
-- `1`: the registry can't be read, no registry has that name, the registry is still in use, `--base` names no commit, or, for `validate` and `index`, the registry has problems.
-- `2`: `add` or `remove` was given no address or name, `--as` isn't a valid name, the name already belongs to another address, `show` was given no argument and the scope declares no registry or more than one, the action is unknown, `index` or `validate` is run outside a registry, `init` is given a remote address or a namespace that isn't valid, or `--base` is given a value that starts with `-`.
+- `1`: the registry can't be read, no registry has that name, the registry is still in use, a new address doesn't serve what was installed from the registry, `--base` names no commit, or, for `validate` and `index`, the registry has problems.
+- `2`: `add` or `remove` was given no address or name, `--as` isn't a valid name, `show` was given no argument and the scope declares no registry or more than one, the action is unknown, `index` or `validate` is run outside a registry, `init` is given a remote address or a namespace that isn't valid, or `--base` is given a value that starts with `-`.
+- `4`: `add` can't read an address before you sign in, so it needs `--as`, or can't read a registry's new address to check what was installed from it.
 
 ## Examples
 

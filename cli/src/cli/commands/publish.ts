@@ -607,7 +607,14 @@ function opener(
     const cached = opened.get(alias);
     if (cached !== undefined) return cached;
     const declared = known[alias] as RegistrySource;
-    const read = await readPublished(alias, declared, cwd, wants.get(alias) ?? [], how(alias));
+    const read = await readPublished(
+      alias,
+      declared,
+      Object.keys(known),
+      cwd,
+      wants.get(alias) ?? [],
+      how(alias),
+    );
     opened.set(alias, read);
     return read;
   };
@@ -667,7 +674,13 @@ export async function run(context: CommandContext): Promise<void> {
 
   const how = (alias: string) => intoClone(works, alias, to, context.cwd);
   const namespacesOf = (alias: string) =>
-    namespacesIn(alias, known[alias] as RegistrySource, context.cwd, how(alias));
+    namespacesIn(
+      alias,
+      known[alias] as RegistrySource,
+      Object.keys(known),
+      context.cwd,
+      how(alias),
+    );
   const where = await destinationOf(
     step,
     works,

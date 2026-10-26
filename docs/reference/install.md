@@ -18,7 +18,7 @@ aireg install [-g] [--for <harness>[,<harness>...]] [--frozen] [--force] [--copy
 
 A version's status in its registry decides whether it installs, as [Version status](kinds.md#version-status) describes: a `blocked` version never does, and a `deprecated` one installs with a warning.
 
-An installed artifact that its registry no longer lists stays installed, with a warning and the `aireg remove <name>` that takes it out: a listing cut short or emptied never removes anything.
+An installed artifact that its registry no longer lists stays installed, with a warning and the `aireg remove <name>` that takes it out: a listing cut short or emptied never removes anything. The exception is a registry whose adapter says it read the whole listing: an artifact installed with a whole registry or namespace, and not named on its own, is removed.
 
 An installed copy that was edited after it was installed is kept, with a warning. Pass `--force` to restore the copy the lockfile records instead, or run [`aireg sync`](sync.md) to see how your edit compares with the registry.
 

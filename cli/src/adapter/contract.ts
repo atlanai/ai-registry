@@ -76,6 +76,8 @@ export interface Resolution {
   registry?: RegistryIdentity | undefined;
   /** Artifacts a want reached that the registry's status rules kept back, rather than unpublished. */
   withheld?: readonly Withheld[] | undefined;
+  /** Under `all`, the listing was read to its end: an artifact it leaves out was deleted. */
+  complete?: boolean | undefined;
   /** The newest held version when it differs from the served version, including yanked releases. */
   newest?: readonly Newest[] | undefined;
   /** What a person should know about how the source was read, one sentence each. */

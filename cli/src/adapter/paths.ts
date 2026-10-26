@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { delimiter, extname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { stripTrailing } from "./text.ts";
 
 const UNPRINTABLE = /\p{Cc}/u;
@@ -115,4 +115,45 @@ export function onPath(binary: string, env: NodeJS.ProcessEnv = process.env): bo
   const paths = pathKeys(env).flatMap((key) => absoluteFolders(env[key]));
   const suffixes = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
   return paths.some((entry) => suffixes.some((ext) => existsSync(join(entry, binary + ext))));
+}
+
+const SYSTEM_PROGRAMS = new Map([
+  ["powershell", join("WindowsPowerShell", "v1.0", "powershell.exe")],
+  ["reg", "reg.exe"],
+  ["rundll32", "rundll32.exe"],
+]);
+
+function system32(env: NodeJS.ProcessEnv): string {
+  const key = Object.keys(env).find((each) => each.toUpperCase() === "SYSTEMROOT");
+  const root = key === undefined ? undefined : env[key];
+  return join(
+    root !== undefined && /^[A-Za-z]:[\\/]/.test(root) ? root : "C:\\Windows",
+    "System32",
+  );
+}
+
+/** What a Windows spawn tries for `name`: itself when it has an extension, then .com and .exe. */
+function windowsCandidates(folder: string, name: string): string[] {
+  const names = [...(extname(name) === "" ? [] : [name]), `${name}.com`, `${name}.exe`];
+  return names.map((each) => join(folder, each));
+}
+
+/**
+ * Windows tries a bare name in the working folder before PATH, so there this is its System32 copy
+ * or the first match in PATH's absolute folders other than `cwd`. Elsewhere it is `command`.
+ */
+export function programPath(
+  command: string,
+  env: NodeJS.ProcessEnv,
+  cwd: string = process.cwd(),
+): string | undefined {
+  if (process.platform !== "win32" || /[\\/:]/.test(command)) return command;
+  const system = SYSTEM_PROGRAMS.get(command.toLowerCase());
+  if (system !== undefined) return join(system32(env), system);
+  const here = resolve(cwd).toLowerCase();
+  return pathKeys(env)
+    .flatMap((key) => absoluteFolders(env[key]))
+    .filter((folder) => resolve(folder).toLowerCase() !== here)
+    .flatMap((folder) => windowsCandidates(folder, command))
+    .find((path) => existsSync(path));
 }

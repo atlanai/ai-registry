@@ -228,13 +228,15 @@ function heldOf(artifact: Artifact, version: string | undefined): Current {
 async function connectToPublish(
   alias: string,
   declared: RegistrySource,
+  /** Every registry this scope declares, any of which may read the same token. */
+  aliases: readonly string[],
   cwd: string,
   how: string | undefined,
 ): Promise<{ location: string; source: ConnectedSource }> {
   const refused = readOnlyLayout(alias, declared.config);
   if (refused !== undefined) throw refused;
   const location = expandLocation(declared.location, cwd);
-  const credential = await credentialFor(alias, declared, location);
+  const credential = await credentialFor(alias, declared, location, aliases);
   const source = await connectSource(
     {
       alias,
@@ -257,10 +259,11 @@ async function connectToPublish(
 export async function namespacesIn(
   alias: string,
   declared: RegistrySource,
+  aliases: readonly string[],
   cwd: string,
   how?: string,
 ): Promise<string[]> {
-  const { source } = await connectToPublish(alias, declared, cwd, how);
+  const { source } = await connectToPublish(alias, declared, aliases, cwd, how);
   try {
     const { listed } = await resolveArtifacts(source, [], { all: true });
     const namespaces = listed.flatMap(({ artifact }) => artifact.envelope.metadata.namespace ?? []);
@@ -273,13 +276,14 @@ export async function namespacesIn(
 export async function readPublished(
   alias: string,
   declared: RegistrySource,
+  aliases: readonly string[],
   cwd: string,
   /** Every artifact this run may publish or name here, as `publishWants` gives them. */
   want: readonly Want[],
   /** The command that publishes this work into a clone, for when the registry is a git one. */
   how?: string,
 ): Promise<Published> {
-  const { location, source } = await connectToPublish(alias, declared, cwd, how);
+  const { location, source } = await connectToPublish(alias, declared, aliases, cwd, how);
 
   const listing = await resolveArtifacts(source, want);
   const latest = new Map<string, Current>();

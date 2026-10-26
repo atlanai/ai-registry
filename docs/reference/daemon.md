@@ -28,7 +28,7 @@ The daemon keeps each job's recent runs in `state/aireg.db` under aireg's folder
 
 Says whether the daemon is running, and if it is, its version and process id, how many jobs are enabled, whether autostart is on, and whether jobs are paused. `status` never starts the daemon.
 
-If another program is listening on the daemon's socket, `status` warns about it instead.
+If another program is listening on the daemon's socket, `status` warns about it instead. A daemon that cannot prove it runs as you counts as another program, and commands send it no credentials; one an older aireg started is replaced by `aireg daemon restart`, or by the next command that needs the daemon.
 
 ## aireg daemon start
 

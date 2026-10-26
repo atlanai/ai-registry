@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { AdapterError, type Failure, withAbsolutePath } from "#adapter/index.ts";
+import { AdapterError, type Failure, programPath, withAbsolutePath } from "#adapter/index.ts";
 import { gitEnv } from "./env.ts";
 import { ID } from "./errors.ts";
 
@@ -176,7 +176,12 @@ function spawnOne(
       );
       return;
     }
-    const child = spawn(binary, [...args], {
+    const program = programPath(binary, env, options.cwd);
+    if (program === undefined) {
+      reject(Object.assign(new Error(`spawn ${binary} ENOENT`), { code: "ENOENT" }));
+      return;
+    }
+    const child = spawn(program, [...args], {
       cwd: options.cwd,
       env,
       detached: GROUPED,

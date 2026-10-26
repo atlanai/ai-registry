@@ -14,6 +14,12 @@ import { unlistedRows } from "./unlisted.ts";
 const readWhole = (...args: Parameters<typeof acquired>) =>
   acquired(...args).map((source) => ({ ...source, whole: true }));
 
+const readComplete = (entries = [entry({ name: "fmt", path: "skills/fmt" })]) =>
+  readWhole(entries).map((source) => ({
+    ...source,
+    catalog: { ...source.catalog, complete: true },
+  }));
+
 describe("unlistedRows", () => {
   it("finds a row the manifest asks for that its registry no longer lists", () => {
     const rows = unlistedRows(
@@ -47,6 +53,31 @@ describe("unlistedRows", () => {
     const [whole] = manifest.artifacts;
     if (whole !== undefined) whole.exclude = ["skill/lint"];
     expect(unlistedRows(manifest, installed(), acquired([]))).toEqual([]);
+  });
+});
+
+describe("unlistedRows, for a listing its adapter says is complete", () => {
+  it("leaves out a row only a whole-registry entry reaches", () => {
+    expect(unlistedRows(kitManifest(["kit"]), installed(), readComplete())).toEqual([]);
+  });
+
+  it("keeps a row an entry names", () => {
+    expect(unlistedRows(kitManifest(), installed(), readComplete())).toEqual([
+      { name: "lint", registry: "kit", empty: false },
+    ]);
+  });
+
+  it("keeps a row when the listing is empty", () => {
+    expect(unlistedRows(kitManifest(["kit"]), installed(), readComplete([]))).toEqual([
+      { name: "lint", registry: "kit", empty: true },
+    ]);
+  });
+
+  it("keeps a row when the run did not read the registry whole", () => {
+    const partial = readComplete().map((source) => ({ ...source, whole: false }));
+    expect(unlistedRows(kitManifest(["kit"]), installed(), partial)).toEqual([
+      { name: "lint", registry: "kit", empty: false },
+    ]);
   });
 });
 

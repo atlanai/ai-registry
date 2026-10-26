@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { exec } from "#core/process.ts";
 import { PATH_REFRESH_VARIABLE } from "#core/product.ts";
 
@@ -36,14 +35,8 @@ interface UserPath {
   value: string;
 }
 
-/** Named in full: a `powershell` earlier on PATH would run instead. */
-function powershell(env: NodeJS.ProcessEnv): string {
-  const root = env.SystemRoot ?? env.SYSTEMROOT ?? "C:\\Windows";
-  return join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-}
-
 async function run(script: string, env: NodeJS.ProcessEnv, extra: NodeJS.ProcessEnv = {}) {
-  return exec(powershell(env), ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
+  return exec("powershell", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
     timeoutMs: TIMEOUT_MS,
     env: { ...env, ...extra },
   });

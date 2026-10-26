@@ -116,30 +116,33 @@ async function release(
 }
 
 /**
- * Undefined is the ordinary case: most registries need no account at all.
- * `alias` is the name the current scope declares at `location`.
+ * Undefined for most registries. `declared` is every alias the scope declares, since two can
+ * read one token variable.
  */
 export async function credentialFor(
   alias: string,
   source: Source,
   location: string,
+  declared: readonly string[],
   signal: AbortSignal = new AbortController().signal,
 ): Promise<Credential | undefined> {
-  return release(alias, source, location, true, await lookup(signal, [alias]));
+  return release(alias, source, location, true, await lookup(signal, [alias, ...declared]));
 }
 
 /**
- * Keyed by alias because that is how `acquire` asks for them, and skipping the
- * registries nobody is signed in to so an unauthenticated source stays free.
+ * Keyed by alias, as `acquire` asks; registries nobody is signed in to are skipped. `only`
+ * narrows what is resolved, never which aliases are checked for a shared token.
  */
 export async function credentialsForManifest(
   registries: Readonly<Record<string, RegistrySource>>,
   cwd: string,
   signal: AbortSignal = new AbortController().signal,
+  only: readonly string[] = Object.keys(registries),
 ): Promise<Record<string, Credential>> {
   const shared = await lookup(signal, Object.keys(registries));
+  const wanted = Object.entries(registries).filter(([alias]) => only.includes(alias));
   const resolved = await Promise.all(
-    Object.entries(registries).map(async ([alias, source]) => ({
+    wanted.map(async ([alias, source]) => ({
       alias,
       credential: await release(alias, source, expandLocation(source.location, cwd), true, shared),
     })),

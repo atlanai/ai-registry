@@ -18,7 +18,7 @@ An artifact pinned to a version, such as `acme/engineering/pr-review@1.2.0`, sta
 
 When the manifest takes a whole namespace, `update` also installs the artifacts the namespace has published since.
 
-An installed artifact that its registry no longer lists stays installed: `update` takes everything else, then fails, naming it and the `aireg remove <name>` that takes it out.
+An installed artifact that its registry no longer lists stays installed: `update` takes everything else, then fails, naming it and the `aireg remove <name>` that takes it out. When the registry's adapter says it read the whole listing, `update` removes it instead, as [`install`](install.md) describes.
 
 `update` doesn't overwrite your edits. To take the registry's copy over your edit, run [`aireg sync resolve <name> --theirs`](sync.md#aireg-sync-resolve). To discard edits made here, run [`aireg install --force`](install.md).
 
