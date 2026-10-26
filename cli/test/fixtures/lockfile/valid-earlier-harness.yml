@@ -1,0 +1,32 @@
+version: 1
+registries:
+  kit:
+    source: https://github.com/acme/agent-kit.git
+    adapter: git
+    key: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+artifacts:
+  lint:
+    registry: kit
+    id: skills/lint
+    name: lint
+    kind: skill
+    address: skills/lint
+    content: "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    links:
+      - harness: claude
+        path: .claude/skills/lint
+        mode: symlink
+    blocked:
+      - harness: agents
+        path: .agents/skills/lint
+  notes:
+    registry: kit
+    name: notes
+    kind: skill
+    content: "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    digest: "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    origin:
+      harness: claude
+      path: .claude/skills/notes
+    links: []

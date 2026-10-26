@@ -15,6 +15,14 @@ const Legacy = (minItems: number) =>
     }),
   );
 
+/** A list said under both names is ambiguous, so the parser refuses it. */
+const ONE_TARGETS_KEY = {
+  not: {
+    properties: { targets: true, [LEGACY_TARGETS_KEY]: true },
+    required: ["targets", LEGACY_TARGETS_KEY],
+  },
+};
+
 /** What each layout reads, which an editor shows beside the value it offers. */
 const LAYOUT_READS: Record<LayoutId, string> = {
   registry: "A registry laid out as the file spec describes, with a `registry.json` at its root.",
@@ -132,7 +140,7 @@ const DetailedReference = Type.Object(
       }),
     ),
   },
-  { additionalProperties: false },
+  { additionalProperties: false, ...ONE_TARGETS_KEY },
 );
 
 const PATH = String.raw`(?![A-Za-z]:)(?!(?:[^/]*/)*\.\.?(?:/|$))[^/\\]+(?:/[^/\\]+)*`;
@@ -301,5 +309,6 @@ export const Manifest = Type.Object(
     description:
       "A project's manifest: the registries it installs from, the artifacts it wants, and the targets it projects into. Where this schema and the CLI disagree, the CLI is authoritative.",
     additionalProperties: false,
+    ...ONE_TARGETS_KEY,
   },
 );

@@ -147,9 +147,26 @@
             "origin": {
               "description": "Set when the bytes came from a folder here rather than from upstream.",
               "additionalProperties": false,
+              "anyOf": [
+                {
+                  "properties": {
+                    "target": true
+                  },
+                  "required": [
+                    "target"
+                  ]
+                },
+                {
+                  "properties": {
+                    "harness": true
+                  },
+                  "required": [
+                    "harness"
+                  ]
+                }
+              ],
               "type": "object",
               "required": [
-                "target",
                 "path"
               ],
               "properties": {
@@ -180,9 +197,26 @@
               "type": "array",
               "items": {
                 "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "properties": {
+                      "target": true
+                    },
+                    "required": [
+                      "target"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "harness": true
+                    },
+                    "required": [
+                      "harness"
+                    ]
+                  }
+                ],
                 "type": "object",
                 "required": [
-                  "target",
                   "path",
                   "mode"
                 ],
@@ -245,9 +279,26 @@
               "type": "array",
               "items": {
                 "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "properties": {
+                      "target": true
+                    },
+                    "required": [
+                      "target"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "harness": true
+                    },
+                    "required": [
+                      "harness"
+                    ]
+                  }
+                ],
                 "type": "object",
                 "required": [
-                  "target",
                   "path"
                 ],
                 "properties": {

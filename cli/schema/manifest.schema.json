@@ -4,6 +4,16 @@
   "title": "manifest.yml",
   "description": "A project's manifest: the registries it installs from, the artifacts it wants, and the targets it projects into. Where this schema and the CLI disagree, the CLI is authoritative.",
   "additionalProperties": false,
+  "not": {
+    "properties": {
+      "targets": true,
+      "harnesses": true
+    },
+    "required": [
+      "targets",
+      "harnesses"
+    ]
+  },
   "type": "object",
   "properties": {
     "$schema": {
@@ -137,6 +147,16 @@
           },
           {
             "additionalProperties": false,
+            "not": {
+              "properties": {
+                "targets": true,
+                "harnesses": true
+              },
+              "required": [
+                "targets",
+                "harnesses"
+              ]
+            },
             "type": "object",
             "required": [
               "ref"
