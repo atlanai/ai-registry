@@ -12,7 +12,7 @@ import { homeEnv } from "#test/kit/home.ts";
 import { runCli } from "#test/kit/run.ts";
 import { testRoot } from "#test/kit/temp.ts";
 
-/** One command of the target's own that lists what it loaded, and what its output holds. */
+/** One command of the coding agent's own that lists what it loaded, and what its output holds. */
 export interface Probe {
   /** Run from the project for `project`, from the home folder for `user`. */
   scope: "project" | "user";
@@ -214,7 +214,7 @@ export function conformance(spec: Conformance): void {
       expect(placed(tree(box.home))).toEqual(placed(before));
     });
 
-    // A sandbox of its own: the target may write its own state as it runs.
+    // A sandbox of its own: the coding agent may write its own state as it runs.
     test.skipIf(!live)(
       l2,
       async () => {

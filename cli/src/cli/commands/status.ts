@@ -98,7 +98,7 @@ async function unmanaged(item: Candidate): Promise<Unmanaged> {
   };
 }
 
-/** A link of yours whose target is gone, which its target cannot load. */
+/** A link of yours that points at nothing, so no target can load it. */
 function printDangling(
   context: CommandContext,
   roots: { scope: string; base: string },

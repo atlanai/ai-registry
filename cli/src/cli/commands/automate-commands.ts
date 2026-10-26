@@ -6,8 +6,6 @@ import { RUN_MODES } from "#core/run/model.ts";
 import { MAX_PAGE_SIZE } from "#daemon/rpc/protocol.ts";
 import type { CommandSpec } from "./index.ts";
 
-/** The command table's Automate group, kept apart so the table stays one readable file. */
-
 const policy = (name: string, what: string): OptionSpec => ({
   flag: `--${name}`,
   value: "<policy>",

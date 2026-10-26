@@ -219,7 +219,7 @@ export async function chooseTargets(
 /** Group removal choices by their registry. */
 export async function chooseRemovals(
   step: Interaction,
-  /** `targets` are the targets that load each one, by name. */
+  /** Each with the targets that load it, by name. */
   installed: readonly { name: string; kind: string; source: string; targets: string[] }[],
 ): Promise<string[] | Canceled> {
   return await multiselect(
@@ -430,7 +430,7 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
       removed.add(action.name);
       if (action.edited === true) edited.add(action.name);
     }
-    // A clone is this scope's own copy, not a placement in someone's target,
+    // A clone is this scope's own copy, not a placement in a target's folder,
     // and a link is summarized by target below, so neither gets its own line.
   }
   const linked = linkedTargets(plan);

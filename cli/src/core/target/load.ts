@@ -16,7 +16,7 @@ export const BUILT_IN = "built-in";
 export interface TargetFile {
   path: string;
   definition: TargetDefinition;
-  /** What it says in an earlier way, which it still loads with. */
+  /** What it says as aireg 0.1 did, which it still loads with. */
   warnings: string[];
 }
 
@@ -154,7 +154,7 @@ function readOne(path: string, text: string): TargetFile | SkippedFile {
   return problems.length > 0 ? { path, problems } : { path, definition, warnings };
 }
 
-/** Keys a file may still carry from before, read as what took their place. */
+/** Keys a file written for aireg 0.1 may carry, read as what replaced them. */
 type Earlier = TargetDefinition & { kind?: string; instances?: TargetDefinition["profiles"] };
 
 function upgraded({ kind, instances, ...definition }: Earlier): {
@@ -274,7 +274,7 @@ function readFolder(
   dir: string,
   read: TargetFile[],
   skipped: SkippedFile[],
-  /** Set for the folder's earlier name: where its files now belong. */
+  /** Set for the folder aireg 0.1 used: where its files belong now. */
   moveTo?: string,
 ): void {
   let names: string[];

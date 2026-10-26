@@ -152,7 +152,7 @@ function optional<K extends string>(key: K, value: string | undefined): { [P in 
   return (value === undefined ? {} : { [key]: value }) as { [P in K]?: string };
 }
 
-/** `harness` is the field's earlier name; rows are written with both, and `target` wins. */
+/** aireg 0.1 reads only `harness`, so rows are written with both, and `target` wins. */
 function targetOf(entry: Record<string, unknown>): string | undefined {
   return textOf(entry.target) ?? textOf(entry.harness);
 }
@@ -442,7 +442,7 @@ export async function readLock(roots: Pick<Roots, "scope" | "lock">): Promise<Lo
   return canonicalTargets(parseLock(text, path, roots.scope));
 }
 
-/** Each target by its canonical id, so a lock an earlier aireg wrote reads as this one writes it. */
+/** Each target by its canonical id, so a lock aireg 0.1 wrote reads as this one writes it. */
 function canonicalTargets(lock: Lock): Lock {
   const table = resolveTargets();
   for (const row of Object.values(lock.artifacts)) {

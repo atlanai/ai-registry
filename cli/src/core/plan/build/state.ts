@@ -9,7 +9,7 @@ export interface BuildOptions {
   roots: Roots;
   /** Target names to project into, already resolved from manifest or detection. */
   targets: readonly string[];
-  /** The built-in target table. */
+  /** Every target, built in or defined by a file of yours. */
   targetTable: Targets;
   /** Overwrite or remove a project copy that was edited after installation. */
   force: boolean;

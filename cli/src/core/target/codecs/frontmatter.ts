@@ -16,7 +16,7 @@ function editFrontmatter(source: string, change: (doc: Document) => string | und
 }
 
 /**
- * Keys the targets document as limiting what an agent may use, which no codec drops
+ * Keys the coding agents' own docs name as limiting what an agent may use, which no codec drops
  * or changes; a definition's `restrictions` add to them.
  */
 const RESTRICTIONS = ["tools", "allowed-tools", "disallowedTools", "permissionMode", "permission"];

@@ -225,7 +225,7 @@ export interface DanglingLink {
   target: string;
 }
 
-/** Links of yours in a target folder whose target is gone: the target cannot load them. */
+/** Links of yours in a target folder that point at nothing, so the target cannot load them. */
 export async function danglingLinks(
   roots: Roots,
   targetTable: Targets,

@@ -80,7 +80,7 @@ function selector(read: Readers, value: unknown, where: string): Selector {
   return selected;
 }
 
-/** `harness` is the key's earlier name, still read. */
+/** Reads `harness`, the key aireg 0.1 writes, as `target`. */
 function selectedTargets(
   read: Readers,
   entry: Record<string, unknown>,

@@ -14,7 +14,7 @@ export const SERVICE = {
   runKey: `${NAME[0]?.toUpperCase()}${NAME.slice(1)}Daemon`,
 } as const;
 
-/** Your own target definitions under the home; the second is the folder's earlier name, still read. */
+/** Where your own target definitions sit under the home, and where aireg 0.1 kept them. */
 export const TARGETS_DIR = "targets";
 export const LEGACY_TARGETS_DIR = "harnesses";
 

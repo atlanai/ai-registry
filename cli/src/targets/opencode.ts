@@ -14,8 +14,8 @@ export const opencode = defineTarget({
     plugin: { shape: "contents" },
     // It reads no key that keeps a skill for a person, so one that sets it is left out.
     skill: { shape: "directory", subdir: "skills", keys: { "disable-model-invocation": false } },
-    // A key of another target's, such as a `color` name or a `tools` list, makes its whole
-    // configuration invalid, so an agent keeps only what every target means alike.
+    // A key another coding agent reads, such as a `color` name or a `tools` list, makes its
+    // whole configuration invalid, so an agent keeps only what every coding agent means alike.
     agent: {
       shape: "file",
       subdir: "agents",

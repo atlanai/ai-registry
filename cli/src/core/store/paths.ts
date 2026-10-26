@@ -79,7 +79,7 @@ export function targetsDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), TARGETS_DIR);
 }
 
-/** Where target definitions were kept before, still read beside `targetsDir`. */
+/** The folder aireg 0.1 keeps target definitions in, still read beside `targetsDir`. */
 export function legacyTargetsDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), LEGACY_TARGETS_DIR);
 }

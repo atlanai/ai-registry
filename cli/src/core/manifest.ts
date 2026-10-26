@@ -117,7 +117,7 @@ export type ExportDependency = { type: "local"; path: string } | { type: "remote
 export { type ExportFile, isGlob } from "./export-fields.ts";
 export { ManifestError } from "./manifest-error.ts";
 
-/** The earlier name of `targets:`, still read and rewritten as `targets:`. */
+/** How aireg 0.1 spells `targets:`, still read and rewritten as `targets:`. */
 export const LEGACY_TARGETS_KEY = "harnesses";
 
 /** The published schema is held to this list. */
@@ -946,8 +946,8 @@ function usesEarlierNames(text: string, path: string): boolean {
 }
 
 /**
- * Rewrites a manifest an earlier aireg wrote in today's names, and leaves any other alone.
- * Run with each change to a scope, so a project moves over with its next install.
+ * Rewrites a manifest that says `harnesses:` or names a target by an alias, in canonical names;
+ * any other is left alone.
  */
 export async function migrateManifest(roots: Roots): Promise<void> {
   const text = await readFile(roots.manifest, "utf8").catch((cause: unknown) => {

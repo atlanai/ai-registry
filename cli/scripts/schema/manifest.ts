@@ -5,7 +5,7 @@ import { DEFAULT_TARGETS } from "#core/target/index.ts";
 
 /** The shape of `manifest.yml`. The parser stays the authority on what is accepted. */
 
-/** The earlier name of `targets`, which an editor marks as deprecated. */
+/** `harnesses`, as aireg 0.1 spells `targets`, which an editor marks as deprecated. */
 const Legacy = (minItems: number) =>
   Type.Optional(
     Type.Array(Type.String({ minLength: 1 }), {

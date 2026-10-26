@@ -53,7 +53,7 @@ export function installed(lock: Lock, manifest: Manifest): Installed[] {
             ? ""
             : abbreviate(source.revision)),
         pinned: entry !== undefined && pinOf(manifest, entry) !== undefined,
-        // One target, however many links it took to reach it: a plugin target
+        // One target, however many links it took to reach it: a target that loads plugins
         // gets a link inside the projection as well as the one pointing at it.
         targets: [...new Set((entry?.links ?? []).map((link) => link.target))].sort(),
         watched: watchedFrom(entry),

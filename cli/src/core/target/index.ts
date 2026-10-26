@@ -37,7 +37,7 @@ export function earlierId(id: string): string {
   return at === -1 ? was : `${was}${id.slice(at)}`;
 }
 
-/** Variables that name the target running this process, in the order they are checked. */
+/** Variables that name the coding agent running this process, in the order they are checked. */
 export const CALLER_SIGNALS: readonly { agent: string; env: readonly string[] }[] =
   BUILTIN_TARGETS.flatMap((target) =>
     target.detect === "never" || target.detect?.caller === undefined

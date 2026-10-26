@@ -37,7 +37,7 @@ describe("the git route, end to end", () => {
   });
 
   test("reports an edit and exits 3, then repairs under --force", async ({ aireg, project }) => {
-    // Edited where a person edits it: through the target, which links into
+    // Edited where a person edits it: through the target's folder, which links into
     // the plugin, which links into the mirror.
     await writeFile(projected(project, "lint"), "edited", "utf8");
 

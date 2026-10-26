@@ -615,7 +615,7 @@ async function record(run: Run, action: ActionOf<"record">): Promise<void> {
   for (const [name, entry] of Object.entries(action.lock.artifacts)) {
     if (!run.unstaged.has(name)) patchRow(run, name, entry);
   }
-  // A real change also moves a manifest an earlier aireg wrote onto today's names.
+  // Only with a real change: a run that changes nothing leaves a project aireg 0.1 wrote as it is.
   if (await writeLock(run.roots, action.lock)) await migrateManifest(run.roots);
   run.recorded = action.lock;
 }
