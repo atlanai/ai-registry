@@ -80,8 +80,8 @@ Files written for an earlier aireg keep loading, and a project stays readable by
 
 - The lockfile stays version 1. Each row names its target twice: `target:` with the current id, and `harness:` with the id aireg 0.1 reads, such as `claude` for `claude-code`. aireg 0.1 reads `harness:` and ignores `target:`; this version reads `target:`. A lock that needs no change is left byte for byte as it is.
 - aireg reads a manifest's target list as `targets:` or `harnesses:`, and writes it as `harnesses:` with the ids aireg 0.1 knows unless the manifest says `targets:`: see [`--for`](options.md#targets).
-
-- aireg still reads `~/.aireg/harnesses/`, the folder's earlier name. A target id defined in both folders is refused, naming both files, and neither file is used.
+- aireg still reads `~/.aireg/harnesses/`, the folder's earlier name, with a warning. A file there named for a built-in's earlier id, such as `claude.json` with `"overrides": true`, replaces that built-in, as it did in aireg 0.1, and aireg warns you to rename it `claude-code.json` with that id. A target id defined in both folders is refused, naming both files, and neither file is used.
+- Where a file of yours gives a built-in other `aliases`, so the id aireg 0.1 knew no longer names it, aireg writes today's id in the manifest, the lockfile and its output instead.
 - A file's `kind` is read as the earlier name of `category`: `coding`, `personal` and `shared` mean `coding-agent`, `personal-agent` and `shared-folder`, and other values are ignored. A file that sets both is refused. `aireg targets` and `aireg targets check` warn about a file that sets `kind`.
 - `instances` is read as the earlier name of `profiles`, with a warning.
 

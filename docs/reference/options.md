@@ -57,7 +57,7 @@ A target is a coding agent, or a folder several of them read, that aireg install
 | `opencode` | | OpenCode |
 | `universal` | `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
 
-An alias works wherever aireg reads an id: `--for`, `init --import`, `aireg targets show`, a manifest, the lockfile, a job, a target file's `reads`, and a profile's `<id>:<profile>`. aireg always writes and prints the id, so `--for claude,codex` records `claude-code` and `codex`.
+An alias works wherever aireg reads an id: `--for`, `init --import`, `aireg targets show`, a manifest, the lockfile, a job, a target file's `reads`, and a profile's `<id>:<profile>`. aireg prints the id, so `--for claude,codex` reports `claude-code` and `codex`; the manifest and the lockfile also keep the id aireg 0.1 knows, as below.
 
 aireg links each artifact into the folder its target reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`.
 

@@ -87,8 +87,9 @@ A released version is never rewritten. How registries, sign-in and pins are stor
 
 ```yaml
 # .registry/manifest.yml, committed: which targets, registries and artifacts
-targets:
-  - claude-code
+# (`harnesses:` and these ids keep it readable by aireg 0.1; `targets:` works too)
+harnesses:
+  - claude
   - codex
 registries:
   acme: github.com/acme/ai-registry
