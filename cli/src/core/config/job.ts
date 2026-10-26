@@ -76,7 +76,10 @@ function selector(read: Readers, value: unknown, where: string): Selector {
     selected.kinds = kinds.filter(isKind);
   }
   const target = selectedTargets(read, entry, where);
-  if (target !== undefined) selected.target = target;
+  if (target !== undefined) {
+    selected.target = target;
+    selected.harness = target;
+  }
   return selected;
 }
 

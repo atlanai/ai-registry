@@ -36,20 +36,24 @@ describe("parseConfig", () => {
     expect(job?.steps[1]?.needs).toEqual(["mine"]);
   });
 
-  it("reads a selector's `harness`, the earlier name of `target`, and writes `target`", () => {
+  it("reads a selector's `target` or `harness`, its aireg 0.1 name, and writes `harness`", () => {
     const step = (select: string) =>
       config(`  - id: job_1
     account: acc_1
     steps:
       - { name: mine, kind: origins, to: acme/ws, select: ${select} }
 `);
-    const parsed = parseConfig(step("{ from: /tmp/skills, harness: [claude] }"));
-    expect(parsed.jobs[0]?.steps[0]?.select[0]).toEqual({
-      from: "/tmp/skills",
-      target: ["claude"],
-    });
-    expect(formatConfig(parsed)).toContain("target:");
-    expect(formatConfig(parsed)).not.toContain("harness");
+    for (const key of ["target", "harness"]) {
+      const parsed = parseConfig(step(`{ from: /tmp/skills, ${key}: [claude] }`));
+      expect(parsed.jobs[0]?.steps[0]?.select[0]).toEqual({
+        from: "/tmp/skills",
+        target: ["claude"],
+        harness: ["claude"],
+      });
+      expect(formatConfig(parsed)).toContain("harness:");
+      expect(formatConfig(parsed)).not.toContain("target");
+      expect(parseConfig(formatConfig(parsed))).toEqual(parsed);
+    }
     expect(() =>
       parseConfig(step("{ from: /tmp/skills, target: [claude], harness: [codex] }")),
     ).toThrow("has both `target` and `harness`");

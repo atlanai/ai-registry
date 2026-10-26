@@ -31,6 +31,8 @@ export interface Selector {
   kinds?: readonly ArtifactKind[];
   /** For steps that care whose folder conventions apply. */
   target?: readonly string[];
+  /** @deprecated `target` under its aireg 0.1 name, which adapters built against it read. */
+  harness?: readonly string[];
 }
 
 /** What a step does when it would change something, stored as a person types it. */

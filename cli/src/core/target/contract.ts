@@ -244,6 +244,11 @@ export interface Target {
 
 export type Targets = Record<string, Target>;
 
+/** A target as aireg 0.1 handed it to an adapter, which read `kind` and the ids it knew. */
+export interface EarlierTarget extends Target {
+  kind: "coding" | "personal" | "shared";
+}
+
 /** Typed so a definition is checked as it is written. */
 export function defineTarget(definition: TargetDefinition): TargetDefinition {
   return definition;

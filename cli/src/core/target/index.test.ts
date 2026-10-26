@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { canonicalId, canonicalIds, earlierId, resolveTargets } from "./index.ts";
+import type { Target } from "./contract.ts";
+import { canonicalId, canonicalIds, earlierId, earlierTable, resolveTargets } from "./index.ts";
 
 describe("resolveTargets", () => {
   it("expands each user root against HOME", () => {
@@ -47,6 +48,25 @@ describe("earlierId", () => {
     ["mine", "mine"],
   ])("records %s as %s, the id aireg 0.1 reads", (id, was) => {
     expect(earlierId(id)).toBe(was);
+  });
+});
+
+describe("earlierTable", () => {
+  it("keys and names each target by the id aireg 0.1 knew, with its kind", () => {
+    const table = earlierTable(resolveTargets());
+    const claude = Object.values(table).find((target) => target.name === "claude");
+    expect(claude?.displayName).toBe("Claude Code");
+    expect(Object.keys(table).sort()).toEqual(
+      ["agents", "claude", "codex", "copilot", "cursor", "gemini", "opencode"].sort(),
+    );
+    expect(table.agents?.kind).toBe("shared");
+    expect(table.codex?.kind).toBe("coding");
+  });
+
+  it("leaves an earlier id to a target that has it as its own", () => {
+    const table = resolveTargets();
+    const mine = { ...(table.codex as Target), name: "claude", displayName: "Mine" };
+    expect(earlierTable({ ...table, claude: mine }).claude?.displayName).toBe("Mine");
   });
 });
 

@@ -8,10 +8,10 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { codecOf } from "#core/target/codecs/index.ts";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
-import type { KindMapping, Target, TargetDefinition, Targets } from "./contract.ts";
+import type { EarlierTarget, KindMapping, Target, TargetDefinition, Targets } from "./contract.ts";
 import { BUILT_IN, loadTargetFiles } from "./load.ts";
 
-export type { KindMapping, Target, Targets } from "./contract.ts";
+export type { EarlierTarget, KindMapping, Target, Targets } from "./contract.ts";
 
 /** The tools a manifest installs into when it names none, in the order they are listed. */
 export const DEFAULT_TARGETS: readonly string[] = BUILTIN_TARGETS.filter(
@@ -35,6 +35,20 @@ export function earlierId(id: string): string {
   const was = BUILTIN_TARGETS.find((target) => target.id === base)?.aliases?.[0];
   if (was === undefined) return id;
   return at === -1 ? was : `${was}${id.slice(at)}`;
+}
+
+/**
+ * The table keyed and named by `earlierId`, for adapters built against aireg 0.1.
+ * A target whose own id is an earlier one keeps it, as `canonicalId` does.
+ */
+export function earlierTable(targetTable: Targets): Record<string, EarlierTarget> {
+  const out: Record<string, EarlierTarget> = {};
+  for (const target of Object.values(targetTable)) {
+    const name = earlierId(target.name);
+    if (name !== target.name && Object.hasOwn(targetTable, name)) continue;
+    out[name] = { ...target, name, kind: target.shared ? "shared" : "coding" };
+  }
+  return out;
 }
 
 /** Variables that name the coding agent running this process, in the order they are checked. */

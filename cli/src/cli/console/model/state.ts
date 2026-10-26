@@ -25,7 +25,7 @@ import type { RunCounts, RunRecord } from "#core/run/model.ts";
 import { isActive, type RunMode } from "#core/run/model.ts";
 import { roots as makeRoots, type Roots, scopeFor } from "#core/store/paths.ts";
 import { policyOf } from "#core/sync/policy.ts";
-import { resolveTargets } from "#core/target/index.ts";
+import { earlierTable, resolveTargets } from "#core/target/index.ts";
 import { readDaemonPid } from "#daemon/pidfile.ts";
 import { readAccounts } from "./accounts.ts";
 import { localWork } from "./local.ts";
@@ -157,6 +157,7 @@ export async function collect(
           config,
           manifest: resolved,
           targetTable,
+          harnesses: earlierTable(targetTable),
           account,
           jobs,
           runs: ours,

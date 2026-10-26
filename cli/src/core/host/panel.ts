@@ -4,7 +4,7 @@ import type { AccountRow, ArtifactRow, ConsoleState } from "#core/console/model.
 import type { Manifest } from "#core/manifest.ts";
 import type { RunRecord } from "#core/run/model.ts";
 import type { RunStore } from "#core/run/store.ts";
-import type { Targets } from "#core/target/contract.ts";
+import type { EarlierTarget, Targets } from "#core/target/contract.ts";
 import type { COLOR, GLYPH } from "#core/term/theme.ts";
 import type { HostCommandContext } from "./extend.ts";
 
@@ -99,6 +99,8 @@ interface PanelCollectInput {
   config: RegistryConfig;
   manifest: Manifest;
   targetTable: Targets;
+  /** @deprecated `targetTable` by the ids aireg 0.1 knew, which adapters built against it read. */
+  harnesses: Readonly<Record<string, EarlierTarget>>;
   /** The account whose tab is selected. Every view is scoped to it. */
   account: AccountRow | undefined;
   /** That account's jobs and runs, already narrowed. */

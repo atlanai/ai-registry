@@ -11,6 +11,7 @@ import {
   isNameCollision,
   isNamespaceAddress,
   type RegistryConfig,
+  type Selector,
   type Step,
 } from "./model.ts";
 import { parseAccount } from "./parse-account.ts";
@@ -152,6 +153,12 @@ function parseDocument(document: unknown): RegistryConfig {
   };
 }
 
+/** Targets under `harness`, the key an adapter built against aireg 0.1 reads the file with. */
+function writtenSelector({ target, harness, ...rest }: Selector): Record<string, unknown> {
+  const named = target ?? harness;
+  return named === undefined ? { ...rest } : { ...rest, harness: [...named] };
+}
+
 /** Steps carry an `extra` bag aireg never names; it is spread back out. */
 function written(step: Step): Record<string, unknown> {
   const { extra, ...rest } = step;
@@ -159,7 +166,7 @@ function written(step: Step): Record<string, unknown> {
   if (rest.needs.length > 0) entry.needs = [...rest.needs];
   if (rest.root !== undefined) entry.root = rest.root;
   if (rest.to !== undefined) entry.to = rest.to;
-  if (rest.select.length > 0) entry.select = rest.select.map((item) => ({ ...item }));
+  if (rest.select.length > 0) entry.select = rest.select.map(writtenSelector);
   if (rest.policy !== "on") entry.policy = rest.policy;
   return { ...entry, ...extra };
 }
