@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { GLOBAL_OPTIONS } from "#cli/options.ts";
 import type { OptionSpec } from "#core/host/extend.ts";
-import { COMMANDS, type CommandSpec } from "./index.ts";
+import type { CommandSpec } from "./index.ts";
+import { COMMANDS } from "./table.ts";
 
 const REFERENCE = new URL("../../../../docs/reference/", import.meta.url);
 
