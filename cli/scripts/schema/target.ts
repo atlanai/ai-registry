@@ -188,7 +188,18 @@ export const Target = Type.Object(
     overrides: Type.Optional(
       Type.Boolean({ description: "Replaces the built-in target with this id." }),
     ),
-    kind: Type.Optional(choice("coding", "personal", "shared")),
+    shared: Type.Optional(
+      Type.Literal(true, {
+        description:
+          "A folder several tools read rather than a tool: never detected, never a default.",
+      }),
+    ),
+    kind: Type.Optional(
+      Type.String({
+        deprecated: true,
+        description: 'Read as `"shared": true` when "shared", and otherwise ignored; use `shared`.',
+      }),
+    ),
     roots: Type.Object(
       {
         project: Type.String({ minLength: 1, description: "Relative to the project." }),

@@ -16,6 +16,8 @@ export const BUILT_IN = "built-in";
 export interface TargetFile {
   path: string;
   definition: TargetDefinition;
+  /** What it says in an earlier way, which it still loads with. */
+  warnings: string[];
 }
 
 export interface SkippedFile {
@@ -142,13 +144,32 @@ function readOne(path: string, text: string): TargetFile | SkippedFile {
   const {
     $schema: _,
     overrides,
-    ...definition
-  } = document as TargetDefinition & {
+    ...written
+  } = document as Earlier & {
     $schema?: string;
     overrides?: boolean;
   };
+  const { definition, warnings } = upgraded(written);
   problems.push(...builtinProblems(definition, overrides === true));
-  return problems.length > 0 ? { path, problems } : { path, definition };
+  return problems.length > 0 ? { path, problems } : { path, definition, warnings };
+}
+
+/** Keys a file may still carry from before, read as what took their place. */
+type Earlier = TargetDefinition & { kind?: string };
+
+function upgraded({ kind, ...definition }: Earlier): {
+  definition: TargetDefinition;
+  warnings: string[];
+} {
+  if (kind === undefined) return { definition, warnings: [] };
+  return {
+    definition: kind === "shared" ? { ...definition, shared: true } : definition,
+    warnings: [
+      kind === "shared"
+        ? 'It sets "kind": "shared", the earlier way to say "shared": true; set that instead.'
+        : `It sets "kind": ${quoted(kind)}, which aireg no longer reads; delete it.`,
+    ],
+  };
 }
 
 /** A built-in's id is yours only to replace it; its other ids are never yours. */
@@ -225,7 +246,8 @@ export function loadTargetFiles(env: NodeJS.ProcessEnv = process.env): {
 } {
   const read: TargetFile[] = [];
   const skipped: SkippedFile[] = [];
-  for (const dir of [targetsDir(env), legacyTargetsDir(env)]) readFolder(dir, read, skipped);
+  readFolder(targetsDir(env), read, skipped);
+  readFolder(legacyTargetsDir(env), read, skipped, targetsDir(env));
   const unique = withoutTwins(read, skipped);
   // Each is checked against the rest, so one may read from another.
   const known = [...BUILTIN_TARGETS, ...unique.map((each) => each.definition)];
@@ -238,7 +260,13 @@ export function loadTargetFiles(env: NodeJS.ProcessEnv = process.env): {
   return { files, skipped };
 }
 
-function readFolder(dir: string, read: TargetFile[], skipped: SkippedFile[]): void {
+function readFolder(
+  dir: string,
+  read: TargetFile[],
+  skipped: SkippedFile[],
+  /** Set for the folder's earlier name: where its files now belong. */
+  moveTo?: string,
+): void {
   let names: string[];
   try {
     names = readdirSync(dir)
@@ -261,7 +289,11 @@ function readFolder(dir: string, read: TargetFile[], skipped: SkippedFile[]): vo
         path,
         problems: [`It defines ${quoted(one.definition.id)}, not its own name.`],
       });
-    } else read.push(one);
+    } else if (moveTo === undefined) read.push(one);
+    else {
+      const moved = `It is in ${dir}, the targets folder's earlier name; move it to ${moveTo}.`;
+      read.push({ ...one, warnings: [...one.warnings, moved] });
+    }
   }
 }
 

@@ -459,13 +459,15 @@
       "description": "Replaces the built-in target with this id.",
       "type": "boolean"
     },
+    "shared": {
+      "description": "A folder several tools read rather than a tool: never detected, never a default.",
+      "const": true,
+      "type": "boolean"
+    },
     "kind": {
-      "type": "string",
-      "enum": [
-        "coding",
-        "personal",
-        "shared"
-      ]
+      "deprecated": true,
+      "description": "Read as `\"shared\": true` when \"shared\", and otherwise ignored; use `shared`.",
+      "type": "string"
     },
     "roots": {
       "additionalProperties": false,

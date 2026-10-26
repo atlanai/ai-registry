@@ -48,6 +48,32 @@ describe("target files", () => {
     expect(resolveTargets(env).tool?.origin).toBe(join(legacy, "tool.json"));
   });
 
+  test('read `kind: "shared"` as `shared: true`, and any other `kind` as nothing, with a warning', async () => {
+    await save("tool.json", { ...TOOL, kind: "shared", detect: "never" });
+    await save("other.json", { ...TOOL, id: "other", kind: "personal" });
+    const { files } = loadTargetFiles(env);
+    expect(files.map(({ definition, warnings }) => [definition.id, warnings])).toEqual([
+      ["other", ['It sets "kind": "personal", which aireg no longer reads; delete it.']],
+      [
+        "tool",
+        ['It sets "kind": "shared", the earlier way to say "shared": true; set that instead.'],
+      ],
+    ]);
+    const table = resolveTargets(env);
+    expect(table.tool?.shared).toBe(true);
+    expect(table.other?.shared).toBe(false);
+    expect(table.tool).not.toHaveProperty("kind");
+  });
+
+  test("say to move a file from the folder's earlier name", async () => {
+    const legacy = join(env.AIREG_HOME as string, "harnesses");
+    await mkdir(legacy, { recursive: true });
+    await writeFile(join(legacy, "tool.json"), JSON.stringify(TOOL));
+    expect(loadTargetFiles(env).files[0]?.warnings).toEqual([
+      `It is in ${legacy}, the targets folder's earlier name; move it to ${dir}.`,
+    ]);
+  });
+
   test("refuse an id defined in both folders, naming both files", async () => {
     const legacy = join(env.AIREG_HOME as string, "harnesses");
     await mkdir(legacy, { recursive: true });

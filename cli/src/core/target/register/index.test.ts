@@ -35,7 +35,6 @@ function target(register: RegisterEntry[], place?: "copy", scope?: "user"): Targ
       },
     },
     reads: {},
-    kind: "coding",
     shared: false,
     verified: undefined,
     trust: {},

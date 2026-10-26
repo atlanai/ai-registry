@@ -55,15 +55,21 @@ function origin(path: string): string {
   return path === BUILT_IN ? "built in" : underHome(path);
 }
 
-/** Files in your user scope aireg could not use; the built-ins keep working without them. */
-function warnSkipped(context: CommandContext): void {
-  for (const file of loadTargetFiles().skipped) {
-    const problems = file.problems.join(" ");
-    context.printer.warning(
-      `Skipped ${underHome(file.path)}: ${problems.charAt(0).toLowerCase()}${problems.slice(1)}`,
-    );
+/** Files in your user scope aireg could not use, or uses but would have you change. */
+function warnFiles(context: CommandContext): void {
+  const { files, skipped } = loadTargetFiles();
+  for (const file of skipped) {
+    context.printer.warning(`Skipped ${underHome(file.path)}: ${lowered(file.problems)}`);
+  }
+  for (const file of files.filter((each) => each.warnings.length > 0)) {
+    context.printer.warning(`Read ${underHome(file.path)}, but ${lowered(file.warnings)}`);
   }
 }
+
+const lowered = (sentences: readonly string[]) => {
+  const text = sentences.join(" ");
+  return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+};
 
 /** Each target and what detected it: env, binary, then directories. */
 async function list(context: CommandContext, all: boolean): Promise<void> {
@@ -82,13 +88,15 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
           name: item.target.name,
           aliases: item.target.aliases,
           displayName: item.target.displayName,
-          kind: item.target.kind,
           shared: item.target.shared,
           detected: item.detected,
           by: item.by,
           origin: item.target.origin,
         })),
         skipped: loadTargetFiles().skipped,
+        warnings: loadTargetFiles()
+          .files.filter((file) => file.warnings.length > 0)
+          .map(({ path, warnings }) => ({ path, warnings })),
       },
     });
     return;
@@ -109,7 +117,7 @@ async function list(context: CommandContext, all: boolean): Promise<void> {
   for (const { target } of rows.filter((item) => item.target.shared)) {
     context.printer.hint(sharedHint(target));
   }
-  warnSkipped(context);
+  warnFiles(context);
 }
 
 /** A shared folder has no row, so its ids are said once below the table. */
@@ -185,7 +193,8 @@ async function check(context: CommandContext, file: string): Promise<void> {
   if (problems.length > 0) context.exit = ExitCode.Error;
   if (context.printer.format === "json") {
     const id = "definition" in result ? result.definition.id : undefined;
-    context.printer.json({ ok: problems.length === 0, data: { path, id, problems } });
+    const warnings = "warnings" in result ? result.warnings : [];
+    context.printer.json({ ok: problems.length === 0, data: { path, id, problems, warnings } });
     return;
   }
   if ("definition" in result) {
@@ -194,6 +203,7 @@ async function check(context: CommandContext, file: string): Promise<void> {
     context.printer.success(
       `${file} defines the target ${quoted(id)}${builtIn ? `, in place of the built-in one` : ""}.`,
     );
+    for (const warning of result.warnings) context.printer.warning(warning);
     const home = join(targetsDir(), `${id}.json`);
     if (home !== path) context.printer.hint(`Save it as ${underHome(home)} for aireg to use it.`);
     return;

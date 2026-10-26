@@ -161,9 +161,6 @@ interface Detect {
   caller?: string[] | undefined;
 }
 
-/** What a target is: a coding agent, a personal agent, or a folder several tools read. */
-type TargetKind = "coding" | "personal" | "shared";
-
 /** Profiles of one installation, each installed into as its own target, `<id>:<profile>`. */
 interface Instances {
   /** A profile's user root, under `~/`; `{profile}` in its last segment names each one. */
@@ -182,8 +179,8 @@ export interface TargetDefinition {
   /** Other ids it answers to wherever an id is read, such as an earlier one; output names `id`. */
   aliases?: string[] | undefined;
   displayName: string;
-  /** `coding` when absent. A `shared` folder is never detected and never a default. */
-  kind?: TargetKind | undefined;
+  /** A folder several tools read rather than a tool: never detected and never a default. */
+  shared?: true | undefined;
   /**
    * Installed into when a manifest names none. Fixed rather than detected, so
    * teammates with different tools still write the same lock.
@@ -237,7 +234,6 @@ export interface Target {
   kinds: Partial<Record<ArtifactKind, KindMapping>>;
   /** Only the kinds whose reads differ from this target's own folder. */
   reads: Partial<Record<ArtifactKind, string[]>>;
-  kind: TargetKind;
   shared: boolean;
   verified: { command: string[]; range: string } | undefined;
   trust: Partial<Record<ArtifactKind, Trust>>;

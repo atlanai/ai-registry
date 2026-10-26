@@ -24,7 +24,6 @@ function targetTable(): Targets {
       detect: { env: [], binary: [], paths: [] },
       kinds: { skill: { subdir: "skills", shape: "directory" } },
       reads: {},
-      kind: "coding",
       shared: false,
       verified: undefined,
       trust: {},

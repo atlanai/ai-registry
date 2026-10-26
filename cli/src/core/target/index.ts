@@ -54,7 +54,6 @@ function toTarget(
   origin: string = BUILT_IN,
 ): Target {
   const detect = definition.detect ?? {};
-  const kind = definition.kind ?? "coding";
   return {
     name: definition.id,
     aliases: [...(definition.aliases ?? [])],
@@ -74,8 +73,7 @@ function toTarget(
           },
     kinds: kindsOf(definition),
     reads: { ...definition.reads },
-    kind,
-    shared: kind === "shared",
+    shared: definition.shared === true,
     verified: definition.verified === undefined ? undefined : structuredClone(definition.verified),
     trust: { ...definition.trust },
     reload: definition.reload,

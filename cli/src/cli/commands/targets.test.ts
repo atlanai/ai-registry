@@ -75,7 +75,7 @@ describe("targets", () => {
       data: { targets: Record<string, unknown>[] };
     };
     // In the order the text lists them, with the shared folder last.
-    const builtIn = { kind: "coding", shared: false, origin: "built-in" };
+    const builtIn = { shared: false, origin: "built-in" };
     expect(payload.data.targets).toEqual([
       {
         name: "claude-code",
@@ -106,7 +106,6 @@ describe("targets", () => {
         name: "universal",
         aliases: ["agents"],
         displayName: "Shared .agents folder",
-        kind: "shared",
         shared: true,
         detected: false,
         origin: "built-in",
@@ -158,6 +157,21 @@ describe("targets", () => {
     const text = writes.join("");
     expect(text).toMatch(/Tool +tool +not found +~\/\.aireg\/targets\/tool\.json/);
     expect(text).toContain("Skipped ~/.aireg/targets/broken.json: it is not valid JSON.");
+  });
+
+  test("warns of a file that still says `kind`, which it reads as `shared`", async () => {
+    const dir = join(cwd, ".aireg", "targets");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "tool.json"),
+      JSON.stringify({ ...TOOL, kind: "shared", detect: "never" }),
+    );
+    const writes: string[] = [];
+    await run(context(cwd, writes, "text"));
+    expect(writes.join("")).toContain(
+      'warning: Read ~/.aireg/targets/tool.json, but it sets "kind": "shared", the earlier way to say "shared": true; set that instead.',
+    );
+    expect(writes.join("")).toContain("hint: Use `--for tool` for the shared .tool folder.");
   });
 
   test("shows a target by its id or an alias", async () => {
