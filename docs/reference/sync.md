@@ -52,14 +52,14 @@ Settles a conflict, where you edited an artifact and its registry changed it too
 | Option | Description |
 |---|---|
 | `--mine` | Keep your copy, and publish it as a new version. A git registry takes no publishes, so aireg refuses this and names the `aireg publish` that sends your copy into your clone. |
-| `--theirs` | Take the registry's copy, and drop your edit. For an artifact from a watched folder, the registry's copy is also written into that folder, and yours is moved to `.registry/backups/` first. |
+| `--theirs` | Take the registry's copy, and drop your edit. For an artifact the registry deleted, your copy is removed. For an artifact from a watched folder, the registry's copy is also written into that folder, and yours is moved to `.registry/backups/` first. |
 | `--job <job>` | Settle a conflict that a background job left waiting. Takes the job's name or id. |
 
 `<name>` is the installed artifact's name, as [`aireg list`](list.md) shows it. `resolve` runs in the daemon as `sync` does, and prints how the artifact settled.
 
 ## JSON output
 
-With `--dry-run --json`, `data` holds `dryRun`, the scope, every artifact with its `registry` and `disposition` (`synced`, `pull`, `pull-delete`, `publish`, `conflict`, `adopt`, `archive`, `removed`, `unknown` or `unavailable`), and the work found in your harness folders under `local`, `undeclared`, `linkable`, `changed` and `kept`. Without `--dry-run`, `data` holds `dryRun`, the scope and a run per registry, with its `id`, `state`, `counts`, the `artifacts` that changed, need you, or failed, each with its `outcome`, `operation` and `disposition`, and `warnings` naming any file of yours it moved to backups or left in place. `sync resolve --json` prints its run once it has finished.
+With `--dry-run --json`, `data` holds `dryRun`, the scope, every artifact with its `registry` and `disposition` (`synced`, `pull`, `pull-delete`, `publish`, `conflict`, `adopt`, `archive`, `removed`, `unknown` or `unavailable`), and the work found in your harness folders under `local`, `undeclared`, `linkable`, `changed` and `kept`. Without `--dry-run`, `data` holds `dryRun`, the scope and a run per registry, with its `id`, `state`, `counts`, the `artifacts` that changed, need you, or failed, each with its `outcome`, `operation` and `disposition`, and `warnings` naming any file of yours it moved to backups or left in place. `sync resolve --json` prints its run once it has finished, with the `artifacts` it settled, as `sync` lists them.
 
 Each artifact's `disposition` says how the two sides differ, and the text output shows it as an action:
 

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
@@ -101,5 +101,37 @@ describe("an artifact deleted from a registry installed whole", () => {
     expect(output).toContain("edited here and deleted from the registry");
     // The adapter cannot publish and names nowhere else, so the hint offers a registry of your own.
     expect(output).toContain("keep yours by publishing it to a registry of your own");
+  });
+
+  test("is removed, and reported so, when the registry's side is taken", async ({
+    aireg,
+    project,
+    deleted,
+  }) => {
+    expect((await aireg(["init", "-y", "--for", "claude"])).code).toBe(0);
+    expect((await aireg(["add", "https://drops.example", "--adapter", "drops", "-y"])).code).toBe(
+      0,
+    );
+    const fmt = join(project, ".claude", "skills", "fmt", "SKILL.md");
+    // Settled twice, since the text and the JSON each need a conflict of their own.
+    const resolve = async (format: string[]) => {
+      await rm(deleted, { force: true });
+      expect((await aireg(["sync", "-y"])).code).toBe(0);
+      await appendFile(fmt, "mine\n");
+      await writeFile(deleted, "");
+      expect((await aireg(["sync", "-y"])).code).toBe(3);
+      const resolved = await aireg(["sync", "resolve", "fmt", "--theirs", ...format]);
+      expect(resolved.code, resolved.stderr).toBe(0);
+      expect(existsSync(fmt)).toBe(false);
+      return resolved;
+    };
+
+    expect((await resolve([])).stdout).toMatch(/removed\s+team\/fmt/);
+    const { data } = JSON.parse((await resolve(["--json"])).stdout) as {
+      data: { artifacts: { name: string; operation: string }[] };
+    };
+    expect(data.artifacts).toEqual([
+      expect.objectContaining({ name: "team/fmt", operation: "remove-local" }),
+    ]);
   });
 });

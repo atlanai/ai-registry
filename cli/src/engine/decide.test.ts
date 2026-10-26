@@ -141,3 +141,32 @@ describe("a folder of yours with a registry name", () => {
     expect(outcomeFor(held.outcomes, "skill", "ws/hello")?.operation).toBe("pull");
   });
 });
+
+describe("taking the registry's side", () => {
+  const item = (name: string, disposition: string, upstream: string | undefined) => ({
+    name,
+    kind: "skill",
+    source: "acme",
+    path: `artifacts/ws/skill/${name}`,
+    disposition,
+    digests: { base: undefined, local: undefined, upstream },
+  });
+
+  it("removes what the registry deleted, and leaves one it would not serve a pull", () => {
+    const taken = {
+      items: [item("gone", "pull-delete", undefined), item("held", "unavailable", undefined)],
+      local: [],
+      undeclared: [],
+      publisher: new Map(),
+      pinned: { version: 1, registries: {}, artifacts: {} },
+      acquired: [],
+    } as unknown as Scan;
+    const overrides = new Map([
+      ["skill:gone", "pull" as const],
+      ["skill:held", "pull" as const],
+    ]);
+    const { outcomes } = classify(taken, job, "acme", undefined, "sync", overrides);
+    expect(outcomeFor(outcomes, "skill", "gone")?.operation).toBe("remove-local");
+    expect(outcomeFor(outcomes, "skill", "held")?.operation).toBe("pull");
+  });
+});

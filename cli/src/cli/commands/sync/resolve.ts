@@ -122,7 +122,7 @@ async function settled(
     });
   }
   if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { run: outcome.run } });
+    context.printer.json({ ok: true, data: { run: outcome.run, artifacts: outcome.artifacts } });
   }
   if (outcome.attention) context.exit = ExitCode.Changed;
   return outcome;

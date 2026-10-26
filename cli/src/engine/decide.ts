@@ -76,6 +76,14 @@ function decide(
   return overrides.get(artifactKey(kind, name)) ?? operation(disposition, job.policy);
 }
 
+/** Taking the registry's copy of one it deleted removes this one, and the run must say so. */
+function taken(item: SyncItem, chosen: SyncOperation): SyncOperation {
+  const deleted =
+    item.digests.upstream === undefined &&
+    (item.disposition === "conflict" || item.disposition === "pull-delete");
+  return chosen === "pull" && deleted ? "remove-local" : chosen;
+}
+
 const LOCAL_WRITES: readonly SyncOperation[] = ["pull", "remove-local", "forget"];
 
 /**
@@ -230,7 +238,7 @@ export function classify(
     if (owner !== undefined && owner !== registry) continue;
     if (!relevant(mode, item.disposition)) continue;
     const chosen = withoutPublishing(
-      decide(job, overrides, item, item.disposition),
+      taken(item, decide(job, overrides, item, item.disposition)),
       publishable(item.kind),
     );
     outcomes.set(artifactKey(item.kind, item.name), decided(item, chosen));

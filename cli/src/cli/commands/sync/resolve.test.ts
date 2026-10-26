@@ -77,6 +77,6 @@ describe("aireg sync resolve --job", () => {
       expect.objectContaining({ jobId: "job_1", name: "pr-review", resolution: "theirs" }),
     ]);
     // The run is waited for, so the answer is how it ended.
-    expect(JSON.parse(out.join(""))).toEqual({ ok: true, data: { run: finished } });
+    expect(JSON.parse(out.join(""))).toEqual({ ok: true, data: { run: finished, artifacts: [] } });
   });
 });
