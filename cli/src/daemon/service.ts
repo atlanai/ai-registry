@@ -11,9 +11,9 @@ import { launchArgv, runningEntry } from "#core/release/launch.ts";
 import { ensureHome } from "#core/store/paths.ts";
 import { VERSION } from "#core/version.ts";
 import { NO_EXECUTABLE, startManaged } from "#daemon/autostart/index.ts";
-import { cliClient, RpcClient } from "#daemon/rpc/client.ts";
+import { cliClient, RpcClient, UnprovenDaemonError } from "#daemon/rpc/client.ts";
 import { assertOwnSocket, listening, privateDirectory, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
-import { clearDaemonPid, readDaemonPid } from "./pidfile.ts";
+import { clearDaemonPid, liveDaemonPid, readDaemonPid } from "./pidfile.ts";
 import { isDaemonProcess, socketPids } from "./process-info.ts";
 
 const START_MS = 5_000;
@@ -24,6 +24,7 @@ export type DaemonProbe =
   | { status: "down" }
   | { status: "ready"; version: string }
   | { status: "stopping"; version: string }
+  | { status: "outdated"; pid: number }
   | { status: "foreign" };
 
 /** How long a listening daemon may take to answer before it counts as foreign. */
@@ -41,11 +42,19 @@ export async function probeDaemon(clientVersion: string): Promise<DaemonProbe> {
       const { serverVersion: version, stopping } = client;
       client.close();
       return { status: stopping ? "stopping" : "ready", version };
-    } catch {
+    } catch (error) {
+      // It answered without the proof, and asking again will not change that.
+      if (error instanceof UnprovenDaemonError) return unproven();
       if (Date.now() >= deadline) return { status: "foreign" };
       await sleep(100);
     }
   }
+}
+
+/** Told apart from a foreign program by this home's pid file and that process's command line. */
+async function unproven(): Promise<DaemonProbe> {
+  const pid = await liveDaemonPid();
+  return pid === undefined ? { status: "foreign" } : { status: "outdated", pid };
 }
 
 async function waitUntilDown(endpoint: string, timeoutMs: number): Promise<boolean> {
@@ -67,17 +76,22 @@ async function waitFor(version: string, timeoutMs: number): Promise<boolean> {
   return false;
 }
 
-async function askShutdown(endpoint: string): Promise<void> {
+/** False for a daemon that cannot prove itself, which only a signal stops. */
+async function askShutdown(endpoint: string): Promise<boolean> {
+  let client: RpcClient;
   try {
-    const client = await RpcClient.connect(endpoint, cliClient(VERSION));
-    try {
-      await client.request("shutdown", {}, { timeoutMs: STOP_MS });
-    } finally {
-      client.close();
-    }
+    client = await RpcClient.connect(endpoint, cliClient(VERSION));
+  } catch (error) {
+    return !(error instanceof UnprovenDaemonError);
+  }
+  try {
+    await client.request("shutdown", {}, { timeoutMs: STOP_MS });
   } catch {
     // SIGTERM still runs if the socket is up and RPC is not.
+  } finally {
+    client.close();
   }
+  return true;
 }
 
 async function terminate(pid: number): Promise<void> {
@@ -103,8 +117,7 @@ export async function stopDaemon(endpoint = rpcEndpoint()): Promise<void> {
     await clearDaemonPid();
     return;
   }
-  await askShutdown(endpoint);
-  if (await waitUntilDown(endpoint, STOP_MS)) {
+  if ((await askShutdown(endpoint)) && (await waitUntilDown(endpoint, STOP_MS))) {
     await clearDaemonPid();
     return;
   }

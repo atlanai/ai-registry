@@ -66,11 +66,14 @@ function handshakeVersion(value: unknown): string | undefined {
 }
 
 /** What answered may be another user's process, or a daemon an older aireg started. */
-function unproven(): AiregError {
-  return new AiregError(
-    "The aireg daemon could not prove it runs as you, so aireg sent it nothing more.",
-    { code: ErrorCode.Integrity, hint: "Run `aireg daemon restart`." },
-  );
+export class UnprovenDaemonError extends AiregError {
+  constructor() {
+    super("The aireg daemon could not prove it runs as you, so aireg sent it nothing more.", {
+      code: ErrorCode.Integrity,
+      hint: "Run `aireg daemon restart`.",
+    });
+    this.name = "UnprovenDaemonError";
+  }
 }
 
 export function cliClient(version: string): ClientInfo {
@@ -170,7 +173,7 @@ export class RpcClient {
           "The running aireg daemon is incompatible with this CLI. Run `aireg daemon restart`.",
         );
       }
-      if (!provesDaemon(challenge, initialized.proof)) throw unproven();
+      if (!provesDaemon(challenge, initialized.proof)) throw new UnprovenDaemonError();
       client.#serverVersion = version;
       client.#stopping = initialized.daemon.stopping === true;
       return client;

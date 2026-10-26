@@ -78,6 +78,15 @@ async function status(context: CommandContext): Promise<void> {
     );
     return;
   }
+  if (probe.status === "outdated") {
+    context.printer.warning(
+      `An older aireg daemon is running (pid ${probe.pid}), and this aireg cannot talk to it.`,
+    );
+    context.printer.hint(
+      "Run `aireg daemon restart` to replace it. Commands that need it replace it on their own.",
+    );
+    return;
+  }
   if (probe.status === "foreign") {
     context.printer.warning("Another program is listening on the daemon's socket.");
     return;
@@ -118,6 +127,8 @@ async function start(context: CommandContext): Promise<void> {
   await ensureDaemon(VERSION);
   if (before.status === "ready") {
     context.printer.success(`Restarted the daemon: ${before.version} → ${VERSION}.`);
+  } else if (before.status === "outdated") {
+    context.printer.success("Replaced the older daemon.");
   } else {
     context.printer.success("Started the daemon.");
   }

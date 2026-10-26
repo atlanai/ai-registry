@@ -28,7 +28,7 @@ The daemon keeps each job's recent runs in `state/aireg.db` under aireg's folder
 
 Says whether the daemon is running, and if it is, its version and process id, how many jobs are enabled, whether autostart is on, and whether jobs are paused. `status` never starts the daemon.
 
-If another program is listening on the daemon's socket, `status` warns about it instead. A daemon that cannot prove it runs as you counts as another program, and commands send it no credentials; one an older aireg started is replaced by `aireg daemon restart`, or by the next command that needs the daemon.
+If another program is listening on the daemon's socket, `status` warns about it instead. A daemon that cannot prove it runs as you is sent no credentials. When aireg's own pid file names it, `status` says an older aireg started it, with its process id; `aireg daemon restart` replaces it, as does the next command that needs the daemon. Otherwise it counts as another program.
 
 ## aireg daemon start
 
@@ -76,7 +76,7 @@ On macOS, if autostart is registered but not running, check that aireg is allowe
 {"ok": true, "data": {"status": "ready", "pid": 14300, "jobs": 1, "enabled": 1, "paused": false, "autostart": false}}
 ```
 
-`status` is `ready` when the daemon is running, `stopping` while it finishes its runs before it exits, `down` when it isn't, and `foreign` when another program is listening on its socket. `autostart` prints whether it changed anything, how it is registered, and where. `start`, `stop` and `restart` print the `status` they leave, the daemon's `pid` while it is running, and whether they `changed` anything: `stop` prints `{"status": "down", "changed": true}`.
+`status` is `ready` when the daemon is running, `stopping` while it finishes its runs before it exits, `down` when it isn't, `outdated` when a daemon an older aireg started is running and cannot prove it runs as you, and `foreign` when another program is listening on its socket. `autostart` prints whether it changed anything, how it is registered, and where. `start`, `stop` and `restart` print the `status` they leave, the daemon's `pid` while it is running, and whether they `changed` anything: `stop` prints `{"status": "down", "changed": true}`.
 
 ## Exit status
 

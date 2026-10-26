@@ -192,7 +192,8 @@ async function followDaemon(bin: string, printer: Printer): Promise<void> {
   try {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const found = await probeDaemon(VERSION).catch(() => ({ status: "down" as const }));
-      if (found.status !== "ready" || found.version === VERSION) return;
+      const behind = found.status === "ready" && found.version !== VERSION;
+      if (!behind && found.status !== "outdated") return;
       spin?.update("Restarting aireg's background service");
       try {
         await recycleDaemon(bin, VERSION);
