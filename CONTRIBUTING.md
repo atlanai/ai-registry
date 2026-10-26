@@ -53,7 +53,7 @@ pnpm dev --help       # run aireg from source, no build needed
 pnpm run verify       # the CLI checks CI runs
 ```
 
-`pnpm dev` uses your real `~/.aireg` and harness folders. To try something without touching them, set `HOME` and `AIREG_HOME` to a temporary folder first. Before changing the code, read [cli/ARCHITECTURE.md](cli/ARCHITECTURE.md): it maps the source and the tests, and says how to add a harness, an adapter, a command, a setting or an error, and how to word what aireg prints.
+`pnpm dev` uses your real `~/.aireg` and target folders. To try something without touching them, set `HOME` and `AIREG_HOME` to a temporary folder first. Before changing the code, read [cli/ARCHITECTURE.md](cli/ARCHITECTURE.md): it maps the source and the tests, and says how to add a target, an adapter, a command, a setting or an error, and how to word what aireg prints.
 
 The schemas in `cli/schema/` are generated. Edit the definitions under `cli/scripts/schema/`, then run `pnpm run schema`. A test fails if they drift.
 

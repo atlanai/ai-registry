@@ -1,6 +1,6 @@
 # Example: acme-registry
 
-This page walks through the example that the repository ships, [`examples/acme-registry`](https://github.com/atlanai/ai-registry/tree/main/examples/acme-registry), along with what happens within the registry during core tasks, including adding a skill, installing the skill across harnesses, and updating a skill.
+This page walks through the example that the repository ships, [`examples/acme-registry`](https://github.com/atlanai/ai-registry/tree/main/examples/acme-registry), along with what happens within the registry during core tasks, including adding a skill, installing the skill across coding agents, and updating a skill.
 
 acme-registry is a complete root that follows the specification. It contains two kinds, `skill` and `agent`, with their manifests under `kinds/`, and one namespace, `engineering`. The engineering namespace contains two artifacts: a `pr-review` skill and a `reviewer` agent:
 
@@ -35,11 +35,11 @@ git add . && git commit -m "release run-benchmark 0.1.0"
   ![Adding a new skill, run-benchmark, to the engineering namespace: aireg skill new creates the folder, and aireg registry index writes its artifact.json and versions.json and adds it to index.json](assets/publish-skill.svg)
 </figure>
 
-## 2. Installing the skill into your harnesses
+## 2. Installing the skill into your coding agents
 
 Suppose the engineering team wants to use `run-benchmark` in a project, in Claude Code and Codex.
 
-A client finds the latest version of `run-benchmark`, checks each file against its digest, and puts the files where each harness looks for skills: `.claude/skills/` for Claude Code and `.agents/skills/` for Codex. It records the exact version it installed. The registry itself does not change.
+A client finds the latest version of `run-benchmark`, checks each file against its digest, and puts the files where each coding agent looks for skills: `.claude/skills/` for Claude Code and `.agents/skills/` for Codex. It records the exact version it installed. The registry itself does not change.
 
 If you're using the aireg CLI, you would create a project next to the registry and run:
 
@@ -52,7 +52,7 @@ aireg list
 
 ```text
 1 installed in this project
-  artifact       kind   version  from  harnesses
+  artifact       kind   version  from  targets
   run-benchmark  skill  0.1.0    acme  Claude Code, Codex
 ```
 
@@ -82,7 +82,7 @@ aireg outdated
 aireg update
 ```
 
-Because each harness folder links to the files in `.registry/`, Claude Code and Codex see 0.2.0 as soon as the update finishes. Installs in your user scope need no command: the CLI's background job takes 0.2.0 within 15 minutes. An install pinned to 0.1.0 stays there until you move the pin.
+Because each target folder links to the files in `.registry/`, Claude Code and Codex see 0.2.0 as soon as the update finishes. Installs in your user scope need no command: the CLI's background job takes 0.2.0 within 15 minutes. An install pinned to 0.1.0 stays there until you move the pin.
 
 <figure markdown="span">
   ![Updating run-benchmark to 0.2.0: aireg skill bump creates the folder, and aireg registry index writes its artifact.json and rewrites versions.json and index.json](assets/publish-version.svg)

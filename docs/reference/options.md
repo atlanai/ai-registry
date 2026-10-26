@@ -26,10 +26,10 @@ Several commands share these options. Each command's page, and `aireg <command> 
 | Option | Description |
 |---|---|
 | `-g`, `--user` | Act on your user scope (`~/.registry`) instead of the current project. See [Scopes](#scopes). |
-| `--for <harness>[,<harness>...]` | The coding agents to install into. Takes a comma-separated list, the option more than once, or `*` for all of them. See [Harnesses](#harnesses). |
+| `--for <target>[,<target>...]` | The coding agents to install into. Takes a comma-separated list, the option more than once, or `*` for all of them. See [Targets](#targets). |
 | `-s`, `--select <name>` | The artifacts or namespaces to act on. Repeat it, separate names with commas, or pass `*` for everything. |
 | `--all` | Act on everything, without asking. The same as `--select '*' --yes`. |
-| `--copy` | Copy artifacts into each harness folder instead of linking them. |
+| `--copy` | Copy artifacts into each target folder instead of linking them. |
 | `--dry-run` | Print what would change, then stop without changing anything. |
 | `--frozen` | Fail with exit status 3 if the command would change the lockfile or the manifest. `add`, `remove`, `install` and `update` check it. |
 | `--force` | Overwrite or remove artifacts that were edited after they were installed. A few commands give it a meaning of their own; their pages say so. |
@@ -43,29 +43,31 @@ aireg installs into one of two scopes:
 
 `install`, `update`, `remove`, `sync` and `unlock` need a project unless you pass `-g`. `add`, `publish`, `registry`, `search`, `show`, `status`, `list` and `outdated` use your user scope when the current folder isn't in a project.
 
-## Harnesses
+## Targets
 
-A harness is a coding agent that aireg installs into. aireg knows seven:
+A target is a coding agent, or a folder several of them read, that aireg installs into. aireg knows seven:
 
-| Name | Harness |
-|---|---|
-| `claude` | Claude Code |
-| `codex` | Codex |
-| `cursor` | Cursor |
-| `copilot` | GitHub Copilot |
-| `gemini` | Gemini CLI |
-| `opencode` | OpenCode |
-| `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
+| Id | Alias | Target |
+|---|---|---|
+| `claude-code` | `claude` | Claude Code |
+| `codex` | | Codex |
+| `cursor` | | Cursor |
+| `github-copilot` | `copilot` | GitHub Copilot |
+| `gemini-cli` | `gemini` | Gemini CLI |
+| `opencode` | | OpenCode |
+| `universal` | `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
 
-aireg links each artifact into the folder its harness reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`.
+An alias works wherever aireg reads an id: `--for`, `init --import`, `aireg targets show`, a manifest, the lockfile, a job, a target file's `reads`, and a profile's `<id>:<profile>`. aireg always writes and prints the id, so `--for claude,codex` records `claude-code` and `codex`.
+
+aireg links each artifact into the folder its target reads, in a project and in your user scope alike: `.claude/skills/` and `~/.claude/skills/` for Claude Code, for example. Codex reads skills from `.agents/skills/` and `~/.agents/skills/`.
 
 Codex reads agents only as TOML, so aireg writes each one as a file, never a link: `.codex/agents/<name>.toml`, or `$CODEX_HOME/agents/` (default `~/.codex/agents/`) in your user scope. It holds the agent's `name`, `description` and body, as `developer_instructions`; other front matter is left out. Codex loads a project's agents only in a project it trusts.
 
-A plugin installs as one plugin where a harness loads plugins: Claude Code in `.claude/skills/<plugin>/` in a project and `~/.claude/skills/<plugin>/` in your user scope, Codex, in your user scope only, in `~/.codex/plugins/cache/<registry>/<plugin>/local`, which aireg turns on in `~/.codex/config.toml`, and Cursor, in your user scope only, in `~/.cursor/plugins/local/<plugin>/`, as a copy. The same goes, in your user scope, for each namespace of a registry whose adapter declares its namespaces plugins (`namespacePlugins` in the [adapter contract](adapter.md#the-adapter-contract)). Every other harness, and Codex and Cursor in a project, get each skill and agent where they read it, and each command a plugin holds as a skill named `<plugin>-<command>` that only a person invokes.
+A plugin installs as one plugin where a target loads plugins: Claude Code in `.claude/skills/<plugin>/` in a project and `~/.claude/skills/<plugin>/` in your user scope, Codex, in your user scope only, in `~/.codex/plugins/cache/<registry>/<plugin>/local`, which aireg turns on in `~/.codex/config.toml`, and Cursor, in your user scope only, in `~/.cursor/plugins/local/<plugin>/`, as a copy. The same goes, in your user scope, for each namespace of a registry whose adapter declares its namespaces plugins (`namespacePlugins` in the [adapter contract](adapter.md#the-adapter-contract)). Every other target, and Codex and Cursor in a project, get each skill and agent where they read it, and each command a plugin holds as a skill named `<plugin>-<command>` that only a person invokes.
 
-aireg installs into the harnesses named by `--for`. Without it, aireg uses the `harnesses:` list in the scope's manifest, and without that, `claude` and `codex`. Run [`aireg harnesses`](targets.md) to see which ones this machine has.
+aireg installs into the targets named by `--for`. Without it, aireg uses the `targets:` list in the scope's manifest, and without that, `claude-code` and `codex`. A manifest's `harnesses:`, the list's earlier name, is still read, and the next command that edits the manifest renames it `targets:`. Run [`aireg targets`](targets.md) to see which ones this machine has.
 
-`--for` also takes the id of a harness you define in a [harness file](targets.md#harness-files).
+`--for` also takes the id of a target you define in a [target file](targets.md#target-files).
 
 ## When aireg asks questions
 

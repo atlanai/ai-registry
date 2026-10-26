@@ -42,14 +42,14 @@ To convert an existing skills-only repository in place, preserve uncommitted wor
 
 ### 2. Bring in the skills teams already have
 
-You can use the aireg CLI to find any skills that exist across your harnesses that aren't managed, and bring them into the registry so you can manage them centrally.
+You can use the aireg CLI to find any skills that exist across your coding agents that aren't managed, and bring them into the registry so you can manage them centrally.
 
 ```bash
 aireg status -g
 aireg skill new --from ~/.claude/skills/pr-review ~/.claude/skills/lint --namespace engineering
 ```
 
-`aireg status -g` lists unmanaged skills in your user scope; inside a project, `aireg status` does the same for the project. A row can group copies from several harnesses, so inspect every target harness folder too. `aireg skill new --from` copies existing skill folders into the namespace you name, each as version 0.1.0 of a new skill, and leaves the originals where they are; run it from the registry folder. For an in-place conversion, use the repository paths, such as `skills/pr-review`, instead of the user-scope paths above.
+`aireg status -g` lists unmanaged skills in your user scope; inside a project, `aireg status` does the same for the project. A row can group copies from several targets, so inspect every target folder too. `aireg skill new --from` copies existing skill folders into the namespace you name, each as version 0.1.0 of a new skill, and leaves the originals where they are; run it from the registry folder. For an in-place conversion, use the repository paths, such as `skills/pr-review`, instead of the user-scope paths above.
 
 Before retiring any originals, compare each imported skill and its supporting files with the source. Import skips hidden files and directories; decide how to preserve any needed content and check links, scripts and installers that use the old paths. Run `aireg registry index` and `aireg registry validate`. Offer one conversion pull request that also removes the redundant source folders, updates their consumers and leaves a README pointer to the registry and its editing workflow. Get approval before removing folders. If moving a skills-only repository to a separate registry, offer a README pointer and archive the old repository only with explicit approval after its consumers have migrated. Keep application-repository authoring sources used by step 3.
 
@@ -129,24 +129,24 @@ aireg add acme/engineering/pr-review@0.1.0
 aireg install --frozen && aireg status
 ```
 
-`@0.1.0` pins the version, so `aireg update` leaves it alone. The CLI records what the project uses in `.registry/manifest.yml` and the exact versions and digests in `.registry/manifest.lock.yml`, and keeps the installed copies in `.registry/artifacts/`; commit `.registry/` and the harness folders it links into, such as `.claude/`. None of it makes the project a registry: only a folder holding `registry.json` is one. In CI, `aireg install --frozen` fails rather than change anything, and `aireg status` exits 3 if the installed skills no longer match the lockfile.
+`@0.1.0` pins the version, so `aireg update` leaves it alone. The CLI records what the project uses in `.registry/manifest.yml` and the exact versions and digests in `.registry/manifest.lock.yml`, and keeps the installed copies in `.registry/artifacts/`; commit `.registry/` and the target folders it links into, such as `.claude/`. None of it makes the project a registry: only a folder holding `registry.json` is one. In CI, `aireg install --frozen` fails rather than change anything, and `aireg status` exits 3 if the installed skills no longer match the lockfile.
 
 ### 7. Keep every laptop current
 
-Install a namespace for every project on your machine and let the aireg CLI keep it up to date, so new skills and new versions reach Claude Code and Codex without you running a command. For a conversion, wait until its pull request merges and the remote default branch serves the registry before moving active copies. Every teammate first checks for hand-installed copies of the incoming skills in every target harness folder, including `~/.claude/skills` and `~/.agents/skills`. Compare them with the registry versions and preserve local changes, then move the matching folders to a backup outside all harness discovery paths with their owner's approval. Do this even if the teammate did not create the registry. `aireg add -g` does not replace their folders, so an old copy can remain active while another harness receives the registry version.
+Install a namespace for every project on your machine and let the aireg CLI keep it up to date, so new skills and new versions reach Claude Code and Codex without you running a command. For a conversion, wait until its pull request merges and the remote default branch serves the registry before moving active copies. Every teammate first checks for hand-installed copies of the incoming skills in every target folder, including `~/.claude/skills` and `~/.agents/skills`. Compare them with the registry versions and preserve local changes, then move the matching folders to a backup outside all target discovery paths with their owner's approval. Do this even if the teammate did not create the registry. `aireg add -g` does not replace their folders, so an old copy can remain active while another target receives the registry version.
 
 ```bash
 aireg registry add github.com/acme/ai-registry -g
 aireg registry show acme
 # Confirm the expected namespace and artifacts are available.
 aireg status -g
-# Review and move old copies outside every target harness before installing.
+# Review and move old copies outside every target folder before installing.
 aireg add -g acme/engineering
 aireg status -g
 aireg daemon autostart on
 ```
 
-After installing, confirm every intended harness uses the registry-managed skills and resolve any skipped or blocked placements; a successful command alone does not establish this. Do not publish an old local copy just to clear a collision.
+After installing, confirm every intended target uses the registry-managed skills and resolve any skipped or blocked placements; a successful command alone does not establish this. Do not publish an old local copy just to clear a collision.
 
 `-g` installs into your user scope instead of the current project, so every project on your machine gets the skills. Installing `acme/engineering` takes every skill in the namespace, including ones added later. The CLI's background job checks for new versions every 15 minutes, and `aireg daemon autostart on` starts it when you log in.
 

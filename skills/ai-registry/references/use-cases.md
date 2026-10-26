@@ -27,7 +27,7 @@ I've written a few skills for Claude Code. Put them in a private registry in a n
    `aireg skill new --from <path> --namespace personal` for each skill,
    `aireg registry index` and a commit.
 3. Follow `aireg-new`'s verified cleanup and release-readiness checks. Before moving active
-   harness copies, confirm the release is reachable from the registry address below.
+   target copies, confirm the release is reachable from the registry address below.
 4. `aireg registry add github.com/<owner>/my-skills -g`, then `aireg add my-skills/personal -g`.
    Claude Code reads `~/.claude/skills`, and Codex and Cursor read `~/.agents/skills`.
 
@@ -73,11 +73,11 @@ This works the same for a teammate's machine or your own second laptop.
    a git credential helper.
 2. Connect with `aireg registry add github.com/<owner>/my-skills -g`, then follow
    `aireg-add` to read the registry and migrate matching hand-installed copies on this machine.
-   Its backup and verification steps cover every target harness.
+   Its backup and verification steps cover every target.
 3. Install with `aireg add my-skills/personal -g`, after resolving any blocking copies.
 4. Ask before `aireg daemon autostart on`, which starts the background updates at login.
 
-Check: `aireg status -g` and each target harness confirm the skills are managed with no
+Check: `aireg status -g` and each target folder confirm the skills are managed with no
 blocked placements, and `aireg job list` shows a job for `my-skills`.
 
 ### 5. Check a shared skill before you trust it
@@ -123,7 +123,7 @@ Install our pr-review skill from <org>/ai-registry into this repo at its current
 ```
 
 1. In the project: `aireg add <registry>/<namespace>/pr-review@<version>`, then commit
-   `.registry/` and the harness folders it links into, such as `.claude/` and `.agents/`.
+   `.registry/` and the target folders it links into, such as `.claude/` and `.agents/`.
 2. Add the workflow from "In CI" in the `aireg-add` skill. It runs
    `aireg install --frozen && aireg status`, and `aireg status` exits 3 when an installed copy
    was edited.

@@ -38,9 +38,9 @@ A project keeps what it installs in `.registry/`, next to your code:
 
 | Path | Description |
 |---|---|
-| `.registry/manifest.yml` | What the project installs: its harnesses, the registries it installs from, and the artifacts it takes from each. Commit it. |
+| `.registry/manifest.yml` | What the project installs: its targets, the registries it installs from, and the artifacts it takes from each. Commit it. |
 | `.registry/manifest.lock.yml` | The exact version and digest of everything installed. Commit it. |
-| `.registry/artifacts/` | The installed copies. The harness folders link to them. Committed by default, so a fresh clone works without running aireg; `.registry/.gitignore` shows how to leave them out. |
+| `.registry/artifacts/` | The installed copies. The target folders link to them. Committed by default, so a fresh clone works without running aireg; `.registry/.gitignore` shows how to leave them out. |
 | `.registry/backups/` | Your own files that stood where aireg installs or removes a link, moved aside rather than deleted, in one folder per command named by its time, such as `20261009T062247Z/claude/skills/lint`. A second command in the same second uses `20261009T062247Z-2`. Each command names what it moves. Not committed. |
 | `.registry/leases/` | The write lock a command holds while it changes the project, so two commands never write at once. See [`aireg unlock`](unlock.md). It keeps itself out of git. |
 | `.registry/.gitignore` | Written by aireg. It keeps aireg's temporary files and `backups/` out of git. |

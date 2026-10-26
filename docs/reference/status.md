@@ -15,11 +15,11 @@ aireg status [-g]
 | State | Meaning |
 |---|---|
 | `ok` | Installed as the lockfile records it. |
-| `missing` | The stored copy, or a link in a harness folder, is missing, or something else holds the path the link needs. |
-| `replaced` | A harness link was replaced by a file or folder of yours, or points outside the scope. `--json` calls this state `dangling`. |
-| `edited` | The installed copy was edited after it was installed. With `--copy`, that includes the copy in the harness folder. |
+| `missing` | The stored copy, or a link in a target folder, is missing, or something else holds the path the link needs. |
+| `replaced` | A target's link was replaced by a file or folder of yours, or points outside the scope. `--json` calls this state `dangling`. |
+| `edited` | The installed copy was edited after it was installed. With `--copy`, that includes the copy in the target folder. |
 
-The table shows each artifact's kind, version and registry, then a column per harness it was installed for: `✓` when linked where that harness reads it, `missing`, `replaced`, `foreign` when its link points outside the scope, or `-` when it isn't installed there. A version marked `pinned` is held by the manifest.
+The table shows each artifact's kind, version and registry, then a column per target it was installed for: `✓` when linked where that target reads it, `missing`, `replaced`, `foreign` when its link points outside the scope, or `-` when it isn't installed there. A version marked `pinned` is held by the manifest.
 
 Lines under the table explain each `-` and, when something needs attention, what `ok` means.
 
@@ -27,11 +27,11 @@ Lines under the table explain each `-` and, when something needs attention, what
 
 A link aireg did not make is `missing` too, with the reason: a folder of yours already at the path, or another artifact of the same name installed there. `install` leaves your folder alone, so move it. When another artifact holds the path, `aireg install` with `defaults.name-collision` set to `rename`, the default, installs this one under its namespace and name.
 
-Below the table, `status` lists the unmanaged artifacts: skills and agents in your harness folders that aireg didn't install. A link of yours counts, such as a skill kept in one folder and linked into each harness: it is listed once, with every harness that holds it or links it, at the real folder's path. So does an agent in a harness's own format, such as a Codex `.toml` agent, though `aireg publish` takes its Markdown file instead. Publish one to a registry to manage it, with [`aireg publish`](publish.md). [`aireg sync`](sync.md) still never adopts a link of yours, since whoever made it owns what it points at.
+Below the table, `status` lists the unmanaged artifacts: skills and agents in your target folders that aireg didn't install. A link of yours counts, such as a skill kept in one folder and linked into each target: it is listed once, with every target that holds it or links it, at the real folder's path. So does an agent in a target's own format, such as a Codex `.toml` agent, though `aireg publish` takes its Markdown file instead. Publish one to a registry to manage it, with [`aireg publish`](publish.md). [`aireg sync`](sync.md) still never adopts a link of yours, since whoever made it owns what it points at.
 
-After that, `status` lists the dangling links in your harness folders: links of yours whose target is gone, which the harness cannot load. Remove one with `rm`. A link aireg made that lost its target is reported as `missing` in the table instead.
+After that, `status` lists the dangling links in your target folders: links of yours whose destination is gone, which the target cannot load. Remove one with `rm`. A link aireg made that lost its target is reported as `missing` in the table instead.
 
-In a project, `status` also warns about an artifact installed in both the project and your user scope, because your harness decides which one it loads.
+In a project, `status` also warns about an artifact installed in both the project and your user scope, because your coding agent decides which one it loads.
 
 ## Options
 
@@ -42,14 +42,16 @@ In a project, `status` also warns about an artifact installed in both the projec
 ```json
 {"ok": true, "data": {
   "scope": "project",
-  "artifacts": [{"name": "engineering/pr-review", "state": "ok", "harnesses": {"agents": "linked", "claude": "linked"}, "needsApproval": [{"harness": "tool", "run": "tool trust"}]}],
+  "artifacts": [{"name": "engineering/pr-review", "state": "ok", "targets": {"claude-code": "linked", "universal": "linked"}, "needsApproval": [{"target": "tool", "run": "tool trust"}]}],
   "shadowed": [],
-  "unmanaged": [{"name": "lint", "kind": "skill", "harnesses": ["claude"], "path": "/home/me/project/.claude/skills/lint"}],
-  "dangling": [{"path": "/home/me/project/.claude/agents/old.md", "target": "/home/me/agents/old.md", "harness": "claude"}]
+  "unmanaged": [{"name": "lint", "kind": "skill", "targets": ["claude-code"], "path": "/home/me/project/.claude/skills/lint"}],
+  "dangling": [{"path": "/home/me/project/.claude/agents/old.md", "linksTo": "/home/me/agents/old.md", "target": "claude-code"}]
 }}
 ```
 
-In JSON, `harnesses` is keyed by folder, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's path, the target it names, as written, and its harness. `needsApproval` lists each harness that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
+In JSON, `targets` is keyed by target id, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's `path`, what it links to as written (`linksTo`), and its `target`. `needsApproval` lists each target that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
+
+Earlier versions of aireg said `harnesses` where this output says `targets`, `harness` where it says `target`, and `target` for a dangling link's `linksTo`.
 
 ## Exit status
 

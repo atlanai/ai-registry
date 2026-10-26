@@ -65,9 +65,9 @@ The test skill, `hello-registry`, replies with its own version, so you can watch
 3. Checks the skill, writes its `artifact.json` with a digest for every file, and generates `versions.json` and `index.json`.
 4. Commits the change. The commit is the release.
 
-## Install it into your harnesses
+## Install it into your coding agents
 
-To install the skill into your harnesses, create a project and run:
+To install the skill into your coding agents, create a project and run:
 
 ```bash
 cd .. && mkdir my-project && cd my-project && git init
@@ -85,7 +85,7 @@ The above:
 
 ```text
 1 installed in this project
-  artifact        kind   version  from  harnesses
+  artifact        kind   version  from  targets
   hello-registry  skill  0.1.0    acme  Claude Code, Codex
 ```
 
@@ -136,18 +136,18 @@ After `aireg update`, ask your agent again: it answers with 0.2.0.
 
 ## Uninstall the skill
 
-To uninstall the skill from your harnesses, run:
+To uninstall the skill from your coding agents, run:
 
 ```bash
 aireg remove hello-registry
 aireg list
 ```
 
-This unlinks the skill from every harness in the project. Both versions stay in the registry. In a terminal, `aireg remove` lists what it will remove and asks you to confirm.
+This unlinks the skill from every target in the project. Both versions stay in the registry. In a terminal, `aireg remove` lists what it will remove and asks you to confirm.
 
 ## Add the skills you already have
 
-To bring the skills your harnesses already have into the registry, first list the ones the CLI does not manage:
+To bring the skills your coding agents already have into the registry, first list the ones the CLI does not manage:
 
 ```bash
 aireg status -g
@@ -157,13 +157,13 @@ aireg status -g
 Nothing is installed in your user scope.
 
 2 unmanaged
-  artifact   kind   harness      path
+  artifact   kind   target       path
   lint       skill  Claude Code  ~/.claude/skills/lint
   pr-review  skill  Claude Code  ~/.claude/skills/pr-review
   next   aireg publish <path> --to <registry>/<namespace>
 ```
 
-`-g` looks at your user scope: the harness folders in your home folder, such as `~/.claude/skills`. Without it, `aireg status` checks the project's own harness folders. If you accepted the installer's offer of the aireg skills, `aireg-add`, `aireg-new` and `aireg-publish` are also listed, as installed from `ai-registry`.
+`-g` looks at your user scope: the target folders in your home folder, such as `~/.claude/skills`. Without it, `aireg status` checks the project's own target folders. If you accepted the installer's offer of the aireg skills, `aireg-add`, `aireg-new` and `aireg-publish` are also listed, as installed from `ai-registry`.
 
 Then bring each one in, release them, and install them into the project. Replace `pr-review` and `lint` with the names `aireg status -g` lists:
 
@@ -227,7 +227,7 @@ If you installed the aireg skills, `Jobs` counts their job too. Autostart is off
 
 ## Let your coding agent do it
 
-The ai-registry repository also comes packaged with agent skills to help you manage registries using your preferred harness: `aireg-new`, `aireg-add`, and `aireg-publish`.
+The ai-registry repository also comes packaged with agent skills to help you manage registries using your preferred coding agent: `aireg-new`, `aireg-add`, and `aireg-publish`.
 
 These skills respectively set up a registry of skills and agents for a person or a team, from nothing to installed; find, install, and update skills and agents from a registry, in a project or in your user scope; and publish a skill or agent to a registry, or release a new version of one.
 
@@ -240,7 +240,7 @@ aireg add ai-registry/aireg -g
 
 This connects the registry that holds the skills and installs them into your user scope for Claude Code and Codex, so they're available in every project. It also adds a job that keeps them up to date, so the daemon starts again. In Claude Code they appear as `/aireg-new`, `/aireg-add`, and `/aireg-publish` in a new session. When the installer runs in a terminal, it offers to install them for you, from the release that matches your aireg; without a terminal it leaves them out. `aireg doctor` tells you whether they are installed, and prints the command, pinned to that release, when they are not.
 
-Once installed, you can use your preferred harness to manage registries. For example, "set up a registry for my team's skills" or "publish the skills in `~/.claude/skills` to the acme registry".
+Once installed, you can use your preferred coding agent to manage registries. For example, "set up a registry for my team's skills" or "publish the skills in `~/.claude/skills` to the acme registry".
 
 ## Where to go next
 

@@ -1,54 +1,58 @@
-# aireg harnesses
+# aireg targets
 
-List the harnesses aireg can install into, and which this machine has.
+List the targets aireg can install into, and which this machine has.
 
 ## Synopsis
 
 ```text
-aireg harnesses [--all]
-aireg harnesses show <id>
-aireg harnesses check <file>
+aireg targets [--all]
+aireg targets show <id>
+aireg targets check <file>
 ```
 
 ## Description
 
-`aireg harnesses` lists the coding agents aireg found on this machine, and any a [harness file](#harness-files) of yours defines. It finds one by its environment variables, its program on your `PATH`, or its folder in the project or your home folder. With `--all`, it lists every harness name [`--for`](options.md#harnesses) accepts, found or not.
+`aireg targets` lists the coding agents aireg found on this machine, and any a [target file](#target-files) of yours defines. It finds one by its environment variables, its program on your `PATH`, or its folder in the project or your home folder. With `--all`, it lists every target [`--for`](options.md#targets) accepts, found or not.
 
-Each row names a coding agent and the id `--for` takes. Once a [harness file](#harness-files) of yours defines one, a `from` column says where each harness comes from.
+Each row names a coding agent, the id `--for` takes, and the other names it answers to. Once a [target file](#target-files) of yours defines one, a `from` column says where each target comes from. Below the table, a hint names the ids of the shared `.agents` folder, which has no row.
 
-`harnesses` doesn't need a project.
+`targets` doesn't need a project. `aireg harnesses`, its earlier name, still runs it.
 
 ## Actions
 
 | Action | Description |
 |---|---|
-| `show <id>` | Print a harness as aireg resolved it. |
-| `check <file>` | Check a harness file before you use it. |
+| `show <id>` | Print a target as aireg resolved it. Takes its id or an alias. |
+| `check <file>` | Check a target file before you use it. |
 
-## Supported harnesses
+## Supported targets
 
-Each path is in a project, then in your user scope.
+Each path is in a project, then in your user scope. An alias works everywhere an id does; aireg always writes and prints the id.
 
-| Harness | `--for` | Skills | Agents | Moves the user folder |
-|---|---|---|---|---|
-| Claude Code | `claude` | `.claude/skills/<name>/`, `~/.claude/skills/<name>/` | `.claude/agents/<name>.md`, `~/.claude/agents/<name>.md` | `CLAUDE_CONFIG_DIR` |
-| Codex | `codex` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.codex/agents/<name>.toml`, `~/.codex/agents/<name>.toml`, as TOML | `CODEX_HOME` |
-| Cursor | `cursor` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.cursor/agents/<name>.md`, `~/.cursor/agents/<name>.md` | None |
-| GitHub Copilot | `copilot` | `.github/skills/<name>/`, `~/.copilot/skills/<name>/` | `.github/agents/<name>.agent.md`, `~/.copilot/agents/<name>.agent.md` | `COPILOT_HOME` |
-| Gemini CLI | `gemini` | `.gemini/skills/<name>/`, `~/.gemini/skills/<name>/` | `.gemini/agents/<name>.md`, `~/.gemini/agents/<name>.md`, as a copy | `GEMINI_CLI_HOME` |
-| OpenCode | `opencode` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.opencode/agents/<name>.md`, `~/.config/opencode/agents/<name>.md`, as a copy | `XDG_CONFIG_HOME` |
+| Target | `--for` | Aliases | Skills | Agents | Moves the user folder |
+|---|---|---|---|---|---|
+| Claude Code | `claude-code` | `claude` | `.claude/skills/<name>/`, `~/.claude/skills/<name>/` | `.claude/agents/<name>.md`, `~/.claude/agents/<name>.md` | `CLAUDE_CONFIG_DIR` |
+| Codex | `codex` | | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.codex/agents/<name>.toml`, `~/.codex/agents/<name>.toml`, as TOML | `CODEX_HOME` |
+| Cursor | `cursor` | | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.cursor/agents/<name>.md`, `~/.cursor/agents/<name>.md` | None |
+| GitHub Copilot | `github-copilot` | `copilot` | `.github/skills/<name>/`, `~/.copilot/skills/<name>/` | `.github/agents/<name>.agent.md`, `~/.copilot/agents/<name>.agent.md` | `COPILOT_HOME` |
+| Gemini CLI | `gemini-cli` | `gemini` | `.gemini/skills/<name>/`, `~/.gemini/skills/<name>/` | `.gemini/agents/<name>.md`, `~/.gemini/agents/<name>.md`, as a copy | `GEMINI_CLI_HOME` |
+| OpenCode | `opencode` | | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.opencode/agents/<name>.md`, `~/.config/opencode/agents/<name>.md`, as a copy | `XDG_CONFIG_HOME` |
+| The shared `.agents` folder | `universal` | `agents` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.agents/agents/<name>.md`, `~/.agents/agents/<name>.md` | None |
 
-## Harness files
+The shared `.agents` folder is one several coding agents read, not a coding agent, so aireg never detects it and never installs into it by default.
 
-A harness file adds a harness aireg doesn't ship, or replaces one it does with `"overrides": true`. aireg reads one JSON file per harness from `~/.aireg/harnesses/<id>.json` (`$AIREG_HOME/harnesses/` when `AIREG_HOME` is set). Only your user scope defines harnesses: a project can select one by id, in `--for` or its manifest, but never define one.
+## Target files
+
+A target file adds a target aireg doesn't ship, or replaces one it does with `"overrides": true`. aireg reads one JSON file per target from `~/.aireg/targets/<id>.json` (`$AIREG_HOME/targets/` when `AIREG_HOME` is set). Only your user scope defines targets: a project can select one by id, in `--for` or its manifest, but never define one.
 
 ```json
 {
   "id": "tool",
+  "aliases": ["tl"],
   "displayName": "Tool",
   "roots": { "project": ".tool", "user": { "default": "~/.tool", "env": "TOOL_HOME" } },
   "detect": { "binary": ["tool"] },
-  "reads": { "skill": ["agents"] },
+  "reads": { "skill": ["universal"] },
   "kinds": {
     "plugin": { "shape": "contents" },
     "agent": { "shape": "file", "subdir": "agents", "extension": ".md" }
@@ -56,68 +60,83 @@ A harness file adds a harness aireg doesn't ship, or replaces one it does with `
 }
 ```
 
-This harness reads skills from the shared `.agents` folder and agents from `.tool/agents/`, and takes a plugin as the skills and agents it holds. [`harness.schema.json`](https://github.com/atlanai/ai-registry/blob/main/cli/schema/harness.schema.json) describes every key. A file can't set `default`, `importable` or `detect.caller`, which only built-in harnesses use.
+This target reads skills from the shared `.agents` folder and agents from `.tool/agents/`, takes a plugin as the skills and agents it holds, and answers to `tl` as well as `tool`. [`target.schema.json`](https://github.com/atlanai/ai-registry/blob/main/cli/schema/target.schema.json) describes every key. A file can't set `default`, `importable` or `detect.caller`, which only built-in targets use.
 
-A kind placed with `place: "copy"` is written as real files, for a harness that edits or refuses links; an edit then shows in `aireg status`. A `codec` rewrites an agent in the harness's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
+An alias is a lowercase name that isn't another target's id or alias. A file can't take a built-in alias as its id: to replace Claude Code, name the file `claude-code.json`, not `claude.json`, and set `"overrides": true`. A file that replaces a built-in target and sets no `aliases` keeps the built-in's.
 
-A kind's `keys` say how the harness takes a front-matter key it doesn't read as written, such as `disable-model-invocation`: a `.json` or `.yaml` file it reads instead, which aireg writes into a copy of the artifact, or `false`, which leaves out an artifact that sets the key rather than install it without that limit.
+`"shared": true` marks a folder several tools read rather than a coding agent, like the shared `.agents` folder. aireg never detects a shared folder and never installs into one by default.
 
-aireg skips a file, with a warning, when it isn't valid against the schema, names a codec aireg doesn't have, reaches outside its folders, gives a shell command where a program and its arguments belong, or isn't named `<id>.json`. The built-in harnesses keep working. Run `aireg harnesses check <file>` to see what is wrong with one.
+`profiles` finds the profiles of one installation, such as `{ "root": "~/.tool/profiles/{profile}" }`, where `{profile}` in the last segment names each one. Each profile folder found is a target of its own, `<id>:<profile>`, in your user scope only.
+
+A kind placed with `place: "copy"` is written as real files, for a target that edits or refuses links; an edit then shows in `aireg status`. A `codec` rewrites an agent in the target's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
+
+A kind's `keys` say how the target takes a front-matter key it doesn't read as written, such as `disable-model-invocation`: a `.json` or `.yaml` file it reads instead, which aireg writes into a copy of the artifact, or `false`, which leaves out an artifact that sets the key rather than install it without that limit.
+
+aireg skips a file, with a warning, when it isn't valid against the schema, names a codec aireg doesn't have, reaches outside its folders, gives a shell command where a program and its arguments belong, isn't named `<id>.json`, or takes a built-in alias as its id. The built-in targets keep working. Run `aireg targets check <file>` to see what is wrong with one.
+
+### Earlier names
+
+Files written for an earlier aireg keep loading:
+
+- aireg still reads `~/.aireg/harnesses/`, the folder's earlier name. A target id defined in both folders is refused, naming both files, and neither file is used.
+- A file's `kind` is read only as `"kind": "shared"`, which means `"shared": true`; other values are ignored. `aireg targets` and `aireg targets check` warn about a file that sets it.
+- `instances` is read as the earlier name of `profiles`, with a warning.
 
 ### Trust and reload steps
 
-Some harnesses load what aireg placed only after you trust it. aireg never takes that step: it prints the command once, and `aireg status --json` lists it under [`needsApproval`](status.md#json-output). It also prints a harness's reload step after a change to it.
+Some targets load what aireg placed only after you trust it. aireg never takes that step: it prints the command once, and `aireg status --json` lists it under [`needsApproval`](status.md#json-output). It also prints a target's reload step after a change to it.
 
 ## Options
 
 | Option | Description |
 |---|---|
-| `--all` | List every harness aireg supports, not only those found. |
+| `--all` | List every target aireg supports, not only those found. |
 
 ## JSON output
 
 ```json
-{"ok": true, "data": {"harnesses": [{"name": "claude", "displayName": "Claude Code", "kind": "coding", "shared": false, "detected": true, "by": "binary", "origin": "built-in"}], "skipped": []}}
+{"ok": true, "data": {"targets": [{"name": "claude-code", "aliases": ["claude"], "displayName": "Claude Code", "shared": false, "detected": true, "by": "binary", "origin": "built-in"}], "skipped": []}}
 ```
 
-The harnesses are every one `--all` lists, in its order, plus the shared `.agents` folder, which the table leaves out; `shared` is true for it. `by` is `env`, `binary`, `project` or `user`, and is left out when the harness wasn't found. `origin` is `built-in` or the path of the file that defines the harness. `skipped` lists each harness file aireg refused, with its `path` and `problems`.
+The targets are every one `--all` lists, in its order, plus the shared `.agents` folder, which the table leaves out; `shared` is true for it. `name` is the id, and `aliases` the other names it answers to. `by` is `env`, `binary`, `project` or `user`, and is left out when the target wasn't found. `origin` is `built-in` or the path of the file that defines the target. `skipped` lists each target file aireg refused, with its `path` and `problems`.
 
-`show` prints `{"harness": {...}}`, the harness as aireg resolved it. `check` prints `{"path": "...", "id": "tool", "problems": []}`, with `ok` false when it found a problem.
+`show` prints `{"target": {...}}`, the target as aireg resolved it. `check` prints `{"path": "...", "id": "tool", "problems": []}`, with `ok` false when it found a problem.
 
 ## Exit status
 
 - `0`: listed, shown, or the file is usable.
 - `1`: `check` found a problem with the file.
-- `2`: an unknown action, a missing argument, or no harness with that id.
+- `2`: an unknown action, a missing argument, or no target with that id.
 
 ## Examples
 
 See which coding agents this machine has:
 
 ```bash
-aireg harnesses
+aireg targets
 ```
 
 ```text
-  harness      id      status  where
-  Claude Code  claude  found   on your PATH
+  target       id           aliases  status  where
+  Claude Code  claude-code  claude   found   on your PATH
 
-Found 1 of 3 supported harnesses on this machine.
-hint: Run `aireg harnesses --all` to see every one.
+Found 1 of 6 supported targets on this machine.
+hint: Run `aireg targets --all` to see every one.
+hint: Use `--for universal`, or `agents`, for the shared .agents folder.
 ```
 
 See where Codex takes each kind:
 
 ```bash
-aireg harnesses show codex
+aireg targets show codex
 ```
 
-Check a harness file before you save it in `~/.aireg/harnesses/`:
+Check a target file before you save it in `~/.aireg/targets/`:
 
 ```bash
-aireg harnesses check tool.json
+aireg targets check tool.json
 ```
 
 ## See also
 
-[Harnesses](options.md#harnesses), [`aireg doctor`](doctor.md), [CLI reference](index.md)
+[Targets](options.md#targets), [`aireg doctor`](doctor.md), [CLI reference](index.md)

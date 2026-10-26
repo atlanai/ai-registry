@@ -13,7 +13,7 @@ artifacts/aireg/skill/aireg-add/0.1.2/SKILL.md     find, read, install and updat
 artifacts/aireg/skill/aireg-publish/0.1.2/SKILL.md publish a skill, release its next version, or publish a project's skills from CI
 ```
 
-Give an agent the skills in your user scope, so every harness on your machine has them. In
+Give an agent the skills in your user scope, so every coding agent on your machine has them. In
 Claude Code they appear as `/aireg-new`, `/aireg-add` and `/aireg-publish`, and in Codex as
 `$aireg-new` and so on. `aireg doctor` says whether they are installed. The `new`, `add` and
 `publish` they replace are archived.

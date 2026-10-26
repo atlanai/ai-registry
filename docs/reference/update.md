@@ -5,7 +5,7 @@ Take the newest version each registry offers.
 ## Synopsis
 
 ```text
-aireg update [<name> | <registry>]... [-g] [--for <harness>,...] [--frozen] [--copy] [--dry-run] [-y]
+aireg update [<name> | <registry>]... [-g] [--for <target>,...] [--frozen] [--copy] [--dry-run] [-y]
 ```
 
 `aireg upgrade` is the same command.
@@ -27,8 +27,8 @@ An installed artifact that its registry no longer lists stays installed: `update
 | Option | Description |
 |---|---|
 | `--frozen` | Fail with exit status 3 instead of changing the lockfile or the manifest. |
-| `--for <harness>[,<harness>...]` | Install into these harnesses for this run, instead of the manifest's. |
-| `--copy` | Copy into each harness folder instead of linking, for this run. To keep an artifact copied, add it with `aireg add --copy`. |
+| `--for <target>[,<target>...]` | Install into these targets for this run, instead of the manifest's. |
+| `--copy` | Copy into each target folder instead of linking, for this run. To keep an artifact copied, add it with `aireg add --copy`. |
 | `--dry-run` | Print the plan, and change nothing. |
 | `-y`, `--yes` | Don't ask before removing anything. |
 

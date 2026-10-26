@@ -59,7 +59,7 @@ blobs/
 
 ### aireg CLI
 
-[aireg](https://github.com/atlanai/ai-registry/tree/main/cli), the CLI in this repository, creates registries, publishes to them and installs from them, and keeps installed artifacts in sync with harnesses like Claude Code and Codex. See [Quickstart](quickstart.md) and [Use cases](use-cases/teams.md) to get started.
+[aireg](https://github.com/atlanai/ai-registry/tree/main/cli), the CLI in this repository, creates registries, publishes to them and installs from them, and keeps installed artifacts in sync with targets like Claude Code and Codex. See [Quickstart](quickstart.md) and [Use cases](use-cases/teams.md) to get started.
 
 ### MCP server
 
@@ -85,6 +85,6 @@ An MCP server is also planned, so agents will be able to read a registry's artif
 
 **Publisher.** The one writer of a registry's pointer files. In a repository, whoever runs `aireg registry index`, by hand or in CI.
 
-**Client.** Anything that reads a registry: the aireg CLI, an MCP server, a CI job, or a harness.
+**Client.** Anything that reads a registry: the aireg CLI, an MCP server, a CI job, or a coding agent.
 
 **Host document.** What `/.well-known/registry.json` returns when a host serves several roots: the roots the caller may see, and how to authenticate. See [Host discovery](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md#8-host-discovery).

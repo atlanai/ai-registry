@@ -19,7 +19,7 @@ aireg publish [<path> | <glob> | <name>]... [--to <registry>/<namespace>[/<name>
 - a glob over paths, such as `'.claude/skills/*'`
 - the name of an installed artifact, to publish the edits you made to it
 
-With no arguments, `publish` takes the work edited in this scope: installed artifacts you changed, and skills and agents in your harness folders that no registry has yet. On a terminal it asks which to publish. Without a terminal, pass `--yes` to publish all of them.
+With no arguments, `publish` takes the work edited in this scope: installed artifacts you changed, and skills and agents in your target folders that no registry has yet. On a terminal it asks which to publish. Without a terminal, pass `--yes` to publish all of them.
 
 ### Where it goes
 

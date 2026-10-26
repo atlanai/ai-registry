@@ -47,7 +47,7 @@ aireg skill new --from ~/.claude/skills/pr-review --namespace personal
 aireg registry index && git add . && git commit -m "release pr-review 0.1.0" && git push
 ```
 
-`aireg status -g` lists, with each one's harness and path, the skills in your user scope's harness folders that nothing manages yet. `aireg skill new --from` copies existing skill folders into your namespace, each as version 0.1.0 of a new skill, and leaves the originals where they are.
+`aireg status -g` lists, with each one's target and path, the skills in your user scope's target folders that nothing manages yet. `aireg skill new --from` copies existing skill folders into your namespace, each as version 0.1.0 of a new skill, and leaves the originals where they are.
 
 ### 3. Install them into every tool on this machine
 

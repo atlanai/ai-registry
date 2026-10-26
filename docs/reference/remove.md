@@ -14,7 +14,7 @@ aireg remove
 
 ## Description
 
-`aireg remove` uninstalls artifacts from the current project, or with `-g` from your user scope. It removes each artifact's links from the harness folders and its stored copy, and updates the manifest and lockfile, then removes the dependencies nothing else needs any more. Files aireg didn't install are left alone: a folder or file of yours that replaced one of its links is moved to `.registry/backups/`, and `remove` names where it went.
+`aireg remove` uninstalls artifacts from the current project, or with `-g` from your user scope. It removes each artifact's links from the target folders and its stored copy, and updates the manifest and lockfile, then removes the dependencies nothing else needs any more. Files aireg didn't install are left alone: a folder or file of yours that replaced one of its links is moved to `.registry/backups/`, and `remove` names where it went.
 
 An artifact another installed artifact still needs is kept, and `remove` says which one needs it. So is one a job publishes from a folder of yours, since the job goes on reading that folder: `remove` names it, and [`aireg watch remove <folder>`](watch.md#aireg-watch-remove) stops publishing that folder.
 
@@ -22,7 +22,7 @@ A name can be an installed artifact's name, as [`aireg list`](list.md) shows it,
 
 When the artifact came in with a whole namespace or registry, the manifest keeps that entry and records the artifact as excluded, so the rest of the namespace still arrives, and what it publishes later arrives with [`aireg update`](update.md). That holds for its last installed artifact too. `remove` itself never installs anything new. To drop the namespace itself, remove it by its full name, such as `aireg remove acme/frontend`.
 
-An artifact edited since it was installed, including the copy in a harness folder of a `--copy` install, is not removed: `remove` stops and names it. Run [`aireg sync`](sync.md) to see how the edit compares with its registry, or pass `--force` to delete it.
+An artifact edited since it was installed, including the copy in a target folder of a `--copy` install, is not removed: `remove` stops and names it. Run [`aireg sync`](sync.md) to see how the edit compares with its registry, or pass `--force` to delete it.
 
 `remove` doesn't remove the registry's declaration. Do that with [`aireg registry remove`](registry.md#aireg-registry-remove).
 

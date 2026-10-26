@@ -33,7 +33,7 @@ Only an installed aireg updates itself. A build from source doesn't.
 
 ## aireg self uninstall
 
-Stops the daemon and turns autostart off, removes what your user scope installed in harness folders, deletes the line the installer added to your shell startup files, and deletes `~/.aireg` and `~/.registry`, or `AIREG_HOME` and `AIREG_USER_SCOPE` if you set them. Files aireg didn't install are left alone.
+Stops the daemon and turns autostart off, removes what your user scope installed in target folders, deletes the line the installer added to your shell startup files, and deletes `~/.aireg` and `~/.registry`, or `AIREG_HOME` and `AIREG_USER_SCOPE` if you set them. Files aireg didn't install are left alone.
 
 Projects keep their `.registry/` folder. To take aireg out of a project too, run `aireg remove --all` there first.
 

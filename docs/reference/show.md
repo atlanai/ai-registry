@@ -14,7 +14,7 @@ aireg show ./<path>
 
 `aireg show` prints an artifact's Markdown, such as a skill's `SKILL.md`, so you can read it before you install it. It installs nothing and doesn't change the manifest. Terminal control characters in the file are removed, with a warning; `--json` keeps them.
 
-A plugin can carry more than instructions: hooks, MCP servers, LSP servers, monitors and executables in `bin/`, which a harness starts by itself and runs as you. When an artifact carries any of these, `show` names them in a warning, and `add`, `install` and `update` name them after installing it. Read what such a plugin runs before you install it, and know that an update can add to it.
+A plugin can carry more than instructions: hooks, MCP servers, LSP servers, monitors and executables in `bin/`, which a coding agent starts by itself and runs as you. When an artifact carries any of these, `show` names them in a warning, and `add`, `install` and `update` name them after installing it. Read what such a plugin runs before you install it, and know that an update can add to it.
 
 Name an artifact by its full name, `<registry>/<namespace>/<name>`. Add `@<version>` to read an older version.
 
@@ -43,7 +43,7 @@ For an artifact:
 {"ok": true, "data": {"name": "pr-review", "kind": "skill", "version": "1.2.0", "body": "---\nname: pr-review\n...", "carries": []}}
 ```
 
-For a path on disk, `data` holds `path`, `body` and `carries`. `carries` lists what a harness would start from the artifact, by the plugin manifest key that declares each: `hooks`, `mcpServers`, `lspServers` and `monitors`, and `bin` for a `bin/` folder.
+For a path on disk, `data` holds `path`, `body` and `carries`. `carries` lists what a coding agent would start from the artifact, by the plugin manifest key that declares each: `hooks`, `mcpServers`, `lspServers` and `monitors`, and `bin` for a `bin/` folder.
 
 ## Exit status
 

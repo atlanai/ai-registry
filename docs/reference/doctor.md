@@ -19,7 +19,7 @@ Node.js requires 22.23.4+ on major 22, 24.22.1+ on major 24, or 26.12.1 and late
 |---|---|
 | `git` | Listed only when missing. aireg needs git to read git registries. |
 | `gh` | Whether the GitHub CLI is installed. When it is, its sign-in reads private GitHub repositories; otherwise git's own credentials do. |
-| `symlinks` | Whether this machine can make symbolic links. Without them, aireg copies artifacts into harness folders instead of linking them. |
+| `symlinks` | Whether this machine can make symbolic links. Without them, aireg copies artifacts into target folders instead of linking them. |
 | `store` | Where aireg keeps its copies of registries. |
 | `autostart` | Whether the daemon starts at login, and the command to turn it on. See [`aireg daemon autostart`](daemon.md#aireg-daemon-autostart). |
 | `home` | Where aireg keeps its own files. A problem when other users can write to it, since aireg then refuses the credentials stored there. |
@@ -59,4 +59,4 @@ aireg doctor
 
 ## See also
 
-[`aireg harnesses`](targets.md), [`aireg logs`](logs.md), [CLI reference](index.md)
+[`aireg targets`](targets.md), [`aireg logs`](logs.md), [CLI reference](index.md)

@@ -85,7 +85,7 @@ to install from one, or the `aireg-publish` skill to publish to one. For one per
 
 For an existing skills-only repository, use `aireg-new`'s in-place conversion path, including
 verified cleanup and release readiness. For hand-installed copies on this or another machine,
-use `aireg-add`'s migration procedure before installing; check every intended harness afterward.
+use `aireg-add`'s migration procedure before installing; check every intended target afterward.
 Keep application sources that will continue publishing to a separate registry.
 
 ## Done when

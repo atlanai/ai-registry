@@ -60,7 +60,7 @@ Each registry has one job per scope on this machine. Running `job add` again for
 | `-s`, `--select <name>` | Also add these artifacts to the scope's manifest, named as inside the registry, such as `pr-review` or `engineering/pr-review`. aireg records each one's full address, skips one the manifest already takes, and refuses a name the registry doesn't publish. Without it, the job syncs what the manifest already names. |
 | `--kind <kind>` | A job type an installed adapter adds. |
 | `--account <account>` | The account an adapter's job type runs as. |
-| `--for <harness>[,<harness>...]` | For a step an installed adapter adds, the harnesses it installs into. |
+| `--for <target>[,<target>...]` | For a step an installed adapter adds, the targets it installs into. |
 
 A policy is `on`, `report` or `off`, as for [`aireg sync`](sync.md).
 
