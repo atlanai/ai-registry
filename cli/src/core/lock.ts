@@ -8,7 +8,7 @@ import { writeAtomic } from "#core/fs/atomic.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import type { Roots, Scope } from "#core/store/paths.ts";
-import { canonicalId, earlierId, resolveTargets } from "#core/target/index.ts";
+import { canonicalId, earlierId, resolveTargets, type Targets } from "#core/target/index.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import { dict, isRecord, textMapOf, textOf, withoutUndefined } from "./fields.ts";
 import { parseYaml } from "./yaml.ts";
@@ -320,16 +320,19 @@ function registryDoc(source: LockRegistry): Record<string, unknown> {
   });
 }
 
-function blockedDoc(item: NonNullable<LockArtifact["blocked"]>[number]): Record<string, unknown> {
+function blockedDoc(
+  item: NonNullable<LockArtifact["blocked"]>[number],
+  table: Targets,
+): Record<string, unknown> {
   return withoutUndefined({
     target: item.target,
-    harness: earlierId(item.target),
+    harness: earlierId(table, item.target),
     path: item.path,
     by: item.by,
   });
 }
 
-function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
+function artifactDoc(artifact: LockArtifact, table: Targets): Record<string, unknown> {
   return withoutUndefined({
     registry: artifact.registry,
     id: artifact.id,
@@ -348,7 +351,7 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
         ? undefined
         : withoutUndefined({
             target: artifact.origin.target,
-            harness: earlierId(artifact.origin.target),
+            harness: earlierId(table, artifact.origin.target),
             path: artifact.origin.path,
             step: artifact.origin.step === "" ? undefined : artifact.origin.step,
           }),
@@ -356,14 +359,16 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
       .sort((a, b) => a.path.localeCompare(b.path))
       .map((link) => ({
         target: link.target,
-        harness: earlierId(link.target),
+        harness: earlierId(table, link.target),
         path: link.path,
         mode: link.mode,
         digest: link.mode === "copy" ? link.digest : undefined,
       })),
     needed_by: artifact.neededBy?.length ? [...artifact.neededBy].sort() : undefined,
     blocked: artifact.blocked?.length
-      ? [...artifact.blocked].sort((a, b) => a.path.localeCompare(b.path)).map(blockedDoc)
+      ? [...artifact.blocked]
+          .sort((a, b) => a.path.localeCompare(b.path))
+          .map((item) => blockedDoc(item, table))
       : undefined,
   });
 }
@@ -373,6 +378,7 @@ function artifactDoc(artifact: LockArtifact): Record<string, unknown> {
  * about to be restaged has no digest until its copy lands, so that is no change.
  */
 export function lockChanges(before: Lock, after: Lock): string[] {
+  const table = resolveTargets();
   const changed = new Set<string>();
   const differ = (a: object | undefined, b: object | undefined) =>
     JSON.stringify(a) !== JSON.stringify(b);
@@ -388,12 +394,15 @@ export function lockChanges(before: Lock, after: Lock): string[] {
     const was = before.artifacts[name];
     const now = after.artifacts[name];
     const landed = now?.digest === "" && was !== undefined ? { ...now, digest: was.digest } : now;
-    if (differ(was && artifactDoc(was), landed && artifactDoc(landed))) changed.add(name);
+    if (differ(was && artifactDoc(was, table), landed && artifactDoc(landed, table))) {
+      changed.add(name);
+    }
   }
   return [...changed].sort();
 }
 
 export function formatLock(lock: Lock): string {
+  const table = resolveTargets();
   const registries = dict(
     Object.keys(lock.registries)
       .sort()
@@ -402,7 +411,7 @@ export function formatLock(lock: Lock): string {
   const artifacts = dict(
     Object.keys(lock.artifacts)
       .sort()
-      .map((name) => [name, artifactDoc(lock.artifacts[name] as LockArtifact)] as const),
+      .map((name) => [name, artifactDoc(lock.artifacts[name] as LockArtifact, table)] as const),
   );
 
   const body = stringify(

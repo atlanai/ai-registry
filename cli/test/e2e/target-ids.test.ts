@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import { claudeCode } from "#targets/claude-code.ts";
 import { registry } from "#test/kit/builders/registry.ts";
 import { test as base } from "#test/kit/fixtures.ts";
 
@@ -28,6 +29,31 @@ describe("a target's earlier id", () => {
     expect(lock).toContain("- target: universal\n");
     expect(lock).not.toMatch(/target: (claude|agents)\n/);
     expect(await read(project, "manifest.yml")).not.toMatch(/targets|claude-code|universal/);
+  });
+
+  test("is written as today's id once a file of yours gives the target other ids", async ({
+    aireg,
+    home,
+    kit,
+    project,
+  }) => {
+    const { default: _, importable: __, detect, ...definition } = claudeCode;
+    const { caller: ___, ...signals } = detect as Exclude<typeof detect, "never" | undefined>;
+    await mkdir(join(home.aireg, "targets"), { recursive: true });
+    await writeFile(
+      join(home.aireg, "targets", "claude-code.json"),
+      JSON.stringify({ ...definition, detect: signals, aliases: ["cc"], overrides: true }),
+    );
+    expect((await aireg(["init", "-y", "--for", "claude-code"])).code).toBe(0);
+    expect(await read(project, "manifest.yml")).toContain("harnesses:\n  - claude-code\n");
+    const added = await aireg(["add", kit, "-s", "lint", "-y"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect(await read(project, "manifest.lock.yml")).toContain(
+      "- target: claude-code\n        harness: claude-code\n",
+    );
+    const listed = await aireg(["list", "--json"]);
+    expect(listed.code, listed.stderr).toBe(0);
+    expect(JSON.parse(listed.stdout).data.artifacts[0].targets).toEqual(["claude-code"]);
   });
 
   test("shows the same target by either id", async ({ aireg }) => {

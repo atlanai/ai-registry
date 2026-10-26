@@ -760,12 +760,13 @@ function exportData(entry: Export): unknown {
 
 /** `targets:` under its earlier name, each id as aireg 0.1 knew it, so that version reads it. */
 function inEarlierNames(data: Record<string, unknown>): Record<string, unknown> {
+  const table = resolveTargets();
   const rename = (entry: Record<string, unknown>): Record<string, unknown> => {
     if (!Array.isArray(entry.targets)) return entry;
     const renamed: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(entry)) {
       if (key !== "targets") renamed[key] = value;
-      else renamed[LEGACY_TARGETS_KEY] = entry.targets.map((id) => earlierId(String(id)));
+      else renamed[LEGACY_TARGETS_KEY] = entry.targets.map((id) => earlierId(table, String(id)));
     }
     return renamed;
   };

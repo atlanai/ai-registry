@@ -34,13 +34,14 @@ export const IMPORTABLE_TARGETS: readonly string[] = BUILTIN_TARGETS.filter(
 
 /**
  * The id aireg 0.1 knew a built-in by, its first alias, `<id>:<profile>` included; any other
- * as given. A lock still records it, so a teammate on that version reads the lock.
+ * as given. Only while the table still reads that alias as this target, so a writer never
+ * records an id the next command cannot resolve.
  */
-export function earlierId(id: string): string {
+export function earlierId(targetTable: Targets, id: string): string {
   const at = id.indexOf(":");
   const base = at === -1 ? id : id.slice(0, at);
   const was = BUILTIN_TARGETS.find((target) => target.id === base)?.aliases?.[0];
-  if (was === undefined) return id;
+  if (was === undefined || canonicalId(targetTable, was) !== base) return id;
   return at === -1 ? was : `${was}${id.slice(at)}`;
 }
 
@@ -50,16 +51,25 @@ const EARLIER_KINDS = {
   "shared-folder": "shared",
 } as const satisfies Record<TargetCategory, EarlierTarget["kind"]>;
 
-/**
- * The table keyed and named by `earlierId`, for adapters built against aireg 0.1.
- * A target whose own id is an earlier one keeps it, as `canonicalId` does.
- */
+/** A record keyed by target id, keyed instead by `earlierId`. */
+export function byEarlierIds<T>(targetTable: Targets, byId: Record<string, T>): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(byId).map(([id, value]) => [earlierId(targetTable, id), value]),
+  );
+}
+
+/** The table keyed and named by `earlierId`, for adapters built against aireg 0.1. */
 export function earlierTable(targetTable: Targets): Record<string, EarlierTarget> {
   const out: Record<string, EarlierTarget> = {};
   for (const target of Object.values(targetTable)) {
-    const name = earlierId(target.name);
-    if (name !== target.name && Object.hasOwn(targetTable, name)) continue;
-    out[name] = { ...target, name, kind: EARLIER_KINDS[target.category] };
+    const name = earlierId(targetTable, target.name);
+    const reads = Object.fromEntries(
+      Object.entries(target.reads).map(([kind, ids]) => [
+        kind,
+        ids.map((read) => earlierId(targetTable, read)),
+      ]),
+    );
+    out[name] = { ...target, name, reads, kind: EARLIER_KINDS[target.category] };
   }
   return out;
 }

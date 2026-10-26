@@ -55,7 +55,19 @@ describe("earlierId", () => {
     ["claude-code:work", "claude:work"],
     ["mine", "mine"],
   ])("records %s as %s, the id aireg 0.1 reads", (id, was) => {
-    expect(earlierId(id)).toBe(was);
+    expect(earlierId(resolveTargets(), id)).toBe(was);
+  });
+
+  it("keeps today's id once the table no longer reads the earlier one as this target", () => {
+    const table = resolveTargets();
+    const renamed = {
+      ...table,
+      "claude-code": { ...(table["claude-code"] as Target), aliases: ["cc"] },
+    };
+    expect(earlierId(renamed, "claude-code")).toBe("claude-code");
+    expect(earlierId(renamed, "claude-code:work")).toBe("claude-code:work");
+    const taken = { ...renamed, codex: { ...(table.codex as Target), aliases: ["claude"] } };
+    expect(earlierId(taken, "claude-code")).toBe("claude-code");
   });
 });
 
@@ -68,6 +80,8 @@ describe("earlierTable", () => {
       ["agents", "claude", "codex", "copilot", "cursor", "gemini", "opencode"].sort(),
     );
     expect(table.agents?.kind).toBe("shared");
+    expect(table.codex?.reads).toEqual({ skill: ["agents"] });
+    expect(table.opencode?.reads).toEqual({ skill: ["agents", "opencode", "claude"] });
     expect(table.codex?.kind).toBe("coding");
     const helper = {
       ...(table.codex as Target),
