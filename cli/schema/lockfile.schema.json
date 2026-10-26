@@ -150,7 +150,6 @@
               "type": "object",
               "required": [
                 "target",
-                "harness",
                 "path"
               ],
               "properties": {
@@ -184,7 +183,6 @@
                 "type": "object",
                 "required": [
                   "target",
-                  "harness",
                   "path",
                   "mode"
                 ],
@@ -250,7 +248,6 @@
                 "type": "object",
                 "required": [
                   "target",
-                  "harness",
                   "path"
                 ],
                 "properties": {

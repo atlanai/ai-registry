@@ -7,11 +7,13 @@ import { LOCK_VERSION } from "#core/lock.ts";
 const Link = Type.Object(
   {
     target: Type.String({ minLength: 1, description: "Target name." }),
-    harness: Type.String({
-      minLength: 1,
-      description:
-        "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
-    }),
+    harness: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description:
+          "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
+      }),
+    ),
     path: Type.String({
       minLength: 1,
       description: "Relative to the scope base, so a committed lock is machine-independent.",
@@ -35,11 +37,13 @@ const Link = Type.Object(
 const Blocked = Type.Object(
   {
     target: Type.String({ minLength: 1, description: "Target name." }),
-    harness: Type.String({
-      minLength: 1,
-      description:
-        "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
-    }),
+    harness: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description:
+          "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
+      }),
+    ),
     path: Type.String({ minLength: 1, description: "Relative to the scope base." }),
     by: Type.Optional(Type.String({ minLength: 1, description: "What is at the path instead." })),
   },
@@ -75,11 +79,13 @@ const Registry = Type.Object(
 const Origin = Type.Object(
   {
     target: Type.String({ minLength: 1, description: "Whose folder conventions it follows." }),
-    harness: Type.String({
-      minLength: 1,
-      description:
-        "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
-    }),
+    harness: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description:
+          "The same target by the id aireg 0.1 reads, so a teammate on it still reads this lock.",
+      }),
+    ),
     path: Type.String({ minLength: 1, description: "Relative to the scope base." }),
     step: Type.Optional(Type.String({ minLength: 1, description: "The step that claimed it." })),
   },
