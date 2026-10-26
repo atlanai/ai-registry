@@ -63,7 +63,8 @@ export interface RemoteMutationHooks {
 }
 
 export interface RemoteMutationResult {
-  published: Set<string>;
+  /** Each artifact that landed, and the version it went out as. */
+  published: Map<string, string | undefined>;
   archived: Set<string>;
 }
 
@@ -229,7 +230,7 @@ export async function publishPartial(
       hooks.held?.(name, reason);
       continue;
     }
-    result.published.add(name);
+    result.published.set(name, input.version);
     hooks.event("published", name);
   }
   const first = published.refused?.[0]?.error;
@@ -282,7 +283,7 @@ export async function mutateRemote(
   signal: AbortSignal,
   hooks: RemoteMutationHooks,
 ): Promise<RemoteMutationResult> {
-  const result = { published: new Set<string>(), archived: new Set<string>() };
+  const result: RemoteMutationResult = { published: new Map(), archived: new Set() };
   if (![...operations.values()].some((item) => item === "publish" || item === "archive")) {
     return result;
   }

@@ -43,6 +43,11 @@ function movedUpstream(
     : pinned !== revision;
 }
 
+/** Under `--force`, or for a row whose copy this run published: the source holds those bytes. */
+function forced(item: Selected, build: BuildState): boolean {
+  return build.options.force || build.options.restate?.has(item.name) === true;
+}
+
 function shouldRestage(
   item: Selected,
   previous: LockArtifact | undefined,
@@ -64,7 +69,7 @@ function shouldRestage(
       state?.staged !== true
     );
   }
-  if (!build.options.force) {
+  if (!forced(item, build)) {
     build.warnings.push(
       unlocked
         ? {
@@ -85,7 +90,7 @@ function shouldRestage(
             },
     );
   }
-  return build.options.force;
+  return forced(item, build);
 }
 
 /**

@@ -2,7 +2,7 @@ import { relative, resolve } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import type { PublishRelationship, PublishResult, Want } from "#adapter/index.ts";
 import { isLocalPath } from "#adapter/paths.ts";
-import { BUMPS, type Bump, compareVersion, parseVersion } from "#adapter/semver.ts";
+import { BUMPS, type Bump } from "#adapter/semver.ts";
 import { list, plural, quoted } from "#adapter/text.ts";
 import { parse } from "#cli/options.ts";
 import { type Interaction, interaction, interactive } from "#cli/prompt/flow.ts";
@@ -45,7 +45,7 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/canonical.ts";
 import { digest } from "#core/fs/digest.ts";
 import { gitIn } from "#core/git.ts";
-import { type LockArtifact, writeLock } from "#core/lock.ts";
+import { writeLock } from "#core/lock.ts";
 import {
   type Export,
   type Manifest,
@@ -54,11 +54,11 @@ import {
   unknownRegistry,
 } from "#core/manifest.ts";
 import type { Printer } from "#core/output.ts";
-import { listedAt, type Placement } from "#core/plan/model.ts";
 import { applyLocal } from "#engine/local.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { type Loaded, load, withScope } from "#engine/pipeline.ts";
-import { closeScan, type Scan, scan } from "#engine/scan.ts";
+import { closeScan, scan } from "#engine/scan.ts";
+import { moved, pinnedNote, unservedNote } from "#engine/served.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
 interface Own extends Record<string, unknown> {
@@ -775,10 +775,7 @@ async function follow(
     if (row === undefined || entry === undefined) continue;
     const pinned = pinOf(loaded.manifest, entry);
     if (pinned === undefined) rows.set(row, item.version);
-    else
-      context.printer.hint(
-        `${row} stays at ${pinned} here because the manifest pins it. Change the pin to ${item.version} to install what you published.`,
-      );
+    else context.printer.hint(pinnedNote(row, pinned, item.version));
   }
   if (rows.size === 0) return;
   await withScope(loaded.roots, async (fresh) => {
@@ -796,55 +793,16 @@ async function follow(
         if (served.has(row) || entry === undefined) continue;
         // What was sent is what is on disk, so the copy stops reading as an edit.
         entry.digest = await digest(resolve(fresh.roots.base, entry.path));
-        const next = entry.origin === undefined ? "`aireg update`" : "`aireg sync`";
-        // Moved past the lock but not to what was sent, as after `--force` into a clone.
-        const other = moved(found, entry) ? head(found, entry)?.version : undefined;
-        if (other === undefined) {
-          context.printer.hint(
-            `The registry does not serve ${row} yet, so the copy here was left as it is. Run ${next} once it does.`,
-          );
-        } else {
-          context.printer.warning(
-            `The registry serves ${row} ${other}, not the ${version} you published, so the copy here was left as it is. Run ${next} once it serves ${version}; before that it would replace your copy with ${other}.`,
-          );
-        }
+        const note = unservedNote(found, entry, row, version);
+        if (note.warning) context.printer.warning(note.message);
+        else context.printer.hint(note.message);
       }
-      if (served.size > 0) await applyLocal(fresh, common, found, served, served, true, () => {});
-      else await writeLock(fresh.roots, fresh.lock);
+      if (served.size > 0) {
+        const sentAs = new Map([...served].map((row) => [row, rows.get(row)]));
+        await applyLocal(fresh, common, found, served, sentAs, true, () => {});
+      } else await writeLock(fresh.roots, fresh.lock);
     } finally {
       await closeScan(found);
     }
   });
-}
-
-/**
- * A backend may hold an upload for review. Until upstream serves something else, restating
- * the row from it would overwrite the copy just sent, or delete it when nothing is served.
- */
-export function moved(
-  found: Scan,
-  entry: LockArtifact | undefined,
-  /** The version just sent; an older head is someone else's, as after `--force` into a clone. */
-  sent?: string,
-): boolean {
-  const now = entry === undefined ? undefined : head(found, entry);
-  return (
-    entry !== undefined &&
-    now !== undefined &&
-    (now.contentId !== entry.content || now.version !== entry.version) &&
-    !older(now.version, sent)
-  );
-}
-
-/** What the registry serves at the row's address now. */
-function head(found: Scan, entry: LockArtifact): Placement | undefined {
-  const acquired = found.acquired.find((item) => item.alias === entry.registry);
-  const at = acquired === undefined ? undefined : listedAt(entry, acquired.catalog.entries);
-  return at === undefined ? undefined : acquired?.placements.get(at);
-}
-
-function older(served: string | undefined, sent: string | undefined): boolean {
-  const left = served === undefined ? undefined : parseVersion(served);
-  const right = sent === undefined ? undefined : parseVersion(sent);
-  return left !== undefined && right !== undefined && compareVersion(left, right) < 0;
 }

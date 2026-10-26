@@ -141,7 +141,7 @@ describe("consuming a registry like a package manager", () => {
     expect((await aireg(["install", "--frozen"])).code).toBe(0);
   });
 
-  test("reports an edit to an installed skill, and publishes it only when the run opts in", async () => {
+  test("reports an edit to an installed skill, publishes it only when the run opts in, and records what it sent", async () => {
     await appendFile(
       join(project, ".claude", "skills", "changelog", "SKILL.md"),
       "Group by label.\n",
@@ -158,6 +158,10 @@ describe("consuming a registry like a package manager", () => {
     const sent = await aireg(["sync", "--publish", "on"]);
     expect(sent.code, sent.stderr).toBe(0);
     expect(await versions()).toContain("0.1.1");
+    expect(sent.stderr).not.toContain("was edited after installation");
+    // The copy is what was published, so the lock moves to it and nothing is left to sync.
+    expect(await read(".registry/manifest.lock.yml")).toMatch(/changelog:[\s\S]*?version: 0\.1\.1/);
+    expect((await aireg(["sync"])).code).toBe(0);
   });
 
   test("removes by the address it was added with", async () => {

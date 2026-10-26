@@ -1,6 +1,7 @@
 import { digest } from "#core/fs/digest.ts";
 import { exists } from "#core/fs/tree.ts";
 import { cloneLock, type Lock } from "#core/lock.ts";
+import { pinOf } from "#core/manifest.ts";
 import { build } from "#core/plan/build.ts";
 import type { Action, Plan } from "#core/plan/model.ts";
 import { movedPluginLinks } from "#core/plan/projection.ts";
@@ -24,6 +25,7 @@ import {
 } from "./pipeline.ts";
 import { narrowToRelinks, relinksIn } from "./relink.ts";
 import type { Scan } from "./scan.ts";
+import { moved, pinnedNote, unservedNote } from "./served.ts";
 
 function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan {
   const generated = recordOf(plan);
@@ -69,10 +71,32 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
  * A publish sends this scope's copy, so what landed upstream is exactly what is
  * on disk; the row's digest is restated from it rather than from a refetch.
  */
+/**
+ * Follows what this run published as `aireg publish` does: a row the source serves at the version
+ * sent is restated from it, and one pinned or not served yet is said. A folder of yours keeps its row.
+ */
+function followPublished(
+  loaded: Loaded,
+  scan: Scan,
+  published: ReadonlyMap<string, string | undefined>,
+): { restate: Set<string>; notices: ApplyNotice[] } {
+  const restate = new Set<string>();
+  const notices: ApplyNotice[] = [];
+  for (const [name, version] of published) {
+    const entry = loaded.lock.artifacts[name];
+    if (entry === undefined || entry.origin !== undefined) continue;
+    const pinned = pinOf(loaded.manifest, entry);
+    if (pinned !== undefined) notices.push({ message: pinnedNote(name, pinned, version) });
+    else if (moved(scan, entry, version)) restate.add(name);
+    else notices.push({ message: unservedNote(scan, entry, name, version).message });
+  }
+  return { restate, notices };
+}
+
 async function preservePublishedDigests(
   plan: Plan,
   scan: Scan,
-  published: ReadonlySet<string>,
+  published: Iterable<string>,
 ): Promise<void> {
   const lock = recordOf(plan);
   for (const name of published) {
@@ -95,14 +119,15 @@ export async function applyLocal(
   common: CommonOptions,
   scan: Scan,
   names: ReadonlySet<string>,
-  published: ReadonlySet<string>,
+  /** What this run published, and the version each went out as. */
+  published: ReadonlyMap<string, string | undefined>,
   /** Restages a locally edited artifact, which otherwise only warns. */
   force: boolean,
   onStep: (action: Action) => void,
 ): Promise<{ changed: number; notices: ApplyNotice[] }> {
   // A run that only published still has something to record, or the lock never
   // learns what this project sent and every later comparison has no base.
-  const recording = new Set([...names, ...published]);
+  const recording = new Set([...names, ...published.keys()]);
   const opened = new Set(scan.acquired.map((source) => source.alias));
   const moved = movedPluginLinks(loaded.lock, loaded, opened);
   const relinks = relinksIn(moved, recording);
@@ -110,6 +135,8 @@ export async function applyLocal(
   // The caller holds the lease: it has to cover the publish that precedes this.
   const notices = recoveredNotices(loaded.roots, await prepareWrite(loaded));
   const targets = resolveTargets(loaded.manifest, loaded.harnesses, common);
+  const followed = followPublished(loaded, scan, published);
+  const { restate } = followed;
   const plan = build(
     loaded.manifest,
     scan.pinned,
@@ -120,12 +147,17 @@ export async function applyLocal(
       targets,
       harnesses: loaded.harnesses,
       force,
+      restate,
       copy: false,
       cliVersion: VERSION,
     },
   );
   refusePlan(plan, scan.acquired, loaded.lock);
-  await preservePublishedDigests(plan, scan, published);
+  await preservePublishedDigests(
+    plan,
+    scan,
+    [...published.keys()].filter((name) => !restate.has(name)),
+  );
   recordServed(recordOf(plan), scan, recording);
   // The lock as it stands, not as the scan found it: a folder step writes its
   // own rows inside this run, and the plan must not reclaim them.
@@ -137,9 +169,11 @@ export async function applyLocal(
   const result = await commit(loaded, narrowed, scan.acquired, targets, onStep);
   // What the plan said about a row this run wrote, such as a deprecated version it pulled.
   for (const { name, message, hint } of plan.warnings) {
-    if (name === undefined || !recording.has(name)) continue;
+    // A published row's own note says why its copy stayed; the plan only saw an edit.
+    if (name === undefined || !recording.has(name) || published.has(name)) continue;
     notices.push({ message, ...(hint === undefined ? {} : { hint }) });
   }
+  notices.push(...followed.notices);
   notices.push(
     ...appliedNotices(loaded.roots, result, loaded.harnesses),
     ...unstagedNotices(result.unstaged),

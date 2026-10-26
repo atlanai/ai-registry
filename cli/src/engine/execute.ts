@@ -193,7 +193,7 @@ async function executeScanned(
         current = await rescan();
         names = reclassify().writes;
       }
-      for (const name of remote.published) names.add(name);
+      for (const name of remote.published.keys()) names.add(name);
       for (const claim of claimed) for (const key of claim.keys) names.add(key);
       signal.throwIfAborted();
       hooks.event("run.phase", "applying");
@@ -241,7 +241,7 @@ async function applyReported(
   common: CommonOptions,
   current: Scan,
   names: ReadonlySet<string>,
-  published: ReadonlySet<string>,
+  published: ReadonlyMap<string, string | undefined>,
   overrides: Overrides,
   hooks: SyncExecutionHooks,
 ): Promise<void> {
@@ -416,7 +416,7 @@ async function publishAndSettle(
   deferred: readonly SyncOutcome[],
   hooks: SyncExecutionHooks,
 ): Promise<{ remote: RemoteMutationResult; remoteError: unknown }> {
-  let remote: RemoteMutationResult = { published: new Set(), archived: new Set() };
+  let remote: RemoteMutationResult = { published: new Map(), archived: new Set() };
   let remoteError: unknown;
   const refusals = new Map<string, unknown>();
   const holds = new Map<string, string>();
@@ -437,7 +437,13 @@ async function publishAndSettle(
   }
   settlePublished(
     deferred,
-    { attempted, published: remote.published, archived: remote.archived, refusals, holds },
+    {
+      attempted,
+      published: new Set(remote.published.keys()),
+      archived: remote.archived,
+      refusals,
+      holds,
+    },
     remoteError,
     hooks,
   );

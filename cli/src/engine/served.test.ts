@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Placement } from "#core/plan/model.ts";
-import type { Scan } from "#engine/scan.ts";
-import { moved } from "./publish.ts";
+import type { Scan } from "./scan.ts";
+import { moved } from "./served.ts";
 
 const row = {
   registry: "team",

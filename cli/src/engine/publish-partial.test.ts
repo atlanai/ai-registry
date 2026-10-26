@@ -5,14 +5,15 @@ import type { SyncExecutionHooks, SyncOutcome } from "./decide.ts";
 import { settlePublished } from "./publish-settle.ts";
 import { publishPartial } from "./remote.ts";
 
-const input = (name: string) => ({ name, kind: "skill" }) as unknown as PublishInput;
+const input = (name: string, version?: string) =>
+  ({ name, kind: "skill", version }) as unknown as PublishInput;
 const empty = () => ({
-  published: new Set<string>(),
+  published: new Map<string, string | undefined>(),
   archived: new Set<string>(),
 });
 
 describe("publishPartial", () => {
-  it("records what landed, reports each refusal, and rethrows the first after", async () => {
+  it("records what landed at the version sent, reports each refusal, and rethrows the first after", async () => {
     const refused = new AdapterError("acme", "invalid", "blocked");
     const result = empty();
     const failed: string[] = [];
@@ -23,15 +24,24 @@ describe("publishPartial", () => {
       return { refused: [{ index: 1, error: refused }] };
     };
     await expect(
-      publishPartial(publish, [input("a"), input("b"), input("c")], ["a", "b", "c"], result, {
-        event: () => {},
-        failed: (name) => failed.push(name),
-        sent: (name) => sent.push(name),
-      }),
+      publishPartial(
+        publish,
+        [input("a", "1.0.0"), input("b"), input("c")],
+        ["a", "b", "c"],
+        result,
+        {
+          event: () => {},
+          failed: (name) => failed.push(name),
+          sent: (name) => sent.push(name),
+        },
+      ),
     ).rejects.toBe(refused);
     expect(asked).toEqual({ partial: true });
     expect(sent).toEqual(["a", "b", "c"]);
-    expect([...result.published]).toEqual(["a", "c"]);
+    expect([...result.published]).toEqual([
+      ["a", "1.0.0"],
+      ["c", undefined],
+    ]);
     expect(failed).toEqual(["b"]);
   });
 
@@ -55,7 +65,7 @@ describe("publishPartial", () => {
       event: () => {},
       held: (name, reason) => held.push([name, reason]),
     });
-    expect([...result.published]).toEqual(["b"]);
+    expect([...result.published.keys()]).toEqual(["b"]);
     expect(held).toEqual([["a", "in review"]]);
   });
 });

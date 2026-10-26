@@ -15,6 +15,8 @@ export interface BuildOptions {
   force: boolean;
   /** Rows whose local edits this run may delete: what `remove` was told to take. */
   discard?: ReadonlySet<string>;
+  /** Rows whose copy this run published and the source now serves, so its copy replaces them. */
+  restate?: ReadonlySet<string>;
   /** Place real copies instead of links, for harnesses that will not follow them. */
   copy: boolean;
   /**

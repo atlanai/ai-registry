@@ -60,7 +60,7 @@ afterEach(async () => {
 async function sync() {
   const loaded = await load(COMMON, project);
   const found = await scan(loaded, COMMON);
-  return applyLocal(loaded, COMMON, found, new Set(["lint"]), new Set(), false, () => {});
+  return applyLocal(loaded, COMMON, found, new Set(["lint"]), new Map(), false, () => {});
 }
 
 describe("applyLocal", () => {
