@@ -82,11 +82,36 @@ async function taken(tree: Tree, encoding: Encoding): Promise<string> {
   return value;
 }
 
+/**
+ * The unframed digest of each framed one taken or read. A lock writes it as `digest`, the
+ * one aireg 0.1 checks, so a copy this version placed doesn't read there as edited.
+ */
+const EARLIER = new Map<string, string>();
+
+function remember(framed: string, earlier: string): void {
+  EARLIER.delete(framed);
+  EARLIER.set(framed, earlier);
+  const [oldest] = EARLIER.keys();
+  if (EARLIER.size > KNOWN_LIMIT && oldest !== undefined) EARLIER.delete(oldest);
+}
+
+/** What aireg 0.1 records for the files a framed digest describes, when this process knows it. */
+export function earlierDigest(framed: string): string | undefined {
+  return EARLIER.get(framed);
+}
+
+/** A lock row's two digests, read together so writing the row again keeps both. */
+export function rememberEarlier(framed: string, earlier: string): void {
+  if (framed !== earlier) remember(framed, earlier);
+}
+
 /** `recorded` stands when it is the unframed digest of these files, so older locks read as untouched. */
 async function settle(tree: Tree, recorded: string | undefined): Promise<string> {
   const now = await taken(tree, "framed");
+  const earlier = await taken(tree, "unframed");
+  remember(now, earlier);
   if (recorded === undefined || recorded === "" || recorded === now) return now;
-  return (await taken(tree, "unframed")) === recorded ? recorded : now;
+  return earlier === recorded ? recorded : now;
 }
 
 async function lone(path: string): Promise<Tree> {

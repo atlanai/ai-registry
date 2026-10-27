@@ -41,6 +41,13 @@ const Link = Type.Object(
         description: "A copy's digest as written, so an edit to the target's own copy is seen.",
       }),
     ),
+    framed: Type.Optional(
+      Type.String({
+        pattern: "^sha256:[0-9a-f]{64}$",
+        description:
+          "The copy's digest with each file's path, mode and size framed. `digest` is the one aireg 0.1 checks.",
+      }),
+    ),
   },
   NAMES_TARGET,
 );
@@ -144,6 +151,13 @@ const Artifact = Type.Object(
       minLength: 1,
       description: "Digest of what was placed, so a local edit is detectable.",
     }),
+    framed: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description:
+          "The digest with each file's path, mode and size framed. `digest` is the one aireg 0.1 checks.",
+      }),
+    ),
     origin: Type.Optional(
       Type.Union([Origin], {
         description: "Set when the bytes came from a folder here rather than from upstream.",

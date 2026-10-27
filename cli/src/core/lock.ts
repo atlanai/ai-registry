@@ -5,6 +5,7 @@ import { isSafePath } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
+import { earlierDigest, rememberEarlier } from "#core/fs/digest.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import type { Roots, Scope } from "#core/store/paths.ts";
@@ -169,6 +170,22 @@ function parseBlocked(raw: unknown, scope: Scope): LockArtifact["blocked"] {
   return held.length === 0 ? undefined : held;
 }
 
+/** A row's framed digest when it carries one; `digest` alone is what aireg 0.1 wrote. */
+function digestOf(row: Record<string, unknown>): string | undefined {
+  const earlier = textOf(row.digest);
+  const framed = textOf(row.framed);
+  if (framed === undefined || earlier === undefined) return earlier ?? framed;
+  rememberEarlier(framed, earlier);
+  return framed;
+}
+
+/** `digest` as aireg 0.1 checks it, and `framed` beside it for this version to check. */
+function digestDoc(digest: string | undefined): { digest?: string; framed?: string } {
+  if (digest === undefined) return {};
+  const earlier = earlierDigest(digest);
+  return earlier === undefined ? { digest } : { digest: earlier, framed: digest };
+}
+
 /** Undefined when any link is unreadable: prune reads only these, so none may be guessed at. */
 function parseLinks(raw: unknown, scope: Scope): LockLink[] | undefined {
   if (raw === undefined || raw === null) return [];
@@ -179,7 +196,7 @@ function parseLinks(raw: unknown, scope: Scope): LockLink[] | undefined {
     const target = targetOf(item);
     const path = scopePathOf(item.path, scope);
     const mode = textOf(item.mode);
-    const digest = textOf(item.digest);
+    const digest = digestOf(item);
     if (target === undefined || path === undefined) return undefined;
     if (mode === undefined || !isLinkMode(mode)) return undefined;
     links.push({ target, path, mode, ...(digest === undefined ? {} : { digest }) });
@@ -226,7 +243,7 @@ function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
     ...optional("carried", textOf(entry.carried)),
     ...optional("revision", textOf(entry.revision)),
     path,
-    digest: textOf(entry.digest) ?? "",
+    digest: digestOf(entry) ?? "",
     origin,
     links,
     neededBy: parseNames(entry.needed_by),
@@ -345,7 +362,7 @@ function artifactDoc(artifact: LockArtifact, table: Targets): Record<string, unk
     revision: artifact.revision,
     carried: artifact.carried,
     path: artifact.path === "" ? undefined : artifact.path,
-    digest: artifact.digest,
+    ...digestDoc(artifact.digest),
     origin:
       artifact.origin === undefined
         ? undefined
@@ -362,7 +379,7 @@ function artifactDoc(artifact: LockArtifact, table: Targets): Record<string, unk
         harness: earlierId(table, link.target),
         path: link.path,
         mode: link.mode,
-        digest: link.mode === "copy" ? link.digest : undefined,
+        ...digestDoc(link.mode === "copy" ? link.digest : undefined),
       })),
     needed_by: artifact.neededBy?.length ? [...artifact.neededBy].sort() : undefined,
     blocked: artifact.blocked?.length
