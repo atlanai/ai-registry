@@ -28,7 +28,12 @@ export async function run(context: CommandContext): Promise<void> {
   const rows = installed(lock, manifest, targetTable);
 
   if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { scope: roots.scope, artifacts: rows } });
+    // `targets` is a key aireg 0.1 printed, so it keeps that version's ids for its readers.
+    const artifacts = rows.map((row) => ({
+      ...row,
+      targets: row.targets.map((id) => earlierId(targetTable, id)),
+    }));
+    context.printer.json({ ok: true, data: { scope: roots.scope, artifacts } });
     return;
   }
 

@@ -26,10 +26,10 @@ With a name, `list` shows where one installed artifact came from: its registry, 
 ## JSON output
 
 ```json
-{"ok": true, "data": {"scope": "project", "artifacts": [{"name": "engineering/pr-review", "shown": "pr-review", "kind": "skill", "registry": "acme", "address": "github.com/acme/ai-registry", "ref": "0.1.0", "pinned": false, "targets": ["claude-code", "universal"]}]}}
+{"ok": true, "data": {"scope": "project", "artifacts": [{"name": "engineering/pr-review", "shown": "pr-review", "kind": "skill", "registry": "acme", "address": "github.com/acme/ai-registry", "ref": "0.1.0", "pinned": false, "targets": ["agents", "claude"]}]}}
 ```
 
-`name` is the artifact's name in the lockfile, and `shown` the name the table prints. `address` is where its registry lives. `targets` are the ids of the targets it is linked into, such as `universal`. `ref` is the version; an artifact with no version has its registry's short commit instead, or nothing when it comes from a watched folder. `watched` names the `target` and `path` of an artifact from a watched folder, and its `harness`, the target by the id aireg 0.1 used, kept for compatibility, and `neededBy` the artifacts that need one installed only for them.
+`name` is the artifact's name in the lockfile, and `shown` the name the table prints. `address` is where its registry lives. `targets` are the targets it is linked into, by the ids aireg 0.1 used, such as `claude` for Claude Code and `agents` for the shared `.agents` folder, so readers of that version keep working. `ref` is the version; an artifact with no version has its registry's short commit instead, or nothing when it comes from a watched folder. `watched` names the `target` and `path` of an artifact from a watched folder, and its `harness`, the target by the id aireg 0.1 used, kept for compatibility, and `neededBy` the artifacts that need one installed only for them.
 
 With a name, `data` is that one artifact instead: where it came from, its `version` and `content` digest, the stored `copy` you edit, and its `links` into each target folder.
 

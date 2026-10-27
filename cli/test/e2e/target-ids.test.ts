@@ -69,6 +69,9 @@ describe("a target's earlier id", () => {
       { target: "gemini-cli", harness: "gemini", run: "/permissions trust" },
     ]);
 
+    const rows = JSON.parse((await aireg(["list", "--json"])).stdout).data.artifacts;
+    expect(rows[0].targets).toEqual(["claude", "gemini"]);
+
     const detail = JSON.parse((await aireg(["list", "kit/lint", "--json"])).stdout);
     expect(
       detail.data.links.map(({ target, harness }: Record<string, string>) => [target, harness]),
