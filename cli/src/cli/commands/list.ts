@@ -31,7 +31,7 @@ export async function run(context: CommandContext): Promise<void> {
     // `targets` is a key aireg 0.1 printed, so it keeps that version's ids for its readers.
     const artifacts = rows.map((row) => ({
       ...row,
-      targets: row.targets.map((id) => earlierId(targetTable, id)),
+      targets: row.targets.map((id) => earlierId(targetTable, id)).sort(),
     }));
     context.printer.json({ ok: true, data: { scope: roots.scope, artifacts } });
     return;
