@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { closeSync, fstatSync, openSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import { isWithin } from "#adapter/paths.ts";
@@ -262,25 +262,30 @@ export function checkTargetText(
 
 const cache = new Map<string, { stamp: string; read: TargetFile | SkippedFile }>();
 
-/** Read once per change, since every command resolves the targets more than once. */
+/**
+ * Read once per change, since every command resolves the targets more than once. The stamp
+ * and the text come from one open file, so neither can describe a file the other did not.
+ */
 function cachedRead(path: string, folder: Folder): TargetFile | SkippedFile {
-  let stamp: string;
+  let fd: number;
   try {
-    const info = statSync(path);
-    stamp = `${info.mtimeMs}:${info.size}`;
+    fd = openSync(path, "r");
   } catch {
     return { path, problems: ["It could not be read."] };
   }
-  const held = cache.get(path);
-  if (held?.stamp === stamp) return held.read;
-  let read: TargetFile | SkippedFile;
   try {
-    read = readOne(path, readFileSync(path, "utf8"), folder);
+    const info = fstatSync(fd);
+    const stamp = `${info.mtimeMs}:${info.size}`;
+    const held = cache.get(path);
+    if (held?.stamp === stamp) return held.read;
+    const read = readOne(path, readFileSync(fd, "utf8"), folder);
+    cache.set(path, { stamp, read });
+    return read;
   } catch {
-    read = { path, problems: ["It could not be read."] };
+    return { path, problems: ["It could not be read."] };
+  } finally {
+    closeSync(fd);
   }
-  cache.set(path, { stamp, read });
-  return read;
 }
 
 /**
