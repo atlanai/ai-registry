@@ -27,17 +27,33 @@ Each row names a coding agent, the id `--for` takes, and the other names it answ
 
 ## Supported targets
 
-Each path is in a project, then in your user scope. An alias works everywhere an id does; aireg always writes and prints the id.
+Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agents` still work everywhere an id does.
 
-| Target | `--for` | Aliases | Skills | Agents | Moves the user folder |
-|---|---|---|---|---|---|
-| Claude Code | `claude-code` | `claude` | `.claude/skills/<name>/`, `~/.claude/skills/<name>/` | `.claude/agents/<name>.md`, `~/.claude/agents/<name>.md` | `CLAUDE_CONFIG_DIR` |
-| Codex | `codex` | | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.codex/agents/<name>.toml`, `~/.codex/agents/<name>.toml`, as TOML | `CODEX_HOME` |
-| Cursor | `cursor` | | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.cursor/agents/<name>.md`, `~/.cursor/agents/<name>.md` | None |
-| GitHub Copilot | `github-copilot` | `copilot` | `.github/skills/<name>/`, `~/.copilot/skills/<name>/` | `.github/agents/<name>.agent.md`, `~/.copilot/agents/<name>.agent.md` | `COPILOT_HOME` |
-| Gemini CLI | `gemini-cli` | `gemini` | `.gemini/skills/<name>/`, `~/.gemini/skills/<name>/` | `.gemini/agents/<name>.md`, `~/.gemini/agents/<name>.md`, as a copy | `GEMINI_CLI_HOME` |
-| OpenCode | `opencode` | | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.opencode/agents/<name>.md`, `~/.config/opencode/agents/<name>.md`, as a copy | `XDG_CONFIG_HOME` |
-| The shared `.agents` folder | `universal` | `agents` | `.agents/skills/<name>/`, `~/.agents/skills/<name>/` | `.agents/agents/<name>.md`, `~/.agents/agents/<name>.md` | None |
+### Skills
+
+| Target | `--for` | Project | User |
+|---|---|---|---|
+| Claude Code | `claude-code` | `.claude/skills/` | `~/.claude/skills/` |
+| Codex | `codex` | `.agents/skills/` | `~/.agents/skills/` |
+| Cursor | `cursor` | `.agents/skills/` | `~/.agents/skills/` |
+| GitHub Copilot | `github-copilot` | `.github/skills/` | `~/.copilot/skills/` |
+| Gemini CLI | `gemini-cli` | `.gemini/skills/` | `~/.gemini/skills/` |
+| OpenCode | `opencode` | `.agents/skills/` | `~/.agents/skills/` |
+| Shared `.agents` folder | `universal` | `.agents/skills/` | `~/.agents/skills/` |
+
+### Agents
+
+| Target | `--for` | Project | User |
+|---|---|---|---|
+| Claude Code | `claude-code` | `.claude/agents/` | `~/.claude/agents/` |
+| Codex | `codex` | `.codex/agents/` | `~/.codex/agents/` |
+| Cursor | `cursor` | `.cursor/agents/` | `~/.cursor/agents/` |
+| GitHub Copilot | `github-copilot` | `.github/agents/` | `~/.copilot/agents/` |
+| Gemini CLI | `gemini-cli` | `.gemini/agents/` | `~/.gemini/agents/` |
+| OpenCode | `opencode` | `.opencode/agents/` | `~/.config/opencode/agents/` |
+| Shared `.agents` folder | `universal` | `.agents/agents/` | `~/.agents/agents/` |
+
+A user folder moves with its target's own variable: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, or `XDG_CONFIG_HOME` for OpenCode.
 
 The shared `.agents` folder is one several coding agents read, not a coding agent, so aireg never detects it and never installs into it by default.
 
