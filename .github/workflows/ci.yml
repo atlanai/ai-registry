@@ -474,7 +474,7 @@ jobs:
 
       # Scans the push or pull request range (all history on a first push) with a digest-pinned image.
       # Unknown results may be live; the excluded files are tests that hold fake credentials.
-      - uses: trufflesecurity/trufflehog@e76dff8a7e57d6df0c60ad8cbf5d5cba505a8fc9 # v3.99.2
+      - uses: trufflesecurity/trufflehog@e63326d6545de8f425d93ce24078c6e68d83f70e # v3.99.3
         with:
           version: 3.97.9@sha256:52e67fef4d054ecff5c2ce4b4ae376626d1ef54aa0898b53cac19c25e92e14db
           extra_args: --results=verified,unknown --exclude-paths=.github/secret-scan-exclude.txt
