@@ -86,23 +86,23 @@
   "dependencies": {
     "ajv": "8.20.0",
     "ink": "8.0.0",
-    "re2js": "2.8.8",
+    "re2js": "2.9.0",
     "react": "19.3.1",
     "string-width": "8.3.0",
     "yaml": "2.9.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.2",
+    "@biomejs/biome": "2.6.3",
     "@sinclair/typebox": "0.34.52",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@vitest/coverage-v8": "5.0.5",
-    "knip": "6.42.1",
+    "knip": "6.43.0",
     "publint": "0.3.25",
     "tsup": "9.0.0",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5"
   },
-  "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621"
+  "packageManager": "pnpm@12.15.0+sha512.b3951d6d6ff4a9f13dc7cf56cd28d2b8eb37dbcc9c68e52e1e1191873ea9f82a017287ab50baadc5ccc494f036c67c0e47eb13608c2fa36f47711b61ea128e61"
 }

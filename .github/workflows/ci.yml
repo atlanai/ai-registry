@@ -113,7 +113,7 @@ jobs:
 
       # Verifies pnpm against the integrity hash in packageManager.
       # Hosted Windows runners preinstall Yarn shims; replace them with Corepack.
-      - run: npm install --global --force corepack@0.34.6 && corepack enable pnpm
+      - run: npm install --global --force corepack@0.36.0 && corepack enable pnpm
 
       - id: store
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
@@ -202,7 +202,7 @@ jobs:
           path: ${{ runner.temp }}/corepack
           key: corepack-${{ runner.os }}-${{ steps.corepack.outputs.pin }}
 
-      - run: npm install --global --force corepack@0.34.6 && corepack enable pnpm
+      - run: npm install --global --force corepack@0.36.0 && corepack enable pnpm
 
       - id: store
         shell: bash
@@ -426,9 +426,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.12"
+          python-version: "3.15.2"
 
       - run: python3 -m pip install --require-hashes -r tools/requirements.txt
       - run: python3 tools/check.py examples/acme-registry
@@ -450,9 +450,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.12"
+          python-version: "3.15.2"
       - run: python3 -m pip install --require-hashes -r docs/requirements.txt
       - run: python3 tools/build_figures.py --check
       # Fails when an install pin in the docs or the aireg skills is not cli/package.json's version.
@@ -474,7 +474,7 @@ jobs:
 
       # Scans the push or pull request range (all history on a first push) with a digest-pinned image.
       # Unknown results may be live; the excluded files are tests that hold fake credentials.
-      - uses: trufflesecurity/trufflehog@e76dff8a7e57d6df0c60ad8cbf5d5cba505a8fc9 # v3.99.2
+      - uses: trufflesecurity/trufflehog@31ce31ee1abbcc7dc8eee5764c17121c3044c8b2 # v3.99.7
         with:
-          version: 3.97.9@sha256:52e67fef4d054ecff5c2ce4b4ae376626d1ef54aa0898b53cac19c25e92e14db
+          version: 3.99.7@sha256:0d003fc3abc4e1565eca8462b992001314de51451e96e3c44de80d116794d5d1
           extra_args: --results=verified,unknown --exclude-paths=.github/secret-scan-exclude.txt
