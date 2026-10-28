@@ -1,4 +1,4 @@
-# Not a workspace. pnpm 11 reads its configuration only from here; the same
+# Not a workspace. pnpm reads its configuration only from here; the same
 # settings in package.json are accepted and then ignored.
 
 # Minutes. A week is long enough for a compromised publish to be yanked first.
@@ -22,9 +22,9 @@ allowBuilds:
 overrides:
   react-devtools-core: link:./packaging/stubs/react-devtools-core
   # GHSA-r4xh-jqrq-34v2: use the upstream linear-time TOML parser.
-  smol-toml: 1.9.0
+  smol-toml: 1.9.1
   # GHSA-g7r4-m6w7-qqqr: contain Windows development-server paths.
-  esbuild: 0.28.1
+  esbuild: 0.28.2
   # GHSA-68fv-2mgg-jv7q: indexed source-map offsets must be bounded.
   source-map-js: 1.2.2
   # GHSA-mrhx-c7xc-m3w5: bound the memory used to validate oversized input.
@@ -32,9 +32,7 @@ overrides:
   # GHSA-w74x-v6f9-j3xg, GHSA-wjr9-j795-jxcr: no scheme spoofing or host confusion in parsed URIs.
   fast-uri: 3.1.9
 
-# Exact versions approved for the 2026-10-21 refresh; later releases still age.
-
-# Exact versions approved for the 2026-10-21 refresh; later releases still age.
+# Exact stable versions approved for dependency refreshes; later releases still age.
 minimumReleaseAgeExclude:
   - "@biomejs/biome@2.6.2"
   - "@biomejs/cli-android-arm64@2.6.2"
@@ -99,3 +97,47 @@ minimumReleaseAgeExclude:
   - "vite@8.3.5"
   - "vitest@5.0.5"
   - "fast-uri@3.1.9"
+
+  # Exact stable releases verified for the 2026-10-28 refresh.
+  - "@biomejs/biome@2.6.3"
+  - "@biomejs/cli-android-arm64@2.6.3"
+  - "@biomejs/cli-android-x64@2.6.3"
+  - "@biomejs/cli-darwin-arm64@2.6.3"
+  - "@biomejs/cli-darwin-x64@2.6.3"
+  - "@biomejs/cli-linux-arm64-musl@2.6.3"
+  - "@biomejs/cli-linux-arm64@2.6.3"
+  - "@biomejs/cli-linux-x64-musl@2.6.3"
+  - "@biomejs/cli-linux-x64@2.6.3"
+  - "@biomejs/cli-win32-arm64@2.6.3"
+  - "@biomejs/cli-win32-x64@2.6.3"
+  - "@napi-rs/wasm-runtime@1.2.6"
+  - "@rollup/rollup-android-arm-eabi@4.65.1"
+  - "@rollup/rollup-android-arm64@4.65.1"
+  - "@rollup/rollup-darwin-arm64@4.65.1"
+  - "@rollup/rollup-darwin-x64@4.65.1"
+  - "@rollup/rollup-freebsd-arm64@4.65.1"
+  - "@rollup/rollup-freebsd-x64@4.65.1"
+  - "@rollup/rollup-linux-arm-gnueabihf@4.65.1"
+  - "@rollup/rollup-linux-arm-musleabihf@4.65.1"
+  - "@rollup/rollup-linux-arm64-gnu@4.65.1"
+  - "@rollup/rollup-linux-arm64-musl@4.65.1"
+  - "@rollup/rollup-linux-loong64-gnu@4.65.1"
+  - "@rollup/rollup-linux-loong64-musl@4.65.1"
+  - "@rollup/rollup-linux-ppc64-gnu@4.65.1"
+  - "@rollup/rollup-linux-ppc64-musl@4.65.1"
+  - "@rollup/rollup-linux-riscv64-gnu@4.65.1"
+  - "@rollup/rollup-linux-riscv64-musl@4.65.1"
+  - "@rollup/rollup-linux-s390x-gnu@4.65.1"
+  - "@rollup/rollup-linux-x64-gnu@4.65.1"
+  - "@rollup/rollup-linux-x64-musl@4.65.1"
+  - "@rollup/rollup-openbsd-x64@4.65.1"
+  - "@rollup/rollup-openharmony-arm64@4.65.1"
+  - "@rollup/rollup-win32-arm64-msvc@4.65.1"
+  - "@rollup/rollup-win32-ia32-msvc@4.65.1"
+  - "@rollup/rollup-win32-x64-gnu@4.65.1"
+  - "@rollup/rollup-win32-x64-msvc@4.65.1"
+  - "es-toolkit@1.53.0"
+  - "knip@6.43.0"
+  - "magic-string@1.4.5"
+  - "postcss@8.5.32"
+  - "rollup@4.65.1"

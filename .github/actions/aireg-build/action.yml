@@ -41,7 +41,7 @@ runs:
         TRUSTED_KEYS: ${{ inputs.trusted-keys }}
       run: |
         set -euo pipefail
-        npm install --global --force corepack@0.34.6
+        npm install --global --force corepack@0.36.0
         corepack enable pnpm
         # Bun bundles src/main.ts itself, so only the packages the CLI runs with are needed.
         pnpm install --frozen-lockfile --prod
