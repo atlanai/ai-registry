@@ -140,6 +140,7 @@ export async function run(context: CommandContext): Promise<void> {
   }
 
   let dropped: string[] = [];
+  let asked: string[] = [];
   let approved = true;
   // --force here deletes the named edits; it must not also restore every other edited copy.
   const scoped = { ...common, force: false };
@@ -171,6 +172,7 @@ export async function run(context: CommandContext): Promise<void> {
         );
       }
       const wholes = new Set(names.flatMap(wholeAddress));
+      asked = fresh.manifest.artifacts.flatMap((ref) => ref.targets ?? []);
       fresh.manifest.artifacts = fresh.manifest.artifacts.flatMap((ref) =>
         without(ref, drop, lock, removeAll || wholes.has(formatAddress(ref))),
       );
@@ -232,7 +234,11 @@ export async function run(context: CommandContext): Promise<void> {
     );
   }
   const told = new Set([...kept, ...watched]);
+  // A dropped entry takes the tools it named out of the manifest, yet those tools still reload.
+  const targets = [
+    ...new Set([...result.targets, ...asked.filter((name) => name in result.targetTable)]),
+  ];
   if (result.applied)
-    summarize(context.printer, { ...result, plan, applied: result.applied }, told);
+    summarize(context.printer, { ...result, targets, plan, applied: result.applied }, told);
   settleCollisions(context, plan);
 }
