@@ -159,6 +159,28 @@ describe("summarize", () => {
     ]);
   });
 
+  it("asks for the steps of a tool that reads the shared folder a skill went to", () => {
+    const targetTable = resolveTargets({ HOME: "/home/dev" });
+    targetTable.opencode = {
+      ...targetTable.opencode!,
+      trust: { skill: { run: "tool trust" } },
+      reload: "Run `/reload` in OpenCode.",
+    };
+    const lock = { artifacts: { lint: { kind: "skill", links: [at("universal")] } } };
+    const applied = {
+      performed: { link: 1 } as never,
+      installed: ["lint"],
+      added: ["lint"],
+      lock: lock as never,
+    };
+    const actions = [link("lint", "universal")];
+    expect(printed(actions, applied, {}, ["opencode", "codex"], targetTable)).toEqual([
+      "✓ Installed lint for OpenCode and Codex.",
+      "hint: OpenCode loads skills here only once you trust them: run `tool trust`.",
+      "hint: Run `/reload` in OpenCode.",
+    ]);
+  });
+
   it("says a plugin's hooks run only where it installs whole, not where its skills went", () => {
     const actions = [
       { ...link("tools", "claude-code"), plugin: true } as Action,

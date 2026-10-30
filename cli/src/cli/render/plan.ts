@@ -159,12 +159,23 @@ function targetOf(action: Shown): string | undefined {
   return action.kind === "unlink" ? action.link?.target : undefined;
 }
 
+/** The kind an action placed: a plugin a target takes as its parts asks for each part's step. */
+function placedKind(
+  action: Shown,
+  kindOf: (name: string) => ArtifactKind | undefined,
+): ArtifactKind | undefined {
+  const placed =
+    action.kind !== "link" ? undefined : action.plugin === true ? "plugin" : action.part;
+  return placed ?? kindOf(action.name);
+}
+
 /** What a target asks of a person once it was given something; printed, never run. */
 function followUps(
   printer: Printer,
   shown: readonly Shown[],
   kindOf: (name: string) => ArtifactKind | undefined,
   targetTable: Targets,
+  chosen: readonly string[],
   scope: Ran["scope"],
 ): void {
   // One line per target and command, naming every kind that waits on it.
@@ -172,20 +183,21 @@ function followUps(
   const reloads = new Set<string>();
   for (const action of shown) {
     const id = targetOf(action);
-    const target = id === undefined ? undefined : targetTable[id];
-    if (target === undefined) continue;
-    if (target.reload !== undefined) reloads.add(target.reload);
-    // A plugin a target takes as its parts asks for each part's step, not the plugin's.
-    const placed =
-      action.kind !== "link" ? undefined : action.plugin === true ? "plugin" : action.part;
-    const kind = placed ?? kindOf(action.name);
-    const run =
-      action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
-    if (run !== undefined && kind !== undefined) {
-      const key = `${target.name}\0${run}`;
-      const step = steps.get(key) ?? { target: target.displayName, run, kinds: new Set() };
-      step.kinds.add(`${kind}s`);
-      steps.set(key, step);
+    if (id === undefined) continue;
+    const kind = placedKind(action, kindOf);
+    // A folder several tools read asks for the steps of each tool that reads it.
+    for (const reader of loadedBy(targetTable, chosen, kind, [id])) {
+      const target = targetTable[reader];
+      if (target === undefined) continue;
+      if (target.reload !== undefined) reloads.add(target.reload);
+      const run =
+        action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
+      if (run !== undefined && kind !== undefined) {
+        const key = `${target.name}\0${run}`;
+        const step = steps.get(key) ?? { target: target.displayName, run, kinds: new Set() };
+        step.kinds.add(`${kind}s`);
+        steps.set(key, step);
+      }
     }
   }
   for (const { target, run, kinds } of steps.values()) {
@@ -271,6 +283,7 @@ export function summarize(
     shown.filter((action) => acted.has(action.name)),
     kindOf,
     targetTable,
+    targets,
     scope,
   );
 }
