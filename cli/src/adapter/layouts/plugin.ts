@@ -13,7 +13,8 @@ export type Json = Record<string, unknown>;
 const PLUGIN_MANIFESTS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "plugin.json"];
 
 /** A root `plugin.json` is an Agent Plugins manifest only under this schema. */
-const AGENT_PLUGINS_SCHEMA = /^https:\/\/agent-plugins\.org\/schemas\/[^/]+\/plugin\.schema\.json$/;
+export const AGENT_PLUGINS_SCHEMA =
+  /^https:\/\/agent-plugins\.org\/schemas\/[^/]+\/plugin\.schema\.json$/;
 
 /** Manifests are a few kilobytes; anything larger is not one. */
 const MAX_MANIFEST = 1024 * 1024;

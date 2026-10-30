@@ -1,0 +1,93 @@
+{
+  "apiVersion": "aireg.sh/v1",
+  "kind": "plugin",
+  "metadata": {
+    "name": "review-kit",
+    "namespace": "engineering",
+    "version": "1.0.0",
+    "display_name": "Review kit",
+    "description": "Triage and review pull requests against the team's tracker, with a status command and the tracker's MCP server.",
+    "status": "active",
+    "labels": {
+      "category": "engineering"
+    },
+    "source": {
+      "type": "git",
+      "uri": "https://github.com/acme/plugins",
+      "revision": "5f6e7d8c9b0a1f2e3d4c5b6a7f8e9d0c1b2a3f4e"
+    },
+    "created_at": "2026-09-10T09:00:00Z",
+    "created_by": "acme-ci",
+    "digest": "sha256:3dc857c1bc88c22f404cb9233aa919d28a98ef5ed8a6f14770653e20174c12f8"
+  },
+  "files": [
+    {
+      "path": ".claude-plugin/plugin.json",
+      "digest": "sha256:a5a2956020301b64877a0625bb9581db83a4489804fcc7ffad69c92088a6f99b",
+      "size": 277,
+      "media_type": "application/json",
+      "urls": [
+        ".claude-plugin/plugin.json"
+      ]
+    },
+    {
+      "path": ".mcp.json",
+      "digest": "sha256:cf892c4ff8bc6d38bd626b11841dc7fdd39600cc29a522c8d4ec6819273e6b36",
+      "size": 118,
+      "media_type": "application/json",
+      "urls": [
+        ".mcp.json"
+      ]
+    },
+    {
+      "path": "bin/review-status",
+      "digest": "sha256:9eb3863e9c3fc67a6a0addee37ed69f7c68da894f36d73242276f391276c6dd9",
+      "size": 139,
+      "executable": true,
+      "urls": [
+        "bin/review-status"
+      ]
+    },
+    {
+      "path": "commands/triage.md",
+      "digest": "sha256:bb177d72223e486efca62eaa1075c2cc116ee8f7348838b4ef0a4f8a3f63eb18",
+      "size": 145,
+      "media_type": "text/markdown",
+      "urls": [
+        "commands/triage.md"
+      ]
+    },
+    {
+      "path": "plugin.json",
+      "digest": "sha256:911e5ef047ece91d79a769799b8b875e3c738a77ad1e20f9290d1dcefab07137",
+      "size": 321,
+      "media_type": "application/json",
+      "urls": [
+        "plugin.json"
+      ]
+    },
+    {
+      "path": "skills/pr-triage/SKILL.md",
+      "digest": "sha256:1b7af5aa42ad436bbb4da856006963f4e1a063305a742d48cdf161c3534c4655",
+      "size": 420,
+      "media_type": "text/markdown",
+      "urls": [
+        "skills/pr-triage/SKILL.md"
+      ]
+    }
+  ],
+  "spec": {
+    "name": "review-kit",
+    "description": "Triage and review pull requests against the team's tracker, with a status command and the tracker's MCP server.",
+    "manifest": {
+      "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      "name": "review-kit",
+      "version": "1.0.0",
+      "description": "Triage and review pull requests against the team's tracker, with a status command and the tracker's MCP server.",
+      "author": {
+        "name": "Acme"
+      },
+      "license": "Apache-2.0"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "review-kit",
+  "version": "1.0.0",
+  "description": "Triage and review pull requests against the team's tracker, with a status command and the tracker's MCP server.",
+  "author": {
+    "name": "Acme"
+  },
+  "license": "Apache-2.0",
+  "mcpServers": "./.mcp.json"
+}

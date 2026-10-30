@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kinds/plugin.json",
+  "title": "plugin",
+  "description": "An agent plugin: one tested set of skills, agents, commands, hooks and server definitions, installed as a unit. The version carries the plugin folder byte for byte, including one manifest per host. spec holds the registry slug as name, a description, and the entry manifest, unchanged, in manifest. File spec section 3.4 names the manifests and says which one is the entry.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "MUST equal metadata.name in the envelope.",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "manifest": {
+      "type": "object",
+      "description": "The entry manifest, verbatim. Opaque to this manifest beyond the rules section 3.4 states."
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "manifest"
+  ],
+  "additionalProperties": false,
+  "x-registry-schema-version": 1,
+  "x-registry-searchable": [
+    "/name",
+    "/description"
+  ],
+  "x-registry-embeddings": [
+    "/description"
+  ],
+  "x-registry-edges": [
+    {
+      "rel_type": "depends_on",
+      "to_kinds": [
+        "plugin",
+        "skill",
+        "agent",
+        "mcp_server"
+      ],
+      "cardinality": "many",
+      "direction": "outbound"
+    },
+    {
+      "rel_type": "supersedes",
+      "to_kinds": [
+        "plugin"
+      ],
+      "cardinality": "one",
+      "direction": "outbound"
+    }
+  ],
+  "x-registry-files": {
+    "optional": [
+      {
+        "path": "plugin.json",
+        "media_type": "application/json"
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "media_type": "application/json"
+      },
+      {
+        "path": ".codex-plugin/plugin.json",
+        "media_type": "application/json"
+      },
+      {
+        "path": ".cursor-plugin/plugin.json",
+        "media_type": "application/json"
+      },
+      {
+        "glob": "skills/**"
+      },
+      {
+        "glob": "agents/**"
+      },
+      {
+        "glob": "commands/**"
+      },
+      {
+        "glob": "hooks/**"
+      },
+      {
+        "path": ".mcp.json"
+      },
+      {
+        "path": "mcp.json"
+      },
+      {
+        "glob": "bin/**"
+      },
+      {
+        "glob": "assets/**"
+      }
+    ]
+  },
+  "x-registry-attachment": false,
+  "x-registry-gated": false
+}

@@ -1,6 +1,6 @@
 # acme-registry
 
-A complete file-spec root in one directory. Two kinds, one namespace, one blob, and every digest real. Clone it as a repository and it is a registry; read it from disk and it is a registry. Served from a static file host it is a registry under the file spec too, though no client reads an HTTPS root yet: aireg reads folders and git repositories.
+A complete file-spec root in one directory. Three kinds, one namespace, one blob, and every digest real. Clone it as a repository and it is a registry; read it from disk and it is a registry. Served from a static file host it is a registry under the file spec too, though no client reads an HTTPS root yet: aireg reads folders and git repositories.
 
 ```
 registry.json                                        discovery: kind registry, slug acme
@@ -10,8 +10,10 @@ artifacts/engineering/skill/pr-review/1.1.0/         deprecated; SKILL.md only
 artifacts/engineering/skill/pr-review/1.2.0/         active; adds references/checklist.md inline and assets/rubric.json in the blob store
 artifacts/engineering/agent/reviewer/versions.json
 artifacts/engineering/agent/reviewer/0.3.0/          depends_on engineering/skill/pr-review@1.2.0
+artifacts/engineering/plugin/review-kit/1.0.0/       a plugin: two host manifests, a skill, a command, an MCP server and an executable
+artifacts/engineering/plugin/review-metrics/0.2.0/   an add-on: depends_on review-kit@1.0.0 with the range >=1.0.0 <2.0.0
 blobs/sha256/28eb…fc0c                               the rubric bytes
-kinds/skill.json, kinds/agent.json                   the manifests registry.json advertises
+kinds/skill.json, agent.json, plugin.json           the manifests registry.json advertises
 ```
 
 Two identifiers are at work and they are not the same one. The root belongs to the `acme` organization, which is `slug` in `registry.json` and never appears in a path. `engineering` is a namespace inside that root: a team workspace, one of several the organization could hold. A registry with a single team is tempted to give both the same name; this example keeps them distinct so the layout still reads correctly when a second namespace arrives.
@@ -27,6 +29,12 @@ A client resolving `engineering/skill/pr-review`:
 3. Fetch `SKILL.md` and `references/checklist.md` from the version directory, and `assets/rubric.json` from `blobs/sha256/<digest>` because its descriptor has no `urls`. Verify each against its digest and size.
 
 The agent's envelope names the skill in `relationships[]`, so installing the agent pulls the skill the same way.
+
+## A plugin and its add-on
+
+`review-kit` 1.0.0 carries the plugin folder as its author wrote it. It has an Agent Plugins `plugin.json` and a `.claude-plugin/plugin.json`; the first is the entry manifest, so `spec.manifest` holds it unchanged. Both state version 1.0.0, the envelope's version. Its `.mcp.json` and `bin/review-status` are content that runs, and the descriptor marks `bin/review-status` as `executable`, so a client shows both before the first install and sets the execute permission on that one file.
+
+`review-metrics` 0.2.0 carries only a Claude Code manifest, which is therefore its entry. Its `depends_on` edge names `review-kit@1.0.0`, the version it was tested with, and the range `>=1.0.0 <2.0.0`, so a client that resolves ranges may install a later 1.x of `review-kit` alongside it.
 
 ## Checking it
 

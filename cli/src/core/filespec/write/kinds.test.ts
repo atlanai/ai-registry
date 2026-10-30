@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import plugin from "#schema/kinds/plugin.json" with { type: "json" };
 import { test } from "#test/kit/fixtures.ts";
 import {
   check,
@@ -43,6 +44,46 @@ describe("envelopeSpec", () => {
   it("is empty for a kind with no manifest, or files with no document", () => {
     expect(envelopeSpec("tool", new Map([["SKILL.md", text("---\nname: x\n---\n")]]))).toEqual({});
     expect(envelopeSpec("agent", new Map([["agent-card.json", text("{")]]))).toEqual({});
+  });
+});
+
+describe("a plugin's spec", () => {
+  const kinds = { plugin: plugin as KindManifest };
+  const json = (value: unknown) => text(JSON.stringify(value));
+  const portable = {
+    $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+    name: "kit",
+    version: "1.0.0",
+    description: "A kit.",
+  };
+  const claude = { name: "kit", version: "1.0.0", description: "A kit for Claude Code." };
+
+  it("holds the Agent Plugins manifest unchanged ahead of a host's", () => {
+    const files = new Map([
+      [".claude-plugin/plugin.json", json(claude)],
+      ["plugin.json", json(portable)],
+      ["commands/run.md", text("---\ndescription: Run it.\n---\n")],
+    ]);
+    const spec = envelopeSpec("plugin", files, kinds, "kit");
+    expect(spec).toEqual({ name: "kit", description: "A kit.", manifest: portable });
+    expect(check(plugin as KindManifest, spec)).toEqual([]);
+  });
+
+  it("passes over a plugin.json that is not an Agent Plugins manifest", () => {
+    const files = new Map([
+      ["plugin.json", json({ name: "something-else" })],
+      [".claude-plugin/plugin.json", json(claude)],
+    ]);
+    expect(envelopeSpec("plugin", files, kinds, "kit")).toEqual({
+      name: "kit",
+      description: "A kit for Claude Code.",
+      manifest: claude,
+    });
+  });
+
+  it("is empty without a plugin manifest", () => {
+    const files = new Map([["commands/run.md", text("---\ndescription: Run it.\n---\n")]]);
+    expect(envelopeSpec("plugin", files, kinds, "kit")).toEqual({});
   });
 });
 

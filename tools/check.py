@@ -3,8 +3,9 @@
 
 Standard library only. Verifies path grammar and file paths, every file digest
 and size, the content digest and catalog digest of every version, that latest
-is the newest active release, that versions.json and index.json agree, and
-that every relationship resolves.
+is the newest active release, that versions.json and index.json agree, that
+every relationship resolves and that its range admits its target, and the
+plugin rules of section 3.4.
 
     python3 tools/check.py examples/acme-registry
     python3 tools/check.py examples/acme-registry --print-digests
@@ -47,6 +48,11 @@ CONTROL_RE = re.compile("[\x00-\x1f\x7f-\x9f]")
 # Code points HFS+ ignores in a name, so ".g\u200cit" is ".git" there.
 HFS_IGNORED_RE = re.compile("[\u200c-\u200f\u202a-\u202e\u206a-\u206f\ufeff]")
 STATUSES = {"draft", "pending_review", "active", "blocked", "deprecated", "archived"}
+# Section 3.4: space-separated comparators, every one of which must hold.
+COMPARATOR_RE = re.compile(r"^(>=|<=|>|<|=)(.+)$")
+# Section 3.4, in entry order. The root plugin.json counts only under this schema.
+PLUGIN_MANIFESTS = ("plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json", ".cursor-plugin/plugin.json")
+AGENT_PLUGINS_SCHEMA_RE = re.compile(r"^https://agent-plugins\.org/schemas/[^/]+/plugin\.schema\.json$")
 SUPPORTED_FORMAT = 1
 
 
@@ -181,6 +187,62 @@ def _semver_key(version: str):
     pre = m.group(4).split(".") if m.group(4) else []
     idents = tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in pre)
     return (int(m.group(1)), int(m.group(2)), int(m.group(3)), 0 if pre else 1, idents)
+
+
+def satisfies(version: str, range_: str) -> bool | None:
+    """Section 3.4: whether version satisfies every comparator, or None when the
+    version or a comparator's version does not parse as semver."""
+    key = _semver_key(version)
+    if key is None:
+        return None
+    ok = True
+    for comparator in range_.split(" "):
+        m = COMPARATOR_RE.match(comparator)
+        bound = _semver_key(m.group(2)) if m else None
+        if bound is None:
+            return None
+        op = m.group(1)
+        ok = ok and {"=": key == bound, ">": key > bound, ">=": key >= bound,
+                     "<": key < bound, "<=": key <= bound}[op]
+    return ok
+
+
+def check_plugin(label: str, env: dict, manifests: dict[str, bytes], rep: Report) -> None:
+    """Section 3.4's plugin rules a schema cannot state. manifests holds the
+    verified bytes of each plugin manifest the version carries and this checker
+    could read."""
+    meta, spec = env.get("metadata", {}), env.get("spec")
+    spec = spec if isinstance(spec, dict) else {}
+    carried = [fd.get("path") for fd in env.get("files", []) if fd.get("path") in PLUGIN_MANIFESTS]
+    parsed: dict[str, object] = {}
+    for path in carried:
+        if path not in manifests:
+            continue
+        try:
+            parsed[path] = json.loads(manifests[path])
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            rep.error(f"{label}: {path} is not valid JSON")
+    if "plugin.json" in parsed:
+        root = parsed["plugin.json"]
+        if not isinstance(root, dict) or not AGENT_PLUGINS_SCHEMA_RE.match(str(root.get("$schema", ""))):
+            # Any project may have a plugin.json; only an Agent Plugins one is a manifest.
+            del parsed["plugin.json"]
+            carried.remove("plugin.json")
+    if not carried:
+        rep.error(f"{label}: a plugin carries no plugin manifest")
+        return
+    if spec.get("name") != meta.get("name"):
+        rep.error(f"{label}: spec.name is {spec.get('name')!r}, metadata.name is {meta.get('name')!r}")
+    entry = next(path for path in PLUGIN_MANIFESTS if path in carried)
+    if entry in parsed and spec.get("manifest") != parsed[entry]:
+        rep.error(f"{label}: spec.manifest differs from the entry manifest {entry}")
+    for path, manifest in parsed.items():
+        if not isinstance(manifest, dict):
+            rep.error(f"{label}: {path} must be a JSON object")
+            continue
+        for field in ("name", "version"):
+            if field in manifest and manifest[field] != meta.get(field):
+                rep.error(f"{label}: {path} {field} is {manifest[field]!r}, metadata.{field} is {meta.get(field)!r}")
 
 
 def newest(rows: list) -> str | None:
@@ -376,6 +438,7 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
                 rep.error(f"{label}@{v}: apiVersion must be aireg.sh/v1")
 
             changed = False
+            manifests: dict[str, bytes] = {}
             files = env.get("files", [])
             if not files:
                 rep.error(f"{label}@{v}: files[] is empty")
@@ -419,6 +482,13 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
                     rep.error(f"{label}@{v}: {p} digest mismatch (expected {actual_digest})")
                 if fd.get("size") != actual_size:
                     rep.error(f"{label}@{v}: {p} size {fd.get('size')} != {actual_size}")
+                if "executable" in fd and not isinstance(fd["executable"], bool):
+                    rep.error(f"{label}@{v}: {p} executable must be a boolean")
+                if p in PLUGIN_MANIFESTS:
+                    manifests[p] = data
+
+            if env.get("kind") == "plugin":
+                check_plugin(f"{label}@{v}", env, manifests, rep)
 
             try:
                 cdig = content_digest(env)
@@ -449,6 +519,17 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
                     rep.error(f"{label}@{v}: relationship target {to!r} is not a valid ref")
                 else:
                     pending_refs.append((f"{label}@{v}", to))
+                if "range" not in rel:
+                    continue
+                if rel.get("rel_type") != "depends_on":
+                    rep.error(f"{label}@{v}: range is only for depends_on, not {rel.get('rel_type')!r}")
+                    continue
+                match = REF_RE.match(to)
+                ok = satisfies(match.group("version"), rel["range"]) if match and isinstance(rel["range"], str) else None
+                if ok is None:
+                    rep.error(f"{label}@{v}: range {rel['range']!r} on {to} needs semver comparators and a semver target")
+                elif not ok:
+                    rep.error(f"{label}@{v}: {to} does not satisfy its own range {rel['range']!r}")
 
         for child in name_dir.iterdir():
             if child.is_dir() and child.name not in listed:

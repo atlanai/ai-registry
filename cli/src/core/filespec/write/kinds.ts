@@ -3,6 +3,7 @@ import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { isKindSegment, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
+import { AGENT_PLUGINS_SCHEMA } from "#adapter/layouts/plugin.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { frontmatterRecord } from "#core/catalog/frontmatter.ts";
@@ -168,6 +169,37 @@ function filePaths(files: unknown): unknown[] {
     .flatMap((rule) => (isRecord(rule) && "path" in rule ? [rule.path] : []));
 }
 
+/** File spec section 3.4: a plugin's manifests, in the order that picks its entry. */
+const PLUGIN_MANIFESTS = [
+  "plugin.json",
+  ".claude-plugin/plugin.json",
+  ".codex-plugin/plugin.json",
+  ".cursor-plugin/plugin.json",
+];
+
+/** The entry manifest unchanged, with the name and description lifted beside it. */
+function pluginSpec(
+  files: ReadonlyMap<string, string>,
+  name?: string,
+): Record<string, unknown> | undefined {
+  for (const path of PLUGIN_MANIFESTS) {
+    if (!files.has(path)) continue;
+    let manifest: unknown;
+    try {
+      manifest = JSON.parse(files.get(path) ?? "") as unknown;
+    } catch {
+      return undefined;
+    }
+    if (!isRecord(manifest)) return undefined;
+    // Any project may have a plugin.json; only one under the Agent Plugins schema is a plugin's.
+    if (path === "plugin.json" && !AGENT_PLUGINS_SCHEMA.test(String(manifest.$schema))) continue;
+    const lifted: Record<string, unknown> = { name: name ?? manifest.name };
+    if (manifest.description !== undefined) lifted.description = manifest.description;
+    return { ...lifted, manifest };
+  }
+  return undefined;
+}
+
 /** Shared required files plus the selected alternative, or the first alternative by default. */
 export function primaryFiles(manifest: KindManifest, choose?: string): string[] {
   const files = manifest["x-registry-files"];
@@ -218,6 +250,7 @@ export function specFile(
 ): string | undefined {
   if (manifest.title === "skill") return files.has(SKILL_ENTRY) ? SKILL_ENTRY : undefined;
   if (manifest.title === "agent") return files.has(AGENT_ENTRY) ? AGENT_ENTRY : undefined;
+  if (manifest.title === "plugin") return undefined;
   return [...primaryFiles(manifest), ...files.keys()].find(
     (path) => path.endsWith(".md") && files.has(path),
   );
@@ -250,6 +283,7 @@ export function specOf(
   const markdown = specFile(manifest, files);
   if (markdown !== undefined) return frontmatterRecord(files.get(markdown) ?? "");
   if (manifest.title === "skill") return undefined;
+  if (manifest.title === "plugin") return pluginSpec(files, name);
   const json =
     manifest.title === "agent"
       ? files.has(AGENT_CARD_ENTRY)

@@ -30,6 +30,10 @@
       "items": { "type": "string", "format": "uri-reference", "maxLength": 2048 },
       "minItems": 1,
       "maxItems": 16
+    },
+    "executable": {
+      "type": "boolean",
+      "description": "True when the file is meant to be run directly, such as a script under a plugin's bin/. A client that writes the file sets the execute permission when true and only then. Absent means false. Covered by the content digest, so changing it needs a new version. File spec section 3.5."
     }
   },
   "required": ["path", "digest", "size"]

@@ -1,0 +1,75 @@
+{
+  "apiVersion": "aireg.sh/v1",
+  "kind": "plugin",
+  "metadata": {
+    "name": "review-metrics",
+    "namespace": "engineering",
+    "version": "0.2.0",
+    "display_name": "Review metrics",
+    "description": "Measure review turnaround and finding quality from the review-kit tracker, and report where reviews stall.",
+    "status": "active",
+    "labels": {
+      "category": "engineering"
+    },
+    "source": {
+      "type": "git",
+      "uri": "https://github.com/acme/plugins",
+      "revision": "5f6e7d8c9b0a1f2e3d4c5b6a7f8e9d0c1b2a3f4e"
+    },
+    "created_at": "2026-09-12T09:00:00Z",
+    "created_by": "acme-ci",
+    "digest": "sha256:121b617c77a229dff891dd82383dce913fd4af4b7d3366da9bbb246657df32ec"
+  },
+  "files": [
+    {
+      "path": ".claude-plugin/plugin.json",
+      "digest": "sha256:dfff58c259e2fa348f9ac525c06677115ebc663449423838e589c9840c82f5df",
+      "size": 287,
+      "media_type": "application/json",
+      "urls": [
+        ".claude-plugin/plugin.json"
+      ]
+    },
+    {
+      "path": "agents/metrics-analyst.md",
+      "digest": "sha256:9759a326c908eef1a9b8bdd3b474b054a8c9c3a66d9153e8d7884d887a6a87c3",
+      "size": 274,
+      "media_type": "text/markdown",
+      "urls": [
+        "agents/metrics-analyst.md"
+      ]
+    },
+    {
+      "path": "skills/review-metrics/SKILL.md",
+      "digest": "sha256:67b49b070f520a497b97448e88a8f5ad68046045737d0438a7126a9253ada3eb",
+      "size": 392,
+      "media_type": "text/markdown",
+      "urls": [
+        "skills/review-metrics/SKILL.md"
+      ]
+    }
+  ],
+  "spec": {
+    "name": "review-metrics",
+    "description": "Measure review turnaround and finding quality from the review-kit tracker, and report where reviews stall.",
+    "manifest": {
+      "name": "review-metrics",
+      "version": "0.2.0",
+      "description": "Measure review turnaround and finding quality from the review-kit tracker, and report where reviews stall.",
+      "author": {
+        "name": "Acme"
+      },
+      "license": "Apache-2.0",
+      "dependencies": [
+        "review-kit"
+      ]
+    }
+  },
+  "relationships": [
+    {
+      "rel_type": "depends_on",
+      "to": "engineering/plugin/review-kit@1.0.0",
+      "range": ">=1.0.0 <2.0.0"
+    }
+  ]
+}

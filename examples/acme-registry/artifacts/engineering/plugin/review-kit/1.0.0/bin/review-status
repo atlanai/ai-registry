@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+# Prints how many pull requests wait for review; a synthetic example.
+printf 'review-kit 1.0.0: no tracker configured\n'

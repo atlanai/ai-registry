@@ -1,0 +1,16 @@
+{
+  "namespace": "engineering",
+  "kind": "plugin",
+  "name": "review-kit",
+  "latest": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "digest": "sha256:3dc857c1bc88c22f404cb9233aa919d28a98ef5ed8a6f14770653e20174c12f8",
+      "catalog_digest": "sha256:78586417ec5b96432ff7bcab90e6ec6c17d56229cf3d9690af87934a921838c4",
+      "published_at": "2026-09-10T09:00:00Z",
+      "status": "active",
+      "yanked": false
+    }
+  ]
+}

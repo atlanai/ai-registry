@@ -1,0 +1,16 @@
+{
+  "namespace": "engineering",
+  "kind": "plugin",
+  "name": "review-metrics",
+  "latest": "0.2.0",
+  "versions": [
+    {
+      "version": "0.2.0",
+      "digest": "sha256:121b617c77a229dff891dd82383dce913fd4af4b7d3366da9bbb246657df32ec",
+      "catalog_digest": "sha256:afd16686129e57c70650f8457c23df1488ddf0a204a5dd4d6c3271d5ffd3f05f",
+      "published_at": "2026-09-12T09:00:00Z",
+      "status": "active",
+      "yanked": false
+    }
+  ]
+}

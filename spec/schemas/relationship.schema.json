@@ -14,6 +14,12 @@
       "$ref": "common.schema.json#/$defs/ref",
       "description": "Target as a fully qualified ref, resolved within the same root."
     },
+    "range": {
+      "type": "string",
+      "description": "Only on a depends_on edge whose target version parses as semver: the versions of the target this version works with, as space-separated comparators that must all hold. to names the version the publisher tested with and MUST satisfy the range. A client that does not resolve ranges installs to exactly. File spec section 3.4.",
+      "pattern": "^(?:>=|<=|>|<|=)[0-9A-Za-z.+-]+(?: (?:>=|<=|>|<|=)[0-9A-Za-z.+-]+)*$",
+      "maxLength": 256
+    },
     "annotations": { "$ref": "common.schema.json#/$defs/annotations" }
   },
   "required": ["rel_type", "to"]

@@ -28,7 +28,7 @@ index.json                                   # catalog: every (namespace, kind, 
 
 artifacts/                                   # every artifact lives here and nothing else does
   <namespace>/                               # the owner inside this root: a workspace, a team, a GitHub owner
-    <kind>/                                  # skill, agent, mcp_server, …
+    <kind>/                                  # skill, agent, plugin, mcp_server, …
       <name>/
         versions.json                        # one entry per version: version, digest, catalog_digest, published_at, status, yanked
         <version>/
@@ -176,7 +176,7 @@ The envelope: a fixed header, an open `spec` the kind owns, the files the versio
 | `metadata.uid` | no | an identifier a hosted registry MAY mint. A client MUST NOT require it; the ref is the identity |
 | `files[]` | yes | at least one file descriptor; see 3.5 and 4.1. Schema: [`schemas/file-descriptor.schema.json`](schemas/file-descriptor.schema.json) |
 | `spec` | yes | the kind's own document, unchanged. Opaque to a reader by rule 4; validated against the kind manifest at publish |
-| `relationships[]` | no | outbound edges `{rel_type, to, annotations?}`, where `to` is a fully qualified ref. Part of the version, like labels. Schema: [`schemas/relationship.schema.json`](schemas/relationship.schema.json) |
+| `relationships[]` | no | outbound edges `{rel_type, to, range?, annotations?}`, where `to` is a fully qualified ref. Part of the version, like labels. Schema: [`schemas/relationship.schema.json`](schemas/relationship.schema.json) |
 
 Writers MUST NOT invent header fields. Extension data belongs in `spec`, `labels`, or `annotations`.
 
@@ -190,9 +190,35 @@ own `name` remains its human-readable name and need not equal the slug. An agent
 exactly one of these native entry files. Other supporting files are permitted; the optional
 file patterns in a kind manifest are non-exhaustive conventions.
 
+A plugin carries a plugin folder as its author wrote it: skills, agents, commands, hooks, server
+definitions and assets, with one manifest for each host it supports. The plugin manifests are
+`plugin.json` when its `$schema` names an Agent Plugins plugin schema
+(`https://agent-plugins.org/schemas/<version>/plugin.schema.json`), `.claude-plugin/plugin.json`,
+`.codex-plugin/plugin.json` and `.cursor-plugin/plugin.json`. A plugin MUST carry at least one.
+The entry manifest is the first of them, in that order, that the version carries. `spec.manifest`
+holds the entry manifest unchanged, and `spec.description` holds its `description`, or the
+publisher's when it has none. Every plugin manifest the version carries that states a `name` MUST
+state `metadata.name`, and every one that states a `version` MUST state `metadata.version`, so
+that no host reports a version the registry did not publish. A manifest is part of the envelope, so
+section 4.2's rule on numbers applies to it. The skills and agents inside a plugin, such as
+`skills/<name>/SKILL.md`, are part of the plugin's version and are not separate artifacts; each
+`SKILL.md` MUST still satisfy the skill kind's rules for its front matter.
+
+A `depends_on` edge MAY carry `range`, the versions of its target that this version works with:
+one or more comparators separated by single spaces, each an operator (`>=`, `>`, `<=`, `<` or
+`=`) followed by a version that parses as semver. A version satisfies the range when it satisfies
+every comparator by semver precedence, so `>=0.1.4 <0.2.0` admits `0.1.9` and not `0.2.0`. `to`
+names the version the publisher tested with; it MUST parse as semver and satisfy the range. A
+client that resolves ranges MAY install instead any version of the target that satisfies the
+range and that section 3.3 lets it resolve for an unpinned request, SHOULD prefer the newest, and
+SHOULD NOT choose a prerelease other than `to`. A client that does not resolve ranges installs
+`to` exactly, which is always correct. No other `rel_type` carries `range`.
+
 ### 3.5 Native files
 
 Every file named in `files[]` whose `urls` entry is a relative reference is stored at that path under the version directory, byte-identical to what the author wrote. The envelope wraps a kind's existing format; it never rewrites it.
+
+A file descriptor MAY carry `executable: true` for a file meant to be run directly, such as a script under a plugin's `bin/`. A client that writes the file SHOULD give it execute permission where the platform has one, and MUST NOT give execute permission to a file whose descriptor does not say `executable: true`. The file digest covers the bytes only; the flag is part of the envelope, so the content digest covers it and changing it needs a new version.
 
 ### 3.6 `blobs/sha256/<hex>`
 
@@ -308,8 +334,11 @@ These rules bound what a client fetches, sends, and writes.
 - **Sizes and time.** A client MUST stop reading a file once it has received more bytes than the descriptor's `size`, and MUST verify the size and the digest before it uses the file. It SHOULD cap the size of each JSON document it parses, and give up on a request that takes too long rather than wait indefinitely.
 - **Paths.** A client writes a file only at a path section 2.3 allows, inside the folder it installs into, and MUST NOT follow a symbolic link it finds there.
 - **Cycles.** `depends_on` edges can form a cycle. A client resolves each ref once, so a cycle ends where it began.
+- **Content that runs.** A plugin's carried content is what a host runs for the person without asking each time: its hooks, its MCP, LSP and other server definitions, its `bin/` folder, and every file marked `executable`. Before it first installs a plugin version, a client MUST show the person what that version carries. It MUST NOT install a version, on update or otherwise, whose carried content differs from the installed version's unless the person agrees to the difference. This holds whatever the source, a registry included, and whatever the version's status. A client compares carried content by the digests of the files that hold it and by the manifest fields that declare it.
 
 aireg reads directory and git roots, not HTTPS roots. It applies the path, reference, and cycle rules to both and verifies every file's size and digest before using it. It refuses plain `http://` except to a loopback host, sends a stored credential only to the origin it was issued for and a token from the environment only to the registry of that name, and bounds each git operation with a timeout.
+
+aireg does not yet read the plugin kind from a registry root, and does not yet set execute permission or resolve `range`. It asks before installing content that runs only from a source that is not a registry.
 
 ## 12. Conformance
 

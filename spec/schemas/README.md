@@ -16,7 +16,7 @@ themselves and [file-spec.md](../file-spec.md) are the contract.
 | [relationship.schema.json](relationship.schema.json) | one `relationships[]` edge | §3.4, §4.3, §6 |
 | [host.schema.json](host.schema.json) | the host document at `/.well-known/registry.json` | §8 |
 | [kind-manifest.schema.json](kind-manifest.schema.json) | what `kinds[].manifest_url` points at | §3.1 |
-| [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json) | the `spec` of those kinds | §3.4 |
+| [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json), [kinds/plugin.json](kinds/plugin.json) | the `spec` of those kinds | §3.4 |
 | [common.schema.json](common.schema.json) | shared `$defs`; never instantiated | §2.1, §4 |
 
 An envelope is validated against **both** artifact schemas on purpose. The plain one is the
@@ -29,7 +29,8 @@ kind manifest applies. A failure in each is a different bug.
 envelope fields, unknown kinds, unknown `spec` content, and unknown root entries. A document schema
 with `additionalProperties: false` would contradict the specification it describes, so none has one.
 A kind manifest chooses its own policy for `spec`. The skill schema is closed; the agent schema
-preserves additional native front-matter fields. Writers validate against that policy at publish.
+preserves additional native front-matter fields. The plugin schema is closed, and keeps the native
+manifest whole under `manifest`. Writers validate against that policy at publish.
 
 **`$id`s are relative, and are identifiers rather than locations.** A schema's `$id` is the path it
 sits at under this directory, and every `$ref` is a relative path resolved the same way. Nothing
@@ -48,6 +49,10 @@ live in file-spec.md and are enforced by [`tools/check.py`](../../tools/check.py
 - `files[]` digests and sizes matching the bytes, and the path rules of §2.3. Most of those are also
   in `file-descriptor.schema.json` as a lookahead pattern, which RE2-based validators reject; the
   HFS+ code points and case-insensitive collisions are not.
+- For a plugin: at least one plugin manifest, `spec.manifest` equal to the entry manifest, every
+  manifest's `name` and `version` equal to the envelope's, and `spec.name` equal to `metadata.name`.
+  The skill rules for a plugin's own `SKILL.md` files are not checked; they need a YAML parser.
+- A `range` on `depends_on` only, with a `to` that parses as semver and satisfies it.
 - `registry.json` advertising `files`. The schema does not require it: §3.1 states what a file root
   advertises rather than mandating it, and encoding it here would tighten the specification.
 

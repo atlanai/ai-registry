@@ -1,0 +1,12 @@
+{
+  "name": "review-metrics",
+  "version": "0.2.0",
+  "description": "Measure review turnaround and finding quality from the review-kit tracker, and report where reviews stall.",
+  "author": {
+    "name": "Acme"
+  },
+  "license": "Apache-2.0",
+  "dependencies": [
+    "review-kit"
+  ]
+}

@@ -13,6 +13,8 @@ import unittest
 ROOT = Path(__file__).resolve().parent.parent
 CHECK = ROOT / "tools" / "check.py"
 SKILL = Path("artifacts", "engineering", "skill", "pr-review")
+KIT = Path("artifacts", "engineering", "plugin", "review-kit", "1.0.0")
+METRICS = Path("artifacts", "engineering", "plugin", "review-metrics", "0.2.0")
 
 
 class CheckFixTests(unittest.TestCase):
@@ -91,6 +93,61 @@ class CheckFixTests(unittest.TestCase):
     def test_linked_artifacts_folder_is_not_read_or_rewritten(self):
         artifacts = self.link("artifacts")
         self.assert_refused(artifacts / "engineering" / "skill" / "pr-review" / "versions.json")
+
+
+class PluginRuleTests(unittest.TestCase):
+    """Section 3.4's plugin and range rules, which no schema states."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.registry = Path(temporary.name) / "registry"
+        shutil.copytree(ROOT / "examples" / "acme-registry", self.registry)
+
+    def edit(self, relative, change):
+        path = self.registry / relative
+        document = json.loads(path.read_text(encoding="utf-8"))
+        change(document)
+        path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+    def errors(self):
+        """Fill the digests the edit moved, so only the rule under test is left."""
+        subprocess.run([sys.executable, "-I", str(CHECK), str(self.registry), "--fix"], capture_output=True)
+        result = subprocess.run(
+            [sys.executable, "-I", str(CHECK), str(self.registry)], text=True, capture_output=True,
+        )
+        return [line for line in result.stdout.splitlines() if line.startswith("error:")]
+
+    def test_the_example_plugins_pass(self):
+        self.assertEqual(self.errors(), [])
+
+    def test_a_host_manifest_must_state_the_published_version(self):
+        self.edit(METRICS / ".claude-plugin" / "plugin.json", lambda m: m.update(version="0.2.1"))
+        self.assertEqual(len(self.errors()), 2, self.errors())
+        self.assertIn("version is '0.2.1', metadata.version is '0.2.0'", "\n".join(self.errors()))
+
+    def test_spec_manifest_is_the_agent_plugins_manifest(self):
+        claude = json.loads((self.registry / KIT / ".claude-plugin" / "plugin.json").read_text())
+        self.edit(KIT / "artifact.json", lambda e: e["spec"].update(manifest=claude))
+        self.assertIn("spec.manifest differs from the entry manifest plugin.json", "\n".join(self.errors()))
+
+    def test_a_plugin_carries_a_manifest(self):
+        def drop(envelope):
+            envelope["files"] = [f for f in envelope["files"] if not f["path"].endswith("plugin.json")]
+        self.edit(METRICS / "artifact.json", drop)
+        self.assertIn("carries no plugin manifest", "\n".join(self.errors()))
+
+    def test_the_tested_version_satisfies_its_range(self):
+        self.edit(METRICS / "artifact.json", lambda e: e["relationships"][0].update(range=">=1.1.0 <2.0.0"))
+        self.assertIn("does not satisfy its own range", "\n".join(self.errors()))
+
+    def test_a_range_is_only_for_depends_on(self):
+        self.edit(METRICS / "artifact.json", lambda e: e["relationships"][0].update(rel_type="supersedes"))
+        self.assertIn("range is only for depends_on", "\n".join(self.errors()))
+
+    def test_a_range_names_semver_versions(self):
+        self.edit(METRICS / "artifact.json", lambda e: e["relationships"][0].update(range="^1.0.0"))
+        self.assertIn("needs semver comparators", "\n".join(self.errors()))
 
 
 if __name__ == "__main__":

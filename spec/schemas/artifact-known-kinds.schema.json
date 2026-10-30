@@ -12,6 +12,10 @@
     {
       "if": { "properties": { "kind": { "const": "agent" } }, "required": ["kind"] },
       "then": { "properties": { "spec": { "$ref": "kinds/agent.json" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "plugin" } }, "required": ["kind"] },
+      "then": { "properties": { "spec": { "$ref": "kinds/plugin.json" } } }
     }
   ]
 }
