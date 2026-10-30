@@ -53,6 +53,7 @@ describe("init", () => {
       "github-copilot",
       "grok",
       "opencode",
+      "pi",
       "universal",
     ]);
   });

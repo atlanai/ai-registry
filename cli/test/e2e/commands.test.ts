@@ -56,7 +56,7 @@ describe("a first-run mistake", () => {
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('No target named "myagent".');
     expect(refused.stderr).toContain(
-      "Use claude-code, codex, cursor, gemini-cli, github-copilot, grok, opencode or universal",
+      "Use claude-code, codex, cursor, gemini-cli, github-copilot, grok, opencode, pi or universal",
     );
 
     await manifest("claude-code");

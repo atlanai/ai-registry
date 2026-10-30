@@ -41,6 +41,7 @@ describe("resolveTargets", () => {
       "gemini-cli": ["gemini"],
       grok: [],
       opencode: [],
+      pi: [],
       universal: ["agents"],
     });
   });
@@ -78,7 +79,7 @@ describe("earlierTable", () => {
     const claude = Object.values(table).find((target) => target.name === "claude");
     expect(claude?.displayName).toBe("Claude Code");
     expect(Object.keys(table).sort()).toEqual(
-      ["agents", "claude", "codex", "copilot", "cursor", "gemini", "grok", "opencode"].sort(),
+      ["agents", "claude", "codex", "copilot", "cursor", "gemini", "grok", "opencode", "pi"].sort(),
     );
     expect(table.agents?.kind).toBe("shared");
     expect(table.codex?.reads).toEqual({ skill: ["agents"] });

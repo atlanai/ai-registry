@@ -1,0 +1,18 @@
+{
+  "id": "pi",
+  "displayName": "Pi",
+  "overrides": true,
+  "roots": {
+    "project": ".pi",
+    "user": { "default": "~/.pi/agent", "env": "PI_CODING_AGENT_DIR" }
+  },
+  "detect": { "env": ["PI_CODING_AGENT_DIR"], "binary": ["pi"] },
+  "reads": { "skill": ["universal", "pi"] },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": { "shape": "directory", "subdir": "skills" }
+  },
+  "verified": { "command": ["pi", "--version"], "range": "1.4.0" },
+  "trust": { "skill": { "run": "/trust", "scope": "project" } },
+  "reload": "Run /reload in Pi, or start a new session, to load the change."
+}

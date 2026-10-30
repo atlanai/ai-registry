@@ -39,6 +39,7 @@ describe("callingAgent", () => {
   it.each([
     ["gemini-cli", "GEMINI_CLI"],
     ["opencode", "OPENCODE"],
+    ["pi", "PI_CODING_AGENT"],
   ])("takes %s's variable from its target definition alone", (agent, variable) => {
     expect(CALLER_SIGNALS).toContainEqual({ agent, env: [variable] });
     expect(SIGNALS.filter((signal) => signal.agent === agent)).toHaveLength(1);
