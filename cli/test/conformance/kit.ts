@@ -17,6 +17,8 @@ export interface Probe {
   /** Run from the project for `project`, from the home folder for `user`. */
   scope: "project" | "user";
   argv: string[];
+  /** Written to the command's input, which is then closed, for a target that takes requests there. */
+  stdin?: string;
   expect: (string | RegExp)[];
 }
 
@@ -225,11 +227,13 @@ export function conformance(spec: Conformance): void {
           for (const probe of probes) {
             const [program, ...args] = probe.argv as [string, ...string[]];
             const cwd = probe.scope === "project" ? own.project : own.home;
-            const { stdout, stderr } = await run(program, args, {
+            const ran = run(program, args, {
               cwd,
               env: { ...targetEnv(process.env), ...own.env },
               timeout: 60_000,
             });
+            if (probe.stdin !== undefined) ran.child.stdin?.end(probe.stdin);
+            const { stdout, stderr } = await ran;
             for (const want of probe.expect) expect(`${stdout}${stderr}`).toMatch(want);
           }
         } finally {
