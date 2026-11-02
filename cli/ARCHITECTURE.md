@@ -51,6 +51,7 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | Running git | `adapters/git/exec.ts`, reached through `adapters/git/api.ts` |
 | The scope a command installs into, and where it places artifacts | `core/store/paths.ts` |
 | Edits to a target's own config file, such as registering a plugin | `core/target/register/` |
+| A registry's namespaces merged into one plugin, for a target that loads them so | `core/plan/merge.ts` |
 | The command table: names, options, help and docs links | `cli/commands/index.ts` |
 | The values a release build stamps in, for tsup and `bun build --compile` | `packaging/defines.ts` |
 

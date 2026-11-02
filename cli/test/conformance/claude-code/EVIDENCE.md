@@ -8,7 +8,7 @@ Every path, variable, detection signal, file format and command in `src/targets/
 
 A claim no source settles is left out of the definition and recorded as undocumented. The definition, its JSON twin in `test/fixtures/targets/claude.json` and `claude.test.ts` match this file exactly.
 
-Every page below was read on 2026-10-19, and the plugin loading and security pages again on 2026-10-20. Every command ran with `HOME` and `CLAUDE_CONFIG_DIR` inside a sandbox, no account and no credentials.
+Every page below was read on 2026-10-19, and the plugin loading and security pages again on 2026-10-20. The rows about a registry's namespaces as one plugin were settled by install on 2026-11-02, with Claude Code 2.1.316. Every command ran with `HOME` and `CLAUDE_CONFIG_DIR` inside a sandbox, no account and no credentials.
 
 ## Versions tested
 
@@ -48,6 +48,14 @@ Every page below was read on 2026-10-19, and the plugin loading and security pag
 | A plugin change needs `/reload-plugins` | https://code.claude.com/docs/en/plugins/loading | "Changes to settings or to disk don't reach this layer until you run `/reload-plugins` or start a new session." | 2.1.296 | confirmed; not a `reload` entry, see Left out |
 | `verified.command`: `claude --version` | Install | `2.1.296 (Claude Code)` | 2.1.296 | confirmed |
 | A plugin's commands load from its folder | https://code.claude.com/docs/en/plugins-reference; `claude plugin details toolkit` for a plugin holding `commands/deploy.md` and `skills/ship/` | "Commands \| `commands/` \| Flat Markdown command files." Output: `Skills (2)  deploy, ship` | 2.1.296 | confirmed: Claude Code takes the whole plugin, so its commands are not written as skills |
+
+| A registry's namespaces as one plugin, from a marketplace entry whose source is a command, in link mode (`wrapped`) | The 2.1.316 binary's marketplace schema; install, with `HOME` in a sandbox and no account | Schema: `source: "command"`: "Shell command that prints the absolute path of the plugin directory on stdout (exactly one line) and exits 0"; `mode: "link"`: "the cache entry links to the printed directory in place (no copy, no size limit; macOS/Linux)". After `aireg add -g` of a registry whose namespaces `eng` and `ops` both hold `deploy`, and `ops` also `audit`: `claude plugin marketplace add ~/.claude/aireg` prints `Successfully added marketplace: aireg (declared in user settings)`, then `claude plugin install acme@aireg` with the command accepted prints `Successfully installed plugin: acme@aireg (scope: user)`, and `claude plugin details acme@aireg` prints `Skills (3)  audit, eng-deploy, ops-deploy` | 2.1.316 | confirmed |
+| A plugin from a command loads skill folders that are links | Install, as above | `~/.claude/aireg/acme/skills/audit -> ../namespaces/ops/skills/audit`, itself a link into the projection; `claude plugin details` lists `audit` | 2.1.316 | confirmed |
+| A skill added to the printed folder loads without another install | Install, as above, then a registry with `eng/lint` and a new namespace `qa` holding `smoke`, and `aireg sync -g` | `claude plugin details acme@aireg`: `Skills (5)  audit, eng-deploy, lint, ops-deploy, smoke`; `installed_plugins.json` still records `"sourceProducerPath": "<sandbox>/.claude/aireg/acme"` | 2.1.316 | confirmed |
+| A skill in a plugin is named after its folder | Install: a plugin skill folder `dirname1` whose `SKILL.md` says `name: fmname` | `claude plugin details` lists `dirname1` | 2.1.316 | confirmed: merged entries two namespaces share are renamed by folder |
+| Claude Code asks before it runs the command, and an agent's own `claude` cannot accept | Install, as above | Without consent: `failureCode: "command_source_refused"`, with `shownCommand.command` `aireg targets plugin-dir acme` and its `sha256`. `--accept-command <sha256>` installs from a plain shell; run from inside a Claude Code session (`CLAUDECODE=1`) the same call is refused with `"acceptCommandMatched": true` | 2.1.316 | confirmed: `aireg targets setup` runs `claude plugin install` in the terminal and never accepts for the person |
+| A marketplace declared only in `settings.json` is not installable from the command line | Install: `extraKnownMarketplaces.aireg` written by hand, then `claude plugin install acme@aireg` | `Plugin "acme" not found in marketplace "aireg"`, and `claude plugin marketplace list` lists only the built-in one | 2.1.316 | confirmed: `setup.add` runs `claude plugin marketplace add` instead of a register entry |
+| `claude plugin marketplace add` is safe to repeat | Install | A second run prints `Marketplace 'aireg' already on disk — declared in user settings` and exits 0 | 2.1.316 | confirmed |
 
 Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 

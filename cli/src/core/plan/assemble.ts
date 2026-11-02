@@ -24,7 +24,7 @@ const CLAUDE_MANIFEST = ".claude-plugin/plugin.json";
  * a symlink needs Developer Mode, and a relative one inside a junction resolves the wrong way.
  * A junction reaches only a folder, so there a file, such as `.mcp.json`, is copied.
  */
-async function pointAt(from: string, to: string): Promise<void> {
+export async function pointAt(from: string, to: string): Promise<void> {
   await rm(from, { recursive: true, force: true });
   if (process.platform !== "win32") await symlink(relative(join(from, ".."), to), from);
   else if ((await stat(to)).isDirectory()) await symlink(resolve(to), from, "junction");

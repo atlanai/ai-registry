@@ -105,6 +105,40 @@ const Scope = Type.Optional(
   Type.Literal("user", { description: "Read from the user installation alone." }),
 );
 
+const Wrapped = Type.Object(
+  {
+    subdir: Type.String({
+      minLength: 1,
+      description: "Where each namespace's plugin is linked; takes {source} and ends in {name}.",
+    }),
+    merge: Type.String({
+      minLength: 1,
+      description: "The folder that holds every namespace's parts as one plugin; takes {source}.",
+    }),
+    register: Type.Optional(Type.Array(ref("register"))),
+    setup: Type.Optional(
+      Type.Object(
+        {
+          add: Texts,
+          install: Texts,
+          list: Texts,
+          id: Text,
+        },
+        {
+          additionalProperties: false,
+          description:
+            "Commands `aireg targets setup` runs, each a program and its arguments taking {source} and {root}.",
+        },
+      ),
+    ),
+  },
+  {
+    additionalProperties: false,
+    description:
+      "For `plugin`: where namespaces a source wraps go, when the target loads a registry's namespaces as one plugin.",
+  },
+);
+
 const KindMapping = tagged(
   "shape",
   [
@@ -118,6 +152,7 @@ const KindMapping = tagged(
         entry: Type.Optional(Text),
         manifest: Type.Optional(Type.Array(Manifest)),
         register: Type.Optional(Type.Array(ref("register"))),
+        wrapped: Type.Optional(Wrapped),
         codec: Type.Optional(ref("codec")),
         keys: Type.Optional(
           Type.Record(

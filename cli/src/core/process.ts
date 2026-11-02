@@ -164,3 +164,24 @@ export function handOff(
     child.on("exit", (code) => resolve(code ?? 1));
   });
 }
+
+/**
+ * Runs a command in this terminal, without a shell, so it can ask the person at it; returns its
+ * exit status, 127 when it is not found.
+ */
+export function inTerminal(
+  command: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const ready = launchable(command, env, undefined);
+    if (typeof ready === "string") {
+      resolve(127);
+      return;
+    }
+    const child = spawn(ready.program, [...args], { stdio: "inherit", env: ready.env });
+    child.on("error", reject);
+    child.on("exit", (code) => resolve(code ?? 1));
+  });
+}

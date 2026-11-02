@@ -128,6 +128,8 @@ export interface NamespaceWant {
   target: string;
   namespace: string;
   source: string;
+  /** A namespace its source wraps, rather than a plugin it publishes. */
+  wrapped?: boolean;
 }
 
 /**
@@ -144,7 +146,7 @@ export function crowdedContainers(
     const target = options.targetTable[want.target];
     if (target === undefined || !takesPlugin(target, scope)) continue;
     const at = (name: string) =>
-      pluginProjection(target, name, scope, cwd, process.env, want.source);
+      pluginProjection(target, name, scope, cwd, process.env, want.source, want.wrapped);
     const bare = at(want.namespace);
     if (bare === undefined) continue;
     const qualified = at(qualifiedName(want.source, want.namespace));
@@ -215,6 +217,7 @@ export function movedPluginLinks(
         target,
         namespace,
         source: entry.registry,
+        wrapped: entry.kind !== "plugin",
       })),
     ),
     options,
@@ -223,7 +226,7 @@ export function movedPluginLinks(
   for (const { name, entry, namespace } of rows) {
     if (opened !== undefined && !opened.has(entry.registry)) continue;
     for (const link of entry.links) {
-      const at = pluginLinkAt(link, namespace, entry.registry, options);
+      const at = pluginLinkAt(link, namespace, entry.registry, options, entry.kind !== "plugin");
       // Only the namespace's own plugin link can move; any other link stays put.
       if (at === undefined) continue;
       if (resolve(base, link.path) !== (crowded.has(at.bare) ? at.qualified : at.bare)) {
@@ -234,28 +237,38 @@ export function movedPluginLinks(
   return moved;
 }
 
-/** Where a recorded link sits, when it is a namespace's plugin directory under either name. */
+/**
+ * Where a recorded link sits, when it is a namespace's plugin directory under either name, and
+ * where it belongs. A `wrapped` namespace's link may still sit where the target's own plugins go,
+ * as it did before the target merged them: it is that namespace's, and it has moved.
+ */
 export function pluginLinkAt(
   link: { target: string; path: string },
   namespace: string,
   source: string,
   options: Pick<ProjectionOptions, "roots" | "targetTable">,
+  wrapped = false,
 ): { bare: string; qualified: string } | undefined {
   const { scope, cwd, base } = options.roots;
   const target = options.targetTable[link.target];
   if (target === undefined || !takesPlugin(target, scope)) return undefined;
-  const bare = pluginProjection(target, namespace, scope, cwd, process.env, source);
-  const qualified = pluginProjection(
-    target,
-    qualifiedName(source, namespace),
-    scope,
-    cwd,
-    process.env,
-    source,
-  );
+  const places = (inWrap: boolean) => [
+    pluginProjection(target, namespace, scope, cwd, process.env, source, inWrap),
+    pluginProjection(
+      target,
+      qualifiedName(source, namespace),
+      scope,
+      cwd,
+      process.env,
+      source,
+      inWrap,
+    ),
+  ];
+  const [bare, qualified] = places(wrapped);
   if (bare === undefined || qualified === undefined) return undefined;
   const at = resolve(base, link.path);
-  return at === bare || at === qualified ? { bare, qualified } : undefined;
+  const earlier = wrapped && target.kinds.plugin?.wrapped !== undefined ? places(false) : [];
+  return [bare, qualified, ...earlier].includes(at) ? { bare, qualified } : undefined;
 }
 
 /** The namespace content a lockfile row's link holds as its plugin, if it is one. */
@@ -267,7 +280,8 @@ export function rowPlugin(
 ): string | undefined {
   const source = entry.registry;
   const namespace = namespaceOf({ kind: entry.kind, name, group: entry.namespace, source });
-  if (pluginLinkAt(link, namespace, source, options) === undefined) return undefined;
+  const wrapped = entry.kind !== "plugin";
+  if (pluginLinkAt(link, namespace, source, options, wrapped) === undefined) return undefined;
   return namespaceDir(options.roots, source, namespace);
 }
 
@@ -286,15 +300,15 @@ function pluginLink(
 ): PlannedLink | undefined {
   const { scope, cwd } = options.roots;
   const namespace = namespaceOf(item);
-  const shared = pluginProjection(target, namespace, scope, cwd, process.env, item.source);
+  const wrapped = item.kind !== "plugin";
+  const at = (name: string) =>
+    pluginProjection(target, name, scope, cwd, process.env, item.source, wrapped);
+  const shared = at(namespace);
   if (shared === undefined) return undefined;
   // Every registry sharing the directory takes its alias as a prefix, so
   // no one of them depends on which the others sync first.
   const plugin = crowded.has(shared) ? qualifiedName(item.source, namespace) : namespace;
-  const container =
-    plugin === namespace
-      ? shared
-      : pluginProjection(target, plugin, scope, cwd, process.env, item.source);
+  const container = plugin === namespace ? shared : at(plugin);
   if (container === undefined) return undefined;
   // Always the assembled projection, never the content: the content tree holds
   // no manifests. Its directory name is the plugin name.

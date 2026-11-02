@@ -16,6 +16,38 @@ export const claudeCode = defineTarget({
       shape: "directory",
       subdir: "skills",
       manifest: [{ path: ".claude-plugin/plugin.json" }],
+      // A registry's namespaces load as one plugin, listed in a marketplace of aireg's own: Claude
+      // Code runs the entry's command to find it, and serves the folder it prints in place.
+      wrapped: {
+        subdir: "{tool}/{source}/namespaces/{name}",
+        merge: "{tool}/{source}",
+        register: [
+          {
+            file: "{tool}/.claude-plugin/marketplace.json",
+            format: "json",
+            at: ["plugins"],
+            upsert: {
+              key: "name",
+              item: {
+                name: "{source}",
+                description: "Artifacts the {source} registry publishes, kept current by {tool}.",
+                source: {
+                  source: "command",
+                  command: "{tool} targets plugin-dir {source}",
+                  mode: "link",
+                },
+              },
+            },
+            init: { name: "{tool}", owner: { name: "{tool}" }, plugins: [] },
+          },
+        ],
+        setup: {
+          add: ["claude", "plugin", "marketplace", "add", "{root}/{tool}"],
+          install: ["claude", "plugin", "install", "{source}@{tool}"],
+          list: ["claude", "plugin", "list", "--json"],
+          id: "{source}@{tool}",
+        },
+      },
     },
     skill: { shape: "directory", subdir: "skills" },
     agent: { shape: "file", subdir: "agents", extension: ".md" },

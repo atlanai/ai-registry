@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { emptyLock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
 import { resolveTargets } from "#core/target/index.ts";
+import { linkingNamespaces } from "#test/kit/builders/plan.ts";
 import { movedPluginLinks } from "./projection.ts";
 
 describe("movedPluginLinks", () => {
   const USER = roots("user", "/work");
-  const scope = { roots: USER, targetTable: resolveTargets() };
+  // Linked among Claude Code's plugins, as a target that does not merge namespaces links them.
+  const scope = { roots: USER, targetTable: linkingNamespaces() };
   function lockWith(rows: Record<string, { registry: string; link: string; target?: string }>) {
     const lock = emptyLock();
     for (const [name, row] of Object.entries(rows)) {
@@ -63,5 +65,15 @@ describe("movedPluginLinks", () => {
       },
     });
     expect([...movedPluginLinks(lock, scope)]).toEqual([]);
+  });
+
+  it("names a namespace an earlier aireg linked among Claude Code's skills", () => {
+    const lock = lockWith({ lint: { registry: "kit", link: ".claude/skills/engineering" } });
+    const merging = { roots: USER, targetTable: resolveTargets() };
+    expect([...movedPluginLinks(lock, merging)]).toEqual(["lint"]);
+    const moved = lockWith({
+      lint: { registry: "kit", link: ".claude/aireg/kit/namespaces/engineering" },
+    });
+    expect([...movedPluginLinks(moved, merging)]).toEqual([]);
   });
 });

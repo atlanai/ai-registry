@@ -59,6 +59,29 @@ describe("targetProblems", () => {
     ],
     ["a variable a placement does not fill", [plugin({ subdir: "plugins/{owner}" })], /\{owner\}/],
     [
+      "a wrapped folder that does not end in its namespace",
+      [plugin({ wrapped: { subdir: "{tool}/{source}", merge: "{tool}/{source}" } })],
+      /takes \{source\} and ends in \{name\}/,
+    ],
+    [
+      "a merged folder shared by every registry",
+      [plugin({ wrapped: { subdir: "{tool}/{source}/ns/{name}", merge: "{tool}/all" } })],
+      /wrapped\.merge takes \{source\}/,
+    ],
+    [
+      "a setup command with a variable it does not fill",
+      [
+        plugin({
+          wrapped: {
+            subdir: "{tool}/{source}/ns/{name}",
+            merge: "{tool}/{source}",
+            setup: { add: ["tool", "add"], install: ["tool", "{name}"], list: [], id: "{source}" },
+          },
+        }),
+      ],
+      /\{name\}, which nothing fills[\s\S]*setup\.list names no program/,
+    ],
+    [
       "a codec on a folder with no entry file",
       [plugin({ codec: { id: "frontmatter-strict", keep: ["name"] } })],
       /needs an entry file/,

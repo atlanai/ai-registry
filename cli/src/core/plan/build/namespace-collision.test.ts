@@ -12,6 +12,7 @@ import {
   acquired,
   entry,
   kitManifest,
+  linkingNamespaces,
   linksTo,
   PLAN_OPTIONS,
   wrapping,
@@ -21,7 +22,13 @@ import {
 describe("two registries with a namespace of the same name", () => {
   const USER = roots("user", "/work");
   const home = homedir();
-  const options: BuildOptions = { ...PLAN_OPTIONS, roots: USER, targets: ["claude-code", "codex"] };
+  // Claude Code merges a registry's namespaces; linked among its plugins instead, their names can meet.
+  const options: BuildOptions = {
+    ...PLAN_OPTIONS,
+    roots: USER,
+    targets: ["claude-code", "codex"],
+    targetTable: linkingNamespaces(),
+  };
   const claudeSkills = (name: string) => join(home, ".claude", "skills", name);
 
   function source(alias: "kit" | "far", skill: string): Acquired {
@@ -186,6 +193,7 @@ describe("registries whose plugin names meet once qualified", () => {
     ...PLAN_OPTIONS,
     roots: USER,
     targets: ["claude-code"],
+    targetTable: linkingNamespaces(),
     nameCollision: "rename",
   };
   const claudeSkills = (name: string) => join(homedir(), ".claude", "skills", name);

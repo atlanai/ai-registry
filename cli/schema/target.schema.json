@@ -88,6 +88,71 @@
                 "$ref": "#/$defs/register"
               }
             },
+            "wrapped": {
+              "additionalProperties": false,
+              "description": "For `plugin`: where namespaces a source wraps go, when the target loads a registry's namespaces as one plugin.",
+              "type": "object",
+              "required": [
+                "subdir",
+                "merge"
+              ],
+              "properties": {
+                "subdir": {
+                  "minLength": 1,
+                  "description": "Where each namespace's plugin is linked; takes {source} and ends in {name}.",
+                  "type": "string"
+                },
+                "merge": {
+                  "minLength": 1,
+                  "description": "The folder that holds every namespace's parts as one plugin; takes {source}.",
+                  "type": "string"
+                },
+                "register": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/register"
+                  }
+                },
+                "setup": {
+                  "additionalProperties": false,
+                  "description": "Commands `aireg targets setup` runs, each a program and its arguments taking {source} and {root}.",
+                  "type": "object",
+                  "required": [
+                    "add",
+                    "install",
+                    "list",
+                    "id"
+                  ],
+                  "properties": {
+                    "add": {
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "install": {
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "list": {
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
             "codec": {
               "$ref": "#/$defs/codec"
             },

@@ -437,8 +437,17 @@ export const COMMANDS: readonly CommandSpec[] = [
     formerly: ["harnesses"],
     summary: "List the targets aireg can install into, and which this machine has",
     group: "Check",
-    usage: ["aireg targets [--all]", "aireg targets show <id>", "aireg targets check <file>"],
-    examples: [{ command: "aireg targets", what: "which coding agents this machine has" }],
+    usage: [
+      "aireg targets [--all]",
+      "aireg targets show <id>",
+      "aireg targets check <file>",
+      "aireg targets setup [--status]",
+      "aireg targets plugin-dir <registry>",
+    ],
+    examples: [
+      { command: "aireg targets", what: "which coding agents this machine has" },
+      { command: "aireg targets setup", what: "have each coding agent load your registries" },
+    ],
     docs: "targets",
     options: [{ ...ALL, describe: "List every target aireg supports, not only those found" }],
     actions: [
@@ -455,6 +464,33 @@ export const COMMANDS: readonly CommandSpec[] = [
         usage: ["aireg targets check <file>"],
         maxArguments: 1,
         examples: [{ command: "aireg targets check tool.json", what: "is this file usable?" }],
+      },
+      {
+        name: "setup",
+        summary: "Have each coding agent install your registries as plugins it loads",
+        usage: ["aireg targets setup [--status]"],
+        maxArguments: 0,
+        options: [
+          {
+            flag: "--status",
+            describe: "Only report what each coding agent loads, changing nothing",
+          },
+        ],
+        examples: [
+          { command: "aireg targets setup --status", what: "what each coding agent loads" },
+        ],
+      },
+      {
+        name: "plugin-dir",
+        summary: "Print the folder a coding agent loads a registry from, as one plugin",
+        usage: ["aireg targets plugin-dir <registry>"],
+        maxArguments: 1,
+        examples: [
+          {
+            command: "aireg targets plugin-dir acme",
+            what: "the folder Claude Code loads acme from",
+          },
+        ],
       },
     ],
     load: () => import("./targets.ts"),

@@ -5,6 +5,7 @@ import { sanitizeName } from "#adapter/text.ts";
 import { present } from "#core/env.ts";
 import { expandUserPath } from "#core/fs/path.ts";
 import type { ArtifactKind } from "#core/kinds.ts";
+import { NAME } from "#core/product.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { codecOf } from "#core/target/codecs/index.ts";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
@@ -15,6 +16,7 @@ import type {
   TargetCategory,
   TargetDefinition,
   Targets,
+  WrappedMapping,
 } from "./contract.ts";
 import { BUILT_IN, loadTargetFiles } from "./load.ts";
 
@@ -82,10 +84,20 @@ export const CALLER_SIGNALS: readonly { agent: string; env: readonly string[] }[
       : [{ agent: target.id, env: target.detect.caller }],
   );
 
+/** `{tool}` in a wrapped mapping is the name this build of aireg goes by, on disk and on PATH. */
+function withTool(wrapped: WrappedMapping): WrappedMapping {
+  const text = JSON.stringify(wrapped).replaceAll("{tool}", NAME);
+  return JSON.parse(text) as WrappedMapping;
+}
+
 /** Every mapping as the rest of aireg reads it: a `render` becomes the codec it names. */
 function kindsOf(definition: TargetDefinition): Target["kinds"] {
   const kinds: Target["kinds"] = {};
   for (const [kind, mapping] of Object.entries(definition.kinds) as [ArtifactKind, KindMapping][]) {
+    if (mapping.shape === "directory" && mapping.wrapped !== undefined) {
+      kinds[kind] = { ...structuredClone(mapping), wrapped: withTool(mapping.wrapped) };
+      continue;
+    }
     if (mapping.shape !== "file" || mapping.render === undefined) {
       kinds[kind] = structuredClone(mapping);
       continue;
@@ -456,7 +468,10 @@ function expandPlacement(
   );
 }
 
-/** Where a target expects a whole plugin to sit. */
+/**
+ * Where a target expects a whole plugin to sit; `wrapped` for a namespace its source wraps,
+ * which a target merging a registry's namespaces into one plugin takes elsewhere.
+ */
 export function pluginProjection(
   target: Target,
   namespace: string,
@@ -464,12 +479,35 @@ export function pluginProjection(
   cwd: string,
   env: NodeJS.ProcessEnv = process.env,
   source: string = namespace,
+  wrapped = false,
 ): string | undefined {
   const mapping = target.kinds.plugin;
   if (mapping?.subdir === undefined) return undefined;
   const root = targetRoot(target, scope, cwd, env);
+  if (wrapped && mapping.wrapped !== undefined) {
+    return join(root, expandPlacement(mapping.wrapped.subdir, { name: namespace, source }));
+  }
   if (mapping.subdir.includes("{")) {
     return join(root, expandPlacement(mapping.subdir, { name: namespace, source }));
   }
   return join(root, mapping.subdir, namespace);
+}
+
+/** True when this target merges a registry's wrapped namespaces into one plugin at `scope`. */
+export function mergesWrapped(target: Target, scope: Scope = "user"): boolean {
+  return takesPlugin(target, scope) && target.kinds.plugin?.wrapped !== undefined;
+}
+
+/** The folder a target loads a registry's wrapped namespaces from, merged into one plugin. */
+export function mergedPlugin(
+  target: Target,
+  source: string,
+  scope: Scope,
+  cwd: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const wrapped = target.kinds.plugin?.wrapped;
+  if (wrapped === undefined || !takesPlugin(target, scope)) return undefined;
+  const root = targetRoot(target, scope, cwd, env);
+  return join(root, expandPlacement(wrapped.merge, { name: source, source }));
 }

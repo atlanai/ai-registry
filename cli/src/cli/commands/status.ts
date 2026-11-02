@@ -55,7 +55,8 @@ function needsApproval(
     const steps = entry.links.flatMap((link) => {
       const target = targetTable[link.target];
       if (target === undefined) return [];
-      const plugin = pluginLinkAt(link, namespace, entry.registry, { roots, targetTable });
+      const wrapped = entry.kind !== "plugin";
+      const plugin = pluginLinkAt(link, namespace, entry.registry, { roots, targetTable }, wrapped);
       const run = trustFor(target, plugin === undefined ? entry.kind : "plugin", roots.scope);
       if (run === undefined) return [];
       return [{ target: link.target, harness: earlierId(targetTable, link.target), run }];

@@ -11,12 +11,27 @@ import type {
   Survey,
 } from "#core/plan/model.ts";
 import { roots } from "#core/store/paths.ts";
-import { resolveTargets } from "#core/target/index.ts";
+import { resolveTargets, type Targets } from "#core/target/index.ts";
 import { lock } from "./lock.ts";
 import { manifest } from "./manifest.ts";
 
 /** The one registry the planner tests read, a git checkout at `/snap`. */
 const KIT = "https://github.com/acme/kit.git";
+
+/**
+ * The targets with none merging a registry's namespaces into one plugin, so each namespace is
+ * linked among a target's plugins: the shape in which two registries' plugin names can meet.
+ */
+export function linkingNamespaces(table: Targets = resolveTargets()): Targets {
+  return Object.fromEntries(
+    Object.entries(table).map(([name, target]) => {
+      const plugin = target.kinds.plugin;
+      if (plugin?.wrapped === undefined) return [name, target];
+      const { wrapped: _, ...rest } = plugin;
+      return [name, { ...target, kinds: { ...target.kinds, plugin: rest } }];
+    }),
+  ) as Targets;
+}
 
 /** A project at `/work` projecting into Claude Code. */
 export const PLAN_OPTIONS: BuildOptions = {

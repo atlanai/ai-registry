@@ -34,7 +34,9 @@ function boundaries(roots: RemovableRoots, env: NodeJS.ProcessEnv): Boundary[] {
     const anchor = project ? roots.cwd : root;
     for (const mapping of Object.values(target.kinds)) {
       if (mapping?.subdir === undefined) continue;
-      found.push({ anchor, dir: relative(anchor, join(root, ...fixedPrefix(mapping.subdir))) });
+      for (const subdir of [mapping.subdir, mapping.wrapped?.subdir ?? []].flat()) {
+        found.push({ anchor, dir: relative(anchor, join(root, ...fixedPrefix(subdir))) });
+      }
     }
   }
   return found;

@@ -25,7 +25,7 @@ export function wrappedInLock(
           group: row.namespace,
           source: row.registry,
         });
-        return pluginLinkAt(link, namespace, row.registry, options) !== undefined;
+        return pluginLinkAt(link, namespace, row.registry, options, true) !== undefined;
       }),
   );
 }

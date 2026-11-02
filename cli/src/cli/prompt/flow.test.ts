@@ -404,7 +404,7 @@ describe("chooseTargets", () => {
   it("shows the plugin folder for a source that installs its namespaces as plugins", async () => {
     const tools = resolveTargets({ HOME: homedir() });
     const { shown } = await pick([], TO_CLAUDE, BOTH, "user", tools, true);
-    expect(shown).toContain("~/.claude/skills/engineering");
+    expect(shown).toContain("~/.claude/aireg/acme/namespaces/engineering");
   });
 
   it("keeps a shared folder the manifest already names", async () => {

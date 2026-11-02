@@ -13,6 +13,7 @@ interface ContentsMapping {
   codec?: undefined;
   keys?: undefined;
   render?: undefined;
+  wrapped?: undefined;
 }
 
 /** A folder per artifact, under `subdir`; strings take `{name}` and `{source}`. */
@@ -38,6 +39,35 @@ interface DirectoryMapping {
   /** Front-matter keys it reads elsewhere (a file it reads instead) or not at all (false). */
   keys?: Record<string, KeyFile | false> | undefined;
   render?: undefined;
+  /** For `plugin`: where namespaces a source wraps go, when the target loads them as one plugin. */
+  wrapped?: WrappedMapping | undefined;
+}
+
+/**
+ * A registry's wrapped namespaces as one plugin, for a target that loads a plugin from a folder
+ * a command prints: each namespace is linked at `subdir`, and their parts are merged into `merge`.
+ */
+export interface WrappedMapping {
+  /** Where each namespace's plugin is linked; takes `{source}` and ends in `{name}`. */
+  subdir: string;
+  /** The folder that holds every namespace's parts as one plugin; takes `{source}`. */
+  merge: string;
+  /** Edits that list the merged folder where the target looks for plugins, applied in order. */
+  register?: RegisterEntry[] | undefined;
+  /** The commands `aireg targets setup` runs so the target loads it; the target asks a person first. */
+  setup?: WrappedSetup | undefined;
+}
+
+/** Program and arguments, each taking `{source}` and `{root}`; never run through a shell. */
+export interface WrappedSetup {
+  /** Makes the target read the folder the register entries write, such as a marketplace. */
+  add: string[];
+  /** Installs the merged plugin; the target shows a person what it runs before it runs it. */
+  install: string[];
+  /** Prints a JSON array of what is installed, each item naming itself under `id`. */
+  list: string[];
+  /** How `list` names the merged plugin. */
+  id: string;
 }
 
 export interface KeyFile {
@@ -62,6 +92,7 @@ interface FileMapping {
   keys?: undefined;
   /** @deprecated Read as the `frontmatter-toml` codec; use `codec`. */
   render?: Render | undefined;
+  wrapped?: undefined;
 }
 
 /** @deprecated The `frontmatter-toml` codec, under its earlier name. */

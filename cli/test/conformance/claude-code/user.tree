@@ -1,8 +1,20 @@
 .claude/
 .claude/agents/
 .claude/agents/reviewer.md -> ../../.registry/artifacts/fx/ns/agents/reviewer.md
+.claude/aireg/
+.claude/aireg/.claude-plugin/
+.claude/aireg/.claude-plugin/marketplace.json 8e854723fe9d
+.claude/aireg/kit/
+.claude/aireg/kit/.claude-plugin/
+.claude/aireg/kit/.claude-plugin/plugin.json a440f44786fd
+.claude/aireg/kit/agents/
+.claude/aireg/kit/agents/planner.md -> ../namespaces/kit/agents/planner.md
+.claude/aireg/kit/commands/
+.claude/aireg/kit/namespaces/
+.claude/aireg/kit/namespaces/kit -> ../../../../.registry/artifacts/.projections/kit/kit
+.claude/aireg/kit/skills/
+.claude/aireg/kit/skills/ship -> ../namespaces/kit/skills/ship
 .claude/skills/
-.claude/skills/kit -> ../../.registry/artifacts/.projections/kit/kit
 .claude/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
 project/
 project/.claude/

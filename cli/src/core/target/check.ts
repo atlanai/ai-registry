@@ -1,7 +1,13 @@
 import { isAbsolute } from "node:path";
 import { quoted } from "#adapter/text.ts";
 import { type ArtifactKind, KIND_SPECS, KINDS } from "#core/kinds.ts";
-import type { ConfigValue, KindMapping, RegisterEntry, TargetDefinition } from "./contract.ts";
+import type {
+  ConfigValue,
+  KindMapping,
+  RegisterEntry,
+  TargetDefinition,
+  WrappedMapping,
+} from "./contract.ts";
 import { templateVars } from "./template.ts";
 
 /** Every `{var}` a definition may use, by where it is used. */
@@ -12,6 +18,12 @@ const TEMPLATE_VARS = {
   manifest: ["name", "description"],
   /** A register entry: what its placement's path carries, and the target root. */
   register: ["name", "source", "root"],
+  /** A wrapped namespace's folder, and the merged plugin it joins. */
+  wrapped: ["name", "source", "tool"],
+  merge: ["source", "tool"],
+  /** A wrapped namespace's register entry, and each word of a setup command. */
+  wrappedRegister: ["name", "source", "root", "tool"],
+  setup: ["source", "root", "tool"],
 } as const;
 
 type Report = (problem: string) => void;
@@ -50,6 +62,7 @@ export function targetProblems(
     for (const kind of KINDS) {
       const mapping = definition.kinds[kind];
       if (mapping !== undefined) mappingProblems(kind, mapping, report);
+      if (mapping?.wrapped !== undefined) wrappedProblems(kind, mapping.wrapped, report);
       for (const read of definition.reads?.[kind] ?? [])
         readProblem(kind, owners.get(read)?.[0], read, report);
     }
@@ -168,6 +181,34 @@ function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Repor
         : undefined;
   for (const key of [...(toml?.fields ?? []), toml?.body ?? "body"]) {
     if (!/^[A-Za-z0-9_-]+$/.test(key)) report(`${kind} renders ${key}, which is not a bare key.`);
+  }
+}
+
+/** A merged plugin is one folder per registry, holding one folder per namespace. */
+function wrappedProblems(kind: ArtifactKind, wrapped: WrappedMapping, report: Report) {
+  if (kind !== "plugin") report(`kinds.${kind}: only a plugin wraps namespaces.`);
+  pathProblem(wrapped.subdir, TEMPLATE_VARS.wrapped, report);
+  pathProblem(wrapped.merge, TEMPLATE_VARS.merge, report);
+  if (!wrapped.subdir.endsWith("/{name}") || !templateVars(wrapped.subdir).includes("source")) {
+    report(`kinds.${kind}: wrapped.subdir takes {source} and ends in {name}.`);
+  }
+  if (!templateVars(wrapped.merge).includes("source")) {
+    report(`kinds.${kind}: wrapped.merge takes {source}.`);
+  }
+  for (const entry of wrapped.register ?? []) {
+    registerProblems(kind, entry, TEMPLATE_VARS.wrappedRegister, report);
+  }
+  const setup = wrapped.setup;
+  if (setup === undefined) return;
+  for (const word of [...setup.add, ...setup.install, ...setup.list, setup.id]) {
+    templateProblems(word, TEMPLATE_VARS.setup, report);
+  }
+  for (const [name, argv] of Object.entries({
+    add: setup.add,
+    install: setup.install,
+    list: setup.list,
+  })) {
+    if (argv.length === 0) report(`kinds.${kind}: wrapped.setup.${name} names no program.`);
   }
 }
 

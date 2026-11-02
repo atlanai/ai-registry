@@ -11,6 +11,7 @@ import {
   acquired,
   entry,
   kitManifest,
+  linkingNamespaces,
   linksTo,
   PLAN_OPTIONS,
   wrapping,
@@ -20,7 +21,13 @@ describe("a sync that reads one registry and names none", () => {
   // The daemon's path: it reads the job's registry and passes no `opened`.
   const USER = roots("user", "/work");
   const home = homedir();
-  const options: BuildOptions = { ...PLAN_OPTIONS, roots: USER, targets: ["claude-code"] };
+  // Claude Code merges a registry's namespaces; linked among its plugins instead, their names can meet.
+  const options: BuildOptions = {
+    ...PLAN_OPTIONS,
+    roots: USER,
+    targets: ["claude-code"],
+    targetTable: linkingNamespaces(),
+  };
   const claudeSkills = (name: string) => join(home, ".claude", "skills", name);
   function engineeringSource(alias: string, skill: string): Acquired {
     const [base] = wrapping(

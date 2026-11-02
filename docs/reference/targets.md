@@ -8,6 +8,8 @@ List the targets aireg can install into, and which this machine has.
 aireg targets [--all]
 aireg targets show <id>
 aireg targets check <file>
+aireg targets setup [--status]
+aireg targets plugin-dir <registry>
 ```
 
 ## Description
@@ -24,6 +26,9 @@ Each row names a coding agent, the id `--for` takes, and the other names it answ
 |---|---|
 | `show <id>` | Print a target as aireg resolved it. Takes its id or an alias. |
 | `check <file>` | Check a target file before you use it. |
+| `setup` | Add aireg's marketplace to each coding agent that installs one, install each registry's plugin it does not have yet, and report what each coding agent loads from your user scope. See [Loading a registry as one plugin](#loading-a-registry-as-one-plugin). |
+| `setup --status` | Only report what each coding agent loads from your user scope, changing nothing. |
+| `plugin-dir <registry>` | Print the folder a coding agent loads `<registry>`'s namespaces from, as one plugin. The command aireg's marketplace entry names. |
 
 ## Supported targets
 
@@ -70,6 +75,38 @@ When a target's own folder is a shared folder's, as Antigravity's `.agents/skill
 
 The shared `.agents` folder is one several coding agents read, not a coding agent, so aireg never detects it and never installs into it by default.
 
+## Loading a registry as one plugin
+
+A registry whose adapter declares its namespaces plugins (`namespacePlugins` in the [adapter contract](adapter.md#the-adapter-contract)) installs, in your user scope, as plugins. Codex takes one plugin per namespace, in `~/.codex/plugins/cache/<registry>/<namespace>/local`, which aireg turns on in `~/.codex/config.toml`. Claude Code takes one plugin per registry instead, which it installs itself:
+
+- aireg links each namespace at `~/.claude/aireg/<registry>/namespaces/<namespace>`, and merges their skills, agents and commands into `~/.claude/aireg/<registry>/`, a plugin named after the registry. Where two namespaces hold an entry of the same name, each takes its namespace as a prefix: `team-deploy` and `ops-deploy`.
+- It lists that plugin in a marketplace of its own, `~/.claude/aireg/.claude-plugin/marketplace.json`, named `aireg`. The entry's source is the command `aireg targets plugin-dir <registry>`, in link mode: Claude Code runs it when it installs the plugin and at the start of each session, and loads the folder it prints in place. A skill aireg adds to the folder, in a namespace already there or a new one, loads in the next session without another install.
+- Claude Code asks you before it runs the command the first time. `aireg targets setup` adds the marketplace to Claude Code and installs each registry's plugin, which shows you that question.
+
+A skill from a registry's plugin runs as `/<registry>:<skill>`.
+
+aireg writes the marketplace and the merged folder on every install, update and sync, and removes a registry's entry with its last namespace. An earlier aireg linked each namespace as `~/.claude/skills/<namespace>`; the next sync moves those links, and `aireg targets setup --status` lists any still there. Only Claude Code 2.1.229 or later loads a plugin from a command, and not on Windows.
+
+`setup` runs `claude plugin marketplace add ~/.claude/aireg` and then, for each registry not installed, `claude plugin install <registry>@aireg` in your terminal, where Claude Code shows you the command it will run and asks before it installs. With nobody at the terminal, or with `--json`, it installs nothing and prints the `claude plugin install` command to run instead. It never accepts that question for you.
+
+For each coding agent that loads anything from your user scope, `setup` reports how many artifacts are linked into it and, for each registry it loads as one plugin, how many skills and agents the plugin holds, where it is, and whether the coding agent lists it as installed. It asks with `claude plugin list --json`; when that can't run, installed is not known.
+
+### `setup` and `plugin-dir` JSON output
+
+`setup`:
+
+```json
+{"ok": true, "data": {"targets": [{"target": "claude-code", "displayName": "Claude Code", "artifacts": 3, "plugins": [{"registry": "acme", "folder": "/home/me/.claude/aireg/acme", "skills": 3, "agents": 0, "installed": false}], "earlier": []}], "steps": [{"target": "claude-code", "registry": "acme", "outcome": "needs-person", "run": "claude plugin install acme@aireg"}]}}
+```
+
+`installed` is `true`, `false`, or absent when it could not be asked, and `unknown` then says why. `earlier` lists the links an earlier aireg left among the coding agent's skills. `steps` is absent with `--status`; each step's `outcome` is `installed`, `already`, `failed` or `needs-person`, and `run` is the command that installs it.
+
+`plugin-dir`:
+
+```json
+{"ok": true, "data": {"registry": "acme", "target": "claude-code", "path": "/home/me/.claude/aireg/acme"}}
+```
+
 ## Target files
 
 A target file adds a target aireg doesn't ship, or replaces one it does with `"overrides": true`. aireg reads one JSON file per target from `~/.aireg/targets/<id>.json` (`$AIREG_HOME/targets/` when `AIREG_HOME` is set). Only your user scope defines targets: a project can select one by id, in `--for` or its manifest, but never define one.
@@ -99,6 +136,8 @@ An alias is a lowercase name that isn't another target's id or alias. A file can
 
 A kind placed with `place: "copy"` is written as real files, for a target that edits or refuses links; an edit then shows in `aireg status`. A `codec` rewrites an agent in the target's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
 
+A `plugin` kind's `wrapped` says where a target that loads a registry's namespaces as one plugin takes them, as Claude Code does: `subdir` links each namespace, taking `{source}` and ending in `{name}`; `merge` is the folder their skills, agents and commands are merged into, taking `{source}`; `register` lists that folder where the target looks for plugins; and `setup` names the commands [`aireg targets setup`](#loading-a-registry-as-one-plugin) runs. `{tool}` in any of them is `aireg`.
+
 A kind's `keys` say how the target takes a front-matter key it doesn't read as written, such as `disable-model-invocation`: a `.json` or `.yaml` file it reads instead, which aireg writes into a copy of the artifact, or `false`, which leaves out an artifact that sets the key rather than install it without that limit.
 
 aireg skips a file, with a warning, when it isn't valid against the schema, names a codec aireg doesn't have, reaches outside its folders, gives a shell command where a program and its arguments belong, isn't named `<id>.json`, or takes a built-in alias as its id. The built-in targets keep working. Run `aireg targets check <file>` to see what is wrong with one.
@@ -123,6 +162,7 @@ Some targets load what aireg placed only after you trust it. aireg never takes t
 | Option | Description |
 |---|---|
 | `--all` | List every target aireg supports, not only those found. |
+| `--status` | With `setup`: report what each coding agent loads, changing nothing. |
 
 ## JSON output
 
@@ -136,7 +176,8 @@ The targets are every one `--all` lists, in its order, plus the shared `.agents`
 
 ## Exit status
 
-- `0`: listed, shown, or the file is usable.
+- `0`: listed, shown, set up, or the file is usable. `setup` exits 0 when it leaves a plugin for you to install.
+- `plugin-dir` exits with the `not_found` status when no coding agent loads that registry from your user scope.
 - `1`: `check` found a problem with the file.
 - `2`: an unknown action, a missing argument, or no target with that id.
 

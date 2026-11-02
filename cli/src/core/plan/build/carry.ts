@@ -78,8 +78,9 @@ export function namespaceWants(
     if (carried.has(item.name)) continue;
     if (item.kind !== "plugin" && !build.wrapping.has(item.source)) continue;
     const namespace = namespaceOf(item);
+    const wrapped = item.kind !== "plugin";
     for (const target of item.targets ?? build.options.targets) {
-      wants.push({ target, namespace, source: item.source });
+      wants.push({ target, namespace, source: item.source, wrapped });
     }
   }
   for (const [name, entry] of held) {
@@ -93,10 +94,11 @@ export function namespaceWants(
     const holding = entry.links.filter(
       (link) =>
         entry.kind === "plugin" ||
-        pluginLinkAt(link, namespace, entry.registry, build.options) !== undefined,
+        pluginLinkAt(link, namespace, entry.registry, build.options, true) !== undefined,
     );
+    const wrapped = entry.kind !== "plugin";
     for (const target of new Set(holding.map((link) => link.target))) {
-      wants.push({ target, namespace, source: entry.registry });
+      wants.push({ target, namespace, source: entry.registry, wrapped });
     }
   }
   return wants;

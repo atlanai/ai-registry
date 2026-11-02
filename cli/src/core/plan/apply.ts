@@ -24,6 +24,7 @@ import { type Carried, carriedBy } from "./carries.ts";
 import { commandSkill } from "./command-skill.ts";
 import { keyNeeds, writeKeyFiles } from "./keys.ts";
 import { backUp, guardLink, type LinkGuard } from "./link-guard.ts";
+import { applyMerges } from "./merge.ts";
 import type { Action, Fetch, Plan, PluginDocument, Staged } from "./model.ts";
 import { projectionsOf } from "./projection.ts";
 import { applyRegistrations } from "./register.ts";
@@ -650,6 +651,8 @@ async function finish(run: Run, plan: Plan): Promise<void> {
     await guardManagedPath(roots.artifacts, roots);
     await ensureScopeIgnore(roots);
   }
+  // Before registering: a target may read the merged folder as soon as it is listed.
+  await applyMerges(plan.actions, roots);
   run.kept.push(...(await applyRegistrations(plan.actions, roots, run.recorded ?? run.before)));
 }
 

@@ -347,6 +347,22 @@ async function registerMapping(
   return kept;
 }
 
+/** Each kind's placement, and where a plugin's wrapped namespaces go, which registers on its own. */
+function mappingsOf(kinds: Targets[string]["kinds"]): KindMapping[] {
+  return Object.values(kinds).flatMap((mapping): KindMapping[] => {
+    if (mapping === undefined) return [];
+    const wrapped = mapping.wrapped;
+    if (wrapped === undefined) return [mapping];
+    const merged: KindMapping = {
+      shape: "directory",
+      subdir: wrapped.subdir,
+      scope: "user",
+      register: wrapped.register,
+    };
+    return [mapping, merged];
+  });
+}
+
 /**
  * Writes a target's config entry while a placement of ours needs it and removes it with the
  * last one. Only a link into `scopeDir`, the scope's `.registry` folder, or one of `copies`, the
@@ -367,8 +383,7 @@ export async function applyRegister(
     // A project's own folders hold its target roots, and a link among them may lead out of
     // it; a person's target root is theirs to keep wherever they like, dotfiles included.
     const anchor = where.scope === "project" ? where.cwd : root;
-    for (const mapping of Object.values(target.kinds)) {
-      if (mapping === undefined) continue;
+    for (const mapping of mappingsOf(target.kinds)) {
       // A kind loaded from another scope's installation is that scope's to register.
       if (mapping.scope !== undefined && mapping.scope !== where.scope) continue;
       const at = { root, anchor };

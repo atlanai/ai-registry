@@ -21,7 +21,7 @@ import {
 import { BUILT_IN, checkTargetText, loadTargetFiles } from "#core/target/load.ts";
 import { table } from "#core/term/table.ts";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
-import { builtin, type CommandContext, runAction } from "./index.ts";
+import { actionOf, builtin, type CommandContext, runAction } from "./index.ts";
 
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common } = parse(context.argv, builtin("targets"));
@@ -43,6 +43,16 @@ export async function run(context: CommandContext): Promise<void> {
           "Name the file to check: `aireg targets check <file>`.",
         ),
       ),
+    setup: async () => {
+      const { own } = parse<{ status?: boolean }>(
+        context.argv.slice(1),
+        actionOf(builtin("targets"), "setup"),
+      );
+      const { setup } = await import("#cli/commands/targets/setup.ts");
+      await setup(context, own.status === true);
+    },
+    "plugin-dir": async () =>
+      (await import("#cli/commands/targets/plugin-dir.ts")).pluginDir(context, argument),
   });
 }
 

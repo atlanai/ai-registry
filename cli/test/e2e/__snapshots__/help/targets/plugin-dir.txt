@@ -1,0 +1,10 @@
+Print the folder a coding agent loads a registry from, as one plugin
+
+Usage: aireg targets plugin-dir <registry>
+
+Examples:
+  $ aireg targets plugin-dir acme  the folder Claude Code loads acme from
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/targets/
