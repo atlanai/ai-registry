@@ -14,6 +14,7 @@ import { canceled, defaultIo } from "#cli/prompt/index.ts";
 import { settleCollisions } from "#cli/render/collisions.ts";
 import { planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { loadedBy, toolName } from "#cli/render/tools.ts";
+import { trackRun } from "#cli/telemetry.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import type { Lock } from "#core/lock.ts";
@@ -198,6 +199,7 @@ export async function run(context: CommandContext): Promise<void> {
     cancel(step);
     return;
   }
+  trackRun("remove", result);
 
   // An artifact something else depends on leaves the manifest but stays
   // installed for as long as something needs it.

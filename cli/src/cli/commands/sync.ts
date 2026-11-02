@@ -12,6 +12,7 @@ import {
 } from "#cli/commands/sync/follow.ts";
 import { parse } from "#cli/options.ts";
 import { renderSync } from "#cli/render/sync.ts";
+import { trackSync } from "#cli/telemetry.ts";
 import { isStepPolicy, STEP_POLICIES } from "#core/config/model.ts";
 import { registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
@@ -261,6 +262,8 @@ async function reconcile(
       });
     }
   });
+  const changed = runs.reduce((sum, item) => sum + item.counts.changed, 0);
+  trackSync(runs.length, changed, failed.length);
 
   if (stopped.length > 0) throw stoppedError("Could not finish syncing", stopped, "aireg sync");
   if (failed.length > 0) {

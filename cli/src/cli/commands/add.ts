@@ -47,6 +47,7 @@ import {
   throughRegistry,
   wantOf,
 } from "#cli/source.ts";
+import { trackRun } from "#cli/telemetry.ts";
 import { expandLocation, recordedLocation } from "#core/adapter/location.ts";
 import { type Entry, withoutCoveredLeaves } from "#core/catalog/model.ts";
 import { withheldAt, withheldMessage } from "#core/catalog/withheld.ts";
@@ -369,6 +370,7 @@ async function addAddress(
     cancel(step);
     return;
   }
+  trackRun("install", result);
 
   // `--json` changes only what is printed, so the background job is still added.
   let jobId: string | undefined;

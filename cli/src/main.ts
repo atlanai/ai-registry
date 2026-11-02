@@ -16,11 +16,13 @@ import { printHelp, printShortHelp, unknownCommand } from "#cli/help.ts";
 import { findMapFormat, runMap } from "#cli/map.ts";
 import { reportError } from "#cli/report.ts";
 import { closest, didYouMean } from "#cli/suggest.ts";
+import { flushTelemetry, sendQueued, TELEMETRY_FLAG } from "#cli/telemetry.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { releaseLeasesOnInterrupt } from "#core/lease.ts";
 import { LogLevelError } from "#core/log/index.ts";
 import { type LogBootstrap, openCliLog } from "#core/log/open.ts";
 import { Printer } from "#core/output.ts";
+import { readStdin } from "#core/process.ts";
 import { NODE_REQUIREMENT, nodeTooOld, VERSION, versionInfo } from "#core/version.ts";
 import { extensionHost } from "#daemon/extension-host.ts";
 import { recycleDaemon } from "#daemon/service.ts";
@@ -112,7 +114,9 @@ async function setup(printer: Printer, rest: string[]): Promise<ExitCode> {
   }
   const { install } = await import("#cli/onboarding/setup.ts");
   const context = { argv: [], cwd: homedir(), printer, host: extensionHost(VERSION) };
-  return (await install(context, yes)) as ExitCode;
+  const code = (await install(context, yes)) as ExitCode;
+  await flushTelemetry();
+  return code;
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<ExitCode> {
@@ -171,6 +175,10 @@ async function dispatch(
   }
   if (argv.length === 1 && argv[0] === UPDATE_CHECK_FLAG) {
     await refreshUpdates(recycleDaemon).catch(() => undefined);
+    return ExitCode.Ok;
+  }
+  if (argv.length === 1 && argv[0] === TELEMETRY_FLAG) {
+    await sendQueued(await readStdin()).catch(() => undefined);
     return ExitCode.Ok;
   }
   // After the daemon branch: the daemon installs its own, which log instead.
@@ -295,6 +303,7 @@ async function runCommand(
     return reportError(printer, error);
   } finally {
     if (checksUpdates) await scheduleUpdateCheck().catch(() => undefined);
+    await flushTelemetry();
     log.close();
   }
 }

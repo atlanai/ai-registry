@@ -22,6 +22,10 @@ export const LEGACY_TARGETS_DIR = "harnesses";
 export const DATABASE_FILE = `${NAME}.db`;
 export const LOG_FILE = `${NAME}.log`;
 
+/** Usage events: the install ID's file in the home, and the path on the release server. */
+export const TELEMETRY_ID_FILE = "telemetry-id";
+export const TELEMETRY_PATH = "/t";
+
 /** The CLI's executable on disk; Windows finds a program by its extension. */
 export function executableFile(platform: NodeJS.Platform = process.platform): string {
   return platform === "win32" ? `${NAME}.exe` : NAME;

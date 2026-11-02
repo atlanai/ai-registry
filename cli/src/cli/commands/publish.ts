@@ -39,6 +39,7 @@ import { changedSince, type Exported, edited, fromArgs, type Work } from "#cli/p
 import { chooseRegistry, knownIn, knownRegistries } from "#cli/registries.ts";
 import { underHome } from "#cli/render/home.ts";
 import { noteUserScope } from "#cli/render/where.ts";
+import { trackPublish } from "#cli/telemetry.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -445,6 +446,10 @@ async function sendTo(
     .catch((error: unknown) => {
       throw heldUnlisted(error, alias, items);
     });
+  trackPublish(
+    { location: opened.location, adapter: adapter.id },
+    items.map((item) => item.work),
+  );
   const what = items.length === 1 ? items[0]?.work.name : plural(items.length, "artifact");
   printer.success(published?.summary ?? `Published ${what} to ${alias}.`);
   for (const note of published?.notes ?? []) printer.info(`  ${note}`);

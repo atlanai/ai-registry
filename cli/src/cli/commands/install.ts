@@ -3,6 +3,7 @@ import { cancel, confirmIfDestructive, interaction } from "#cli/prompt/flow.ts";
 import { defaultIo } from "#cli/prompt/index.ts";
 import { settleCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize } from "#cli/render/plan.ts";
+import { trackRun } from "#cli/telemetry.ts";
 import { load, run as runPipeline } from "#engine/pipeline.ts";
 import { builtin, type CommandContext } from "./index.ts";
 
@@ -35,6 +36,7 @@ export async function run(context: CommandContext): Promise<void> {
     cancel(step);
     return;
   }
+  trackRun("install", result);
 
   if (context.printer.format === "json") {
     context.printer.json({

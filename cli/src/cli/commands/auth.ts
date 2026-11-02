@@ -23,6 +23,7 @@ import { signedInAccounts } from "#core/credentials/store.ts";
 import { isCI, registryToken, tokenVariable } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { type RegistrySource, readManifest } from "#core/manifest.ts";
+import { readStdin } from "#core/process.ts";
 import { roots } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { withDaemon } from "#daemon/service.ts";
@@ -108,12 +109,6 @@ interface LoginFlags {
   "token-stdin"?: boolean;
 }
 
-async function readStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-  return Buffer.concat(chunks).toString("utf8").trim();
-}
-
 /**
  * Never an argument: argv is visible to `ps` and lands in shell history, so it comes
  * from a pipe. One in the environment is used where it is set and never written to disk.
@@ -137,7 +132,7 @@ async function resolveToken(registry: string, flags: LoginFlags): Promise<string
         hint: `Pipe the token in: \`… | aireg auth login ${registry} --token-stdin\`.`,
       });
     }
-    const piped = await readStdin();
+    const piped = (await readStdin()).trim();
     if (piped === "") {
       throw new AiregError("No token arrived on standard input.", {
         code: ErrorCode.Usage,

@@ -15,6 +15,9 @@ export const SETTINGS = {
   GIT_TIMEOUT_MS: { public: true },
   RELEASE_CHANNEL: { public: true },
   DISABLE_UPDATE_CHECK: { public: true },
+  DISABLE_TELEMETRY: { public: true },
+  // A test's own collector, used even by a build from source.
+  TELEMETRY_URL: { public: false },
   NO_MODIFY_PATH: { public: true },
   NO_DEFAULT_REGISTRIES: { public: true },
   // Set on the process a minimum update restarts, and by the service manager that started the daemon.

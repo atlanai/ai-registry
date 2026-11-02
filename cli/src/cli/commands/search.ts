@@ -3,6 +3,7 @@ import { parse } from "#cli/options.ts";
 import { knownRegistries, undeclaredRegistry } from "#cli/registries.ts";
 import { search } from "#cli/search.ts";
 import { probe, type Resolved, throughManifest } from "#cli/source.ts";
+import { trackSearch } from "#cli/telemetry.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { type ArtifactKind, isKind, KINDS } from "#core/kinds.ts";
 import { formatAddress } from "#core/ref.ts";
@@ -95,6 +96,11 @@ export async function run(context: CommandContext): Promise<void> {
     matches.filter((match) => kind === undefined || match.kind === kind),
     query,
   );
+  const searched = targets.map((target) => ({
+    location: target.input,
+    adapter: target.flags.adapter,
+  }));
+  trackSearch(query, found.length, kind, searched);
   report(context, query, found, skipped);
 }
 

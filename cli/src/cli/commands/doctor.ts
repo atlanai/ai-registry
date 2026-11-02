@@ -7,6 +7,7 @@ import { gte } from "#adapter/semver.ts";
 import { plural, sanitizeText } from "#adapter/text.ts";
 import { noArguments, parse } from "#cli/options.ts";
 import { underHome } from "#cli/render/home.ts";
+import { type TelemetryState, telemetryState } from "#cli/telemetry.ts";
 import { loadAdapters } from "#core/adapter/registry.ts";
 import { fileExposure } from "#core/credentials/store.ts";
 import { ExitCode } from "#core/errors.ts";
@@ -162,6 +163,12 @@ async function ownSkills(cwd: string): Promise<Check> {
   };
 }
 
+function telemetryDetail(state: TelemetryState): string {
+  if (state.on) return "usage events on; set DO_NOT_TRACK=1 to turn them off";
+  if (state.why === "opted-out") return `off, because ${state.switch} is set`;
+  return "off: a build from source sends none";
+}
+
 function updates(stamp: ReleaseStamp | undefined, cached: UpdateCache | undefined): Check {
   if (stamp === undefined) {
     return {
@@ -224,13 +231,7 @@ async function checksFor(
     await credentials(),
     userScope(),
     await ownSkills(cwd),
-    // aireg itself sends none; an installed adapter reports its own through `ready()`.
-    {
-      name: "telemetry",
-      ok: true,
-      info: true,
-      detail: "none",
-    },
+    { name: "telemetry", ok: true, info: true, detail: telemetryDetail(telemetryState()) },
     updates(releaseStamp(), cached),
   ];
 }
