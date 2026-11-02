@@ -29,7 +29,7 @@ interface DirectoryMapping {
   place?: "link" | "fan" | "copy" | undefined;
   /** For a file-shaped kind: the file's name inside its folder, written as a copy. */
   entry?: string | undefined;
-  /** Manifests a plugin directory needs, written only when missing. */
+  /** A plugin directory's manifests: the plugin's own if it has one, else written if missing. */
   manifest?: ManifestEntry[] | undefined;
   /** Edits to the target's own config that make it load what was placed, applied in order. */
   register?: RegisterEntry[] | undefined;

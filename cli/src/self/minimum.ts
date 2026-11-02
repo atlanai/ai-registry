@@ -19,11 +19,11 @@ import {
   resolveRelease,
 } from "./source.ts";
 
-/**
- * A ~62-81MB payload at 0.15MB/s; a forced update that times out leaves the CLI
- * below the floor and retries anyway.
- */
-const INSTALL_TIMEOUT_MS = 600_000;
+/** 0.15 MB/s, a slow link that works; a forced update that times out stays below the floor. */
+const SLOW_LINK_BYTES_PER_MS = 150;
+const MIN_INSTALL_TIMEOUT_MS = 600_000;
+/** Above the largest release so far, for a manifest that states no size. */
+const ASSUMED_DOWNLOAD_BYTES = 128 * 1024 * 1024;
 /** A command below the floor waits on this probe, so it stays short. */
 const PROBE_TIMEOUT_MS = 2000;
 
@@ -70,9 +70,15 @@ export async function installRelease(
   env: NodeJS.ProcessEnv = process.env,
   $fetch: typeof fetch = fetch,
 ): Promise<void> {
-  const bytes = await downloadRelease(release, $fetch, INSTALL_TIMEOUT_MS);
+  const timeoutMs = installTimeoutMs(downloadSize(release));
+  const bytes = await downloadRelease(release, $fetch, timeoutMs);
   await installBinary(release.version, bytes, env);
   await pruneOld(env);
+}
+
+export function installTimeoutMs(sizeBytes: number | undefined): number {
+  const bytes = sizeBytes ?? ASSUMED_DOWNLOAD_BYTES;
+  return Math.max(MIN_INSTALL_TIMEOUT_MS, Math.ceil(bytes / SLOW_LINK_BYTES_PER_MS));
 }
 
 export type MinimumUpdate = { kind: "skip" } | { kind: "reexec"; code: number };

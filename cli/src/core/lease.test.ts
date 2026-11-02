@@ -49,7 +49,12 @@ async function age(lock: string, ms: number): Promise<void> {
 async function heldBy(lock: string, holder: { pid: number; host?: string }): Promise<void> {
   const meta = leaseMeta(lock);
   await mkdir(dirname(meta), { recursive: true });
-  const current = await readFile(meta, "utf8").then(JSON.parse, () => ({ id: "left-behind" }));
+  const current = await readFile(meta, "utf8").then(JSON.parse, () => ({
+    id: "left-behind",
+    scope: "project",
+    lock,
+    acquiredAtMs: Date.now(),
+  }));
   await writeFile(meta, JSON.stringify({ ...current, host: hostname(), ...holder }));
   await age(lock, 60_000);
 }
@@ -130,6 +135,14 @@ describe("reclaiming a stale lease", () => {
     const roots = scope(join(home, "manifest.lock.yml"));
     await heldBy(roots.lock, { pid: running() });
     await age(roots.lock, 11 * 60_000);
+
+    const taken = await acquire(roots, { env });
+    await taken.release();
+  });
+
+  test.for([-1, 0, 1.5, "1234"])("reclaims a stale lease whose pid is %s", async (pid) => {
+    const roots = scope(join(home, "manifest.lock.yml"));
+    await heldBy(roots.lock, { pid: pid as number });
 
     const taken = await acquire(roots, { env });
     await taken.release();

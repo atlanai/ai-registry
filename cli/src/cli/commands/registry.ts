@@ -53,13 +53,7 @@ import { kindsOf } from "#core/filespec/write/kinds.ts";
 import { validateRoot } from "#core/filespec/write/validate.ts";
 import { gitIn } from "#core/git.ts";
 import type { Lock } from "#core/lock.ts";
-import {
-  type RegistrySource,
-  reaches,
-  readManifest,
-  unknownRegistry,
-  writeManifest,
-} from "#core/manifest.ts";
+import { type RegistrySource, reaches, unknownRegistry, writeManifest } from "#core/manifest.ts";
 import { abbreviate } from "#core/output.ts";
 import { formatRef, type Ref } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
@@ -726,15 +720,11 @@ async function remove(
   }
 
   const loaded = await load(common, context.cwd, "user");
-  const manifest = await readManifest(loaded.roots.manifest);
+  const { manifest } = loaded;
   if (manifest.registries[alias] === undefined) {
     throw unknownRegistry(alias, loaded.roots.scope, Object.keys(manifest.registries));
   }
-
-  // Dropping the source of an installed artifact would leave the manifest
-  // unresolvable, so say what to uninstall first rather than half-doing it.
-  const dependents = manifest.artifacts.filter((ref) => ref.registry === alias);
-  if (dependents.length > 0) throw stillDeclared(alias, dependents, loaded.lock);
+  refuseDependents(loaded, alias);
 
   const jobs = registryJobs(await jobsConfig(context, alias), alias, loaded.roots);
   const removed = jobs.map((job) => job.id);
@@ -752,8 +742,17 @@ async function remove(
 
   // The jobs go first: a job left behind fails every run once its registry is gone.
   if (removed.length > 0) await removeJobs(removed);
-  delete manifest.registries[alias];
-  await writeManifest(loaded.roots, manifest);
+  await withScope(
+    loaded.roots,
+    async (state) => {
+      // Read again under the lease, so a change another command made meanwhile is kept.
+      if (state.manifest.registries[alias] === undefined) return;
+      refuseDependents(state, alias);
+      delete state.manifest.registries[alias];
+      await writeManifest(state.roots, state.manifest);
+    },
+    context.printer,
+  );
 
   if (context.printer.format === "json") {
     context.printer.json({ ok: true, data: { registry: alias, dryRun: false, jobs: removed } });
@@ -761,6 +760,12 @@ async function remove(
   }
   context.printer.success(`Removed ${what}.`);
   noteUserScope(context.printer, common.scope, context.cwd);
+}
+
+/** Dropping the source of installed artifacts would leave the manifest unresolvable, so refuse. */
+function refuseDependents({ manifest, lock }: Loaded, alias: string): void {
+  const dependents = manifest.artifacts.filter((ref) => ref.registry === alias);
+  if (dependents.length > 0) throw stillDeclared(alias, dependents, lock);
 }
 
 /** Counts what is installed, not manifest entries: an entry can cover nothing. */

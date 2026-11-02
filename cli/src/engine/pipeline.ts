@@ -143,7 +143,7 @@ async function read(roots: Roots): Promise<Loaded> {
   return { roots, manifest, lock, targetTable, manifestAsRead: formatManifest(manifest) };
 }
 
-/** Explicit flag wins, then the manifest, then what is installed on the machine. */
+/** Explicit flag wins, then the manifest, then `DEFAULT_TARGETS`. */
 export function selectTargets(
   manifest: Manifest,
   targetTable: Targets,
