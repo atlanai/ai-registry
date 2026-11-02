@@ -353,54 +353,54 @@ describe("aireg targets setup and plugin-dir", () => {
     expect(missing.stderr).toContain('No plugin holds the registry "nope"');
   });
 
-  test("setup lists the marketplace, and leaves the install to a person when none is at hand", async ({
-    aireg,
-    adapters: home,
-    tmp,
-  }) => {
-    expect((await aireg(add("wraps", "deploy"), { cwd: tmp })).code).toBe(0);
-    const env = await withClaude(home);
+  // The stand-in `claude` is a shell script, and Claude Code serves no command source on Windows.
+  test.skipIf(process.platform === "win32")(
+    "setup lists the marketplace, and leaves the install to a person when none is at hand",
+    async ({ aireg, adapters: home, tmp }) => {
+      expect((await aireg(add("wraps", "deploy"), { cwd: tmp })).code).toBe(0);
+      const env = await withClaude(home);
 
-    const set = await aireg(["targets", "setup", "--json"], { cwd: tmp, env });
-    expect(set.code, set.stderr).toBe(0);
-    const calls = await readFile(join(home, "bin", "calls.log"), "utf8");
-    expect(calls).toContain(`plugin marketplace add ${join(home, ".claude", "aireg")}`);
-    expect(calls).not.toContain("plugin install");
-    const { data } = JSON.parse(set.stdout);
-    expect(data.steps).toEqual([
-      {
-        target: "claude-code",
-        registry: "wraps",
-        outcome: "needs-person",
-        run: "claude plugin install wraps@aireg",
-      },
-    ]);
-    const claude = data.targets.find((each: { target: string }) => each.target === "claude-code");
-    expect(claude.plugins).toEqual([
-      {
-        registry: "wraps",
-        folder: join(home, ".claude", "aireg", "wraps"),
-        skills: 1,
-        agents: 0,
-        installed: false,
-      },
-    ]);
-    expect(claude.earlier).toEqual([]);
-  });
+      const set = await aireg(["targets", "setup", "--json"], { cwd: tmp, env });
+      expect(set.code, set.stderr).toBe(0);
+      const calls = await readFile(join(home, "bin", "calls.log"), "utf8");
+      expect(calls).toContain(`plugin marketplace add ${join(home, ".claude", "aireg")}`);
+      expect(calls).not.toContain("plugin install");
+      const { data } = JSON.parse(set.stdout);
+      expect(data.steps).toEqual([
+        {
+          target: "claude-code",
+          registry: "wraps",
+          outcome: "needs-person",
+          run: "claude plugin install wraps@aireg",
+        },
+      ]);
+      const claude = data.targets.find((each: { target: string }) => each.target === "claude-code");
+      expect(claude.plugins).toEqual([
+        {
+          registry: "wraps",
+          folder: join(home, ".claude", "aireg", "wraps"),
+          skills: 1,
+          agents: 0,
+          installed: false,
+        },
+      ]);
+      expect(claude.earlier).toEqual([]);
+    },
+  );
 
-  test("setup --status reads what the coding agent installed and changes nothing", async ({
-    aireg,
-    adapters: home,
-    tmp,
-  }) => {
-    expect((await aireg(add("wraps", "deploy"), { cwd: tmp })).code).toBe(0);
-    const env = await withClaude(home);
-    await writeFile(join(home, "bin", "installed"), '{"id":"wraps@aireg"}');
+  // The stand-in `claude` is a shell script, and Claude Code serves no command source on Windows.
+  test.skipIf(process.platform === "win32")(
+    "setup --status reads what the coding agent installed and changes nothing",
+    async ({ aireg, adapters: home, tmp }) => {
+      expect((await aireg(add("wraps", "deploy"), { cwd: tmp })).code).toBe(0);
+      const env = await withClaude(home);
+      await writeFile(join(home, "bin", "installed"), '{"id":"wraps@aireg"}');
 
-    const status = await aireg(["targets", "setup", "--status"], { cwd: tmp, env });
-    expect(status.code, status.stderr).toBe(0);
-    expect(status.stdout).toContain("wraps: 1 skill, 0 agents, installed");
-    const calls = await readFile(join(home, "bin", "calls.log"), "utf8");
-    expect(calls.trim()).toBe("plugin list --json");
-  });
+      const status = await aireg(["targets", "setup", "--status"], { cwd: tmp, env });
+      expect(status.code, status.stderr).toBe(0);
+      expect(status.stdout).toContain("wraps: 1 skill, 0 agents, installed");
+      const calls = await readFile(join(home, "bin", "calls.log"), "utf8");
+      expect(calls.trim()).toBe("plugin list --json");
+    },
+  );
 });
