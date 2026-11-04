@@ -7,7 +7,7 @@ import { gte } from "#adapter/semver.ts";
 import { plural, sanitizeText } from "#adapter/text.ts";
 import { noArguments, parse } from "#cli/options.ts";
 import { underHome } from "#cli/render/home.ts";
-import { type TelemetryState, telemetryState } from "#cli/telemetry.ts";
+import { savedTelemetryState, type TelemetryState } from "#cli/telemetry.ts";
 import { loadAdapters } from "#core/adapter/registry.ts";
 import { fileExposure } from "#core/credentials/store.ts";
 import { ExitCode } from "#core/errors.ts";
@@ -164,8 +164,9 @@ async function ownSkills(cwd: string): Promise<Check> {
 }
 
 function telemetryDetail(state: TelemetryState): string {
-  if (state.on) return "usage events on; set DO_NOT_TRACK=1 to turn them off";
+  if (state.on) return "usage events on; turn them off with `aireg config set telemetry false`";
   if (state.why === "opted-out") return `off, because ${state.switch} is set`;
+  if (state.why === "config") return "off, because `aireg config` has telemetry false";
   return "off: a build from source sends none";
 }
 
@@ -231,7 +232,12 @@ async function checksFor(
     await credentials(),
     userScope(),
     await ownSkills(cwd),
-    { name: "telemetry", ok: true, info: true, detail: telemetryDetail(telemetryState()) },
+    {
+      name: "telemetry",
+      ok: true,
+      info: true,
+      detail: telemetryDetail(await savedTelemetryState()),
+    },
     updates(releaseStamp(), cached),
   ];
 }

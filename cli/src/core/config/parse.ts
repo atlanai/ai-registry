@@ -106,7 +106,17 @@ function parseDocument(document: unknown): RegistryConfig {
   const root = document;
   onlyKnown(
     root,
-    ["schemaVersion", "revision", "paused", "defaults", "adapters", "accounts", "jobs", "hooks"],
+    [
+      "schemaVersion",
+      "revision",
+      "paused",
+      "telemetry",
+      "defaults",
+      "adapters",
+      "accounts",
+      "jobs",
+      "hooks",
+    ],
     "",
   );
   if (root.schemaVersion !== CONFIG_SCHEMA_VERSION) {
@@ -146,6 +156,7 @@ function parseDocument(document: unknown): RegistryConfig {
     schemaVersion: CONFIG_SCHEMA_VERSION,
     revision: root.revision as number,
     paused: optionalFlag(root, "paused", false),
+    telemetry: optionalFlag(root, "telemetry", true),
     defaults: defaults(root.defaults, "defaults"),
     adapters: adapterPins(root.adapters),
     accounts,
@@ -178,8 +189,11 @@ function written(step: Step, targetTable: Targets): Record<string, unknown> {
 
 export function formatConfig(config: RegistryConfig): string {
   const targetTable = resolveTargets();
+  // Written only when turned off, so a config that never opted out reads as it always has.
+  const { telemetry, ...rest } = config;
   const document = {
-    ...config,
+    ...rest,
+    ...(telemetry ? {} : { telemetry: false }),
     accounts: config.accounts.map(({ id, registry, ...rest }) => ({
       id,
       registry,

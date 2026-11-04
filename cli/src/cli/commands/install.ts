@@ -36,7 +36,7 @@ export async function run(context: CommandContext): Promise<void> {
     cancel(step);
     return;
   }
-  trackRun("install", result);
+  trackRun("install", result, "install");
 
   if (context.printer.format === "json") {
     context.printer.json({

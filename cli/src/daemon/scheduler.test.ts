@@ -21,6 +21,7 @@ function config(jobs: Job[], paused = false): RegistryConfig {
     schemaVersion: 1,
     revision: 0,
     paused,
+    telemetry: true,
     defaults: {},
     adapters: {},
     accounts: [{ id: "acc_demo", registry: "personal" }],

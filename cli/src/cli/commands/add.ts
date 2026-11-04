@@ -370,7 +370,7 @@ async function addAddress(
     cancel(step);
     return;
   }
-  trackRun("install", result);
+  trackRun("install", result, "add");
 
   // `--json` changes only what is printed, so the background job is still added.
   let jobId: string | undefined;

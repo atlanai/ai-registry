@@ -176,6 +176,8 @@ export interface RegistryConfig {
   revision: number;
   /** Stops the scheduler outright; manual runs are unaffected. */
   paused: boolean;
+  /** Whether usage events are sent; `aireg config set telemetry false` turns them off. */
+  telemetry: boolean;
   defaults: Defaults;
   adapters: Readonly<Record<string, string>>;
   accounts: readonly Account[];
@@ -193,6 +195,7 @@ export function emptyRegistryConfig(): RegistryConfig {
     schemaVersion: CONFIG_SCHEMA_VERSION,
     revision: 0,
     paused: false,
+    telemetry: true,
     defaults: {},
     adapters: {},
     accounts: [],

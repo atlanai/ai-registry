@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import type { Lock, LockArtifact } from "#core/lock.ts";
@@ -69,6 +69,7 @@ describe("telemetryState", () => {
   test("is on only for a stamped build, and off once a switch holds a value", () => {
     expect(telemetryState({}, undefined)).toEqual({ on: false, why: "source-build" });
     expect(telemetryState({}, "https://aireg.sh")).toEqual({ on: true, url: "https://aireg.sh/t" });
+    expect(telemetryState({}, "https://aireg.sh", false)).toEqual({ on: false, why: "config" });
     for (const name of ["DO_NOT_TRACK", "AIREG_DISABLE_TELEMETRY"]) {
       expect(telemetryState({ [name]: "1" }, "https://aireg.sh")).toMatchObject({ switch: name });
     }
@@ -175,14 +176,23 @@ describe("what commands queue", () => {
 
   test("one install per registry, names offered only for the github.com one", async () => {
     const queued = await queuedBy(() =>
-      trackRun("install", {
-        before: { artifacts: {} },
-        targets: ["codex", "claude-code", "my-own-tool"],
-        scope: "user",
-        applied: { lock, added: ["lint", "notes"], removed: [] },
-      } as unknown as RunResult),
+      trackRun(
+        "install",
+        {
+          before: { artifacts: {} },
+          targets: ["codex", "claude-code", "my-own-tool"],
+          scope: "user",
+          applied: { lock, added: ["lint", "notes"], removed: [] },
+        } as unknown as RunResult,
+        "add",
+      ),
     );
-    const shared = { event: "install", agents: "claude-code,codex,custom", global: "1" };
+    const shared = {
+      event: "install",
+      trigger: "add",
+      agents: "claude-code,codex,custom",
+      global: "1",
+    };
     expect(queued).toEqual([
       {
         event: {
@@ -195,6 +205,30 @@ describe("what commands queue", () => {
         github: ["acme/skills"],
       },
       { event: { ...shared, sourceType: "local", kinds: "agent" } },
+    ]);
+  });
+
+  test("a restore counts what it linked, though its lockfile came from another machine", async () => {
+    const queued = await queuedBy(() =>
+      trackRun(
+        "install",
+        {
+          before: lock,
+          targets: ["codex"],
+          scope: "project",
+          applied: { lock, added: [], installed: ["notes"], removed: [] },
+        } as unknown as RunResult,
+        "install",
+      ),
+    );
+    expect(queued.map((item) => item.event)).toEqual([
+      {
+        event: "install",
+        trigger: "install",
+        agents: "codex",
+        sourceType: "local",
+        kinds: "agent",
+      },
     ]);
   });
 
@@ -284,14 +318,36 @@ describe("noticeFirst", () => {
     };
 
     await run();
-    expect(err).toContain("notice: aireg sends usage events");
-    expect(err).toContain("DO_NOT_TRACK=1");
+    expect(err).toContain("notice: aireg collects anonymous usage data");
+    expect(err).toContain("Learn more, including how to opt out");
     expect($spawn).not.toHaveBeenCalled();
 
     err = "";
     await run();
     expect(err).toBe("");
     expect($spawn).toHaveBeenCalledTimes(1);
+  });
+
+  test("a saved `telemetry: false` stops the notice and every send", async ({ tmp }) => {
+    await writeFile(
+      join(tmp, "config.yml"),
+      "schemaVersion: 1\nrevision: 0\ntelemetry: false\naccounts: []\njobs: []\n",
+    );
+    const env = { AIREG_HOME: tmp, AIREG_TELEMETRY_URL: COLLECTOR };
+    let err = "";
+    const printer = new Printer({
+      err: {
+        isTTY: false,
+        write: (chunk: string) => {
+          err += chunk;
+        },
+      },
+    });
+    await noticeFirst(printer, env);
+    const { urls, $fetch } = recorder();
+    await sendQueued(JSON.stringify([SYNC]), env, $fetch);
+    expect(err).toBe("");
+    expect(urls).toEqual([]);
   });
 
   test("says nothing while telemetry is off", async ({ tmp }) => {

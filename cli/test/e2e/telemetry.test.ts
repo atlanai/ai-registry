@@ -41,7 +41,7 @@ describe("usage events", () => {
 
       const first = await aireg(["registry", "add", market, "--as", "acme"], { env });
       expect(first.code).toBe(0);
-      expect(first.stderr).toContain("notice: aireg sends usage events");
+      expect(first.stderr).toContain("notice: aireg collects anonymous usage data");
       const added = await aireg(["add", "acme/lint", "--yes"], { env });
       expect(added.code, added.stderr).toBe(0);
       expect(added.stderr).not.toContain("notice:");
@@ -55,7 +55,12 @@ describe("usage events", () => {
 
       expect(events.map((event) => event.event)).toEqual(["install", "search", "remove"]);
       const [install, search, remove] = events;
-      expect(install).toMatchObject({ sourceType: "local", kinds: "skill", agent: "claude-code" });
+      expect(install).toMatchObject({
+        trigger: "add",
+        sourceType: "local",
+        kinds: "skill",
+        agent: "claude-code",
+      });
       expect(install).not.toHaveProperty("artifacts");
       expect(search).toMatchObject({ resultCount: "1" });
       expect(search).not.toHaveProperty("query");
@@ -63,9 +68,18 @@ describe("usage events", () => {
       expect(events.every((event) => event.id === install?.id)).toBe(true);
       expect(JSON.stringify(events)).not.toContain(home.dir);
 
-      expect(await doctorTelemetry(aireg, env)).toMatch(/events on; set DO_NOT_TRACK=1/);
+      expect(await doctorTelemetry(aireg, env)).toMatch(/usage events on/);
       expect(await doctorTelemetry(aireg, { ...env, DO_NOT_TRACK: "1" })).toBe(
         "off, because DO_NOT_TRACK is set",
+      );
+
+      const sentBefore = events.length;
+      expect((await aireg(["config", "set", "telemetry", "false"], { env })).code).toBe(0);
+      expect((await aireg(["search", "lint"], { env })).code).toBe(0);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      expect(events).toHaveLength(sentBefore);
+      expect(await doctorTelemetry(aireg, env)).toBe(
+        "off, because `aireg config` has telemetry false",
       );
     } finally {
       server.close();

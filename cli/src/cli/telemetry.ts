@@ -5,6 +5,7 @@ import { ID as GIT, parseSource } from "#adapters/git/api.ts";
 import { ID as LOCAL } from "#adapters/local/api.ts";
 import { ID as WELL_KNOWN } from "#adapters/well-known/api.ts";
 import { callingAgent, SIGNALS } from "#cli/prompt/caller.ts";
+import { readConfig } from "#core/config/repository.ts";
 import { envName, isCI, present, setting } from "#core/env.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { Printer } from "#core/output.ts";
@@ -48,7 +49,12 @@ interface Named {
 
 /** Every event and field aireg can send. */
 type UsageEvent =
-  | ({ event: "install" | "remove"; agents: string; global?: "1" } & Named)
+  | ({
+      event: "install" | "remove";
+      agents: string;
+      global?: "1";
+      trigger?: "add" | "install";
+    } & Named)
   | ({ event: "publish" } & Named)
   | { event: "update"; artifactCount: string; updatedCount: string; global?: "1" }
   | { event: "search"; resultCount: string; kind?: string; query?: string }
@@ -63,17 +69,31 @@ export interface Queued {
 export type TelemetryState =
   | { on: true; url: string }
   | { on: false; why: "opted-out"; switch: string }
+  | { on: false; why: "config" }
   | { on: false; why: "source-build" };
 
 export function telemetryState(
   env: NodeJS.ProcessEnv = process.env,
   origin: string | undefined = stampedOrigin(),
+  saved = true,
 ): TelemetryState {
   const off = OFF_SWITCHES.find((name) => present(name, env));
   if (off !== undefined) return { on: false, why: "opted-out", switch: off };
+  if (!saved) return { on: false, why: "config" };
   const url =
     setting("TELEMETRY_URL", env) ?? (origin === undefined ? undefined : origin + TELEMETRY_PATH);
   return url === undefined ? { on: false, why: "source-build" } : { on: true, url };
+}
+
+/** With the saved `telemetry` setting read; a config that cannot be read sends nothing. */
+export async function savedTelemetryState(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<TelemetryState> {
+  const saved = await readConfig(env).then(
+    (config) => config.telemetry,
+    () => false,
+  );
+  return telemetryState(env, stampedOrigin(), saved);
 }
 
 const pending: Queued[] = [];
@@ -89,17 +109,15 @@ export async function noticeFirst(
   printer: Printer,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
-  if (!telemetryState(env).on) return;
+  if (!(await savedTelemetryState(env)).on) return;
   try {
     const file = join(ensureHome(env), TELEMETRY_NOTICE_FILE);
     const shown = (await readFile(file, "utf8").catch(() => "")).trim();
     if (shown === NOTICE_VERSION) return;
     printer.notice(
       [
-        "aireg sends usage events (which commands ran, counts, version and OS) to help improve it.",
-        "  It never names a private registry or sends file paths. Nothing was sent this time.",
-        "  Turn them off with DO_NOT_TRACK=1. Details:",
-        `  ${DOCS_URL}reference/environment/#network-and-privacy`,
+        "aireg collects anonymous usage data to improve the CLI.",
+        `  Learn more, including how to opt out: ${DOCS_URL}reference/environment/#network-and-privacy`,
       ].join("\n"),
     );
     await writeFile(file, `${NOTICE_VERSION}\n`, { mode: 0o600 });
@@ -120,6 +138,7 @@ export async function flushTelemetry(
 ): Promise<void> {
   const items = pending.splice(0);
   if (items.length === 0 || entry === undefined) return;
+  if (!(await savedTelemetryState()).on) return;
   try {
     const launch = launchArgv(entry, [TELEMETRY_FLAG]);
     const child = $spawn(launch.command, launch.args, { stdio: ["pipe", "ignore", "ignore"] });
@@ -139,7 +158,7 @@ export async function sendQueued(
   env: NodeJS.ProcessEnv = process.env,
   $fetch: typeof fetch = fetch,
 ): Promise<void> {
-  const state = telemetryState(env);
+  const state = await savedTelemetryState(env);
   if (!state.on) return;
   let items: unknown;
   try {
@@ -288,19 +307,27 @@ const BUILTIN_TARGET_IDS = new Set<string>(BUILTIN_TARGETS.map((target) => targe
 const userScope = (scope: RunResult["scope"]) => (scope === "user" ? { global: "1" as const } : {});
 
 /** One event per registry the run installed from, or removed from. */
-export function trackRun(event: "install" | "remove", result: RunResult): void {
+/** `trigger` says whether the install chose something new (`add`) or restored a project (`install`). */
+export function trackRun(
+  event: "install" | "remove",
+  result: RunResult,
+  trigger?: "add" | "install",
+): void {
   const { applied, before, scope, targets } = result;
   const lock = event === "install" ? applied?.lock : before;
   if (applied === undefined || lock === undefined) return;
   // A target of your own is named by you, so it is sent only as `custom`.
   const agents = [...new Set(targets.map((id) => (BUILTIN_TARGET_IDS.has(id) ? id : "custom")))];
-  const names = event === "install" ? applied.added : applied.removed;
+  // A restore's lockfile already records links from another machine, so it reads what this run linked.
+  const installed = trigger === "install" ? applied.installed : applied.added;
+  const names = event === "install" ? installed : applied.removed;
   for (const [alias, rows] of byRegistry(lock, names)) {
     const registry = lock.registries[alias];
     if (registry === undefined) continue;
     const { fields, github } = named(registry, rows);
     const agentList = agents.sort().join(",");
-    queue({ event: { event, agents: agentList, ...userScope(scope), ...fields }, github });
+    const by = trigger === undefined ? {} : { trigger };
+    queue({ event: { event, ...by, agents: agentList, ...userScope(scope), ...fields }, github });
   }
 }
 
