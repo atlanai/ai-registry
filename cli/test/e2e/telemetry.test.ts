@@ -39,9 +39,12 @@ describe("usage events", () => {
       const market = join(tmp, "market");
       await registry(market).skill("acme/lint@1.0.0").agent("acme/triage@1.0.0").write();
 
-      expect((await aireg(["registry", "add", market, "--as", "acme"], { env })).code).toBe(0);
+      const first = await aireg(["registry", "add", market, "--as", "acme"], { env });
+      expect(first.code).toBe(0);
+      expect(first.stderr).toContain("notice: aireg sends usage events");
       const added = await aireg(["add", "acme/lint", "--yes"], { env });
       expect(added.code, added.stderr).toBe(0);
+      expect(added.stderr).not.toContain("notice:");
       await arrived(events, 1);
       const searched = await aireg(["search", "triage"], { env });
       expect(searched.code, searched.stderr).toBe(0);

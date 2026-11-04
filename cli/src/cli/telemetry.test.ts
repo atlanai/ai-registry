@@ -2,11 +2,13 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import type { Lock, LockArtifact } from "#core/lock.ts";
+import { Printer } from "#core/output.ts";
 import type { spawnDetached } from "#core/process.ts";
 import type { RunResult } from "#engine/pipeline.ts";
 import { test } from "#test/kit/fixtures.ts";
 import {
   flushTelemetry,
+  noticeFirst,
   type Queued,
   sendQueued,
   sourceOf,
@@ -253,5 +255,60 @@ describe("what commands queue", () => {
     trackSearch("lint", 1, undefined, []);
     await flushTelemetry("/bin/aireg", $spawn);
     expect($spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe("noticeFirst", () => {
+  test("shows once per home, and the run that shows it sends nothing", async ({ tmp }) => {
+    vi.stubEnv("AIREG_HOME", tmp);
+    vi.stubEnv("AIREG_TELEMETRY_URL", COLLECTOR);
+    vi.stubEnv("DO_NOT_TRACK", "");
+    vi.stubEnv("AIREG_DISABLE_TELEMETRY", "");
+    let err = "";
+    const printer = new Printer({
+      err: {
+        isTTY: false,
+        write: (chunk: string) => {
+          err += chunk;
+        },
+      },
+    });
+    const $spawn = vi.fn(() => ({
+      on: () => {},
+      stdin: { on: () => {}, end: (_: string, done: () => void) => done() },
+    }));
+    const run = async () => {
+      trackSearch("lint", 1, undefined, []);
+      await noticeFirst(printer);
+      await flushTelemetry("/bin/aireg", $spawn as unknown as typeof spawnDetached);
+    };
+
+    await run();
+    expect(err).toContain("notice: aireg sends usage events");
+    expect(err).toContain("DO_NOT_TRACK=1");
+    expect($spawn).not.toHaveBeenCalled();
+
+    err = "";
+    await run();
+    expect(err).toBe("");
+    expect($spawn).toHaveBeenCalledTimes(1);
+  });
+
+  test("says nothing while telemetry is off", async ({ tmp }) => {
+    let err = "";
+    const printer = new Printer({
+      err: {
+        isTTY: false,
+        write: (chunk: string) => {
+          err += chunk;
+        },
+      },
+    });
+    await noticeFirst(printer, {
+      AIREG_HOME: tmp,
+      AIREG_TELEMETRY_URL: COLLECTOR,
+      DO_NOT_TRACK: "1",
+    });
+    expect(err).toBe("");
   });
 });

@@ -7,8 +7,14 @@ import { ID as WELL_KNOWN } from "#adapters/well-known/api.ts";
 import { callingAgent, SIGNALS } from "#cli/prompt/caller.ts";
 import { envName, isCI, present, setting } from "#core/env.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
+import type { Printer } from "#core/output.ts";
 import { spawnDetached } from "#core/process.ts";
-import { TELEMETRY_ID_FILE, TELEMETRY_PATH } from "#core/product.ts";
+import {
+  DOCS_URL,
+  TELEMETRY_ID_FILE,
+  TELEMETRY_NOTICE_FILE,
+  TELEMETRY_PATH,
+} from "#core/product.ts";
 import { launchArgv, runningEntry } from "#core/release/launch.ts";
 import { stampedOrigin } from "#core/release/stamp.ts";
 import { ensureHome } from "#core/store/paths.ts";
@@ -71,6 +77,37 @@ export function telemetryState(
 }
 
 const pending: Queued[] = [];
+
+/** Bumped when the notice says something materially new, so it is shown again. */
+const NOTICE_VERSION = "1";
+
+/**
+ * Shown once per aireg home before anything is sent: the run that shows it sends
+ * nothing, so a person can turn events off before the first one leaves.
+ */
+export async function noticeFirst(
+  printer: Printer,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  if (!telemetryState(env).on) return;
+  try {
+    const file = join(ensureHome(env), TELEMETRY_NOTICE_FILE);
+    const shown = (await readFile(file, "utf8").catch(() => "")).trim();
+    if (shown === NOTICE_VERSION) return;
+    printer.notice(
+      [
+        "aireg sends usage events (which commands ran, counts, version and OS) to help improve it.",
+        "  It never names a private registry or sends file paths. Nothing was sent this time.",
+        "  Turn them off with DO_NOT_TRACK=1. Details:",
+        `  ${DOCS_URL}reference/environment/#network-and-privacy`,
+      ].join("\n"),
+    );
+    await writeFile(file, `${NOTICE_VERSION}\n`, { mode: 0o600 });
+  } catch {
+    // A home that cannot be written to shows the notice again next time.
+  }
+  pending.splice(0);
+}
 
 function queue(item: Queued): void {
   if (telemetryState().on) pending.push(item);

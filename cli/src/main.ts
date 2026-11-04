@@ -16,7 +16,7 @@ import { printHelp, printShortHelp, unknownCommand } from "#cli/help.ts";
 import { findMapFormat, runMap } from "#cli/map.ts";
 import { reportError } from "#cli/report.ts";
 import { closest, didYouMean } from "#cli/suggest.ts";
-import { flushTelemetry, sendQueued, TELEMETRY_FLAG } from "#cli/telemetry.ts";
+import { flushTelemetry, noticeFirst, sendQueued, TELEMETRY_FLAG } from "#cli/telemetry.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { releaseLeasesOnInterrupt } from "#core/lease.ts";
 import { LogLevelError } from "#core/log/index.ts";
@@ -115,6 +115,7 @@ async function setup(printer: Printer, rest: string[]): Promise<ExitCode> {
   const { install } = await import("#cli/onboarding/setup.ts");
   const context = { argv: [], cwd: homedir(), printer, host: extensionHost(VERSION) };
   const code = (await install(context, yes)) as ExitCode;
+  await noticeFirst(printer);
   await flushTelemetry();
   return code;
 }
@@ -303,6 +304,7 @@ async function runCommand(
     return reportError(printer, error);
   } finally {
     if (checksUpdates) await scheduleUpdateCheck().catch(() => undefined);
+    await noticeFirst(printer);
     await flushTelemetry();
     log.close();
   }

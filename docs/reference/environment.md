@@ -66,6 +66,7 @@ aireg keeps its settings, caches and logs in `~/.aireg/` (or `AIREG_HOME`). Noth
 | `bin/aireg` | The `aireg` on your `PATH`. |
 | `cli/` | The installed versions of aireg. |
 | `telemetry-id` | The random ID usage events carry, made once and derived from nothing on your machine. Delete it for a new one. |
+| `telemetry-notice` | Which version of the usage-events notice you were shown. |
 
 ## Network and privacy
 
@@ -76,7 +77,7 @@ aireg makes four kinds of request:
 - **Usage events.** An installed aireg sends an event to `https://aireg.sh/t`, from a background process, when `add`, `install`, `remove`, `update`, `search`, `sync` or `publish` changes something or finishes. Each carries aireg's version, OS and architecture, `ci=1` when `CI` is set, the coding agent running aireg, and a random ID kept in `telemetry-id`. A registry's `owner/repo`, the names of what was installed from it and a search query are sent only for a repository GitHub confirms is public.
 - **To GitHub, for that check.** aireg asks `https://api.github.com/repos/<owner>/<repo>` whether a github.com registry is public, without a token. A private repository, an error or no answer counts as private.
 
-Set `DO_NOT_TRACK=1` or `AIREG_DISABLE_TELEMETRY=1` to stop usage events and the GitHub check. A build from source sends none.
+The first command after install prints a notice about usage events on stderr and sends nothing; later commands send. Set `DO_NOT_TRACK=1` or `AIREG_DISABLE_TELEMETRY=1` to stop usage events and the GitHub check. A build from source sends none.
 
 Set `AIREG_DISABLE_UPDATE_CHECK=1` to stop the update requests, then update with [`aireg self update`](self.md) when you choose. aireg also skips them when `CI` is set. A build from source doesn't check or update itself.
 
