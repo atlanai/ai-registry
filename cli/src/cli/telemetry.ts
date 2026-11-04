@@ -173,7 +173,11 @@ export async function sendQueued(
       (await Promise.all(github.map((slug) => isPublicOnGitHub(slug, $fetch)))).every(Boolean);
     const fields: Record<string, unknown> = { ...event };
     if (!confirmed) for (const field of NAMING_FIELDS) delete fields[field];
-    const response = await $fetch(`${state.url}?${await paramsOf(fields, env)}`, {
+    const response = await $fetch(state.url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(await payloadOf(fields, env)),
+      redirect: "error",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     await response.body?.cancel();
@@ -186,25 +190,25 @@ export async function sendQueued(
   clearTimeout(timer);
 }
 
-async function paramsOf(
+async function payloadOf(
   fields: Record<string, unknown>,
   env: NodeJS.ProcessEnv,
-): Promise<URLSearchParams> {
-  const params = new URLSearchParams({
+): Promise<Record<string, string>> {
+  const payload: Record<string, string> = {
     event: String(fields.event),
     v: VERSION,
     os: process.platform,
     arch: process.arch,
-  });
-  if (isCI(env)) params.set("ci", "1");
+  };
+  if (isCI(env)) payload.ci = "1";
   const agent = agentOf(env);
-  if (agent !== undefined) params.set("agent", agent);
+  if (agent !== undefined) payload.agent = agent;
   const id = await installId(env);
-  if (id !== undefined) params.set("id", id);
+  if (id !== undefined) payload.id = id;
   for (const [key, value] of Object.entries(fields)) {
-    if (key !== "event" && typeof value === "string") params.set(key, value);
+    if (key !== "event" && typeof value === "string") payload[key] = value;
   }
-  return params;
+  return payload;
 }
 
 const KNOWN_AGENTS = [...new Set(SIGNALS.map((signal) => signal.agent))];

@@ -28,9 +28,26 @@ describe("usage events", () => {
     home,
   }) => {
     const events: Record<string, string>[] = [];
+    const requests: {
+      method: string | undefined;
+      url: string | undefined;
+      type: string | undefined;
+    }[] = [];
     const server = createServer((request, response) => {
-      events.push(Object.fromEntries(new URL(request.url ?? "/", "http://c").searchParams));
-      response.writeHead(204).end();
+      requests.push({
+        method: request.method,
+        url: request.url,
+        type: request.headers["content-type"],
+      });
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => {
+        body += chunk;
+      });
+      request.on("end", () => {
+        events.push(JSON.parse(body) as Record<string, string>);
+        response.writeHead(204).end();
+      });
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     try {
@@ -54,6 +71,9 @@ describe("usage events", () => {
       await arrived(events, 3);
 
       expect(events.map((event) => event.event)).toEqual(["install", "search", "remove"]);
+      expect(requests).toEqual(
+        Array(3).fill({ method: "POST", url: "/t", type: "application/json" }),
+      );
       const [install, search, remove] = events;
       expect(install).toMatchObject({
         trigger: "add",

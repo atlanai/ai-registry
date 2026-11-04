@@ -22,19 +22,21 @@ const COLLECTOR = "https://collector.example/t";
 
 function recorder(respond: (url: string) => Response | Promise<Response> = () => ok()) {
   const urls: string[] = [];
-  const $fetch = vi.fn(async (input: string | URL | Request) => {
+  const requests: { url: string; init: RequestInit | undefined }[] = [];
+  const $fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     urls.push(String(input));
+    requests.push({ url: String(input), init });
     return respond(String(input));
   }) as unknown as typeof fetch;
-  return { urls, $fetch };
+  return { urls, requests, $fetch };
 }
 
 const ok = (body: unknown = {}) => new Response(JSON.stringify(body), { status: 200 });
 
-const sent = (urls: string[]) =>
-  urls
-    .filter((url) => url.startsWith(COLLECTOR))
-    .map((url) => Object.fromEntries(new URL(url).searchParams));
+const sent = (requests: { url: string; init: RequestInit | undefined }[]) =>
+  requests
+    .filter(({ url }) => url.startsWith(COLLECTOR))
+    .map(({ init }) => JSON.parse(String(init?.body)) as Record<string, string>);
 
 const SYNC: Queued = {
   event: { event: "sync", registryCount: "0", changedCount: "0", failedCount: "0" },
@@ -98,6 +100,34 @@ describe("sourceOf", () => {
 });
 
 describe("sendQueued", () => {
+  test("posts flat JSON to the collector without event data in its URL or redirects", async ({
+    tmp,
+  }) => {
+    const { requests, $fetch } = recorder();
+    const env = { AIREG_HOME: tmp, AIREG_TELEMETRY_URL: COLLECTOR };
+    await sendQueued(JSON.stringify([SYNC]), env, $fetch);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      url: COLLECTOR,
+      init: {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        redirect: "error",
+        signal: expect.any(AbortSignal),
+      },
+    });
+    expect(sent(requests)[0]).toMatchObject({
+      ...SYNC.event,
+      v: expect.any(String),
+      os: process.platform,
+      arch: process.arch,
+      id: expect.any(String),
+    });
+    expect(Object.values(sent(requests)[0] ?? {}).every((value) => typeof value === "string")).toBe(
+      true,
+    );
+  });
+
   test("sends nothing while telemetry is off", async ({ tmp }) => {
     const { urls, $fetch } = recorder();
     const env = { AIREG_HOME: tmp, AIREG_TELEMETRY_URL: COLLECTOR, DO_NOT_TRACK: "1" };
@@ -106,7 +136,7 @@ describe("sendQueued", () => {
   });
 
   test("keeps names only for a repository GitHub confirms is public", async ({ tmp }) => {
-    const { urls, $fetch } = recorder((url) => {
+    const { requests, $fetch } = recorder((url) => {
       if (url.endsWith("/repos/acme/open")) return ok({ private: false });
       if (url.endsWith("/repos/acme/closed")) return ok({ private: true });
       if (url.endsWith("/repos/acme/gone")) return new Response("", { status: 404 });
@@ -131,7 +161,7 @@ describe("sendQueued", () => {
     const env = { AIREG_HOME: tmp, AIREG_TELEMETRY_URL: COLLECTOR, CI: "true" };
     await sendQueued(JSON.stringify(queued), env, $fetch);
 
-    const events = sent(urls);
+    const events = sent(requests);
     expect(events).toHaveLength(4);
     expect(events.flatMap((event) => event.source ?? [])).toEqual(["acme/open"]);
     expect(events.filter((event) => "artifacts" in event)).toHaveLength(1);
@@ -149,10 +179,10 @@ describe("sendQueued", () => {
     };
     const agents: Record<string, string | undefined> = {};
     for (const [label, env] of Object.entries(cases)) {
-      const { urls, $fetch } = recorder();
+      const { requests, $fetch } = recorder();
       const base = { AIREG_HOME: tmp, AIREG_TELEMETRY_URL: COLLECTOR };
       await sendQueued(JSON.stringify([SYNC]), { ...base, ...env }, $fetch);
-      agents[label] = sent(urls)[0]?.agent;
+      agents[label] = sent(requests)[0]?.agent;
     }
     expect(agents).toEqual({
       versioned: "claude-code",
