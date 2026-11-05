@@ -252,11 +252,15 @@ async function writeRendered(
   return "copy";
 }
 
-/** A copy under a name not its own says that name, so the target shows it as installed. */
+/**
+ * A copy under a name not its own says that name, so the target shows it as installed.
+ * Read, not stat-then-read: a skill folder's entry fails as ENOTDIR on a single-file copy.
+ */
 async function renameCopy(to: string, name: string): Promise<void> {
-  const file = (await lstat(to)).isDirectory() ? join(to, SKILL_ENTRY) : to;
-  const text = await readFile(file, "utf8").catch(() => undefined);
-  if (text !== undefined) await writeAtomic(file, withName(text, name));
+  for (const file of [join(to, SKILL_ENTRY), to]) {
+    const text = await readFile(file, "utf8").catch(() => undefined);
+    if (text !== undefined) return writeAtomic(file, withName(text, name));
+  }
 }
 
 export async function unlink(run: Run, action: ActionOf<"unlink">): Promise<void> {
