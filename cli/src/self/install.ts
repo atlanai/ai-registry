@@ -13,7 +13,7 @@ import {
   symlink,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { EXECUTABLE } from "#adapter/files.ts";
+import { EXECUTABLE, isAbsent } from "#adapter/files.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { gte, parseVersion } from "#adapter/semver.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -40,8 +40,9 @@ export async function installedVersion(env: NodeJS.ProcessEnv = process.env): Pr
       ? (await readFile(currentLink(env), "utf8")).trim()
       : await readlink(currentLink(env));
     if (target !== "") return target;
-  } catch {
-    // Source and npm installs have no ~/.aireg/cli/current yet.
+  } catch (error) {
+    // Source and npm installs have no `current`; a folder there (EINVAL) is not this installer's.
+    if (!isAbsent(error) && (error as NodeJS.ErrnoException).code !== "EINVAL") throw error;
   }
   return VERSION;
 }
@@ -178,8 +179,10 @@ export async function versionOnDisk(
   try {
     await access(versionBin(version, env), constants.X_OK);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // Not there, or there but not executable: either way not a version to run.
+    if (isAbsent(error) || (error as NodeJS.ErrnoException).code === "EACCES") return false;
+    throw error;
   }
 }
 

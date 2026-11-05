@@ -43,8 +43,13 @@ test.each([".registry", ".registry/artifacts", ".registry/artifacts/acme/skills"
     plan.actions.push({ kind: "clone", name: "demo", from: source, to: join(redirected, "demo") });
 
     await expect(
-      apply(plan, roots, async () => {
-        throw new Error("unexpected fetch");
+      apply({
+        plan,
+        roots,
+        fetch: async () => {
+          throw new Error("unexpected fetch");
+        },
+        env: process.env,
       }),
     ).rejects.toThrow(/symlink/i);
     expect(await readdir(outside)).toEqual(["sentinel"]);
@@ -70,8 +75,13 @@ test("refuses a redirected projection before assembling it", async () => {
   });
 
   await expect(
-    apply(plan, roots, async () => {
-      throw new Error("unexpected fetch");
+    apply({
+      plan,
+      roots,
+      fetch: async () => {
+        throw new Error("unexpected fetch");
+      },
+      env: process.env,
     }),
   ).rejects.toThrow(/symlink/i);
   expect(await readdir(outside)).toEqual(["sentinel"]);
@@ -84,7 +94,7 @@ test("does not recover through a redirected artifact parent, and says so once", 
   await mkdir(dirname(roots.applyJournal), { recursive: true });
   await writeFile(roots.applyJournal, JSON.stringify({ writes: [join(parent, "sentinel")] }));
 
-  const recovered = await recover(roots, emptyLock());
+  const recovered = await recover(roots, emptyLock(), process.env);
   expect(recovered.removed).toEqual([]);
   expect(recovered.skipped).toEqual([
     { path: join(parent, "sentinel"), reason: expect.stringMatching(/symlink/i) },
@@ -92,7 +102,7 @@ test("does not recover through a redirected artifact parent, and says so once", 
   expect(await readFile(join(outside, "sentinel"), "utf8")).toBe("keep");
   // Cleared, so the next run is not stopped by the same entry again.
   expect(await exists(roots.applyJournal)).toBe(false);
-  expect(await recover(roots, emptyLock())).toEqual({ removed: [], skipped: [] });
+  expect(await recover(roots, emptyLock(), process.env)).toEqual({ removed: [], skipped: [] });
 });
 
 test("rechecks a managed parent immediately before copying", async () => {
@@ -101,14 +111,15 @@ test("rechecks a managed parent immediately before copying", async () => {
   const plan = emptyPlan();
   plan.actions.push({ kind: "clone", name: "demo", from: source, to: join(parent, "demo") });
   await expect(
-    apply(
+    apply({
       plan,
       roots,
-      async () => {
+      fetch: async () => {
         throw new Error("unexpected fetch");
       },
-      () => symlinkSync(outside, parent),
-    ),
+      env: process.env,
+      onStep: () => symlinkSync(outside, parent),
+    }),
   ).rejects.toThrow(/symlink/i);
   expect(await readdir(outside)).toEqual(["sentinel"]);
 });
@@ -120,8 +131,13 @@ test("rejects a dangling relative link instead of creating its destination", asy
   const plan = emptyPlan();
   plan.actions.push({ kind: "clone", name: "demo", from: source, to: join(parent, "demo") });
   await expect(
-    apply(plan, roots, async () => {
-      throw new Error("unexpected fetch");
+    apply({
+      plan,
+      roots,
+      fetch: async () => {
+        throw new Error("unexpected fetch");
+      },
+      env: process.env,
     }),
   ).rejects.toThrow(/symlink/i);
   expect(await exists(join(home, "missing"))).toBe(false);
@@ -142,7 +158,7 @@ test("refuses redirected staging before starting a fetch", async () => {
   const fetch = vi.fn(async () => {
     throw new Error("unexpected fetch");
   });
-  await expect(apply(plan, roots, fetch)).rejects.toThrow(/symlink/i);
+  await expect(apply({ plan, roots, fetch, env: process.env })).rejects.toThrow(/symlink/i);
   expect(fetch).not.toHaveBeenCalled();
   expect(await exists(roots.applyJournal)).toBe(false);
 });
@@ -175,13 +191,18 @@ test("keeps a shared target root and an explicitly selected user scope working",
     metadata: { name: "demo" },
     files: [{ path: "SKILL.md", digest: sha256(bytes), size: bytes.length }],
   });
-  const result = await apply(plan, roots, async () => ({
-    path: source,
-    root: source,
-    contentId: contentDigest(envelope),
-    envelope,
-    dropped: [],
-  }));
+  const result = await apply({
+    plan,
+    roots,
+    fetch: async () => ({
+      path: source,
+      root: source,
+      contentId: contentDigest(envelope),
+      envelope,
+      dropped: [],
+    }),
+    env: process.env,
+  });
   expect(result.installed).toEqual(["demo"]);
   expect(await readFile(join(outside, "demo", "SKILL.md"), "utf8")).toBe("synthetic skill");
 });
@@ -206,7 +227,7 @@ test("does not mistake a descendant linking back to the cache root for a root al
   const fetch = vi.fn(async () => {
     throw new Error("unexpected fetch");
   });
-  await expect(apply(plan, roots, fetch)).rejects.toThrow(/symlink/i);
+  await expect(apply({ plan, roots, fetch, env: process.env })).rejects.toThrow(/symlink/i);
   expect(fetch).not.toHaveBeenCalled();
   expect(await readFile(join(actual, "demo"), "utf8")).toBe("keep");
 });

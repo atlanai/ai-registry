@@ -1,5 +1,4 @@
 import { heldAt } from "#accounts/registry.ts";
-import { AccountService } from "#accounts/service.ts";
 import { plural, withoutCredentials } from "#adapter/text.ts";
 import type { AuthList, ListedAccount } from "#cli/commands/auth/result.ts";
 import { comparableLocation } from "#core/adapter/identity.ts";
@@ -18,12 +17,9 @@ import { needsSignIn } from "./shared.ts";
 export async function list(): Promise<AuthList> {
   const config = await readConfig();
   const signedIn = await signedInAccounts();
-  const service = new AccountService();
   const needs = new Map(
     await Promise.all(
-      config.accounts.map(
-        async (account) => [account.id, await needsSignIn(service, account)] as const,
-      ),
+      config.accounts.map(async (account) => [account.id, await needsSignIn(account)] as const),
     ),
   );
   return {

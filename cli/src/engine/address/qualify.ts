@@ -3,19 +3,17 @@ import type { Entry } from "#core/catalog/catalog.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { among, relativeRef } from "#engine/address/probe.ts";
 
-/**
- * Each pick as the manifest records it: `<namespace>/<kind>/<name>`, or
- * `<kind>/<name>` where the source groups nothing. A plugin is its namespace.
- */
-export function qualify(
-  picks: readonly string[],
-  /** What `aireg registry show` takes for this registry. */
-  shown: string,
-  all: readonly Entry[],
-  /** True when only the requested names were read, so `all` is not the catalog. */
-  partial: boolean,
-  alias: string,
-): string[] {
+export interface QualifyOptions {
+  picks: readonly string[];
+  shown: string;
+  entries: readonly Entry[];
+  /** Only the requested names were read, so `entries` is not the catalog. */
+  partial: boolean;
+  alias: string;
+}
+
+/** `<namespace>/<kind>/<name>`, or `<kind>/<name>` where the source groups nothing. */
+export function qualify({ picks, shown, entries: all, partial, alias }: QualifyOptions): string[] {
   const addresses: string[] = [];
   const missing: string[] = [];
   for (const pick of picks) {

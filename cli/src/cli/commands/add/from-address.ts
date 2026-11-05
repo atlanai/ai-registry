@@ -14,7 +14,7 @@ import { reached } from "#core/plan/acquire/lock-view.ts";
 import { describeCarried } from "#core/plan/carries.ts";
 import { formatAddress, parseRef } from "#core/ref.ts";
 import type { Probed, Resolved } from "#engine/address/probe.ts";
-import { run as runPipeline } from "#engine/install/pipeline.ts";
+import { runPipeline } from "#engine/install/pipeline.ts";
 import { openAddress, showable } from "./address.ts";
 import { chosenEntries, gather, shortened } from "./choose.ts";
 import { declare, narrowedTargets, type Repin, recordRegistry } from "./declare.ts";
@@ -34,7 +34,7 @@ export async function addAddress(
     cancel(step);
     return undefined;
   }
-  const { known, input, within, resolved, asked, partial, asking, source, alias } = opened;
+  const { declared, input, within, resolved, asked, partial, asking, source, alias } = opened;
   const { catalogAlias, entries } = opened;
 
   const gathered = await gather(
@@ -71,16 +71,16 @@ export async function addAddress(
   let repinned: Repin[] = [];
   let { location, config } = source.declared;
   // `--copy` and `--for` are recorded on the entries this adds, not applied to the whole scope.
-  const result = await runPipeline(
-    loaded.roots,
-    { ...asked, scope: choices.scope, targets: undefined, copy: false },
-    context.printer,
-    context.cwd,
-    planReport(context.printer),
-    (fresh) => {
+  const result = await runPipeline({
+    roots: loaded.roots,
+    common: { ...asked, scope: choices.scope, targets: undefined, copy: false },
+    printer: context.printer,
+    cwd: context.cwd,
+    report: planReport(context.printer),
+    edit: (fresh) => {
       const { manifest } = fresh;
       let recorded: RegistrySource;
-      ({ introduced, copied, recorded } = recordRegistry(fresh, alias, known, source, resolved));
+      ({ introduced, copied, recorded } = recordRegistry(fresh, alias, declared, source, resolved));
       ({ location, config } = recorded);
 
       const narrowed = narrowedTargets(fresh, asked, choices.targets);
@@ -101,19 +101,19 @@ export async function addAddress(
         adding: new Set(
           refs.map(parseRef).flatMap((ref) => (ref.name === undefined ? [] : [formatAddress(ref)])),
         ),
-        approve: async (plan, targets) => {
-          // The targets picked for this add, which an entry may narrow from the scope's.
-          approved = await confirmPlan(asking, plan, {
-            verb: "Install",
-            targets: choices.targets ?? targets,
-            kinds: choices.kinds,
-            targetTable: fresh.targetTable,
-          });
-          return approved;
-        },
       };
     },
-  );
+    approve: async (plan, { targets, targetTable }) => {
+      approved = await confirmPlan(asking, plan, {
+        verb: "Install",
+        // The targets picked for this add, which an entry may narrow from the scope's.
+        targets: choices.targets ?? targets,
+        kinds: choices.kinds,
+        targetTable,
+      });
+      return approved;
+    },
+  });
 
   if (!approved) {
     cancel(step);

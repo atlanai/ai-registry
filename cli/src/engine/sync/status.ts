@@ -15,8 +15,6 @@ interface WatchArtifactStatus {
   path: string;
   disposition: Disposition;
   operation: SyncOperation;
-  /** False for a name the registry publishes that this job does not take. */
-  selected: boolean;
   detail: string | undefined;
 }
 
@@ -64,7 +62,6 @@ export async function watchStatus(
         path: item.path,
         disposition: item.disposition,
         operation: operation(item.disposition, job.policy),
-        selected: true,
         detail: item.detail,
       })),
     local: found.local.map(place),

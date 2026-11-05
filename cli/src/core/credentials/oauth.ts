@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { isRecord } from "#adapter/fields.ts";
 import type { Credential, OAuthClient } from "#adapter/index.ts";
 import { ERROR_CODE, signInFailed as failed, listenForCode } from "./loopback.ts";
 
@@ -97,6 +98,7 @@ async function discover(issuer: URL, signal: AbortSignal): Promise<Server> {
 async function readJson(response: Response): Promise<Record<string, unknown>> {
   const tooLarge = () => failed("The sign-in server's answer is too large.");
   if (Number(response.headers.get("content-length")) > MAX_BODY_BYTES) {
+    // The error thrown next says what went wrong; a failed cancel adds nothing to it.
     await response.body?.cancel().catch(() => undefined);
     throw tooLarge();
   }
@@ -116,14 +118,14 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
     chunks.push(read.value);
   }
   const text = Buffer.concat(chunks).toString("utf8");
+  let value: unknown;
   try {
-    const value: unknown = JSON.parse(text);
-    return typeof value === "object" && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : {};
+    value = JSON.parse(text);
   } catch {
+    // An answer that is not JSON has none of the fields a caller requires, which it reports.
     return {};
   }
+  return isRecord(value) ? value : {};
 }
 
 function trustedUrl(raw: unknown, origin: string | undefined, field: string): URL {
@@ -181,6 +183,7 @@ function aborted(limited: AbortSignal, signal: AbortSignal): Promise<never> {
     if (limited.aborted) stop();
     else limited.addEventListener("abort", stop, { once: true });
   });
+  // Awaited in a race it may lose; a late rejection must not surface as an unhandled one.
   stopped.catch(() => undefined);
   return stopped;
 }

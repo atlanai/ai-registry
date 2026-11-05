@@ -28,7 +28,7 @@ describe("an agent for a target that reads its own format", () => {
 
 describe("a target that places a kind as a folder of its own", () => {
   test("writes an agent into its own folder, never through the plugin its namespace becomes", () => {
-    const targetTable = resolveTargets();
+    const targetTable = resolveTargets(process.env);
     const claude = targetTable["claude-code"] as Target;
     targetTable["claude-code"] = {
       ...claude,
@@ -51,7 +51,7 @@ describe("a target that places a kind as a folder of its own", () => {
   });
 
   test("copies a plugin folder for a target that will not load a linked one", () => {
-    const targetTable = resolveTargets();
+    const targetTable = resolveTargets(process.env);
     const claude = targetTable["claude-code"] as Target;
     const plugin = claude.kinds.plugin as Extract<KindMapping, { shape: "directory" }>;
     targetTable["claude-code"] = {

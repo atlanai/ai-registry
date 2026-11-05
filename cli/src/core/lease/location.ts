@@ -18,6 +18,7 @@ export function canonicalLock(lock: string): string {
     try {
       return join(realpathSync.native(dir), ...rest);
     } catch {
+      // Missing, or not a folder at all, as the pipe namespace the daemon listens in on Windows.
       if (dirname(dir) === dir) return full;
       rest.unshift(basename(dir));
     }

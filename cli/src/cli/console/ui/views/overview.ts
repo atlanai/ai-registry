@@ -1,13 +1,36 @@
 import type { ReactElement, ReactNode } from "react";
 import { plural } from "#adapter/text.ts";
 import { box, dim, faint, heading, plain, text } from "#cli/console/ui/elements.ts";
+import { defineView } from "#cli/console/ui/screen.ts";
 import { health } from "#core/console/artifacts.ts";
-import type { ConsoleState } from "#core/console/model.ts";
+import type { ArtifactGroup, ConsoleState } from "#core/console/model.ts";
 import { bar, clock, interval, pad, truncate } from "#core/term/format.ts";
 import { COLOR, GLYPH, runColor, runGlyph } from "#core/term/theme.ts";
 
-/** The one screen that answers "is this machine in a good state" without scrolling. */
-export function overviewView(props: {
+export const OVERVIEW_VIEW = defineView<readonly ArtifactGroup[]>("overview", {
+  // Its cursor walks the namespaces: up and down have to do something on every view, and
+  // enter on one is the shortest path to its artifacts.
+  model: ({ state }) => state.groups,
+  length: (groups) => groups.length,
+  body: ({ frame, cursor }) =>
+    overviewView({
+      width: frame.width,
+      state: frame.state,
+      cursor,
+      extra: frame.blocks("overview"),
+    }),
+  keys: {
+    // Opens the namespace in Artifacts, with only that group shown.
+    enter: ({ model, cursor }, { dispatch }) => {
+      const group = model[cursor];
+      if (group !== undefined) {
+        dispatch({ type: "open-namespace", filter: group.authoredHere ? "" : group.key });
+      }
+    },
+  },
+});
+
+function overviewView(props: {
   width: number;
   state: ConsoleState;
   cursor: number;

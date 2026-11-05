@@ -16,7 +16,6 @@ import { type Claim, moveAside, surveyClaims } from "./claim.ts";
 import {
   artifactKey,
   classify,
-  execution,
   type Overrides,
   outcomeOf,
   type Publishable,
@@ -25,11 +24,12 @@ import {
   type SyncExecution,
   type SyncExecutionHooks,
   type SyncOutcome,
+  summarizeExecution,
 } from "./decide.ts";
 import { registryOf, syncOptions } from "./inspect.ts";
 import { applyLocal } from "./local.ts";
 import { type RunScope, scopedKeys } from "./narrow.ts";
-import { applyOrigins, originKey, takeIntoOrigins } from "./origins.ts";
+import { applyOrigins, type OriginOutcome, originKey, takeIntoOrigins } from "./origins.ts";
 import { settlePublished } from "./publish-settle.ts";
 import {
   mutateRemote,
@@ -40,17 +40,67 @@ import {
 import { closeScan, type Scan, scan } from "./scan.ts";
 import type { ScopeWork } from "./work.ts";
 
-export async function executeSync(
-  job: ScopeWork,
-  account: Account,
-  mode: RunMode,
-  /** Everything the job covers, unless this run was asked for a narrower set. */
-  refs: RunScope,
-  signal: AbortSignal,
-  hooks: SyncExecutionHooks,
-  /** Settles one named artifact whatever the policy would have chosen for it. */
-  overrides: Overrides = new Map(),
-): Promise<SyncExecution> {
+export interface ExecuteSyncOptions {
+  work: ScopeWork;
+  account: Account;
+  mode: RunMode;
+  /** Undefined runs everything the job covers. */
+  refs?: RunScope;
+  signal: AbortSignal;
+  hooks: SyncExecutionHooks;
+  overrides?: Overrides | undefined;
+}
+
+interface SyncRun {
+  work: ScopeWork;
+  account: Account;
+  mode: RunMode;
+  refs: RunScope;
+  signal: AbortSignal;
+  hooks: SyncExecutionHooks;
+  overrides: Overrides;
+  common: CommonOptions;
+  publishable: Publishable;
+  rescan: (loaded: Loaded) => Promise<Scan>;
+}
+
+type Claimed = Claim & { keys: string[] };
+
+interface Classification {
+  scoped: Scoped;
+  outcomes: SyncOutcome[];
+  operations: ReadonlyMap<string, SyncOperation>;
+  pending: OriginOutcome[];
+  /** Publishes and archives, reported once the registry answers. */
+  deferred: SyncOutcome[];
+  /** Outcomes an import is about to change, reported after the rescan that follows it. */
+  held: SyncOutcome[];
+  claimed: Claimed[];
+  /** Whether the run writes here or upstream, and so needs the lease. */
+  writes: boolean;
+}
+
+interface Imported {
+  current: Scan;
+  operations: ReadonlyMap<string, SyncOperation>;
+  deferred: SyncOutcome[];
+  /** Lock keys the import refreshed. */
+  refreshed: readonly string[];
+  settled: ReadonlyMap<SyncOutcome, SyncOutcome>;
+}
+
+interface LocalWrite {
+  scoped: Scoped;
+  claimed: readonly Claimed[];
+  loaded: Loaded;
+  current: Scan;
+  writes: ReadonlySet<string>;
+  /** Lock keys the import refreshed. */
+  refreshed: readonly string[];
+  remote: RemoteMutationResult;
+}
+
+export async function executeSync(options: ExecuteSyncOptions): Promise<SyncExecution> {
   // Every scan is closed when the run ends, not when the next replaces it: a
   // pull may still be reading from an earlier one's sources.
   const scans: Scan[] = [];
@@ -60,150 +110,36 @@ export async function executeSync(
     return found;
   };
   try {
-    return await executeScanned(job, account, mode, refs, signal, hooks, overrides, scanned);
+    return await executeScanned(options, scanned);
   } finally {
     await Promise.all(scans.map(closeScan));
   }
 }
 
 async function executeScanned(
-  job: ScopeWork,
-  account: Account,
-  mode: RunMode,
-  refs: RunScope,
-  signal: AbortSignal,
-  hooks: SyncExecutionHooks,
-  overrides: Overrides,
+  options: ExecuteSyncOptions,
   scanning: typeof scan,
 ): Promise<SyncExecution> {
-  const common = syncOptions(job, refs);
-  let loaded = await load(common, job.root);
-  const source = registryOf(loaded, account);
-
-  const publishable = await publishableTo(account, source);
-
-  enter(hooks, "listing");
-  const downloaded = new Set<string>();
-  const onDownload = (artifact: Artifact) => {
-    const name = artifact.envelope.metadata.name;
-    if (downloaded.has(name)) return;
-    downloaded.add(name);
-    hooks.event(RunEventType.Progress, "downloading", name, { step: "downloading" });
+  const common = syncOptions(options.work, options.refs);
+  const loaded = await load(common, options.work.root);
+  const run: SyncRun = {
+    work: options.work,
+    account: options.account,
+    mode: options.mode,
+    refs: options.refs,
+    signal: options.signal,
+    hooks: options.hooks,
+    overrides: options.overrides ?? new Map(),
+    common,
+    publishable: await publishableTo(options.account, registryOf(loaded, options.account)),
+    rescan: scannerFor(options, common, scanning),
   };
-  // Only this job's registry: opening another account's lets two organizations on one tree
-  // fail each other's runs.
-  const aliases = [account.registry];
-  // Released for the manifest each scan reads, which a reload may change, and checked against
-  // every declared alias, since two can read one token variable.
-  const released = () => {
-    registryOf(loaded, account);
-    return credentialsForManifest(loaded.manifest.registries, job.root, signal, [account.registry]);
-  };
-  const rescan = async () =>
-    scanning(loaded, common, { aliases, credentials: await released(), signal, onDownload });
-  let current = await rescan();
-  enter(hooks, "classifying");
-  // Before anything is classified: a ref that reaches nothing is the caller's
-  // mistake, not an empty run.
-  const scoped = scopedKeys(refs, current, account.registry);
-  const reclassify = () =>
-    classify(current, job, account.registry, scoped, mode, overrides, publishable);
-  const classified = reclassify();
-  const outcomes = [...classified.outcomes.values()];
-  const initialOperations = new Map(
-    [...classified.outcomes].map(([key, item]) => [key, item.operation]),
-  );
-  // Read before the lease and reported either way: an import that changed is a
-  // local write, so it needs the lease even when nothing goes upstream.
-  const pending = await pendingOrigins(job, loaded, hooks);
-  // What an import is about to change settles as the rescan after it classifies it.
-  const importing = new Set(
-    pending.filter((item) => item.state === "refreshed").map((item) => originKey(item.origin)),
-  );
-  // Settled after the publish, so a refusal is reported on its own artifact.
-  const reported = reportClassified(outcomes, hooks, importing);
-  let deferred = reported.deferred;
-  const claimed = await claims(current, job, account.registry, scoped, mode, outcomes, hooks);
-
-  if (
-    classified.mutates ||
-    classified.writes.size > 0 ||
-    pending.length > 0 ||
-    claimed.length > 0 ||
-    movedPluginLinks(loaded.lock, loaded, new Set(aliases)).size > 0
-  ) {
-    // One lease over the publish and the write, and it waits rather than fails:
-    // the expensive half already happened outside it, so the wait is short.
-    await withLease(loaded.roots, { wait: true, signal }, async () => {
-      // Before the rescan, so the pull links the registry's copy where these sat.
-      await moveClaimedAside(claimed, loaded.roots, account.registry, hooks);
-      // Whoever held the lease may have written the lock while this run was
-      // computing against it, so the plan is rebased on what is there now.
-      loaded = await load(common, job.root);
-      current = await rescan();
-      const rebased = reclassify();
-
-      // After the pull: a name the registry already publishes is claimed by
-      // the lock by now, so a colliding import is reported, not sent as a rival.
-      const imported = await applyOrigins(pending, loaded.lock, loaded.roots);
-      warnRefused(imported.refused, hooks);
-      // The copies moved, so a push has to reread. Not the lock: the rows just
-      // written live in it, and rereading would discard them.
-      let operations: ReadonlyMap<string, SyncOperation> = initialOperations;
-      let after: ReturnType<typeof reclassify> | undefined;
-      if (imported.refreshed.length > 0) {
-        current = await rescan();
-        // What was just imported is classified now, so it goes out in this run rather than the next.
-        after = reclassify();
-        const refreshed = refreshedKeys(imported.refreshed, loaded.lock);
-        operations = withRefreshed(initialOperations, refreshed, after);
-        deferred = importedDeferred(
-          deferred,
-          current,
-          refreshed,
-          after.outcomes,
-          initialOperations,
-        );
-      }
-      deferred.push(...settleHeld(reported.held, after, imported.refreshed, outcomes, hooks));
-
-      // A refused publish must not skip pulls the run already classified.
-      const { remote, remoteError } = await publishAndSettle(
-        (hooksFor) =>
-          mutateRemote(
-            current,
-            loaded.roots,
-            registryOf(loaded, account),
-            account,
-            operations,
-            signal,
-            hooksFor,
-          ),
-        deferred,
-        hooks,
-      );
-
-      let names = rebased.writes;
-      // A folder step's rows are recorded by the same write as everything else,
-      // so the plan has to be told they are part of this run.
-      for (const key of imported.refreshed) names.add(key);
-      // A remote mutation changes what is on disk, so the apply step follows the fresh scan.
-      if (remote.published.size > 0 || remote.archived.size > 0) {
-        loaded = await reloadKeeping(common, job.root, loaded, imported.refreshed);
-        current = await rescan();
-        names = reclassify().writes;
-      }
-      for (const name of remote.published.keys()) names.add(name);
-      for (const claim of claimed) for (const key of claim.keys) names.add(key);
-      signal.throwIfAborted();
-      enter(hooks, "applying");
-      await applyReported(loaded, common, current, names, remote.published, overrides, hooks);
-      await takeTheirs(overrides, current, loaded.roots, account.registry, hooks);
-      if (remoteError !== undefined) throw remoteError;
-    });
-  }
-  enter(hooks, "finalizing");
-  return execution(outcomes);
+  const current = await listRun(run, loaded);
+  const classification = await classifyRun(run, loaded, current);
+  const outcomes = classification.writes
+    ? await applyRun(run, loaded, classification)
+    : classification.outcomes;
+  return finalizeRun(run.hooks, outcomes);
 }
 
 /**
@@ -211,6 +147,7 @@ async function executeScanned(
  * failing the whole run at write time every interval.
  */
 async function publishableTo(account: Account, source: RegistrySource): Promise<Publishable> {
+  // An adapter that fails to load is reported when the publish opens it.
   const adapter = await adapterFor(
     source.location,
     source.adapter,
@@ -223,6 +160,87 @@ async function publishableTo(account: Account, source: RegistrySource): Promise<
     (adapter === undefined ||
       (adapter.capabilities.publish !== false &&
         (adapter.publishKinds === undefined || adapter.publishKinds.includes(kind))));
+}
+
+function scannerFor(
+  { account, work, signal, hooks }: ExecuteSyncOptions,
+  common: CommonOptions,
+  scanning: typeof scan,
+): SyncRun["rescan"] {
+  const downloaded = new Set<string>();
+  const onDownload = (artifact: Artifact) => {
+    const name = artifact.envelope.metadata.name;
+    if (downloaded.has(name)) return;
+    downloaded.add(name);
+    hooks.event(RunEventType.Progress, "downloading", name, { step: "downloading" });
+  };
+  // Only this job's registry: opening another account's lets two organizations on one tree
+  // fail each other's runs.
+  const aliases = [account.registry];
+  return async (loaded) => {
+    // Released for the manifest each scan reads, which a reload may change, and checked against
+    // every declared alias, since two can read one token variable.
+    registryOf(loaded, account);
+    const credentials = await credentialsForManifest(
+      loaded.manifest.registries,
+      work.root,
+      signal,
+      aliases,
+    );
+    return scanning(loaded, common, { aliases, credentials, signal, onDownload });
+  };
+}
+
+async function listRun(run: SyncRun, loaded: Loaded): Promise<Scan> {
+  enter(run.hooks, "listing");
+  return run.rescan(loaded);
+}
+
+async function classifyRun(run: SyncRun, loaded: Loaded, current: Scan): Promise<Classification> {
+  const { work, account, hooks } = run;
+  enter(hooks, "classifying");
+  // Before anything is classified: a ref that reaches nothing is the caller's
+  // mistake, not an empty run.
+  const scoped = scopedKeys(run.refs, current, account.registry);
+  const classified = classifyScan(run, scoped, current);
+  const outcomes = [...classified.outcomes.values()];
+  // Read before the lease and reported either way: an import that changed is a
+  // local write, so it needs the lease even when nothing goes upstream.
+  const pending = await pendingOrigins(work, loaded, hooks);
+  // What an import is about to change settles as the rescan after it classifies it.
+  const importing = new Set(
+    pending.filter((item) => item.state === "refreshed").map((item) => originKey(item.origin)),
+  );
+  // Settled after the publish, so a refusal is reported on its own artifact.
+  const { deferred, held } = reportClassified(outcomes, hooks, importing);
+  const { claimed, attention } = await claims(run, current, scoped);
+  return {
+    scoped,
+    outcomes: [...outcomes, ...attention],
+    operations: new Map([...classified.outcomes].map(([key, item]) => [key, item.operation])),
+    pending,
+    deferred,
+    held,
+    claimed,
+    writes:
+      classified.mutates ||
+      classified.writes.size > 0 ||
+      pending.length > 0 ||
+      claimed.length > 0 ||
+      movedPluginLinks(loaded.lock, loaded, new Set([account.registry])).size > 0,
+  };
+}
+
+function classifyScan(run: SyncRun, scoped: Scoped, current: Scan): ReturnType<typeof classify> {
+  return classify(
+    current,
+    run.work,
+    run.account.registry,
+    scoped,
+    run.mode,
+    run.overrides,
+    run.publishable,
+  );
 }
 
 /**
@@ -274,35 +292,32 @@ function reportOutcome(outcome: SyncOutcome, hooks: SyncExecutionHooks): void {
  * is held for a person, and identical ones are moved aside once the registry's copy is pulled.
  */
 async function claims(
+  { work, account, mode, hooks }: SyncRun,
   current: Scan,
-  job: ScopeWork,
-  registry: string,
   scoped: Scoped,
-  mode: RunMode,
-  outcomes: SyncOutcome[],
-  hooks: SyncExecutionHooks,
-): Promise<(Claim & { keys: string[] })[]> {
+): Promise<{ claimed: Claimed[]; attention: SyncOutcome[] }> {
   // Opt-in: without it a person's folder is theirs, and the registry copy is left out instead.
-  if (job.policy.claim !== "on") return [];
-  if (scoped !== undefined || mode === "publish") return [];
-  const moving: (Claim & { keys: string[] })[] = [];
+  if (work.policy.claim !== "on") return { claimed: [], attention: [] };
+  if (scoped !== undefined || mode === "publish") return { claimed: [], attention: [] };
+  const registry = account.registry;
+  const claimed: Claimed[] = [];
+  const attention: SyncOutcome[] = [];
   for (const claim of await surveyClaims(current.undeclared, current.acquired, registry)) {
     // Only what this job installs: moving anything else would leave nothing in its place.
     const keys = current.items
       .filter((item) => item.source === registry && claim.entries.includes(item.path))
       .map((item) => item.name);
     if (keys.length === 0) continue;
-    if (claim.identical.length > 0 && job.policy.pull === "on") {
-      moving.push({ ...claim, keys });
+    if (claim.identical.length > 0 && work.policy.pull === "on") {
+      claimed.push({ ...claim, keys });
     }
     if (claim.different.length === 0) continue;
-    const outcome: SyncOutcome = {
+    attention.push({
       artifact: claim.name,
       kind: claim.kind,
       disposition: "conflict",
       operation: "attention",
-    };
-    outcomes.push(outcome);
+    });
     hooks.item(
       claim.name,
       "classifying",
@@ -313,7 +328,50 @@ async function claims(
       },
     );
   }
-  return moving;
+  return { claimed, attention };
+}
+
+/** The import, publish and write, under one lease. */
+async function applyRun(
+  run: SyncRun,
+  loaded: Loaded,
+  classification: Classification,
+): Promise<SyncOutcome[]> {
+  const { account, hooks, signal } = run;
+  // One lease over the publish and the write, and it waits rather than fails:
+  // the expensive half already happened outside it, so the wait is short.
+  return withLease(loaded.roots, { wait: true, signal }, async () => {
+    // Before the rescan, so the pull links the registry's copy where these sat.
+    await moveClaimedAside(classification.claimed, loaded.roots, account.registry, hooks);
+    const rebased = await rebase(run, classification.scoped);
+    const imported = await importPending(run, classification, rebased);
+    // A refused publish must not skip pulls the run already classified.
+    const { remote, remoteError } = await publishAndSettle(
+      (hooksFor) =>
+        mutateRemote(
+          imported.current,
+          rebased.loaded.roots,
+          registryOf(rebased.loaded, account),
+          account,
+          imported.operations,
+          signal,
+          hooksFor,
+        ),
+      imported.deferred,
+      hooks,
+    );
+    await writeLocal(run, {
+      scoped: classification.scoped,
+      claimed: classification.claimed,
+      loaded: rebased.loaded,
+      current: imported.current,
+      writes: rebased.writes,
+      refreshed: imported.refreshed,
+      remote,
+    });
+    if (remoteError !== undefined) throw remoteError;
+    return classification.outcomes.map((item) => imported.settled.get(item) ?? item);
+  });
 }
 
 /** The identical copies a claim found, moved aside so the pull can link the registry's. */
@@ -334,6 +392,51 @@ async function moveClaimedAside(
       detail: `already in ${registry}; moved ${from} to ${to}`,
     });
   }
+}
+
+// Another lease holder may have written the lock meanwhile, so the plan is rebased on it.
+async function rebase(
+  run: SyncRun,
+  scoped: Scoped,
+): Promise<{ loaded: Loaded; current: Scan; writes: ReadonlySet<string> }> {
+  const loaded = await load(run.common, run.work.root);
+  const current = await run.rescan(loaded);
+  return { loaded, current, writes: classifyScan(run, scoped, current).writes };
+}
+
+// After the pull, a name the registry publishes is in the lock, so a colliding import is
+// reported rather than sent as a rival.
+async function importPending(
+  run: SyncRun,
+  classification: Classification,
+  { loaded, current }: { loaded: Loaded; current: Scan },
+): Promise<Imported> {
+  const { hooks } = run;
+  const initial = classification.operations;
+  const imported = await applyOrigins(classification.pending, loaded.lock, loaded.roots);
+  warnRefused(imported.refused, hooks);
+  // The copies moved, so a push has to reread. Not the lock: the rows just
+  // written live in it, and rereading would discard them.
+  let rescanned = current;
+  let operations = initial;
+  let deferred = classification.deferred;
+  let after: ReturnType<typeof classify> | undefined;
+  if (imported.refreshed.length > 0) {
+    rescanned = await run.rescan(loaded);
+    // What was just imported is classified now, so it goes out in this run rather than the next.
+    after = classifyScan(run, classification.scoped, rescanned);
+    const refreshed = refreshedKeys(imported.refreshed, loaded.lock);
+    operations = withRefreshed(initial, refreshed, after);
+    deferred = importedDeferred(deferred, rescanned, refreshed, after.outcomes, initial);
+  }
+  const held = settleHeld(classification.held, after, imported.refreshed, hooks);
+  return {
+    current: rescanned,
+    operations,
+    deferred: [...deferred, ...held.deferred],
+    refreshed: imported.refreshed,
+    settled: held.settled,
+  };
 }
 
 function warnRefused(
@@ -400,20 +503,20 @@ function settleHeld(
   held: readonly SyncOutcome[],
   after: { outcomes: ReadonlyMap<string, SyncOutcome> } | undefined,
   refreshed: readonly string[],
-  outcomes: SyncOutcome[],
   hooks: SyncExecutionHooks,
-): SyncOutcome[] {
+): { deferred: SyncOutcome[]; settled: Map<SyncOutcome, SyncOutcome> } {
   const deferred: SyncOutcome[] = [];
+  const settled = new Map<SyncOutcome, SyncOutcome>();
   for (const before of held) {
     const now =
       (refreshed.includes(before.artifact)
         ? after?.outcomes.get(artifactKey(before.kind, before.artifact))
         : undefined) ?? before;
-    outcomes[outcomes.indexOf(before)] = now;
+    settled.set(before, now);
     if (sends(now)) deferred.push(now);
     else reportOutcome(now, hooks);
   }
-  return deferred;
+  return { deferred, settled };
 }
 
 /** Publishes, then settles each deferred outcome on what its own artifact met. */
@@ -457,6 +560,31 @@ async function publishAndSettle(
   return { remote, remoteError };
 }
 
+async function writeLocal(run: SyncRun, write: LocalWrite): Promise<void> {
+  const { common, work, signal, hooks, overrides, account } = run;
+  const { remote, refreshed } = write;
+  // A remote mutation changes what is on disk, so the apply step follows the fresh scan.
+  const mutated = remote.published.size > 0 || remote.archived.size > 0;
+  const loaded = mutated
+    ? await reloadKeeping(common, work.root, write.loaded, refreshed)
+    : write.loaded;
+  const current = mutated ? await run.rescan(loaded) : write.current;
+  // A folder step's rows are recorded by the same write as everything else,
+  // so the plan has to be told they are part of this run.
+  const planned = mutated
+    ? classifyScan(run, write.scoped, current).writes
+    : [...write.writes, ...refreshed];
+  const names = new Set([
+    ...planned,
+    ...remote.published.keys(),
+    ...write.claimed.flatMap((claim) => claim.keys),
+  ]);
+  signal.throwIfAborted();
+  enter(hooks, "applying");
+  await applyReported(loaded, common, current, names, remote.published, overrides, hooks);
+  await takeTheirs(overrides, current, loaded.roots, account.registry, hooks);
+}
+
 /** Folder rows live only in memory until the write, so they cross the reload. */
 async function reloadKeeping(
   common: Parameters<typeof load>[0],
@@ -485,10 +613,18 @@ async function applyReported(
   // An override is a person overruling the edit that caused the conflict, so
   // the guard against an unasked-for overwrite has nothing left to protect.
   const forced = [...overrides.values()].some((item) => item === "pull" || item === "remove-local");
-  const applied = await applyLocal(loaded, common, current, names, published, forced, (action) => {
-    if (action.kind !== "record") {
-      hooks.event(RunEventType.Progress, "applying", action.name, { step: action.kind });
-    }
+  const applied = await applyLocal({
+    loaded,
+    common,
+    scan: current,
+    names,
+    published,
+    force: forced,
+    onStep: (action) => {
+      if (action.kind !== "record") {
+        hooks.event(RunEventType.Progress, "applying", action.name, { step: action.kind });
+      }
+    },
   });
   // What it did to a person's files, said wherever the run is followed.
   for (const notice of applied.notices) {
@@ -516,6 +652,11 @@ async function takeTheirs(
         : `Kept ${taken.folder} as it is, since aireg may not replace it.`,
     });
   }
+}
+
+function finalizeRun(hooks: SyncExecutionHooks, outcomes: SyncOutcome[]): SyncExecution {
+  enter(hooks, "finalizing");
+  return summarizeExecution(outcomes);
 }
 
 function enter(hooks: SyncExecutionHooks, phase: RunPhase): void {

@@ -19,25 +19,32 @@ import type { Printer } from "#core/term/printer.ts";
 import { VERSION } from "#core/version.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/scope/load.ts";
-import type { RunHooks } from "./pipeline.ts";
+import type { RunRequest } from "./pipeline.ts";
 
-/**
- * The lock is the source of truth: a registry it fully answers is planned
- * from it, and its registry is opened only for what the lock cannot supply.
- */
-export async function plan(
-  loaded: Loaded,
-  common: CommonOptions,
-  printer: Printer,
-  cwd: string,
-  hooks: RunHooks,
-  targets: readonly string[],
-  nameCollision: NameCollision,
-): Promise<{ planned: Plan; acquired: Acquired[] }> {
-  const { roots, manifest, lock, targetTable } = loaded;
+export interface PlanOptions {
+  loaded: Loaded;
+  common: CommonOptions;
+  printer: Printer;
+  cwd: string;
+  request: RunRequest;
+  targets: readonly string[];
+  nameCollision: NameCollision;
+}
+
+/** The lock is the source of truth; a registry is opened only for what the lock cannot supply. */
+export async function plan({
+  loaded,
+  common,
+  printer,
+  cwd,
+  request,
+  targets,
+  nameCollision,
+}: PlanOptions): Promise<{ planned: Plan; acquired: Acquired[] }> {
+  const { roots, env, manifest, lock, targetTable } = loaded;
   const aliases = Object.keys(manifest.registries);
   // Carried rows are planned from the lock alone, so their copies are not hashed.
-  const opened = hooks.aliases === undefined ? undefined : new Set(hooks.aliases);
+  const opened = request.aliases === undefined ? undefined : new Set(request.aliases);
   const surveyed =
     opened === undefined
       ? lock
@@ -49,20 +56,20 @@ export async function plan(
         };
   const state = await survey(surveyed, roots);
 
-  const moving = hooks.moving ?? new Set<string>();
+  const moving = request.moving ?? new Set<string>();
   // What the manifest's artifacts depend on, asked of their registry once a plan finds it missing.
   const needs = new Map<string, Want[]>();
   const settled = new Map<string, Acquired>();
   const view = lockView(lock);
-  for (const alias of hooks.aliases ?? aliases) {
+  for (const alias of request.aliases ?? aliases) {
     if (view.rows(alias).some(([name]) => moving.has(name))) continue;
     const source = view.source(alias);
-    if (source === undefined || !answers(manifest, source, hooks.held)) continue;
+    if (source === undefined || !answers(manifest, source, request.held)) continue;
     // Only user scope wraps; an adapter that will not load leaves its rows as the lock has them.
     const namespacePlugins =
       roots.scope === "user" &&
       (await loadAdapter(source.origin.adapter).then(wrapsNamespaces, () =>
-        wrappedInLock(view.rows(alias), { roots, targetTable }),
+        wrappedInLock(view.rows(alias), { roots, env, targetTable }),
       ));
     settled.set(alias, { ...source, namespacePlugins });
   }
@@ -73,25 +80,26 @@ export async function plan(
       aliases: only,
       onStep: (message) => printer.step(message),
       credentials: await credentialsForManifest(manifest.registries, cwd, undefined, only),
-      locked: { lock, moving, held: hooks.held === true },
+      locked: { lock, moving, held: request.held === true },
       needs,
     });
-  const acquired = await open((hooks.aliases ?? aliases).filter((alias) => !settled.has(alias)));
+  const acquired = await open((request.aliases ?? aliases).filter((alias) => !settled.has(alias)));
   try {
     await runPipelineHooks("prePlan", { targets, aliases });
     const planFrom = (sources: readonly Acquired[]) =>
       build(manifest, lock, sources, state, {
         roots,
+        env,
         targets,
         targetTable,
         force: common.force,
         copy: common.copy,
-        refresh: hooks.refresh === true,
+        refresh: request.refresh === true,
         cliVersion: VERSION,
         nameCollision,
-        ...(hooks.aliases === undefined ? {} : { opened: hooks.aliases }),
-        ...(hooks.discard === undefined ? {} : { discard: hooks.discard }),
-        ...(hooks.adopt === undefined ? {} : { adopt: hooks.adopt }),
+        ...(request.aliases === undefined ? {} : { opened: request.aliases }),
+        ...(request.discard === undefined ? {} : { discard: request.discard }),
+        ...(request.adopt === undefined ? {} : { adopt: request.adopt }),
       });
     let planned = planFrom([...settled.values(), ...acquired]);
     while (planned.conflicts.length === 0) {

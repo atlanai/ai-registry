@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
-import { PUBLIC_FILE } from "#adapter/files.ts";
+import { ifPresent, PUBLIC_FILE } from "#adapter/files.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { inspectAdapterModule, isBuiltinAdapter } from "#core/adapter/load.ts";
 import { updateConfig } from "#core/config/repository.ts";
@@ -102,7 +102,7 @@ export async function unpinAdapter(
 /** Every version folder aireg installed for this adapter; its data beside them stays. */
 async function removeVersions(id: string, env: NodeJS.ProcessEnv): Promise<void> {
   const dir = adapterDataDir(id, env);
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  const entries = (await ifPresent(readdir(dir, { withFileTypes: true }))) ?? [];
   for (const entry of entries) {
     if (!entry.isDirectory() || !existsSync(join(dir, entry.name, ADAPTER_MODULE_FILE))) continue;
     await rm(join(dir, entry.name), { recursive: true, force: true });

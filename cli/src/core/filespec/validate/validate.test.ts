@@ -123,6 +123,12 @@ const CASES: Case[] = [
     message: "changed since 1.0.0 was released",
   },
   {
+    name: "a released envelope that is JSON but not an object",
+    edit: (root) => writeFile(join(root, "artifacts/eng/skill/lint/1.0.0/artifact.json"), "null"),
+    path: "artifacts/eng/skill/lint/1.0.0/artifact.json",
+    message: "was edited",
+  },
+  {
     name: "a file path that would make the version a repository",
     edit: async (root) => {
       const at = join(root, "artifacts/eng/skill/lint/1.0.0/artifact.json");

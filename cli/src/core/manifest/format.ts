@@ -76,7 +76,7 @@ function exportData(entry: Export): unknown {
 
 /** `targets:` under its earlier name, each id as aireg 0.1 knew it, so that version reads it. */
 export function inEarlierNames(data: Record<string, unknown>): Record<string, unknown> {
-  const table = resolveTargets();
+  const table = resolveTargets(process.env);
   const rename = (entry: Record<string, unknown>): Record<string, unknown> => {
     if (!Array.isArray(entry.targets)) return entry;
     const renamed: Record<string, unknown> = {};

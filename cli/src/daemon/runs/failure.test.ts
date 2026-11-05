@@ -121,7 +121,7 @@ describe("failure classification", () => {
   });
 
   test("names a lease another writer took over, and retries from what it wrote", () => {
-    const lost = new LeaseError("Another process took over the lease", "lease_lost");
+    const lost = new LeaseError("Another process took over the lease", { reason: "lease_lost" });
     expect(classifyFailure(lost, undefined, 0)).toEqual({
       state: "failed",
       errorCode: "lease_lost",

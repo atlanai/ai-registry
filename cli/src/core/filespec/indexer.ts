@@ -103,7 +103,7 @@ export async function listed(
 }
 
 async function listedNow(root: string, at: string): Promise<Map<string, unknown>> {
-  const raw = await json(root, at);
+  const raw = await readJsonAt(root, at);
   const rows = (raw as { versions?: unknown } | undefined)?.versions;
   return new Map(
     Array.isArray(rows)
@@ -115,7 +115,7 @@ async function listedNow(root: string, at: string): Promise<Map<string, unknown>
   );
 }
 
-function json(root: string, path: string): Promise<unknown | undefined> {
+function readJsonAt(root: string, path: string): Promise<unknown | undefined> {
   return readJson(rootReader(root), path);
 }
 
@@ -183,7 +183,7 @@ async function indexRootNow(root: string, at: string): Promise<Indexed> {
     // Written once per run, so indexing stays linear in the number of versions.
     const current = pending.has(versionsAt)
       ? pending.get(versionsAt)
-      : await json(root, versionsAt);
+      : await readJsonAt(root, versionsAt);
     const versions = mergedVersions(current, offered, at);
     pending.set(versionsAt, versions);
     listings.get(versionsAt)?.set(offered.version, offered.digest);
@@ -208,7 +208,7 @@ async function indexRootNow(root: string, at: string): Promise<Indexed> {
     moved.push(found.offered);
     paths.push(versionsAt);
   }
-  const existing = await json(root, INDEX_DOCUMENT);
+  const existing = await readJsonAt(root, INDEX_DOCUMENT);
   const index = await withoutDeleted(root, mergedIndex(existing, [...latest.values()], at), at);
   if (added.length > 0 || specJson(index) !== specJson(existing)) {
     await writeAtomic(join(root, INDEX_DOCUMENT), specJson(index));
@@ -222,7 +222,8 @@ async function indexRootNow(root: string, at: string): Promise<Indexed> {
  * whose envelope still has its content digest is recomputed, so changed content stays an error.
  */
 async function recatalog(root: string, versionsAt: string): Promise<boolean> {
-  const document = await json(root, versionsAt).catch(() => undefined);
+  // Only a document that reads is recomputed; `registry validate` reports one that does not.
+  const document = await readJsonAt(root, versionsAt).catch(() => undefined);
   if (!isRecord(document) || !Array.isArray(document.versions)) return false;
   const rows: unknown[] = document.versions;
   const versions: unknown[] = [];
@@ -238,7 +239,8 @@ async function recatalog(root: string, versionsAt: string): Promise<boolean> {
 async function recataloged(root: string, versionsAt: string, row: unknown): Promise<unknown> {
   if (!isRecord(row) || typeof row.catalog_digest !== "string") return row;
   if (typeof row.version !== "string" || !isVersion(row.version)) return row;
-  const envelope = await json(
+  // A row whose envelope will not read is left as it is.
+  const envelope = await readJsonAt(
     root,
     `${posix.dirname(versionsAt)}/${row.version}/${ENVELOPE}`,
   ).catch(() => undefined);
@@ -279,7 +281,7 @@ async function envelopeOf(
     bytes.set(record.path, read.bytes);
     files.push(describeFile(record.path, read.digest, read.size));
   }
-  const existing = (await json(root, `${folder.at}/${ENVELOPE}`)) as
+  const existing = (await readJsonAt(root, `${folder.at}/${ENVELOPE}`)) as
     | { metadata?: Partial<EnvelopeMetadata>; spec?: unknown; relationships?: unknown }
     | undefined;
   const onDisk = new Set(records.map((record) => record.path));
@@ -359,6 +361,7 @@ async function blobProblem(
   file: FileDescriptor,
   locator: string,
 ): Promise<string | undefined> {
+  // Any failure is itself the problem reported.
   const read = await hashRegular(root, locator).catch(() => undefined);
   if (read === undefined) return "could not be read";
   if (read.kind === "missing") return "is missing";
@@ -376,7 +379,7 @@ async function currentLatest(
 ): Promise<
   { offered: OfferedVersion; document: Record<string, unknown>; moved: boolean } | undefined
 > {
-  const raw = await json(root, versionsAt);
+  const raw = await readJsonAt(root, versionsAt);
   if (typeof raw !== "object" || raw === null) return undefined;
   const document = raw as Record<string, unknown>;
   const rows = Array.isArray(document.versions) ? (document.versions as unknown[]) : [];
@@ -387,7 +390,7 @@ async function currentLatest(
     | undefined;
   if (version === undefined || typeof row?.digest !== "string") return undefined;
   const [, namespace = "", kind = "", name = ""] = versionsAt.split(posix.sep);
-  const envelope = (await json(
+  const envelope = (await readJsonAt(
     root,
     `${versionsAt.replace(/versions\.json$/, version)}/${ENVELOPE}`,
   )) as { metadata?: { description?: unknown } } | undefined;

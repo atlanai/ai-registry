@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { box, dim, faint, heading, text } from "#cli/console/ui/elements.ts";
+import { defineView } from "#cli/console/ui/screen.ts";
 import { underHome } from "#cli/render/home.ts";
 import { STEP_POLICIES } from "#core/config/model.ts";
 import { configPath } from "#core/config/repository.ts";
@@ -7,6 +8,19 @@ import type { ConsoleState } from "#core/console/model.ts";
 import { POLICY_AXES, type PolicyAxis, type SyncPolicy } from "#core/sync/policy.ts";
 import { interval, pad } from "#core/term/format.ts";
 import { COLOR } from "#core/term/theme.ts";
+
+export const SETTINGS_VIEW = defineView<readonly PolicyAxis[]>("settings", {
+  model: () => POLICY_AXES,
+  length: (axes) => axes.length,
+  body: ({ frame, cursor }) =>
+    settingsView({
+      width: frame.width,
+      state: frame.state,
+      cursor,
+      extra: frame.blocks("settings"),
+    }),
+  keys: {},
+});
 
 /** What each of `STEP_POLICIES` means on an axis, in that order. */
 const MEANING: Record<PolicyAxis, readonly string[]> = {

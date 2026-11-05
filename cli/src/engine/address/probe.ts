@@ -71,8 +71,8 @@ export interface Probed {
   labelsOf: (entry: Entry) => Readonly<Record<string, string>> | undefined;
   /** What a plugin from a source that is not a registry would have a target start. */
   carriesOf: (entry: Entry) => readonly Carried[];
-  /** The bytes an entry names, fetched now if they are not already here. */
-  content: (entry: Entry) => Promise<string>;
+  /** Fetches the entry's bytes if they are not staged yet. */
+  stage: (entry: Entry) => Promise<string>;
   /** The adapter that read it, as a lockfile records it. */
   adapter: string;
   /** The content digest the source serves for one want, or undefined when it serves none. */
@@ -127,9 +127,7 @@ export function throughManifest(
   registries: Readonly<Record<string, RegistrySource>>,
   flags: SourceFlags,
 ): Resolved {
-  // Split before the version, so `house@1.0.0` still finds the alias it names
-  // and is answered by the reference grammar rather than by the URL parser.
-  const alias = (input.split("@")[0] ?? input).split("/")[0] ?? input;
+  const alias = aliasIn(input);
   const source = registries[alias];
   if (source === undefined) {
     return {
@@ -171,6 +169,11 @@ export function throughManifest(
     alias,
     aliases: Object.keys(registries),
   };
+}
+
+/** Split before the version, so `house@1.0.0` still names its alias. */
+export function aliasIn(address: string): string {
+  return (address.split("@")[0] ?? address).split("/")[0] ?? address;
 }
 
 /** Flags win over the manifest, so `--ref` can override a pinned registry. */
@@ -301,8 +304,11 @@ export async function probeAddress(
   cwd: string,
   want: readonly Want[],
 ): Promise<Probed> {
+  const { input, flags } = resolved;
+  const read = (asked: readonly Want[]) =>
+    probe({ input, flags, cwd, want: asked, declared: resolved });
   try {
-    return await probe(resolved.input, resolved.flags, cwd, want, resolved);
+    return await read(want);
   } catch (error) {
     const { name, namespace, kind } = resolved;
     const versioned = want.some((item) => item.version !== undefined);
@@ -310,9 +316,8 @@ export async function probeAddress(
     const failure = adapterOf(error)?.failure;
     if (failure !== "invalid" && failure !== "not_found") throw error;
     // Read again only after such a failure, so a versioned address costs one read otherwise.
-    const bare = await probe(resolved.input, resolved.flags, cwd, [{ name }], resolved).catch(
-      () => undefined,
-    );
+    // The first failure is the one to report, whatever this read hits.
+    const bare = await read([{ name }]).catch(() => undefined);
     if (bare === undefined) throw error;
     try {
       among(bare.catalog.entries, resolved.alias ?? bare.alias, { name, namespace });
@@ -399,19 +404,24 @@ function addressOf(place: ArtifactPlace): string {
   return place.version === undefined ? address : `${address}@${place.version}`;
 }
 
-/**
- * Reads a registry without installing it: resolving and fetching are
- * separate, so listing hundreds of artifacts does not download them.
- */
-export async function probe(
-  input: string,
-  flags: SourceFlags,
-  cwd: string,
-  /** What to ask for, at the version wanted. Empty asks for everything. */
-  want: readonly Want[] = [],
+export interface ProbeOptions {
+  input: string;
+  flags: SourceFlags;
+  cwd: string;
+  /** Empty asks for everything. */
+  want?: readonly Want[] | undefined;
   /** A declared registry reads with its own account; two aliases can share one address. */
-  declared?: Pick<Resolved, "alias" | "aliases">,
-): Promise<Probed> {
+  declared?: Pick<Resolved, "alias" | "aliases"> | undefined;
+}
+
+/** Resolving and fetching are separate, so listing hundreds of artifacts downloads none. */
+export async function probe({
+  input,
+  flags,
+  cwd,
+  want = [],
+  declared,
+}: ProbeOptions): Promise<Probed> {
   const declaredAlias = declared?.alias;
   // A pasted link names the repository, a ref and a folder; each is recorded where it belongs.
   const pasted = await settlePastedLink(
@@ -446,6 +456,7 @@ export async function probe(
     if (cause instanceof AiregError) throw cause;
     const failure = isAdapterError(cause) ? cause.failure : undefined;
     const refused = isAuthFailure(failure);
+    // Only the hint depends on the adapter, so one that will not load gets the general one.
     const failed =
       refused && isAdapterError(cause)
         ? await loadAdapter(cause.adapter).catch(() => undefined)
@@ -488,7 +499,7 @@ export async function probe(
       if (artifact?.kind !== "plugin" || !isReadOnlyLayout(listing.layout)) return [];
       return carriedIn(artifact.envelope, manifestOf(artifact)).carries;
     },
-    content: async (entry) => {
+    stage: async (entry) => {
       const item = listedAt(entry);
       if (item === undefined) {
         throw new AiregError(`The registry at ${location} has no content for ${entry.name}.`, {

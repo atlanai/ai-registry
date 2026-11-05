@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { CONCURRENCY, limiter } from "#adapter/concurrency.ts";
+import { ifReadable } from "#adapter/files.ts";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { sanitizeName } from "#adapter/text.ts";
@@ -13,7 +14,7 @@ import { KIND_SPECS } from "#core/kinds.ts";
 import { type Lock, type LockArtifact, readLock, writeLock } from "#core/lock.ts";
 import { listedAt } from "#core/plan/acquire/sources.ts";
 import { removeContained } from "#core/plan/removable.ts";
-import { guardManagedPath } from "#core/store/managed-paths.ts";
+import { assertManagedPath } from "#core/store/managed-paths.ts";
 import { artifactPath, type Roots } from "#core/store/paths.ts";
 import { canonicalId } from "#core/target/ids.ts";
 import { resolveTargets } from "#core/target/table.ts";
@@ -106,16 +107,14 @@ async function found(step: Step, selector: Selector): Promise<Origin[]> {
   if (kind === undefined) return [];
   if (selector.kinds !== undefined && !selector.kinds.includes(kind)) return [];
 
-  let entries: string[];
-  try {
-    entries = await readdir(selector.from);
-  } catch {
-    return [];
-  }
+  const entries = (await ifReadable(readdir(selector.from))) ?? [];
 
   const shape = KIND_SPECS[kind].shape;
   // A selector's id, or a folder's name such as `claude` from `.claude`, may be an alias.
-  const target = canonicalId(resolveTargets(), selector.target?.[0] ?? targetOf(selector.from));
+  const target = canonicalId(
+    resolveTargets(process.env),
+    selector.target?.[0] ?? targetOf(selector.from),
+  );
   const origins: Origin[] = [];
   for (const entry of entries) {
     if (entry.startsWith(".")) continue;
@@ -219,7 +218,7 @@ export async function applyOrigins(
     );
     // Never the other way round: the origin is read, the copy is written.
     if (resolve(copy) === resolve(outcome.origin.from)) continue;
-    await guardManagedPath(copy, roots);
+    await assertManagedPath(copy, roots, { env: process.env });
     // Checked again as it copies: a link that appeared since the survey is refused, not followed.
     const irregular = await copyAuthored(outcome.origin.from, copy);
     if (irregular !== undefined) {
@@ -317,9 +316,9 @@ export async function forgetOrigins(
     // A pull of the same namespace links the copy into other targets, and they would dangle.
     for (const link of row.links) {
       const at = resolve(roots.base, link.path);
-      if (canonical(at) !== from) await removeContained(at, roots);
+      if (canonical(at) !== from) await removeContained(at, roots, process.env);
     }
-    await removeContained(resolve(roots.base, row.path), roots);
+    await removeContained(resolve(roots.base, row.path), roots, process.env);
     delete lock.artifacts[key];
     forgotten.push(key);
   }

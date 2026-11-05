@@ -4,7 +4,6 @@ import type { SyncOperation } from "#core/sync/policy.ts";
 import type {
   ItemOutcome,
   RunEvent,
-  RunEventType,
   RunMode,
   RunRecord,
   RunState,
@@ -25,7 +24,8 @@ export interface CreateRun {
 
 export interface AppendRunEvent {
   occurredAtMs: number;
-  eventType: RunEventType;
+  /** One of `RunEventType`, or a type an extension's step records, as `JobHooks.event` allows. */
+  eventType: string;
   step?: string;
   artifact?: string;
   kind?: ArtifactKind;
@@ -43,6 +43,9 @@ export interface FinishRun {
   errorCode?: string;
   retryable?: boolean;
 }
+
+/** Per read, of runs or of run events. */
+export const MAX_PAGE_SIZE = 500;
 
 export interface RunQuery {
   jobId?: string;

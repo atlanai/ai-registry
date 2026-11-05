@@ -48,12 +48,8 @@ export interface Destination {
 
 export function parseTo(to: string): Destination {
   const ref = parseRef(to);
-  if (ref.namespace === undefined) {
-    throw new AiregError(`--to ${quoted(to)} names no namespace.`, {
-      code: ErrorCode.Usage,
-      hint: "Write it as <registry>/<namespace>, such as acme/engineering.",
-    });
-  }
+  if (ref.namespace === undefined)
+    throw noNamespace(to, "<registry>/<namespace>, such as acme/engineering");
   refuseName(ref.name);
   return {
     registry: ref.registry,
@@ -61,6 +57,13 @@ export function parseTo(to: string): Destination {
     name: ref.name,
     version: ref.version,
   };
+}
+
+function noNamespace(to: string, form: string): AiregError {
+  return new AiregError(`--to ${quoted(to)} names no namespace.`, {
+    code: ErrorCode.Usage,
+    hint: `Write it as ${form}.`,
+  });
 }
 
 /** Renamed silently, it would no longer match the name in its own front matter. */
@@ -88,8 +91,12 @@ export function cannotPublish(adapter: SourceAdapter, alias: string, how?: strin
   }
   return new AiregError(adapter.readOnly.message.replace("{registry}", alias), {
     code: ErrorCode.Usage,
-    hint: `${instead.charAt(0).toUpperCase()}${instead.slice(1)}.`,
+    hint: sentence(instead),
   });
+}
+
+function sentence(clause: string): string {
+  return `${clause.charAt(0).toUpperCase()}${clause.slice(1)}.`;
 }
 
 /**
@@ -132,15 +139,11 @@ export async function writableRegistries(
   );
   throw new AiregError(`None of ${aliases} takes a publish.`, {
     code: ErrorCode.Usage,
-    hint: `${instead.charAt(0).toUpperCase()}${instead.slice(1)}.`,
+    hint: sentence(instead),
   });
 }
 
-const noNamespace = (to: string) =>
-  new AiregError(`--to ${quoted(to)} names no namespace.`, {
-    code: ErrorCode.Usage,
-    hint: "Write it as <folder>/<namespace>, such as ../acme-registry/engineering.",
-  });
+const FOLDER_FORM = "<folder>/<namespace>, such as ../acme-registry/engineering";
 
 const holdsRegistry = (folder: string) =>
   access(join(folder, REGISTRY_DOCUMENT)).then(
@@ -168,7 +171,7 @@ export async function folderTo(
     root = dirname(root);
   }
   const rest = posixRelative(root, path);
-  if (rest === "") throw noNamespace(to);
+  if (rest === "") throw noNamespace(to, FOLDER_FORM);
   // As typed, less the namespace: relative to here, a symlink in either path would read differently.
   let shown = normalize(to);
   for (const _ of rest.split("/")) shown = dirname(shown);
@@ -178,9 +181,9 @@ export async function folderTo(
     ref = parseRef(`${LOCAL}/${rest}`);
   } catch (error) {
     if (!(error instanceof RefParseError)) throw error;
-    throw noNamespace(to);
+    throw noNamespace(to, FOLDER_FORM);
   }
-  if (ref.namespace === undefined) throw noNamespace(to);
+  if (ref.namespace === undefined) throw noNamespace(to, FOLDER_FORM);
   refuseName(ref.name);
   return {
     declared: { location: root, adapter: LOCAL, config: {} },
@@ -212,17 +215,24 @@ export interface Published {
   newest?: readonly Newest[] | undefined;
 }
 
-const keyOf = (namespace: string, kind: string, name: string) => `${namespace}/${kind}/${name}`;
+/** How `Published` keys an artifact. */
+export function artifactKey(namespace: string, kind: string, name: string): string {
+  return `${namespace}/${kind}/${name}`;
+}
+
+export interface PublishRegistry {
+  alias: string;
+  declared: RegistrySource;
+  /** Every registry this scope declares, any of which may read the same token. */
+  aliases: readonly string[];
+  cwd: string;
+  /** The command that publishes this work into a clone, for when the registry is a git one. */
+  how?: string | undefined;
+}
 
 /** The namespaces a registry lists, to choose one from: the one whole listing a publish reads. */
-export async function namespacesIn(
-  alias: string,
-  declared: RegistrySource,
-  aliases: readonly string[],
-  cwd: string,
-  how?: string,
-): Promise<string[]> {
-  const { source } = await connectToPublish(alias, declared, aliases, cwd, how);
+export async function namespacesIn(registry: PublishRegistry): Promise<string[]> {
+  const { source } = await connectToPublish(registry);
   try {
     const { listed } = await resolveArtifacts(source, [], { all: true });
     const namespaces = listed.flatMap(({ artifact }) => artifact.envelope.metadata.namespace ?? []);
@@ -232,14 +242,13 @@ export async function namespacesIn(
   }
 }
 
-async function connectToPublish(
-  alias: string,
-  declared: RegistrySource,
-  /** Every registry this scope declares, any of which may read the same token. */
-  aliases: readonly string[],
-  cwd: string,
-  how: string | undefined,
-): Promise<{ location: string; source: ConnectedSource }> {
+async function connectToPublish({
+  alias,
+  declared,
+  aliases,
+  cwd,
+  how,
+}: PublishRegistry): Promise<{ location: string; source: ConnectedSource }> {
   const refused = readOnlyLayout(alias, declared.config);
   if (refused !== undefined) throw refused;
   const location = expandLocation(declared.location, cwd);
@@ -262,17 +271,14 @@ async function connectToPublish(
   return { location, source };
 }
 
-export async function readPublished(
-  alias: string,
-  declared: RegistrySource,
-  aliases: readonly string[],
-  cwd: string,
+export interface ReadPublishedOptions extends PublishRegistry {
   /** Every artifact this run may publish or name here, as `publishWants` gives them. */
-  want: readonly Want[],
-  /** The command that publishes this work into a clone, for when the registry is a git one. */
-  how?: string,
-): Promise<Published> {
-  const { location, source } = await connectToPublish(alias, declared, aliases, cwd, how);
+  want: readonly Want[];
+}
+
+export async function readPublished(options: ReadPublishedOptions): Promise<Published> {
+  const { alias, want } = options;
+  const { location, source } = await connectToPublish(options);
 
   const listing = await resolveArtifacts(source, want);
   const latest = new Map<string, Current>();
@@ -286,18 +292,13 @@ export async function readPublished(
       newest.push({ name, group: namespace, kind: artifact.kind, version });
       continue;
     }
-    latest.set(keyOf(namespace, artifact.kind, name), heldOf(artifact, version));
+    latest.set(artifactKey(namespace, artifact.kind, name), heldOf(artifact, version));
   }
 
   const withheld = new Map<string, Current>();
   for (const item of listing.catalog.withheld ?? []) {
     if (item.group === undefined) continue;
-    withheld.set(keyOf(item.group, item.kind, item.name), {
-      id: undefined,
-      version: item.version,
-      digests: [],
-      withheld: item,
-    });
+    withheld.set(artifactKey(item.group, item.kind, item.name), heldBack(item));
   }
   return {
     alias,
@@ -318,6 +319,11 @@ function heldOf(artifact: Artifact, version: string | undefined): Current {
     files: files.map(({ path, digest }) => ({ path, digest })),
     relationships,
   };
+}
+
+/** A version the registry holds back gives no files, so only its status is known. */
+function heldBack(withheld: Withheld): Current {
+  return { id: undefined, version: withheld.version, digests: [], withheld };
 }
 
 /** One artifact's outcome: a first version, the next one, or already there. */
@@ -356,18 +362,31 @@ export function heldUnlisted(error: unknown, alias: string, items: readonly Plan
   });
 }
 
-export async function plan(
-  work: Work,
-  published: Published,
-  namespace: string,
-  how: Bump,
-  exact: string | undefined,
-  force: boolean,
+export interface PublishPlanOptions {
+  work: Work;
+  published: Published;
+  namespace: string;
+  /** How far past the registry's latest version the next one goes, when none is named. */
+  bump: Bump;
+  /** The version `--to` names, which wins over an export's own. */
+  exact?: string | undefined;
+  /** Publish over a version released since the one the work was edited from. */
+  force?: boolean | undefined;
   /** Absent leaves existing edges unmanaged; an explicit list participates in version identity. */
-  relationships?: readonly PublishRelationship[],
-): Promise<Planned> {
+  relationships?: readonly PublishRelationship[] | undefined;
+}
+
+export async function plan({
+  work,
+  published,
+  namespace,
+  bump,
+  exact,
+  force = false,
+  relationships,
+}: PublishPlanOptions): Promise<Planned> {
   refuseRelationships(work, published, relationships);
-  const key = keyOf(namespace, work.kind, work.name);
+  const key = artifactKey(namespace, work.kind, work.name);
   const current = published.latest.get(key) ?? published.withheld.get(key);
   const folder = published.source.adapter.capabilities.fileSpec === true;
   if (!force) refuseBehind(work, current);
@@ -427,7 +446,7 @@ export async function plan(
     group: namespace,
     kind: work.kind,
   });
-  const version = asked ?? (same ? (current?.version as string) : bumpVersion(from, how));
+  const version = asked ?? (same ? (current?.version as string) : bumpVersion(from, bump));
   // The version is not part of the content identity, so the files read once serve it.
   const moved = version === probe.input.version ? probe.input : { ...probe.input, version };
 
@@ -516,6 +535,7 @@ async function heldAt(
   version: string,
 ): Promise<Current | undefined> {
   const { name, kind } = work;
+  // Not held there, or not readable now: either way nothing to compare against.
   const found = await published.source.handle
     .resolve([{ name, namespace, kind, version }])
     .catch(() => undefined);
@@ -531,7 +551,7 @@ async function heldAt(
       item.version === version &&
       (item.group === undefined || item.group === namespace),
   );
-  return kept === undefined ? undefined : { id: undefined, version, digests: [], withheld: kept };
+  return kept === undefined ? undefined : heldBack(kept);
 }
 
 function alreadyPublished(

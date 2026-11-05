@@ -188,7 +188,7 @@ function selectedTargets(
   where: string,
 ): Pick<Selector, "target" | "harness"> {
   if (entry.target === undefined && entry.harness === undefined) return {};
-  const targetTable = resolveTargets();
+  const targetTable = resolveTargets(process.env);
   const named = (key: "target" | "harness") =>
     entry[key] === undefined
       ? undefined

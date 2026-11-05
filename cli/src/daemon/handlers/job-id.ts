@@ -3,8 +3,7 @@ import { quoted, sanitizeName } from "#adapter/text.ts";
 import type { Account, Job, RegistryConfig } from "#core/config/model.ts";
 import { canonical } from "#core/fs/realpath.ts";
 import type { Scope } from "#core/store/paths.ts";
-import { RpcErrorCode } from "#daemon/rpc/codes.ts";
-import { ProtocolError } from "#daemon/rpc/protocol.ts";
+import { invalidParams } from "#daemon/rpc/errors.ts";
 import * as inputs from "./params.ts";
 
 /**
@@ -29,17 +28,13 @@ export function skillsJobId(
   }
   const id = inputs.jobId(params, "name");
   if (existing !== undefined && existing.id !== id) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
+    throw invalidParams(
       `${root} already syncs with ${alias} as job ${existing.id}. Leave out --name to update that job, or remove it first with \`aireg job remove ${existing.id}\`.`,
     );
   }
   const taken = config.jobs.find((job) => job.id === id);
   if (taken !== undefined && taken !== existing) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
-      `Job ${quoted(id)} already exists. Pass another --name.`,
-    );
+    throw invalidParams(`Job ${quoted(id)} already exists. Pass another --name.`);
   }
   return id;
 }
@@ -63,10 +58,7 @@ function nextFree(config: RegistryConfig, alias: string, folder: string): string
 function productJobId(kind: string, label: string): string {
   const id = `job_${kind}_${sanitizeName(label)}`;
   if (!inputs.JOB_ID.test(id)) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
-      `Cannot make a job id from ${quoted(label)}. Name the job with --name.`,
-    );
+    throw invalidParams(`Cannot make a job id from ${quoted(label)}. Name the job with --name.`);
   }
   return id;
 }
@@ -86,8 +78,7 @@ export function contributedJobId(
       ? existing.id
       : named(params, productJobId(kind, account.registry));
   if (existing !== undefined && existing.id !== id) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
+    throw invalidParams(
       `${account.registry} already has a ${kind} job, ${existing.id}. Leave out --name to update it.`,
     );
   }

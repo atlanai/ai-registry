@@ -211,6 +211,7 @@ export async function materialize(
     return landed(final, contentId, envelope, dropped);
   } finally {
     await guard(staging);
+    // A leftover staging folder costs only disk; the result or its error stands either way.
     await rm(staging, { recursive: true, force: true }).catch(() => {});
   }
 }

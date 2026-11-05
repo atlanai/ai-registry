@@ -82,14 +82,14 @@ async function lone(path: string): Promise<Tree> {
 
 /** Keeps `recorded` when it is these files' unframed digest, so older locks read as untouched. */
 async function settle(tree: Tree, recorded: string | undefined): Promise<string> {
-  const now = await taken(tree, "framed");
-  const earlier = await taken(tree, "unframed");
+  const now = await encodedDigest(tree, "framed");
+  const earlier = await encodedDigest(tree, "unframed");
   remember(now, earlier);
   if (recorded === undefined || recorded === "" || recorded === now) return now;
   return earlier === recorded ? recorded : now;
 }
 
-async function taken(tree: Tree, encoding: Encoding): Promise<string> {
+async function encodedDigest(tree: Tree, encoding: Encoding): Promise<string> {
   const stamp = stampOf(tree.files);
   const known = KNOWN.get(tree.key);
   const held = known?.stamp === stamp ? known : { stamp };

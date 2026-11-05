@@ -20,9 +20,9 @@ export function selectTargets(
   const known = new Set(names(targetTable));
   const unknown = wanted.filter((name) => !known.has(name));
   if (unknown.length > 0) {
-    // From --for it is the command line; from the manifest it is file content.
-    // A file of yours that would define one, but was skipped, is the likelier story.
-    const skipped = loadTargetFiles().skipped.filter((file) =>
+    // From --for it is a usage error, from the manifest invalid content; a skipped
+    // target file is the likelier cause either way.
+    const skipped = loadTargetFiles(process.env).skipped.filter((file) =>
       unknown.some((name) => basename(file.path) === `${name}.json`),
     );
     throw new AiregError(`No target named ${list(unknown.map(quoted), "or")}.`, {

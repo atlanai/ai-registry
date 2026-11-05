@@ -26,6 +26,7 @@ export function bindAdapter(adapter: SourceAdapter, alias: string): SourceAdapte
       try {
         await runPipelineHooks("postConnect", { alias }, context.signal, hooks);
       } catch (error) {
+        // The hook's refusal is the one to report.
         await handle.close().catch(() => {});
         throw error;
       }

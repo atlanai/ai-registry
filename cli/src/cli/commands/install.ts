@@ -7,7 +7,7 @@ import { cancel, interaction } from "#cli/prompt/interaction.ts";
 import { exitOnClash, reportCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize } from "#cli/render/plan.ts";
 import { trackRun } from "#cli/telemetry/events.ts";
-import { type RunResult, run as runPipeline } from "#engine/install/pipeline.ts";
+import { type RunResult, runPipeline } from "#engine/install/pipeline.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
 import { defineCommand, STREAMED } from "./define.ts";
@@ -29,23 +29,17 @@ export const { run } = defineCommand({
     const loaded = await load(common, context.cwd);
 
     let approved = true;
-    const result = await runPipeline(
-      loaded.roots,
+    const result = await runPipeline({
+      roots: loaded.roots,
       common,
-      context.printer,
-      context.cwd,
-      planReport(context.printer),
-      () => ({
-        approve: async (plan, targets) => {
-          approved = await confirmIfDestructive(step, plan, {
-            verb: "Update",
-            targets,
-            targetTable: loaded.targetTable,
-          });
-          return approved;
-        },
-      }),
-    );
+      printer: context.printer,
+      cwd: context.cwd,
+      report: planReport(context.printer),
+      approve: async (plan, chosen) => {
+        approved = await confirmIfDestructive(step, plan, { verb: "Update", ...chosen });
+        return approved;
+      },
+    });
 
     if (!approved) {
       cancel(step);

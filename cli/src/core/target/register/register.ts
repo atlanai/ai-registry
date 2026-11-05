@@ -8,7 +8,7 @@ import { inspect } from "#core/fs/link.ts";
 import { isStrictlyWithin, posixRelative, readTextIfPresent } from "#core/fs/path.ts";
 import { canonical } from "#core/fs/realpath.ts";
 import { pruneEmptyParent } from "#core/fs/tree.ts";
-import type { Scope } from "#core/store/paths.ts";
+import type { Where } from "#core/store/paths.ts";
 import type { ConfigValue, KindMapping, RegisterEntry, Targets } from "#core/target/contract.ts";
 import { targetRoot } from "#core/target/roots.ts";
 import {
@@ -39,12 +39,6 @@ export interface Kept {
   reason?: string;
   /** A target config file left unedited, for an install or a removal alike. */
   config?: true;
-}
-
-/** The run registrations are for: its scope, and the folder a project's target roots are in. */
-export interface Where {
-  scope: Scope;
-  cwd: string;
 }
 
 interface OpenFile {
@@ -99,22 +93,27 @@ interface Group {
   absent: Map<string, Vars>;
 }
 
+export interface RegisterOptions {
+  targetTable: Targets;
+  where: Where;
+  scopeDir: string;
+  copies?: ReadonlySet<string>;
+}
+
 /**
  * Writes a target's config entry while a placement of ours needs it, removing it with the last.
  * Ours is a link into `scopeDir` (the scope's `.registry`) or one of the lockfile's `copies`.
  */
 export async function applyRegister(
   touched: readonly Touched[],
-  targetTable: Targets,
-  where: Where,
-  scopeDir: string,
-  copies: ReadonlySet<string> = new Set(),
+  options: RegisterOptions,
 ): Promise<Kept[]> {
+  const { targetTable, where, scopeDir, copies = new Set() } = options;
   const files = new Files();
   const kept: Kept[] = [];
   const owned = { scopeDir, copies };
   for (const target of Object.values(targetTable)) {
-    const root = targetRoot(target, where.scope, where.cwd);
+    const root = targetRoot(target, where);
     // A project's own folders hold its target roots, and a link among them may lead out of
     // it; a person's target root is theirs to keep wherever they like, dotfiles included.
     const anchor = where.scope === "project" ? where.cwd : root;

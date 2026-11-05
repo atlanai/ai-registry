@@ -1,6 +1,7 @@
-import { statSync, watch } from "node:fs";
+import { type Stats, statSync, watch } from "node:fs";
 import { open } from "node:fs/promises";
 import { dirname } from "node:path";
+import { isAbsent } from "#adapter/files.ts";
 
 export interface TailOptions {
   path: string;
@@ -57,18 +58,20 @@ export async function* follow(options: TailOptions): AsyncGenerator<string> {
 }
 
 function sizeOf(path: string): number {
-  try {
-    return statSync(path).size;
-  } catch {
-    return 0;
-  }
+  return statOf(path)?.size ?? 0;
 }
 
 function inodeOf(path: string): number | undefined {
+  return statOf(path)?.ino;
+}
+
+/** A log not written yet, or rolled away this instant, is followed from when it appears. */
+function statOf(path: string): Stats | undefined {
   try {
-    return statSync(path).ino;
-  } catch {
-    return undefined;
+    return statSync(path);
+  } catch (error) {
+    if (isAbsent(error)) return undefined;
+    throw error;
   }
 }
 
@@ -89,6 +92,7 @@ async function readPast(
   try {
     handle = await open(path, "r");
   } catch {
+    // Gone, or held mid-rotation on Windows: the next poll tries again.
     return undefined;
   }
   try {

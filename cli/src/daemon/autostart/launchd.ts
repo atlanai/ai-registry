@@ -26,16 +26,16 @@ export function renderPlist(spec: ServiceSpec): string {
     '<plist version="1.0">',
     "<dict>",
     "  <key>Label</key>",
-    string(launchdLabel(spec.suffix)),
+    plistString(launchdLabel(spec.suffix)),
     "  <key>ProgramArguments</key>",
     "  <array>",
-    ...spec.daemon.map((arg) => string(arg, "    ")),
+    ...spec.daemon.map((arg) => plistString(arg, "    ")),
     "  </array>",
     "  <key>EnvironmentVariables</key>",
     "  <dict>",
     ...Object.entries(env).flatMap(([key, value]) => [
-      `    <key>${xml(key)}</key>`,
-      string(value, "    "),
+      `    <key>${escapeXml(key)}</key>`,
+      plistString(value, "    "),
     ]),
     "  </dict>",
     "  <key>RunAtLoad</key>",
@@ -52,18 +52,18 @@ export function renderPlist(spec: ServiceSpec): string {
     "  <key>LimitLoadToSessionType</key>",
     "  <string>Aqua</string>",
     "  <key>StandardErrorPath</key>",
-    string(spec.stderrLog),
+    plistString(spec.stderrLog),
     "</dict>",
     "</plist>",
     "",
   ].join("\n");
 }
 
-function string(value: string, indent = "  "): string {
-  return `${indent}<string>${xml(value)}</string>`;
+function plistString(value: string, indent = "  "): string {
+  return `${indent}<string>${escapeXml(value)}</string>`;
 }
 
-function xml(value: string): string {
+function escapeXml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -134,7 +134,7 @@ export function launchdBackend(spec: ServiceSpec, exec: Exec): AutostartBackend 
     },
     async starts(program) {
       const found = await readTextIfPresent(path);
-      return found !== undefined && PROGRAM.exec(found)?.[1] === xml(program);
+      return found !== undefined && PROGRAM.exec(found)?.[1] === escapeXml(program);
     },
   };
 }

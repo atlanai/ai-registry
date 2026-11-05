@@ -1,16 +1,17 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import { readFileSync, renameSync, rmSync } from "node:fs";
+import { renameSync, rmSync } from "node:fs";
 import { mkdir, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname } from "node:path";
+import { ifPresent } from "#adapter/files.ts";
 import { quoted } from "#adapter/text.ts";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
 import { processAlive } from "#core/process.ts";
 import { type Roots, type Scope, scopeName } from "#core/store/paths.ts";
-import { POLL_MS, removeDir, STUCK_MS, taken, withCoordination } from "./coordination.ts";
+import { alreadyTaken, POLL_MS, removeDir, STUCK_MS, withCoordination } from "./coordination.ts";
 import { LeaseBusyError, LeaseError, stuckError, unlockCommand } from "./errors.ts";
-import { type LeaseHolder, readHolder } from "./holder.ts";
+import { type LeaseHolder, readHolder, readHolderSync } from "./holder.ts";
 import {
   asideOf,
   canonicalLock,
@@ -52,9 +53,10 @@ export function releaseLeasesOnInterrupt(alsoStop: () => void): void {
     for (const [dir, id] of held) {
       let holder: LeaseHolder | undefined;
       try {
-        holder = JSON.parse(readFileSync(metaPath(dir), "utf8")) as LeaseHolder;
+        holder = readHolderSync(dir);
       } catch {
-        // No metadata yet: the directory is the one this process just made.
+        // None readable: the directory is the one this process made. Nothing
+        // here may throw, since a signal handler runs it.
       }
       try {
         if (holder === undefined || holder.id === id) {
@@ -128,7 +130,7 @@ async function claim(dir: string, holder: LeaseHolder, guard: Guard): Promise<Cl
   try {
     await mkdir(dir);
   } catch (error) {
-    if (!taken(error)) throw error;
+    if (!alreadyTaken(error)) throw error;
     if (!(await stale(dir))) return "held";
     await guard(dir);
     if (!(await removeDir(dir))) return "unremovable";
@@ -136,7 +138,7 @@ async function claim(dir: string, holder: LeaseHolder, guard: Guard): Promise<Cl
     const made = await mkdir(dir).then(
       () => true,
       (again: unknown) => {
-        if (taken(again)) return false;
+        if (alreadyTaken(again)) return false;
         throw again;
       },
     );
@@ -153,29 +155,22 @@ async function stale(dir: string): Promise<boolean> {
   if (age === undefined || age <= STALE_MS) return false;
   if (age > ABANDONED_MS) return true;
   const holder = await readHolder(dir);
-  return holder === undefined || !running(dir, holder);
+  return holder === undefined || !holderAlive(dir, holder);
 }
 
 /** Absolute: a clock stepped back leaves an mtime in the future, and that must still age out. */
 async function ageMs(dir: string): Promise<number | undefined> {
-  try {
-    return Math.abs(Date.now() - (await stat(metaPath(dir))).mtimeMs);
-  } catch {
-    // A half-written acquire must not wedge the scope forever.
-    try {
-      await stat(dir);
-      return Number.POSITIVE_INFINITY;
-    } catch {
-      return undefined;
-    }
-  }
+  const meta = await ifPresent(stat(metaPath(dir)));
+  if (meta !== undefined) return Math.abs(Date.now() - meta.mtimeMs);
+  // A half-written acquire must not wedge the scope forever.
+  return (await ifPresent(stat(dir))) === undefined ? undefined : Number.POSITIVE_INFINITY;
 }
 
 /**
  * A paused holder cannot heartbeat, so one gone, or on another host, ages out at STALE_MS; one whose
  * pid still runs here keeps its lease until ABANDONED_MS, when that pid is taken to be reused.
  */
-function running(dir: string, holder: LeaseHolder): boolean {
+function holderAlive(dir: string, holder: LeaseHolder): boolean {
   if (holder.host !== hostname()) return false;
   if (holder.pid === process.pid) return held.get(dir) === holder.id;
   return processAlive(holder.pid);
@@ -191,6 +186,7 @@ function beat(dir: string, id: string, guard: Guard): NodeJS.Timeout {
     void guard(dir)
       .then(() => readHolder(dir))
       .then((holder) => (holder?.id === id ? utimes(metaPath(dir), now, now) : undefined))
+      // A missed beat is retried next tick; the lease goes stale only after two.
       .catch(() => {});
   }, HEARTBEAT_MS);
   // Never the reason a one-shot command stays alive.
@@ -238,8 +234,7 @@ async function assertOwned(dir: string, id: string, scope: Scope): Promise<void>
   if ((await readHolder(dir))?.id === id) return;
   throw new LeaseError(
     `Another aireg process took over ${scopeName(scope)}, so this command stopped.`,
-    "lease_lost",
-    "Run the command again.",
+    { reason: "lease_lost", hint: "Run the command again." },
   );
 }
 
@@ -264,11 +259,11 @@ export async function breakLease(
   const again = `Run ${unlockCommand(roots.scope)} to see the current one.`;
   if (holder === undefined) throw new LeaseError("Nothing is locked.");
   if (holder.id !== id) {
-    throw new LeaseError(`No lock with id ${quoted(id)}.`, undefined, again);
+    throw new LeaseError(`No lock with id ${quoted(id)}.`, { hint: again });
   }
   await withCoordination(dirname(dir), guard, async () => {
     const current = await readHolder(dir);
-    if (current?.id !== id) throw new LeaseError("That lock changed.", undefined, again);
+    if (current?.id !== id) throw new LeaseError("That lock changed.", { hint: again });
     await guard(dir);
     await rm(dir, { recursive: true, force: true });
   });

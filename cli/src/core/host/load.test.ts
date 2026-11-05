@@ -23,7 +23,10 @@ const CONTRIBUTING = `export default {
   connect: async () => ({ resolve: async () => ({ artifacts: [] }), fetch: async () => new Uint8Array(), close: async () => {} }),
   extend: {
     commands: [{ name: "kit", summary: "Kit things", group: "Kit", load: async () => ({ run: async () => {} }) }],
-    panels: [{ id: "kit", label: "Kit", collect: async () => ({}), length: () => 0, render: () => null }],
+    panels: [
+      { id: "kit", label: "Kit", collect: async () => ({}), length: () => 0, render: () => null },
+      { id: "jobs", label: "Jobs", collect: async () => ({}), length: () => 0, render: () => null },
+    ],
     upstream: { app: "Kit" },
   },
 };
@@ -39,6 +42,7 @@ describe("adapter extensions", () => {
 
     expect((await stepContribution("probe"))?.kind).toBe("probe");
     expect((await contributedCommands()).map(({ name }) => name)).toEqual(["kit"]);
+    // One with the id of aireg's own jobs view would replace it and add a second tab.
     expect((await contributedPanels()).map(({ id }) => id)).toEqual(["kit"]);
     expect((await contributedUpstream())?.app).toBe("Kit");
   });

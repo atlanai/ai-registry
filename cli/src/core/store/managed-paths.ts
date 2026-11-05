@@ -4,24 +4,29 @@ import { isWithin } from "#adapter/paths.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { type Roots, stagingDir, toolHome, toolHomeRoot } from "#core/store/paths.ts";
 
+export interface ManagedPathOptions {
+  /** The path itself must not be a link either, not only the folders above it. */
+  leaf?: boolean;
+  /** Folders already checked, shared across many calls. */
+  verified?: Set<string>;
+  env: NodeJS.ProcessEnv;
+}
+
 /** Target roots may be shared; only scope-owned and staging trees are guarded here. */
-export async function guardManagedPath(
+export async function assertManagedPath(
   path: string,
   roots: Roots,
-  includeLeaf = true,
-  env: NodeJS.ProcessEnv = process.env,
-  /** Folders this pass already checked, for a caller guarding many paths at once. */
-  verified?: Set<string>,
+  { leaf = true, verified, env }: ManagedPathOptions,
 ): Promise<void> {
   if (isWithin(dirname(roots.artifacts), path)) {
-    await assertUnredirected(scopeRoot(roots), path, includeLeaf, verified);
+    await assertUnredirected(scopeRoot(roots), path, leaf, verified);
   } else {
     const home = toolHome(env);
     // Resolve only the explicitly configured root, never a link below it.
     const selected = toolHomeRoot(env);
     const staging = isWithin(selected, path) ? join(home, relative(selected, path)) : path;
     if (isWithin(stagingDir(env), staging)) {
-      await assertUnredirected(home, staging, includeLeaf, verified);
+      await assertUnredirected(home, staging, leaf, verified);
     }
   }
 }

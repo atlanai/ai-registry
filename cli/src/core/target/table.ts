@@ -8,8 +8,8 @@ import type { KindMapping, Target, TargetDefinition, Targets } from "./contract.
 import { canonicalIds } from "./ids.ts";
 import { BUILT_IN, loadTargetFiles } from "./load.ts";
 
-/** The built-in targets and the ones your user scope defines, as data that crosses the daemon RPC. */
-export function resolveTargets(env: NodeJS.ProcessEnv = process.env): Targets {
+/** Plain data, since it crosses the daemon RPC. */
+export function resolveTargets(env: NodeJS.ProcessEnv): Targets {
   const definitions = new Map<string, { definition: TargetDefinition; origin: string }>();
   for (const definition of BUILTIN_TARGETS) {
     definitions.set(definition.id, { definition, origin: BUILT_IN });

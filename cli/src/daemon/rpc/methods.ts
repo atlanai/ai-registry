@@ -8,9 +8,6 @@ import type { SyncPolicy } from "#core/sync/policy.ts";
 
 export const PROTOCOL_VERSION = 1;
 
-/** The most runs, or run events, one request returns. */
-export const MAX_PAGE_SIZE = 500;
-
 /** Who a connection says it is; checked for shape, never trusted. */
 export interface ClientInfo {
   kind: "cli";

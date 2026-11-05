@@ -119,6 +119,7 @@ async function rowProblems(
       continue;
     }
     if (typeof row.catalog_digest !== "string") continue;
+    // An envelope that will not read is reported by the drift check.
     const envelope = await readJson(rootReader(root), `${folder}/${ENVELOPE}`).catch(
       () => undefined,
     );

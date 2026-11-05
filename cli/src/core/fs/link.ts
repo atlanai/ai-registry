@@ -9,6 +9,7 @@ import {
   symlink,
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { ifPresent, ifReadable, isAbsent } from "#adapter/files.ts";
 import { copyInto, isDirectory, remove } from "#core/fs/tree.ts";
 import type { LinkMode } from "#core/lock.ts";
 
@@ -27,6 +28,7 @@ export async function link(source: string, linkPath: string, copyOnly = false): 
     await symlink(await relativeTarget(source, linkPath), linkPath);
     return "symlink";
   } catch {
+    // Whether a filesystem or a policy refuses the link, a copy still installs.
     await copyInto(source, linkPath);
     return "copy";
   }
@@ -58,7 +60,7 @@ async function relativeTarget(source: string, linkPath: string): Promise<string>
  * of each manifest. A refresh replaces what changed and drops entries the source lacks.
  */
 export async function fanOut(source: string, dir: string): Promise<LinkMode> {
-  const info = await lstat(dir).catch(() => undefined);
+  const info = await ifPresent(lstat(dir));
   if (info !== undefined && !info.isDirectory()) await remove(dir);
   await mkdir(dir, { recursive: true });
   const wanted = new Set(await readdir(source));
@@ -86,6 +88,7 @@ export async function fanOut(source: string, dir: string): Promise<LinkMode> {
     try {
       await symlink(target, at);
     } catch {
+      // An entry that cannot be linked is copied.
       await copyInto(join(from, entry), at);
     }
   }
@@ -97,7 +100,7 @@ export async function fanOut(source: string, dir: string): Promise<LinkMode> {
  * and some refuse one reached through a link; content directories stay links.
  */
 async function isManifest(path: string, entry: string): Promise<boolean> {
-  const info = await stat(path).catch(() => undefined);
+  const info = await ifPresent(stat(path));
   return info !== undefined && (!info.isDirectory() || entry.startsWith("."));
 }
 
@@ -110,22 +113,19 @@ async function sameFile(source: string, copy: string): Promise<boolean> {
     [readFile(source), readFile(copy)].map((read) => read.catch(() => undefined)),
   );
   if (left === undefined || right === undefined || !left.equals(right)) return false;
-  return (await lstat(copy).catch(() => undefined))?.isFile() === true;
+  return (await ifPresent(lstat(copy)))?.isFile() === true;
 }
 
 /** Compared resolved, since a Windows junction names its target in full. */
 async function linksTo(path: string, target: string): Promise<boolean> {
+  // Anything that is not a link refuses readlink, with a code that differs by platform.
   const raw = await readlink(path).catch(() => undefined);
   return raw !== undefined && resolve(dirname(path), raw) === resolve(dirname(path), target);
 }
 
 export async function inspect(linkPath: string): Promise<LinkState> {
-  let info: Awaited<ReturnType<typeof lstat>>;
-  try {
-    info = await lstat(linkPath);
-  } catch {
-    return { exists: false, isLink: false, target: undefined };
-  }
+  const info = await ifReadable(lstat(linkPath));
+  if (info === undefined) return { exists: false, isLink: false, target: undefined };
   if (!info.isSymbolicLink()) {
     const source = info.isDirectory() ? await fanOutSource(linkPath) : undefined;
     return { exists: true, isLink: source !== undefined, target: source };
@@ -138,8 +138,10 @@ export async function inspect(linkPath: string): Promise<LinkState> {
       isLink: true,
       target: isAbsolute(raw) ? raw : resolve(dirname(linkPath), raw),
     };
-  } catch {
-    return { exists: true, isLink: true, target: undefined };
+  } catch (error) {
+    // Removed between the two reads.
+    if (isAbsent(error)) return { exists: true, isLink: true, target: undefined };
+    throw error;
   }
 }
 
@@ -155,12 +157,8 @@ export interface LinkState {
  * entry of one directory, and every copied manifest is an entry of it too.
  */
 async function fanOutSource(dir: string): Promise<string | undefined> {
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch {
-    return undefined;
-  }
+  const entries = await ifPresent(readdir(dir));
+  if (entries === undefined) return undefined;
   let source: string | undefined;
   const copied: string[] = [];
   for (const entry of entries) {
@@ -169,6 +167,7 @@ async function fanOutSource(dir: string): Promise<string | undefined> {
     try {
       raw = await readlink(at);
     } catch {
+      // Not a link, whatever code this platform's readlink gives for that.
       if (!(await isManifest(at, entry))) return undefined;
       copied.push(entry);
       continue;
@@ -182,7 +181,7 @@ async function fanOutSource(dir: string): Promise<string | undefined> {
   // A folder of plain files and no link at all is a person's, not a fan-out.
   if (source === undefined) return undefined;
   for (const entry of copied) {
-    if ((await lstat(join(source, entry)).catch(() => undefined)) === undefined) return undefined;
+    if ((await ifPresent(lstat(join(source, entry)))) === undefined) return undefined;
   }
   return source;
 }

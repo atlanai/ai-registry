@@ -4,7 +4,7 @@ import { FOR, POLICIES, SELECT, USER } from "#cli/options/flags.ts";
 import { DEFAULT_INTERVAL_SECONDS } from "#core/config/model.ts";
 import { MINIMUM_INTERVAL_SECONDS } from "#core/config/parse-job.ts";
 import { RUN_MODES, RUN_STATES } from "#core/run/model.ts";
-import { MAX_PAGE_SIZE } from "#daemon/rpc/methods.ts";
+import { MAX_PAGE_SIZE } from "#core/run/store.ts";
 
 export const JOB_COMMAND: CommandSpec = {
   name: "job",

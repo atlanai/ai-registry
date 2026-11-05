@@ -14,6 +14,7 @@ export async function clone(
   try {
     await overLadder(spec, limits, (a) => attempt(a, dest, ref, limits));
   } catch (error) {
+    // The clone's failure is the one to report; a leftover folder costs only disk.
     await rm(dest, { recursive: true, force: true }).catch(() => {});
     throw error;
   }

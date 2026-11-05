@@ -42,6 +42,7 @@ export function updateConfig(
       return updated;
     }),
   );
+  // The caller sees this write's failure; the queue only orders the next one after it.
   pendingWrite = write.catch(() => {});
   return write;
 }

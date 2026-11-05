@@ -46,7 +46,9 @@ function exportEntry(raw: unknown, artifacts: readonly Ref[]): Export {
   if (isGlob(path)) {
     throw new ManifestError(
       `Export ${quoted(path)} is a glob, which only a plain \`exports:\` entry can be.`,
-      "Give each path it matches an entry of its own to set its version, dependencies or targets.",
+      {
+        hint: "Give each path it matches an entry of its own to set its version, dependencies or targets.",
+      },
     );
   }
   const optional = withoutUndefined({
@@ -68,7 +70,7 @@ function exportPath(text: string): string {
   if (text.trim() === "") throw new ManifestError("An `exports:` entry has an empty path.");
   const problem = pathProblem(text);
   if (problem !== undefined) {
-    throw new ManifestError(`Export ${quoted(text)} ${problem}.`, PATH_HINT);
+    throw new ManifestError(`Export ${quoted(text)} ${problem}.`, { hint: PATH_HINT });
   }
   return text;
 }
@@ -97,12 +99,12 @@ function dependency(text: string, path: string, artifacts: readonly Ref[]): Expo
   if (text.startsWith("./")) {
     const local = text.slice(2);
     const problem = pathProblem(local);
-    if (problem !== undefined) throw new ManifestError(`${of}, whose path ${problem}.`, PATH_HINT);
+    if (problem !== undefined)
+      throw new ManifestError(`${of}, whose path ${problem}.`, { hint: PATH_HINT });
     if (isGlob(local)) {
-      throw new ManifestError(
-        `${of}, a glob rather than a path.`,
-        "Name an artifact, or a folder of them, such as ./skills.",
-      );
+      throw new ManifestError(`${of}, a glob rather than a path.`, {
+        hint: "Name an artifact, or a folder of them, such as ./skills.",
+      });
     }
     if (local === path) throw new ManifestError(`Export ${quoted(path)} depends on itself.`);
     return { type: "local", path: local };
@@ -116,23 +118,21 @@ function dependency(text: string, path: string, artifacts: readonly Ref[]): Expo
   if (ref === undefined || ref.namespace === undefined || ref.kind === undefined) {
     throw new ManifestError(
       `${of}, which is neither ./<path> nor <registry>/<namespace>/<kind>/<name>.`,
-      "Start a path in this project with ./, such as ./.claude/skills/review.",
+      { hint: "Start a path in this project with ./, such as ./.claude/skills/review." },
     );
   }
   const address = formatAddress(ref);
   // Which versions it takes is the install's to say, so it is said once.
   if (ref.version !== undefined) {
-    throw new ManifestError(
-      `${of}, but its version belongs on its \`artifacts:\` entry.`,
-      `Write ${address} here, and ${formatRef(ref)} under \`artifacts:\`.`,
-    );
+    throw new ManifestError(`${of}, but its version belongs on its \`artifacts:\` entry.`, {
+      hint: `Write ${address} here, and ${formatRef(ref)} under \`artifacts:\`.`,
+    });
   }
   if (artifactFor(artifacts, ref) === undefined) {
     // The hint is not `aireg add`, which reads this manifest first and so stops here too.
-    throw new ManifestError(
-      `${of}, which is not listed under \`artifacts:\`.`,
-      `List it under \`artifacts:\`, such as \`- ${address}\`.`,
-    );
+    throw new ManifestError(`${of}, which is not listed under \`artifacts:\`.`, {
+      hint: `List it under \`artifacts:\`, such as \`- ${address}\`.`,
+    });
   }
   return { type: "remote", ref };
 }
@@ -153,8 +153,7 @@ function exportPublish(raw: unknown, path: string): false | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (raw === false) return false;
   // One target for the whole project, so an entry can only keep itself out of it.
-  throw new ManifestError(
-    `\`publish\` of export ${quoted(path)} takes only false.`,
-    "Remove it to publish the export to `publish.to`, or write `publish: false` to keep it here.",
-  );
+  throw new ManifestError(`\`publish\` of export ${quoted(path)} takes only false.`, {
+    hint: "Remove it to publish the export to `publish.to`, or write `publish: false` to keep it here.",
+  });
 }

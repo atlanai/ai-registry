@@ -78,7 +78,7 @@ export async function uninstall(
   }
   let links: string[];
   try {
-    links = await unlinkUserScope();
+    links = await unlinkUserScope(process.env);
   } catch (error) {
     throw new AiregError(`Could not remove your user scope's links: ${messageOf(error)}`, {
       cause: error,

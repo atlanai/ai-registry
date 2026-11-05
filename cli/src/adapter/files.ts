@@ -61,10 +61,7 @@ async function openRegular(
     throw new Error(`${path} is not a path inside ${root}.`);
   }
   if (verified?.has(root) !== true) {
-    const rootInfo = await lstat(root).catch((error: NodeJS.ErrnoException) => {
-      if (isAbsent(error)) return undefined;
-      throw error;
-    });
+    const rootInfo = await ifPresent(lstat(root));
     if (rootInfo === undefined) return { kind: "missing" };
     if (rootInfo.isSymbolicLink()) return { kind: "refused", reason: "is a symlink" };
     if (!rootInfo.isDirectory()) return { kind: "refused", reason: "is not a regular file" };
@@ -75,10 +72,7 @@ async function openRegular(
   for (const part of parts) {
     at = join(at, part);
     if (at !== leaf && verified?.has(at) === true) continue;
-    const info = await lstat(at).catch((error: NodeJS.ErrnoException) => {
-      if (isAbsent(error)) return undefined;
-      throw error;
-    });
+    const info = await ifPresent(lstat(at));
     if (info === undefined) return { kind: "missing" };
     if (info.isSymbolicLink()) return { kind: "refused", reason: "is a symlink" };
     if (at === leaf && !info.isFile()) return { kind: "refused", reason: "is not a regular file" };
@@ -257,6 +251,7 @@ export async function writeAtomic(
     await file.chmod(mode);
     if (durable) await file.sync();
   } catch (error) {
+    // The write's own error is the one to report; a leftover scratch file costs only disk.
     await file.close().catch(() => {});
     await rm(temp, { force: true }).catch(() => {});
     throw error;
@@ -267,6 +262,7 @@ export async function writeAtomic(
     await replaceFile(temp, target, options.beforeRename);
     if (durable) await syncDirectory(parent);
   } catch (error) {
+    // As above.
     await rm(temp, { force: true }).catch(() => {});
     throw error;
   }
@@ -297,4 +293,26 @@ async function syncDirectory(path: string): Promise<void> {
 export function isAbsent(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
   return code === "ENOENT" || code === "ENOTDIR";
+}
+
+export async function ifPresent<T>(pending: Promise<T>): Promise<T | undefined> {
+  try {
+    return await pending;
+  } catch (error) {
+    if (isAbsent(error)) return undefined;
+    throw error;
+  }
+}
+
+/** For a read-only probe: an unreadable path or a link loop is no entry. Code that writes uses `ifPresent`. */
+export async function ifReadable<T>(pending: Promise<T>): Promise<T | undefined> {
+  try {
+    return await pending;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (isAbsent(error) || code === "EACCES" || code === "EPERM" || code === "ELOOP") {
+      return undefined;
+    }
+    throw error;
+  }
 }

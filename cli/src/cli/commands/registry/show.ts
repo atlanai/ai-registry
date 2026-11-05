@@ -24,7 +24,12 @@ export const show = action({
       const unknown = await undeclaredRegistry(target, known, common, context.cwd);
       if (unknown !== undefined) throw unknown;
     }
-    const source = await probe(resolved.input, resolved.flags, context.cwd, [], resolved);
+    const source = await probe({
+      input: resolved.input,
+      flags: resolved.flags,
+      cwd: context.cwd,
+      declared: resolved,
+    });
     try {
       const catalog = source.catalog;
       return {

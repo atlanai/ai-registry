@@ -1,8 +1,9 @@
+import { unknownAccount } from "#accounts/service.ts";
 import { plural } from "#adapter/text.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { withDaemon } from "#daemon/process/lifecycle.ts";
-import { findAccount, needsRegistry, noAccount } from "./shared.ts";
+import { findAccount, needsRegistry } from "./shared.ts";
 
 export const LOGOUT_OR_REMOVE =
   "Use logout to sign out and keep the account for its jobs, or remove to delete it.";
@@ -16,7 +17,7 @@ export interface ChangedAccount {
 export async function logout(wanted: string | undefined): Promise<ChangedAccount> {
   if (wanted === undefined) throw needsRegistry("logout");
   const account = findAccount((await readConfig()).accounts, wanted);
-  if (account === undefined) throw noAccount(wanted);
+  if (account === undefined) throw unknownAccount(wanted);
   await withDaemon((client) => client.request("account.logout", { accountId: account.id }));
   return { accountId: account.id, registry: account.registry };
 }
@@ -26,7 +27,7 @@ export async function remove(wanted: string | undefined): Promise<ChangedAccount
   if (wanted === undefined) throw needsRegistry("remove");
   const config = await readConfig();
   const account = findAccount(config.accounts, wanted);
-  if (account === undefined) throw noAccount(wanted);
+  if (account === undefined) throw unknownAccount(wanted);
   const jobs = config.jobs.filter(({ account: id }) => id === account.id);
   if (jobs.length > 0) {
     throw new AiregError(

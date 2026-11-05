@@ -190,17 +190,19 @@ describe("target files", () => {
     };
     await save("tool.json", { ...TOOL, roots });
     const tool = resolveTargets(env).tool as Target;
-    expect(targetRoot(tool, "user", "/work", { TOOL_HOME: "/elsewhere" })).toBe(
-      resolve("/elsewhere", ".tool"),
+    expect(
+      targetRoot(tool, { scope: "user", cwd: "/work", env: { TOOL_HOME: "/elsewhere" } }),
+    ).toBe(resolve("/elsewhere", ".tool"));
+    expect(targetRoot(tool, { scope: "user", cwd: "/work", env: {} })).toBe(
+      join(env.HOME as string, ".tool"),
     );
-    expect(targetRoot(tool, "user", "/work", {})).toBe(join(env.HOME as string, ".tool"));
   });
 
   test("detect nothing from a project folder they say proves nothing", async ({ tmp }) => {
     await save("tool.json", { ...TOOL, detect: { projectRoot: false } });
     const project = join(tmp, "project");
     await mkdir(join(project, ".tool"), { recursive: true });
-    const found = detectAll(resolveTargets(env), project, env).find(
+    const found = detectAll(resolveTargets(env), { cwd: project, env }).find(
       (each) => each.target.name === "tool",
     );
     expect(found?.detected).toBe(false);

@@ -54,7 +54,7 @@ export function exportExclude(raw: unknown, path: string): string[] | undefined 
     ) {
       throw new ManifestError(
         `Export ${quoted(path)} excludes ${quoted(name)}, which is not the name of something directly inside it.`,
-        "Write the name alone, such as drafts, with no / or glob.",
+        { hint: "Write the name alone, such as drafts, with no / or glob." },
       );
     }
   }
@@ -100,13 +100,17 @@ export function exportInclude(raw: unknown, path: string): ExportFile[] | undefi
     if (ENTRIES.has(as) && from !== as) {
       throw new ManifestError(
         `Export ${quoted(path)} would store ${from} as ${as}, which is an entry file.`,
-        "An artifact's entry file is always published as itself; store the file at another path.",
+        {
+          hint: "An artifact's entry file is always published as itself; store the file at another path.",
+        },
       );
     }
     if (ENTRIES.has(from) && from !== as) {
       throw new ManifestError(
         `Export ${quoted(path)} would store its entry file ${from} as ${as}.`,
-        "An artifact's entry file is always published as itself; leave it out of `include`.",
+        {
+          hint: "An artifact's entry file is always published as itself; leave it out of `include`.",
+        },
       );
     }
     if (read.has(from)) {
@@ -145,16 +149,14 @@ function insidePath(text: string, path: string, key: "from" | "as" | "include"):
     pathProblem(text) ?? (isSafePath(text) ? undefined : "is no path a registry stores");
   const shown = `\`${key === "include" ? "include" : `include ${key}`}\` ${quoted(text)} of export ${quoted(path)}`;
   if (problem !== undefined) {
-    throw new ManifestError(
-      `${shown} ${problem.replace("the project", "the artifact")}.`,
-      "Write it relative to the artifact's folder, such as workspace/AGENTS.md.",
-    );
+    throw new ManifestError(`${shown} ${problem.replace("the project", "the artifact")}.`, {
+      hint: "Write it relative to the artifact's folder, such as workspace/AGENTS.md.",
+    });
   }
   if (isGlob(text)) {
-    throw new ManifestError(
-      `${shown} is a glob, not a file or folder.`,
-      "Name each file or folder to publish.",
-    );
+    throw new ManifestError(`${shown} is a glob, not a file or folder.`, {
+      hint: "Name each file or folder to publish.",
+    });
   }
   return text;
 }

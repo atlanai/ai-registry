@@ -95,6 +95,25 @@ describe("SQLite run store", () => {
     ).toHaveLength(1);
   });
 
+  test("records an event type an extension's step names, as its hooks allow", async () => {
+    const store = await SqliteRunStore.open(":memory:");
+    onTestFinished(() => store.close());
+    store.create({
+      id: "run_1",
+      jobId: "job_1",
+      accountId: "acc_1",
+      configRevision: 1,
+      mode: "sync",
+      trigger: "manual",
+      requestedAtMs: 100,
+      deadlineAtMs: 1_000,
+    });
+    store.start("run_1", "export", 110);
+    store.progress("run_1", "export", { occurredAtMs: 111, eventType: "trace.exported" });
+
+    expect(store.events("run_1").map((event) => event.eventType)).toContain("trace.exported");
+  });
+
   test("returns only the events the console reads, and they tell it everything", async () => {
     const store = await SqliteRunStore.open(":memory:");
     onTestFinished(() => store.close());

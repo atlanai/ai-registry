@@ -23,7 +23,7 @@ export async function moveToBackup(
   // A profile's target id, such as `tool:work`, holds a colon a Windows path cannot.
   const at = within.replaceAll(":", "-");
   let to = join(base, stamp, at);
-  for (let next = 2; await taken(to); next += 1) to = join(base, `${stamp}-${next}`, at);
+  for (let next = 2; await isTaken(to); next += 1) to = join(base, `${stamp}-${next}`, at);
   await assertUnredirected(dirname(roots.artifacts), to);
   await mkdir(dirname(to), { recursive: true });
   await rename(from, to);
@@ -35,7 +35,7 @@ function backupsDir(roots: Pick<Roots, "artifacts">): string {
   return join(dirname(roots.artifacts), "backups");
 }
 
-async function taken(path: string): Promise<boolean> {
+async function isTaken(path: string): Promise<boolean> {
   return lstat(path).then(
     () => true,
     () => false,

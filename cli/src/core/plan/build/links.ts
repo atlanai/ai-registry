@@ -52,7 +52,7 @@ export function placeLinks(
       return false;
     }
     if (!project) return true;
-    const verdict = removal(link.absolute, build.options.roots);
+    const verdict = removal(link.absolute, build.options.roots, build.options.env);
     if (verdict.how !== "refuse") return true;
     refused = true;
     build.warnings.push({

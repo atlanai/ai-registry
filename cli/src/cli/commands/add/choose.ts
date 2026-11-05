@@ -115,13 +115,13 @@ async function pickArtifacts(
   if (common.select?.includes("*") === true) return { addresses: undefined };
 
   if (common.select !== undefined) {
-    return { addresses: qualify(common.select, shown, all, partial, alias) };
+    return { addresses: qualify({ picks: common.select, shown, entries: all, partial, alias }) };
   }
 
   if (interactive(step)) {
     const picked = await chooseArtifacts(step, all, []);
     if (canceled(picked)) return undefined;
-    return { addresses: qualify(picked, shown, all, false, alias) };
+    return { addresses: qualify({ picks: picked, shown, entries: all, partial: false, alias }) };
   }
 
   // Leaves a plugin already covers are not counted; an explicit -s may still name one.

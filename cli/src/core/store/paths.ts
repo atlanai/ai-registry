@@ -15,6 +15,13 @@ import { HOME_DIR, LEGACY_TARGETS_DIR, TARGETS_DIR } from "#core/product.ts";
 export const SCOPES = ["user", "project"] as const;
 export type Scope = (typeof SCOPES)[number];
 
+/** `cwd` holds a project's target roots; `env` supplies a target's own folder variables. */
+export interface Where {
+  scope: Scope;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+}
+
 /** The one folder each scope keeps its manifest, lock and installed copies in. */
 export const SCOPE_DIR = ".registry";
 export const MANIFEST_FILE = "manifest.yml";

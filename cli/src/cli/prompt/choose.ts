@@ -123,12 +123,14 @@ export async function chooseTargets(
 ): Promise<string[] | Canceled> {
   // A shared folder is where tools read from, not a tool to pick: choosing a
   // tool reaches it. One a manifest already names is kept as it was.
-  const all = detectAll(targetTable, roots.cwd).filter((item) => !item.target.shared);
+  const all = detectAll(targetTable, { cwd: roots.cwd, env: process.env }).filter(
+    (item) => !item.target.shared,
+  );
   const kept = preselected.filter((name) => targetTable[name]?.shared === true);
   const show = (path: string): string =>
     roots.scope === "user" ? underHome(path) : relative(roots.cwd, path) || path;
   const folders = (name: string, chosen: readonly string[]): string[] =>
-    loadsFrom(name, chosen, items, { roots, targetTable }, wrapped);
+    loadsFrom(name, chosen, items, { roots, targetTable, env: process.env }, wrapped);
 
   const choices: Choice<string>[] = all.map((item) => ({
     value: item.target.name,
@@ -227,7 +229,9 @@ export function methodIsMeaningful(
     .filter(
       (target) => kinds.length === 0 || kinds.some((kind) => target.kinds[kind] !== undefined),
     );
-  return new Set(chosen.map((target) => targetRoot(target, scope, cwd))).size > 1;
+  return (
+    new Set(chosen.map((target) => targetRoot(target, { scope, cwd, env: process.env }))).size > 1
+  );
 }
 
 export async function chooseMethod(

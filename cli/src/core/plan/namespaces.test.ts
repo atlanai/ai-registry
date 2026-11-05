@@ -8,7 +8,7 @@ import { wrappedInLock } from "./namespaces.ts";
 
 describe("wrappedInLock", () => {
   const user = roots("user", "/work");
-  const options = { roots: user, targetTable: PLAN_OPTIONS.targetTable };
+  const options = { roots: user, env: process.env, targetTable: PLAN_OPTIONS.targetTable };
   const row = (path: string): readonly [string, LockArtifact] => [
     "engineering/lint",
     {

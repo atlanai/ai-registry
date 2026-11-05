@@ -12,7 +12,7 @@ import type { ExportFile } from "#core/manifest/export-fields.ts";
 import type { Export } from "#core/manifest/model.ts";
 
 /** The files to publish after `include` and `ignore`: the entry first, the rest sorted by stored path. */
-export async function chooseFiles(choosing: Choosing, base: string): Promise<ExportFile[]> {
+export async function chooseFiles(choosing: Choosing, base: string): Promise<Chosen> {
   const { root, kind, entries, tracked } = choosing;
   const shown = posixRelative(base, root);
   const entry = entryOf(kind);
@@ -33,15 +33,21 @@ export async function chooseFiles(choosing: Choosing, base: string): Promise<Exp
   const ignore = gitignore(patterns.map((each) => each.pattern));
   const kept = chosen.filter((file) => file.from === entry || !ignore.ignores(file.from));
   const unmatched = new Set(ignore.unmatched());
-  for (const { entry: each, pattern } of patterns) {
-    if (!unmatched.has(pattern)) choosing.matched.add(`${each.path}\0${pattern}`);
-  }
+  const matched = patterns
+    .filter(({ pattern }) => !unmatched.has(pattern))
+    .map(({ entry: each, pattern }) => ignoredBy(each, pattern));
   const files = [{ from: entry, as: entry }, ...kept.filter((file) => file.from !== entry)];
   refuseShared(files, shown);
 
   const unique = [...new Map(files.map((file) => [`${file.from}\0${file.as}`, file])).values()];
   const [first, ...rest] = unique;
-  return [first as ExportFile, ...rest.sort((a, b) => (a.as < b.as ? -1 : a.as > b.as ? 1 : 0))];
+  const sorted = rest.sort((a, b) => (a.as < b.as ? -1 : a.as > b.as ? 1 : 0));
+  return { files: [first as ExportFile, ...sorted], matched };
+}
+
+/** One entry's `ignore` pattern, as `Chosen.matched` names it. */
+export function ignoredBy(entry: Export, pattern: string): string {
+  return `${entry.path}\0${pattern}`;
 }
 
 /** What one folder artifact's files are chosen against. */
@@ -54,8 +60,12 @@ export interface Choosing {
   tracked: readonly string[] | undefined;
   /** Every artifact that is exported, so one inside this one publishes its own files. */
   exported: Iterable<string>;
-  /** Filled with each entry's patterns that left something out, keyed by entry path and pattern. */
-  matched: Set<string>;
+}
+
+export interface Chosen {
+  files: ExportFile[];
+  /** Each entry's `ignore` patterns that left something out, as `ignoredBy` names them. */
+  matched: string[];
 }
 
 function entryOf(kind: ArtifactKind): string {

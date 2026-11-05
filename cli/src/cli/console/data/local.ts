@@ -1,5 +1,6 @@
 import { lstat, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { ifPresent } from "#adapter/files.ts";
 import type { ArtifactRow } from "#core/console/model.ts";
 import { LOCAL_SOURCE } from "#core/console/model.ts";
 import type { Carrier } from "#core/console/runs.ts";
@@ -78,7 +79,7 @@ async function editsOf(
   path: string,
 ): Promise<{ changedAtMs: number | undefined; edited: boolean }> {
   if (carrier === undefined) {
-    return { changedAtMs: (await stat(path).catch(() => undefined))?.mtimeMs, edited: false };
+    return { changedAtMs: (await ifPresent(stat(path)))?.mtimeMs, edited: false };
   }
   const changedAtMs = await newestChange(path);
   return {
@@ -89,12 +90,12 @@ async function editsOf(
 
 /** The newest mtime under a skill folder, bounded: an edit to any file counts. */
 async function newestChange(dir: string, depth = 4): Promise<number> {
-  let newest = (await stat(dir).catch(() => undefined))?.mtimeMs ?? 0;
+  let newest = (await ifPresent(stat(dir)))?.mtimeMs ?? 0;
   if (depth === 0) return newest;
-  const names = await readdir(dir).catch(() => [] as string[]);
+  const names = (await ifPresent(readdir(dir))) ?? [];
   for (const name of names.slice(0, 500)) {
     const path = join(dir, name);
-    const entry = await lstat(path).catch(() => undefined);
+    const entry = await ifPresent(lstat(path));
     if (entry === undefined || entry.isSymbolicLink()) continue;
     newest = Math.max(
       newest,

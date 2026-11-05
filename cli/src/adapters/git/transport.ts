@@ -96,21 +96,21 @@ function describeFailure(error: unknown, spec: SourceSpec, ladder: readonly Atte
         return new GitError(
           error.failure,
           `${host} blocked access to ${spec.location}: the organization requires SAML single sign-on.`,
-          error.stderr,
-          "Authorize your credentials for that organization, then run the command again.",
+          {
+            stderr: error.stderr,
+            hint: "Authorize your credentials for that organization, then run the command again.",
+          },
         );
       }
-      return new GitError(
-        error.failure,
-        `Cannot read ${spec.location} (tried ${tried}).`,
-        error.stderr,
-        `Check your access with \`gh auth status -h ${host}\` or \`ssh -T git@${host}\`.`,
-      );
+      return new GitError(error.failure, `Cannot read ${spec.location} (tried ${tried}).`, {
+        stderr: error.stderr,
+        hint: `Check your access with \`gh auth status -h ${host}\` or \`ssh -T git@${host}\`.`,
+      });
     case "not_found":
       return new GitError(
         error.failure,
         `${spec.location} is not a repository, or you cannot see it.`,
-        error.stderr,
+        { stderr: error.stderr },
       );
     default:
       return error;

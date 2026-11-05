@@ -86,7 +86,7 @@ describe("a link over something already at its destination", () => {
   test("keeps a folder aireg never linked there, and records no link", async () => {
     await folder(dest(), "MY LOCAL EDIT\n");
     const { plan, lock } = linkPlan();
-    const result = await apply(plan, roots, fetch);
+    const result = await apply({ plan, roots, fetch, env: process.env });
     expect((await lstat(dest())).isSymbolicLink()).toBe(false);
     expect(await readFile(join(dest(), "SKILL.md"), "utf8")).toBe("MY LOCAL EDIT\n");
     expect(result.kept).toEqual([{ name: "ws/hello", path: dest() }]);
@@ -98,14 +98,14 @@ describe("a link over something already at its destination", () => {
     await folder(theirs, "mine\n");
     await mkdir(join(root, ".agents", "skills"), { recursive: true });
     await symlink(theirs, dest());
-    const result = await apply(linkPlan().plan, roots, fetch);
+    const result = await apply({ plan: linkPlan().plan, roots, fetch, env: process.env });
     expect(await readlink(dest())).toBe(theirs);
     expect(result.kept).toHaveLength(1);
   });
 
   test("backs up a folder that replaced a link aireg made, then links", async () => {
     await folder(dest(), "MY LOCAL EDIT\n");
-    const result = await apply(linkPlan("symlink").plan, roots, fetch);
+    const result = await apply({ plan: linkPlan("symlink").plan, roots, fetch, env: process.env });
     expect((await lstat(dest())).isSymbolicLink()).toBe(true);
     expect(result.kept).toEqual([]);
     const backups = join(root, ".registry", "backups");
@@ -120,7 +120,7 @@ describe("a link over something already at its destination", () => {
 
   test("replaces a copy aireg made itself", async () => {
     await folder(dest(), "old copy\n");
-    await apply(linkPlan("copy", true).plan, roots, fetch);
+    await apply({ plan: linkPlan("copy", true).plan, roots, fetch, env: process.env });
     expect(await readFile(join(dest(), "SKILL.md"), "utf8")).toBe("theirs\n");
     await expect(lstat(join(root, ".registry", "backups"))).rejects.toThrow();
   });
@@ -128,10 +128,10 @@ describe("a link over something already at its destination", () => {
   test("replaces its own link into the scope folder, and links a free path", async () => {
     await mkdir(join(root, ".agents", "skills"), { recursive: true });
     await symlink(store, dest());
-    await apply(linkPlan().plan, roots, fetch);
+    await apply({ plan: linkPlan().plan, roots, fetch, env: process.env });
     expect((await lstat(dest())).isSymbolicLink()).toBe(true);
     await rm(dest());
-    const result = await apply(linkPlan().plan, roots, fetch);
+    const result = await apply({ plan: linkPlan().plan, roots, fetch, env: process.env });
     expect((await lstat(dest())).isSymbolicLink()).toBe(true);
     expect(result.kept).toEqual([]);
   });
@@ -147,14 +147,19 @@ describe("a destination reached through a target folder that is a link", () => {
   });
 
   test("keeps a folder there although the lock records a copy", async () => {
-    const result = await apply(linkPlan("copy", true).plan, roots, fetch);
+    const result = await apply({
+      plan: linkPlan("copy", true).plan,
+      roots,
+      fetch,
+      env: process.env,
+    });
     expect((await lstat(dest())).isSymbolicLink()).toBe(false);
     expect(await readFile(join(outside(), "hello", "SKILL.md"), "utf8")).toBe("NOT AIREG'S\n");
     expect(result.kept).toEqual([{ name: "ws/hello", path: dest() }]);
   });
 
   test("moves nothing into the backups", async () => {
-    const result = await apply(linkPlan("symlink").plan, roots, fetch);
+    const result = await apply({ plan: linkPlan("symlink").plan, roots, fetch, env: process.env });
     expect(await readFile(join(outside(), "hello", "SKILL.md"), "utf8")).toBe("NOT AIREG'S\n");
     await expect(lstat(join(root, ".registry", "backups"))).rejects.toThrow();
     expect(result.kept).toHaveLength(1);
@@ -163,7 +168,7 @@ describe("a destination reached through a target folder that is a link", () => {
   test("still replaces its own link there, as a shared target folder has", async () => {
     await rm(join(outside(), "hello"), { recursive: true });
     await symlink(store, join(outside(), "hello"));
-    const result = await apply(linkPlan("symlink").plan, roots, fetch);
+    const result = await apply({ plan: linkPlan("symlink").plan, roots, fetch, env: process.env });
     // A Windows junction names its target in full, as the one planted here does.
     if (process.platform !== "win32")
       expect(await readlink(join(outside(), "hello"))).not.toBe(store);
@@ -184,7 +189,7 @@ describe("a recorded link going away", () => {
 
   test("moves a folder that replaced the link into the backups, never deletes it", async () => {
     await folder(dest(), "MY LOCAL EDIT\n");
-    const result = await apply(unlinkPlan("symlink"), roots, fetch);
+    const result = await apply({ plan: unlinkPlan("symlink"), roots, fetch, env: process.env });
     await expect(lstat(dest())).rejects.toThrow();
     const backups = join(root, ".registry", "backups");
     const [stamp] = await readdir(backups);
@@ -198,9 +203,9 @@ describe("a recorded link going away", () => {
     vi.setSystemTime(new Date("2026-10-09T06:22:47.100Z"));
     try {
       await folder(dest(), "FIRST\n");
-      const first = await apply(unlinkPlan("symlink"), roots, fetch);
+      const first = await apply({ plan: unlinkPlan("symlink"), roots, fetch, env: process.env });
       await folder(dest(), "SECOND\n");
-      const second = await apply(unlinkPlan("symlink"), roots, fetch);
+      const second = await apply({ plan: unlinkPlan("symlink"), roots, fetch, env: process.env });
       const backups = join(root, ".registry", "backups");
       expect(await readdir(backups)).toEqual(["20261009T062247Z", "20261009T062247Z-2"]);
       const [one, two] = [first.backedUp[0]?.to ?? "", second.backedUp[0]?.to ?? ""];
@@ -215,7 +220,7 @@ describe("a recorded link going away", () => {
   test("removes its own link, and leaves what it pointed at", async () => {
     await mkdir(join(root, ".agents", "skills"), { recursive: true });
     await symlink(store, dest());
-    const result = await apply(unlinkPlan("symlink"), roots, fetch);
+    const result = await apply({ plan: unlinkPlan("symlink"), roots, fetch, env: process.env });
     await expect(lstat(dest())).rejects.toThrow();
     expect(await readFile(join(store, "SKILL.md"), "utf8")).toBe("theirs\n");
     expect(result.backedUp).toEqual([]);
@@ -223,7 +228,7 @@ describe("a recorded link going away", () => {
 
   test("removes a copy it made itself", async () => {
     await folder(dest(), "old copy\n");
-    const result = await apply(unlinkPlan("copy"), roots, fetch);
+    const result = await apply({ plan: unlinkPlan("copy"), roots, fetch, env: process.env });
     await expect(lstat(dest())).rejects.toThrow();
     expect(result.backedUp).toEqual([]);
   });

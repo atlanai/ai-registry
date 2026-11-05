@@ -7,7 +7,7 @@ import { authoredDigest } from "#core/fs/digest.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { authoredArtifact, copyAuthored, exists, type Irregular, refusal } from "#core/fs/tree.ts";
 import { emptyLock, type Lock, writeLock } from "#core/lock.ts";
-import { guardManagedPath } from "#core/store/managed-paths.ts";
+import { assertManagedPath } from "#core/store/managed-paths.ts";
 import { artifactPath, type Roots, type Scope } from "#core/store/paths.ts";
 import { type Candidate, candidates, displayPath } from "#core/sync/adopt.ts";
 import type { CommonOptions } from "#engine/options.ts";
@@ -161,7 +161,7 @@ async function copyAll(
       artifact.name,
       artifact.artifactPath,
     );
-    await guardManagedPath(copy, loaded.roots);
+    await assertManagedPath(copy, loaded.roots, { env: process.env });
     if (!(await exists(copy))) made.push(copy);
     await refuseIrregular(loaded.roots, source.from, await copyAuthored(source.from, copy));
     // A later `origins` step keeps this row up to date from the folder it came from.

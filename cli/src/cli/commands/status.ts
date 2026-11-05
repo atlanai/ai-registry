@@ -1,5 +1,6 @@
 import { lstat } from "node:fs/promises";
 import { relative } from "node:path";
+import { ifPresent } from "#adapter/files.ts";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { plural } from "#adapter/text.ts";
@@ -175,11 +176,7 @@ async function unmanaged(item: Candidate): Promise<Unmanaged> {
 }
 
 async function isLink(path: string): Promise<boolean> {
-  try {
-    return (await lstat(path)).isSymbolicLink();
-  } catch {
-    return false;
-  }
+  return (await ifPresent(lstat(path)))?.isSymbolicLink() ?? false;
 }
 
 function needsApproval(lock: Lock, roots: Roots, targetTable: Targets): Map<string, Approval[]> {
@@ -194,7 +191,11 @@ function needsApproval(lock: Lock, roots: Roots, targetTable: Targets): Map<stri
     const steps = entry.links.flatMap((link) => {
       const target = targetTable[link.target];
       if (target === undefined) return [];
-      const plugin = pluginLinkAt(link, namespace, entry.registry, { roots, targetTable });
+      const plugin = pluginLinkAt(link, namespace, entry.registry, {
+        roots,
+        targetTable,
+        env: process.env,
+      });
       const run = trustFor(target, plugin === undefined ? entry.kind : "plugin", roots.scope);
       if (run === undefined) return [];
       return [{ target: link.target, harness: earlierId(targetTable, link.target), run }];

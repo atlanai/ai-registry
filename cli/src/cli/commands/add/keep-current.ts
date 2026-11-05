@@ -47,6 +47,7 @@ export async function keepCurrent(
   } catch (error) {
     return { alias, failed: messageOf(error) };
   }
+  // Only whether to mention autostart depends on it.
   const autostart = await autostartState().catch(() => undefined);
   return { jobId, pinned, autostartOff: autostart !== undefined && !autostart.registered };
 }

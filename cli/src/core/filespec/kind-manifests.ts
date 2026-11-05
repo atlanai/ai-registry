@@ -83,6 +83,7 @@ interface Listed {
 
 /** Each kind `registry.json` lists, with the manifest it serves when it names one in the root. */
 async function listedKinds(root: string): Promise<Listed[]> {
+  // A registry.json that will not read lists no kinds; reading the registry reports why.
   const registry = await readJson(rootReader(root), REGISTRY_DOCUMENT).catch(() => undefined);
   const listed = isRecord(registry) && Array.isArray(registry.kinds) ? registry.kinds : [];
   const kinds: Listed[] = [];
@@ -261,6 +262,7 @@ export function specOf(
   try {
     card = JSON.parse(files.get(json) ?? "") as unknown;
   } catch {
+    // A card that is not JSON carries no spec, as Markdown with no front matter carries none.
     return undefined;
   }
   // The card stays verbatim, with the fields a kind requires lifted beside it (`kinds/agent.json`).
