@@ -12,10 +12,15 @@ run `pnpm run schema`. A test fails if these drift from them.
 | [lockfile.schema.json](lockfile.schema.json) | `.registry/manifest.lock.yml`, what it resolved to |
 | [target.schema.json](target.schema.json) | `~/.aireg/targets/<id>.json`, a target of your own |
 | [kinds/agent.json](kinds/agent.json), [kinds/skill.json](kinds/skill.json) | Copies of the file spec's kind manifests in [`spec/schemas/kinds`](../../spec/schemas/kinds), which the CLI bundles; edit the spec's copy |
+| [output/](output) | The `data` each command prints under `--json`, one document per command with an entry per action |
 
 These describe the CLI's own files. The registry documents an artifact is
 published as - `registry.json`, `index.json`, `versions.json`, `artifact.json` -
 are the file spec's, and their schemas live in [`spec/schemas`](../../spec/schemas).
+
+Each output schema is checked at compile time against the result type the command
+declares in `src/cli/commands/<command>/result.ts`, and a contract test runs the
+real command and validates what it prints.
 
 ## Policies
 

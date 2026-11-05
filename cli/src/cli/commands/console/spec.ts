@@ -1,6 +1,6 @@
 import type { CommandSpec } from "#cli/commands/command.ts";
 
-export const CONSOLE_COMMAND: CommandSpec = {
+export const CONSOLE_COMMAND = {
   name: "console",
   summary: "Open a full-screen view of installed artifacts, jobs and registries",
   group: "Check",
@@ -11,4 +11,4 @@ export const CONSOLE_COMMAND: CommandSpec = {
   ],
   docs: "console",
   options: [{ flag: "--account", value: "<account>", describe: "The account to open on" }],
-};
+} satisfies CommandSpec;

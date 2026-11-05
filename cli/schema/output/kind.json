@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/kind.json",
+  "title": "aireg <kind> --json",
+  "description": "The `data` each `aireg <kind>` action, such as `aireg skill new`, prints under --json, by action.",
+  "$defs": {
+    "new": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "name",
+            "created",
+            "todo"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "created": {
+              "description": "Paths from where it ran.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "todo": {
+              "description": "Fields left as TODO, dotted.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "With `--from`.",
+          "type": "object",
+          "required": [
+            "kind",
+            "namespace",
+            "created"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "created": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "at"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "at": {
+                    "description": "The version's folder, from the registry's root.",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "bump": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "name",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "from": {
+          "description": "The version copied.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The version started.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -72,6 +72,9 @@ export interface OptionSpec {
   /** Present only on an option that takes a value; help prints it after the flag. */
   readonly value?: string;
   readonly multiple?: true;
+  readonly choices?: readonly string[];
+  /** The parser hands the value over as a number. */
+  readonly integer?: { readonly min?: number; readonly max?: number };
   readonly describe: string;
 }
 

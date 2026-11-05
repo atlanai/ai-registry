@@ -1,6 +1,8 @@
 import { isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import { list as listOf, withoutCredentials } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import { action } from "#cli/commands/define.ts";
+import type { PublishedArtifact, RegistryShown } from "#cli/commands/registry/result.ts";
 import { needsInput } from "#cli/options/parse.ts";
 import { underHome } from "#cli/render/home.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
@@ -11,90 +13,85 @@ import { probe, throughManifest } from "#engine/address/probe.ts";
 import { knownRegistries, undeclaredRegistry } from "#engine/address/registries.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
-import type { Flags } from "./options.ts";
+import type { Options } from "./options.ts";
 
-/** Reads what a registry publishes; nothing is installed. */
-export async function show(
-  context: CommandContext,
-  input: string | undefined,
-  flags: Flags,
-  common: CommonOptions,
-): Promise<void> {
-  const target = input ?? (await onlyDeclared(context, common));
-  const known = await knownRegistries(common, context.cwd);
-  const resolved = throughManifest(target, known, flags);
-  if (!resolved.declared) {
-    const unknown = await undeclaredRegistry(target, known, common, context.cwd);
-    if (unknown !== undefined) throw unknown;
-  }
-  const source = await probe(resolved.input, resolved.flags, context.cwd, [], resolved);
-  const catalog = source.catalog;
-
-  if (context.printer.format === "json") {
-    context.printer.json({
-      ok: true,
-      data: {
+export const show = action({
+  async run({ argument: input, flags, common }: Options, context): Promise<RegistryShown> {
+    const target = input ?? (await onlyDeclared(context, common));
+    const known = await knownRegistries(common, context.cwd);
+    const resolved = throughManifest(target, known, flags);
+    if (!resolved.declared) {
+      const unknown = await undeclaredRegistry(target, known, common, context.cwd);
+      if (unknown !== undefined) throw unknown;
+    }
+    const source = await probe(resolved.input, resolved.flags, context.cwd, [], resolved);
+    try {
+      const catalog = source.catalog;
+      return {
         registry: resolved.alias ?? source.alias,
         address: withoutCredentials(source.location),
-        revision: source.revision,
-        ...(isReadOnlyLayout(source.layout) ? { layout: source.layout } : {}),
+        ...(source.revision === undefined ? {} : { revision: source.revision }),
+        ...(source.layout !== undefined && isReadOnlyLayout(source.layout)
+          ? { layout: source.layout }
+          : {}),
         layouts: catalog.layouts,
-        entries: catalog.entries.map((entry) => ({
-          name: entry.name,
-          kind: entry.kind,
-          namespace: entry.group,
-          path: entry.path,
-          description: entry.description,
-          engine: entry.engine,
-          version: source.versionOf(entry),
-        })),
+        entries: catalog.entries.map((entry) => published(entry, source.versionOf(entry))),
         warnings: catalog.warnings,
-      },
-    });
-    return;
-  }
+      };
+    } finally {
+      await source.close();
+    }
+  },
+  text(result, printer) {
+    const style = printer.style;
+    const revision =
+      result.revision === undefined ? "" : style.dim(` @ ${abbreviate(result.revision)}`);
+    printer.info(`${style.bold(result.registry)}${revision}`);
+    fields(printer, [
+      ["address", underHome(result.address)],
+      ["layout", result.layout ?? (result.layouts.join(" + ") || "none")],
+      ["artifacts", String(result.entries.length)],
+    ]);
 
-  const style = context.printer.style;
-  const revision =
-    source.revision === undefined ? "" : style.dim(` @ ${abbreviate(source.revision)}`);
-  context.printer.info(`${style.bold(resolved.alias ?? source.alias)}${revision}`);
-  fields(context.printer, [
-    ["address", underHome(withoutCredentials(source.location))],
-    [
-      "layout",
-      isReadOnlyLayout(source.layout)
-        ? (source.layout as string)
-        : catalog.layouts.join(" + ") || "none",
-    ],
-    ["artifacts", String(catalog.entries.length)],
-  ]);
+    if (result.entries.length === 0) {
+      for (const warning of result.warnings) printer.warning(warning);
+      return;
+    }
 
-  if (catalog.entries.length === 0) {
-    for (const warning of catalog.warnings) context.printer.warning(warning);
-    return;
-  }
+    printer.info();
+    table(
+      printer,
+      [
+        {
+          header: "artifact",
+          value: (entry: PublishedArtifact) =>
+            entry.namespace === undefined ? entry.name : `${entry.namespace}/${entry.name}`,
+        },
+        { header: "kind", value: (entry: PublishedArtifact) => style.dim(entry.kind) },
+        {
+          header: "needs",
+          value: (entry: PublishedArtifact) =>
+            entry.engine === undefined ? "" : style.dim(`aireg ${entry.engine}`),
+          optional: true,
+        },
+        { header: "description", value: (entry: PublishedArtifact) => entry.description ?? "" },
+      ],
+      result.entries,
+    );
+    for (const warning of result.warnings) printer.warning(warning);
+  },
+});
 
-  context.printer.info();
-  table(
-    context.printer,
-    [
-      {
-        header: "artifact",
-        value: (entry: Entry) =>
-          entry.group === undefined ? entry.name : `${entry.group}/${entry.name}`,
-      },
-      { header: "kind", value: (entry: Entry) => style.dim(entry.kind) },
-      {
-        header: "needs",
-        value: (entry: Entry) =>
-          entry.engine === undefined ? "" : style.dim(`aireg ${entry.engine}`),
-        optional: true,
-      },
-      { header: "description", value: (entry: Entry) => entry.description ?? "" },
-    ],
-    catalog.entries,
-  );
-  for (const warning of catalog.warnings) context.printer.warning(warning);
+function published(entry: Entry, version: string | undefined): PublishedArtifact {
+  return {
+    name: entry.name,
+    kind: entry.kind,
+    ...(entry.group === undefined ? {} : { namespace: entry.group }),
+    path: entry.path,
+    ...(entry.description === undefined ? {} : { description: entry.description }),
+    ...(entry.engine === undefined ? {} : { engine: entry.engine }),
+    ...(version === undefined ? {} : { version }),
+  };
 }
 
 /** `aireg registry show` with no argument means the one this project declares. */

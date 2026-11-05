@@ -8,7 +8,9 @@ import {
   type SourceAdapter,
 } from "#adapter/index.ts";
 import { withoutCredentials } from "#adapter/text.ts";
+import type { AuthLogin, SignedInAs } from "#cli/commands/auth/result.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import { STREAMED } from "#cli/commands/define.ts";
 import { needsInput } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
 import { cancel, interaction, interactive } from "#cli/prompt/interaction.ts";
@@ -19,6 +21,7 @@ import { open } from "#core/console/actions.ts";
 import { type SignInPrompt, signInWithOAuth } from "#core/credentials/oauth.ts";
 import { isCI, registryToken, tokenVariable } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { withDaemon } from "#daemon/process/lifecycle.ts";
 import { type Declared, declared, heldFor } from "./list.ts";
 import { tokensOf } from "./shared.ts";
@@ -27,6 +30,10 @@ export interface LoginFlags {
   address?: string;
   adapter?: string;
   "token-stdin"?: boolean;
+}
+
+export interface SignedIn extends AuthLogin {
+  address: string | undefined;
 }
 
 /** Over SSH the browser runs on another machine, and its redirect must be forwarded here. */
@@ -39,7 +46,7 @@ export async function login(
   registry: string | undefined,
   flags: LoginFlags,
   yes: boolean,
-): Promise<void> {
+): Promise<SignedIn | typeof STREAMED> {
   if (registry === undefined) {
     throw needsInput(
       "auth login",
@@ -63,7 +70,9 @@ export async function login(
     });
   }
   const declaring = found?.projectOnly === true ? found : undefined;
-  if (declaring !== undefined && !(await signsInThere(context, registry, declaring, yes))) return;
+  if (declaring !== undefined && !(await signsInThere(context, registry, declaring, yes))) {
+    return STREAMED;
+  }
   const address = flags.address ?? declaring?.location;
   const adapter = flags.adapter ?? declaring?.source.adapter;
   const config = declaring?.source.config ?? {};
@@ -99,12 +108,16 @@ export async function login(
     const signedIn = await (client === undefined
       ? signIn()
       : signInWithOAuth(client, prompt, controller.signal, signIn));
-    report(context, signedIn, where);
+    return {
+      account: signedIn.account,
+      ...(signedIn.identity === undefined ? {} : { identity: shownAs(signedIn.identity) }),
+      address: where,
+    };
   } catch (error) {
     // Once the daemon has the sign-in, Ctrl+C no longer stops it, so its own outcome stands.
     if (controller.signal.aborted && !finishing) {
       context.printer.info("Canceled. Nothing was changed.");
-      return;
+      return STREAMED;
     }
     throw loginFailure(error, registry, { token, oauth: client !== undefined });
   } finally {
@@ -217,22 +230,11 @@ async function oauthClientFor(
 
 const LOGIN_TIMEOUT_MS = 2 * 60_000;
 
-function report(
-  context: CommandContext,
-  { account, identity }: { account: { registry: string }; identity?: Identity | undefined },
-  where: string | undefined,
-): void {
-  const at = where === undefined ? "" : ` at ${withoutCredentials(where)}`;
-  const who =
-    identity === undefined
-      ? ""
-      : ` as ${identity.name}${identity.account === undefined ? "" : ` (${identity.account})`}`;
-  context.printer.format === "json"
-    ? context.printer.json({
-        ok: true,
-        data: { account, ...(identity === undefined ? {} : { identity }) },
-      })
-    : context.printer.success(`Signed in to ${account.registry}${at}${who}.`);
+/** The daemon's identity holds no undefined, having come over JSON. */
+function shownAs(identity: Identity): SignedInAs {
+  return identity.account === undefined
+    ? { name: identity.name }
+    : { name: identity.name, account: identity.account };
 }
 
 /** The adapter's own refusal, with exit 4 when it is about the credential. */
@@ -266,4 +268,17 @@ function failureHint(
     `Pipe one in with \`… | aireg auth login ${registry} --token-stdin\`, ` +
     `or set ${tokenVariable(registry)}.`
   );
+}
+
+export function printLogin({ account, identity, address }: SignedIn, printer: Printer): void {
+  const at = address === undefined ? "" : ` at ${withoutCredentials(address)}`;
+  const who =
+    identity === undefined
+      ? ""
+      : ` as ${identity.name}${identity.account === undefined ? "" : ` (${identity.account})`}`;
+  printer.success(`Signed in to ${account.registry}${at}${who}.`);
+}
+
+export function loginData({ account, identity }: SignedIn): AuthLogin {
+  return identity === undefined ? { account } : { account, identity };
 }

@@ -1,5 +1,6 @@
 import { list, plural } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import type { SettledArtifact } from "#cli/commands/sync/result.ts";
 import { failureWords, itemLine } from "#cli/render/run.ts";
 import { loadAdapter } from "#core/adapter/load.ts";
 import { readOnlyLayout } from "#core/adapter/read-only.ts";
@@ -8,6 +9,7 @@ import {
   isFailed,
   isInterrupted,
   RunErrorCode,
+  type RunEvent,
   RunEventType,
   type RunRecord,
 } from "#core/run/model.ts";
@@ -55,14 +57,7 @@ export interface Followed {
   /** Why the run stopped before its work was done, in words, when it did. */
   stopped: string | undefined;
   run: RunRecord;
-  /** Each item that changed, needs you, or failed, as the text lists them. */
-  artifacts: {
-    name: string;
-    kind: string | undefined;
-    outcome: string;
-    operation?: string;
-    disposition?: string;
-  }[];
+  artifacts: SettledArtifact[];
   /** What the run did to your own files, or left undone. */
   warnings: string[];
 }
@@ -114,13 +109,7 @@ export async function follow(
     if (event.artifact === undefined || event.eventType !== RunEventType.ItemSettled) return;
     if (event.outcome === "unchanged" || event.outcome === "skipped") return;
     context.printer.info(itemLine(context.printer, event));
-    artifacts.push({
-      name: event.artifact,
-      kind: event.kind,
-      outcome: event.outcome ?? "changed",
-      ...(event.operation === undefined ? {} : { operation: event.operation }),
-      ...(event.disposition === undefined ? {} : { disposition: event.disposition }),
-    });
+    artifacts.push(settledOf(event.artifact, event));
     if (event.outcome === "attention") attention = true;
     if (event.outcome === "failed") failed = true;
   });
@@ -139,6 +128,16 @@ export async function follow(
     attention = true;
   }
   return { attention, failed, stopped, run, artifacts, warnings };
+}
+
+function settledOf(name: string, event: RunEvent): SettledArtifact {
+  return {
+    name,
+    ...(event.kind === undefined ? {} : { kind: event.kind }),
+    outcome: event.outcome ?? "changed",
+    ...(event.operation === undefined ? {} : { operation: event.operation }),
+    ...(event.disposition === undefined ? {} : { disposition: event.disposition }),
+  };
 }
 
 /** A run that stopped before its work was done, under the name its command gave it. */

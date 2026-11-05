@@ -5,7 +5,7 @@ import { olderThan } from "#core/engines.ts";
 import type { Lock } from "#core/lock.ts";
 import type { ApplyResult } from "#core/plan/apply/run.ts";
 import { describeCarried } from "#core/plan/carries.ts";
-import type { Action, Plan } from "#core/plan/model.ts";
+import type { Action, Plan, Renamed } from "#core/plan/model.ts";
 import type { Roots } from "#core/store/paths.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { trustFor } from "#core/target/placement.ts";
@@ -13,11 +13,21 @@ import type { Printer } from "#core/term/printer.ts";
 import { table } from "#core/term/table.ts";
 import { GLYPH } from "#core/term/theme.ts";
 import type { Chosen, PlanReport, RunResult } from "#engine/install/pipeline.ts";
-import { collisionFields } from "./collisions.ts";
+import { collisionFields, type Unlinked } from "./collisions.ts";
 import { underHome } from "./home.ts";
 import { linkLoadedBy, loadedBy, toolName } from "./tools.ts";
 
 type Shown = Exclude<Action, { kind: "record" }>;
+
+/** A run's result under `--json`; a dry run reports what it would change, in the same fields. */
+export interface Outcome {
+  dryRun: boolean;
+  changed: number;
+  installed: string[];
+  kept: ApplyResult["kept"];
+  renamed?: Renamed[];
+  unlinked?: Unlinked[];
+}
 
 /** What each action does for the person, rather than how it is done. */
 const VERB: Record<Shown["kind"], string> = {
@@ -258,8 +268,7 @@ function placedKind(
   return placed ?? kindOf(action.name);
 }
 
-/** A run's result under `--json`; a dry run reports what it would change, in the same fields. */
-export function outcome({ plan, applied }: RunResult, dryRun: boolean) {
+export function outcome({ plan, applied }: RunResult, dryRun: boolean): Outcome {
   const planned = plan.actions.filter((action) => action.kind !== "record");
   return {
     dryRun,

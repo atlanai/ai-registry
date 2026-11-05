@@ -2,7 +2,8 @@ import { list } from "#adapter/text.ts";
 import type { CommandSpec } from "#cli/commands/command.ts";
 import { FOR, POLICIES, SELECT, USER } from "#cli/options/flags.ts";
 import { DEFAULT_INTERVAL_SECONDS } from "#core/config/model.ts";
-import { RUN_MODES } from "#core/run/model.ts";
+import { MINIMUM_INTERVAL_SECONDS } from "#core/config/parse-job.ts";
+import { RUN_MODES, RUN_STATES } from "#core/run/model.ts";
 import { MAX_PAGE_SIZE } from "#daemon/rpc/methods.ts";
 
 export const JOB_COMMAND: CommandSpec = {
@@ -47,6 +48,7 @@ export const JOB_COMMAND: CommandSpec = {
         {
           flag: "--interval",
           value: "<seconds>",
+          integer: { min: MINIMUM_INTERVAL_SECONDS },
           describe: `How often the job runs, in seconds (default ${DEFAULT_INTERVAL_SECONDS})`,
         },
         {
@@ -89,6 +91,7 @@ export const JOB_COMMAND: CommandSpec = {
         {
           flag: "--mode",
           value: "<mode>",
+          choices: RUN_MODES,
           describe: `What the run does: ${list(RUN_MODES, "or")} (default sync)`,
         },
       ],
@@ -122,10 +125,16 @@ export const JOB_COMMAND: CommandSpec = {
       maxArguments: 1,
       options: [
         { flag: "--job", value: "<job>", describe: "Only this job's runs" },
-        { flag: "--state", value: "<state>", describe: "Only runs in this state" },
+        {
+          flag: "--state",
+          value: "<state>",
+          choices: RUN_STATES,
+          describe: "Only runs in this state",
+        },
         {
           flag: "--limit",
           value: "<n>",
+          integer: { min: 1, max: MAX_PAGE_SIZE },
           describe: `How many runs to list, from 1 to ${MAX_PAGE_SIZE}`,
         },
         { flag: "--follow", describe: "With a run id, print its events until it finishes" },

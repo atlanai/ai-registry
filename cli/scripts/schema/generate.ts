@@ -4,11 +4,25 @@ import { Lockfile } from "./lockfile.ts";
 import { Manifest } from "./manifest.ts";
 import { Target } from "./target.ts";
 
-export const GENERATED = {
+const OUTPUTS = join(import.meta.dirname, "output");
+
+/** Each command's `--json` schema, from its module under `output/`, so adding one edits no list. */
+const outputs = await Promise.all(
+  readdirSync(OUTPUTS)
+    .filter((name) => name.endsWith(".ts") && name !== "match.ts")
+    .sort()
+    .map(async (name) => {
+      const module = (await import(join(OUTPUTS, name))) as { OUTPUT: object };
+      return [`output/${name.replace(/\.ts$/, ".json")}`, module.OUTPUT] as const;
+    }),
+);
+
+export const GENERATED: Readonly<Record<string, object>> = {
   "manifest.schema.json": Manifest,
   "lockfile.schema.json": Lockfile,
   "target.schema.json": Target,
-} as const;
+  ...Object.fromEntries(outputs),
+};
 
 /** Published, so the generated documents live apart from the definitions. */
 export const SCHEMA_DIR = join(import.meta.dirname, "..", "..", "schema");
@@ -40,7 +54,7 @@ if (process.argv[1]?.endsWith("generate.ts") === true) {
     ...Object.fromEntries(Object.entries(GENERATED).map(([name, s]) => [name, render(s)])),
     ...kindCopies(),
   };
-  mkdirSync(join(SCHEMA_DIR, "kinds"), { recursive: true });
+  for (const dir of ["kinds", "output"]) mkdirSync(join(SCHEMA_DIR, dir), { recursive: true });
   for (const [name, text] of Object.entries(documents)) {
     writeFileSync(join(SCHEMA_DIR, name), text);
     process.stdout.write(`wrote schema/${name}\n`);

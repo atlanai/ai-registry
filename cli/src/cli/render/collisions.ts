@@ -1,15 +1,22 @@
 import { ExitCode } from "#core/errors.ts";
 import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
-import type { Plan } from "#core/plan/model.ts";
+import type { Plan, Renamed } from "#core/plan/model.ts";
 import type { Printer } from "#core/term/printer.ts";
 
-/**
- * Each artifact a run renamed or left out because another holds its name, and the setting
- * that decides it. One left out means the install is not whole, so it exits 3.
- */
-export function settleCollisions(context: { printer: Printer; exit?: ExitCode }, plan: Plan): void {
+/** An artifact left out because another holds its name. */
+export interface Unlinked {
+  artifact: string;
+  by: string;
+  /** The path both would take, when they differ in name but not in where they land. */
+  at?: string;
+}
+
+/** One artifact left out means the install is not whole, so it exits 3. */
+export function exitOnClash(context: { exit?: ExitCode }, plan: Plan): void {
   if (plan.clashes.length > 0) context.exit = ExitCode.Changed;
-  const { printer } = context;
+}
+
+export function reportCollisions(printer: Printer, plan: Plan): void {
   if (printer.format === "json") return;
   for (const { artifact, as, by } of plan.renamed) {
     const why = `${leafOf(artifact)} is taken by ${shownAddress(by)}`;
@@ -27,8 +34,7 @@ export function settleCollisions(context: { printer: Printer; exit?: ExitCode },
   if (plan.renamed.length > 0 || renameable) printer.hint(NAME_COLLISION_HINT);
 }
 
-/** The same, for `--json`: `renamed`, and `unlinked` for what was left out. */
-export function collisionFields(plan: Plan) {
+export function collisionFields(plan: Plan): { renamed?: Renamed[]; unlinked?: Unlinked[] } {
   return {
     ...(plan.renamed.length === 0 ? {} : { renamed: plan.renamed }),
     ...(plan.clashes.length === 0

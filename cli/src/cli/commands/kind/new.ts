@@ -3,6 +3,8 @@ import { join, relative } from "node:path";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { list } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import { STREAMED } from "#cli/commands/define.ts";
+import type { KindNew } from "#cli/commands/kind/result.ts";
 import type { Own } from "#cli/commands/kind.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
 import { cancel, interaction, interactive } from "#cli/prompt/interaction.ts";
@@ -10,8 +12,14 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { findRegistry } from "#core/filespec/init.ts";
 import { type KindManifest, primaryFiles } from "#core/filespec/kind-manifests.ts";
 import { refuseRedirect, writeFresh } from "#core/fs/fresh.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { askFields, nameOf, render, scaffold, settings } from "./fields.ts";
 import { outsidePlace, registryPlace } from "./place.ts";
+
+export interface Created extends KindNew {
+  edit: string | undefined;
+  next: string;
+}
 
 export async function init(
   kind: string,
@@ -20,7 +28,7 @@ export async function init(
   input: string | undefined,
   own: Own,
   yes: boolean,
-): Promise<void> {
+): Promise<Created | typeof STREAMED> {
   const root = findRegistry(context.cwd);
   const inRegistry = root !== undefined;
   const given = input === undefined ? undefined : nameOf(input, input);
@@ -36,12 +44,15 @@ export async function init(
   const place = inRegistry
     ? await registryPlace(kind, root, context, own, yes, given, step)
     : outsidePlace(kind, files, context, given);
-  if (place === undefined) return;
+  if (place === undefined) return STREAMED;
   const { name, at } = place;
   const shown = relative(context.cwd, at) || ".";
 
   const { fields, todo } = scaffold(manifest, name, sets);
-  if (interactive(step) && !(await askFields(step, fields, todo))) return cancel(step);
+  if (interactive(step) && !(await askFields(step, fields, todo))) {
+    cancel(step);
+    return STREAMED;
+  }
 
   const created = files.map((file) => (shown === "." ? file : `${shown}/${file}`));
   for (const file of files) refuseRedirect(inRegistry ? root : context.cwd, join(at, file));
@@ -53,21 +64,25 @@ export async function init(
     });
   }
 
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { kind, name, created, todo } });
-    return;
-  }
-  context.printer.success(`Created ${list(created)}.`);
-  if (todo.length > 0) context.printer.note("todo", list(todo));
-  if (inRegistry) context.printer.note("edit", shown);
   // Publish takes a skill's folder, and any other kind's Markdown file.
   const publishable = files.includes(SKILL_ENTRY)
     ? shown
     : (created.find((file) => file.endsWith(".md")) ?? shown);
-  context.printer.note(
-    "next",
-    inRegistry
+  return {
+    kind,
+    name,
+    created,
+    todo,
+    edit: inRegistry ? shown : undefined,
+    next: inRegistry
       ? "aireg registry index"
       : `aireg publish ${publishable} --to <registry>/<namespace>`,
-  );
+  };
+}
+
+export function printCreated(result: Created, printer: Printer): void {
+  printer.success(`Created ${list(result.created)}.`);
+  if (result.todo.length > 0) printer.note("todo", list(result.todo));
+  if (result.edit !== undefined) printer.note("edit", result.edit);
+  printer.note("next", result.next);
 }

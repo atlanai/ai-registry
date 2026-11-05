@@ -1,9 +1,10 @@
 import { messageOf } from "#adapter/errors.ts";
-import { list, quoted, sanitizeText } from "#adapter/text.ts";
+import { sanitizeText } from "#adapter/text.ts";
+import type { LogName, LogsResult } from "#cli/commands/logs/result.ts";
 import { LOGS_COMMAND } from "#cli/commands/logs/spec.ts";
-import { noArguments, parse } from "#cli/options/parse.ts";
+import { noArguments, type OptionsOf, parse } from "#cli/options/parse.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { isLevel, LEVELS, type LogRecord } from "#core/log/model.ts";
+import type { LogRecord } from "#core/log/model.ts";
 import {
   type Entry,
   type Filter,
@@ -16,98 +17,83 @@ import {
 import { DAEMON_LOG_FILE, DAEMON_STDERR_FILE, logPath } from "#core/log/sink.ts";
 import { follow } from "#core/log/tail.ts";
 import { toolHome } from "#core/store/paths.ts";
-import type { CommandContext } from "./command.ts";
+import type { Printer } from "#core/term/printer.ts";
+import { defineCommand, STREAMED } from "./define.ts";
 
-interface Own extends Record<string, unknown> {
-  follow?: boolean;
-  tail?: string;
-  since?: string;
-  until?: string;
-  level?: string;
-  grep?: string;
-  daemon?: boolean;
-  cli?: boolean;
-  stderr?: boolean;
-  previous?: boolean;
-}
+type Options = OptionsOf<typeof LOGS_COMMAND.options>;
 
 const DEFAULT_TAIL = 50;
 
-export async function run(context: CommandContext): Promise<void> {
-  const { positionals, own } = parse<Own>(context.argv, LOGS_COMMAND);
-  noArguments(positionals, "logs");
+export const { run } = defineCommand({
+  spec: LOGS_COMMAND,
+  parse(argv): Options {
+    const { positionals, own } = parse<Options>(argv, LOGS_COMMAND);
+    noArguments(positionals, "logs");
+    return own;
+  },
+  async run(options, context): Promise<LogsResult | typeof STREAMED> {
+    const chosen = sources(options, toolHome());
+    const filter = filterOf(options);
+    const limit = options.tail ?? DEFAULT_TAIL;
 
-  const home = toolHome();
-  const chosen = sources(own, home);
-  const filter = filterOf(own);
+    // Each log is in time order, so the newest of all are among each one's newest.
+    const history = chosen
+      .flatMap((source) =>
+        newestEntries(source.path, filter, limit).map((entry) => ({ log: source.label, entry })),
+      )
+      .sort((a, b) => {
+        const at = isRaw(a.entry) ? "" : a.entry.timestamp;
+        const bt = isRaw(b.entry) ? "" : b.entry.timestamp;
+        return at < bt ? -1 : at > bt ? 1 : 0;
+      });
+    const entries = limit === 0 ? [] : history.slice(-limit);
+    if (options.follow !== true) return { entries };
 
-  const limit = own.tail === undefined ? DEFAULT_TAIL : Number(own.tail);
-  if (!Number.isInteger(limit) || limit < 0) {
-    throw new AiregError(`--tail takes a whole number, not ${quoted(own.tail ?? "")}.`, {
-      code: ErrorCode.Usage,
-      hint: "Pass how many entries to print, such as `--tail 20`.",
-    });
-  }
-
-  // Each log is in time order, so the newest of all are among each one's newest.
-  const history = chosen
-    .flatMap((source) =>
-      newestEntries(source.path, filter, limit).map((entry) => ({ log: source.label, entry })),
-    )
-    .sort((a, b) => {
-      const at = isRaw(a.entry) ? "" : a.entry.timestamp;
-      const bt = isRaw(b.entry) ? "" : b.entry.timestamp;
-      return at < bt ? -1 : at > bt ? 1 : 0;
-    });
-
-  const newest = limit === 0 ? [] : history.slice(-limit);
-  // One document for what is there; only a follow streams, one line per entry.
-  if (context.printer.format === "json" && own.follow !== true) {
-    context.printer.json({ ok: true, data: { entries: newest } });
-    return;
-  }
-  // `--tail 0` asked for no entries, so finding none is not news.
-  if (history.length === 0 && limit > 0 && own.follow !== true) {
-    context.printer.info("No log entries yet.");
-    context.printer.info(
-      context.printer.style.dim(
-        "Commands you run log only with `--log-level`. The daemon logs whenever it runs.",
-      ),
+    for (const { log, entry } of entries) render(context.printer, log, entry);
+    const controller = new AbortController();
+    const stop = () => controller.abort();
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+    await Promise.all(
+      chosen.map(async (source) => {
+        for await (const line of follow({ path: source.path, signal: controller.signal })) {
+          const entry = parseLine(line);
+          if (entry !== undefined && matches(entry, filter)) {
+            render(context.printer, source.label, entry);
+          }
+        }
+      }),
     );
-    return;
-  }
-
-  for (const { log, entry } of newest) render(context, log, entry);
-  if (own.follow !== true) return;
-
-  const controller = new AbortController();
-  const stop = () => controller.abort();
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
-
-  await Promise.all(
-    chosen.map(async (source) => {
-      for await (const line of follow({ path: source.path, signal: controller.signal })) {
-        const entry = parseLine(line);
-        if (entry !== undefined && matches(entry, filter)) render(context, source.label, entry);
-      }
-    }),
-  );
-}
+    return STREAMED;
+  },
+  text(result, printer, options) {
+    // `--tail 0` asked for no entries, so finding none is not news.
+    if (result.entries.length === 0 && options.tail !== 0) {
+      printer.info("No log entries yet.");
+      printer.info(
+        printer.style.dim(
+          "Commands you run log only with `--log-level`. The daemon logs whenever it runs.",
+        ),
+      );
+      return;
+    }
+    for (const { log, entry } of result.entries) render(printer, log, entry);
+  },
+});
 
 interface Source {
-  label: string;
+  label: LogName;
   path: string;
 }
 
-function sources(own: Own, home: string): Source[] {
+function sources(own: Options, home: string): Source[] {
   const suffix = own.previous === true ? ".1" : "";
   const all: Source[] = [
     { label: "daemon", path: `${logPath(home, DAEMON_LOG_FILE)}${suffix}` },
     { label: "cli", path: `${logPath(home)}${suffix}` },
     { label: "stderr", path: `${logPath(home, DAEMON_STDERR_FILE)}${suffix}` },
   ];
-  const wanted = new Set<string>();
+  const wanted = new Set<LogName>();
   if (own.daemon === true) wanted.add("daemon");
   if (own.cli === true) wanted.add("cli");
   if (own.stderr === true) wanted.add("stderr");
@@ -116,17 +102,9 @@ function sources(own: Own, home: string): Source[] {
   return all.filter((source) => wanted.has(source.label));
 }
 
-function filterOf(own: Own): Filter {
+function filterOf(own: Options): Filter {
   const filter: Filter = {};
-  if (own.level !== undefined) {
-    if (!isLevel(own.level)) {
-      throw new AiregError(`Unknown log level ${quoted(own.level)}.`, {
-        code: ErrorCode.Usage,
-        hint: `Use ${list(LEVELS, "or")}.`,
-      });
-    }
-    filter.minLevel = own.level;
-  }
+  if (own.level !== undefined) filter.minLevel = own.level;
   try {
     if (own.since !== undefined) filter.sinceMs = parseSince(own.since);
     if (own.until !== undefined) filter.untilMs = parseSince(own.until);
@@ -140,8 +118,7 @@ function filterOf(own: Own): Filter {
   return filter;
 }
 
-function render(context: CommandContext, log: string, entry: Entry): void {
-  const { printer } = context;
+function render(printer: Printer, log: LogName, entry: Entry): void {
   if (printer.format === "json") {
     printer.json({ ok: true, data: { log, entry } });
     return;
@@ -167,7 +144,7 @@ function render(context: CommandContext, log: string, entry: Entry): void {
   );
 }
 
-function paint(printer: CommandContext["printer"], level: LogRecord["severity_text"]): string {
+function paint(printer: Printer, level: LogRecord["severity_text"]): string {
   const text = level.toUpperCase().padEnd(5);
   if (level === "error" || level === "fatal") return printer.style.red(text);
   if (level === "warn") return printer.style.yellow(text);

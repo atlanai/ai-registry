@@ -1,7 +1,7 @@
 import { type ParseArgsConfig, parseArgs } from "node:util";
 import { messageOf } from "#adapter/errors.ts";
 import { isNamespace } from "#adapter/filespec/names.ts";
-import { quoted } from "#adapter/text.ts";
+import { list, quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { OptionSpec } from "#core/host/extend.ts";
 import type { Scope } from "#core/store/paths.ts";
@@ -88,6 +88,7 @@ export function parse<T extends Record<string, unknown>>(
     }
   }
   if (typeof values.as === "string" && declared.includes(AS)) refuseAlias(values.as);
+  checkValues(declared, values, accepts.name);
 
   const scope: Scope | undefined = values.user === true ? "user" : undefined;
 
@@ -109,6 +110,21 @@ export function parse<T extends Record<string, unknown>>(
   };
 }
 
+type ValueOf<O extends OptionSpec> = O extends { integer: object }
+  ? number
+  : O extends { choices: readonly (infer C)[] }
+    ? C
+    : O extends { value: string }
+      ? O extends { multiple: true }
+        ? string[]
+        : string
+      : boolean;
+
+/** Keyed by flag without the dashes. */
+export type OptionsOf<T extends readonly OptionSpec[]> = {
+  [O in T[number] as O["flag"] extends `--${infer Name}` ? Name : never]?: ValueOf<O>;
+};
+
 export interface Parsed<T> {
   positionals: string[];
   common: CommonOptions;
@@ -116,6 +132,59 @@ export interface Parsed<T> {
 }
 
 const helpHint = (path: string) => `Run \`aireg ${path} --help\` for the options it takes.`;
+
+/** Refuses a value outside an option's `choices` or `integer` range, and makes an integer a number. */
+function checkValues(
+  declared: readonly OptionSpec[],
+  values: Record<string, unknown>,
+  path: string,
+): void {
+  for (const option of declared) {
+    const key = option.flag.slice(2);
+    const value = values[key];
+    if (typeof value !== "string") continue;
+    if (option.choices !== undefined) {
+      // `--kind Skill` names the same choice as `--kind skill`; the command sees the choice.
+      const chosen = option.choices.find((choice) => choice === value.trim().toLowerCase());
+      if (chosen === undefined) {
+        throw valueError(option, `${list(option.choices, "or")}`, value, path);
+      }
+      values[key] = chosen;
+    }
+    if (option.integer !== undefined) values[key] = integerOf(option, option.integer, value, path);
+  }
+}
+
+function integerOf(
+  option: OptionSpec,
+  range: { min?: number; max?: number },
+  value: string,
+  path: string,
+): number {
+  const number = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  const { min, max } = range;
+  const inRange =
+    Number.isSafeInteger(number) &&
+    (min === undefined || number >= min) &&
+    (max === undefined || number <= max);
+  if (inRange) return number;
+  const bounds =
+    min !== undefined && max !== undefined
+      ? ` from ${min} to ${max}`
+      : min !== undefined
+        ? ` of at least ${min}`
+        : max !== undefined
+          ? ` of at most ${max}`
+          : "";
+  throw valueError(option, `a whole number${bounds}`, value, path);
+}
+
+function valueError(option: OptionSpec, takes: string, value: string, path: string): AiregError {
+  return new AiregError(`${option.flag} takes ${takes}, not ${quoted(value)}.`, {
+    code: ErrorCode.Usage,
+    hint: helpHint(path),
+  });
+}
 
 /** Every option a command takes, across its actions, since the parser sees them all at once. */
 function declaredBy(accepts: Accepts): OptionSpec[] {

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { plural, quoted } from "#adapter/text.ts";
-import { initAdapter } from "#cli/commands/adapter/init.ts";
+import { initAdapter, initData, printInit } from "#cli/commands/adapter/init.ts";
+import type { AdapterInstall, AdapterList, AdapterRemove } from "#cli/commands/adapter/result.ts";
 import { ADAPTER_COMMAND } from "#cli/commands/adapter/spec.ts";
 import { needsInput, parse } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
@@ -18,39 +19,64 @@ import { withReleaseHint } from "#core/release/errors.ts";
 import { runningEntry } from "#core/release/launch.ts";
 import { releaseStamp } from "#core/release/stamp.ts";
 import { toolHome } from "#core/store/paths.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { table } from "#core/term/table.ts";
 import { VERSION } from "#core/version.ts";
 import { recycleDaemon } from "#daemon/process/lifecycle.ts";
-import { type CommandContext, runAction } from "./command.ts";
+import type { CommandContext } from "./command.ts";
+import { action, defineCommand, STREAMED } from "./define.ts";
 
-export async function run(context: CommandContext): Promise<void> {
-  const spec = ADAPTER_COMMAND;
-  const { common, own, positionals } = parse<{ dir?: string }>(context.argv, spec);
-  const [action = "list", argument] = positionals;
-  return runAction(spec, action, {
-    init: () => initAdapter(context, argument, common, own),
-    list: () => verified(list(context)),
-    install: () => verified(install(context, argument, common)),
-    remove: () => verified(remove(context, argument, common.dryRun)),
-  });
+interface Options {
+  argument: string | undefined;
+  dryRun: boolean;
+  force: boolean;
+  yes: boolean;
+  dir: string | undefined;
 }
 
-async function list(context: CommandContext): Promise<void> {
+export const { run } = defineCommand<Options>({
+  spec: ADAPTER_COMMAND,
+  parse(argv) {
+    const { common, own, positionals } = parse<{ dir?: string }>(argv, ADAPTER_COMMAND);
+    const [verb = "list", argument] = positionals;
+    const { dryRun, force, yes } = common;
+    return { action: verb, options: { argument, dryRun, force, yes, dir: own.dir } };
+  },
+  actions: {
+    init: action({
+      run: ({ argument, force, dryRun, dir }, context) =>
+        initAdapter(context.cwd, argument, { force, dryRun, dir }),
+      text: printInit,
+      data: initData,
+    }),
+    list: action({ run: () => verified(list()), text: printList }),
+    install: action({
+      run: (options, context) => verified(install(context, options)),
+      text: printInstall,
+    }),
+    remove: action({
+      run: ({ argument, dryRun }) => verified(remove(argument, dryRun)),
+      text: printRemove,
+    }),
+  },
+});
+
+async function list(): Promise<AdapterList> {
   const adapters = (await readConfig()).adapters;
-  const rows = Object.entries(adapters).map(([id, specifier]) => ({ id, specifier }));
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { adapters: rows } });
-    return;
-  }
+  return { adapters: Object.entries(adapters).map(([id, specifier]) => ({ id, specifier })) };
+}
+
+/** Installed adapters live at `adapters/<id>/<version>/`. */
+const VERSIONED = /\/(\d+\.\d+\.\d+[^/]*)\//;
+
+function printList({ adapters: rows }: AdapterList, printer: Printer): void {
   if (rows.length === 0) {
-    context.printer.info(
-      "No adapters installed from the release server. Built-in adapters still load.",
-    );
+    printer.info("No adapters installed from the release server. Built-in adapters still load.");
     return;
   }
-  context.printer.info(context.printer.style.bold(`${plural(rows.length, "adapter")} installed`));
+  printer.info(printer.style.bold(`${plural(rows.length, "adapter")} installed`));
   table(
-    context.printer,
+    printer,
     [
       { header: "adapter", value: (row: (typeof rows)[number]) => row.id },
       {
@@ -60,17 +86,16 @@ async function list(context: CommandContext): Promise<void> {
       },
       {
         header: "module",
-        value: (row: (typeof rows)[number]) => context.printer.style.dim(row.specifier),
+        value: (row: (typeof rows)[number]) => printer.style.dim(row.specifier),
       },
     ],
     rows,
   );
 }
 
-/** A failure the release server's checks raised, named as one rather than as a crash. */
-async function verified(work: Promise<void>): Promise<void> {
+async function verified<R>(work: Promise<R>): Promise<R> {
   try {
-    await work;
+    return await work;
   } catch (error) {
     throw withReleaseHint(
       error,
@@ -81,9 +106,8 @@ async function verified(work: Promise<void>): Promise<void> {
 
 async function install(
   context: CommandContext,
-  raw: string | undefined,
-  { dryRun, force, yes }: { dryRun: boolean; force: boolean; yes: boolean },
-): Promise<void> {
+  { argument: raw, dryRun, force, yes }: Options,
+): Promise<AdapterInstall | typeof STREAMED> {
   if (raw === undefined) {
     throw needsInput(
       "adapter install",
@@ -92,7 +116,9 @@ async function install(
     );
   }
   const want = parseWant(raw);
-  if (!dryRun && !yes && !isTrusted(want.id) && !(await consents(context, want.id))) return;
+  if (!dryRun && !yes && !isTrusted(want.id) && !(await consents(context, want.id))) {
+    return STREAMED;
+  }
   const stamp = releaseStamp();
   if (stamp === undefined) {
     throw new AiregError(
@@ -107,40 +133,22 @@ async function install(
   const specifier = adapterSpecifier(release.id, release.version);
   const current = (await readConfig()).adapters[release.id];
   const present = current === specifier && (await exists(join(toolHome(), specifier)));
+  const { id, version } = release;
   if (dryRun) {
-    report(context, {
+    return {
       dryRun,
       action: present ? "already-installed" : "would-install",
-      id: release.id,
-      version: release.version,
+      id,
+      version,
       specifier,
-    });
-    return;
+    };
   }
-  if (present && !force) {
-    report(context, {
-      dryRun,
-      action: "already-installed",
-      id: release.id,
-      version: release.version,
-      specifier,
-    });
-    return;
-  }
+  if (present && !force) return { dryRun, action: "already-installed", id, version, specifier };
   const bytes = await downloadAdapter(release);
   await writeInstalled(release.id, release.version, bytes);
   await recycle();
-  report(context, {
-    dryRun,
-    action: "installed",
-    id: release.id,
-    version: release.version,
-    specifier,
-  });
+  return { dryRun, action: "installed", id, version, specifier };
 }
-
-/** Installed adapters live at `adapters/<id>/<version>/`. */
-const VERSIONED = /\/(\d+\.\d+\.\d+[^/]*)\//;
 
 /** An adapter runs inside aireg with your access, so one it does not trust needs a yes. */
 async function consents(context: CommandContext, id: string): Promise<boolean> {
@@ -166,45 +174,20 @@ async function consents(context: CommandContext, id: string): Promise<boolean> {
   return true;
 }
 
-function report(
-  context: CommandContext,
-  data: {
-    dryRun: boolean;
-    action: string;
-    id: string;
-    specifier: string;
-    version?: string | undefined;
-  },
-): void {
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data });
+function printInstall(result: AdapterInstall, printer: Printer): void {
+  if (result.action === "already-installed") {
+    printer.info(`${result.id} ${result.version} is already installed.`);
     return;
   }
-  if (data.action === "already-installed") {
-    context.printer.info(`${data.id} ${data.version} is already installed.`);
+  if (result.action === "would-install") {
+    printer.info(`Would install ${result.id} ${result.version}.`);
     return;
   }
-  if (data.action === "would-install") {
-    context.printer.info(`Would install ${data.id} ${data.version}.`);
-    return;
-  }
-  if (data.action === "would-remove") {
-    context.printer.info(`Would remove ${data.id}.`);
-    return;
-  }
-  if (data.action === "removed") {
-    context.printer.success(`Removed ${data.id}.`);
-    return;
-  }
-  context.printer.success(`Installed ${data.id} ${data.version}.`);
-  context.printer.note("path", data.specifier);
+  printer.success(`Installed ${result.id} ${result.version}.`);
+  printer.note("path", result.specifier);
 }
 
-async function remove(
-  context: CommandContext,
-  raw: string | undefined,
-  dryRun: boolean,
-): Promise<void> {
+async function remove(raw: string | undefined, dryRun: boolean): Promise<AdapterRemove> {
   if (raw === undefined) {
     throw needsInput(
       "adapter remove",
@@ -220,13 +203,15 @@ async function remove(
       hint: "Built-in adapters need no install. Run `aireg adapter list` to see the installed ones.",
     });
   }
-  if (dryRun) {
-    report(context, { dryRun, action: "would-remove", id, specifier });
-    return;
-  }
+  if (dryRun) return { dryRun, action: "would-remove", id, specifier };
   await unpinAdapter(id);
   await recycle();
-  report(context, { dryRun, action: "removed", id, specifier });
+  return { dryRun, action: "removed", id, specifier };
+}
+
+function printRemove(result: AdapterRemove, printer: Printer): void {
+  if (result.action === "would-remove") printer.info(`Would remove ${result.id}.`);
+  else printer.success(`Removed ${result.id}.`);
 }
 
 async function recycle(): Promise<void> {

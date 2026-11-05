@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/outdated.json",
+  "title": "aireg outdated --json",
+  "description": "The `data` each `aireg outdated` action prints under --json, by action.",
+  "$defs": {
+    "outdated": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "scope",
+        "artifacts"
+      ],
+      "properties": {
+        "scope": {
+          "anyOf": [
+            {
+              "const": "user",
+              "type": "string"
+            },
+            {
+              "const": "project",
+              "type": "string"
+            }
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "registry",
+              "current",
+              "latest",
+              "moved"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "registry": {
+                "type": "string"
+              },
+              "pinned": {
+                "description": "The version the manifest pins.",
+                "type": "string"
+              },
+              "watched": {
+                "additionalProperties": false,
+                "description": "Published from a watched folder, so `aireg update` never moves it.",
+                "type": "object",
+                "required": [
+                  "target",
+                  "harness",
+                  "path"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string"
+                  },
+                  "harness": {
+                    "description": "`target` by the id aireg 0.1 used.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                }
+              },
+              "current": {
+                "description": "Empty for one not installed yet.",
+                "type": "string"
+              },
+              "latest": {
+                "type": "string"
+              },
+              "moved": {
+                "type": "boolean"
+              },
+              "unchecked": {
+                "description": "Why it could not be checked.",
+                "type": "string"
+              },
+              "added": {
+                "description": "Published since the last install, under an entry taken whole.",
+                "const": true,
+                "type": "boolean"
+              },
+              "unpublished": {
+                "const": true,
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

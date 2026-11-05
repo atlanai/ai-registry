@@ -1,0 +1,454 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/registry.json",
+  "title": "aireg registry --json",
+  "description": "The `data` each `aireg registry` action prints under --json, by action.",
+  "$defs": {
+    "add": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "registry",
+        "address",
+        "config",
+        "readable",
+        "dryRun"
+      ],
+      "properties": {
+        "registry": {
+          "type": "string"
+        },
+        "address": {
+          "description": "The address, without credentials.",
+          "type": "string"
+        },
+        "adapter": {
+          "description": "Only for a registry declared with --adapter.",
+          "type": "string"
+        },
+        "config": {
+          "type": "object",
+          "patternProperties": {
+            "^(.*)$": {
+              "type": "string"
+            }
+          }
+        },
+        "movedFrom": {
+          "description": "The old address, when the name moved.",
+          "type": "string"
+        },
+        "kept": {
+          "description": "When the name moved, the installed artifacts it serves.",
+          "type": "number"
+        },
+        "readable": {
+          "description": "`false` when the registry could not be read before you sign in.",
+          "type": "boolean"
+        },
+        "dryRun": {
+          "type": "boolean"
+        }
+      }
+    },
+    "list": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "scope",
+        "registries"
+      ],
+      "properties": {
+        "scope": {
+          "anyOf": [
+            {
+              "const": "project",
+              "type": "string"
+            },
+            {
+              "const": "user",
+              "type": "string"
+            }
+          ]
+        },
+        "registries": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "registry",
+              "address",
+              "config"
+            ],
+            "properties": {
+              "registry": {
+                "type": "string"
+              },
+              "address": {
+                "description": "The address, without credentials.",
+                "type": "string"
+              },
+              "adapter": {
+                "description": "Only for a registry declared with --adapter.",
+                "type": "string"
+              },
+              "config": {
+                "type": "object",
+                "patternProperties": {
+                  "^(.*)$": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "show": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "registry",
+        "address",
+        "layouts",
+        "entries",
+        "warnings"
+      ],
+      "properties": {
+        "registry": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "revision": {
+          "description": "The commit read, for a git registry.",
+          "type": "string"
+        },
+        "layout": {
+          "description": "Only for a source that is not a registry.",
+          "anyOf": [
+            {
+              "const": "registry",
+              "type": "string"
+            },
+            {
+              "const": "marketplace",
+              "type": "string"
+            },
+            {
+              "const": "well-known",
+              "type": "string"
+            },
+            {
+              "const": "folder",
+              "type": "string"
+            }
+          ]
+        },
+        "layouts": {
+          "description": "How the registry was read.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "kind",
+              "path"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "plugin",
+                    "type": "string"
+                  },
+                  {
+                    "const": "skill",
+                    "type": "string"
+                  },
+                  {
+                    "const": "agent",
+                    "type": "string"
+                  }
+                ]
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "engine": {
+                "description": "The oldest aireg that can install it.",
+                "type": "string"
+              },
+              "version": {
+                "description": "The version the registry serves.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "remove": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "registry",
+        "dryRun",
+        "jobs"
+      ],
+      "properties": {
+        "registry": {
+          "type": "string"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "jobs": {
+          "description": "The ids of the jobs removed with it, or that would be.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "init": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "root",
+        "created",
+        "slug",
+        "namespaces"
+      ],
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "created": {
+          "description": "`false` in a folder that is already a registry.",
+          "type": "boolean"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "namespaces": {
+          "description": "In a registry already, only the namespaces added.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "index": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "root",
+        "added",
+        "moved",
+        "paths"
+      ],
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "added": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "namespace",
+              "kind",
+              "name",
+              "version",
+              "digest"
+            ],
+            "properties": {
+              "namespace": {
+                "type": "string"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "plugin",
+                    "type": "string"
+                  },
+                  {
+                    "const": "skill",
+                    "type": "string"
+                  },
+                  {
+                    "const": "agent",
+                    "type": "string"
+                  }
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "catalogDigest": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "moved": {
+          "description": "Artifacts whose `latest` moved without a new version.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "namespace",
+              "kind",
+              "name",
+              "version",
+              "digest"
+            ],
+            "properties": {
+              "namespace": {
+                "type": "string"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "plugin",
+                    "type": "string"
+                  },
+                  {
+                    "const": "skill",
+                    "type": "string"
+                  },
+                  {
+                    "const": "agent",
+                    "type": "string"
+                  }
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "catalogDigest": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "paths": {
+          "description": "Root-relative paths written.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "validate": {
+      "additionalProperties": false,
+      "description": "Printed under `ok: false` when it has problems.",
+      "type": "object",
+      "required": [
+        "name",
+        "namespaces",
+        "artifacts",
+        "versions",
+        "problems",
+        "warnings"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "namespaces": {
+          "type": "number"
+        },
+        "artifacts": {
+          "type": "number"
+        },
+        "versions": {
+          "type": "number"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "path",
+              "message"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "fix": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

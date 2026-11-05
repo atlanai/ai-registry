@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/adapter.json",
+  "title": "aireg adapter --json",
+  "description": "The `data` each `aireg adapter` action prints under --json, by action.",
+  "$defs": {
+    "list": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "adapters"
+      ],
+      "properties": {
+        "adapters": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "specifier"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "specifier": {
+                "description": "The module aireg loads for it.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "install": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dryRun",
+        "action",
+        "id",
+        "version",
+        "specifier"
+      ],
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
+        },
+        "action": {
+          "anyOf": [
+            {
+              "const": "already-installed",
+              "type": "string"
+            },
+            {
+              "const": "would-install",
+              "type": "string"
+            },
+            {
+              "const": "installed",
+              "type": "string"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "specifier": {
+          "description": "The module aireg loads for it.",
+          "type": "string"
+        }
+      }
+    },
+    "remove": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dryRun",
+        "action",
+        "id",
+        "specifier"
+      ],
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
+        },
+        "action": {
+          "anyOf": [
+            {
+              "const": "would-remove",
+              "type": "string"
+            },
+            {
+              "const": "removed",
+              "type": "string"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "specifier": {
+          "description": "The module aireg loads for it.",
+          "type": "string"
+        }
+      }
+    },
+    "init": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "dir",
+        "files",
+        "dryRun"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "dir": {
+          "description": "The package's folder, as an absolute path.",
+          "type": "string"
+        },
+        "files": {
+          "description": "Paths within the package's folder.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dryRun": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

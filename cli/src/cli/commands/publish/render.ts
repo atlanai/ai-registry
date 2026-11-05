@@ -1,11 +1,11 @@
 import type { PublishResult } from "#adapter/index.ts";
+import type { PublishReport } from "#cli/commands/publish/result.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { changesJson } from "#engine/publish/changes.ts";
 import type { Skipped } from "#engine/publish/exports.ts";
 import type { Destination, Planned } from "#engine/publish/target.ts";
 import { describeSkip, type Sending } from "./review.ts";
 
-/** What `--json` says beside each artifact: whether anything was sent, where, and what was left out. */
 interface Outcome {
   dryRun: boolean;
   /** Where exports go, from `--to` or `publish.to`; absent when each artifact goes where it came from. */
@@ -13,14 +13,11 @@ interface Outcome {
   skipped: readonly Skipped[];
 }
 
-/** Prints the `--json` result; does nothing in other formats. */
 export function report(
-  printer: Printer,
   planned: Sending,
   results: ReadonlyMap<string, PublishResult | undefined>,
   outcome: Outcome,
-): void {
-  if (printer.format !== "json") return;
+): PublishReport {
   const { dryRun, to, skipped } = outcome;
   const target = to === undefined ? null : { registry: to.registry, namespace: to.namespace };
   const artifacts = planned.map(({ alias, item }) => {
@@ -41,7 +38,7 @@ export function report(
       ...changesJson(item.changes),
     };
   });
-  printer.json({ ok: true, data: { dryRun, target, artifacts, skipped } });
+  return { dryRun, target, artifacts, skipped: [...skipped] };
 }
 
 function filesOf(item: Planned): { files?: string[] } {
@@ -51,8 +48,10 @@ function filesOf(item: Planned): { files?: string[] } {
     : {};
 }
 
-export function nothing(printer: Printer, outcome: Outcome): void {
+/** The plan and each send were printed as they happened, so only an empty run is left to say. */
+export function renderPublish(result: PublishReport, printer: Printer): void {
+  if (result.artifacts.length > 0) return;
   printer.info(printer.style.dim("Nothing to publish."));
-  for (const skip of outcome.skipped) printer.info(describeSkip(skip, outcome.to?.namespace ?? ""));
-  report(printer, [], new Map(), outcome);
+  const namespace = result.target?.namespace ?? "";
+  for (const skip of result.skipped) printer.info(describeSkip(skip, namespace));
 }
