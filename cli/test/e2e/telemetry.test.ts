@@ -58,7 +58,9 @@ describe("usage events", () => {
 
       const first = await aireg(["registry", "add", market, "--as", "acme"], { env });
       expect(first.code).toBe(0);
-      expect(first.stderr).toContain("notice: aireg collects usage data under a random ID");
+      expect(first.stderr).toContain(
+        "notice: aireg collects usage data to improve the CLI. Events never include your identity.",
+      );
       const added = await aireg(["add", "acme/lint", "--yes"], { env });
       expect(added.code, added.stderr).toBe(0);
       expect(added.stderr).not.toContain("notice:");
