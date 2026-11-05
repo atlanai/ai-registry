@@ -7,7 +7,7 @@ import { isWithin } from "#adapter/paths.ts";
 import { inspect } from "#core/fs/link.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { canonical } from "#core/fs/realpath.ts";
-import { KIND_SPECS, SCANNED_KINDS } from "#core/kinds.ts";
+import { kindDir, kindSpec, scannedKinds } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { entriesIn } from "#core/sync/scan.ts";
@@ -29,8 +29,8 @@ export interface Candidate {
 
 /** The scanner's table read in reverse, so a scan finds the result again. */
 export function registryPath(kind: ArtifactKind, name: string, from: string): string {
-  const spec = KIND_SPECS[kind];
-  if (spec.shape === "directory") return posix.join(spec.dir, name);
+  const spec = kindSpec(kind);
+  if (spec?.shape !== "file") return posix.join(kindDir(kind), name);
   const dot = from.lastIndexOf(".");
   const extension = dot > 0 ? from.slice(dot) : (spec.extensions[0] ?? "");
   return posix.join(spec.dir, `${name}${extension}`);
@@ -105,7 +105,7 @@ function kindDirs(
     if (target === undefined) continue;
     const root = targetRoot(target, { scope: roots.scope, cwd: roots.cwd, env: process.env });
     // A target may keep plugins and skills in one folder; walking both would report skills twice.
-    for (const kind of SCANNED_KINDS) {
+    for (const [kind] of scannedKinds()) {
       const mapping = target.kinds[kind];
       if (mapping?.subdir === undefined) continue;
       // A file in the target's own format cannot be published as it is.
@@ -177,7 +177,7 @@ interface ScanOptions {
 }
 
 function entryOf(kind: ArtifactKind): { entry?: string } {
-  const entry = KIND_SPECS[kind].entry;
+  const entry = kindSpec(kind)?.entry;
   return entry === undefined ? {} : { entry };
 }
 

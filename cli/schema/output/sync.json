@@ -55,20 +55,9 @@
                     "type": "string"
                   },
                   "kind": {
-                    "anyOf": [
-                      {
-                        "const": "plugin",
-                        "type": "string"
-                      },
-                      {
-                        "const": "skill",
-                        "type": "string"
-                      },
-                      {
-                        "const": "agent",
-                        "type": "string"
-                      }
-                    ]
+                    "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                    "description": "plugin, skill or agent, or a kind an adapter declares.",
+                    "type": "string"
                   },
                   "path": {
                     "description": "Its address in the registry.",
@@ -176,20 +165,9 @@
                     "type": "string"
                   },
                   "kind": {
-                    "anyOf": [
-                      {
-                        "const": "plugin",
-                        "type": "string"
-                      },
-                      {
-                        "const": "skill",
-                        "type": "string"
-                      },
-                      {
-                        "const": "agent",
-                        "type": "string"
-                      }
-                    ]
+                    "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                    "description": "plugin, skill or agent, or a kind an adapter declares.",
+                    "type": "string"
                   },
                   "path": {
                     "description": "Its folder, relative to the scope.",
@@ -220,20 +198,9 @@
                     "type": "string"
                   },
                   "kind": {
-                    "anyOf": [
-                      {
-                        "const": "plugin",
-                        "type": "string"
-                      },
-                      {
-                        "const": "skill",
-                        "type": "string"
-                      },
-                      {
-                        "const": "agent",
-                        "type": "string"
-                      }
-                    ]
+                    "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                    "description": "plugin, skill or agent, or a kind an adapter declares.",
+                    "type": "string"
                   },
                   "path": {
                     "description": "Its folder, relative to the scope.",
@@ -261,20 +228,9 @@
                     "type": "string"
                   },
                   "kind": {
-                    "anyOf": [
-                      {
-                        "const": "plugin",
-                        "type": "string"
-                      },
-                      {
-                        "const": "skill",
-                        "type": "string"
-                      },
-                      {
-                        "const": "agent",
-                        "type": "string"
-                      }
-                    ]
+                    "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                    "description": "plugin, skill or agent, or a kind an adapter declares.",
+                    "type": "string"
                   },
                   "path": {
                     "description": "Its folder, relative to the scope.",
@@ -302,20 +258,9 @@
                     "type": "string"
                   },
                   "kind": {
-                    "anyOf": [
-                      {
-                        "const": "plugin",
-                        "type": "string"
-                      },
-                      {
-                        "const": "skill",
-                        "type": "string"
-                      },
-                      {
-                        "const": "agent",
-                        "type": "string"
-                      }
-                    ]
+                    "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                    "description": "plugin, skill or agent, or a kind an adapter declares.",
+                    "type": "string"
                   },
                   "path": {
                     "description": "Its folder, relative to the scope.",
@@ -343,20 +288,9 @@
                     "type": "string"
                   },
                   "kind": {
-                    "anyOf": [
-                      {
-                        "const": "plugin",
-                        "type": "string"
-                      },
-                      {
-                        "const": "skill",
-                        "type": "string"
-                      },
-                      {
-                        "const": "agent",
-                        "type": "string"
-                      }
-                    ]
+                    "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                    "description": "plugin, skill or agent, or a kind an adapter declares.",
+                    "type": "string"
                   },
                   "path": {
                     "description": "Its folder, relative to the scope.",
@@ -498,20 +432,9 @@
                           "type": "string"
                         },
                         "kind": {
-                          "anyOf": [
-                            {
-                              "const": "plugin",
-                              "type": "string"
-                            },
-                            {
-                              "const": "skill",
-                              "type": "string"
-                            },
-                            {
-                              "const": "agent",
-                              "type": "string"
-                            }
-                          ]
+                          "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                          "description": "plugin, skill or agent, or a kind an adapter declares.",
+                          "type": "string"
                         },
                         "outcome": {
                           "anyOf": [
@@ -815,20 +738,9 @@
                 "type": "string"
               },
               "kind": {
-                "anyOf": [
-                  {
-                    "const": "plugin",
-                    "type": "string"
-                  },
-                  {
-                    "const": "skill",
-                    "type": "string"
-                  },
-                  {
-                    "const": "agent",
-                    "type": "string"
-                  }
-                ]
+                "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                "description": "plugin, skill or agent, or a kind an adapter declares.",
+                "type": "string"
               },
               "outcome": {
                 "anyOf": [

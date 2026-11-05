@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { KINDS } from "#adapter/kinds.ts";
-import { KIND_SPECS, kindDir, stagedLeaf } from "./kinds.ts";
+import { kindDir, kindPlural, kindSpec, stagedLeaf } from "./kinds.ts";
 
-describe("KIND_SPECS", () => {
+describe("kindSpec", () => {
   test("gives every kind a distinct directory", () => {
     const dirs = KINDS.map(kindDir);
     expect(new Set(dirs).size).toBe(dirs.length);
@@ -10,9 +10,17 @@ describe("KIND_SPECS", () => {
 
   test("requires an extension for every file-shaped kind", () => {
     for (const kind of KINDS) {
-      const spec = KIND_SPECS[kind];
-      expect(spec.extensions.length > 0, kind).toBe(spec.shape === "file");
+      const spec = kindSpec(kind);
+      expect(spec?.extensions.length !== 0, kind).toBe(spec?.shape === "file");
     }
+  });
+
+  test("knows no kind outside the built-ins and declared ones, and never guesses its folder", () => {
+    expect(kindSpec("knowledge")).toBeUndefined();
+    expect(kindSpec("toString")).toBeUndefined();
+    expect(kindPlural("knowledge")).toBe("knowledge artifacts");
+    expect(kindPlural("agent")).toBe("agents");
+    expect(() => kindDir("knowledge")).toThrow('aireg does not know the kind "knowledge".');
   });
 });
 

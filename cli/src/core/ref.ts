@@ -1,8 +1,9 @@
-import { isArtifactName, isDeviceName } from "#adapter/filespec/names.ts";
-import { type ArtifactKind, isKind, KINDS } from "#adapter/kinds.ts";
+import { isArtifactName, isDeviceName, isKindSegment } from "#adapter/filespec/names.ts";
+import { type ArtifactKind, isBuiltinKind } from "#adapter/kinds.ts";
 import { isVersion } from "#adapter/spec/ref.ts";
 import { list, quoted, withoutCredentials } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
+import { knownKinds } from "./kinds.ts";
 
 /** A whole registry, a whole namespace, or one artifact, which alone takes `@version`. */
 export interface Ref {
@@ -64,8 +65,8 @@ export function parseRef(input: string): Ref {
   if (parts.length === 2) return { registry, namespace: parts[1] };
   if (parts.length === 3) {
     const middle = parts[1] as string;
-    // A kind in the middle reads as a kind; a namespace named like a kind needs all four segments.
-    if (isKind(middle) || middle === "plugin") {
+    // Only a built-in reads as a kind here, so loading an adapter never changes what a ref means.
+    if (isBuiltinKind(middle)) {
       const name = parts[2] as string;
       return { registry, kind: kindOf(input, middle, registry, name), name, ...pinned };
     }
@@ -105,9 +106,6 @@ function segments(input: string, trimmed: string): string[] {
   return parts;
 }
 
-/** A plugin is addressed as the namespace it is. */
-const ADDRESSABLE = KINDS.filter((kind) => kind !== "plugin");
-
 function kindOf(input: string, segment: string, registry: string, name: string): ArtifactKind {
   // A plugin and the namespace it publishes under are one thing to install, and
   // naming the plugin alone would leave out the loose artifacts beside it.
@@ -117,10 +115,13 @@ function kindOf(input: string, segment: string, registry: string, name: string):
       `a plugin is addressed as its namespace. Write ${registry}/${name}`,
     );
   }
-  if (isKind(segment)) return segment;
+  // Any kind in the grammar parses, so a row of a kind no adapter declares stays readable.
+  if (isKindSegment(segment)) return segment;
+  // A plugin is addressed as the namespace it is.
+  const addressable = knownKinds().filter((kind) => kind !== "plugin");
   throw new RefParseError(
     input,
-    `${quoted(segment)} is not a kind. The part before the name must be ${list(ADDRESSABLE, "or")}`,
+    `${quoted(segment)} is not a kind. The part before the name must be ${list(addressable, "or")}`,
   );
 }
 

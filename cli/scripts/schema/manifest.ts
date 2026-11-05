@@ -1,4 +1,5 @@
 import { Type } from "@sinclair/typebox";
+import { KIND_SEGMENT } from "#adapter/filespec/names.ts";
 import { LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
 import { LEGACY_TARGETS_KEY } from "#core/manifest/model.ts";
 import { DEFAULT_TARGETS } from "#core/target/ids.ts";
@@ -163,8 +164,12 @@ const DetailedExport = Type.Object(
         "One path relative to the project: an artifact, such as .claude/agents/reviewer.md, or a folder, whose artifacts directly inside it are each exported.",
     }),
     kind: Type.Optional(
-      Type.Union([Type.Literal("skill"), Type.Literal("agent")], {
-        description: "When set, every artifact the entry reaches must be this kind.",
+      Type.String({
+        pattern: KIND_SEGMENT.source,
+        // A plugin is published as the namespace it is, never as one export.
+        not: { const: "plugin" },
+        description:
+          "When set, every artifact the entry reaches must be this kind: skill, agent, or a kind an adapter declares.",
       }),
     ),
     version: Type.Optional(

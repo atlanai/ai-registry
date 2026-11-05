@@ -141,7 +141,7 @@ export function readTargets(selected: readonly string[], targetTable: Targets): 
     if (targetTable[name] === undefined) continue;
     out.add(name);
     for (const reads of Object.values(targetTable[name].reads)) {
-      for (const read of reads) if (targetTable[read] !== undefined) out.add(read);
+      for (const read of reads ?? []) if (targetTable[read] !== undefined) out.add(read);
     }
   }
   return [...out];

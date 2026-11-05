@@ -6,6 +6,7 @@ import { comparableLocation, sourceKey } from "#core/adapter/identity.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { canonical } from "#core/fs/realpath.ts";
+import { kindPlural } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import { artifactFor } from "#core/manifest/match.ts";
 import type { Export, ExportDependency, Manifest, RegistrySource } from "#core/manifest/model.ts";
@@ -135,7 +136,7 @@ export interface Taken {
 function untaken(work: Work, adapter: SourceAdapter, alias: string): string | undefined {
   if (work.exported === undefined) return undefined;
   const kinds = adapter.publishKinds ?? adapter.artifactKinds;
-  if (!kinds.includes(work.kind)) return `${alias} does not take ${work.kind}s`;
+  if (!kinds.includes(work.kind)) return `${alias} does not take ${kindPlural(work.kind)}`;
   const files = work.exported.files?.length ?? 1;
   if (work.kind !== "agent" || files <= 1 || adapter.capabilities.agentFolders === true) {
     return undefined;

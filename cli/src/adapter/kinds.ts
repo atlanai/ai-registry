@@ -1,10 +1,18 @@
-/** A kind with no file-spec schema cannot be published or verified, so it is not one. */
+/** The kinds aireg itself knows, each with a file-spec schema; an adapter may declare more. */
 export const KINDS = ["plugin", "skill", "agent"] as const;
 
-export type ArtifactKind = (typeof KINDS)[number];
+export type BuiltinKind = (typeof KINDS)[number];
 
-export function isKind(value: string): value is ArtifactKind {
+/** A built-in kind, or another one in the file spec's kind grammar (`isKindSegment`). */
+export type ArtifactKind = BuiltinKind | (string & {});
+
+export function isBuiltinKind(value: string): value is BuiltinKind {
   return (KINDS as readonly string[]).includes(value);
+}
+
+/** @deprecated Use `isBuiltinKind`, or `isKindSegment` for any kind name. */
+export function isKind(value: string): value is BuiltinKind {
+  return isBuiltinKind(value);
 }
 
 /** The file that makes a directory a skill and holds its front matter. */

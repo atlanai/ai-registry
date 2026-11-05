@@ -265,7 +265,7 @@ describe("exportsOn, for a folder of artifacts", () => {
     await expect(
       exportsOn(manifestWith("  - path: skills\n    kind: skill\n"), base),
     ).rejects.toMatchObject({
-      message: 'Export "skills" reaches skills/helper.md, which is an agent, not a skill.',
+      message: 'Export "skills" reaches skills/helper.md, which is of the kind agent, not skill.',
       hint: "Leave it out with `exclude`, move it, or remove `kind`.",
       code: "invalid",
     });

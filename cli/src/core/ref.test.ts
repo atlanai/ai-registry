@@ -16,6 +16,12 @@ describe("parseRef", () => {
       { registry: "kit", namespace: "sales", kind: "skill", name: "deploy", version: "2.0.0" },
     ],
     ["kit/sales/deploy", { registry: "kit", namespace: "sales", name: "deploy" }],
+    // Any kind name reads in the full form; only a built-in is a kind in the short one.
+    [
+      "kit/eng/knowledge/accounts",
+      { registry: "kit", namespace: "eng", kind: "knowledge", name: "accounts" },
+    ],
+    ["kit/knowledge/accounts", { registry: "kit", namespace: "knowledge", name: "accounts" }],
     [
       "kit/sales/deploy@2.0.0",
       { registry: "kit", namespace: "sales", name: "deploy", version: "2.0.0" },

@@ -286,14 +286,12 @@ function untracked(path: string, reading: Reading): boolean {
   return tracked !== undefined && !tracked.some((file) => isWithin(path, file));
 }
 
-const aKind = (kind: ArtifactKind) => `${kind === "agent" ? "an" : "a"} ${kind}`;
-
 function refuseKind(entry: Export, roots: ReadonlyMap<string, ArtifactKind>, base: string): void {
   if (entry.kind === undefined) return;
   for (const [root, kind] of roots) {
     if (kind === entry.kind) continue;
     throw new AiregError(
-      `Export ${quoted(entry.path)} reaches ${shownAt(root, base)}, which is ${aKind(kind)}, not ${aKind(entry.kind)}.`,
+      `Export ${quoted(entry.path)} reaches ${shownAt(root, base)}, which is of the kind ${kind}, not ${entry.kind}.`,
       {
         code: ErrorCode.Invalid,
         hint: isGlob(entry.path)

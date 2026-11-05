@@ -1,9 +1,7 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import type { PublishReport } from "#cli/commands/publish/result.ts";
-import { matching, oneOf, outputDocument } from "./match.ts";
-
-const Kind = oneOf(KINDS);
+import { Kind } from "#scripts/schema/kind.ts";
+import { matching, outputDocument } from "./match.ts";
 
 const Paths = Type.Array(Type.String());
 

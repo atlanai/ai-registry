@@ -1,4 +1,5 @@
 import { type TSchema, Type } from "@sinclair/typebox";
+import { KIND_SEGMENT } from "#adapter/filespec/names.ts";
 import type { TargetCheck, TargetShown, TargetsList } from "#cli/commands/targets/result.ts";
 import type { ConfigValue as Value } from "#core/target/contract.ts";
 import { matching, outputDocument } from "./match.ts";
@@ -169,15 +170,11 @@ const KindMapping = Type.Union(
   { description: "Where one kind lands inside the target's folder." },
 );
 
+/** By kind: a built-in, or one an adapter declares. */
 const PerKind = <T extends TSchema>(schema: T) =>
-  Type.Object(
-    {
-      plugin: Type.Optional(schema),
-      skill: Type.Optional(schema),
-      agent: Type.Optional(schema),
-    },
-    { additionalProperties: false },
-  );
+  Type.Record(Type.String({ pattern: KIND_SEGMENT.source }), schema, {
+    additionalProperties: false,
+  });
 
 /** The fields a resolved target and aireg 0.1's form of it share. */
 const resolved = {

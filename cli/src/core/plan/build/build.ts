@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { list, plural, sanitizeText } from "#adapter/text.ts";
 import { statusWarning } from "#core/catalog/withheld.ts";
 import { dict } from "#core/fields.ts";
+import { kindPlural } from "#core/kinds.ts";
 import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { dropUnusedSources, lockSourceOf } from "#core/plan/acquire/sources.ts";
@@ -255,7 +256,7 @@ function warnLeftOut(item: Selected, previous: LockArtifact | undefined, build: 
   const files = rest === 0 ? list(named) : `${named.join(", ")} and ${plural(rest, "more file")}`;
   build.warnings.push({
     name: item.name,
-    message: `${shown}${at} installs as its ${sanitizeText(leftOut.entry)} alone, since a target takes ${item.kind === "agent" ? "an" : "a"} ${item.kind} as one file, so ${files} ${leftOut.files.length === 1 ? "is" : "are"} left out.`,
+    message: `${shown}${at} installs as its ${sanitizeText(leftOut.entry)} alone, since a target takes ${kindPlural(item.kind)} as one file each, so ${files} ${leftOut.files.length === 1 ? "is" : "are"} left out.`,
   });
 }
 

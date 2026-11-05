@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { list, quoted } from "#adapter/text.ts";
+import { kindPlural } from "#core/kinds.ts";
 import type { LinkMode, LockArtifact } from "#core/lock.ts";
 import type { Action, Selected } from "#core/plan/model.ts";
 import { claim, linksFor, type PlannedLink } from "#core/plan/projection.ts";
@@ -68,15 +69,17 @@ export function placeLinks(
     const reasons = [
       ...(claimed.skipped.size === 0
         ? []
-        : [`${list([...claimed.skipped])} cannot load ${item.kind}s`]),
+        : [`${list([...claimed.skipped])} cannot load ${kindPlural(item.kind)}`]),
       ...(claimed.elsewhere.size === 0
         ? []
         : [
-            `${list([...claimed.elsewhere])} ${claimed.elsewhere.size === 1 ? "loads" : "load"} ${item.kind}s only in ${scopeName(other)}`,
+            `${list([...claimed.elsewhere])} ${claimed.elsewhere.size === 1 ? "loads" : "load"} ${kindPlural(item.kind)} only in ${scopeName(other)}`,
           ]),
     ];
     const why =
-      reasons.length === 0 ? `no selected target accepts a ${item.kind}` : reasons.join("; ");
+      reasons.length === 0
+        ? `no selected target accepts ${kindPlural(item.kind)}`
+        : reasons.join("; ");
     build.warnings.push({
       name: item.name,
       message: `${quoted(item.name)} was fetched but installed into no target: ${why}.`,

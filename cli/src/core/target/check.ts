@@ -1,7 +1,8 @@
 import { isAbsolute } from "node:path";
-import { type ArtifactKind, KINDS } from "#adapter/kinds.ts";
+import { isKindSegment } from "#adapter/filespec/names.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { quoted } from "#adapter/text.ts";
-import { KIND_SPECS } from "#core/kinds.ts";
+import { kindSpec } from "#core/kinds.ts";
 import type { ConfigValue, KindMapping, RegisterEntry, TargetDefinition } from "./contract.ts";
 import { templateVars } from "./template.ts";
 
@@ -44,17 +45,31 @@ export function targetProblems(
     }
     const profiles = definition.profiles?.root;
     if (profiles !== undefined) profileProblems(profiles, report);
-    for (const kind of KINDS) {
-      const mapping = definition.kinds[kind];
-      if (mapping !== undefined) mappingProblems(kind, mapping, report);
-      for (const read of definition.reads?.[kind] ?? [])
-        readProblem(kind, owners.get(read)?.[0], read, report);
-    }
+    kindProblems(definition, owners, report);
   }
   return problems;
 }
 
 const ID = /^[a-z][a-z0-9-]{0,63}$/;
+
+function kindProblems(
+  definition: TargetDefinition,
+  owners: ReadonlyMap<string, TargetDefinition[]>,
+  report: Report,
+) {
+  const kinds = new Set([
+    ...Object.keys(definition.kinds),
+    ...Object.keys(definition.reads ?? {}),
+    ...Object.keys(definition.trust ?? {}),
+  ]);
+  for (const kind of kinds) {
+    if (!isKindSegment(kind)) report(`${quoted(kind)} is not a kind name.`);
+    const mapping = definition.kinds[kind];
+    if (mapping !== undefined) mappingProblems(kind, mapping, report);
+    for (const read of definition.reads?.[kind] ?? [])
+      readProblem(kind, owners.get(read)?.[0], read, report);
+  }
+}
 
 function ownersOf(definitions: readonly TargetDefinition[]): Map<string, TargetDefinition[]> {
   const owners = new Map<string, TargetDefinition[]>();
@@ -137,7 +152,8 @@ function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Repor
   if (mapping.shape === "directory" && mapping.entry !== undefined) {
     pathProblem(mapping.entry, [], report);
     if (mapping.entry.includes("/")) report(`kinds.${kind}: entry is not a file name.`);
-    if (KIND_SPECS[kind].shape !== "file")
+    // A kind no loaded adapter declares is checked once one does.
+    if ((kindSpec(kind)?.shape ?? "file") !== "file")
       report(`kinds.${kind}: entry is for a kind that is one file.`);
   }
   if (mapping.shape === "directory" && mapping.codec !== undefined && mapping.entry === undefined) {

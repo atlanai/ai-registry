@@ -29,6 +29,7 @@ describe("the published adapter contract", () => {
       "formatVersion",
       "isAdapterError",
       "isArtifactName",
+      "isBuiltinKind",
       "isDeviceName",
       "isKind",
       "isKindSegment",

@@ -1,14 +1,13 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import type { SyncPreview, SyncResolved, SyncRuns } from "#cli/commands/sync/result.ts";
 import { ITEM_OUTCOMES, RUN_STATES } from "#core/run/model.ts";
 import { SCOPES } from "#core/store/paths.ts";
 import { DISPOSITIONS } from "#core/sync/model.ts";
 import { SYNC_OPERATIONS } from "#core/sync/policy.ts";
+import { Kind } from "#scripts/schema/kind.ts";
 import { RunCounts, RunRecord } from "./job.ts";
 import { matching, oneOf, outputDocument } from "./match.ts";
 
-const Kind = oneOf(KINDS);
 const Scope = oneOf(SCOPES);
 const Disposition = oneOf(DISPOSITIONS);
 const RunState = oneOf(RUN_STATES);

@@ -106,10 +106,11 @@ function profilesOf(definition: TargetDefinition, env: NodeJS.ProcessEnv, origin
       {
         ...base,
         kinds: Object.fromEntries(
-          Object.entries(base.kinds).map(([kind, mapping]) => [
-            kind,
-            mapping.shape === "contents" ? mapping : { ...mapping, scope: "user" },
-          ]),
+          Object.entries(base.kinds).flatMap(([kind, mapping]) =>
+            mapping === undefined
+              ? []
+              : [[kind, mapping.shape === "contents" ? mapping : { ...mapping, scope: "user" }]],
+          ),
         ),
         name: `${definition.id}:${profile}`,
         aliases: [],

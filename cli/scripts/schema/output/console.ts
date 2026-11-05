@@ -1,9 +1,9 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import { STEP_POLICIES } from "#core/config/model.ts";
 import type { ConsoleState } from "#core/console/model.ts";
 import { RUN_MODES, RUN_STATES, RUN_TRIGGERS } from "#core/run/model.ts";
 import { SCOPES } from "#core/store/paths.ts";
+import { Kind } from "#scripts/schema/kind.ts";
 import { RunCounts } from "./job.ts";
 import { absent, matching, oneOf, outputDocument, readonlyRecord } from "./match.ts";
 
@@ -42,7 +42,7 @@ const Row = Type.Object(
   {
     key: Type.String(),
     name: Type.String(),
-    kind: oneOf(KINDS),
+    kind: Kind,
     registry: Type.String({ description: "`local` for work authored on this machine." }),
     namespace: absent(Type.String()),
     id: Type.String(),

@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, relative } from "node:path";
 import { isAdapterError } from "#adapter/index.ts";
-import { KINDS } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { list, plural, quoted } from "#adapter/text.ts";
 import type { InitNext, InitResult, InitSteps } from "#cli/commands/init/result.ts";
@@ -15,6 +14,7 @@ import { isNamespaceAddress } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { canonical } from "#core/fs/realpath.ts";
+import { knownKinds } from "#core/kinds.ts";
 import { formatManifest } from "#core/manifest/format.ts";
 import { emptyManifest } from "#core/manifest/model.ts";
 import { readManifest } from "#core/manifest/repository.ts";
@@ -268,7 +268,7 @@ function foldersFor(chosen: readonly string[]): string[] {
   const targetTable = resolveTargets(process.env);
   const where = { scope: "project", env: process.env } as const;
   const placed = new Set(
-    KINDS.flatMap((kind) => placementFor(kind, chosen, { targetTable, where }).targets),
+    knownKinds().flatMap((kind) => placementFor(kind, chosen, { targetTable, where }).targets),
   );
   return [...placed].sort().map((name) => targetTable[name]?.projectRoot ?? name);
 }
