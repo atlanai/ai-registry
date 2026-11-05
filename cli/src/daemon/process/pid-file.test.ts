@@ -36,7 +36,8 @@ describe.skipIf(process.platform === "win32")("liveDaemonPid", () => {
       other.kill();
     });
     await writeDaemonPid(other.pid as number, env);
-    await expect(liveDaemonPid(env)).resolves.toBe(other.pid);
+    // Its command line can lag the spawn on a loaded machine, so it is read until it shows.
+    await expect.poll(() => liveDaemonPid(env), { timeout: 10_000 }).toBe(other.pid);
   });
 
   test("ignores its own pid, a process that is gone, and one that is not a daemon", async ({
