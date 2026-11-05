@@ -1,13 +1,13 @@
 import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { PUBLIC_FILE } from "#adapter/files.ts";
 import { isWithin } from "#adapter/paths.ts";
-import { inspectAdapterModule, isBuiltinAdapter } from "#core/adapter/registry.ts";
+import { inspectAdapterModule, isBuiltinAdapter } from "#core/adapter/load.ts";
 import { updateConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { sha256Hex } from "#core/fs/hash.ts";
-import { PUBLIC_FILE } from "#core/fs/mode.ts";
 import { ADAPTER_MODULE_FILE } from "#core/product.ts";
 import { adapterDataDir, adapterModulePath, ensureHome, toolHome } from "#core/store/paths.ts";
 import { parseDispatch, writeInstallRecord } from "./record.ts";
@@ -69,21 +69,6 @@ async function pinAdapter(
   }
 }
 
-export async function unpinAdapter(
-  id: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<string | undefined> {
-  let removed: string | undefined;
-  await mutateAdapters((adapters) => {
-    removed = adapters[id];
-    const rest = { ...adapters };
-    delete rest[id];
-    return rest;
-  }, env);
-  if (removed !== undefined) await removeVersions(id, env);
-  return removed;
-}
-
 async function mutateAdapters(
   next: (adapters: Readonly<Record<string, string>>) => Record<string, string>,
   env: NodeJS.ProcessEnv,
@@ -97,6 +82,21 @@ async function removeManaged(id: string, specifier: string, env: NodeJS.ProcessE
   const dir = adapterDataDir(id, env);
   if (!isWithin(dir, resolved) || relative(dir, resolved).split(sep).length !== 2) return;
   await rm(dirname(resolved), { recursive: true, force: true });
+}
+
+export async function unpinAdapter(
+  id: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | undefined> {
+  let removed: string | undefined;
+  await mutateAdapters((adapters) => {
+    removed = adapters[id];
+    const rest = { ...adapters };
+    delete rest[id];
+    return rest;
+  }, env);
+  if (removed !== undefined) await removeVersions(id, env);
+  return removed;
 }
 
 /** Every version folder aireg installed for this adapter; its data beside them stays. */

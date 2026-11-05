@@ -4,8 +4,11 @@ import { describe, expect } from "vitest";
 import { codex } from "#targets/codex.ts";
 import { test } from "#test/kit/fixtures.ts";
 import type { Target } from "./contract.ts";
-import { canonicalId, detectAll, resolveTargets, targetRoot } from "./index.ts";
+import { detectAll } from "./detect.ts";
+import { canonicalId } from "./ids.ts";
 import { loadTargetFiles } from "./load.ts";
+import { targetRoot } from "./roots.ts";
+import { resolveTargets } from "./table.ts";
 
 let env: NodeJS.ProcessEnv;
 let dir: string;

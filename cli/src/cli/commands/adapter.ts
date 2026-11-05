@@ -1,9 +1,12 @@
 import { join } from "node:path";
 import { plural, quoted } from "#adapter/text.ts";
-import { initAdapter } from "#cli/commands/adapter/scaffold.ts";
-import { parse } from "#cli/options.ts";
-import { cancel, interaction, interactive } from "#cli/prompt/flow.ts";
-import { canceled, confirm, defaultIo } from "#cli/prompt/index.ts";
+import { initAdapter } from "#cli/commands/adapter/init.ts";
+import { ADAPTER_COMMAND } from "#cli/commands/adapter/spec.ts";
+import { parse } from "#cli/options/parse.ts";
+import { defaultIo } from "#cli/prompt/ask.ts";
+import { cancel, interaction, interactive } from "#cli/prompt/interaction.ts";
+import { canceled } from "#cli/prompt/model.ts";
+import { confirm } from "#cli/prompt/select.ts";
 import { underHome } from "#cli/render/home.ts";
 import { downloadAdapter, resolveAdapter } from "#core/adapter/installed/fetch.ts";
 import { adapterSpecifier, unpinAdapter, writeInstalled } from "#core/adapter/installed/store.ts";
@@ -17,11 +20,11 @@ import { releaseStamp } from "#core/release/stamp.ts";
 import { toolHome } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
 import { VERSION } from "#core/version.ts";
-import { recycleDaemon } from "#daemon/service.ts";
-import { builtin, type CommandContext, runAction } from "./index.ts";
+import { recycleDaemon } from "#daemon/process/lifecycle.ts";
+import { type CommandContext, runAction } from "./command.ts";
 
 export async function run(context: CommandContext): Promise<void> {
-  const spec = builtin("adapter");
+  const spec = ADAPTER_COMMAND;
   const { common, own, positionals } = parse<{ dir?: string }>(context.argv, spec);
   const [action = "list", argument] = positionals;
   return runAction(spec, action, {
@@ -30,18 +33,6 @@ export async function run(context: CommandContext): Promise<void> {
     install: () => verified(install(context, argument, common)),
     remove: () => verified(remove(context, argument, common.dryRun)),
   });
-}
-
-/** A failure the release server's checks raised, named as one rather than as a crash. */
-async function verified(work: Promise<void>): Promise<void> {
-  try {
-    await work;
-  } catch (error) {
-    throw withReleaseHint(
-      error,
-      "A released aireg checks each adapter against its release server's signing keys.",
-    );
-  }
 }
 
 async function list(context: CommandContext): Promise<void> {
@@ -76,32 +67,17 @@ async function list(context: CommandContext): Promise<void> {
   );
 }
 
-/** An adapter runs inside aireg with your access, so one it does not trust needs a yes. */
-async function consents(context: CommandContext, id: string): Promise<boolean> {
-  const step = interaction(context.printer, defaultIo(), false);
-  if (!interactive(step)) {
-    throw new AiregError(`${quoted(id)} is not a trusted adapter.`, {
-      code: ErrorCode.Usage,
-      hint: "Pass `--yes` to install an adapter that is not trusted.",
-    });
+/** A failure the release server's checks raised, named as one rather than as a crash. */
+async function verified(work: Promise<void>): Promise<void> {
+  try {
+    await work;
+  } catch (error) {
+    throw withReleaseHint(
+      error,
+      "A released aireg checks each adapter against its release server's signing keys.",
+    );
   }
-  const yes = await confirm(
-    {
-      message: `${quoted(id)} is not a trusted adapter. Install it anyway?`,
-      style: context.printer.errStyle,
-      initial: false,
-    },
-    step.io,
-  );
-  if (canceled(yes) || !yes) {
-    cancel(step);
-    return false;
-  }
-  return true;
 }
-
-/** Installed adapters live at `adapters/<id>/<version>/`. */
-const VERSIONED = /\/(\d+\.\d+\.\d+[^/]*)\//;
 
 async function install(
   context: CommandContext,
@@ -162,38 +138,31 @@ async function install(
   });
 }
 
-async function remove(
-  context: CommandContext,
-  raw: string | undefined,
-  dryRun: boolean,
-): Promise<void> {
-  if (raw === undefined) {
-    throw new AiregError("`aireg adapter remove` needs an adapter id.", {
-      code: ErrorCode.Usage,
-      hint: "Name the adapter: `aireg adapter remove <id>`.",
-    });
-  }
-  const id = parseAdapterId(raw);
-  const specifier = (await readConfig()).adapters[id];
-  if (specifier === undefined) {
-    throw new AiregError(`No installed adapter named ${quoted(id)}.`, {
-      code: ErrorCode.NotFound,
-      hint: "Built-in adapters need no install. Run `aireg adapter list` to see the installed ones.",
-    });
-  }
-  if (dryRun) {
-    report(context, { dryRun, action: "would-remove", id, specifier });
-    return;
-  }
-  await unpinAdapter(id);
-  await recycle();
-  report(context, { dryRun, action: "removed", id, specifier });
-}
+/** Installed adapters live at `adapters/<id>/<version>/`. */
+const VERSIONED = /\/(\d+\.\d+\.\d+[^/]*)\//;
 
-async function recycle(): Promise<void> {
-  const entry = runningEntry();
-  if (entry === undefined) return;
-  await recycleDaemon(entry, VERSION);
+/** An adapter runs inside aireg with your access, so one it does not trust needs a yes. */
+async function consents(context: CommandContext, id: string): Promise<boolean> {
+  const step = interaction(context.printer, defaultIo(), false);
+  if (!interactive(step)) {
+    throw new AiregError(`${quoted(id)} is not a trusted adapter.`, {
+      code: ErrorCode.Usage,
+      hint: "Pass `--yes` to install an adapter that is not trusted.",
+    });
+  }
+  const yes = await confirm(
+    {
+      message: `${quoted(id)} is not a trusted adapter. Install it anyway?`,
+      style: context.printer.errStyle,
+      initial: false,
+    },
+    step.io,
+  );
+  if (canceled(yes) || !yes) {
+    cancel(step);
+    return false;
+  }
+  return true;
 }
 
 function report(
@@ -228,4 +197,38 @@ function report(
   }
   context.printer.success(`Installed ${data.id} ${data.version}.`);
   context.printer.note("path", data.specifier);
+}
+
+async function remove(
+  context: CommandContext,
+  raw: string | undefined,
+  dryRun: boolean,
+): Promise<void> {
+  if (raw === undefined) {
+    throw new AiregError("`aireg adapter remove` needs an adapter id.", {
+      code: ErrorCode.Usage,
+      hint: "Name the adapter: `aireg adapter remove <id>`.",
+    });
+  }
+  const id = parseAdapterId(raw);
+  const specifier = (await readConfig()).adapters[id];
+  if (specifier === undefined) {
+    throw new AiregError(`No installed adapter named ${quoted(id)}.`, {
+      code: ErrorCode.NotFound,
+      hint: "Built-in adapters need no install. Run `aireg adapter list` to see the installed ones.",
+    });
+  }
+  if (dryRun) {
+    report(context, { dryRun, action: "would-remove", id, specifier });
+    return;
+  }
+  await unpinAdapter(id);
+  await recycle();
+  report(context, { dryRun, action: "removed", id, specifier });
+}
+
+async function recycle(): Promise<void> {
+  const entry = runningEntry();
+  if (entry === undefined) return;
+  await recycleDaemon(entry, VERSION);
 }

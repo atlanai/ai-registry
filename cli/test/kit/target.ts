@@ -1,7 +1,8 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { type ArtifactKind, KIND_SPECS } from "#core/kinds.ts";
-import type { Targets } from "#core/target/index.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
+import { KIND_SPECS } from "#core/kinds.ts";
+import type { Targets } from "#core/target/contract.ts";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
 
 /** Which targets a machine has varies, so every root the CLI may write is searched. */

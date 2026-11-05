@@ -21,7 +21,6 @@ export interface LevelSource {
   env?: NodeJS.ProcessEnv;
 }
 
-/** What `--log-level` and the variable accept: a level, or `off`. */
 export const LEVEL_CHOICES = [...LEVELS, "off"] as const;
 
 export class LogLevelError extends AiregError {

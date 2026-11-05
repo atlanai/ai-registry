@@ -1,8 +1,14 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { list, quoted, sanitizeBlock, sanitizeName } from "#adapter/text.ts";
-import { parse } from "#cli/options.ts";
-import { knownRegistries, undeclaredRegistry } from "#cli/registries.ts";
+import { SHOW_COMMAND } from "#cli/commands/show/spec.ts";
+import { parse } from "#cli/options/parse.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
+import { expandUserPath, isMissing } from "#core/fs/path.ts";
+import { isDirectory } from "#core/fs/tree.ts";
+import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
+import { type Carried, carries, describeCarried } from "#core/plan/carries.ts";
+import { parseRef } from "#core/ref.ts";
 import {
   atAddress,
   probeAddress,
@@ -10,14 +16,9 @@ import {
   throughManifest,
   throughRegistry,
   wantOf,
-} from "#cli/source.ts";
-import { AiregError, ErrorCode } from "#core/errors.ts";
-import { expandUserPath, isMissing } from "#core/fs/path.ts";
-import { isDirectory } from "#core/fs/tree.ts";
-import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
-import { type Carried, carries, describeCarried } from "#core/plan/carries.ts";
-import { parseRef } from "#core/ref.ts";
-import { builtin, type CommandContext } from "./index.ts";
+} from "#engine/address/probe.ts";
+import { knownRegistries, undeclaredRegistry } from "#engine/address/registries.ts";
+import type { CommandContext } from "./command.ts";
 
 /**
  * Prints an artifact so it can be piped straight into an agent. Nothing is
@@ -26,7 +27,7 @@ import { builtin, type CommandContext } from "./index.ts";
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common, own } = parse<SourceFlags & { registry?: string }>(
     context.argv,
-    builtin("show"),
+    SHOW_COMMAND,
   );
   const input = positionals[0];
   if (input === undefined) {
@@ -109,15 +110,6 @@ export async function run(context: CommandContext): Promise<void> {
   disclose(context, entry.name, carried);
 }
 
-/** A folder's own Markdown: its SKILL.md, AGENT.md or README.md, else its first Markdown file. */
-async function markdownIn(dir: string): Promise<string | undefined> {
-  const names = (await readdir(dir)).sort();
-  const own =
-    [SKILL_ENTRY, AGENT_ENTRY, "README.md"].find((name) => names.includes(name)) ??
-    names.find((name) => name.endsWith(".md"));
-  return own === undefined ? undefined : join(dir, own);
-}
-
 /** A folder or file on disk, printed the way an agent reads it: its own Markdown. */
 async function showFolder(context: CommandContext, input: string): Promise<void> {
   const path = resolve(context.cwd, expandUserPath(input));
@@ -144,12 +136,13 @@ async function showFolder(context: CommandContext, input: string): Promise<void>
   disclose(context, basename(path), carried);
 }
 
-/** Said apart from the body, on stderr, so the body still pipes into an agent unchanged. */
-function disclose(context: CommandContext, name: string, carried: readonly Carried[]): void {
-  if (carried.length === 0) return;
-  context.printer.warning(
-    `${name} carries ${describeCarried(carried)}, which a target that loads it runs as you.`,
-  );
+/** A folder's own Markdown: its SKILL.md, AGENT.md or README.md, else its first Markdown file. */
+async function markdownIn(dir: string): Promise<string | undefined> {
+  const names = (await readdir(dir)).sort();
+  const own =
+    [SKILL_ENTRY, AGENT_ENTRY, "README.md"].find((name) => names.includes(name)) ??
+    names.find((name) => name.endsWith(".md"));
+  return own === undefined ? undefined : join(dir, own);
 }
 
 /** What a registry serves can hide lines from the person reading it, or write to their clipboard. */
@@ -161,6 +154,14 @@ function print(context: CommandContext, body: string): void {
       "Removed terminal control characters from the output; `--json` prints the file as written.",
     );
   }
+}
+
+/** Said apart from the body, on stderr, so the body still pipes into an agent unchanged. */
+function disclose(context: CommandContext, name: string, carried: readonly Carried[]): void {
+  if (carried.length === 0) return;
+  context.printer.warning(
+    `${name} carries ${describeCarried(carried)}, which a target that loads it runs as you.`,
+  );
 }
 
 /** A declared address that goes past its registry names a namespace; a source is a registry. */

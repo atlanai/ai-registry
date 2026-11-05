@@ -4,13 +4,15 @@ import { join } from "node:path";
 import { test as base, expect, vi } from "vitest";
 import { RpcClient } from "#daemon/rpc/client.ts";
 import { rpcEndpoint } from "#daemon/rpc/endpoint.ts";
-import type { ClientInfo } from "#daemon/rpc/protocol.ts";
+import type { ClientInfo } from "#daemon/rpc/methods.ts";
 import { DaemonRuntime } from "#daemon/runtime.ts";
 import { testClient } from "./daemon.ts";
 import { type Home, makeHome } from "./home.ts";
 import { type Places, redact, redactPlaces, serializer } from "./redact.ts";
 import { exec, type Ran, runCli } from "./run.ts";
 import { tempDir } from "./temp.ts";
+
+export type { Home } from "./home.ts";
 
 interface AiregOptions {
   /** Defaults to the project. */
@@ -57,8 +59,6 @@ const GIT_CONFIG = [
 ].join("\n");
 
 expect.addSnapshotSerializer(serializer);
-
-export type { Home };
 
 async function makeGit(home: Home): Promise<Git> {
   // The spawned CLI authors commits too, so the identity lives in the test home.
@@ -127,7 +127,7 @@ interface Cleanup {
 }
 
 export const test = base
-  /** A folder for the whole file, for what every test reads and none changes, such as a registry. */
+  // `fileTmp` is one folder per file, for what every test reads and none changes, like a registry.
   .extend("fileTmp", { scope: "file" }, makeTmp)
   .extend("tmp", makeTmp)
   .extend("home", async ({ tmp }, { onCleanup }): Promise<Home> => {
@@ -142,7 +142,6 @@ export const test = base
   })
   .extend("project", makeProject)
   .extend("aireg", ({ home, project }) => cliIn(home, project))
-  /** Output with this test's folders, digests, times and the CLI version as placeholders. */
   .extend("redact", ({ tmp, home, project }, { onCleanup }) => {
     const places: Places = { root: tmp, home: home.dir, project };
     redactPlaces(places);

@@ -1,0 +1,190 @@
+import { existsSync } from "node:fs";
+import { cp, lstat, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join, relative, resolve } from "node:path";
+import { readJson } from "#adapter/filespec/documents.ts";
+import { rootReader } from "#adapter/filespec/folder.ts";
+import { ENVELOPE } from "#adapter/filespec/names.ts";
+import { list, sanitizeName } from "#adapter/text.ts";
+import type { CommandContext } from "#cli/commands/command.ts";
+import type { Own } from "#cli/commands/kind.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
+import { isRecord } from "#core/fields.ts";
+import { inBlobStore } from "#core/filespec/indexer.ts";
+import { requireRegistry } from "#core/filespec/init.ts";
+import {
+  fileProblems,
+  type KindManifest,
+  specFile,
+  specOf,
+} from "#core/filespec/kind-manifests.ts";
+import { check } from "#core/filespec/schema.ts";
+import { withName } from "#core/frontmatter.ts";
+import { expandUserPath } from "#core/fs/path.ts";
+import { authored, type Irregular, refusal } from "#core/fs/tree.ts";
+import { nameOf } from "./fields.ts";
+import { FRESH, refuseRedirect } from "./files.ts";
+import { namespaceFor } from "./place.ts";
+
+/** One existing folder, read and checked before anything is copied. */
+interface Incoming {
+  input: string;
+  dir: string;
+  entries: string[];
+  name: string;
+  front: { file: string; name: string } | undefined;
+}
+
+export async function newFrom(
+  kind: string,
+  manifest: KindManifest,
+  context: CommandContext,
+  paths: readonly string[],
+  own: Own,
+  yes: boolean,
+): Promise<void> {
+  if (paths.length === 0) {
+    throw new AiregError(`\`aireg ${kind} new --from\` needs a folder.`, {
+      code: ErrorCode.Usage,
+      hint: `Name the folder: \`aireg ${kind} new --from <path>\`.`,
+    });
+  }
+  if (own.name !== undefined && paths.length > 1) {
+    throw new AiregError("--name renames one folder, and more than one was given.", {
+      code: ErrorCode.Usage,
+      hint: "Leave out `--name`, and each takes the name its own files give it.",
+    });
+  }
+  const root = requireRegistry(context.cwd);
+  // Every folder is checked first, so a bad one in a batch leaves nothing half copied.
+  const found: Incoming[] = [];
+  for (const input of paths)
+    found.push(await incoming(kind, manifest, context.cwd, input, own.name));
+  const names = found.map((item) => item.name);
+  const twice = names.filter((name, index) => names.indexOf(name) !== index);
+  if (twice.length > 0) {
+    throw new AiregError(`More than one folder is named ${list([...new Set(twice)])}.`, {
+      code: ErrorCode.Usage,
+      hint: "Copy them in one at a time, with `--name` to rename one.",
+    });
+  }
+
+  const namespace = await namespaceFor(root, context.cwd, own, context, yes);
+  if (namespace === undefined) return;
+  for (const item of found) {
+    refuseRedirect(root, join(root, "artifacts", namespace, kind, item.name, "0.1.0"));
+    if (existsSync(join(root, "artifacts", namespace, kind, item.name))) {
+      throw new AiregError(`${namespace}/${kind}/${item.name} already exists.`, {
+        code: ErrorCode.Conflict,
+        hint: `Start its next version with \`aireg ${kind} bump ${item.name}\`.`,
+      });
+    }
+  }
+
+  const copied: { name: string; at: string }[] = [];
+  for (const item of found) {
+    const at = join(root, "artifacts", namespace, kind, item.name, "0.1.0");
+    await mkdir(at, { recursive: true });
+    for (const path of item.entries) {
+      await cp(join(item.dir, path), join(at, path), FRESH);
+    }
+    await rm(join(at, ENVELOPE), { force: true });
+    // `--name` renames the copy, and index checks the folder against its front matter.
+    if (item.front !== undefined && item.front.name !== item.name) {
+      const file = join(at, item.front.file);
+      await writeFile(file, withName(await readFile(file, "utf8"), item.name), "utf8");
+    }
+    copied.push({ name: item.name, at });
+  }
+
+  if (context.printer.format === "json") {
+    context.printer.json({
+      ok: true,
+      data: {
+        kind,
+        namespace,
+        created: copied.map((item) => ({ name: item.name, at: relative(root, item.at) })),
+      },
+    });
+    return;
+  }
+  for (const item of copied) {
+    context.printer.success(`Copied ${item.name} into ${relative(context.cwd, item.at) || "."}/.`);
+  }
+  context.printer.note("next", "aireg registry index");
+}
+
+async function incoming(
+  kind: string,
+  manifest: KindManifest,
+  cwd: string,
+  input: string,
+  named: string | undefined,
+): Promise<Incoming> {
+  const source = resolve(cwd, expandUserPath(input));
+  if (!existsSync(source)) {
+    throw new AiregError(`Nothing exists at ${input}.`, {
+      code: ErrorCode.NotFound,
+      hint: `Name an existing ${kind} folder or file: \`aireg ${kind} new --from <path>\`.`,
+    });
+  }
+  const isDirectory = (await stat(source)).isDirectory();
+  const dir = isDirectory ? source : dirname(source);
+  const visible = (path: string) => !path.split("/").some((part) => part.startsWith("."));
+  const found = isDirectory ? await authored(dir) : { files: [], irregular: await linked(source) };
+  const entries = isDirectory
+    ? found.files.map((record) => record.path).filter(visible)
+    : [basename(source)];
+
+  const texts = new Map<string, string>();
+  for (const path of entries.filter((item) => /\.(md|json)$/.test(item))) {
+    texts.set(path, await readFile(join(dir, path), "utf8"));
+  }
+  const spec = specOf(manifest, texts, named);
+  const problems = [
+    ...found.irregular
+      .filter((entry) => visible(entry.path))
+      .map((entry) => `${entry.path} ${refusal(entry)}`),
+    ...fileProblems(manifest, new Set(entries)),
+    ...(spec === undefined ? ["has no front matter"] : check(manifest, spec)),
+  ];
+  const fallback =
+    typeof spec?.name === "string"
+      ? spec.name
+      : sanitizeName(basename(isDirectory ? source : dirname(source)));
+  const name = nameOf(named, fallback);
+  if (problems.length > 0) {
+    throw new AiregError(`${input} is not a valid ${kind}: ${problems.join("; ")}.`, {
+      code: ErrorCode.Invalid,
+      hint: `Fix it where it is, then run \`aireg ${kind} new --from ${input}\` again.`,
+    });
+  }
+  const file = specFile(manifest, texts);
+  const front =
+    file !== undefined && typeof spec?.name === "string" ? { file, name: spec.name } : undefined;
+  return { input, dir, entries, name, front };
+}
+
+/** One file named by `--from`, refused as a link the way a folder's entries are. */
+async function linked(source: string): Promise<Irregular[]> {
+  if (!(await lstat(source)).isSymbolicLink()) return [];
+  return [{ path: basename(source), reason: "is a symlink" }];
+}
+
+/** Carries over the last version's edges and blob-store files, which only the envelope holds. */
+export async function keepFromEnvelope(
+  from: string,
+  to: string,
+): Promise<{ relationships: number; blobs: number }> {
+  const envelope = await readJson(rootReader(from), ENVELOPE).catch(() => undefined);
+  const edges =
+    isRecord(envelope) && Array.isArray(envelope.relationships) ? envelope.relationships : [];
+  const blobs =
+    isRecord(envelope) && Array.isArray(envelope.files) ? envelope.files.filter(inBlobStore) : [];
+  if (edges.length === 0 && blobs.length === 0) return { relationships: 0, blobs: 0 };
+  const stub = {
+    ...(blobs.length === 0 ? {} : { files: blobs }),
+    ...(edges.length === 0 ? {} : { relationships: edges }),
+  };
+  await writeFile(join(to, ENVELOPE), `${JSON.stringify(stub, null, 2)}\n`);
+  return { relationships: edges.length, blobs: blobs.length };
+}

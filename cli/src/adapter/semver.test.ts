@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { bumpVersion, compareVersion, formatVersion, gte, parseVersion } from "./semver.ts";
 
 describe("parseVersion", () => {
-  it("reads a plain triple", () => {
+  test("reads a plain triple", () => {
     expect(parseVersion("1.2.3")).toEqual({
       major: 1,
       minor: 2,
@@ -12,7 +12,7 @@ describe("parseVersion", () => {
     expect(formatVersion(parseVersion("0.10.0")!)).toBe("0.10.0");
   });
 
-  it("refuses what SemVer 2.0.0 does: a v prefix and leading zeros", () => {
+  test("refuses what SemVer 2.0.0 does: a v prefix and leading zeros", () => {
     expect(parseVersion("v1.2.3")).toBeUndefined();
     expect(parseVersion("01.10.0")).toBeUndefined();
     expect(parseVersion("1.02.0")).toBeUndefined();
@@ -22,11 +22,11 @@ describe("parseVersion", () => {
     expect(parseVersion("1.0.0-0.0a.alpha-1")?.prerelease).toEqual(["0", "0a", "alpha-1"]);
   });
 
-  it("keeps a prerelease and drops build metadata", () => {
+  test("keeps a prerelease and drops build metadata", () => {
     expect(parseVersion("1.0.0-beta.1+build")?.prerelease).toEqual(["beta", "1"]);
   });
 
-  it("refuses ranges and leftover text", () => {
+  test("refuses ranges and leftover text", () => {
     expect(parseVersion("^1.2.3")).toBeUndefined();
     expect(parseVersion("1.2")).toBeUndefined();
     expect(parseVersion("abc")).toBeUndefined();
@@ -34,7 +34,7 @@ describe("parseVersion", () => {
 });
 
 describe("compareVersion", () => {
-  it("orders by major, minor, patch, then prerelease", () => {
+  test("orders by major, minor, patch, then prerelease", () => {
     const a = parseVersion("1.2.3")!;
     expect(compareVersion(a, parseVersion("1.2.4")!)).toBe(-1);
     expect(compareVersion(a, parseVersion("1.3.0")!)).toBe(-1);
@@ -45,7 +45,7 @@ describe("compareVersion", () => {
 });
 
 describe("gte", () => {
-  it("treats the current CLI as new enough at equality", () => {
+  test("treats the current CLI as new enough at equality", () => {
     expect(gte("0.2.0", "0.2.0")).toBe(true);
     expect(gte("0.2.1", "0.2.0")).toBe(true);
     expect(gte("0.1.9", "0.2.0")).toBe(false);
@@ -53,11 +53,11 @@ describe("gte", () => {
 });
 
 describe("bumpVersion", () => {
-  it("starts a first release at 0.1.0", () => {
+  test("starts a first release at 0.1.0", () => {
     expect(bumpVersion(undefined)).toBe("0.1.0");
   });
 
-  it("moves the part it is asked to, and resets the ones below it", () => {
+  test("moves the part it is asked to, and resets the ones below it", () => {
     expect(bumpVersion("1.2.3")).toBe("1.2.4");
     expect(bumpVersion("1.2.3", "minor")).toBe("1.3.0");
     expect(bumpVersion("1.2.3", "major")).toBe("2.0.0");

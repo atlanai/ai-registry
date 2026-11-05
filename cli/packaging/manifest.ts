@@ -11,9 +11,6 @@ import {
 } from "#core/release/manifest.ts";
 import { artifactUrl, type Channel } from "#core/release/origin.ts";
 
-// The schema, the signed bytes and the verifier all come from the client's own module, so the
-// release workflow cannot sign anything an installed aireg would reject.
-
 /** PKCS#8 header for a 32-byte Ed25519 seed (RFC 8410); only the signer ever holds a private key. */
 const PKCS8_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 
@@ -41,7 +38,10 @@ export function privateKeyFromSeed(encoded: string): KeyObject {
   });
 }
 
-/** The wire document; `url` sits outside the signed payload, so it is added after signing. */
+/**
+ * Uses the client's own schema and payload, so CI cannot sign what an installed aireg rejects.
+ * `url` sits outside the signed payload, so it is added after signing.
+ */
 export function signManifest(options: SignOptions): string {
   const artifacts = options.artifacts.map((path) => {
     const name = basename(path);

@@ -1,8 +1,3 @@
-/*
- * What the console shows, as values. Nothing here touches a terminal, so the
- * whole read path is testable without one.
- */
-
 import type { ArtifactKind } from "#adapter/index.ts";
 import type { State } from "#core/plan/status.ts";
 import type { RunCounts, RunMode, RunState, RunTrigger } from "#core/run/model.ts";
@@ -12,16 +7,7 @@ import type { SyncPolicy } from "#core/sync/policy.ts";
 /** The source of a row for work authored on this machine, which no registry serves yet. */
 export const LOCAL_SOURCE = "local";
 
-/** Everything `status` can say, plus what the last sync and this machine's own folders add. */
-export type ArtifactState =
-  | State
-  | "failed"
-  | "pending"
-  /** Written here, and an adapter job already carries it into the account. */
-  | "imported"
-  | "unpublished"
-  /** A folder of its own with the name of an artifact installed here. */
-  | "duplicate";
+export type ArtifactState = State | "failed" | "pending" | "imported" | "unpublished" | "duplicate";
 
 export interface ArtifactRow {
   /** Lock key. Namespaced (`engineering/lint`) where the registry namespaces. */
@@ -31,7 +17,7 @@ export interface ArtifactRow {
   kind: ArtifactKind;
   /** The registry this came from; `local` for work authored here. */
   registry: string;
-  /** The namespace it belongs to. Absent for locally authored work. */
+  /** Absent for locally authored work. */
   namespace: string | undefined;
   id: string;
   version: string | undefined;
@@ -41,7 +27,6 @@ export interface ArtifactRow {
   diskDigest: string | undefined;
   state: ArtifactState;
   detail: string | undefined;
-  /** Targets this is projected into, by name. */
   targets: string[];
   /** Absolute path of the writable copy a target is served. */
   copy: string;
@@ -61,7 +46,7 @@ export interface ArtifactGroup {
   authoredHere: boolean;
   rows: ArtifactRow[];
   counts: Record<ArtifactState, number>;
-  /** Distinct versions, commonest first, as `0.1.0 x349`. */
+  /** Distinct versions, commonest first, each counted when more than one row has it. */
   versions: string[];
 }
 

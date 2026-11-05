@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { LockArtifact } from "#core/lock.ts";
-import { resolveTargets } from "#core/target/index.ts";
+import { resolveTargets } from "#core/target/table.ts";
 import { watchedFrom } from "./installed.ts";
 
 describe("watchedFrom", () => {
-  it("names the target under its aireg 0.1 key and id too", () => {
+  test("names the target under its aireg 0.1 key and id too", () => {
     const entry = {
       origin: { target: "claude-code", path: ".claude/skills/lint", step: "" },
     } as unknown as LockArtifact;

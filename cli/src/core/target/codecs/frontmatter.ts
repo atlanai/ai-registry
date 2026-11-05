@@ -1,32 +1,8 @@
 import { isDeepStrictEqual } from "node:util";
 import { type Document, isMap, isScalar, parseDocument } from "yaml";
-import { splitFrontmatter } from "#core/catalog/frontmatter.ts";
+import { splitFrontmatter } from "#core/frontmatter.ts";
 import type { ConfigValue } from "#core/target/contract.ts";
 import type { Rendered } from "./index.ts";
-
-/** Edited as a document, so the comments and key order a person wrote survive. */
-function editFrontmatter(source: string, change: (doc: Document) => string | undefined): Rendered {
-  const parts = splitFrontmatter(source);
-  if (parts === undefined) return { problem: "it has no front matter" };
-  const doc = parseDocument(parts.yaml, { logLevel: "error" });
-  if (doc.errors.length > 0 || !isMap(doc.contents)) return { problem: "it has no front matter" };
-  const problem = change(doc);
-  if (problem !== undefined) return { problem };
-  return { text: `---\n${doc.toString()}---\n${parts.body}` };
-}
-
-/**
- * Keys the coding agents' own docs name as limiting what an agent may use, which no codec drops
- * or changes; a definition's `restrictions` add to them.
- */
-const RESTRICTIONS = ["tools", "allowed-tools", "disallowedTools", "permissionMode", "permission"];
-
-const restricting = (own: readonly string[]) => [...RESTRICTIONS, ...own];
-
-function keys(doc: Document): string[] {
-  if (!isMap(doc.contents)) return [];
-  return doc.contents.items.map((pair) => String(isScalar(pair.key) ? pair.key.value : pair.key));
-}
 
 export function frontmatterStrict(
   source: string,
@@ -43,6 +19,30 @@ export function frontmatterStrict(
     }
     return undefined;
   });
+}
+
+/**
+ * Keys the coding agents' own docs name as limiting what an agent may use, which no codec drops
+ * or changes; a definition's `restrictions` add to them.
+ */
+const RESTRICTIONS = ["tools", "allowed-tools", "disallowedTools", "permissionMode", "permission"];
+
+const restricting = (own: readonly string[]) => [...RESTRICTIONS, ...own];
+
+/** Edited as a document, so the comments and key order a person wrote survive. */
+function editFrontmatter(source: string, change: (doc: Document) => string | undefined): Rendered {
+  const parts = splitFrontmatter(source);
+  if (parts === undefined) return { problem: "it has no front matter" };
+  const doc = parseDocument(parts.yaml, { logLevel: "error" });
+  if (doc.errors.length > 0 || !isMap(doc.contents)) return { problem: "it has no front matter" };
+  const problem = change(doc);
+  if (problem !== undefined) return { problem };
+  return { text: `---\n${doc.toString()}---\n${parts.body}` };
+}
+
+function keys(doc: Document): string[] {
+  if (!isMap(doc.contents)) return [];
+  return doc.contents.items.map((pair) => String(isScalar(pair.key) ? pair.key.value : pair.key));
 }
 
 export function frontmatterSet(

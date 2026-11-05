@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { artifactAt } from "./names.ts";
 
 describe("artifactAt", () => {
-  it("reads an artifact folder at the registry's root", () => {
+  test("reads an artifact folder at the registry's root", () => {
     expect(artifactAt("artifacts/engineering/skill/pr-review")).toEqual({
       root: "",
       namespace: "engineering",
@@ -12,7 +12,7 @@ describe("artifactAt", () => {
     });
   });
 
-  it("reads a version folder, and a file inside one", () => {
+  test("reads a version folder, and a file inside one", () => {
     const at = { root: "", namespace: "engineering", kind: "skill", name: "pr-review" };
     expect(artifactAt("artifacts/engineering/skill/pr-review/1.2.0")).toEqual({
       ...at,
@@ -28,7 +28,7 @@ describe("artifactAt", () => {
     });
   });
 
-  it("names the folder above artifacts as the registry's", () => {
+  test("names the folder above artifacts as the registry's", () => {
     expect(artifactAt("examples/acme/artifacts/engineering/agent/reviewer")).toMatchObject({
       root: "examples/acme",
       kind: "agent",
@@ -36,7 +36,7 @@ describe("artifactAt", () => {
     });
   });
 
-  it("tells a namespace called artifacts from the registry's own folder", () => {
+  test("tells a namespace called artifacts from the registry's own folder", () => {
     expect(artifactAt("artifacts/artifacts/skill/lint")).toMatchObject({
       root: "",
       namespace: "artifacts",
@@ -44,7 +44,7 @@ describe("artifactAt", () => {
     });
   });
 
-  it("finds nothing where the path stops short of an artifact", () => {
+  test("finds nothing where the path stops short of an artifact", () => {
     expect(artifactAt("")).toBeUndefined();
     expect(artifactAt("examples/acme")).toBeUndefined();
     expect(artifactAt("artifacts/engineering/skill")).toBeUndefined();

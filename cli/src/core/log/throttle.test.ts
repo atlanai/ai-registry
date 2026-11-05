@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { memorySink } from "#test/kit/memory-sink.ts";
 import type { LogRecord } from "./model.ts";
 import { throttleSink } from "./throttle.ts";
@@ -14,7 +14,7 @@ function record(body: string, atMs: number): LogRecord {
 }
 
 describe("throttleSink", () => {
-  it("collapses the same message inside the window", () => {
+  test("collapses the same message inside the window", () => {
     const inner = memorySink();
     const sink = throttleSink(inner, { windowMs: 60_000 });
     for (let i = 0; i < 10; i += 1) sink.write(record("stuck", 1_000 + i * 1_000));
@@ -22,7 +22,7 @@ describe("throttleSink", () => {
   });
 
   // Each info line is its own event; debug and trace are only written when asked for.
-  it("passes info, debug and trace through", () => {
+  test("passes info, debug and trace through", () => {
     const inner = memorySink();
     const sink = throttleSink(inner, { windowMs: 60_000 });
     for (let i = 0; i < 3; i += 1) {
@@ -43,7 +43,7 @@ describe("throttleSink", () => {
     expect(inner.records.every((item) => item.attributes.repeated === undefined)).toBe(true);
   });
 
-  it("reports how many it swallowed on the next one through", () => {
+  test("reports how many it swallowed on the next one through", () => {
     const inner = memorySink();
     const sink = throttleSink(inner, { windowMs: 10_000 });
     sink.write(record("stuck", 0));
@@ -53,7 +53,7 @@ describe("throttleSink", () => {
     expect(inner.records[1]?.attributes.repeated).toBe(5);
   });
 
-  it("reports what it swallowed when it closes, so a burst that stopped still shows", () => {
+  test("reports what it swallowed when it closes, so a burst that stopped still shows", () => {
     const inner = memorySink();
     const sink = throttleSink(inner, { windowMs: 60_000 });
     for (let i = 0; i < 4; i += 1) sink.write(record("stuck", 1_000 + i));
@@ -61,7 +61,7 @@ describe("throttleSink", () => {
     expect(inner.records.map((item) => item.attributes.repeated)).toEqual([undefined, 3]);
   });
 
-  it("reports what it swallowed before it forgets a full key map", () => {
+  test("reports what it swallowed before it forgets a full key map", () => {
     const inner = memorySink();
     const sink = throttleSink(inner, { windowMs: 60_000, maxKeys: 2 });
     sink.write(record("stuck", 0));
@@ -71,7 +71,7 @@ describe("throttleSink", () => {
     expect(inner.records.find((item) => item.attributes.repeated === 1)?.body).toBe("stuck");
   });
 
-  it("keeps one job's failure from hiding another's", () => {
+  test("keeps one job's failure from hiding another's", () => {
     const inner = memorySink();
     const sink = throttleSink(inner, { windowMs: 60_000 });
     for (const jobId of ["job_a", "job_b", "job_c"]) {
@@ -87,7 +87,7 @@ describe("throttleSink", () => {
     expect(inner.records.map((item) => item.attributes.jobId)).toEqual(["job_a", "job_b", "job_c"]);
   });
 
-  it("keeps distinct messages apart, even past the bound on the key map", () => {
+  test("keeps distinct messages apart, even past the bound on the key map", () => {
     const inner = memorySink();
     const sink = throttleSink(inner, { windowMs: 60_000, maxKeys: 4 });
     for (let i = 0; i < 50; i += 1) sink.write(record(`unique-${i}`, i));

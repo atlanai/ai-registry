@@ -1,12 +1,8 @@
 import { posixRelative } from "#core/fs/path.ts";
 import type { LinkMode, Lock, LockArtifact } from "#core/lock.ts";
-import {
-  type ArtifactSurvey,
-  editedAnywhere,
-  type Rewritten,
-  type Selected,
-} from "#core/plan/model.ts";
+import type { Rewritten, Selected } from "#core/plan/model.ts";
 import type { PlannedLink } from "#core/plan/projection.ts";
+import { type ArtifactSurvey, editedAnywhere } from "#core/plan/survey.ts";
 
 interface RowInput {
   item: Selected;
@@ -15,13 +11,12 @@ interface RowInput {
   state: ArtifactSurvey | undefined;
   /** This run stages the item's bytes again. */
   restage: boolean;
-  /** This scope's copy of the item. */
+  /** Path to this scope's copy of the item. */
   copy: string;
   base: string;
   neededBy: string[] | undefined;
 }
 
-/** The lock row a planned artifact records. */
 export function lockRow({
   item,
   links,
@@ -32,11 +27,12 @@ export function lockRow({
   base,
   neededBy,
 }: RowInput): LockArtifact {
-  // An edited copy left in place stays based on what it was installed from, so
-  // `outdated` still sees the newer version and a publish never skips over it.
-  // A row of yours stays based on what it last sent, until a pull or a served publish moves it.
+  // An edited copy keeps its install basis so `outdated` still sees newer versions and a publish
+  // never skips one; a row of yours keeps what it last sent until a pull or served publish.
   const yours = !restage && previous?.origin !== undefined;
   const basis = yours || (!restage && editedAnywhere(previous, state)) ? previous : undefined;
+  // Never adopt a drifted digest; the survey fallback is a copy the lock forgot, so drift stays
+  // detectable. Pull never claims a row as yours: only an origins step writes `origin`.
   return {
     registry: item.source,
     id: basis?.id ?? item.id,
@@ -49,10 +45,7 @@ export function lockRow({
     version: basis === undefined ? item.version : basis.version,
     ...carriedOf(basis === undefined ? fingerprintOf(item, previous) : basis.carried),
     ...revisionOf(basis === undefined ? item.revision : basis.revision),
-    // Never adopt a drifted digest: the lock records what we installed. The
-    // survey fallback is a copy the lock forgot, so drift stays detectable.
     digest: restage ? "" : (previous?.digest ?? state?.digest ?? ""),
-    // Pull never claims a row as yours; only an origins step writes this.
     origin: previous?.origin,
     links: links.map((link) => {
       const mode = modeOf(link, previous);
@@ -68,6 +61,10 @@ export function lockRow({
   };
 }
 
+function carriedOf(fingerprint: string | undefined): Pick<LockArtifact, "carried"> {
+  return fingerprint === undefined ? {} : { carried: fingerprint };
+}
+
 /**
  * What the plugin runs, as read this run; a run that read nothing of it, as an install off the
  * lockfile, has the same bytes as before and so the same parts.
@@ -77,10 +74,6 @@ function fingerprintOf(item: Selected, previous: LockArtifact | undefined): stri
   return item.contentId !== undefined && item.contentId === previous?.content
     ? previous.carried
     : undefined;
-}
-
-function carriedOf(fingerprint: string | undefined): Pick<LockArtifact, "carried"> {
-  return fingerprint === undefined ? {} : { carried: fingerprint };
 }
 
 function revisionOf(revision: string | undefined): Pick<LockArtifact, "revision"> {
@@ -109,6 +102,19 @@ export function rewrittenFrom(
   };
 }
 
+/**
+ * The revision says what the lock was resolved at; serving the same rows again does not move it.
+ * A registry at a new address is another source, with a revision of its own.
+ */
+export function keepUnmovedRevisions(before: Lock, next: Lock): void {
+  for (const [alias, source] of Object.entries(next.registries)) {
+    const held = before.registries[alias];
+    if (held !== undefined && held.key === source.key && unmoved(before, next, alias)) {
+      next.registries[alias] = { ...source, revision: held.revision };
+    }
+  }
+}
+
 /** Whether a registry's rows resolved to exactly what the lock already held. */
 function unmoved(before: Lock, after: Lock, alias: string): boolean {
   const rows = (lock: Lock) =>
@@ -131,17 +137,4 @@ function unmoved(before: Lock, after: Lock, alias: string): boolean {
       );
     })
   );
-}
-
-/**
- * The revision says what the lock was resolved at; serving the same rows again does not move it.
- * A registry at a new address is another source, with a revision of its own.
- */
-export function keepUnmovedRevisions(before: Lock, next: Lock): void {
-  for (const [alias, source] of Object.entries(next.registries)) {
-    const held = before.registries[alias];
-    if (held !== undefined && held.key === source.key && unmoved(before, next, alias)) {
-      next.registries[alias] = { ...source, revision: held.revision };
-    }
-  }
 }

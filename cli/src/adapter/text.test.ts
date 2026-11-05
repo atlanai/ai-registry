@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   quoted,
   sanitizeBlock,
@@ -10,14 +10,14 @@ import {
 } from "./text.ts";
 
 describe("sanitizeName", () => {
-  it("keeps a name that is already an address", () => {
+  test("keeps a name that is already an address", () => {
     expect(sanitizeName("pr-review")).toBe("pr-review");
     expect(sanitizeName("access--01kzrtf9bhe69ssx1xc9hfw2ea")).toBe(
       "access--01kzrtf9bhe69ssx1xc9hfw2ea",
     );
   });
 
-  it("settles in one pass, which is what lets an address be matched by comparison", () => {
+  test("settles in one pass, which is what lets an address be matched by comparison", () => {
     const boundary = `${"x".repeat(63)}-${"y".repeat(10)}`;
     for (const name of [
       boundary,
@@ -35,39 +35,39 @@ describe("sanitizeName", () => {
     }
   });
 
-  it("never ends in a separator, however long the name was", () => {
+  test("never ends in a separator, however long the name was", () => {
     expect(sanitizeName(`${"x".repeat(63)}-${"y".repeat(10)}`)).toBe("x".repeat(63));
   });
 
-  it("cuts to the segment length the file spec allows", () => {
+  test("cuts to the segment length the file spec allows", () => {
     expect(sanitizeName("a".repeat(300))).toBe("a".repeat(64));
   });
 });
 
 describe("withoutCredentials", () => {
-  it("strips userinfo a user typed into a source URL", () => {
+  test("strips userinfo a user typed into a source URL", () => {
     const token = `ghp_${"0".repeat(36)}`;
     expect(withoutCredentials(`https://user:${token}@github.com/a/b`)).toBe(
       "https://<redacted>@github.com/a/b",
     );
   });
 
-  it("strips a bare username too", () => {
+  test("strips a bare username too", () => {
     expect(withoutCredentials("https://token@example.com/x")).toBe(
       "https://<redacted>@example.com/x",
     );
   });
 
-  it("leaves a clean URL alone", () => {
+  test("leaves a clean URL alone", () => {
     expect(withoutCredentials("https://github.com/a/b")).toBe("https://github.com/a/b");
   });
 
-  it("leaves shorthand and paths alone", () => {
+  test("leaves shorthand and paths alone", () => {
     expect(withoutCredentials("owner/repo")).toBe("owner/repo");
     expect(withoutCredentials("./local/dir")).toBe("./local/dir");
   });
 
-  it("does not mistake an scp-style remote for userinfo", () => {
+  test("does not mistake an scp-style remote for userinfo", () => {
     expect(withoutCredentials("git@github.com:owner/repo.git")).toBe(
       "git@github.com:owner/repo.git",
     );
@@ -75,7 +75,7 @@ describe("withoutCredentials", () => {
 });
 
 describe("quoted", () => {
-  it("escapes control and bidi characters, so the value reads as typed", () => {
+  test("escapes control and bidi characters, so the value reads as typed", () => {
     expect(quoted("a\nb")).toBe('"a\\nb"');
     expect(quoted("e\u202Eng")).toBe('"e\\u202Eng"');
     expect(quoted("x\u009By\u2066")).toBe('"x\\u009By\\u2066"');
@@ -83,14 +83,14 @@ describe("quoted", () => {
 });
 
 describe("masking long input", () => {
-  it("takes linear time on text built to make a backtracking pattern stall", () => {
+  test("takes linear time on text built to make a backtracking pattern stall", () => {
     const hostile = `${"a".repeat(200_000)}://${"b".repeat(200_000)}`;
     const started = Date.now();
     expect(withoutCredentials(hostile)).toBe(hostile);
     expect(Date.now() - started).toBeLessThan(500);
   });
 
-  it("still finds userinfo after a long run, and every one in a line", () => {
+  test("still finds userinfo after a long run, and every one in a line", () => {
     expect(withoutCredentials(`${"x".repeat(50)} git+https://t@a.example/x and ssh://u@b/y`)).toBe(
       `${"x".repeat(50)} git+https://<redacted>@a.example/x and ssh://<redacted>@b/y`,
     );
@@ -102,7 +102,7 @@ describe("text from a registry, shown in a terminal", () => {
   const ESC = "\u001B";
   const BEL = "\u0007";
 
-  it("loses every escape sequence, in its 7-bit and 8-bit forms", () => {
+  test("loses every escape sequence, in its 7-bit and 8-bit forms", () => {
     const hostile = [
       `${ESC}]0;title${BEL}`,
       `${ESC}]52;c;Zm9v${ESC}\\`,
@@ -116,46 +116,46 @@ describe("text from a registry, shown in a terminal", () => {
     expect(sanitizeText(`a${hostile}b`)).toBe("ab");
   });
 
-  it("leaves no escape or C1 control even from a sequence cut short", () => {
+  test("leaves no escape or C1 control even from a sequence cut short", () => {
     for (const cut of [`${ESC}]0;title`, `${ESC}[3`, "\u009D0;t", `${ESC}`]) {
       const left = [...sanitizeBlock(`a${cut}b`)].map((char) => char.codePointAt(0) as number);
       expect(left.filter((code) => code < 0x20 || (code >= 0x7f && code <= 0x9f))).toEqual([]);
     }
   });
 
-  it("takes linear time on sequences that never end", () => {
+  test("takes linear time on sequences that never end", () => {
     const hostile = [`${ESC}]x`, "\u009Dx", `${ESC}[1`, "\u009B1"].map((cut) => cut.repeat(50_000));
     const started = Date.now();
     for (const text of hostile) sanitizeBlock(text);
     expect(Date.now() - started).toBeLessThan(500);
   });
 
-  it("drops the bidi controls that make text read in another order (Trojan Source)", () => {
+  test("drops the bidi controls that make text read in another order (Trojan Source)", () => {
     const reordered = "if \u202Eend\u2066 x\u2069\u202C \u200Fy\u061C";
     expect(sanitizeBlock(reordered)).toBe("if end x y");
     expect(sanitizeText(reordered)).toBe("if end x y");
   });
 
-  it("keeps lines and tabs in a block and folds them on one line", () => {
+  test("keeps lines and tabs in a block and folds them on one line", () => {
     expect(sanitizeBlock("a\n\tb\r\nc\rd")).toBe("a\n\tb\r\ncd");
     expect(sanitizeText("a\n\tb")).toBe("a b");
   });
 
-  it("keeps the characters a person's text is made of", () => {
+  test("keeps the characters a person's text is made of", () => {
     const text = "Revue de code \u2014 日本語 👩\u200D💻 ü";
     expect(sanitizeBlock(text)).toBe(text);
   });
 });
 
 describe("trimming a run of characters", () => {
-  it("strips the run from either end", () => {
+  test("strips the run from either end", () => {
     expect(stripTrailing("https://example.com/a///", "/")).toBe("https://example.com/a");
     expect(stripLeading("//a/b/", "/")).toBe("a/b/");
     expect(stripTrailing(".git. . ", ". ")).toBe(".git");
     expect(stripTrailing("///", "/")).toBe("");
   });
 
-  it("takes linear time on a run built to make a backtracking pattern stall", () => {
+  test("takes linear time on a run built to make a backtracking pattern stall", () => {
     const hostile = `${"/".repeat(200_000)}a`;
     const started = Date.now();
     expect(stripTrailing(hostile, "/")).toBe(hostile);

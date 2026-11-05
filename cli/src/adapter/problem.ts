@@ -2,38 +2,6 @@ import { FAILURE_CODES } from "./codes.ts";
 import type { Failure } from "./errors.ts";
 import type { Problem } from "./spec/types.ts";
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
-  return value as Record<string, unknown>;
-}
-
-function stringField(record: Record<string, unknown> | undefined, key: string): string | undefined {
-  const value = record?.[key];
-  return typeof value === "string" && value !== "" ? value : undefined;
-}
-
-function statusOf(
-  record: Record<string, unknown> | undefined,
-  fallback: number | undefined,
-): number | undefined {
-  const value = record?.status;
-  if (typeof value === "number" && Number.isInteger(value) && value > 0) return value;
-  return fallback;
-}
-
-function fieldErrors(value: unknown): Problem["errors"] {
-  if (!Array.isArray(value)) return undefined;
-  const errors: { path?: string; message: string }[] = [];
-  for (const item of value) {
-    const row = asRecord(item);
-    const message = stringField(row, "message");
-    if (message === undefined) continue;
-    const path = stringField(row, "path");
-    errors.push(path === undefined ? { message } : { path, message });
-  }
-  return errors.length > 0 ? errors : undefined;
-}
-
 /** How an HTTP status is classified. A server's own `code` is not rewritten here. */
 export function failureFromStatus(status: number): Failure {
   if (status === 401) return "unauthorized";
@@ -99,6 +67,38 @@ export function readProblem(status: number | undefined, body: unknown): Problem 
   const errors = fieldErrors(source?.errors);
   if (errors !== undefined) problem.errors = errors;
   return problem;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function stringField(record: Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = record?.[key];
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+function statusOf(
+  record: Record<string, unknown> | undefined,
+  fallback: number | undefined,
+): number | undefined {
+  const value = record?.status;
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) return value;
+  return fallback;
+}
+
+function fieldErrors(value: unknown): Problem["errors"] {
+  if (!Array.isArray(value)) return undefined;
+  const errors: { path?: string; message: string }[] = [];
+  for (const item of value) {
+    const row = asRecord(item);
+    const message = stringField(row, "message");
+    if (message === undefined) continue;
+    const path = stringField(row, "path");
+    errors.push(path === undefined ? { message } : { path, message });
+  }
+  return errors.length > 0 ? errors : undefined;
 }
 
 /** One line for a person: the title, and the detail when it adds something. */

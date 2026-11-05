@@ -75,7 +75,7 @@ export const codex = defineTarget({
         },
       },
     },
-    // Codex reads an agent only as TOML, so each is written in its format.
+    // Codex reads an agent only as TOML.
     agent: {
       shape: "file",
       subdir: "agents",

@@ -1,9 +1,8 @@
 import { list, plural } from "#adapter/text.ts";
-import type { CommandContext } from "#cli/commands/index.ts";
-import { publishInstead } from "#cli/publish/target.ts";
+import type { CommandContext } from "#cli/commands/command.ts";
 import { failureWords, itemLine } from "#cli/render/run.ts";
-import { loadAdapter } from "#core/adapter/registry.ts";
-import { readOnlyLayout } from "#core/adapter/writable.ts";
+import { loadAdapter } from "#core/adapter/load.ts";
+import { readOnlyLayout } from "#core/adapter/read-only.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import {
   ITEM_EVENT,
@@ -14,7 +13,8 @@ import {
   WARNING_EVENT,
 } from "#core/run/model.ts";
 import { followRun, type RpcClient } from "#daemon/rpc/client.ts";
-import type { load } from "#engine/pipeline.ts";
+import { publishInstead } from "#engine/publish/target.ts";
+import type { load } from "#engine/scope/load.ts";
 
 type Loaded = Awaited<ReturnType<typeof load>>;
 
@@ -77,11 +77,11 @@ export function runSummary(
   if (changed === 0 && attention === 0 && failed === 0 && skipped === 0) {
     return `In sync with ${named ?? "every registry"} (${plural(examined, "artifact")}).`;
   }
+  // Skipped: left alone by a policy that is off, or a registry that takes no publishes.
   const parts = [
     changed > 0 ? `${changed} changed` : "",
     attention > 0 ? `${attention} ${attention === 1 ? "needs" : "need"} attention` : "",
     failed > 0 ? `${failed} failed` : "",
-    // Left alone by a policy that is off, or by a registry that takes no publishes: not in sync.
     skipped > 0 ? `${skipped} left as ${skipped === 1 ? "it is" : "they are"}` : "",
   ].filter((part) => part !== "");
   return `${prefix}Checked ${plural(examined, "artifact")}: ${list(parts)}.`;

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { fitLines, wrapRows } from "./layout.ts";
 
 describe("fitLines", () => {
-  it.each<[string, string | undefined, number, number, string[]]>([
+  test.each<[string, string | undefined, number, number, string[]]>([
     ["pads to the requested height", "one", 20, 3, ["one", "", ""]],
     ["pads nothing to blank lines", undefined, 20, 2, ["", ""]],
     ["returns no lines for no height", "one", 20, 0, []],
@@ -39,7 +39,7 @@ describe("fitLines", () => {
 });
 
 describe("wrapRows", () => {
-  it.each<[string, string, number, string[]]>([
+  test.each<[string, string, number, string[]]>([
     ["leaves a line that fits", "hello", 80, ["hello"]],
     [
       "breaks at the last cell, as a terminal soft-wraps",

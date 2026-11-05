@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { classify } from "./classify.ts";
 
 const D = (base?: string, local?: string, upstream?: string) => ({ base, local, upstream });
@@ -6,7 +6,7 @@ const D = (base?: string, local?: string, upstream?: string) => ({ base, local, 
 type Row = [string | undefined, string | undefined, string | undefined, string, string];
 
 describe("classify", () => {
-  it.each<Row>([
+  test.each<Row>([
     ["a", "b", "b", "synced", "the two sides hold the same bytes"],
     ["a", "a", "a", "synced", "nothing moved"],
     ["a", "a", "b", "pull", "only the registry moved"],
@@ -23,13 +23,12 @@ describe("classify", () => {
     expect(classify(D(base, local, upstream)).disposition).toBe(disposition);
   });
 
-  it("explains a conflict", () => {
+  test("explains a conflict", () => {
     expect(classify(D("a", "b", "c")).detail).toMatch(/edited here and changed in the registry/);
   });
 
-  // Guessing a direction with nothing to have diverged from is how a tool
-  // discards work silently.
-  it("refuses a direction with no base", () => {
+  // Guessing a direction with no base silently discards work.
+  test("refuses a direction with no base", () => {
     expect(classify(D(undefined, "b", "c")).detail).toMatch(/no digest/);
     expect(classify(D("", "b", "c")).disposition).toBe("unknown");
   });

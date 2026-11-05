@@ -35,38 +35,6 @@ interface UserPath {
   value: string;
 }
 
-async function run(script: string, env: NodeJS.ProcessEnv, extra: NodeJS.ProcessEnv = {}) {
-  return exec("powershell", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
-    timeoutMs: TIMEOUT_MS,
-    env: { ...env, ...extra },
-  });
-}
-
-async function readUserPath(env: NodeJS.ProcessEnv): Promise<UserPath> {
-  const result = await run(READ, env);
-  if (result.code === NO_PATH) return { kind: "ExpandString", value: "" };
-  if (result.code !== 0) throw new Error(`could not read the user PATH: ${result.stderr.trim()}`);
-  const split = result.stdout.indexOf("\n");
-  return { kind: result.stdout.slice(0, split).trim(), value: result.stdout.slice(split + 1) };
-}
-
-async function writeUserPath(path: UserPath, env: NodeJS.ProcessEnv): Promise<void> {
-  const result = await run(WRITE, env, {
-    REG_VALUE: path.value,
-    REG_KIND: path.kind === "String" ? "String" : "ExpandString",
-    REG_REFRESH: PATH_REFRESH_VARIABLE,
-  });
-  if (result.code !== 0) throw new Error(`could not write the user PATH: ${result.stderr.trim()}`);
-}
-
-/** `%NAME%` as Windows expands it, with names in any case. */
-function expand(entry: string, env: NodeJS.ProcessEnv): string {
-  return entry.replace(/%([^%]+)%/g, (whole, name: string) => {
-    const key = Object.keys(env).find((each) => each.toLowerCase() === name.toLowerCase());
-    return key === undefined ? whole : (env[key] ?? whole);
-  });
-}
-
 /** Windows compares paths without case, and `C:\x\` names `C:\x`. */
 function same(entry: string, dir: string, env: NodeJS.ProcessEnv): boolean {
   const normal = (path: string) =>
@@ -115,4 +83,36 @@ export async function removeFromUserPath(dir: string, env: NodeJS.ProcessEnv): P
   if (value === undefined) return false;
   await writeUserPath({ ...path, value }, env);
   return true;
+}
+
+/** `%NAME%` as Windows expands it, with names in any case. */
+function expand(entry: string, env: NodeJS.ProcessEnv): string {
+  return entry.replace(/%([^%]+)%/g, (whole, name: string) => {
+    const key = Object.keys(env).find((each) => each.toLowerCase() === name.toLowerCase());
+    return key === undefined ? whole : (env[key] ?? whole);
+  });
+}
+
+async function readUserPath(env: NodeJS.ProcessEnv): Promise<UserPath> {
+  const result = await run(READ, env);
+  if (result.code === NO_PATH) return { kind: "ExpandString", value: "" };
+  if (result.code !== 0) throw new Error(`could not read the user PATH: ${result.stderr.trim()}`);
+  const split = result.stdout.indexOf("\n");
+  return { kind: result.stdout.slice(0, split).trim(), value: result.stdout.slice(split + 1) };
+}
+
+async function run(script: string, env: NodeJS.ProcessEnv, extra: NodeJS.ProcessEnv = {}) {
+  return exec("powershell", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
+    timeoutMs: TIMEOUT_MS,
+    env: { ...env, ...extra },
+  });
+}
+
+async function writeUserPath(path: UserPath, env: NodeJS.ProcessEnv): Promise<void> {
+  const result = await run(WRITE, env, {
+    REG_VALUE: path.value,
+    REG_KIND: path.kind === "String" ? "String" : "ExpandString",
+    REG_REFRESH: PATH_REFRESH_VARIABLE,
+  });
+  if (result.code !== 0) throw new Error(`could not write the user PATH: ${result.stderr.trim()}`);
 }

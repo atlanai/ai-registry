@@ -26,58 +26,6 @@ interface FileSinkOptions {
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_KEEP = 4;
 
-/** Far longer than a rotation takes, so a lock this old was left by a process that died in one. */
-const ROTATE_STALE_MS = 60_000;
-
-/** Takes over a lock left by a crash, which would otherwise stop rotation for good. */
-function reclaim(lock: string): boolean {
-  try {
-    if (Math.abs(Date.now() - statSync(lock).mtimeMs) <= ROTATE_STALE_MS) return false;
-    rmdirSync(lock);
-    mkdirSync(lock);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** A directory is the portable atomic mutex; two rotations at once lose a rename. */
-function withRotateLock(path: string, rotate: () => void): boolean {
-  const lock = `${path}.rotating`;
-  try {
-    mkdirSync(lock);
-  } catch {
-    if (!reclaim(lock)) return false;
-  }
-  try {
-    rotate();
-    return true;
-  } finally {
-    try {
-      rmdirSync(lock);
-    } catch {
-      // Losing the lock directory would wedge every later rotation.
-    }
-  }
-}
-
-function shift(path: string, keep: number): void {
-  rmSync(`${path}.${keep}`, { force: true, recursive: true });
-  for (let index = keep - 1; index >= 1; index -= 1) {
-    try {
-      renameSync(`${path}.${index}`, `${path}.${index + 1}`);
-    } catch {
-      // Absent rung.
-    }
-  }
-  try {
-    renameSync(path, `${path}.1`);
-  } catch (error) {
-    // Removed under this process: there is nothing to roll, only a file to start.
-    if (!isMissing(error)) throw error;
-  }
-}
-
 /**
  * Writes are synchronous: a process that hands its tail to an async transport
  * loses the lines explaining why it exited.
@@ -162,6 +110,58 @@ export function fileSink(options: FileSinkOptions): Sink {
       release();
     },
   };
+}
+
+/** A directory is the portable atomic mutex; two rotations at once lose a rename. */
+function withRotateLock(path: string, rotate: () => void): boolean {
+  const lock = `${path}.rotating`;
+  try {
+    mkdirSync(lock);
+  } catch {
+    if (!reclaim(lock)) return false;
+  }
+  try {
+    rotate();
+    return true;
+  } finally {
+    try {
+      rmdirSync(lock);
+    } catch {
+      // Losing the lock directory would wedge every later rotation.
+    }
+  }
+}
+
+/** Far longer than a rotation takes, so a lock this old was left by a process that died in one. */
+const ROTATE_STALE_MS = 60_000;
+
+/** Takes over a lock left by a crash, which would otherwise stop rotation for good. */
+function reclaim(lock: string): boolean {
+  try {
+    if (Math.abs(Date.now() - statSync(lock).mtimeMs) <= ROTATE_STALE_MS) return false;
+    rmdirSync(lock);
+    mkdirSync(lock);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function shift(path: string, keep: number): void {
+  rmSync(`${path}.${keep}`, { force: true, recursive: true });
+  for (let index = keep - 1; index >= 1; index -= 1) {
+    try {
+      renameSync(`${path}.${index}`, `${path}.${index + 1}`);
+    } catch {
+      // Absent rung.
+    }
+  }
+  try {
+    renameSync(path, `${path}.1`);
+  } catch (error) {
+    // Removed under this process: there is nothing to roll, only a file to start.
+    if (!isMissing(error)) throw error;
+  }
 }
 
 /** Diagnostics on stderr, never stdout: stdout carries `--json` output. */

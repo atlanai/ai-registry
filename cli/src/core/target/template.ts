@@ -56,50 +56,6 @@ interface Segment {
   vars: string[];
 }
 
-function compile(template: string): Segment[] {
-  return template
-    .split("/")
-    .filter((segment) => segment !== "")
-    .map((literal) => {
-      const vars = templateVars(literal);
-      const source = literal
-        .split(VAR)
-        .map((part, index) =>
-          index % 2 === 1 ? "([^/\\\\]+)" : part.replace(/[.*+?^$()|[\]\\]/g, "\\$&"),
-        )
-        .join("");
-      return { literal, pattern: new RegExp(`^${source}$`), vars };
-    });
-}
-
-/** Reads one segment's variables off a path segment into `into`; false when it does not fit. */
-function bind(segment: Segment, part: string, into: Record<string, string>): boolean {
-  const match = segment.pattern.exec(part);
-  if (match === null) return false;
-  for (const [index, name] of segment.vars.entries()) {
-    const value = match[index + 1] as string;
-    if (into[name] !== undefined && into[name] !== value) return false;
-    into[name] = value;
-  }
-  return true;
-}
-
-/** A path a template placed, and what it carries. */
-export interface PlacedPath {
-  path: string;
-  /** The target root it is under, which the template does not name. */
-  root: string;
-  vars: Record<string, string>;
-}
-
-/** Placement paths of one kind, read in both directions. */
-export interface PlacementPattern {
-  /** The variables an absolute path of this shape carries, and the root it is under. */
-  match(path: string): PlacedPath | undefined;
-  /** Every path under `root` this template could have placed. */
-  scan(root: string): Promise<PlacedPath[]>;
-}
-
 export function placementPattern(template: string): PlacementPattern {
   const segments = compile(template);
   return {
@@ -133,4 +89,47 @@ export function placementPattern(template: string): PlacementPattern {
       return found;
     },
   };
+}
+
+function compile(template: string): Segment[] {
+  return template
+    .split("/")
+    .filter((segment) => segment !== "")
+    .map((literal) => {
+      const vars = templateVars(literal);
+      const source = literal
+        .split(VAR)
+        .map((part, index) =>
+          index % 2 === 1 ? "([^/\\\\]+)" : part.replace(/[.*+?^$()|[\]\\]/g, "\\$&"),
+        )
+        .join("");
+      return { literal, pattern: new RegExp(`^${source}$`), vars };
+    });
+}
+
+export interface PlacedPath {
+  path: string;
+  /** The target root it is under, which the template does not name. */
+  root: string;
+  vars: Record<string, string>;
+}
+
+/** Placement paths of one kind, read in both directions. */
+export interface PlacementPattern {
+  /** The variables an absolute path of this shape carries, and the root it is under. */
+  match(path: string): PlacedPath | undefined;
+  /** Every path under `root` this template could have placed. */
+  scan(root: string): Promise<PlacedPath[]>;
+}
+
+/** Reads one segment's variables off a path segment into `into`; false when it does not fit. */
+function bind(segment: Segment, part: string, into: Record<string, string>): boolean {
+  const match = segment.pattern.exec(part);
+  if (match === null) return false;
+  for (const [index, name] of segment.vars.entries()) {
+    const value = match[index + 1] as string;
+    if (into[name] !== undefined && into[name] !== value) return false;
+    into[name] = value;
+  }
+  return true;
 }

@@ -20,11 +20,11 @@ vi.mock("node:fs", async (importOriginal) => {
 });
 
 function record(index: number, severity = "info"): string {
+  // The body is multi-byte, so a chunk boundary can fall inside a character.
   return JSON.stringify({
     timestamp: `2026-10-08T00:00:${String(index % 60).padStart(2, "0")}.000Z`,
     severity_text: severity,
     severity_number: 9,
-    // Multi-byte, so a chunk boundary can fall inside a character.
     body: `entry ${index} é中`,
     attributes: {},
   });

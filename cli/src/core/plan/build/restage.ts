@@ -1,51 +1,27 @@
 import { quoted } from "#adapter/text.ts";
 import { nativePath } from "#core/kinds.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
-import {
-  type Acquired,
-  type ArtifactSurvey,
-  copyEdited,
-  editedAnywhere,
-  editedHere,
-  type Selected,
-} from "#core/plan/model.ts";
+import type { Acquired, Selected } from "#core/plan/model.ts";
+import { type ArtifactSurvey, copyEdited, editedAnywhere, editedHere } from "#core/plan/survey.ts";
 import { scopeName, stagingPath } from "#core/store/paths.ts";
 import type { BuildState } from "./state.ts";
 
-function movedUpstream(
+/**
+ * Whether this run stages the item's bytes again. A missing copy is made again from what the
+ * lock holds; when the source no longer serves that, the copy and the row both move to what it serves.
+ */
+export function restages(
   item: Selected,
   previous: LockArtifact | undefined,
-  source: Acquired | undefined,
-  lock: Lock,
-  refresh: boolean,
+  state: ArtifactSurvey | undefined,
+  build: BuildState,
 ): boolean {
-  const revision = source?.origin.revision;
-  if (
-    previous === undefined ||
-    previous.address !== item.path ||
-    previous.id !== item.id ||
-    previous.name !== item.upstreamName
-  ) {
-    return true;
-  }
-  const pinned = lock.registries[previous.registry]?.revision;
-  // Adopted content records no basis and an unpinned source cannot reconstruct
-  // one, so restage while the copy on disk still matches the lock.
-  if (revision === undefined && pinned === undefined) {
-    if (previous.content === undefined) return true;
-    // A refresh asks the source again; identical bytes are not new, so `update`
-    // reports no work on an up-to-date tree.
-    if (refresh && item.contentId === undefined) return true;
-  }
-
-  return item.contentId !== undefined && previous.content !== undefined
-    ? previous.content !== item.contentId
-    : pinned !== revision;
-}
-
-/** Under `--force`, or for a row whose copy this run published: the source holds those bytes. */
-function forced(item: Selected, build: BuildState): boolean {
-  return build.options.force || build.options.restate?.has(item.name) === true;
+  const missing = state?.staged !== true;
+  // A row of yours is its folder's copy: only `sync resolve --theirs` puts the registry's over it.
+  if (previous?.origin !== undefined && !missing && !build.options.force) return false;
+  return (
+    shouldRestage(item, previous, state, build) || (missing && item.contentId !== previous?.content)
+  );
 }
 
 function shouldRestage(
@@ -93,22 +69,40 @@ function shouldRestage(
   return forced(item, build);
 }
 
-/**
- * Whether this run stages the item's bytes again. A missing copy is made again from what the
- * lock holds; when the source no longer serves that, the copy and the row both move to what it serves.
- */
-export function restages(
+function movedUpstream(
   item: Selected,
   previous: LockArtifact | undefined,
-  state: ArtifactSurvey | undefined,
-  build: BuildState,
+  source: Acquired | undefined,
+  lock: Lock,
+  refresh: boolean,
 ): boolean {
-  const missing = state?.staged !== true;
-  // A row of yours is its folder's copy: only `sync resolve --theirs` puts the registry's over it.
-  if (previous?.origin !== undefined && !missing && !build.options.force) return false;
-  return (
-    shouldRestage(item, previous, state, build) || (missing && item.contentId !== previous?.content)
-  );
+  const revision = source?.origin.revision;
+  if (
+    previous === undefined ||
+    previous.address !== item.path ||
+    previous.id !== item.id ||
+    previous.name !== item.upstreamName
+  ) {
+    return true;
+  }
+  const pinned = lock.registries[previous.registry]?.revision;
+  // Adopted content records no basis and an unpinned source cannot reconstruct
+  // one, so restage while the copy on disk still matches the lock.
+  if (revision === undefined && pinned === undefined) {
+    if (previous.content === undefined) return true;
+    // A refresh asks the source again; identical bytes are not new, so `update`
+    // reports no work on an up-to-date tree.
+    if (refresh && item.contentId === undefined) return true;
+  }
+
+  return item.contentId !== undefined && previous.content !== undefined
+    ? previous.content !== item.contentId
+    : pinned !== revision;
+}
+
+/** Under `--force`, or for a row whose copy this run published: the source holds those bytes. */
+function forced(item: Selected, build: BuildState): boolean {
+  return build.options.force || build.options.restate?.has(item.name) === true;
 }
 
 /**

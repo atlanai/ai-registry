@@ -1,7 +1,8 @@
-import { isArtifactName, isNamespace, isVersion } from "#adapter/filespec/names.ts";
+import { isArtifactName, isNamespace } from "#adapter/filespec/names.ts";
 import type { Envelope, Want } from "#adapter/index.ts";
-import { entryFor } from "#core/catalog/model.ts";
-import { type ArtifactKind, isKind } from "#core/kinds.ts";
+import { type ArtifactKind, isKind } from "#adapter/kinds.ts";
+import { isVersion } from "#adapter/spec/ref.ts";
+import { entryFor } from "#core/catalog/catalog.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { Ref } from "#core/ref.ts";
 import type { Acquired, Selected } from "./model.ts";
@@ -65,19 +66,6 @@ const rowId = (row: LockArtifact): string => idOf(row.registry, row.namespace, r
 const placeOf = (item: Selected): string =>
   addressOf({ group: item.group, kind: item.kind, name: item.upstreamName });
 
-function parseNeed(to: string): Need | undefined {
-  const at = to.lastIndexOf("@");
-  if (at === -1) return undefined;
-  const version = to.slice(at + 1);
-  const parts = to.slice(0, at).split("/");
-  if (parts.length !== 3) return undefined;
-  const [namespace, kind, name] = parts as [string, string, string];
-  if (!isNamespace(namespace) || !isKind(kind) || !isArtifactName(name) || !isVersion(version)) {
-    return undefined;
-  }
-  return { namespace, kind, name, version };
-}
-
 /** The `depends_on` edges a version declares, and the ones aireg cannot follow. */
 export function needsOf(envelope: Envelope): { needs: Need[]; unusable: string[] } {
   const needs: Need[] = [];
@@ -94,19 +82,24 @@ export function needsOf(envelope: Envelope): { needs: Need[]; unusable: string[]
   return { needs, unusable };
 }
 
+function parseNeed(to: string): Need | undefined {
+  const at = to.lastIndexOf("@");
+  if (at === -1) return undefined;
+  const version = to.slice(at + 1);
+  const parts = to.slice(0, at).split("/");
+  if (parts.length !== 3) return undefined;
+  const [namespace, kind, name] = parts as [string, string, string];
+  if (!isNamespace(namespace) || !isKind(kind) || !isArtifactName(name) || !isVersion(version)) {
+    return undefined;
+  }
+  return { namespace, kind, name, version };
+}
+
 interface Visit {
   alias: string;
   id: string;
   path: string;
   address: string;
-}
-
-/** Where the source publishes a need at exactly the version asked for. */
-function publishedAt(source: Acquired | undefined, need: Need): string | undefined {
-  if (source === undefined) return undefined;
-  const entry = entryFor(source.catalog.entries, need.namespace, need.kind, need.name);
-  if (entry === undefined) return undefined;
-  return source.placements.get(entry.path)?.version === need.version ? entry.path : undefined;
 }
 
 /**
@@ -173,6 +166,83 @@ export function closure(top: readonly Selected[], acquired: readonly Acquired[])
   };
 }
 
+function againstManifest(
+  alias: string,
+  wanted: string,
+  version: string,
+  by: string,
+  held: Selected,
+): Conflict {
+  return {
+    message: `${by} needs ${wanted} ${version}, but the manifest installs ${held.version ?? "another version"}.`,
+    hint: `Only one version can be installed here. Pin the one it needs with \`aireg add ${alias}/${wanted}@${version}\`, or remove one of them.`,
+  };
+}
+
+function betweenTwo(
+  wanted: string,
+  first: { version: string; by: string },
+  second: { version: string; by: string },
+): Conflict {
+  return {
+    message: `${wanted} is needed at two versions: ${first.version} by ${first.by}, and ${second.version} by ${second.by}.`,
+    hint: "Only one version can be installed here. Remove one of them, or ask the registry's owner to publish versions that agree.",
+  };
+}
+
+/** Where the source publishes a need at exactly the version asked for. */
+function publishedAt(source: Acquired | undefined, need: Need): string | undefined {
+  if (source === undefined) return undefined;
+  const entry = entryFor(source.catalog.entries, need.namespace, need.kind, need.name);
+  if (entry === undefined) return undefined;
+  return source.placements.get(entry.path)?.version === need.version ? entry.path : undefined;
+}
+
+/**
+ * A dependency lands in the targets its dependents were narrowed to: the union
+ * over every manifest artifact that reaches it, or the scope's own when one is not narrowed.
+ */
+function inheritTargets(
+  top: readonly Selected[],
+  neededBy: ReadonlyMap<string, ReadonlySet<string>>,
+  chosen: ReadonlyMap<string, { ref: Ref }>,
+): void {
+  const forward = new Map<string, string[]>();
+  for (const [to, froms] of neededBy) {
+    for (const from of froms) forward.set(from, [...(forward.get(from) ?? []), to]);
+  }
+  // Undefined is the scope's targets, which nothing narrower can add to.
+  const narrowed = new Map<string, readonly string[] | undefined>();
+  for (const item of top) {
+    for (const id of descendants(selectedId(item), forward)) {
+      if (!chosen.has(id)) continue;
+      const held = narrowed.has(id) ? narrowed.get(id) : [];
+      narrowed.set(
+        id,
+        held === undefined || item.targets === undefined
+          ? undefined
+          : [...new Set([...held, ...item.targets])].sort(),
+      );
+    }
+  }
+  for (const [id, targets] of narrowed) {
+    const ref = chosen.get(id)?.ref;
+    if (ref !== undefined && targets !== undefined) ref.targets = [...targets];
+  }
+}
+
+function descendants(start: string, forward: ReadonlyMap<string, readonly string[]>): Set<string> {
+  const seen = new Set<string>();
+  const stack = [start];
+  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
+    for (const to of forward.get(id) ?? []) {
+      if (!seen.has(to)) stack.push(to);
+      seen.add(to);
+    }
+  }
+  return seen;
+}
+
 /** By installed name, what needs each artifact, read from the closure's ids. */
 export function dependentsByName(
   needs: Closure,
@@ -210,74 +280,4 @@ export function nameClashes(needs: Closure, selected: readonly Selected[]): Conf
       },
     ];
   });
-}
-
-/** Everything reachable from one artifact along its edges. */
-function descendants(start: string, forward: ReadonlyMap<string, readonly string[]>): Set<string> {
-  const seen = new Set<string>();
-  const stack = [start];
-  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
-    for (const to of forward.get(id) ?? []) {
-      if (!seen.has(to)) stack.push(to);
-      seen.add(to);
-    }
-  }
-  return seen;
-}
-
-/**
- * A dependency lands in the targets its dependents were narrowed to: the union
- * over every manifest artifact that reaches it, or the scope's own when one is not narrowed.
- */
-function inheritTargets(
-  top: readonly Selected[],
-  neededBy: ReadonlyMap<string, ReadonlySet<string>>,
-  chosen: ReadonlyMap<string, { ref: Ref }>,
-): void {
-  const forward = new Map<string, string[]>();
-  for (const [to, froms] of neededBy) {
-    for (const from of froms) forward.set(from, [...(forward.get(from) ?? []), to]);
-  }
-  // Undefined is the scope's targets, which nothing narrower can add to.
-  const narrowed = new Map<string, readonly string[] | undefined>();
-  for (const item of top) {
-    for (const id of descendants(selectedId(item), forward)) {
-      if (!chosen.has(id)) continue;
-      const held = narrowed.has(id) ? narrowed.get(id) : [];
-      narrowed.set(
-        id,
-        held === undefined || item.targets === undefined
-          ? undefined
-          : [...new Set([...held, ...item.targets])].sort(),
-      );
-    }
-  }
-  for (const [id, targets] of narrowed) {
-    const ref = chosen.get(id)?.ref;
-    if (ref !== undefined && targets !== undefined) ref.targets = [...targets];
-  }
-}
-
-function againstManifest(
-  alias: string,
-  wanted: string,
-  version: string,
-  by: string,
-  held: Selected,
-): Conflict {
-  return {
-    message: `${by} needs ${wanted} ${version}, but the manifest installs ${held.version ?? "another version"}.`,
-    hint: `Only one version can be installed here. Pin the one it needs with \`aireg add ${alias}/${wanted}@${version}\`, or remove one of them.`,
-  };
-}
-
-function betweenTwo(
-  wanted: string,
-  first: { version: string; by: string },
-  second: { version: string; by: string },
-): Conflict {
-  return {
-    message: `${wanted} is needed at two versions: ${first.version} by ${first.by}, and ${second.version} by ${second.by}.`,
-    hint: "Only one version can be installed here. Remove one of them, or ask the registry's owner to publish versions that agree.",
-  };
 }

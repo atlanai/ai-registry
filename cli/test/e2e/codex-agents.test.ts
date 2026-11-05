@@ -4,8 +4,6 @@ import { describe, expect } from "vitest";
 import { registry } from "#test/kit/builders/registry.ts";
 import { type Aireg, fileTest as test } from "#test/kit/fixtures.ts";
 
-// Codex reads agents only as TOML, so each one is written there as a file of its own.
-
 let aireg: Aireg;
 let project: string;
 let home: string;
@@ -45,6 +43,7 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir, home: { dir: homeDir } })
   expect((await aireg(["registry", "add", market, "--as", "acme", "-g"])).code).toBe(0);
 });
 
+// Codex reads agents only as TOML, so each one is written there as a file of its own.
 describe("an agent installed for Codex", () => {
   test("is written as TOML holding only what Codex reads", async () => {
     const added = await aireg(["add", "acme/eng/agent/reviewer", "-y"]);

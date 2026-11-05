@@ -12,7 +12,7 @@ const test = base
   .extend("initialised", { scope: "file" }, ({ fileTmp }) =>
     projectTemplate(join(fileTmp, "initialised"), [["init", "--for", "claude-code"]]),
   )
-  /** A project for Claude Code that declares the stock marketplace, which no test changes. */
+  // `declared`: a Claude Code project that declares the stock marketplace, which no test changes.
   .extend("declared", { scope: "file" }, async ({ fileTmp }) => {
     const root = await marketplace(join(fileTmp, "mkt")).write();
     return projectTemplate(join(fileTmp, "declared"), [

@@ -4,7 +4,7 @@ import { sanitizeText } from "#adapter/text.ts";
 import type { Lock } from "#core/lock.ts";
 import { NAME } from "#core/product.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
-import { copyEdited, editedHere, type Survey } from "./model.ts";
+import { copyEdited, editedHere, type Survey } from "./survey.ts";
 
 /** Worst state wins per artifact, and the worst across all of them is the exit code. */
 const STATES = ["ok", "missing", "dangling", "edited"] as const;
@@ -25,10 +25,6 @@ export interface ArtifactStatus {
   blocked?: true;
   /** Another artifact holds it, rather than a folder of yours. */
   taken?: true;
-}
-
-function worse(a: State, b: State): State {
-  return STATES.indexOf(a) >= STATES.indexOf(b) ? a : b;
 }
 
 /** Pure: the disk was already read into `survey`. */
@@ -89,17 +85,6 @@ export function status(lock: Lock, survey: Survey, roots: Roots): ArtifactStatus
   return out;
 }
 
-export function worstState(statuses: readonly ArtifactStatus[]): State {
-  return statuses.reduce<State>((acc, item) => worse(acc, item.state), "ok");
-}
-
-/** What holds a path a link needed: a folder of yours, or another artifact. */
-function blockedDetail(held: { target: string; path: string; by?: string | undefined }): string {
-  return held.by === undefined
-    ? `${held.target}: something of yours is at ${held.path}`
-    : `${held.target}: ${held.by} is installed at ${held.path}`;
-}
-
 /** How one recorded link looks on disk: the state it adds, why, and what its target sees. */
 function linkFinding(
   link: Lock["artifacts"][string]["links"][number],
@@ -137,4 +122,18 @@ function linkFinding(
     };
   }
   return { state: "ok", seen: "linked" };
+}
+
+function worse(a: State, b: State): State {
+  return STATES.indexOf(a) >= STATES.indexOf(b) ? a : b;
+}
+
+function blockedDetail(held: { target: string; path: string; by?: string | undefined }): string {
+  return held.by === undefined
+    ? `${held.target}: something of yours is at ${held.path}`
+    : `${held.target}: ${held.by} is installed at ${held.path}`;
+}
+
+export function worstState(statuses: readonly ArtifactStatus[]): State {
+  return statuses.reduce<State>((acc, item) => worse(acc, item.state), "ok");
 }

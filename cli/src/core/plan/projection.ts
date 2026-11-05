@@ -1,19 +1,13 @@
 import { dirname, join, posix, resolve } from "node:path";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { posixRelative } from "#core/fs/path.ts";
-import type { ArtifactKind } from "#core/kinds.ts";
 import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
-import type { Codec } from "#core/target/contract.ts";
-import {
-  placementFor,
-  pluginProjection,
-  projectionPath,
-  readsFor,
-  type Targets,
-  takesPlugin,
-} from "#core/target/index.ts";
+import type { Codec, Targets } from "#core/target/contract.ts";
+import { placementFor, readsFor, takesPlugin } from "#core/target/placement.ts";
+import { pluginProjection, projectionPath } from "#core/target/roots.ts";
 import type { KeyRule, PluginDocument, Selected } from "./model.ts";
 
 export interface ProjectionOptions {
@@ -28,20 +22,18 @@ export interface ProjectionOptions {
 }
 
 export interface PlannedLink {
-  /** Target name, the same concept the lock records on a link. */
   target: string;
   absolute: string;
   relative: string;
   from: string;
   /** A plugin directory is shared by every artifact in its namespace. */
   shared?: boolean;
-  /** The content the projection links to, when this link is a projection. */
+  /** Present when this link is a projection: the content it links to. */
   content?: string;
   /** Placed as a real directory of links, for a target that will not load a linked plugin. */
   fan?: boolean;
   /** The plugin name, when it had to differ from the namespace it holds. */
   renamed?: { namespace: string; name: string };
-  /** Written in the target's own format. */
   codec?: Codec;
   /** Written as a real folder holding this file. */
   entry?: string;
@@ -49,69 +41,11 @@ export interface PlannedLink {
   copy?: boolean;
   /** A plugin's command, written as a skill a person invokes under this name. */
   command?: string;
-  /** The plugin's own account of itself, for the manifests its projection gets. */
   document?: PluginDocument;
   /** The kind of the plugin part this places, where a target takes the plugin as its parts. */
   part?: ArtifactKind;
   /** Front-matter keys a target reading this folder does not read as written. */
   keys?: Record<string, KeyRule>;
-}
-
-/** Copies, when any selected target that reads `folder` takes this kind as copies. */
-function copyAt(
-  folder: string,
-  kind: ArtifactKind,
-  selected: readonly string[],
-  targetTable: Targets,
-  scope: Scope,
-): { copy?: true } {
-  const copied = [...new Set(selected)].some(
-    (reader) =>
-      targetTable[reader]?.kinds[kind]?.place === "copy" &&
-      readsFor(targetTable, reader, kind, scope).includes(folder),
-  );
-  return copied ? { copy: true } : {};
-}
-
-/** The key rules of every selected target that reads `folder`. */
-function keysAt(
-  folder: string,
-  kind: ArtifactKind,
-  selected: readonly string[],
-  targetTable: Targets,
-  scope: Scope,
-): { keys?: Record<string, KeyRule> } {
-  const keys: Record<string, KeyRule> = {};
-  for (const reader of new Set(selected)) {
-    if (!readsFor(targetTable, reader, kind, scope).includes(folder)) continue;
-    const target = targetTable[reader];
-    for (const [key, how] of Object.entries(target?.kinds[kind]?.keys ?? {})) {
-      const rule = keys[key] ?? { files: [], refusedBy: [] };
-      keys[key] = rule;
-      if (how === false) rule.refusedBy.push(target?.displayName ?? reader);
-      else if (!rule.files.some((file) => file.path === how.path)) rule.files.push(how);
-    }
-  }
-  return Object.keys(keys).length === 0 ? {} : { keys };
-}
-
-function plannedLink(
-  name: string,
-  path: string,
-  from: string,
-  options: ProjectionOptions,
-  kind?: ArtifactKind,
-): PlannedLink {
-  const mapping = kind === undefined ? undefined : options.targetTable[name]?.kinds[kind];
-  return {
-    target: name,
-    absolute: path,
-    relative: posixRelative(options.roots.base, path),
-    from,
-    ...(mapping?.codec === undefined ? {} : { codec: mapping.codec }),
-    ...(mapping?.entry === undefined ? {} : { entry: mapping.entry }),
-    ...(mapping?.place === "copy" ? { copy: true } : {}),
-  };
 }
 
 /**
@@ -123,16 +57,9 @@ export function namespaceOf(item: Pick<Selected, "kind" | "name" | "group" | "so
   return item.group ?? item.source;
 }
 
-/** One registry's namespace, as a target would hold it. */
-export interface NamespaceWant {
-  target: string;
-  namespace: string;
-  source: string;
-}
-
 /**
- * Plugin directories two registries' namespaces want under a bare name, repeated until no
- * qualified name lands on another's bare name; equal qualified names are left to clash in claim().
+ * Plugin directories two registries' namespaces want under a bare name; equal qualified names
+ * are left to clash in claim().
  */
 export function crowdedContainers(
   wants: Iterable<NamespaceWant>,
@@ -187,6 +114,13 @@ export function projectionsOf(
     }
   }
   return dirs;
+}
+
+/** One registry's namespace, as a target would hold it. */
+export interface NamespaceWant {
+  target: string;
+  namespace: string;
+  source: string;
 }
 
 /**
@@ -271,92 +205,6 @@ export function rowPlugin(
   return namespaceDir(options.roots, source, namespace);
 }
 
-type Unreadable = (target: string, kind: ArtifactKind) => void;
-
-/**
- * A target that loads plugins is pointed at the whole namespace: one entry in a
- * directory we do not own, holding the layout it already reads.
- */
-function pluginLink(
-  item: Selected,
-  name: string,
-  target: Targets[string],
-  options: ProjectionOptions,
-  crowded: ReadonlySet<string>,
-): PlannedLink | undefined {
-  const { scope, cwd } = options.roots;
-  const namespace = namespaceOf(item);
-  const shared = pluginProjection(target, namespace, scope, cwd, process.env, item.source);
-  if (shared === undefined) return undefined;
-  // Every registry sharing the directory takes its alias as a prefix, so
-  // no one of them depends on which the others sync first.
-  const plugin = crowded.has(shared) ? qualifiedName(item.source, namespace) : namespace;
-  const container =
-    plugin === namespace
-      ? shared
-      : pluginProjection(target, plugin, scope, cwd, process.env, item.source);
-  if (container === undefined) return undefined;
-  // Always the assembled projection, never the content: the content tree holds
-  // no manifests. Its directory name is the plugin name.
-  const dir = projectionDir(options.roots, item.source, plugin);
-  return {
-    ...plannedLink(name, container, dir, options),
-    shared: true,
-    content: namespaceDir(options.roots, item.source, namespace),
-    ...(item.plugin === undefined ? {} : { document: item.plugin }),
-    ...(target.kinds.plugin?.place === "fan" ? { fan: true } : {}),
-    ...(target.kinds.plugin?.place === "copy" ? { copy: true } : {}),
-    ...(plugin === namespace ? {} : { renamed: { namespace, name: plugin } }),
-  };
-}
-
-/** Tools that load plugins get the container; the rest get its members where they read each kind. */
-function pluginLinks(
-  item: Selected,
-  copy: string,
-  selected: readonly string[],
-  options: ProjectionOptions,
-  crowded: ReadonlySet<string>,
-  onUnreadable: Unreadable,
-): PlannedLink[] {
-  const { scope, cwd } = options.roots;
-  const links: PlannedLink[] = [];
-  const rest: string[] = [];
-  for (const name of selected) {
-    const target = options.targetTable[name];
-    if (target === undefined) continue;
-    if (!takesPlugin(target, scope)) {
-      rest.push(name);
-      continue;
-    }
-    const link = pluginLink(item, name, target, options, crowded);
-    if (link !== undefined) links.push(link);
-  }
-  for (const kind of new Set(item.contents.map((leaf) => leaf.kind))) {
-    const placed = placementFor(kind, rest, options.targetTable, scope, true);
-    for (const target of placed.unreadable) onUnreadable(target, kind);
-    for (const name of placed.targets) {
-      const target = options.targetTable[name] as Targets[string];
-      for (const leaf of item.contents.filter((each) => each.kind === kind)) {
-        const path = projectionPath(target, leaf.kind, leaf.name, scope, cwd);
-        if (path === undefined) continue;
-        const from = join(copy, ...leaf.within.split(posix.sep));
-        const link = {
-          ...plannedLink(name, path, from, options, leaf.kind),
-          ...copyAt(name, leaf.kind, selected, options.targetTable, scope),
-          ...keysAt(name, leaf.kind, selected, options.targetTable, scope),
-          part: leaf.kind,
-        };
-        links.push(
-          // A skill is a folder, so the command is written as one holding its SKILL.md.
-          leaf.command === true ? { ...link, entry: SKILL_ENTRY, command: leaf.name } : link,
-        );
-      }
-    }
-  }
-  return links;
-}
-
 /**
  * A plugin installs as one, and so does a namespace whose source wraps it; anything else
  * is placed as itself, in the fewest folders that reach every target able to read its kind.
@@ -403,6 +251,149 @@ export function linksFor(
     });
   }
   return links;
+}
+
+/** Tools that load plugins get the container; the rest get its members where they read each kind. */
+function pluginLinks(
+  item: Selected,
+  copy: string,
+  selected: readonly string[],
+  options: ProjectionOptions,
+  crowded: ReadonlySet<string>,
+  onUnreadable: Unreadable,
+): PlannedLink[] {
+  const { scope, cwd } = options.roots;
+  const links: PlannedLink[] = [];
+  const rest: string[] = [];
+  for (const name of selected) {
+    const target = options.targetTable[name];
+    if (target === undefined) continue;
+    if (!takesPlugin(target, scope)) {
+      rest.push(name);
+      continue;
+    }
+    const link = pluginLink(item, name, target, options, crowded);
+    if (link !== undefined) links.push(link);
+  }
+  for (const kind of new Set(item.contents.map((leaf) => leaf.kind))) {
+    const placed = placementFor(kind, rest, options.targetTable, scope, true);
+    for (const target of placed.unreadable) onUnreadable(target, kind);
+    for (const name of placed.targets) {
+      const target = options.targetTable[name] as Targets[string];
+      for (const leaf of item.contents.filter((each) => each.kind === kind)) {
+        const path = projectionPath(target, leaf.kind, leaf.name, scope, cwd);
+        if (path === undefined) continue;
+        const from = join(copy, ...leaf.within.split(posix.sep));
+        const link = {
+          ...plannedLink(name, path, from, options, leaf.kind),
+          ...copyAt(name, leaf.kind, selected, options.targetTable, scope),
+          ...keysAt(name, leaf.kind, selected, options.targetTable, scope),
+          part: leaf.kind,
+        };
+        // A skill is a folder, so the command is written as one holding its SKILL.md.
+        links.push(
+          leaf.command === true ? { ...link, entry: SKILL_ENTRY, command: leaf.name } : link,
+        );
+      }
+    }
+  }
+  return links;
+}
+
+/**
+ * A target that loads plugins is pointed at the whole namespace: one entry in a
+ * directory we do not own, holding the layout it already reads.
+ */
+function pluginLink(
+  item: Selected,
+  name: string,
+  target: Targets[string],
+  options: ProjectionOptions,
+  crowded: ReadonlySet<string>,
+): PlannedLink | undefined {
+  const { scope, cwd } = options.roots;
+  const namespace = namespaceOf(item);
+  const shared = pluginProjection(target, namespace, scope, cwd, process.env, item.source);
+  if (shared === undefined) return undefined;
+  // Every registry sharing the directory takes its alias as a prefix, so
+  // no one of them depends on which the others sync first.
+  const plugin = crowded.has(shared) ? qualifiedName(item.source, namespace) : namespace;
+  const container =
+    plugin === namespace
+      ? shared
+      : pluginProjection(target, plugin, scope, cwd, process.env, item.source);
+  if (container === undefined) return undefined;
+  // Always the assembled projection, never the content: the content tree holds
+  // no manifests. Its directory name is the plugin name.
+  const dir = projectionDir(options.roots, item.source, plugin);
+  return {
+    ...plannedLink(name, container, dir, options),
+    shared: true,
+    content: namespaceDir(options.roots, item.source, namespace),
+    ...(item.plugin === undefined ? {} : { document: item.plugin }),
+    ...(target.kinds.plugin?.place === "fan" ? { fan: true } : {}),
+    ...(target.kinds.plugin?.place === "copy" ? { copy: true } : {}),
+    ...(plugin === namespace ? {} : { renamed: { namespace, name: plugin } }),
+  };
+}
+
+type Unreadable = (target: string, kind: ArtifactKind) => void;
+
+function plannedLink(
+  name: string,
+  path: string,
+  from: string,
+  options: ProjectionOptions,
+  kind?: ArtifactKind,
+): PlannedLink {
+  const mapping = kind === undefined ? undefined : options.targetTable[name]?.kinds[kind];
+  return {
+    target: name,
+    absolute: path,
+    relative: posixRelative(options.roots.base, path),
+    from,
+    ...(mapping?.codec === undefined ? {} : { codec: mapping.codec }),
+    ...(mapping?.entry === undefined ? {} : { entry: mapping.entry }),
+    ...(mapping?.place === "copy" ? { copy: true } : {}),
+  };
+}
+
+/** Copies, when any selected target that reads `folder` takes this kind as copies. */
+function copyAt(
+  folder: string,
+  kind: ArtifactKind,
+  selected: readonly string[],
+  targetTable: Targets,
+  scope: Scope,
+): { copy?: true } {
+  const copied = [...new Set(selected)].some(
+    (reader) =>
+      targetTable[reader]?.kinds[kind]?.place === "copy" &&
+      readsFor(targetTable, reader, kind, scope).includes(folder),
+  );
+  return copied ? { copy: true } : {};
+}
+
+/** The key rules of every selected target that reads `folder`. */
+function keysAt(
+  folder: string,
+  kind: ArtifactKind,
+  selected: readonly string[],
+  targetTable: Targets,
+  scope: Scope,
+): { keys?: Record<string, KeyRule> } {
+  const keys: Record<string, KeyRule> = {};
+  for (const reader of new Set(selected)) {
+    if (!readsFor(targetTable, reader, kind, scope).includes(folder)) continue;
+    const target = targetTable[reader];
+    for (const [key, how] of Object.entries(target?.kinds[kind]?.keys ?? {})) {
+      const rule = keys[key] ?? { files: [], refusedBy: [] };
+      keys[key] = rule;
+      if (how === false) rule.refusedBy.push(target?.displayName ?? reader);
+      else if (!rule.files.some((file) => file.path === how.path)) rule.files.push(how);
+    }
+  }
+  return Object.keys(keys).length === 0 ? {} : { keys };
 }
 
 /**

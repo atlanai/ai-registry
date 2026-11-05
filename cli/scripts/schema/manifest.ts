@@ -1,9 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
-import { LEGACY_TARGETS_KEY } from "#core/manifest.ts";
-import { DEFAULT_TARGETS } from "#core/target/index.ts";
-
-/** The shape of `manifest.yml`. The parser stays the authority on what is accepted. */
+import { LEGACY_TARGETS_KEY } from "#core/manifest/model.ts";
+import { DEFAULT_TARGETS } from "#core/target/ids.ts";
 
 /** `harnesses`, as aireg 0.1 spells `targets`, which aireg still writes so that version reads it. */
 const Legacy = (minItems: number) =>
@@ -88,7 +86,7 @@ const AnyRegistry = Type.Union(
   { description: "One address, and whatever the adapter reading it needs to know." },
 );
 
-/** An address; only one artifact, three segments or more, may carry `@<version>`: a version token as `adapter/spec/ref.ts` reads it. */
+/** Only an address of three or more segments may carry `@<version>`; see `adapter/spec/ref.ts`. */
 const REFERENCE =
   "^[^@\\\\/]+(/[^@\\\\/]+)*$|^[^@\\\\/]+(/[^@\\\\/]+){2,}@[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$";
 
@@ -247,6 +245,7 @@ const AnyExport = Type.Union(
   { description: "One path, or one path and what to publish it with." },
 );
 
+/** The shape of `manifest.yml`. The parser stays the authority on what is accepted. */
 export const Manifest = Type.Object(
   {
     $schema: Type.Optional(

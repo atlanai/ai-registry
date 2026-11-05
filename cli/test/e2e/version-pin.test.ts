@@ -15,9 +15,6 @@ import { registry } from "#test/kit/builders/registry.ts";
 import { type Aireg, fileTest as test } from "#test/kit/fixtures.ts";
 import { declared, lockPath, manifestPath } from "#test/kit/scope.ts";
 
-// A version is asked for in the manifest and answered in the lock, so these
-// assert both: what the manifest holds, and which bytes arrived.
-
 let aireg: Aireg;
 let root: string;
 let market: string;
@@ -68,6 +65,8 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir }) => {
   expect((await aireg(["registry", "add", market, "--as", "acme"])).code).toBe(0);
 });
 
+// A version is asked for in the manifest and answered in the lock, so these
+// assert both: what the manifest holds, and which bytes arrived.
 describe("a version a project asks for", () => {
   test("installs the one named, not the newest", async () => {
     expect((await aireg(["add", "acme/skill/lint@1.0.0", "-y"])).code).toBe(0);

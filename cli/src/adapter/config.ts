@@ -7,10 +7,6 @@ export interface AdapterConfigSchema {
   properties?: Readonly<Record<string, { type: "string" }>>;
 }
 
-function keys(names: readonly string[]): string {
-  return names.map((name) => `\`${name}\``).join(", ");
-}
-
 export function assertAdapterConfig(
   adapter: string,
   schema: AdapterConfigSchema | undefined,
@@ -47,4 +43,8 @@ export function assertAdapterConfig(
       });
     }
   }
+}
+
+function keys(names: readonly string[]): string {
+  return names.map((name) => `\`${name}\``).join(", ");
 }

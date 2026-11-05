@@ -4,11 +4,17 @@ import { sanitizeBlock } from "#adapter/text.ts";
 import type { HintKey } from "#core/host/panel.ts";
 import { COLOR } from "#core/term/theme.ts";
 
-// `createElement` rather than JSX: the CLI runs from TypeScript source under Node's type
-// stripping, which does not transform JSX.
-
 type BoxProps = (Parameters<typeof Box>[0] & Attributes) | null;
 type TextProps = (Parameters<typeof Text>[0] & Attributes) | null;
+
+// `createElement`, not JSX: Node's type stripping does not transform JSX.
+export function box(props: BoxProps, ...children: ReactNode[]): ReactElement {
+  return createElement(Box, props, ...children);
+}
+
+export function text(props: TextProps, ...children: ReactNode[]): ReactElement {
+  return createElement(Text, props, ...children.map(inert));
+}
 
 /**
  * The console shows manifest, lockfile and registry text, and Ink keeps hyperlinks and any
@@ -17,14 +23,6 @@ type TextProps = (Parameters<typeof Text>[0] & Attributes) | null;
 function inert(node: ReactNode): ReactNode {
   if (typeof node === "string") return sanitizeBlock(node);
   return Array.isArray(node) ? node.map(inert) : node;
-}
-
-export function box(props: BoxProps, ...children: ReactNode[]): ReactElement {
-  return createElement(Box, props, ...children);
-}
-
-export function text(props: TextProps, ...children: ReactNode[]): ReactElement {
-  return createElement(Text, props, ...children.map(inert));
 }
 
 export function plain(value: ReactNode): ReactElement {

@@ -1,7 +1,7 @@
 import { chmod, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
-import { withLease } from "#core/lease.ts";
+import { withLease } from "#core/lease/lease.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { expectMode } from "#test/kit/mode.ts";
 import {

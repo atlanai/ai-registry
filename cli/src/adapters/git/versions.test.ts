@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { parseVersion } from "#adapter/index.ts";
 import { skillsFolder } from "#test/kit/builders/layouts.ts";
 import { test } from "#test/kit/fixtures.ts";
@@ -11,7 +11,7 @@ const SHA = "4e1d2c9a8b7f6e5d4c3b2a190817263544536271";
 const TIME = new Date(Date.UTC(2026, 9, 19, 12, 0, 5));
 
 describe("pseudoVersion", () => {
-  it("follows the nearest tag, and sorts before the next release", () => {
+  test("follows the nearest tag, and sorts before the next release", () => {
     expect(pseudoVersion(undefined, TIME, SHA)).toBe("0.0.0-20261019120005-4e1d2c9a8b7f");
     expect(pseudoVersion(parseVersion("1.2.0"), TIME, SHA)).toBe(
       "1.2.1-0.20261019120005-4e1d2c9a8b7f",
@@ -21,7 +21,7 @@ describe("pseudoVersion", () => {
     );
   });
 
-  it("is read back by readPseudo, and a release is not one", () => {
+  test("is read back by readPseudo, and a release is not one", () => {
     expect(readPseudo("1.2.1-0.20261019120005-4e1d2c9a8b7f")).toEqual({
       stamp: "20261019120005",
       sha: "4e1d2c9a8b7f",
@@ -32,7 +32,7 @@ describe("pseudoVersion", () => {
 });
 
 describe("releaseTag", () => {
-  it("takes the newest release of the whole repository, never a prerelease or one artifact's", () => {
+  test("takes the newest release of the whole repository, never a prerelease or one artifact's", () => {
     const tags = [
       { name: "v1.0.0", commit: "a" },
       { name: "1.2.0", commit: "b" },

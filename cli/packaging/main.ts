@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { EXECUTABLE } from "#adapter/files.ts";
 import { envName, type Setting, setting } from "#core/env.ts";
-import { EXECUTABLE } from "#core/fs/mode.ts";
 import { isChannel } from "#core/release/origin.ts";
 import { renderInstaller, renderWindowsInstaller } from "#packaging/installer/render.ts";
 import { compile } from "./compile.ts";

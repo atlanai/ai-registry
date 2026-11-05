@@ -1,17 +1,18 @@
 import { relative } from "node:path";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, plural } from "#adapter/text.ts";
-import type { ArtifactKind } from "#core/kinds.ts";
+import { olderThan } from "#core/engines.ts";
 import type { Lock } from "#core/lock.ts";
-import type { Printer } from "#core/output.ts";
-import type { ApplyResult } from "#core/plan/apply.ts";
+import type { ApplyResult } from "#core/plan/apply/run.ts";
 import { describeCarried } from "#core/plan/carries.ts";
 import type { Action, Plan } from "#core/plan/model.ts";
-import { olderThan } from "#core/semver.ts";
 import type { Roots } from "#core/store/paths.ts";
-import { type Targets, trustFor } from "#core/target/index.ts";
+import type { Targets } from "#core/target/contract.ts";
+import { trustFor } from "#core/target/placement.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { table } from "#core/term/table.ts";
 import { GLYPH } from "#core/term/theme.ts";
-import type { Chosen, PlanReport, RunResult } from "#engine/pipeline.ts";
+import type { Chosen, PlanReport, RunResult } from "#engine/install/pipeline.ts";
 import { collisionFields } from "./collisions.ts";
 import { underHome } from "./home.ts";
 import { linkLoadedBy, loadedBy, toolName } from "./tools.ts";
@@ -26,186 +27,8 @@ const VERB: Record<Shown["kind"], string> = {
   unlink: "uninstall",
 };
 
-/** The kind the plan records for an artifact, which says which targets load it. */
-function kindIn(plan: Plan, name: string): ArtifactKind | undefined {
-  const record = plan.actions.find((action) => action.kind === "record");
-  return record?.kind === "record" ? record.lock.artifacts[name]?.kind : undefined;
-}
-
-/** One line per action as it happens, naming the targets so four links read apart. */
-function describeAction(action: Shown, plan: Plan, chosen: Chosen): string {
-  if (action.kind === "link") {
-    const kind = kindIn(plan, action.name);
-    return `install ${action.name} for ${linkLoadedBy(chosen.targetTable, chosen.targets, kind, action.target)}`;
-  }
-  if (action.kind === "clone") return `copy ${action.name} into this project`;
-  return `${VERB[action.kind]} ${action.name}`;
-}
-
-/** The same value a real run executes, printed instead of performed. */
-function renderPlan(
-  printer: Printer,
-  plan: Plan,
-  roots: Roots,
-  aside: ReadonlySet<string>,
-  chosen: Chosen,
-): void {
-  const shown = plan.actions.filter((action): action is Shown => action.kind !== "record");
-  // Your user scope is your home folder, so its paths read from there.
-  const shownPath = (path: string): string =>
-    roots.scope === "user" ? underHome(path) : relative(roots.base, path) || path;
-
-  if (shown.length === 0) {
-    printer.info("Nothing to do.");
-    return;
-  }
-
-  const { style } = printer;
-  // Said once per artifact, on its first line.
-  const first = new Set(shown.map((action) => shown.find((other) => other.name === action.name)));
-  const verb = (action: Shown): string =>
-    action.kind === "unlink" && aside.has(action.to) ? "move aside" : VERB[action.kind];
-  const note = (action: Shown): string => {
-    // A fetch lands in aireg's own cache, so where it comes from is what a person can use.
-    if (action.kind === "stage") return style.dim(`from ${action.source}`);
-    if (aside.has(action.to)) return style.yellow("yours, kept in backups");
-    if (action.kind === "unlink" && action.edited === true) return style.yellow("has local edits");
-    if (!first.has(action)) return "";
-    const by = plan.neededBy[action.name];
-    if (by !== undefined) return style.dim(`needed by ${by.join(", ")}`);
-    return plan.pruned.includes(action.name) ? style.dim("no longer needed") : "";
-  };
-  printer.info(style.bold(plural(shown.length, "change")));
-  table(
-    printer,
-    [
-      {
-        header: "action",
-        value: (action: Shown) =>
-          action.kind === "unlink" ? style.yellow(verb(action)) : style.cyan(verb(action)),
-      },
-      { header: "artifact", value: (action: Shown) => action.name },
-      {
-        header: "targets",
-        value: (action: Shown) =>
-          action.kind === "link"
-            ? linkLoadedBy(
-                chosen.targetTable,
-                chosen.targets,
-                kindIn(plan, action.name),
-                action.target,
-              )
-            : "",
-        optional: true,
-      },
-      {
-        header: "path",
-        value: (action: Shown) => (action.kind === "stage" ? "" : style.dim(shownPath(action.to))),
-      },
-      { header: "note", value: note, optional: true },
-    ],
-    shown,
-  );
-  // Only an install brings anything up to date; a removal leaves the rest as they were.
-  const acted = new Set(shown.map((action) => action.name));
-  const others = plan.unchanged.filter((name) => !acted.has(name));
-  if (others.length > 0 && shown.some((action) => action.kind !== "unlink")) {
-    printer.info(style.dim(`  ${plural(others.length, "other artifact")} already up to date`));
-  }
-  // Said plainly, because the list above is identical to what a real run does
-  // and a dry run that ends in a success line reads as a completed one.
-  printer.info(style.dim("Dry run. Nothing was changed."));
-}
-
-/** `reviewer needs`, `reviewer and triage need`. */
 export function whoNeeds(by: readonly string[]): string {
   return `${list(by)} need${by.length === 1 ? "s" : ""}`;
-}
-
-/** Up to three names, else a count, so a large install still reads as one line. */
-function named(names: readonly string[]): string {
-  return names.length <= 3 ? list(names) : plural(names.length, "artifact");
-}
-
-/**
- * "Up to date" is false when something was deliberately left alone, and the
- * pin can advance while no content moves. Say only what is certain.
- */
-function unchanged(printer: Printer, plan: Plan): void {
-  if (plan.warnings.length === 0) {
-    printer.success("Already up to date.");
-    return;
-  }
-  const names = [...new Set(plan.warnings.flatMap((w) => (w.name ? [w.name] : [])))];
-  printer.info(
-    printer.style.dim(
-      names.length === 0
-        ? "Nothing was changed."
-        : `Left ${list(names)} as ${names.length === 1 ? "it is" : "they are"}, and changed nothing else.`,
-    ),
-  );
-}
-
-/** The targets some artifacts went to, named as chosen; `folders` narrows where each went. */
-type Tools = (names: readonly string[], folders?: (name: string) => string[]) => string;
-
-/** An applied run: the plan, what apply did, and the lockfile it started from. */
-export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "targetTable" | "scope"> & {
-  applied: ApplyResult;
-};
-
-function targetOf(action: Shown): string | undefined {
-  if (action.kind === "link") return action.target;
-  return action.kind === "unlink" ? action.link?.target : undefined;
-}
-
-/** The kind an action placed: a plugin a target takes as its parts asks for each part's step. */
-function placedKind(
-  action: Shown,
-  kindOf: (name: string) => ArtifactKind | undefined,
-): ArtifactKind | undefined {
-  const placed =
-    action.kind !== "link" ? undefined : action.plugin === true ? "plugin" : action.part;
-  return placed ?? kindOf(action.name);
-}
-
-/** What a target asks of a person once it was given something; printed, never run. */
-function followUps(
-  printer: Printer,
-  shown: readonly Shown[],
-  kindOf: (name: string) => ArtifactKind | undefined,
-  targetTable: Targets,
-  chosen: readonly string[],
-  scope: Ran["scope"],
-): void {
-  // One line per target and command, naming every kind that waits on it.
-  const steps = new Map<string, { target: string; run: string; kinds: Set<string> }>();
-  const reloads = new Set<string>();
-  for (const action of shown) {
-    const id = targetOf(action);
-    if (id === undefined) continue;
-    const kind = placedKind(action, kindOf);
-    // A folder several tools read asks for the steps of each tool that reads it.
-    for (const reader of loadedBy(targetTable, chosen, kind, [id])) {
-      const target = targetTable[reader];
-      if (target === undefined) continue;
-      if (target.reload !== undefined) reloads.add(target.reload);
-      const run =
-        action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
-      if (run !== undefined && kind !== undefined) {
-        const key = `${target.name}\0${run}`;
-        const step = steps.get(key) ?? { target: target.displayName, run, kinds: new Set() };
-        step.kinds.add(`${kind}s`);
-        steps.set(key, step);
-      }
-    }
-  }
-  for (const { target, run, kinds } of steps.values()) {
-    printer.hint(
-      `${target} loads ${list([...kinds])} here only once you trust them: run \`${run}\`.`,
-    );
-  }
-  for (const reload of reloads) printer.hint(reload);
 }
 
 /**
@@ -288,6 +111,11 @@ export function summarize(
   );
 }
 
+/** Up to three names, else a count, so a large install still reads as one line. */
+function named(names: readonly string[]): string {
+  return names.length <= 3 ? list(names) : plural(names.length, "artifact");
+}
+
 /**
  * What happened to installed artifacts a run changed: a new version, links into a
  * target only put back, or anything else.
@@ -349,6 +177,87 @@ function changeLines(
   ];
 }
 
+/**
+ * "Up to date" is false when something was deliberately left alone, and the
+ * pin can advance while no content moves. Say only what is certain.
+ */
+function unchanged(printer: Printer, plan: Plan): void {
+  if (plan.warnings.length === 0) {
+    printer.success("Already up to date.");
+    return;
+  }
+  const names = [...new Set(plan.warnings.flatMap((w) => (w.name ? [w.name] : [])))];
+  printer.info(
+    printer.style.dim(
+      names.length === 0
+        ? "Nothing was changed."
+        : `Left ${list(names)} as ${names.length === 1 ? "it is" : "they are"}, and changed nothing else.`,
+    ),
+  );
+}
+
+/** What a target asks of a person once it was given something; printed, never run. */
+function followUps(
+  printer: Printer,
+  shown: readonly Shown[],
+  kindOf: (name: string) => ArtifactKind | undefined,
+  targetTable: Targets,
+  chosen: readonly string[],
+  scope: Ran["scope"],
+): void {
+  // One line per target and command, naming every kind that waits on it.
+  const steps = new Map<string, { target: string; run: string; kinds: Set<string> }>();
+  const reloads = new Set<string>();
+  for (const action of shown) {
+    const id = targetOf(action);
+    if (id === undefined) continue;
+    const kind = placedKind(action, kindOf);
+    // A folder several tools read asks for the steps of each tool that reads it.
+    for (const reader of loadedBy(targetTable, chosen, kind, [id])) {
+      const target = targetTable[reader];
+      if (target === undefined) continue;
+      if (target.reload !== undefined) reloads.add(target.reload);
+      const run =
+        action.kind === "link" && kind !== undefined ? trustFor(target, kind, scope) : undefined;
+      if (run !== undefined && kind !== undefined) {
+        const key = `${target.name}\0${run}`;
+        const step = steps.get(key) ?? { target: target.displayName, run, kinds: new Set() };
+        step.kinds.add(`${kind}s`);
+        steps.set(key, step);
+      }
+    }
+  }
+  for (const { target, run, kinds } of steps.values()) {
+    printer.hint(
+      `${target} loads ${list([...kinds])} here only once you trust them: run \`${run}\`.`,
+    );
+  }
+  for (const reload of reloads) printer.hint(reload);
+}
+
+/** The targets some artifacts went to, named as chosen; `folders` narrows where each went. */
+type Tools = (names: readonly string[], folders?: (name: string) => string[]) => string;
+
+/** An applied run: the plan, what apply did, and the lockfile it started from. */
+export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "targetTable" | "scope"> & {
+  applied: ApplyResult;
+};
+
+function targetOf(action: Shown): string | undefined {
+  if (action.kind === "link") return action.target;
+  return action.kind === "unlink" ? action.link?.target : undefined;
+}
+
+/** The kind an action placed: a plugin a target takes as its parts asks for each part's step. */
+function placedKind(
+  action: Shown,
+  kindOf: (name: string) => ArtifactKind | undefined,
+): ArtifactKind | undefined {
+  const placed =
+    action.kind !== "link" ? undefined : action.plugin === true ? "plugin" : action.part;
+  return placed ?? kindOf(action.name);
+}
+
 /** A run's result under `--json`; a dry run reports what it would change, in the same fields. */
 export function outcome({ plan, applied }: RunResult, dryRun: boolean) {
   const planned = plan.actions.filter((action) => action.kind !== "record");
@@ -376,4 +285,95 @@ export function planReport(printer: Printer): PlanReport {
       if (action.kind !== "record") printer.step(describeAction(action, plan, chosen));
     },
   };
+}
+
+/** The same value a real run executes, printed instead of performed. */
+function renderPlan(
+  printer: Printer,
+  plan: Plan,
+  roots: Roots,
+  aside: ReadonlySet<string>,
+  chosen: Chosen,
+): void {
+  const shown = plan.actions.filter((action): action is Shown => action.kind !== "record");
+  // Your user scope is your home folder, so its paths read from there.
+  const shownPath = (path: string): string =>
+    roots.scope === "user" ? underHome(path) : relative(roots.base, path) || path;
+
+  if (shown.length === 0) {
+    printer.info("Nothing to do.");
+    return;
+  }
+
+  const { style } = printer;
+  // Said once per artifact, on its first line.
+  const first = new Set(shown.map((action) => shown.find((other) => other.name === action.name)));
+  const verb = (action: Shown): string =>
+    action.kind === "unlink" && aside.has(action.to) ? "move aside" : VERB[action.kind];
+  const note = (action: Shown): string => {
+    // A fetch lands in aireg's own cache, so where it comes from is what a person can use.
+    if (action.kind === "stage") return style.dim(`from ${action.source}`);
+    if (aside.has(action.to)) return style.yellow("yours, kept in backups");
+    if (action.kind === "unlink" && action.edited === true) return style.yellow("has local edits");
+    if (!first.has(action)) return "";
+    const by = plan.neededBy[action.name];
+    if (by !== undefined) return style.dim(`needed by ${by.join(", ")}`);
+    return plan.pruned.includes(action.name) ? style.dim("no longer needed") : "";
+  };
+  printer.info(style.bold(plural(shown.length, "change")));
+  table(
+    printer,
+    [
+      {
+        header: "action",
+        value: (action: Shown) =>
+          action.kind === "unlink" ? style.yellow(verb(action)) : style.cyan(verb(action)),
+      },
+      { header: "artifact", value: (action: Shown) => action.name },
+      {
+        header: "targets",
+        value: (action: Shown) =>
+          action.kind === "link"
+            ? linkLoadedBy(
+                chosen.targetTable,
+                chosen.targets,
+                kindIn(plan, action.name),
+                action.target,
+              )
+            : "",
+        optional: true,
+      },
+      {
+        header: "path",
+        value: (action: Shown) => (action.kind === "stage" ? "" : style.dim(shownPath(action.to))),
+      },
+      { header: "note", value: note, optional: true },
+    ],
+    shown,
+  );
+  // Only an install brings anything up to date; a removal leaves the rest as they were.
+  const acted = new Set(shown.map((action) => action.name));
+  const others = plan.unchanged.filter((name) => !acted.has(name));
+  if (others.length > 0 && shown.some((action) => action.kind !== "unlink")) {
+    printer.info(style.dim(`  ${plural(others.length, "other artifact")} already up to date`));
+  }
+  // Said plainly, because the list above is identical to what a real run does
+  // and a dry run that ends in a success line reads as a completed one.
+  printer.info(style.dim("Dry run. Nothing was changed."));
+}
+
+/** The kind the plan records for an artifact, which says which targets load it. */
+function kindIn(plan: Plan, name: string): ArtifactKind | undefined {
+  const record = plan.actions.find((action) => action.kind === "record");
+  return record?.kind === "record" ? record.lock.artifacts[name]?.kind : undefined;
+}
+
+/** One line per action as it happens, naming the targets so four links read apart. */
+function describeAction(action: Shown, plan: Plan, chosen: Chosen): string {
+  if (action.kind === "link") {
+    const kind = kindIn(plan, action.name);
+    return `install ${action.name} for ${linkLoadedBy(chosen.targetTable, chosen.targets, kind, action.target)}`;
+  }
+  if (action.kind === "clone") return `copy ${action.name} into this project`;
+  return `${VERB[action.kind]} ${action.name}`;
 }

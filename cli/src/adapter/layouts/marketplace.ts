@@ -3,7 +3,7 @@ import type { Artifact } from "../contract.ts";
 import { SpecError } from "../filespec/documents.ts";
 import { list, quoted } from "../text.ts";
 import { ROOT_ID } from "./folder.ts";
-import type { FetchedPlugin, Found, Layout, LayoutContext, RemotePlugin } from "./layout.ts";
+import type { FetchedPlugin, Found, Layout, LayoutContext, RemotePlugin } from "./model.ts";
 import { type Json, pluginManifest, readObject, readPlugin } from "./plugin.ts";
 import { openTree, type Tree } from "./tree.ts";
 
@@ -23,6 +23,31 @@ interface Marketplace {
   /** Where a bare plugin source resolves, from `metadata.pluginRoot`. */
   pluginRoot: string | undefined;
 }
+
+/** Warns when both marketplaces disagree, so a plugin only one lists is not lost quietly. */
+function disagreement(first: Marketplace, second: Marketplace): string | undefined {
+  const [a, b] = [names(first), names(second)];
+  const onlyFirst = [...a].filter((name) => !b.has(name)).sort();
+  const onlySecond = [...b].filter((name) => !a.has(name)).sort();
+  if (onlyFirst.length === 0 && onlySecond.length === 0) return undefined;
+  const differ = [...onlyFirst, ...onlySecond].map(quoted);
+  return `The two marketplace files list different plugins, so aireg reads ${first.path} alone: ${list(differ)} ${differ.length === 1 ? "is" : "are"} in only one.`;
+}
+
+async function marketplaces(tree: Tree): Promise<Marketplace[]> {
+  const found: Marketplace[] = [];
+  for (const path of MARKETPLACES) {
+    const read = await readMarketplace(tree, path);
+    if (read !== undefined) found.push(read);
+  }
+  return found;
+}
+
+/** Sources aireg fetches with git, which take a `ref` and a `sha`. */
+const FETCHED = new Set(["github", "url", "git-subdir"]);
+
+/** A commit, as Claude Code takes one: forty lowercase hex characters. */
+const SHA = /^[0-9a-f]{40}$/;
 
 /** A marketplace as its format requires it: Claude Code's needs an owner, Codex's does not. */
 async function readMarketplace(tree: Tree, path: string): Promise<Marketplace | undefined> {
@@ -44,40 +69,50 @@ async function readMarketplace(tree: Tree, path: string): Promise<Marketplace | 
   };
 }
 
-/** A relative path inside the marketplace, `./x` from its root; undefined for one that leaves it. */
-function relative(path: string): string | undefined {
-  if (path === "." || path === "./") return "";
-  if (!path.startsWith("./") || path.includes("\\")) return undefined;
-  const rest = posix.normalize(path.slice(2)).replace(/\/+$/, "");
-  if (rest === "." || rest === "") return "";
-  return rest === ".." || rest.startsWith("../") ? undefined : rest;
+type Located = { dir: string } | { remote: RemotePlugin } | { skip: string };
+
+/** Starts fetching every remote entry, each with its own warnings, to be read in entry order. */
+function prefetch(marketplace: Marketplace, context: LayoutContext): Map<Json, Promise<Fetched>> {
+  let free = FETCHES_AT_ONCE;
+  const waiting: (() => void)[] = [];
+  // A finished fetch hands its slot to the next one waiting, so no more than the limit run.
+  const slot = (): Promise<void> => {
+    if (free === 0) return new Promise((go) => waiting.push(go));
+    free -= 1;
+    return Promise.resolve();
+  };
+  const release = () => {
+    const next = waiting.shift();
+    if (next === undefined) free += 1;
+    else next();
+  };
+  const turns = new Map<string, Promise<unknown>>();
+  const started = new Map<Json, Promise<Fetched>>();
+  for (const entry of marketplace.entries) {
+    const name = textOf(entry.name);
+    const at = name === undefined ? undefined : sourceOf(entry, name, marketplace);
+    if (at === undefined || !("remote" in at) || context.asked?.(at.remote.name) === false)
+      continue;
+    const warnings: string[] = [];
+    const repository = repositoryOf(at.remote);
+    const fetched = (turns.get(repository) ?? Promise.resolve()).then(async () => {
+      await slot();
+      try {
+        return { plugin: await fetchedPlugin(at.remote, entry, context, warnings), warnings };
+      } finally {
+        release();
+      }
+    });
+    turns.set(
+      repository,
+      fetched.catch(() => undefined),
+    );
+    started.set(entry, fetched);
+  }
+  return started;
 }
 
 /** Where an entry's plugin lives in this source, or why aireg leaves it out. */
-/** Sources aireg fetches with git, which take a `ref` and a `sha`. */
-const FETCHED = new Set(["github", "url", "git-subdir"]);
-
-/** A commit, as Claude Code takes one: forty lowercase hex characters. */
-const SHA = /^[0-9a-f]{40}$/;
-
-/** A source fetched from elsewhere, read from the entry; a sha that is not a commit is an error. */
-function remoteOf(name: string, source: Json, path: string): RemotePlugin | undefined {
-  const type = textOf(source.source);
-  if (type === undefined || !FETCHED.has(type)) return undefined;
-  const location = textOf(type === "github" ? source.repo : source.url);
-  if (location === undefined) return undefined;
-  const sha = textOf(source.sha);
-  if (sha !== undefined && !SHA.test(sha)) {
-    throw new SpecError(
-      `${path} gives ${quoted(name)} the sha ${quoted(sha)}, which is not a full commit: it takes 40 lowercase hex characters.`,
-      { path },
-    );
-  }
-  return { name, type, location, path: textOf(source.path), ref: textOf(source.ref), sha };
-}
-
-type Located = { dir: string } | { remote: RemotePlugin } | { skip: string };
-
 function sourceOf(entry: Json, name: string, marketplace: Marketplace): Located {
   const pluginRoot = marketplace.pluginRoot;
   const source =
@@ -97,6 +132,49 @@ function sourceOf(entry: Json, name: string, marketplace: Marketplace): Located 
   const type = isRecord(source) ? textOf(source.source) : undefined;
   return { skip: `its ${type === undefined ? "" : `${type} `}source is not one aireg reads` };
 }
+
+/** Where the ids of fetched plugins begin, which no folder in a marketplace can be named. */
+const REMOTE = "@remote";
+
+const names = (marketplace: Marketplace) =>
+  new Set(marketplace.entries.map((entry) => textOf(entry.name)).filter((n) => n !== undefined));
+
+/** A relative path inside the marketplace, `./x` from its root; undefined for one that leaves it. */
+function relative(path: string): string | undefined {
+  if (path === "." || path === "./") return "";
+  if (!path.startsWith("./") || path.includes("\\")) return undefined;
+  const rest = posix.normalize(path.slice(2)).replace(/\/+$/, "");
+  if (rest === "." || rest === "") return "";
+  return rest === ".." || rest.startsWith("../") ? undefined : rest;
+}
+
+/** A source fetched from elsewhere, read from the entry; a sha that is not a commit is an error. */
+function remoteOf(name: string, source: Json, path: string): RemotePlugin | undefined {
+  const type = textOf(source.source);
+  if (type === undefined || !FETCHED.has(type)) return undefined;
+  const location = textOf(type === "github" ? source.repo : source.url);
+  if (location === undefined) return undefined;
+  const sha = textOf(source.sha);
+  if (sha !== undefined && !SHA.test(sha)) {
+    throw new SpecError(
+      `${path} gives ${quoted(name)} the sha ${quoted(sha)}, which is not a full commit: it takes 40 lowercase hex characters.`,
+      { path },
+    );
+  }
+  return { name, type, location, path: textOf(source.path), ref: textOf(source.ref), sha };
+}
+
+/** Remote plugins fetched at once. One repository's take turns, since they share its cache. */
+const FETCHES_AT_ONCE = 8;
+
+type Fetched = { plugin: Awaited<ReturnType<typeof fetchedPlugin>>; warnings: string[] };
+
+/** A repository however a source writes it: `acme/x`, or its github.com URL. */
+const repositoryOf = (remote: RemotePlugin) =>
+  remote.location
+    .toLowerCase()
+    .replace(/^https:\/\/github\.com\//, "")
+    .replace(/\.git$/, "");
 
 /** A plugin from elsewhere, read from its own folder, with ids kept apart from the marketplace's. */
 async function fetchedPlugin(
@@ -139,84 +217,6 @@ async function fetchedPlugin(
       ...(fetched.version === undefined ? {} : { version: fetched.version }),
     })),
   };
-}
-
-/** Where the ids of fetched plugins begin, which no folder in a marketplace can be named. */
-const REMOTE = "@remote";
-
-const names = (marketplace: Marketplace) =>
-  new Set(marketplace.entries.map((entry) => textOf(entry.name)).filter((n) => n !== undefined));
-
-/** Said when both marketplaces are there and disagree, so a plugin only one lists is not lost quietly. */
-function disagreement(first: Marketplace, second: Marketplace): string | undefined {
-  const [a, b] = [names(first), names(second)];
-  const onlyFirst = [...a].filter((name) => !b.has(name)).sort();
-  const onlySecond = [...b].filter((name) => !a.has(name)).sort();
-  if (onlyFirst.length === 0 && onlySecond.length === 0) return undefined;
-  const differ = [...onlyFirst, ...onlySecond].map(quoted);
-  return `The two marketplace files list different plugins, so aireg reads ${first.path} alone: ${list(differ)} ${differ.length === 1 ? "is" : "are"} in only one.`;
-}
-
-async function marketplaces(tree: Tree): Promise<Marketplace[]> {
-  const found: Marketplace[] = [];
-  for (const path of MARKETPLACES) {
-    const read = await readMarketplace(tree, path);
-    if (read !== undefined) found.push(read);
-  }
-  return found;
-}
-
-/** Remote plugins fetched at once. One repository's take turns, since they share its cache. */
-const FETCHES_AT_ONCE = 8;
-
-type Fetched = { plugin: Awaited<ReturnType<typeof fetchedPlugin>>; warnings: string[] };
-
-/** A repository however a source writes it: `acme/x`, or its github.com URL. */
-const repositoryOf = (remote: RemotePlugin) =>
-  remote.location
-    .toLowerCase()
-    .replace(/^https:\/\/github\.com\//, "")
-    .replace(/\.git$/, "");
-
-/** Starts fetching every remote entry, each with its own warnings, to be read in entry order. */
-function prefetch(marketplace: Marketplace, context: LayoutContext): Map<Json, Promise<Fetched>> {
-  let free = FETCHES_AT_ONCE;
-  const waiting: (() => void)[] = [];
-  // A finished fetch hands its slot to the next one waiting, so no more than the limit run.
-  const slot = (): Promise<void> => {
-    if (free === 0) return new Promise((go) => waiting.push(go));
-    free -= 1;
-    return Promise.resolve();
-  };
-  const release = () => {
-    const next = waiting.shift();
-    if (next === undefined) free += 1;
-    else next();
-  };
-  const turns = new Map<string, Promise<unknown>>();
-  const started = new Map<Json, Promise<Fetched>>();
-  for (const entry of marketplace.entries) {
-    const name = textOf(entry.name);
-    const at = name === undefined ? undefined : sourceOf(entry, name, marketplace);
-    if (at === undefined || !("remote" in at) || context.asked?.(at.remote.name) === false)
-      continue;
-    const warnings: string[] = [];
-    const repository = repositoryOf(at.remote);
-    const fetched = (turns.get(repository) ?? Promise.resolve()).then(async () => {
-      await slot();
-      try {
-        return { plugin: await fetchedPlugin(at.remote, entry, context, warnings), warnings };
-      } finally {
-        release();
-      }
-    });
-    turns.set(
-      repository,
-      fetched.catch(() => undefined),
-    );
-    started.set(entry, fetched);
-  }
-  return started;
 }
 
 /** One entry's plugin and its parts, read where its source says, or undefined when skipped. */

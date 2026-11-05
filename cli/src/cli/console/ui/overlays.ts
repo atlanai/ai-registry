@@ -6,38 +6,6 @@ import { ago, duration, pad, shortDigest, truncate, truncateStart } from "#core/
 import { COLOR, GLYPH } from "#core/term/theme.ts";
 import { action, box, dim, faint, plain, text } from "./elements.ts";
 
-function panel(title: string, width: number, ...children: ReactNode[]): ReactElement {
-  return box(
-    {
-      flexDirection: "column",
-      width,
-      borderStyle: "round",
-      borderColor: COLOR.faint,
-      paddingX: 1,
-    },
-    box(
-      { justifyContent: "space-between" },
-      text({ color: COLOR.white, bold: true }, title),
-      plain(""),
-    ),
-    box({ flexDirection: "column", marginTop: 1 }, ...children),
-  );
-}
-
-function field(label: string, value: ReactNode): ReactElement {
-  return box(null, dim(pad(label, 12)), value);
-}
-
-/** Only the fields the artifact actually has: an empty row says nothing. */
-function known(
-  label: string,
-  value: string | undefined,
-  node?: ReactNode,
-): ReactElement | undefined {
-  if (value === undefined || value === "" || value === "\u2014") return undefined;
-  return field(label, node ?? text({ color: COLOR.white }, value));
-}
-
 export function artifactDetail(props: {
   width: number;
   row: ArtifactRow;
@@ -135,6 +103,38 @@ export function artifactDetail(props: {
       plain("      "),
       action("esc", "close"),
     ),
+  );
+}
+
+/** Only the fields the artifact actually has: an empty row says nothing. */
+function known(
+  label: string,
+  value: string | undefined,
+  node?: ReactNode,
+): ReactElement | undefined {
+  if (value === undefined || value === "" || value === "\u2014") return undefined;
+  return field(label, node ?? text({ color: COLOR.white }, value));
+}
+
+function field(label: string, value: ReactNode): ReactElement {
+  return box(null, dim(pad(label, 12)), value);
+}
+
+function panel(title: string, width: number, ...children: ReactNode[]): ReactElement {
+  return box(
+    {
+      flexDirection: "column",
+      width,
+      borderStyle: "round",
+      borderColor: COLOR.faint,
+      paddingX: 1,
+    },
+    box(
+      { justifyContent: "space-between" },
+      text({ color: COLOR.white, bold: true }, title),
+      plain(""),
+    ),
+    box({ flexDirection: "column", marginTop: 1 }, ...children),
   );
 }
 
@@ -248,7 +248,7 @@ export function activityPanel(props: {
   code: number | undefined;
   /** What the run's own counts say it has got through, while it is going. */
   progress: string | undefined;
-  /** How long it has been going. A publish uploads one artifact at a time. */
+  /** Shown from 2 s on: a publish uploads one artifact at a time. */
   elapsedMs: number;
   /**
    * What the state actually says now that it has finished, read back rather

@@ -1,13 +1,14 @@
 import { mkdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { digestHex } from "#adapter/spec/ref.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { setting } from "#core/env.ts";
-import { canonical } from "#core/fs/canonical.ts";
 import { isSha256Hex, sha256Hex, shortHash } from "#core/fs/hash.ts";
 import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { homeDir } from "#core/fs/path.ts";
-import { type ArtifactKind, kindDir, stagedLeaf } from "#core/kinds.ts";
+import { canonical } from "#core/fs/realpath.ts";
+import { kindDir, stagedLeaf } from "#core/kinds.ts";
 import { HOME_DIR, LEGACY_TARGETS_DIR, TARGETS_DIR } from "#core/product.ts";
 
 /** Where a command installs: this project, or `-g` for the user. */
@@ -106,27 +107,26 @@ export function leasesDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), "leases");
 }
 
-/** In aireg's home, not the scope: recovery deletes what it names, and a clone could ship one. */
-function journalPath(dir: string, env: NodeJS.ProcessEnv): string {
-  const scope = join(canonical(dirname(dir)), basename(dir));
-  const key = shortHash(scope);
-  return join(toolHome(env), "journals", `${key}.json`);
-}
-
 export function roots(scope: Scope, cwd: string, env: NodeJS.ProcessEnv = process.env): Roots {
   const user = scope === "user";
   const dir = user ? userScopeDir(env) : join(cwd, SCOPE_DIR);
+  // Canonical like the scope folder, or under a symlinked home lock paths escape upwards.
   return {
     scope,
     cwd,
-    // Canonical, like the home it is paired with: an artifacts tree under a
-    // symlinked root would otherwise make every recorded path escape upwards.
     base: user ? homeDir(env) : cwd,
     manifest: join(dir, MANIFEST_FILE),
     lock: join(dir, LOCK_FILE),
     artifacts: join(dir, "artifacts"),
     applyJournal: journalPath(dir, env),
   };
+}
+
+/** In aireg's home, not the scope: recovery deletes what it names, and a clone could ship one. */
+function journalPath(dir: string, env: NodeJS.ProcessEnv): string {
+  const scope = join(canonical(dirname(dir)), basename(dir));
+  const key = shortHash(scope);
+  return join(toolHome(env), "journals", `${key}.json`);
 }
 
 /** Scope is positional rather than declared: the user scope's folder, else a project. */

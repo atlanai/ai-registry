@@ -168,6 +168,7 @@ describe("creating a registry and publishing into it", () => {
       { cwd: work },
     );
     expect(sent.code, sent.stderr).toBe(0);
+    // A first version adds every file it sends, so `filesChanged` lists them all as added.
     expect(JSON.parse(sent.stdout).data).toEqual({
       dryRun: false,
       target: { registry: "team", namespace: "data" },
@@ -183,7 +184,6 @@ describe("creating a registry and publishing into it", () => {
           belowLatest: false,
           published: true,
           dependsOn: [],
-          // A first version adds every file it sends.
           filesChanged: { added: ["AGENT.md"], changed: [], removed: [] },
         },
       ],

@@ -1,17 +1,21 @@
 import { list, plural, quoted } from "#adapter/text.ts";
-import { actionOf, builtin, type CommandContext } from "#cli/commands/index.ts";
-import { parse } from "#cli/options.ts";
-import { cancel, interaction, interactive, silence } from "#cli/prompt/flow.ts";
-import { canceled, confirm, defaultIo, note } from "#cli/prompt/index.ts";
+import { actionOf, type CommandContext } from "#cli/commands/command.ts";
+import { parse } from "#cli/options/parse.ts";
+import { defaultIo } from "#cli/prompt/ask.ts";
+import { cancel, interaction, interactive, silence } from "#cli/prompt/interaction.ts";
+import { canceled } from "#cli/prompt/model.ts";
+import { confirm } from "#cli/prompt/select.ts";
+import { note } from "#cli/prompt/spinner.ts";
 import { underHome } from "#cli/render/home.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import type { Styler } from "#core/output.ts";
 import { pad } from "#core/term/format.ts";
+import type { Styler } from "#core/term/printer.ts";
 import { VERSION } from "#core/version.ts";
 import { autostartState, disableAutostart } from "#daemon/autostart/index.ts";
-import { probeDaemon, stopDaemon } from "#daemon/service.ts";
-import { removeFromPath } from "#self/path-setup.ts";
+import { probeDaemon, stopDaemon } from "#daemon/process/lifecycle.ts";
+import { removeFromPath } from "#self/shell-path.ts";
 import { deleteFolders, type Footprint, footprint, unlinkUserScope } from "#self/uninstall.ts";
+import { SELF_COMMAND } from "./spec.ts";
 
 /** Everything aireg put on this machine outside projects. */
 interface Found extends Footprint {
@@ -34,21 +38,8 @@ export async function stopEverything(): Promise<{ autostart: boolean }> {
   return { autostart: change?.changed === true };
 }
 
-function planLines(found: Found, style: Styler): string[] {
-  const rows: [string, string[]][] = [];
-  const daemon = [found.daemon ? "stop it" : "", found.autostart ? "turn autostart off" : ""];
-  if (found.daemon || found.autostart) rows.push(["daemon", [daemon.filter(Boolean).join(", ")]]);
-  rows.push(["unlink", found.links.map(underHome)]);
-  rows.push(["PATH", found.startupFiles.map(underHome)]);
-  rows.push(["delete", found.folders.map(underHome)]);
-  rows.push(["keep", [...found.kept.map(underHome), "each project's .registry/ folder"]]);
-  return rows.flatMap(([label, values]) =>
-    values.map((value, index) => `${style.dim(pad(index === 0 ? label : "", 8))}${value}`),
-  );
-}
-
 export async function run(context: CommandContext): Promise<void> {
-  const { common, positionals } = parse(context.argv, actionOf(builtin("self"), "uninstall"));
+  const { common, positionals } = parse(context.argv, actionOf(SELF_COMMAND, "uninstall"));
   if (positionals.length > 0) {
     throw new AiregError(
       `\`aireg self uninstall\` takes no argument, not ${quoted(positionals[0] as string)}.`,
@@ -110,9 +101,9 @@ export async function run(context: CommandContext): Promise<void> {
   }
   const path = await removeFromPath();
   const folders = await deleteFolders();
+  // Only what was on is reported as turned off.
   const done = {
     daemon: found.daemon,
-    // Only what was on is reported as turned off.
     autostart: found.autostart && stopped.autostart,
     links,
     startupFiles: path.removed,
@@ -131,6 +122,19 @@ export async function run(context: CommandContext): Promise<void> {
     return;
   }
   report(context, done);
+}
+
+function planLines(found: Found, style: Styler): string[] {
+  const rows: [string, string[]][] = [];
+  const daemon = [found.daemon ? "stop it" : "", found.autostart ? "turn autostart off" : ""];
+  if (found.daemon || found.autostart) rows.push(["daemon", [daemon.filter(Boolean).join(", ")]]);
+  rows.push(["unlink", found.links.map(underHome)]);
+  rows.push(["PATH", found.startupFiles.map(underHome)]);
+  rows.push(["delete", found.folders.map(underHome)]);
+  rows.push(["keep", [...found.kept.map(underHome), "each project's .registry/ folder"]]);
+  return rows.flatMap(([label, values]) =>
+    values.map((value, index) => `${style.dim(pad(index === 0 ? label : "", 8))}${value}`),
+  );
 }
 
 function report(context: CommandContext, done: Found): void {

@@ -2,13 +2,13 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { createInterface } from "node:readline";
 import { afterEach, describe, expect, vi } from "vitest";
-import { type OutputFormat, Printer } from "#core/output.ts";
-import { writeDaemonPid } from "#daemon/pidfile.ts";
+import { type OutputFormat, Printer } from "#core/term/printer.ts";
+import { writeDaemonPid } from "#daemon/process/pid-file.ts";
 import { rpcEndpoint } from "#daemon/rpc/endpoint.ts";
-import { PROTOCOL_VERSION } from "#daemon/rpc/protocol.ts";
+import { PROTOCOL_VERSION } from "#daemon/rpc/methods.ts";
 import { test } from "#test/kit/fixtures.ts";
+import type { CommandContext } from "./command.ts";
 import { daemonAction, run } from "./daemon.ts";
-import type { CommandContext } from "./index.ts";
 
 function context(argv: string[], writes: string[], format: OutputFormat = "json"): CommandContext {
   const writer = { write: (chunk: string) => writes.push(chunk), isTTY: false };

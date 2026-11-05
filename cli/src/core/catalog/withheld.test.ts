@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   countPast,
   newestFrom,
@@ -9,7 +9,7 @@ import {
 } from "./withheld.ts";
 
 describe("what a registry withholds", () => {
-  it("drops what it cannot name, and shows a reason without its escapes", () => {
+  test("drops what it cannot name, and shows a reason without its escapes", () => {
     const withheld = withheldFrom([
       {
         name: "gate",
@@ -28,7 +28,7 @@ describe("what a registry withholds", () => {
     );
   });
 
-  it("is found by the address that reaches it", () => {
+  test("is found by the address that reaches it", () => {
     const withheld = withheldFrom([
       { name: "sketch", namespace: "ops", kind: "skill", version: "0.1.0", status: "draft" },
     ]);
@@ -40,13 +40,13 @@ describe("what a registry withholds", () => {
 
 describe("statusWarning", () => {
   const at = { name: "lint", group: "ops", kind: "skill" as const, version: "1.1.0" };
-  it("names a deprecated version and why", () => {
+  test("names a deprecated version and why", () => {
     expect(statusWarning({ ...at, status: "deprecated", reason: "use fmt" })).toBe(
       "ops/lint 1.1.0 is deprecated (use fmt).",
     );
   });
 
-  it("says a draft installs only because it was pinned", () => {
+  test("says a draft installs only because it was pinned", () => {
     expect(statusWarning({ ...at, status: "pending_review", reason: undefined })).toBe(
       "ops/lint 1.1.0 is pending review, and installs only because it is pinned.",
     );
@@ -61,12 +61,12 @@ describe("countPast", () => {
     { name: "lint", kind: "tool", version: "9.0.0" },
   ]);
 
-  it("counts from a newer version the registry holds, such as a yanked one", () => {
+  test("counts from a newer version the registry holds, such as a yanked one", () => {
     expect(countPast("0.1.0", newest, lint)).toBe("0.1.1");
     expect(countPast(undefined, newest, lint)).toBe("0.1.1");
   });
 
-  it("keeps the version when nothing it holds is newer, or names another artifact", () => {
+  test("keeps the version when nothing it holds is newer, or names another artifact", () => {
     expect(countPast("0.2.0", newest, lint)).toBe("0.2.0");
     expect(countPast("0.1.0", newest, { ...lint, kind: "agent" })).toBe("0.1.0");
     expect(countPast("0.1.0", undefined, lint)).toBe("0.1.0");

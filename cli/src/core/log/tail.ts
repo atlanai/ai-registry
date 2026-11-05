@@ -11,55 +11,6 @@ export interface TailOptions {
 
 const NEWLINE = 0x0a;
 
-function sizeOf(path: string): number {
-  try {
-    return statSync(path).size;
-  } catch {
-    return 0;
-  }
-}
-
-function inodeOf(path: string): number | undefined {
-  try {
-    return statSync(path).ino;
-  } catch {
-    return undefined;
-  }
-}
-
-interface Read {
-  inode: number;
-  /** True when the file was rolled or truncated, so reading began again at its start. */
-  restarted: boolean;
-  /** Where the next read begins. */
-  end: number;
-  bytes: Buffer;
-}
-
-/** The bytes past `offset` up to the size the file has now, never past it. */
-async function readPast(
-  path: string,
-  offset: number,
-  inode: number | undefined,
-): Promise<Read | undefined> {
-  let handle: Awaited<ReturnType<typeof open>>;
-  try {
-    handle = await open(path, "r");
-  } catch {
-    return undefined;
-  }
-  try {
-    const { ino, size } = await handle.stat();
-    const restarted = ino !== inode || size < offset;
-    const from = restarted ? 0 : offset;
-    const bytes = Buffer.alloc(size - from);
-    const { bytesRead } = await handle.read(bytes, 0, bytes.length, from);
-    return { inode: ino, restarted, end: from + bytesRead, bytes: bytes.subarray(0, bytesRead) };
-  } finally {
-    await handle.close();
-  }
-}
-
 /**
  * `tail -F`, not `-f`: rotation renames the file out from under a reader, so
  * the path is followed. A smaller size means truncation, a new inode a roll.
@@ -86,7 +37,7 @@ export async function* follow(options: TailOptions): AsyncGenerator<string> {
         // Rolled or truncated: whatever was buffered past the cut is gone.
         if (read.restarted) pending = Buffer.alloc(0);
         inode = read.inode;
-        offset = read.end;
+        offset = read.nextOffset;
         const bytes = Buffer.concat([pending, read.bytes]);
         const complete = bytes.lastIndexOf(NEWLINE) + 1;
         pending = bytes.subarray(complete);
@@ -102,5 +53,57 @@ export async function* follow(options: TailOptions): AsyncGenerator<string> {
     }
   } finally {
     watcher.close();
+  }
+}
+
+function sizeOf(path: string): number {
+  try {
+    return statSync(path).size;
+  } catch {
+    return 0;
+  }
+}
+
+function inodeOf(path: string): number | undefined {
+  try {
+    return statSync(path).ino;
+  } catch {
+    return undefined;
+  }
+}
+
+interface Read {
+  inode: number;
+  /** True when the file was rolled or truncated, so reading began again at its start. */
+  restarted: boolean;
+  nextOffset: number;
+  bytes: Buffer;
+}
+
+async function readPast(
+  path: string,
+  offset: number,
+  inode: number | undefined,
+): Promise<Read | undefined> {
+  let handle: Awaited<ReturnType<typeof open>>;
+  try {
+    handle = await open(path, "r");
+  } catch {
+    return undefined;
+  }
+  try {
+    const { ino, size } = await handle.stat();
+    const restarted = ino !== inode || size < offset;
+    const from = restarted ? 0 : offset;
+    const bytes = Buffer.alloc(size - from);
+    const { bytesRead } = await handle.read(bytes, 0, bytes.length, from);
+    return {
+      inode: ino,
+      restarted,
+      nextOffset: from + bytesRead,
+      bytes: bytes.subarray(0, bytesRead),
+    };
+  } finally {
+    await handle.close();
   }
 }

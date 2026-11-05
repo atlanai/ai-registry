@@ -24,45 +24,6 @@ export function signInFailed(message: string, cause?: unknown): AiregError {
   return new AiregError(message, { code: ErrorCode.Unauthorized, cause });
 }
 
-function answer(response: ServerResponse, status: number, message: string): void {
-  response
-    .writeHead(status, PAGE_HEADERS)
-    .end(`<!doctype html><meta charset="utf-8"><title>aireg</title><p>${message}</p>`);
-}
-
-function tell(response: ServerResponse, signedIn: boolean): void {
-  signedIn
-    ? answer(response, 200, "Signed in. You can close this tab and go back to the terminal.")
-    : answer(response, 500, "The sign-in did not finish. The terminal says why.");
-}
-
-function refusal(error: string | null): AiregError {
-  if (error === "access_denied") return signInFailed("The sign-in was declined in the browser.");
-  const reason = ERROR_CODE.test(error ?? "") ? ` (${error})` : "";
-  return signInFailed(`The sign-in was not completed${reason}.`);
-}
-
-function delay(ms: number): { done: Promise<void>; clear(): void } {
-  let timer: NodeJS.Timeout | undefined;
-  const done = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, ms);
-  });
-  return { done, clear: () => clearTimeout(timer) };
-}
-
-export interface Expected {
-  state: string;
-  issuer: string;
-  namesIssuer: boolean;
-}
-
-export interface Callback {
-  redirectUri: string;
-  port: number;
-  code: Promise<string>;
-  close(signedIn: boolean): Promise<void>;
-}
-
 /**
  * The loopback redirect of RFC 8252: one answer for this `state`, then the tab moves to a
  * page without the code in its address, held until `close` says how the sign-in ended.
@@ -148,6 +109,37 @@ export async function listenForCode(
   };
 }
 
+function answer(response: ServerResponse, status: number, message: string): void {
+  response
+    .writeHead(status, PAGE_HEADERS)
+    .end(`<!doctype html><meta charset="utf-8"><title>aireg</title><p>${message}</p>`);
+}
+
+function tell(response: ServerResponse, signedIn: boolean): void {
+  signedIn
+    ? answer(response, 200, "Signed in. You can close this tab and go back to the terminal.")
+    : answer(response, 500, "The sign-in did not finish. The terminal says why.");
+}
+
+function refusal(error: string | null): AiregError {
+  if (error === "access_denied") return signInFailed("The sign-in was declined in the browser.");
+  const reason = ERROR_CODE.test(error ?? "") ? ` (${error})` : "";
+  return signInFailed(`The sign-in was not completed${reason}.`);
+}
+
+export interface Expected {
+  state: string;
+  issuer: string;
+  namesIssuer: boolean;
+}
+
+export interface Callback {
+  redirectUri: string;
+  port: number;
+  code: Promise<string>;
+  close(signedIn: boolean): Promise<void>;
+}
+
 async function bind(http: Server, ports: readonly number[]): Promise<void> {
   let failure: NodeJS.ErrnoException | undefined;
   for (const port of ports) {
@@ -170,4 +162,12 @@ async function bind(http: Server, ports: readonly number[]): Promise<void> {
   throw signInFailed(
     `Ports ${ports.join(", ")} are all in use, and the sign-in can only come back to one of them.`,
   );
+}
+
+function delay(ms: number): { done: Promise<void>; clear(): void } {
+  let timer: NodeJS.Timeout | undefined;
+  const done = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, ms);
+  });
+  return { done, clear: () => clearTimeout(timer) };
 }

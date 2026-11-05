@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { registryNameFromLocation } from "./location.ts";
 
 describe("registryNameFromLocation", () => {
-  it("names a registry after the last segment, as an identifier", () => {
+  test("names a registry after the last segment, as an identifier", () => {
     expect(registryNameFromLocation("https://example.com/Acme/Team_Kit.git", "git")).toBe(
       "team-kit",
     );
@@ -11,7 +11,7 @@ describe("registryNameFromLocation", () => {
     expect(registryNameFromLocation("C:\\work\\Acme-Registry\\", "local")).toBe("acme-registry");
   });
 
-  it("falls back to the adapter when a bare origin has no path", () => {
+  test("falls back to the adapter when a bare origin has no path", () => {
     expect(registryNameFromLocation("https://registry.example.com", "http")).toBe("http");
   });
 });

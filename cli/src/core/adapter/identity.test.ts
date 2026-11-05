@@ -1,22 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { comparableLocation, sourceKey } from "./identity.ts";
 
 describe("a registry's identity", () => {
-  it("is the same with or without a trailing slash", () => {
+  test("is the same with or without a trailing slash", () => {
     expect(sourceKey("https://example.com/acme/", {})).toBe(
       sourceKey("https://example.com/acme", {}),
     );
     expect(comparableLocation("./acme///")).toBe("./acme");
   });
 
-  it("takes linear time on an address a hostile manifest padded with slashes", () => {
+  test("takes linear time on an address a hostile manifest padded with slashes", () => {
     const started = Date.now();
     sourceKey(`https://127.0.0.1:9/x${"/".repeat(80_000)}a`, {});
     comparableLocation(`x${"/".repeat(80_000)}a`);
     expect(Date.now() - started).toBeLessThan(200);
   });
 
-  it("keeps the user of an ssh address, which names an account rather than a secret", () => {
+  test("keeps the user of an ssh address, which names an account rather than a secret", () => {
     expect(sourceKey("ssh://git@example.com/acme/kit/", {})).toBe(
       sourceKey("ssh://git@example.com/acme/kit", {}),
     );
@@ -30,7 +30,7 @@ describe("a registry's identity", () => {
 });
 
 describe("a registry's config", () => {
-  it("takes a key an object inherits, and refuses one that would reach its prototype", () => {
+  test("takes a key an object inherits, and refuses one that would reach its prototype", () => {
     expect(() => sourceKey("./acme", { toString: "a", hasOwnProperty: "b" })).not.toThrow();
     for (const key of ["__proto__", "constructor"]) {
       expect(() => sourceKey("./acme", JSON.parse(`{"${key}": "x"}`)), key).toThrow(

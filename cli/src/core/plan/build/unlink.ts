@@ -1,11 +1,20 @@
 import { resolve } from "node:path";
 import { quoted, sanitizeText } from "#adapter/text.ts";
 import type { LockArtifact } from "#core/lock.ts";
-import { editedAnywhere } from "#core/plan/model.ts";
 import { removal } from "#core/plan/removable.ts";
+import { editedAnywhere } from "#core/plan/survey.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
 import { keep } from "./carry.ts";
 import type { BuildState } from "./state.ts";
+
+/** A target link the lock recorded, which apply takes back only if it is still ours. */
+export function unlinkRecorded(
+  build: BuildState,
+  name: string,
+  link: LockArtifact["links"][number],
+): boolean {
+  return unlink(build, name, resolve(build.options.roots.base, link.path), { link });
+}
 
 /** Every removal the lock asks for passes here: the lock is a file a repository can ship. */
 function unlink(
@@ -32,16 +41,10 @@ function unlink(
   return true;
 }
 
-/** A target link the lock recorded, which apply takes back only if it is still ours. */
-export function unlinkRecorded(
-  build: BuildState,
-  name: string,
-  link: LockArtifact["links"][number],
-): boolean {
-  return unlink(build, name, resolve(build.options.roots.base, link.path), { link });
-}
-
-/** Removes the rows the plan no longer holds, keeping an edited copy and a row of yours. */
+/**
+ * Removes the rows the plan no longer holds, keeping an edited copy and a row of yours. Never the
+ * mirror: every scope shares it, so only a sweep that reads every lock knows what is unreferenced.
+ */
 export function removeStale(build: BuildState): void {
   for (const [name, entry] of Object.entries(build.lock.artifacts)) {
     if (build.next.artifacts[name] !== undefined) continue;
@@ -82,8 +85,6 @@ export function removeStale(build: BuildState): void {
       ),
       { edited },
     );
-    // Nothing is removed from the mirror: it is shared by every scope, so only a
-    // sweep that reads every lock could tell a version nothing references.
   }
 }
 

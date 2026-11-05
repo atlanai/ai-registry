@@ -4,13 +4,13 @@ import { afterEach, describe, expect, vi } from "vitest";
 import { emptyRegistryConfig, type Job, type StepPolicy } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { AiregError } from "#core/errors.ts";
-import { Printer } from "#core/output.ts";
+import { Printer } from "#core/term/printer.ts";
 import { test } from "#test/kit/fixtures.ts";
-import type { CommandContext } from "./index.ts";
+import type { CommandContext } from "./command.ts";
 import { run } from "./job.ts";
 
 const daemon = vi.hoisted(() => ({ withDaemon: vi.fn() }));
-vi.mock("#daemon/service.ts", () => daemon);
+vi.mock("#daemon/process/lifecycle.ts", () => daemon);
 
 let home: string;
 
@@ -114,7 +114,6 @@ describe("a job named by a name other than its id", () => {
   });
 });
 
-/** One step of a job, rooted at `root`. */
 const step = (kind: string, root = "/scope", policy: StepPolicy = "on", needs: string[] = []) => ({
   name: kind,
   kind,

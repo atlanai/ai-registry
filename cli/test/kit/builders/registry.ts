@@ -1,4 +1,4 @@
-import { type KindManifest, kindsOf, primaryFiles } from "#core/filespec/write/kinds.ts";
+import { type KindManifest, kindsOf, primaryFiles } from "#core/filespec/kind-manifests.ts";
 import type { Git } from "#test/kit/fixtures.ts";
 import {
   type SpecArtifact,

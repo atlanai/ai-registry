@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { LockArtifact } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
 import { PLAN_OPTIONS } from "#test/kit/builders/plan.ts";
@@ -19,12 +19,12 @@ describe("wrappedInLock", () => {
     } as unknown as LockArtifact,
   ];
 
-  it("reads a row linked through its namespace's plugin directory as wrapped", () => {
+  test("reads a row linked through its namespace's plugin directory as wrapped", () => {
     const plugin = join(homedir(), ".claude", "skills", "engineering");
     expect(wrappedInLock([row(plugin)], options)).toBe(true);
   });
 
-  it("reads a row linked as itself as not wrapped", () => {
+  test("reads a row linked as itself as not wrapped", () => {
     const flat = join(homedir(), ".claude", "skills", "lint");
     expect(wrappedInLock([row(flat)], options)).toBe(false);
   });

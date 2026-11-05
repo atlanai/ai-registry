@@ -12,27 +12,6 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { copyInto, isDirectory, remove } from "#core/fs/tree.ts";
 import type { LinkMode } from "#core/lock.ts";
 
-/**
- * On macOS /tmp is a symlink to /private/tmp, so the parent is resolved first: a
- * target computed from the unresolved parent is one `lstat` reports as dangling.
- */
-async function relativeTarget(source: string, linkPath: string): Promise<string> {
-  return relative(await realpath(dirname(linkPath)), await realpath(source));
-}
-
-/**
- * Junctions need neither Developer Mode nor elevation, which plain symlinks do
- * on a default Windows install. They only work for directories.
- */
-async function windowsLink(source: string, linkPath: string): Promise<LinkMode> {
-  if (await isDirectory(source)) {
-    await symlink(resolve(source), linkPath, "junction");
-    return "junction";
-  }
-  await copyInto(source, linkPath);
-  return "copy";
-}
-
 export async function link(source: string, linkPath: string, copyOnly = false): Promise<LinkMode> {
   await mkdir(dirname(linkPath), { recursive: true });
   await remove(linkPath);
@@ -54,12 +33,24 @@ export async function link(source: string, linkPath: string, copyOnly = false): 
 }
 
 /**
- * A file or dot-directory in a plugin is the manifest a target reads itself,
- * and some refuse one reached through a link; content directories stay links.
+ * Junctions need neither Developer Mode nor elevation, which plain symlinks do
+ * on a default Windows install. They only work for directories.
  */
-async function isManifest(path: string, entry: string): Promise<boolean> {
-  const info = await stat(path).catch(() => undefined);
-  return info !== undefined && (!info.isDirectory() || entry.startsWith("."));
+async function windowsLink(source: string, linkPath: string): Promise<LinkMode> {
+  if (await isDirectory(source)) {
+    await symlink(resolve(source), linkPath, "junction");
+    return "junction";
+  }
+  await copyInto(source, linkPath);
+  return "copy";
+}
+
+/**
+ * On macOS /tmp is a symlink to /private/tmp, so the parent is resolved first: a
+ * target computed from the unresolved parent is one `lstat` reports as dangling.
+ */
+async function relativeTarget(source: string, linkPath: string): Promise<string> {
+  return relative(await realpath(dirname(linkPath)), await realpath(source));
 }
 
 /**
@@ -101,18 +92,58 @@ export async function fanOut(source: string, dir: string): Promise<LinkMode> {
   return "fanout";
 }
 
+/**
+ * A file or dot-directory in a plugin is the manifest a target reads itself,
+ * and some refuse one reached through a link; content directories stay links.
+ */
+async function isManifest(path: string, entry: string): Promise<boolean> {
+  const info = await stat(path).catch(() => undefined);
+  return info !== undefined && (!info.isDirectory() || entry.startsWith("."));
+}
+
+/** Whether a copied manifest file holds the source's bytes; a manifest folder is recopied. */
+async function sameFile(source: string, copy: string): Promise<boolean> {
+  const info = await lstat(copy).catch(() => undefined);
+  if (info === undefined || !info.isFile() || !(await stat(source)).isFile()) return false;
+  const [left, right] = await Promise.all([readFile(source), readFile(copy)]);
+  return left.equals(right);
+}
+
 /** Compared resolved, since a Windows junction names its target in full. */
 async function linksTo(path: string, target: string): Promise<boolean> {
   const raw = await readlink(path).catch(() => undefined);
   return raw !== undefined && resolve(dirname(path), raw) === resolve(dirname(path), target);
 }
 
-/** A copied manifest file that already holds the source's bytes; a manifest folder is always copied again. */
-async function sameFile(source: string, copy: string): Promise<boolean> {
-  const info = await lstat(copy).catch(() => undefined);
-  if (info === undefined || !info.isFile() || !(await stat(source)).isFile()) return false;
-  const [left, right] = await Promise.all([readFile(source), readFile(copy)]);
-  return left.equals(right);
+export async function inspect(linkPath: string): Promise<LinkState> {
+  let info: Awaited<ReturnType<typeof lstat>>;
+  try {
+    info = await lstat(linkPath);
+  } catch {
+    return { exists: false, isLink: false, target: undefined };
+  }
+  if (!info.isSymbolicLink()) {
+    const source = info.isDirectory() ? await fanOutSource(linkPath) : undefined;
+    return { exists: true, isLink: source !== undefined, target: source };
+  }
+
+  try {
+    const raw = await readlink(linkPath);
+    return {
+      exists: true,
+      isLink: true,
+      target: isAbsolute(raw) ? raw : resolve(dirname(linkPath), raw),
+    };
+  } catch {
+    return { exists: true, isLink: true, target: undefined };
+  }
+}
+
+export interface LinkState {
+  exists: boolean;
+  isLink: boolean;
+  /** Absolute, resolved against the link's own directory. */
+  target: string | undefined;
 }
 
 /**
@@ -150,35 +181,4 @@ async function fanOutSource(dir: string): Promise<string | undefined> {
     if ((await lstat(join(source, entry)).catch(() => undefined)) === undefined) return undefined;
   }
   return source;
-}
-
-export interface LinkState {
-  exists: boolean;
-  isLink: boolean;
-  /** Absolute, resolved against the link's own directory. */
-  target: string | undefined;
-}
-
-export async function inspect(linkPath: string): Promise<LinkState> {
-  let info: Awaited<ReturnType<typeof lstat>>;
-  try {
-    info = await lstat(linkPath);
-  } catch {
-    return { exists: false, isLink: false, target: undefined };
-  }
-  if (!info.isSymbolicLink()) {
-    const source = info.isDirectory() ? await fanOutSource(linkPath) : undefined;
-    return { exists: true, isLink: source !== undefined, target: source };
-  }
-
-  try {
-    const raw = await readlink(linkPath);
-    return {
-      exists: true,
-      isLink: true,
-      target: isAbsolute(raw) ? raw : resolve(dirname(linkPath), raw),
-    };
-  } catch {
-    return { exists: true, isLink: true, target: undefined };
-  }
 }

@@ -3,9 +3,9 @@ import { userInfo } from "node:os";
 import { basename, delimiter, isAbsolute, join } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { envName, setting } from "#core/env.ts";
-import { canonical } from "#core/fs/canonical.ts";
 import { userHome } from "#core/fs/path.ts";
-import { DAEMON_STDERR_FILE, logPath } from "#core/log/index.ts";
+import { canonical } from "#core/fs/realpath.ts";
+import { DAEMON_STDERR_FILE, logPath } from "#core/log/sink.ts";
 import { exec } from "#core/process.ts";
 import { HOME_DIR } from "#core/product.ts";
 import { launchArgv, runningEntry } from "#core/release/launch.ts";
@@ -22,8 +22,6 @@ import {
 } from "./model.ts";
 import { runKeyBackend } from "./run-key.ts";
 import { systemdBackend } from "./systemd.ts";
-
-export { type AutostartState, RESTART_EXIT_CODE } from "./model.ts";
 
 const EXEC_MS = 15_000;
 
@@ -45,42 +43,6 @@ export function supervised(env: NodeJS.ProcessEnv = process.env): boolean {
   const value = env[SUPERVISOR_ENV];
   return value !== undefined && value !== "";
 }
-
-/**
- * Pruning deletes versioned directories, so the service names a path every update relinks: the
- * signed binary under `current`, trusted over a shell script, else the shim or the Windows copy.
- */
-function stableEntry(entry: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
-  if (!isWithin(cliRoot(env), entry)) return entry;
-  // On Windows `current` is a file naming the version, so only the copy is stable there.
-  if (platform !== "win32" && existsSync(currentBin(env))) return currentBin(env);
-  return existsSync(shimPath(env)) ? shimPath(env) : entry;
-}
-
-function real(path: string): string | undefined {
-  try {
-    return realpathSync(path);
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * `execPath` is resolved, so it can name a versioned directory that an
- * upgrade deletes; the PATH entry linking to it survives.
- */
-function stableNode(execPath: string, path: string | undefined): string {
-  const target = real(execPath);
-  if (target === undefined || path === undefined) return execPath;
-  for (const dir of path.split(delimiter)) {
-    if (!isAbsolute(dir)) continue;
-    const candidate = join(dir, basename(execPath));
-    if (real(candidate) === target) return candidate;
-  }
-  return execPath;
-}
-
-export const NO_EXECUTABLE = "aireg cannot find its own executable, so it cannot start the daemon.";
 
 export function serviceSpec(options: AutostartOptions = {}): ServiceSpec {
   const env = options.env ?? process.env;
@@ -119,6 +81,48 @@ export function serviceSpec(options: AutostartOptions = {}): ServiceSpec {
   };
 }
 
+/**
+ * `execPath` is resolved, so it can name a versioned directory that an
+ * upgrade deletes; the PATH entry linking to it survives.
+ */
+function stableNode(execPath: string, path: string | undefined): string {
+  const target = real(execPath);
+  if (target === undefined || path === undefined) return execPath;
+  for (const dir of path.split(delimiter)) {
+    if (!isAbsolute(dir)) continue;
+    const candidate = join(dir, basename(execPath));
+    if (real(candidate) === target) return candidate;
+  }
+  return execPath;
+}
+
+function real(path: string): string | undefined {
+  try {
+    return realpathSync(path);
+  } catch {
+    return undefined;
+  }
+}
+
+export const NO_EXECUTABLE = "aireg cannot find its own executable, so it cannot start the daemon.";
+
+/**
+ * Pruning deletes versioned directories, so the service names a path every update relinks: the
+ * signed binary under `current`, trusted over a shell script, else the shim or the Windows copy.
+ */
+function stableEntry(entry: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
+  if (!isWithin(cliRoot(env), entry)) return entry;
+  // On Windows `current` is a file naming the version, so only the copy is stable there.
+  if (platform !== "win32" && existsSync(currentBin(env))) return currentBin(env);
+  return existsSync(shimPath(env)) ? shimPath(env) : entry;
+}
+
+export async function autostartState(
+  options: AutostartOptions = {},
+): Promise<AutostartState | undefined> {
+  return backendFor(options)?.state();
+}
+
 /** Undefined where this CLI knows no per-user login mechanism. */
 function backendFor(options: AutostartOptions): AutostartBackend | undefined {
   const platform = options.platform ?? process.platform;
@@ -127,12 +131,6 @@ function backendFor(options: AutostartOptions): AutostartBackend | undefined {
   if (platform === "linux") return systemdBackend(serviceSpec(options), exec);
   if (platform === "win32") return runKeyBackend(serviceSpec(options), exec);
   return undefined;
-}
-
-export async function autostartState(
-  options: AutostartOptions = {},
-): Promise<AutostartState | undefined> {
-  return backendFor(options)?.state();
 }
 
 export interface AutostartChange {

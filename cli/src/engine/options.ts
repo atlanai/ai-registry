@@ -1,6 +1,5 @@
 import type { Scope } from "#core/store/paths.ts";
 
-/** What a run takes from the command line, whichever command started it. */
 export interface CommonOptions {
   scope: Scope | undefined;
   targets: string[] | undefined;

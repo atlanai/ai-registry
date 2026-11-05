@@ -17,22 +17,6 @@ interface Seen {
   last: LogRecord;
 }
 
-function repeated(record: LogRecord, times: number): LogRecord {
-  return { ...record, attributes: { ...record.attributes, repeated: times } };
-}
-
-/** One job's repeated failure collapses; another job's, or another cause, still shows. */
-function keyOf(record: LogRecord): string {
-  const { jobId, errorCode } = record.attributes as { jobId?: unknown; errorCode?: unknown };
-  return JSON.stringify([
-    record.severity_text,
-    record.body,
-    record.error?.name ?? "",
-    typeof jobId === "string" ? jobId : "",
-    typeof errorCode === "string" ? errorCode : "",
-  ]);
-}
-
 /**
  * A stuck job re-reports the same failure every tick, which would evict
  * everything else from the kept files within a day.
@@ -81,4 +65,20 @@ export function throttleSink(inner: Sink, options: ThrottleOptions = {}): Sink {
       inner.close?.();
     },
   };
+}
+
+function repeated(record: LogRecord, times: number): LogRecord {
+  return { ...record, attributes: { ...record.attributes, repeated: times } };
+}
+
+/** One job's repeated failure collapses; another job's, or another cause, still shows. */
+function keyOf(record: LogRecord): string {
+  const { jobId, errorCode } = record.attributes as { jobId?: unknown; errorCode?: unknown };
+  return JSON.stringify([
+    record.severity_text,
+    record.body,
+    record.error?.name ?? "",
+    typeof jobId === "string" ? jobId : "",
+    typeof errorCode === "string" ? errorCode : "",
+  ]);
 }

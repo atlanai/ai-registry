@@ -1,12 +1,10 @@
 import type { AdapterError, Envelope } from "#adapter/index.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import type { LayoutId } from "#adapter/layouts/ids.ts";
-import { quoted } from "#adapter/text.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
-import { type Catalog, type Entry, entryFor } from "#core/catalog/model.ts";
+import type { Catalog } from "#core/catalog/catalog.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
-import { AiregError, ErrorCode } from "#core/errors.ts";
-import type { ArtifactKind } from "#core/kinds.ts";
-import type { LinkMode, Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
+import type { LinkMode, Lock } from "#core/lock.ts";
 import type { Codec, KeyFile } from "#core/target/contract.ts";
 import type { Carried } from "./carries.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
@@ -16,18 +14,14 @@ import type { Unlisted } from "./unlisted.ts";
 /** One resolved registry, in the shape the lock stores. */
 export interface Origin {
   adapter: string;
-  /** Expanded: what an adapter reads. Absolute for anything that is a path. */
+  /** Expanded for the adapter to read; absolute where it is a path. */
   location: string;
-  /**
-   * What the manifest actually says. A relative path stays relative here, so a
-   * committed lock does not pin the directory the machine that wrote it used.
-   */
+  /** As the manifest wrote it, so a committed lock does not pin the writer's directory. */
   declared: string;
   key: string;
   config: SourceConfig;
-  /** What the source was at, when it has one revision covering everything. */
+  /** Undefined unless one revision covers the whole source. */
   revision: string | undefined;
-  /** How the source lays out what it holds, when its adapter says. */
   layout?: LayoutId | undefined;
 }
 
@@ -36,14 +30,13 @@ export interface Placement {
   /** Source-owned, stable across a rename. */
   id: string;
   name: string;
-  /** The envelope's content digest, which every source has. */
+  /** Content digest; undefined when read from a lock row without one. */
   contentId: string | undefined;
   version: string | undefined;
-  /** What this version's `depends_on` edges name. Absent means nothing. */
   needs?: readonly Need[] | undefined;
   /** Withdrawn by the registry, and served only because something pinned it. */
   yanked?: { reason: string | undefined } | undefined;
-  /** Its status where it installs with a warning, such as `deprecated`. */
+  /** Present only for a status that installs with a warning, such as `deprecated`. */
   status?: { name: string; reason: string | undefined } | undefined;
   /** For a plugin read from a source that is not a registry, what places it. */
   plugin?: PluginDocument | undefined;
@@ -59,67 +52,25 @@ export interface Acquired {
   /** Keyed by catalog entry path. */
   placements: Map<string, Placement>;
   catalog: Catalog;
-  /** Its adapter declares each namespace a plugin. Absent is off. */
+  /** Its adapter declares each namespace a plugin; absent is off. */
   namespacePlugins?: boolean;
   /** Read whole this run, so its catalog is everything it lists, not only what was asked for. */
   whole?: boolean;
-  /** An entry's content on disk, and the identity the store keyed it by. */
   content: (entryPath: string) => Promise<Staged>;
-  /** Releases whatever the adapter opened. */
   close: () => Promise<void>;
 }
 
-/** Where the bytes are, and what upstream identity they were stored under. */
 export interface Staged {
   path: string;
-  /** The directory holding the native files, which is what a version directory is. */
+  /** The version directory, which holds the native files. */
   root: string;
   contentId: string;
   /** Written into the mirror as `artifact.json`, which is what makes it a root. */
   envelope: Envelope;
-  /** Members of a collection that did not land, and why. Empty on a clean fetch. */
   dropped: { member: string; reason: string; error: AdapterError | undefined }[];
 }
 
 export type Fetch = (source: string, path: string) => Promise<Staged>;
-
-/** Resolve content through the registry that produced the catalog entry. */
-export function fetchFrom(acquired: readonly Acquired[]): Fetch {
-  const byAlias = new Map(acquired.map((entry) => [entry.alias, entry]));
-  return (source, path) => {
-    const found = byAlias.get(source);
-    return found === undefined
-      ? Promise.reject(
-          new AiregError(`Registry ${quoted(source)} is no longer available.`, {
-            code: ErrorCode.NotFound,
-          }),
-        )
-      : found.content(path);
-  };
-}
-
-/** Where a registry lists a lock row; one of yours has no address until a publish of it is recorded. */
-export function listedAt(row: LockArtifact, entries: readonly Entry[]): string | undefined {
-  if (row.address !== undefined || row.origin === undefined) return row.address;
-  return entryFor(entries, row.namespace, row.kind, row.name)?.path;
-}
-
-export function lockSourceOf(origin: Origin): LockRegistry {
-  return {
-    location: origin.declared,
-    adapter: origin.adapter,
-    key: origin.key,
-    config: origin.config,
-    revision: origin.revision,
-  };
-}
-
-export function dropUnusedSources(lock: Lock): void {
-  for (const alias of Object.keys(lock.registries)) {
-    const used = Object.values(lock.artifacts).some((entry) => entry.registry === alias);
-    if (!used) delete lock.registries[alias];
-  }
-}
 
 /** For one front-matter key: the files its readers take it from, and who cannot keep it. */
 export interface KeyRule {
@@ -130,10 +81,7 @@ export interface KeyRule {
 export type Action =
   /** Fetch and stage content only when this action is applied. */
   | { kind: "stage"; name: string; source: string; path: string; to: string }
-  /**
-   * This scope's own writable copy of a staged version directory. A target is
-   * pointed at the copy, never at the mirror, so an edit stops in this scope.
-   */
+  /** This scope's writable copy of a staged version directory, so an edit stops in this scope. */
   | { kind: "clone"; name: string; from: string; to: string }
   | {
       kind: "link";
@@ -145,17 +93,16 @@ export type Action =
       copy: boolean;
       /** Points the target at a whole plugin, which has to be assembled. */
       plugin?: boolean;
-      /** The content this projection links to. Present with `plugin`. */
+      /** Present with `plugin`: the content this projection links to. */
       content?: string;
-      /** The plugin's own account of itself, for the manifests its projection gets. */
       document?: PluginDocument;
       /** A real copy already at `to`, holding exactly these bytes, is taken over rather than rewritten. */
       adopt?: boolean;
-      /** How the lock recorded a link at this path, when aireg made one before. */
+      /** How the lock recorded a link at this path; absent when aireg made none. */
       recorded?: LinkMode;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
-      /** Written in the target's own format. */
+      /** Absent writes the bytes as they are. */
       codec?: Codec;
       /** A plugin's command, written as a skill a person invokes under this name. */
       command?: string;
@@ -182,36 +129,29 @@ export type Action =
 export interface Warning {
   name: string | undefined;
   message: string;
-  /** What to do about it, said on its own line. */
+  /** Printed on its own line. */
   hint?: string;
 }
 
 export interface Plan {
   actions: Action[];
-  /** Artifacts already correct on disk. An empty plan is the common case. */
+  /** Artifacts already correct on disk. */
   unchanged: string[];
   warnings: Warning[];
   /** Explicitly requested artifacts this CLI is too old to install. */
   incompatible: Incompatible[];
-  /** Locked versions the registry now serves other bytes for. */
   rewritten: Rewritten[];
-  /** Artifacts left out because another holds the name they install under. */
   clashes: Clash[];
-  /** Artifacts this run installs under another name, because another holds their own. */
   renamed: Renamed[];
-  /** What is installed only because other artifacts need it, by installed name: their names. */
+  /** Installed name of each dependency-only install, mapped to the names that need it. */
   neededBy: Record<string, string[]>;
-  /** Dependencies this plan removes because nothing needs them any more. */
+  /** Dependencies nothing needs any more. */
   pruned: string[];
-  /** Needs no source listed at the version asked for; the caller asks again or refuses. */
   unresolved: Unresolved[];
-  /** Requirements no single installation can meet. */
   conflicts: Conflict[];
   /** Installed artifacts kept as they are, because the registry withholds the version it reached. */
   withheld: Kept[];
-  /** Installed artifacts kept as they are, because their registry no longer lists them. */
   unlisted: Unlisted[];
-  /** Plugins left out because they carry what runs on its own, and no entry trusts them. */
   untrusted: Untrusted[];
 }
 
@@ -242,64 +182,6 @@ export function emptyPlan(): Plan {
   };
 }
 
-/** What survey found for one locked artifact. */
-export interface ArtifactSurvey {
-  /** Present in the project's writable copy. */
-  staged: boolean;
-  /** Undefined when nothing is staged. */
-  digest: string | undefined;
-  links: Record<
-    string,
-    {
-      present: boolean;
-      isLink: boolean;
-      target: string | undefined;
-      mode: LinkMode;
-      /** A copy's digest now, compared with the one the lock recorded. */
-      digest?: string | undefined;
-    }
-  >;
-}
-
-export interface Survey {
-  artifacts: Record<string, ArtifactSurvey>;
-}
-
-/** A target's copy that no longer matches what was written there. */
-export function copyEdited(
-  link: { path: string; mode: LinkMode; digest?: string | undefined },
-  state: ArtifactSurvey | undefined,
-): boolean {
-  const seen = state?.links[link.path];
-  return (
-    link.mode === "copy" &&
-    link.digest !== undefined &&
-    seen?.digest !== undefined &&
-    seen.digest !== link.digest
-  );
-}
-
-/** The copy here no longer matches what the lock says was installed. */
-export function editedHere(
-  entry: LockArtifact | undefined,
-  state: ArtifactSurvey | undefined,
-): boolean {
-  return (
-    state?.staged === true &&
-    entry !== undefined &&
-    entry.digest !== "" &&
-    state.digest !== entry.digest
-  );
-}
-
-/** Edited in this scope's copy or in a target's own copy, so not ours to replace unasked. */
-export function editedAnywhere(
-  entry: LockArtifact | undefined,
-  state: ArtifactSurvey | undefined,
-): boolean {
-  return editedHere(entry, state) || (entry?.links ?? []).some((link) => copyEdited(link, state));
-}
-
 /** One artifact inside a plugin, as the plugin's own directory holds it. */
 export interface Contained {
   name: string;
@@ -316,7 +198,7 @@ export interface PluginDocument {
   description?: string | undefined;
   /** The manifest a target loads it by, which a plugin without its own gets written for it. */
   manifest?: Record<string, unknown> | undefined;
-  /** Its command files, by command name, relative to the plugin. */
+  /** Paths are relative to the plugin. */
   commands: readonly { name: string; path: string }[];
   /** What a target that loads it would start on its own, which needs a person's yes. */
   carries: readonly Carried[];
@@ -337,20 +219,16 @@ export interface Selected {
   upstreamName: string;
   /** Upstream content identity, when the source attests one before fetching. */
   contentId: string | undefined;
-  /** The version the source published, where it publishes versions. */
   version: string | undefined;
   /** For a plugin read from a source that is not a registry, what places it. */
   plugin?: PluginDocument | undefined;
   /** The commit it was read at, where that is its own rather than the registry's. */
   revision?: string | undefined;
-  /**
-   * What a plugin holds, so a target with no plugin directory can be given
-   * its parts. Empty for every other kind.
-   */
+  /** A plugin's parts, for a target with no plugin directory; empty for every other kind. */
   contents: Contained[];
   /** The plugin that publishes this, when one does. */
   group: string | undefined;
-  /** Targets the manifest narrowed this artifact to. */
+  /** Targets the manifest narrowed this artifact to; absent means every target the run writes. */
   targets?: readonly string[] | undefined;
   /** The manifest names it, rather than taking it with a whole namespace or registry. */
   named?: boolean;
@@ -378,18 +256,25 @@ export interface Clash {
 
 /** An artifact installed under another name because another artifact holds its own. */
 export interface Renamed {
-  /** Its registry address. */
+  /** Registry address. */
   artifact: string;
   as: string;
-  /** The address of what holds its own name. */
+  /** Registry address of what holds its own name. */
   by: string;
 }
 
+/** A locked version the registry now serves other bytes for; `locked` and `served` are content digests. */
 export interface Rewritten {
   name: string;
   version: string;
-  /** The content digest the lock records. */
   locked: string;
-  /** The one the registry serves now. */
   served: string;
+}
+
+export function recordOf(plan: Plan): Lock {
+  const record = plan.actions.find(
+    (action): action is Extract<Action, { kind: "record" }> => action.kind === "record",
+  );
+  if (record === undefined) throw new Error("The plan has no lockfile record.");
+  return record.lock;
 }

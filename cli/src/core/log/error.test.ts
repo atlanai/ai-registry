@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { SpecError } from "#adapter/index.ts";
 import { serializeError } from "./error.ts";
 
@@ -11,22 +11,22 @@ class AdapterError extends Error {
 }
 
 describe("serializeError", () => {
-  it("keeps the stack of an error nobody classified", () => {
+  test("keeps the stack of an error nobody classified", () => {
     expect(serializeError(new Error("unexpected")).stack).toBeDefined();
   });
 
-  it("omits the stack of a classified error, whose code already says it", () => {
+  test("omits the stack of a classified error, whose code already says it", () => {
     const serialized = serializeError(new AdapterError("repository not found"));
     expect(serialized.stack).toBeUndefined();
     expect(serialized.code).toBe("not_found");
   });
 
-  it("omits the stack of a registry that breaks the file spec, an expected failure", () => {
+  test("omits the stack of a registry that breaks the file spec, an expected failure", () => {
     expect(serializeError(new SpecError("index.json is not valid JSON.")).stack).toBeUndefined();
     expect(serializeError(new SpecError("gone", { missing: true })).code).toBe("not_found");
   });
 
-  it("classifies any error that carries its own code, whatever its class is named", () => {
+  test("classifies any error that carries its own code, whatever its class is named", () => {
     class ScopeError extends Error {
       readonly code = "usage";
       constructor() {
@@ -37,7 +37,7 @@ describe("serializeError", () => {
     expect(serializeError(new ScopeError()).stack).toBeUndefined();
   });
 
-  it("keeps the stack of a system error, whose code names the call that failed, not a cause", () => {
+  test("keeps the stack of a system error, whose code names the call that failed, not a cause", () => {
     const missing = Object.assign(new Error("ENOENT: no such file"), {
       code: "ENOENT",
       syscall: "open",
@@ -45,14 +45,14 @@ describe("serializeError", () => {
     expect(serializeError(missing).stack).toBeDefined();
   });
 
-  it("stops walking a cyclic cause chain", () => {
+  test("stops walking a cyclic cause chain", () => {
     const a = new Error("a");
     const b = new Error("b", { cause: a });
     (a as { cause?: unknown }).cause = b;
     expect(() => serializeError(a)).not.toThrow();
   });
 
-  it("describes a value that is not an Error at all", () => {
+  test("describes a value that is not an Error at all", () => {
     expect(serializeError("plain string")).toMatchObject({
       name: "NonError",
       message: "plain string",

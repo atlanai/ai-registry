@@ -14,29 +14,9 @@ import {
   type Want,
 } from "#adapter/index.ts";
 import { isLayoutId, isReadOnlyLayout, type LayoutId } from "#adapter/layouts/ids.ts";
-import { detectLayout, openLayoutRoot } from "#adapter/layouts/index.ts";
+import { detectLayout, openLayoutRoot } from "#adapter/layouts/open.ts";
 import { fail, translating } from "./errors.ts";
 import { writeOffer } from "./publish.ts";
-
-/** The layout the manifest recorded or `--layout` forced; undefined detects it. */
-function layoutOf(context: SourceContext): LayoutId | undefined {
-  const named = context.source.config.layout;
-  if (named === undefined) return undefined;
-  if (!isLayoutId(named)) throw fail("invalid", `${named} is not a layout this adapter reads.`);
-  return named;
-}
-
-/** A folder of skills has no versions: what it holds now is all there is, named by its content. */
-function refuseVersions(registry: string, want: readonly Want[]): void {
-  const pinned = want.find((item) => item.version !== undefined);
-  if (pinned === undefined) return;
-  throw fail(
-    "invalid",
-    `${registry} is a folder of skills, which has no versions, so ${pinned.name}@${pinned.version} cannot be installed.`,
-    pinned.name,
-    "Leave off the `@<version>`: aireg installs what the folder holds now.",
-  );
-}
 
 export async function connect(context: SourceContext): Promise<SourceHandle> {
   const root = context.source.location;
@@ -65,6 +45,8 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
   const namespace = registryNameFromLocation(root, "skills");
   const { registry } = context.source;
 
+  // A version folder is already content the spec describes, so it is copied from where it sits,
+  // never staged into a second store; a publish writes in place, for the next resolve to read.
   return {
     resolve: (want, options): Promise<Resolution> =>
       translating(async () => {
@@ -77,15 +59,10 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
         return resolution;
       }),
 
-    /**
-     * The version directory is already content the spec describes, so it is
-     * copied from where it sits rather than staged into a second store first.
-     */
     localRoot: (artifact) => translating(() => files.localRoot(artifact)),
 
     fetch: (artifact, file) => translating(() => files.fetch(artifact, file)),
 
-    /** Written in place, and read by the next resolve. */
     async publish(
       changes: readonly PublishInput[],
       options?: PublishOptions,
@@ -116,4 +93,24 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
 
     async close(): Promise<void> {},
   };
+}
+
+/** The layout the manifest recorded or `--layout` forced; undefined detects it. */
+function layoutOf(context: SourceContext): LayoutId | undefined {
+  const named = context.source.config.layout;
+  if (named === undefined) return undefined;
+  if (!isLayoutId(named)) throw fail("invalid", `${named} is not a layout this adapter reads.`);
+  return named;
+}
+
+/** A folder of skills has no versions: what it holds now is all there is, named by its content. */
+function refuseVersions(registry: string, want: readonly Want[]): void {
+  const pinned = want.find((item) => item.version !== undefined);
+  if (pinned === undefined) return;
+  throw fail(
+    "invalid",
+    `${registry} is a folder of skills, which has no versions, so ${pinned.name}@${pinned.version} cannot be installed.`,
+    pinned.name,
+    "Leave off the `@<version>`: aireg installs what the folder holds now.",
+  );
 }

@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { render, useInput } from "ink";
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { useMouse } from "./mouse.ts";
 
 /** A terminal Ink can drive: raw mode recorded, output discarded. */
@@ -37,7 +37,7 @@ function Probe(props: { typing: boolean; pointing: boolean }) {
 }
 
 describe("useMouse", () => {
-  it("hands raw mode back when it unmounts, so the terminal leaves raw mode once nothing reads keys", async () => {
+  test("hands raw mode back when it unmounts, so the terminal leaves raw mode once nothing reads keys", async () => {
     const { stdin, stdout } = terminal();
     const written = vi.spyOn(process.stdout, "write").mockReturnValue(true);
     const app = render(createElement(Probe, { typing: true, pointing: true }), {

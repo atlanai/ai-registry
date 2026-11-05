@@ -2,12 +2,10 @@ import { StringDecoder } from "node:string_decoder";
 import { parseMessage, type RpcMessage } from "./protocol.ts";
 
 export const MAX_RPC_FRAME_BYTES = 1024 * 1024;
-/** The limit as the messages name it. */
 export const MAX_RPC_FRAME_SHOWN = `${MAX_RPC_FRAME_BYTES / (1024 * 1024)} MiB`;
 
 export class FrameDecoder {
   readonly #decoder = new StringDecoder("utf8");
-  /** Who sent the frames, as the limit message names them. */
   readonly #peer: string;
   #buffer = "";
   #bytes = 0;

@@ -1,5 +1,5 @@
 import { generateKeyPairSync, sign } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { ErrorCode } from "#core/errors.ts";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { RELEASE_ADAPTER_FILE } from "#core/product.ts";
@@ -65,7 +65,7 @@ function origin(bodies: Record<string, string>, bytes: Uint8Array, seen: string[
 }
 
 describe("resolveAdapter", () => {
-  it("reads the channel manifest and derives the artifact URL", async () => {
+  test("reads the channel manifest and derives the artifact URL", async () => {
     const keys = stamped();
     const manifest = manifestOf();
     const seen: string[] = [];
@@ -92,7 +92,7 @@ describe("resolveAdapter", () => {
     expect(seen).toEqual([CHANNEL, ARTIFACT]);
   });
 
-  it("pins through the version directory, and never fetches the manifest url field", async () => {
+  test("pins through the version directory, and never fetches the manifest url field", async () => {
     const keys = stamped();
     const manifest = manifestOf();
     const seen: string[] = [];
@@ -110,7 +110,7 @@ describe("resolveAdapter", () => {
     expect(seen).not.toContain(CHANNEL);
   });
 
-  it("accepts a pinned version signed for stable on a canary CLI", async () => {
+  test("accepts a pinned version signed for stable on a canary CLI", async () => {
     const keys = stamped();
     const stamp = { ...keys.stamp, channel: "canary" as const };
     const manifest = manifestOf();
@@ -126,7 +126,7 @@ describe("resolveAdapter", () => {
     expect(seen).toEqual([VERSION_MANIFEST]);
   });
 
-  it("resolves an adapter whose minimum_version floor is above the CLI's own version", async () => {
+  test("resolves an adapter whose minimum_version floor is above the CLI's own version", async () => {
     // `minimum_version` is a floor on the adapter's own line, not on the client.
     const keys = stamped();
     const manifest = manifestOf({ version: "1.4.0", minimumVersion: "1.2.0" });
@@ -139,7 +139,7 @@ describe("resolveAdapter", () => {
     expect(release.version).toBe("1.4.0");
   });
 
-  it("refuses another adapter's signed release before downloading it", async () => {
+  test("refuses another adapter's signed release before downloading it", async () => {
     const keys = stamped();
     const manifest = manifestOf({ adapter: "other" });
     const seen: string[] = [];
@@ -157,7 +157,7 @@ describe("resolveAdapter", () => {
     expect(seen).toEqual([CHANNEL]);
   });
 
-  it("refuses a release that names no adapter", async () => {
+  test("refuses a release that names no adapter", async () => {
     const keys = stamped();
     const { adapter: _, ...manifest } = manifestOf();
     const $fetch = origin(
@@ -173,7 +173,7 @@ describe("resolveAdapter", () => {
     });
   });
 
-  it("accepts atlan's releases, which were signed before releases named their adapter", async () => {
+  test("accepts atlan's releases, which were signed before releases named their adapter", async () => {
     const keys = stamped();
     const { adapter: _, ...manifest } = manifestOf();
     const url = `${ORIGIN}/adapters/atlan/channels/stable/manifest.json`;

@@ -1,9 +1,10 @@
 import type { RegistryIdentity } from "../contract.ts";
 import { type ArtifactKind, isKind } from "../kinds.ts";
 import { compareVersion, parseVersion, type Version } from "../semver.ts";
+import { isVersion } from "../spec/ref.ts";
 import { SUPPORTED_FORMAT } from "../spec/types.ts";
 import { list, quoted } from "../text.ts";
-import { INDEX_DOCUMENT, isVersion, REGISTRY_DOCUMENT, versionsPath } from "./names.ts";
+import { INDEX_DOCUMENT, REGISTRY_DOCUMENT, versionsPath } from "./names.ts";
 
 // The same paths work for every kind of root, so this is the only reader there is
 // and a transport is one function.
@@ -43,12 +44,21 @@ export class SpecError extends Error {
 
 type Fields = Record<string, unknown>;
 
-function isRecord(value: unknown): value is Fields {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+/** The JSON document at `path`, or undefined when there is none. */
+export async function readJson(read: ReadPath, path: string): Promise<unknown | undefined> {
+  const bytes = await read(path);
+  if (bytes === undefined) return undefined;
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+  } catch (cause) {
+    // The parser's message quotes the bytes it stopped at, which are the registry's to choose.
+    throw new SpecError(`${path} is not valid JSON.`, { path, cause });
+  }
 }
 
-function textOf(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+export function object(value: unknown, path: string): Fields {
+  if (!isRecord(value)) throw new SpecError(`${path} must be a JSON object.`, { path });
+  return value;
 }
 
 /** A root's `registry.json`, read and checked. */
@@ -95,27 +105,8 @@ export interface VersionsDocument {
 
 export const DEFAULT_BLOB_URL = "blobs/sha256/{digest}";
 
-/** The JSON document at `path`, or undefined when there is none. */
-export async function readJson(read: ReadPath, path: string): Promise<unknown | undefined> {
-  const bytes = await read(path);
-  if (bytes === undefined) return undefined;
-  try {
-    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-  } catch (cause) {
-    // The parser's message quotes the bytes it stopped at, which are the registry's to choose.
-    throw new SpecError(`${path} is not valid JSON.`, { path, cause });
-  }
-}
-
-export function object(value: unknown, path: string): Fields {
-  if (!isRecord(value)) throw new SpecError(`${path} must be a JSON object.`, { path });
-  return value;
-}
-
-function text(entry: Fields, key: string, path: string): string {
-  const value = textOf(entry[key]);
-  if (value === undefined) throw new SpecError(`${path} needs a non-empty \`${key}\`.`, { path });
-  return value;
+function isRecord(value: unknown): value is Fields {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function identityOf(registry: RegistryDocument): RegistryIdentity {
@@ -178,27 +169,16 @@ export async function readRegistry(read: ReadPath): Promise<RegistryDocument> {
   };
 }
 
-function entryOf(raw: unknown, at: string): IndexRow | undefined {
-  const item = object(raw, at);
-  const kind = text(item, "kind", at);
-  // A root may hold kinds this client has no reader for. Section 5 rule 4:
-  // unknown is not an error, so it is skipped rather than refused.
-  if (!isKind(kind)) return undefined;
-  return {
-    namespace: text(item, "namespace", at),
-    kind,
-    name: text(item, "name", at),
-    latest: text(item, "latest", at),
-    digest: text(item, "digest", at),
-    status: textOf(item.status),
-    description: textOf(item.description),
-  };
+function textOf(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
-/**
- * The catalog. One read answers "what does this publish", which is what
- * replaces walking a tree.
- */
+function text(entry: Fields, key: string, path: string): string {
+  const value = textOf(entry[key]);
+  if (value === undefined) throw new SpecError(`${path} needs a non-empty \`${key}\`.`, { path });
+  return value;
+}
+
 export async function readIndex(read: ReadPath): Promise<IndexRow[]> {
   const raw = await readJson(read, INDEX_DOCUMENT);
   if (raw === undefined) {
@@ -226,6 +206,23 @@ export async function readIndex(read: ReadPath): Promise<IndexRow[]> {
     entries.push(parsed);
   }
   return entries;
+}
+
+function entryOf(raw: unknown, at: string): IndexRow | undefined {
+  const item = object(raw, at);
+  const kind = text(item, "kind", at);
+  // A root may hold kinds this client has no reader for. Section 5 rule 4:
+  // unknown is not an error, so it is skipped rather than refused.
+  if (!isKind(kind)) return undefined;
+  return {
+    namespace: text(item, "namespace", at),
+    kind,
+    name: text(item, "name", at),
+    latest: text(item, "latest", at),
+    digest: text(item, "digest", at),
+    status: textOf(item.status),
+    description: textOf(item.description),
+  };
 }
 
 /** An artifact's versions, from its `versions.json` under the root `read` serves. */
@@ -267,7 +264,7 @@ export async function readVersions(
 /** How many versions a refusal suggests; `versions.json` lists the newest first. */
 const SUGGESTED = 5;
 
-/** What a ref without `@<version>` resolves to: `latest`, skipping nothing. */
+/** Does not skip yanked or unreleased rows; an unlisted version throws. */
 export function resolveVersion(document: VersionsDocument, wanted: string | undefined): VersionRow {
   const version = wanted ?? document.latest;
   const found = document.versions.find((item) => item.version === version);
@@ -275,9 +272,9 @@ export function resolveVersion(document: VersionsDocument, wanted: string | unde
   const artifact = [document.namespace, document.name].filter(Boolean).join("/");
   const offered = document.versions.filter((item) => !item.yanked).map((item) => item.version);
   const more = offered.length > SUGGESTED ? `, or another of its ${offered.length} versions` : "";
+  // A version that was never released is a wrong name, not a broken registry.
   throw new SpecError(`${artifact} has no version ${version}.`, {
     path: versionsPath(document.namespace, document.kind, document.name),
-    // Asking for a version that was never released is a wrong name, not a broken registry.
     missing: wanted !== undefined,
     artifact,
     hint:

@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeAll, describe, expect } from "vitest";
 import { ADAPTER_PROTOCOL } from "#adapter/index.ts";
-import { registerBuiltinAdapter } from "#core/adapter/registry.ts";
+import { registerBuiltinAdapter } from "#core/adapter/load.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { ADAPTER_MODULE_FILE } from "#core/product.ts";

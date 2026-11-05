@@ -3,7 +3,7 @@ import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
-import { acquire } from "#core/lease.ts";
+import { acquire } from "#core/lease/lease.ts";
 import { roots } from "#core/store/paths.ts";
 import { registry } from "#test/kit/builders/registry.ts";
 import { fileTest } from "#test/kit/fixtures.ts";

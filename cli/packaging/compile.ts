@@ -22,10 +22,6 @@ export interface CompileOptions {
 }
 
 /**
- * The `bun build` argv for one target. `--bytecode` and `--minify` are absent
- * on purpose; compile.test.ts asserts that and says why.
- */
-/**
  * What Windows shows in a binary's properties and in Task Manager. Bun sets these only when
  * compiling on Windows, which is where the release builds each Windows target.
  */
@@ -39,20 +35,21 @@ function windowsResources(version: Version): string[] {
   ];
 }
 
+/** `--bytecode` and `--minify` are absent on purpose; compile.test.ts says why. */
 export function compileArgs(options: CompileOptions, executable?: string): string[] {
   const version = parseVersion(options.version);
   if (version === undefined || formatVersion(version) !== options.version) {
     throw new Error(`compile version must be exact SemVer (got ${options.version})`);
   }
+  // Bun otherwise reads .env and bunfig.toml from the folder aireg runs in. Stamps are build
+  // inputs, never configuration: a redirectable origin makes the signature check decorative.
   return [
     "build",
     "--compile",
     ...(executable === undefined ? [] : [`--compile-executable-path=${executable}`]),
     `--target=${options.target.bunTarget}`,
-    // Bun otherwise reads .env and bunfig.toml from whatever folder aireg runs in.
     "--no-compile-autoload-dotenv",
     "--no-compile-autoload-bunfig",
-    // Build inputs, never configuration: a redirectable origin makes the signature check decorative.
     ...Object.entries(
       defines({
         version: options.version,

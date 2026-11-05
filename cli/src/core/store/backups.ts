@@ -3,21 +3,9 @@ import { dirname, join } from "node:path";
 import { assertUnredirected } from "#adapter/files.ts";
 import type { Roots } from "./paths.ts";
 
-/** Beside the scope's content tree, so a person finds what was moved where the registry lives. */
-function backupsDir(roots: Pick<Roots, "artifacts">): string {
-  return join(dirname(roots.artifacts), "backups");
-}
-
 /** One directory per run, sortable and free of characters a filesystem refuses. */
 export function backupStamp(now: Date = new Date()): string {
   return now.toISOString().replace(/[-:]|\.\d+/g, "");
-}
-
-async function taken(path: string): Promise<boolean> {
-  return lstat(path).then(
-    () => true,
-    () => false,
-  );
 }
 
 /**
@@ -40,4 +28,16 @@ export async function moveToBackup(
   await mkdir(dirname(to), { recursive: true });
   await rename(from, to);
   return to;
+}
+
+/** Beside the scope's content tree, so a person finds what was moved where the registry lives. */
+function backupsDir(roots: Pick<Roots, "artifacts">): string {
+  return join(dirname(roots.artifacts), "backups");
+}
+
+async function taken(path: string): Promise<boolean> {
+  return lstat(path).then(
+    () => true,
+    () => false,
+  );
 }

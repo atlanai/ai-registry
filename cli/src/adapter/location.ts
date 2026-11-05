@@ -6,19 +6,13 @@ import { sanitizeName } from "./text.ts";
 /** `user@host:path`, the form git takes a remote in without a scheme. */
 export const SCP_LOCATION = /^(?:([\w.-]+)@)?([\w.-]+):(?!\/)(.+)$/;
 
-/**
- * `acme/platform` is a registry and a namespace, never a repository: a source
- * spells out its host, so the two can not be mistaken for each other.
- */
+/** Whether `input` spells out a host or path; `acme/platform` is a registry and a namespace. */
 export function namesHost(input: string): boolean {
   if (isLocalPath(input) || input.includes("://") || SCP_LOCATION.test(input)) return true;
   return (input.split("/")[0] ?? "").includes(".");
 }
 
-/**
- * The last path segment is what a person would have typed, so `acme/kit` and
- * `/src/kit` both become `kit`. A bare origin has none, so `fallback` names it.
- */
+/** The name a person would have typed: the address's last path segment, else `fallback`. */
 export function registryNameFromLocation(location: string, fallback: string): string {
   let path = location;
   try {

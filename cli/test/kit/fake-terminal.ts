@@ -1,7 +1,7 @@
 import { PassThrough } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import { onTestFinished, vi } from "vitest";
-import type { PromptIo } from "#cli/prompt/prompt.ts";
+import type { PromptIo } from "#cli/prompt/model.ts";
 import { CSI_BODY, ESC } from "#core/term/format.ts";
 
 // Under CI, where prompts never run, Ink draws only a final frame; it reads

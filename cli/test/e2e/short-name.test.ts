@@ -7,7 +7,7 @@ import { manifestPath } from "#test/kit/scope.ts";
 import { projectTemplate } from "#test/kit/template.ts";
 
 const test = base
-  /** `lint` in one namespace, `deploy` in two, and a skill named `tools` beside the `tools` namespace. */
+  // `lint` in one namespace, `deploy` in two, and a `tools` skill beside the `tools` namespace.
   .extend("declared", { scope: "file" }, async ({ fileTmp }) => {
     const market = await registry(join(fileTmp, "market"), { name: "acme", slug: "acme" })
       .skill("tools/lint@1.0.0")

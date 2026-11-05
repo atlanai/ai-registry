@@ -80,9 +80,9 @@ describe("publishing a folder agent", () => {
     const { artifacts } = JSON.parse(shown.stdout).data as {
       artifacts: { name: string; kind: string; files?: string[] }[];
     };
+    // `site-health` comes after what it depends on.
     expect(artifacts.map(({ name, kind, files }) => ({ name, kind, files }))).toEqual([
       { name: "pr-approval", kind: "skill", files: undefined },
-      // After what it depends on.
       { name: "site-health", kind: "skill", files: undefined },
       {
         name: "websiteclaw",

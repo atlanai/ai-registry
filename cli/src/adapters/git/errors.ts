@@ -1,6 +1,5 @@
 import { AdapterError, SpecError } from "#adapter/index.ts";
 
-/** The adapter's id, under which every failure it reports is filed. */
 export const ID = "git";
 
 /** Git registries take no token from aireg: git brings its own credentials. */
