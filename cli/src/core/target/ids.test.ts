@@ -12,7 +12,7 @@ describe("resolveTargets", () => {
   });
 
   test("fills the defaults an entry leaves out", () => {
-    const table = resolveTargets();
+    const table = resolveTargets(process.env);
     expect(table.cursor?.detect).toEqual({
       env: [],
       binary: ["cursor", "cursor-agent"],
@@ -23,7 +23,7 @@ describe("resolveTargets", () => {
   });
 
   test("files every built-in as a coding agent but the shared folder", () => {
-    const table = resolveTargets();
+    const table = resolveTargets(process.env);
     const others = Object.values(table).filter((target) => target.category !== "coding-agent");
     expect(others.map(({ name, category, shared }) => [name, category, shared])).toEqual([
       ["universal", "shared-folder", true],
@@ -31,7 +31,7 @@ describe("resolveTargets", () => {
   });
 
   test("keys each built-in by its industry id, with its earlier id as an alias", () => {
-    const table = resolveTargets();
+    const table = resolveTargets(process.env);
     expect(
       Object.fromEntries(Object.values(table).map((each) => [each.name, each.aliases])),
     ).toEqual({
@@ -59,11 +59,11 @@ describe("earlierId", () => {
     ["claude-code:work", "claude:work"],
     ["mine", "mine"],
   ])("records %s as %s, the id aireg 0.1 reads", (id, was) => {
-    expect(earlierId(resolveTargets(), id)).toBe(was);
+    expect(earlierId(resolveTargets(process.env), id)).toBe(was);
   });
 
   test("keeps today's id once the table no longer reads the earlier one as this target", () => {
-    const table = resolveTargets();
+    const table = resolveTargets(process.env);
     const renamed = {
       ...table,
       "claude-code": { ...(table["claude-code"] as Target), aliases: ["cc"] },
@@ -77,7 +77,7 @@ describe("earlierId", () => {
 
 describe("earlierTable", () => {
   test("keys and names each target by the id aireg 0.1 knew, with its kind", () => {
-    const table = earlierTable(resolveTargets());
+    const table = earlierTable(resolveTargets(process.env));
     const claude = Object.values(table).find((target) => target.name === "claude");
     expect(claude?.displayName).toBe("Claude Code");
     expect(Object.keys(table).sort()).toEqual(
@@ -107,14 +107,14 @@ describe("earlierTable", () => {
   });
 
   test("leaves an earlier id to a target that has it as its own", () => {
-    const table = resolveTargets();
+    const table = resolveTargets(process.env);
     const mine = { ...(table.codex as Target), name: "claude", displayName: "Mine" };
     expect(earlierTable({ ...table, claude: mine }).claude?.displayName).toBe("Mine");
   });
 });
 
 describe("canonicalId", () => {
-  const table = resolveTargets();
+  const table = resolveTargets(process.env);
 
   test.each([
     ["claude", "claude-code"],

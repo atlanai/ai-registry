@@ -4,9 +4,8 @@ import { readConfig } from "#core/config/repository.ts";
 import type { RunRecord } from "#core/run/model.ts";
 import type { Disposition } from "#core/sync/model.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
-import { RpcErrorCode } from "#daemon/rpc/codes.ts";
+import { invalidParams } from "#daemon/rpc/errors.ts";
 import type { ConflictResolution, RpcContext } from "#daemon/rpc/methods.ts";
-import { ProtocolError } from "#daemon/rpc/protocol.ts";
 import type { SyncRunner } from "#daemon/runs/runner.ts";
 import { artifactKey } from "#engine/sync/decide.ts";
 import { kindAddress } from "#engine/sync/narrow.ts";
@@ -55,8 +54,7 @@ export async function startResolution(
   const wanted = inputs.oneOf(params, "resolution", RESOLUTIONS);
   // Refused rather than start a run that would silently do nothing.
   if (wanted === "theirs" && work.policy.pull === "off") {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
+    throw invalidParams(
       `The registry's copy cannot be taken ${options.place}, because pulling is off.`,
     );
   }
@@ -64,10 +62,8 @@ export async function startResolution(
   const status = await watchStatus(work, account, options.signal);
   const artifact = status.artifacts.find((entry) => entry.name === name);
   if (artifact === undefined || !resolvable(artifact, wanted)) {
-    // Says what it is instead, because "not waiting" alone leaves a caller
-    // guessing between an unknown name and an artifact that already settled.
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
+    // Tell an unknown name from an artifact that already settled.
+    throw invalidParams(
       artifact === undefined
         ? `No artifact named ${quoted(name)} ${options.place}.`
         : `${quoted(name)} is not waiting on a choice ${options.place}, so there is nothing to resolve.`,

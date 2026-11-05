@@ -40,14 +40,15 @@ describe("a plugin placed as a copy", () => {
     };
 
     // A member cloned after the plugin's first link, as a later clone in the plan would be.
-    await apply(
+    await apply({
       plan,
       roots,
-      () => Promise.reject(new Error("nothing is staged")),
-      (action) => {
+      fetch: () => Promise.reject(new Error("nothing is staged")),
+      env: process.env,
+      onStep: (action) => {
         if (action.kind === "record") mkdirSync(join(content, "skills", "lint"));
       },
-    );
+    });
     expect((await readdir(join(to, "skills"))).sort()).toEqual(["lint", "ship"]);
   });
 });

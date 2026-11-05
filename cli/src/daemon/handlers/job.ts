@@ -1,10 +1,11 @@
-import { AccountService } from "#accounts/service.ts";
+import type { ResolvedRegistry } from "#accounts/registry.ts";
+import { adoptAccount, resolveAccount } from "#accounts/service.ts";
 import { messageOf } from "#adapter/errors.ts";
 import { expandHome } from "#adapter/paths.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { unwatchCommand } from "#core/config/jobs.ts";
+import { scopeSteps, unwatchCommand } from "#core/config/jobs.ts";
 import {
   type Account,
   DEFAULT_INTERVAL_SECONDS,
@@ -23,16 +24,13 @@ import type { RegistrySource } from "#core/manifest/model.ts";
 import { readManifest, writeManifest } from "#core/manifest/repository.ts";
 import { formatAddress, formatRef, parseRef, type Ref } from "#core/ref.ts";
 import { type Roots, roots, type Scope, scopeFor } from "#core/store/paths.ts";
-import type { SyncPolicy } from "#core/sync/policy.ts";
-import { OPTIONAL_AXES } from "#core/sync/policy.ts";
 import { DEFAULT_TARGETS } from "#core/target/ids.ts";
-import { RpcErrorCode } from "#daemon/rpc/codes.ts";
-import { ProtocolError } from "#daemon/rpc/protocol.ts";
+import { invalidParams, noAccount, noJob, staleSettings } from "#daemon/rpc/errors.ts";
 import { forgetOrigins } from "#engine/sync/origins.ts";
 import { FOREGROUND_POLICY } from "#engine/sync/work.ts";
 import { contributedJobId, skillsJobId } from "./job-id.ts";
 import * as inputs from "./params.ts";
-import { committed, staleSettings } from "./settings-write.ts";
+import { committed } from "./settings-write.ts";
 
 /** Every job names an account; the credential on it is what may be absent. */
 export function accountOf(config: RegistryConfig, job: Job): Account {
@@ -42,7 +40,7 @@ export function accountOf(config: RegistryConfig, job: Job): Account {
 function accountFor(config: RegistryConfig, accountId: string): Account {
   const account = config.accounts.find(({ id }) => id === accountId);
   if (account === undefined) {
-    throw new ProtocolError(RpcErrorCode.NotFound, `No account named ${quoted(accountId)}.`);
+    throw noAccount(accountId);
   }
   return account;
 }
@@ -51,10 +49,7 @@ function accountFor(config: RegistryConfig, accountId: string): Account {
 export function artifactsJobFor(config: RegistryConfig, jobId: string): Job {
   const job = jobFor(config, jobId);
   if (!job.steps.some((step) => step.root !== undefined)) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
-      `Job ${quoted(jobId)} does not sync a project or your user scope.`,
-    );
+    throw invalidParams(`Job ${quoted(jobId)} does not sync a project or your user scope.`);
   }
   return job;
 }
@@ -62,7 +57,7 @@ export function artifactsJobFor(config: RegistryConfig, jobId: string): Job {
 function jobFor(config: RegistryConfig, jobId: string): Job {
   const job = config.jobs.find(({ id }) => id === jobId);
   if (job === undefined) {
-    throw new ProtocolError(RpcErrorCode.NotFound, `No job named ${quoted(jobId)}.`);
+    throw noJob(jobId);
   }
   return job;
 }
@@ -86,8 +81,7 @@ export async function createJob(
   const refs = (inputs.optionalNames(params, "refs") ?? []).map((ref) => parseRef(ref));
   const foreign = refs.find((ref) => ref.registry !== alias);
   if (foreign !== undefined) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
+    throw invalidParams(
       `${quoted(formatRef(foreign))} is not an artifact of ${quoted(alias)}: name it as ${alias}/<namespace>/<kind>/<name>.`,
     );
   }
@@ -142,34 +136,7 @@ export async function createJob(
     },
     steps: [
       ...(origins === undefined ? [] : [origins]),
-      {
-        name: "pull",
-        kind: "pull",
-        needs: origins === undefined ? [] : ["origins"],
-        root,
-        select: [],
-        policy: policy.pull,
-        extra: {},
-      },
-      {
-        name: "publish",
-        kind: "publish",
-        needs: ["pull"],
-        root,
-        select: [],
-        policy: policy.publish,
-        extra: {},
-      },
-      {
-        name: "prune",
-        kind: "prune",
-        needs: ["pull"],
-        root,
-        select: [],
-        policy: policy.delete,
-        extra: {},
-      },
-      ...optionalSteps(policy, root),
+      ...scopeSteps(root, policy, origins === undefined ? [] : ["origins"]),
     ],
   };
   return { config: await saveJob(job, latest.revision), job };
@@ -191,14 +158,13 @@ async function createAdapterJob(
   const account = accountFor(config, inputs.text(params, "account"));
   let handler = await stepContribution(type);
   try {
-    const resolved = await new AccountService().resolve(account);
+    const resolved = await resolveAccount(account);
     handler = stepOn(resolved.adapter, type) ?? handler;
   } catch {
     // The job still runs if any installed adapter registered this type.
   }
   if (handler === undefined) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
+    throw invalidParams(
       `No installed adapter runs ${quoted(type)} jobs. Install one with \`aireg adapter install\`.`,
     );
   }
@@ -309,25 +275,20 @@ async function declareForAccounts(
 async function bindAccount(config: RegistryConfig, alias: string): Promise<Account> {
   const existing = config.accounts.find((account) => account.registry === alias);
   if (existing !== undefined) return existing;
-  const service = new AccountService();
-  // Resolved before anything is written: a refusal must leave no row behind.
-  let resolved: Awaited<ReturnType<AccountService["resolve"]>>;
+  // Before anything is written, so a refusal leaves no row behind.
+  let resolved: ResolvedRegistry;
   try {
-    resolved = await service.resolve({ id: "", registry: alias });
+    resolved = await resolveAccount({ id: "", registry: alias });
   } catch (cause) {
-    throw new ProtocolError(RpcErrorCode.InvalidParams, messageOf(cause));
+    throw invalidParams(messageOf(cause));
   }
   if (resolved.adapter.auth !== undefined) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
-      `${alias} needs a signed-in account for a job to run as.`,
-      {
-        code: ErrorCode.Unauthorized,
-        hint: `Run \`aireg auth login ${alias}\`. A job never sees ${tokenVariable(alias)}, since the daemon does not inherit it.`,
-      },
-    );
+    throw invalidParams(`${alias} needs a signed-in account for a job to run as.`, {
+      code: ErrorCode.Unauthorized,
+      hint: `Run \`aireg auth login ${alias}\`. A job never sees ${tokenVariable(alias)}, since the daemon does not inherit it.`,
+    });
   }
-  return service.adopt(alias);
+  return adoptAccount(alias);
 }
 
 /** An existing entry is never rewritten, only given settings it had none of. */
@@ -352,8 +313,7 @@ async function declareRegistry(
     existing.config = config;
     changed = true;
   } else if (!sameConfig(existing.config, config) && Object.keys(config).length > 0) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
+    throw invalidParams(
       `Registry ${quoted(alias)} is already declared with the settings ` +
         `${JSON.stringify(existing.config)}, not ${JSON.stringify(config)}.`,
     );
@@ -391,22 +351,15 @@ function originsStep(
   const to = inputs.text(asked, "to");
   const from = inputs.optionalNames(asked, "from") ?? [];
   if (!/^[^/\s]+\/[^/\s]+$/.test(to)) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
-      `The destination must be <registry>/<namespace>, not ${quoted(to)}.`,
-    );
+    throw invalidParams(`The destination must be <registry>/<namespace>, not ${quoted(to)}.`);
   }
   const kept = before?.select.map((selector) => selector.from) ?? [];
   // One job publishes to one place, so moving its folders elsewhere is asked for, never done in passing.
   if (before !== undefined && before.to !== to && kept.length > 0) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
-      `This scope already publishes ${list(kept)} to ${before.to}.`,
-      {
-        code: ErrorCode.Usage,
-        hint: `Publish to ${before.to} instead, or first run \`${unwatchCommand(kept, scope)}\`.`,
-      },
-    );
+    throw invalidParams(`This scope already publishes ${list(kept)} to ${before.to}.`, {
+      code: ErrorCode.Usage,
+      hint: `Publish to ${before.to} instead, or first run \`${unwatchCommand(kept, scope)}\`.`,
+    });
   }
   const folders = [...new Set([...kept, ...from])];
   return {
@@ -420,16 +373,6 @@ function originsStep(
   };
 }
 
-/** The axes a caller named and the defaults leave out: first publishes, and claiming copies. */
-function optionalSteps(policy: SyncPolicy, root: string): Step[] {
-  return OPTIONAL_AXES.flatMap((axis) => {
-    const level = policy[axis];
-    return level === undefined
-      ? []
-      : [{ name: axis, kind: axis, needs: ["pull"], root, select: [], policy: level, extra: {} }];
-  });
-}
-
 /** Every plain config edit as one transaction, so it lands on one revision. */
 export async function patchSettings(raw: unknown): Promise<{ config: RegistryConfig }> {
   const params = inputs.object(raw);
@@ -441,14 +384,13 @@ export async function patchSettings(raw: unknown): Promise<{ config: RegistryCon
   const remove = new Set(inputs.optionalNames(edits, "remove") ?? []);
   for (const id of remove) {
     if (!config.jobs.some((job) => job.id === id)) {
-      throw new ProtocolError(RpcErrorCode.NotFound, `No job named ${quoted(id)}.`);
+      throw noJob(id);
     }
   }
   // An id on both sides is a caller contradicting itself, not an ordering to guess at.
   const collision = upsert.find(({ id }) => remove.has(id));
   if (collision !== undefined) {
-    throw new ProtocolError(
-      RpcErrorCode.InvalidParams,
+    throw invalidParams(
       `Job ${quoted(collision.id)} cannot be both added and removed in one change.`,
     );
   }

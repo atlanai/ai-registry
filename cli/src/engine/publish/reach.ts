@@ -17,7 +17,7 @@ import { type ExportFile, isGlob } from "#core/manifest/export-fields.ts";
 import type { Export, ExportDependency, Manifest } from "#core/manifest/model.ts";
 import { gitIn } from "#core/process.ts";
 import { formatAddress } from "#core/ref.ts";
-import { chooseFiles } from "./files.ts";
+import { chooseFiles, ignoredBy } from "./files.ts";
 import { type Exported, expand } from "./work.ts";
 
 /** A folder artifact is its folder, however an entry reaches it, so one path names one export. */
@@ -43,15 +43,18 @@ export async function exportsOn(
   installed: ReadonlySet<string> = new Set(),
 ): Promise<Reached> {
   const tracked = manifest.exports.length > 0 ? await trackedFiles(base) : undefined;
-  const reading: Reading = { base, tracked, installed, notes: [] };
+  const reading: Reading = { base, tracked, installed };
   const reached = new Map<string, { kind: ArtifactKind; reaches: Reach[] }>();
   const kinds = new Map<string, ArtifactKind>();
+  const notes: string[] = [];
   for (const listed of manifest.exports) {
-    const { roots, named } = await reachedBy(listed, reading);
-    const needed = await neededBy(listed, reading, kinds);
+    const { roots, named, notes: skipped } = await reachedBy(listed, reading);
+    const needed = await neededBy(listed, reading);
+    notes.push(...skipped, ...needed.notes);
+    for (const [root, kind] of needed.kinds) kinds.set(root, kind);
     for (const [root, kind] of roots) {
       const at = reached.get(root) ?? { kind, reaches: [] };
-      at.reaches.push({ entry: { ...listed, dependsOn: needed(root) }, named });
+      at.reaches.push({ entry: { ...listed, dependsOn: needed.dependsOn(root) }, named });
       reached.set(root, at);
     }
   }
@@ -59,19 +62,22 @@ export async function exportsOn(
   for (const [root, { kind, reaches }] of reached) {
     exports.set(root, { kind, exported: merged(reaches, shownAt(root, base)) });
   }
-  exportNeeded(exports, kinds, manifest.exports, reading);
+  for (const [root, needed] of exportNeeded(exports, kinds, manifest.exports, reading)) {
+    exports.set(root, needed);
+  }
   const found = new Map<string, Exported>();
   const matched = new Set<string>();
   for (const [root, { kind, exported }] of exports) {
     const entries = reached.get(root)?.reaches.map((each) => each.entry) ?? [exported];
-    const files = (await isDirectory(root))
-      ? await chooseFiles({ root, kind, entries, tracked, exported: exports.keys(), matched }, base)
+    const chosen = (await isDirectory(root))
+      ? await chooseFiles({ root, kind, entries, tracked, exported: exports.keys() }, base)
       : undefined;
-    found.set(root, { ...exported, files });
+    for (const pattern of chosen?.matched ?? []) matched.add(pattern);
+    found.set(root, { ...exported, files: chosen?.files });
   }
   return {
     found,
-    notes: [...new Set(reading.notes)],
+    notes: [...new Set(notes)],
     warnings: unmatchedPatterns(manifest.exports, matched),
   };
 }
@@ -96,13 +102,8 @@ const SINGLE = ["version", "publish", "kind"] as const;
 
 async function reachedBy(entry: Export, reading: Reading): Promise<Reaching> {
   const reached = isGlob(entry.path)
-    ? { roots: new Map<string, ArtifactKind>(), named: false }
+    ? { ...(await reachEach(entry, await expand(entry.path, reading.base), reading)), named: false }
     : await namedBy(entry, reading);
-  if (isGlob(entry.path)) {
-    for (const path of await expand(entry.path, reading.base)) {
-      await reachThrough(entry, path, reading, reached.roots);
-    }
-  }
   refuseKind(entry, reached.roots, reading.base);
   return reached;
 }
@@ -137,10 +138,10 @@ async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
         },
       );
     }
-    return { roots: new Map([[held.root, held.kind]]), named: true };
+    return { roots: new Map([[held.root, held.kind]]), notes: [], named: true };
   }
   if (await isPlainFolder(path)) {
-    return { roots: await reachInside(entry, path, reading, entry.exclude ?? []), named: false };
+    return { ...(await reachInside(entry, path, reading, entry.exclude ?? [])), named: false };
   }
   throw new AiregError(`Export ${quoted(entry.path)} is not an artifact: it ${held.stray}.`, {
     code: ErrorCode.Invalid,
@@ -214,17 +215,18 @@ async function isPlainFolder(path: string): Promise<boolean> {
   return !entryFile && (await isDirectory(path));
 }
 
-/** What every entry is read against, and the notes on what an entry skipped. */
 interface Reading {
   base: string;
   tracked: readonly string[] | undefined;
   installed: ReadonlySet<string>;
+}
+
+interface Found {
+  roots: Map<string, ArtifactKind>;
   notes: string[];
 }
 
-/** What an entry reaches: artifacts by their roots and kinds, and whether it names one itself. */
-interface Reaching {
-  roots: Map<string, ArtifactKind>;
+interface Reaching extends Found {
   named: boolean;
 }
 
@@ -236,7 +238,7 @@ async function reachInside(
   folder: string,
   reading: Reading,
   exclude: readonly string[],
-): Promise<Map<string, ArtifactKind>> {
+): Promise<Found> {
   const names = (await readdir(folder)).sort();
   for (const name of exclude) {
     if (names.includes(name)) continue;
@@ -248,28 +250,38 @@ async function reachInside(
       },
     );
   }
-  const roots = new Map<string, ArtifactKind>();
-  for (const name of names) {
-    if (exclude.includes(name)) continue;
-    await reachThrough(entry, join(folder, name), reading, roots);
-  }
-  return roots;
+  const paths = names.filter((name) => !exclude.includes(name)).map((name) => join(folder, name));
+  return reachEach(entry, paths, reading);
 }
 
+async function reachEach(
+  entry: Export,
+  paths: readonly string[],
+  reading: Reading,
+): Promise<Found> {
+  const roots = new Map<string, ArtifactKind>();
+  const notes: string[] = [];
+  for (const path of paths) {
+    const held = await reachThrough(entry, path, reading);
+    if (held === undefined) continue;
+    if ("root" in held) roots.set(held.root, held.kind);
+    else notes.push(`Skipped ${shownAt(path, reading.base)}, which ${held.stray}.`);
+  }
+  return { roots, notes };
+}
+
+/** Undefined for a path aireg installed or git does not track. */
 async function reachThrough(
   entry: Export,
   path: string,
   reading: Reading,
-  into: Map<string, ArtifactKind>,
-) {
+): Promise<Held | undefined> {
   const { base, installed } = reading;
   const root = artifactRoot(path);
   if (!isWithin(base, root)) await refuseOutside(entry, root, base);
-  if (installed.has(root) || untracked(path, reading)) return;
+  if (installed.has(root) || untracked(path, reading)) return undefined;
   await refuseOutside(entry, root, base);
-  const held = await heldAt(path, base);
-  if ("root" in held) into.set(held.root, held.kind);
-  else reading.notes.push(`Skipped ${shownAt(path, base)}, which ${held.stray}.`);
+  return heldAt(path, base);
 }
 
 function untracked(path: string, reading: Reading): boolean {
@@ -295,36 +307,43 @@ function refuseKind(entry: Export, roots: ReadonlyMap<string, ArtifactKind>, bas
   }
 }
 
-async function neededBy(
-  entry: Export,
-  reading: Reading,
-  kinds: Map<string, ArtifactKind>,
-): Promise<(root: string) => ExportDependency[]> {
+interface Needed {
+  /** Never the artifact itself, unless named. */
+  dependsOn: (root: string) => ExportDependency[];
+  kinds: Map<string, ArtifactKind>;
+  notes: string[];
+}
+
+async function neededBy(entry: Export, reading: Reading): Promise<Needed> {
   const needs: ExportDependency[] = [];
   const named = new Set<string>();
+  const kinds = new Map<string, ArtifactKind>();
+  const notes: string[] = [];
   for (const need of entry.dependsOn) {
     if (need.type !== "local") {
       needs.push(need);
       continue;
     }
-    const { roots, folder } = await neededAt(entry, need.path, reading);
-    for (const [root, kind] of roots) {
+    const at = await neededAt(entry, need.path, reading);
+    notes.push(...at.notes);
+    for (const [root, kind] of at.roots) {
       kinds.set(root, kind);
-      if (!folder) named.add(root);
+      if (!at.folder) named.add(root);
       needs.push({ type: "local", path: posixRelative(reading.base, root) });
     }
   }
-  return (root) =>
+  const dependsOn = (root: string) =>
     named.has(root)
       ? needs
       : needs.filter((need) => need.type !== "local" || resolve(reading.base, need.path) !== root);
+  return { dependsOn, kinds, notes };
 }
 
 async function neededAt(
   entry: Export,
   need: string,
   reading: Reading,
-): Promise<{ roots: Map<string, ArtifactKind>; folder: boolean }> {
+): Promise<Found & { folder: boolean }> {
   const path = resolve(reading.base, need);
   if (!existsSync(path)) {
     throw new AiregError(
@@ -334,10 +353,10 @@ async function neededAt(
   }
   await refuseOutside(entry, artifactRoot(path), reading.base);
   const held = await heldAt(path, reading.base);
-  if ("root" in held) return { roots: new Map([[held.root, held.kind]]), folder: false };
+  if ("root" in held) return { roots: new Map([[held.root, held.kind]]), notes: [], folder: false };
   if (await isPlainFolder(path)) {
-    const roots = await reachInside(entry, path, reading, []);
-    if (roots.size > 0) return { roots, folder: true };
+    const inside = await reachInside(entry, path, reading, []);
+    if (inside.roots.size > 0) return { ...inside, folder: true };
     throw new AiregError(
       `Export ${quoted(entry.path)} depends on ./${need}, a folder with no skill or agent directly inside it.`,
       {
@@ -446,30 +465,33 @@ function dependencyKey(need: ExportDependency): string {
   return need.type === "local" ? `./${artifactRoot(need.path)}` : formatAddress(need.ref);
 }
 
+/** Local dependencies no entry exports publish with their dependents. */
 function exportNeeded(
-  exports: Map<string, Exporting>,
+  exports: ReadonlyMap<string, Exporting>,
   kinds: ReadonlyMap<string, ArtifactKind>,
   entries: readonly Export[],
   reading: Reading,
-): void {
+): Map<string, Exporting> {
   const { base } = reading;
-  for (const [root, { exported }] of [...exports]) {
+  const added = new Map<string, Exporting>();
+  for (const [root, { exported }] of exports) {
     if (exported.publish === false) continue;
     for (const need of exported.dependsOn) {
       if (need.type !== "local") continue;
       const path = resolve(base, need.path);
       const needing = { dependent: shownAt(root, base), needed: need.path, entry: exported.path };
-      const other = exports.get(path)?.exported;
+      const other = (exports.get(path) ?? added.get(path))?.exported;
       if (other?.publish === false) throw keptHere(needing, other);
       if (other !== undefined) continue;
       refuseUnreached(needing, path, entries, reading);
-      // `neededBy` read every local dependency, and kept its kind.
-      exports.set(path, {
+      // `neededBy` read every local dependency and kept its kind.
+      added.set(path, {
         kind: kinds.get(path) as ArtifactKind,
         exported: { path: need.path, version: undefined, dependsOn: [], publish: undefined },
       });
     }
   }
+  return added;
 }
 
 function keptHere(needing: Needing, kept: Export): AiregError {
@@ -509,7 +531,7 @@ function refuseUnreached(
 function unmatchedPatterns(entries: readonly Export[], matched: ReadonlySet<string>): string[] {
   return entries.flatMap((entry) =>
     (entry.ignore ?? [])
-      .filter((pattern) => !matched.has(`${entry.path}\0${pattern}`))
+      .filter((pattern) => !matched.has(ignoredBy(entry, pattern)))
       .map(
         (pattern) =>
           `Export ${quoted(entry.path)} ignores ${quoted(pattern)}, which matches no file it publishes, so it leaves nothing out.`,

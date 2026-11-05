@@ -1,6 +1,7 @@
 import { chmod, mkdir, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
+import { isAbsent } from "#adapter/files.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { PRIVATE_DIR, PRIVATE_FILE } from "#core/fs/mode.ts";
@@ -14,9 +15,15 @@ import {
   RunEventType,
   type RunRecord,
 } from "#core/run/model.ts";
-import type { AppendRunEvent, CreateRun, FinishRun, RunQuery, RunStore } from "#core/run/store.ts";
+import {
+  type AppendRunEvent,
+  type CreateRun,
+  type FinishRun,
+  MAX_PAGE_SIZE,
+  type RunQuery,
+  type RunStore,
+} from "#core/run/store.ts";
 import { stateDir } from "#core/store/paths.ts";
-import { MAX_PAGE_SIZE } from "#daemon/rpc/methods.ts";
 import { toCounts, toEvent, toRun } from "./store-rows.ts";
 import {
   ACTIVE,
@@ -83,130 +90,6 @@ export class SqliteRunStore implements RunStore {
     this.#database = database;
   }
 
-  #prepare(sql: string): StatementSync {
-    let statement = this.#statements.get(sql);
-    if (statement === undefined) {
-      statement = this.#database.prepare(sql);
-      this.#statements.set(sql, statement);
-    }
-    return statement;
-  }
-
-  /**
-   * History is a cache, so a database SQLite cannot read is moved aside and a
-   * new one started, rather than keeping the daemon from ever starting.
-   */
-  static async open(
-    path: string,
-    movedAside: (to: string) => void = () => {},
-  ): Promise<SqliteRunStore> {
-    try {
-      return await SqliteRunStore.#openAt(path);
-    } catch (error) {
-      if (path === ":memory:" || !unreadable(error)) throw error;
-      const to = `${path}.corrupt-${new Date().toISOString().replace(/[-:]|\.\d+/g, "")}`;
-      for (const suffix of ["", "-wal", "-shm"]) {
-        await rename(`${path}${suffix}`, `${to}${suffix}`).catch(() => {});
-      }
-      movedAside(to);
-      return SqliteRunStore.#openAt(path);
-    }
-  }
-
-  static async #openAt(path: string): Promise<SqliteRunStore> {
-    const onDisk = path !== ":memory:";
-    if (onDisk) {
-      await mkdir(dirname(path), { recursive: true, mode: PRIVATE_DIR });
-      // Also tightens a folder left at 0755.
-      await ownerOnly(dirname(path), PRIVATE_DIR);
-    }
-    const { DatabaseSync } = (await import(SQLITE_BUILTIN)) as typeof import("node:sqlite");
-    const database = new DatabaseSync(path, {
-      allowExtension: false,
-      enableDoubleQuotedStringLiterals: false,
-      enableForeignKeyConstraints: true,
-      timeout: 5000,
-    });
-    try {
-      await prepare(database, path, onDisk);
-    } catch (error) {
-      // An open handle would keep SQLite writing beside a file that is then moved aside.
-      database.close();
-      throw error;
-    }
-    return new SqliteRunStore(database);
-  }
-
-  #transaction<T>(work: () => T): T {
-    this.#database.exec("BEGIN IMMEDIATE");
-    try {
-      const result = work();
-      this.#database.exec("COMMIT");
-      return result;
-    } catch (error) {
-      // SQLite already rolled back after SQLITE_FULL, and a second error must not hide the first.
-      if (this.#database.isTransaction) {
-        try {
-          this.#database.exec("ROLLBACK");
-        } catch {
-          // The original error says what went wrong.
-        }
-      }
-      throw error;
-    }
-  }
-
-  #counts(runIds: readonly string[]): Map<string, RunCounts> {
-    if (runIds.length === 0) return new Map();
-    const holes = runIds.map(() => "?").join(", ");
-    const rows = this.#prepare(`${COUNTS_SELECT} AND run_id IN (${holes}) GROUP BY run_id`).all(
-      ...runIds,
-    ) as Row[];
-    return new Map(rows.map((row) => [String(row.run_id), toCounts(row)]));
-  }
-
-  #hydrate(rows: Row[]): RunRecord[] {
-    const counts = this.#counts(rows.map((row) => String(row.id)));
-    return rows.map((row) => toRun(row, counts.get(String(row.id)) ?? EMPTY_RUN_COUNTS));
-  }
-
-  #event(runId: string, event: AppendRunEvent): RunEvent {
-    const sequence =
-      this.#sequences.get(runId) ??
-      Number(
-        (
-          this.#prepare(
-            "SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM run_events WHERE run_id = ?",
-          ).get(runId) as Row
-        ).seq,
-      );
-    const inserted = this.#prepare(
-      `INSERT INTO run_events
-          (run_id, seq, occurred_at_ms, event_type, step, artifact, kind,
-           disposition, operation, outcome, error_code, retryable, data_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      runId,
-      sequence,
-      event.occurredAtMs,
-      event.eventType,
-      scalar(event.step),
-      scalar(event.artifact),
-      scalar(event.kind),
-      scalar(event.disposition),
-      scalar(event.operation),
-      scalar(event.outcome),
-      scalar(event.errorCode),
-      event.retryable === true ? 1 : 0,
-      encoded(event.data),
-    );
-    this.#sequences.set(runId, sequence + 1);
-    const row = this.#prepare(`SELECT ${EVENT_COLUMNS} FROM run_events WHERE id = ?`).get(
-      inserted.lastInsertRowid,
-    ) as Row;
-    return toEvent(row);
-  }
-
   create(input: CreateRun): RunRecord {
     return this.#transaction(() => {
       this.#prepare(
@@ -261,32 +144,6 @@ export class SqliteRunStore implements RunStore {
       this.#prepare("DELETE FROM runs WHERE job_id = ?").run(id);
     }
     return stale.length;
-  }
-
-  /** One-off runs have no job to prune under, so they are capped per account. */
-  #prune(run: RunRecord): void {
-    if (run.jobId === undefined) {
-      this.#prepare(
-        `DELETE FROM runs WHERE job_id IS NULL AND account_id = ? AND id NOT IN (
-             SELECT id FROM runs WHERE job_id IS NULL AND account_id = ?
-             ORDER BY requested_at_ms DESC, id DESC LIMIT ?
-           )`,
-      ).run(run.accountId, run.accountId, RUN_HISTORY_PER_ACCOUNT);
-      return;
-    }
-    // The newest runs, up to the run cap and the event budget; the newest is always kept.
-    this.#prepare(
-      `DELETE FROM runs WHERE job_id = ? AND id NOT IN (
-           SELECT id FROM (
-             SELECT id,
-               ROW_NUMBER() OVER newest AS place,
-               SUM((SELECT COUNT(*) FROM run_events WHERE run_id = runs.id)) OVER newest AS events
-             FROM runs WHERE job_id = ?
-             WINDOW newest AS (ORDER BY requested_at_ms DESC, id DESC)
-           ) WHERE place = 1 OR (place <= ? AND events <= ?)
-         )`,
-    ).run(run.jobId, run.jobId, RUN_HISTORY_PER_JOB, RUN_EVENTS_PER_JOB);
-    this.#database.exec("PRAGMA incremental_vacuum;");
   }
 
   finish(id: string, result: FinishRun): RunRecord {
@@ -407,8 +264,162 @@ export class SqliteRunStore implements RunStore {
     });
   }
 
+  /**
+   * History is a cache, so a database SQLite cannot read is moved aside and a
+   * new one started, rather than keeping the daemon from ever starting.
+   */
+  static async open(
+    path: string,
+    movedAside: (to: string) => void = () => {},
+  ): Promise<SqliteRunStore> {
+    try {
+      return await SqliteRunStore.#openAt(path);
+    } catch (error) {
+      if (path === ":memory:" || !unreadable(error)) throw error;
+      const to = `${path}.corrupt-${new Date().toISOString().replace(/[-:]|\.\d+/g, "")}`;
+      // Sidecars first: one that will not move leaves the database where it was.
+      for (const suffix of ["-wal", "-shm", ""]) {
+        // A database without a write-ahead log has no -wal or -shm to move.
+        await rename(`${path}${suffix}`, `${to}${suffix}`).catch((moving: unknown) => {
+          if (!isAbsent(moving)) throw moving;
+        });
+      }
+      movedAside(to);
+      return SqliteRunStore.#openAt(path);
+    }
+  }
+
   close(): void {
     this.#database.close();
+  }
+
+  static async #openAt(path: string): Promise<SqliteRunStore> {
+    const onDisk = path !== ":memory:";
+    if (onDisk) {
+      await mkdir(dirname(path), { recursive: true, mode: PRIVATE_DIR });
+      // Also tightens a folder left at 0755.
+      await ownerOnly(dirname(path), PRIVATE_DIR);
+    }
+    const { DatabaseSync } = (await import(SQLITE_BUILTIN)) as typeof import("node:sqlite");
+    const database = new DatabaseSync(path, {
+      allowExtension: false,
+      enableDoubleQuotedStringLiterals: false,
+      enableForeignKeyConstraints: true,
+      timeout: 5000,
+    });
+    try {
+      await prepare(database, path, onDisk);
+    } catch (error) {
+      // An open handle would keep SQLite writing beside a file that is then moved aside.
+      database.close();
+      throw error;
+    }
+    return new SqliteRunStore(database);
+  }
+
+  #prepare(sql: string): StatementSync {
+    let statement = this.#statements.get(sql);
+    if (statement === undefined) {
+      statement = this.#database.prepare(sql);
+      this.#statements.set(sql, statement);
+    }
+    return statement;
+  }
+
+  #transaction<T>(work: () => T): T {
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      const result = work();
+      this.#database.exec("COMMIT");
+      return result;
+    } catch (error) {
+      // SQLite already rolled back after SQLITE_FULL, and a second error must not hide the first.
+      if (this.#database.isTransaction) {
+        try {
+          this.#database.exec("ROLLBACK");
+        } catch {
+          // The original error says what went wrong.
+        }
+      }
+      throw error;
+    }
+  }
+
+  #counts(runIds: readonly string[]): Map<string, RunCounts> {
+    if (runIds.length === 0) return new Map();
+    const holes = runIds.map(() => "?").join(", ");
+    const rows = this.#prepare(`${COUNTS_SELECT} AND run_id IN (${holes}) GROUP BY run_id`).all(
+      ...runIds,
+    ) as Row[];
+    return new Map(rows.map((row) => [String(row.run_id), toCounts(row)]));
+  }
+
+  #hydrate(rows: Row[]): RunRecord[] {
+    const counts = this.#counts(rows.map((row) => String(row.id)));
+    return rows.map((row) => toRun(row, counts.get(String(row.id)) ?? EMPTY_RUN_COUNTS));
+  }
+
+  #event(runId: string, event: AppendRunEvent): RunEvent {
+    const sequence =
+      this.#sequences.get(runId) ??
+      Number(
+        (
+          this.#prepare(
+            "SELECT COALESCE(MAX(seq), 0) + 1 AS seq FROM run_events WHERE run_id = ?",
+          ).get(runId) as Row
+        ).seq,
+      );
+    const inserted = this.#prepare(
+      `INSERT INTO run_events
+          (run_id, seq, occurred_at_ms, event_type, step, artifact, kind,
+           disposition, operation, outcome, error_code, retryable, data_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      runId,
+      sequence,
+      event.occurredAtMs,
+      event.eventType,
+      scalar(event.step),
+      scalar(event.artifact),
+      scalar(event.kind),
+      scalar(event.disposition),
+      scalar(event.operation),
+      scalar(event.outcome),
+      scalar(event.errorCode),
+      event.retryable === true ? 1 : 0,
+      encoded(event.data),
+    );
+    this.#sequences.set(runId, sequence + 1);
+    const row = this.#prepare(`SELECT ${EVENT_COLUMNS} FROM run_events WHERE id = ?`).get(
+      inserted.lastInsertRowid,
+    ) as Row;
+    return toEvent(row);
+  }
+
+  /** One-off runs have no job to prune under, so they are capped per account. */
+  #prune(run: RunRecord): void {
+    if (run.jobId === undefined) {
+      this.#prepare(
+        `DELETE FROM runs WHERE job_id IS NULL AND account_id = ? AND id NOT IN (
+             SELECT id FROM runs WHERE job_id IS NULL AND account_id = ?
+             ORDER BY requested_at_ms DESC, id DESC LIMIT ?
+           )`,
+      ).run(run.accountId, run.accountId, RUN_HISTORY_PER_ACCOUNT);
+      return;
+    }
+    // The newest runs, up to the run cap and the event budget; the newest is always kept.
+    this.#prepare(
+      `DELETE FROM runs WHERE job_id = ? AND id NOT IN (
+           SELECT id FROM (
+             SELECT id,
+               ROW_NUMBER() OVER newest AS place,
+               SUM((SELECT COUNT(*) FROM run_events WHERE run_id = runs.id)) OVER newest AS events
+             FROM runs WHERE job_id = ?
+             WINDOW newest AS (ORDER BY requested_at_ms DESC, id DESC)
+           ) WHERE place = 1 OR (place <= ? AND events <= ?)
+         )`,
+    ).run(run.jobId, run.jobId, RUN_HISTORY_PER_JOB, RUN_EVENTS_PER_JOB);
+    this.#database.exec("PRAGMA incremental_vacuum;");
   }
 }
 

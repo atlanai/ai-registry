@@ -1,9 +1,10 @@
 import { chmod, lstat, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import type { Where } from "#core/store/paths.ts";
 import type { RegisterEntry, Target, Targets } from "#core/target/contract.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { applyRegister, type Where } from "./register.ts";
+import { applyRegister } from "./register.ts";
 
 let dir: string;
 let home: string;
@@ -47,10 +48,9 @@ function target(register: RegisterEntry[], place?: "copy", scope?: "user"): Targ
 
 const placement = (source: string, name: string) => join(root, "plugins", source, name);
 
-/** The user scope, where `target()` keeps its root. */
-const user = (): Where => ({ scope: "user", cwd: dir });
+const user = (): Where => ({ scope: "user", cwd: dir, env: {} });
 /** The project in `dir`, whose `.tool` folder is the same root. */
-const project = (): Where => ({ scope: "project", cwd: dir });
+const project = (): Where => ({ scope: "project", cwd: dir, env: {} });
 
 /** A placement of ours: a link into the scope's folder. */
 async function place(source: string, name: string): Promise<string> {
@@ -105,12 +105,11 @@ describe("applyRegister", () => {
     await mkdir(root, { recursive: true });
     await writeFile(join(root, "settings.json"), '{"theme":"dark","enabledPlugins":{"x@y":false}}');
     const sales = await place("acme", "sales");
-    const kept = await applyRegister(
-      [{ path: sales, target: "tool" }],
-      target([SETTINGS]),
-      user(),
-      home,
-    );
+    const kept = await applyRegister([{ path: sales, target: "tool" }], {
+      targetTable: target([SETTINGS]),
+      where: user(),
+      scopeDir: home,
+    });
     expect(kept).toEqual([]);
     expect(JSON.parse(await readFile(join(root, "settings.json"), "utf8"))).toEqual({
       theme: "dark",
@@ -118,7 +117,11 @@ describe("applyRegister", () => {
     });
 
     await rm(sales);
-    await applyRegister([{ path: sales, target: undefined }], target([SETTINGS]), user(), home);
+    await applyRegister([{ path: sales, target: undefined }], {
+      targetTable: target([SETTINGS]),
+      where: user(),
+      scopeDir: home,
+    });
     expect(JSON.parse(await readFile(join(root, "settings.json"), "utf8"))).toEqual({
       theme: "dark",
       enabledPlugins: { "x@y": false },
@@ -128,13 +131,21 @@ describe("applyRegister", () => {
   test("registers nothing for a path that is not a link of ours", async () => {
     const theirs = placement("acme", "sales");
     await mkdir(theirs, { recursive: true });
-    await applyRegister([{ path: theirs, target: "tool" }], target([SETTINGS]), user(), home);
+    await applyRegister([{ path: theirs, target: "tool" }], {
+      targetTable: target([SETTINGS]),
+      where: user(),
+      scopeDir: home,
+    });
     await expect(readFile(join(root, "settings.json"), "utf8")).rejects.toThrow();
   });
 
   test("ignores a path no kind of the target places", async () => {
     const elsewhere = join(dir, "other", "sales");
-    await applyRegister([{ path: elsewhere, target: undefined }], target([SETTINGS]), user(), home);
+    await applyRegister([{ path: elsewhere, target: undefined }], {
+      targetTable: target([SETTINGS]),
+      where: user(),
+      scopeDir: home,
+    });
     await expect(readFile(join(root, "settings.json"), "utf8")).rejects.toThrow();
   });
 
@@ -143,7 +154,11 @@ describe("applyRegister", () => {
     await writeFile(join(root, "settings.json"), "{ not json");
     const sales = await place("acme", "sales");
     await expect(
-      applyRegister([{ path: sales, target: "tool" }], target([SETTINGS]), user(), home),
+      applyRegister([{ path: sales, target: "tool" }], {
+        targetTable: target([SETTINGS]),
+        where: user(),
+        scopeDir: home,
+      }),
     ).rejects.toThrow(/not valid JSON/);
   });
 
@@ -155,9 +170,7 @@ describe("applyRegister", () => {
         { path: sales, target: "tool" },
         { path: ops, target: "tool" },
       ],
-      target([GROUP]),
-      user(),
-      home,
+      { targetTable: target([GROUP]), where: user(), scopeDir: home },
     );
     const config = join(root, "config.toml");
     expect(await readFile(config, "utf8")).toBe(
@@ -165,11 +178,19 @@ describe("applyRegister", () => {
     );
 
     await rm(ops);
-    await applyRegister([{ path: ops, target: undefined }], target([GROUP]), user(), home);
+    await applyRegister([{ path: ops, target: undefined }], {
+      targetTable: target([GROUP]),
+      where: user(),
+      scopeDir: home,
+    });
     expect(await readFile(config, "utf8")).toContain("[sources.acme]");
 
     await rm(sales);
-    await applyRegister([{ path: sales, target: undefined }], target([GROUP]), user(), home);
+    await applyRegister([{ path: sales, target: undefined }], {
+      targetTable: target([GROUP]),
+      where: user(),
+      scopeDir: home,
+    });
     expect(await readFile(config, "utf8")).toBe("");
   });
 
@@ -177,17 +198,33 @@ describe("applyRegister", () => {
     const made = { ...GROUP, init: {} };
     const sales = await place("acme", "sales");
     const config = join(root, "config.toml");
-    await applyRegister([{ path: sales, target: "tool" }], target([made]), user(), home);
+    await applyRegister([{ path: sales, target: "tool" }], {
+      targetTable: target([made]),
+      where: user(),
+      scopeDir: home,
+    });
     expect(await readFile(config, "utf8")).toContain("[sources.acme]");
     await rm(sales);
-    await applyRegister([{ path: sales, target: undefined }], target([made]), user(), home);
+    await applyRegister([{ path: sales, target: undefined }], {
+      targetTable: target([made]),
+      where: user(),
+      scopeDir: home,
+    });
     await expect(readFile(config, "utf8")).rejects.toThrow();
 
     await writeFile(config, '# model = "big"\n');
     const ops = await place("acme", "ops");
-    await applyRegister([{ path: ops, target: "tool" }], target([made]), user(), home);
+    await applyRegister([{ path: ops, target: "tool" }], {
+      targetTable: target([made]),
+      where: user(),
+      scopeDir: home,
+    });
     await rm(ops);
-    await applyRegister([{ path: ops, target: undefined }], target([made]), user(), home);
+    await applyRegister([{ path: ops, target: undefined }], {
+      targetTable: target([made]),
+      where: user(),
+      scopeDir: home,
+    });
     expect(await readFile(config, "utf8")).toBe('# model = "big"\n');
   });
 
@@ -196,23 +233,32 @@ describe("applyRegister", () => {
     await writeConfig(before);
     const sales = await copy("sales");
     const ops = await copy("ops");
-    await applyRegister(
-      placed(sales, ops),
-      target([LIST], "copy"),
-      user(),
-      home,
-      new Set([sales, ops]),
-    );
+    await applyRegister(placed(sales, ops), {
+      targetTable: target([LIST], "copy"),
+      where: user(),
+      scopeDir: home,
+      copies: new Set([sales, ops]),
+    });
     expect(await readFile(config(), "utf8")).toBe(
       `${before}skills:\n  dirs:\n    - ${join(root, "plugins", "acme")} # aireg\n`,
     );
 
     await rm(ops, { recursive: true });
-    await applyRegister(gone(ops), target([LIST], "copy"), user(), home, new Set([sales]));
+    await applyRegister(gone(ops), {
+      targetTable: target([LIST], "copy"),
+      where: user(),
+      scopeDir: home,
+      copies: new Set([sales]),
+    });
     expect(await readFile(config(), "utf8")).toContain("dirs:");
 
     await rm(sales, { recursive: true });
-    await applyRegister(gone(sales), target([LIST], "copy"), user(), home, new Set());
+    await applyRegister(gone(sales), {
+      targetTable: target([LIST], "copy"),
+      where: user(),
+      scopeDir: home,
+      copies: new Set(),
+    });
     expect(await readFile(config(), "utf8")).toBe(before);
   });
 
@@ -220,17 +266,32 @@ describe("applyRegister", () => {
     const before = `skills:\n  dirs:\n    - ${join(root, "plugins", "acme")} # mine too\n`;
     await writeConfig(before);
     const sales = await copy("sales");
-    await applyRegister(placed(sales), target([LIST], "copy"), user(), home, new Set([sales]));
+    await applyRegister(placed(sales), {
+      targetTable: target([LIST], "copy"),
+      where: user(),
+      scopeDir: home,
+      copies: new Set([sales]),
+    });
     expect(await readFile(config(), "utf8")).toBe(before);
     await rm(sales, { recursive: true });
-    await applyRegister(gone(sales), target([LIST], "copy"), user(), home, new Set());
+    await applyRegister(gone(sales), {
+      targetTable: target([LIST], "copy"),
+      where: user(),
+      scopeDir: home,
+      copies: new Set(),
+    });
     expect(await readFile(config(), "utf8")).toBe(before);
   });
 
   test("adds to a YAML file of comments alone, keeping them", async () => {
     await writeConfig("# model: big\n");
     const sales = await copy("sales");
-    await applyRegister(placed(sales), target([LIST], "copy"), user(), home, new Set([sales]));
+    await applyRegister(placed(sales), {
+      targetTable: target([LIST], "copy"),
+      where: user(),
+      scopeDir: home,
+      copies: new Set([sales]),
+    });
     const text = await readFile(config(), "utf8");
     expect(text).toMatch(/^# model: big\n/);
     expect(text).toContain(`- ${join(root, "plugins", "acme")} # aireg`);
@@ -238,7 +299,12 @@ describe("applyRegister", () => {
 
   test("registers no copy of a kind not placed as copies", async () => {
     const sales = await copy("sales");
-    await applyRegister(placed(sales), target([LIST]), user(), home, new Set([sales]));
+    await applyRegister(placed(sales), {
+      targetTable: target([LIST]),
+      where: user(),
+      scopeDir: home,
+      copies: new Set([sales]),
+    });
     await expect(readFile(config(), "utf8")).rejects.toThrow();
   });
 
@@ -255,7 +321,11 @@ describe("applyRegister", () => {
       await symlink(real, config);
 
       const sales = await place("acme", "sales");
-      await applyRegister([{ path: sales, target: "tool" }], target([GROUP]), user(), home);
+      await applyRegister([{ path: sales, target: "tool" }], {
+        targetTable: target([GROUP]),
+        where: user(),
+        scopeDir: home,
+      });
 
       expect((await lstat(config)).isSymbolicLink()).toBe(true);
       expect(await readFile(real, "utf8")).toContain("[sources.acme]");
@@ -267,7 +337,11 @@ describe("applyRegister", () => {
     "creates a config only its owner can read",
     async () => {
       const sales = await place("acme", "sales");
-      await applyRegister([{ path: sales, target: "tool" }], target([GROUP]), user(), home);
+      await applyRegister([{ path: sales, target: "tool" }], {
+        targetTable: target([GROUP]),
+        where: user(),
+        scopeDir: home,
+      });
       expect((await stat(join(root, "config.toml"))).mode & 0o777).toBe(0o600);
     },
   );
@@ -281,7 +355,11 @@ describe("applyRegister", () => {
       await symlink(real, join(root, "config.toml"));
 
       const sales = await place("acme", "sales");
-      await applyRegister([{ path: sales, target: "tool" }], target([GROUP]), user(), home);
+      await applyRegister([{ path: sales, target: "tool" }], {
+        targetTable: target([GROUP]),
+        where: user(),
+        scopeDir: home,
+      });
 
       expect((await lstat(join(root, "config.toml"))).isSymbolicLink()).toBe(true);
       expect((await stat(real)).mode & 0o777).toBe(0o600);
@@ -300,10 +378,18 @@ describe("applyRegister, kept to the run's target roots", () => {
     const userOnly = target([SETTINGS], undefined, "user");
 
     // The project's target root is this same folder, but the kind is the user scope's.
-    await applyRegister([{ path: sales, target: "tool" }], userOnly, project(), home);
+    await applyRegister([{ path: sales, target: "tool" }], {
+      targetTable: userOnly,
+      where: project(),
+      scopeDir: home,
+    });
     await expect(readFile(join(root, "settings.json"), "utf8")).rejects.toThrow();
 
-    await applyRegister([{ path: sales, target: "tool" }], userOnly, user(), home);
+    await applyRegister([{ path: sales, target: "tool" }], {
+      targetTable: userOnly,
+      where: user(),
+      scopeDir: home,
+    });
     expect(await readFile(join(root, "settings.json"), "utf8")).toContain("sales@acme");
   });
 
@@ -314,22 +400,34 @@ describe("applyRegister, kept to the run's target roots", () => {
     await mkdir(join(home, "artifacts", "sales"), { recursive: true });
     await symlink(join(home, "artifacts", "sales"), at);
 
-    await applyRegister([{ path: at, target: "tool" }], target([SETTINGS]), user(), home);
+    await applyRegister([{ path: at, target: "tool" }], {
+      targetTable: target([SETTINGS]),
+      where: user(),
+      scopeDir: home,
+    });
     await expect(readFile(join(elsewhere, "settings.json"), "utf8")).rejects.toThrow();
   });
 
   test("cleans up a removal only for the target the lockfile recorded it for", async () => {
     const sales = await place("acme", "sales");
-    await applyRegister([{ path: sales, target: "tool" }], target([SETTINGS]), user(), home);
+    await applyRegister([{ path: sales, target: "tool" }], {
+      targetTable: target([SETTINGS]),
+      where: user(),
+      scopeDir: home,
+    });
     await rm(sales);
     const settings = join(root, "settings.json");
 
     const other = { path: sales, target: undefined, recorded: "other" };
-    await applyRegister([other], target([SETTINGS]), user(), home);
+    await applyRegister([other], {
+      targetTable: target([SETTINGS]),
+      where: user(),
+      scopeDir: home,
+    });
     expect(await readFile(settings, "utf8")).toContain("sales@acme");
 
     const ours = { path: sales, target: undefined, recorded: "tool" };
-    await applyRegister([ours], target([SETTINGS]), user(), home);
+    await applyRegister([ours], { targetTable: target([SETTINGS]), where: user(), scopeDir: home });
     expect(await readFile(settings, "utf8")).not.toContain("sales@acme");
   });
 
@@ -343,12 +441,11 @@ describe("applyRegister, kept to the run's target roots", () => {
       await symlink(victim, root);
       const sales = placement("acme", "sales");
 
-      const kept = await applyRegister(
-        [{ path: sales, target: undefined, recorded: "tool" }],
-        target([SETTINGS]),
-        project(),
-        home,
-      );
+      const kept = await applyRegister([{ path: sales, target: undefined, recorded: "tool" }], {
+        targetTable: target([SETTINGS]),
+        where: project(),
+        scopeDir: home,
+      });
 
       expect(await readFile(join(victim, "settings.json"), "utf8")).toBe(config);
       expect(kept).toEqual([
@@ -368,12 +465,11 @@ describe("applyRegister, kept to the run's target roots", () => {
       await symlink(outside, join(dotfiles, "nested"));
       const sales = await place("acme", "sales");
 
-      const kept = await applyRegister(
-        [{ path: sales, target: "tool" }],
-        target([settingsIn("real"), settingsIn("nested")]),
-        user(),
-        home,
-      );
+      const kept = await applyRegister([{ path: sales, target: "tool" }], {
+        targetTable: target([settingsIn("real"), settingsIn("nested")]),
+        where: user(),
+        scopeDir: home,
+      });
 
       expect(await readFile(join(dotfiles, "real", "settings.json"), "utf8")).toContain(
         "sales@acme",

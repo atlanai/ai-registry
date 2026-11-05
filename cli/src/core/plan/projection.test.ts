@@ -6,7 +6,7 @@ import { movedPluginLinks } from "./projection.ts";
 
 describe("movedPluginLinks", () => {
   const USER = roots("user", "/work");
-  const scope = { roots: USER, targetTable: resolveTargets() };
+  const scope = { roots: USER, env: process.env, targetTable: resolveTargets(process.env) };
   function lockWith(rows: Record<string, { registry: string; link: string; target?: string }>) {
     const lock = emptyLock();
     for (const [name, row] of Object.entries(rows)) {

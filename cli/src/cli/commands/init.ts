@@ -19,7 +19,7 @@ import { emptyManifest } from "#core/manifest/model.ts";
 import { readManifest } from "#core/manifest/repository.ts";
 import { gitIn } from "#core/process.ts";
 import { ensureScopeIgnore } from "#core/store/ignore.ts";
-import { guardManagedPath } from "#core/store/managed-paths.ts";
+import { assertManagedPath } from "#core/store/managed-paths.ts";
 import { roots as makeRoots, userScopeDir } from "#core/store/paths.ts";
 import { canonicalIds, IMPORTABLE_TARGETS } from "#core/target/ids.ts";
 import { placementFor } from "#core/target/placement.ts";
@@ -100,7 +100,7 @@ export const { run } = defineCommand({
 
     // Detection is the default, not the rule: someone who names targets is saying
     // what this project projects into, and writing something else hides that.
-    const chosen = selectTargets(emptyManifest(), resolveTargets(), common);
+    const chosen = selectTargets(emptyManifest(), resolveTargets(process.env), common);
 
     const imports = requestedImports(own.import);
     const namespace = publishTarget(own["publish-to"]);
@@ -116,7 +116,7 @@ export const { run } = defineCommand({
       source !== undefined || planned === undefined ? undefined : importInto(existing.registries);
 
     // The manifest and the ignore file below go in the scope folder, which must be this project's.
-    await guardManagedPath(roots.manifest, roots);
+    await assertManagedPath(roots.manifest, roots, { env: process.env });
     if (!resuming) {
       const contents = formatManifest({
         ...emptyManifest(),
@@ -190,7 +190,9 @@ export const { run } = defineCommand({
 function requestedImports(value: string | undefined): string[] {
   if (value === undefined) return [];
   const requested =
-    value === "all" ? [...IMPORTABLE_TARGETS] : canonicalIds(resolveTargets(), value.split(","));
+    value === "all"
+      ? [...IMPORTABLE_TARGETS]
+      : canonicalIds(resolveTargets(process.env), value.split(","));
   const allowed = new Set<string>(IMPORTABLE_TARGETS);
   if (requested.length === 0 || requested.some((name) => !allowed.has(name))) {
     throw new AiregError(`Unknown --import value ${quoted(value)}.`, {
@@ -265,9 +267,10 @@ function shownFrom(cwd: string, manifest: string): string {
  * a shared one such as `.agents` stands in for every target that reads it.
  */
 function foldersFor(chosen: readonly string[]): string[] {
-  const targetTable = resolveTargets();
+  const targetTable = resolveTargets(process.env);
+  const where = { scope: "project", env: process.env } as const;
   const placed = new Set(
-    KINDS.flatMap((kind) => placementFor(kind, chosen, targetTable, "project").targets),
+    KINDS.flatMap((kind) => placementFor(kind, chosen, { targetTable, where }).targets),
   );
   return [...placed].sort().map((name) => targetTable[name]?.projectRoot ?? name);
 }

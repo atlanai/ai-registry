@@ -1,3 +1,4 @@
+import type { Stats } from "node:fs";
 import { lstat, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
@@ -9,36 +10,48 @@ import { exists, pruneEmptyParent, remove } from "#core/fs/tree.ts";
 import type { LinkMode } from "#core/lock.ts";
 import type { Plan } from "#core/plan/model.ts";
 import { assertRemovable, removal, removeContained } from "#core/plan/removable.ts";
-import { backupStamp } from "#core/store/backups.ts";
-import { guardManagedPath } from "#core/store/managed-paths.ts";
+import { assertManagedPath } from "#core/store/managed-paths.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { applyCodec, type Rendered } from "#core/target/codecs/index.ts";
 import type { KeyFile } from "#core/target/contract.ts";
 import { assemble } from "./assemble.ts";
 import { commandSkill } from "./command-skill.ts";
 import { keyNeeds, writeKeyFiles } from "./keys.ts";
-import { backUp, guardLink, type LinkGuard } from "./link-guard.ts";
-import { type ActionOf, linkKey, type Run } from "./run.ts";
+import { backUp, type GuardScope, guardLink, type LinkGuard } from "./link-guard.ts";
+import type {
+  ActionOf,
+  BackedUp,
+  Linked,
+  PluginSource,
+  Run,
+  RunInputs,
+  Unrendered,
+} from "./run.ts";
 
 /** Refuses the entire plan before journaling or starting any fetch. */
-export async function preflight(plan: Plan, roots: Roots): Promise<Map<string, LinkGuard>> {
-  await guardManagedPath(roots.lock, roots);
+export async function preflight(
+  plan: Plan,
+  roots: Roots,
+  env: NodeJS.ProcessEnv,
+): Promise<Map<string, LinkGuard>> {
+  await assertManagedPath(roots.lock, roots, { env });
   // Each folder is checked once here; every write checks its own path again as it happens.
   const checked = new Set<string>();
   for (const action of plan.actions) {
     if (action.kind !== "record")
-      await guardManagedPath(action.to, roots, action.kind !== "unlink", process.env, checked);
+      await assertManagedPath(action.to, roots, {
+        leaf: action.kind !== "unlink",
+        verified: checked,
+        env,
+      });
     if (action.kind === "link")
-      await guardManagedPath(action.from, roots, true, process.env, checked);
+      await assertManagedPath(action.from, roots, { verified: checked, env });
   }
-  return guardsOf(plan, roots);
+  return guardsOf(plan, { roots, env });
 }
 
-/**
- * Decided before the journal, so recovery never counts a person's folder as ours to remove.
- * Read-only, so a dry run shows the same verdicts.
- */
-export async function guardsOf(plan: Plan, roots: Roots): Promise<Map<string, LinkGuard>> {
+/** Taken before the journal so recovery never removes a person's folder; read-only for dry runs. */
+export async function guardsOf(plan: Plan, scope: GuardScope): Promise<Map<string, LinkGuard>> {
   const guards = new Map<string, LinkGuard>();
   for (const action of plan.actions) {
     if (action.kind === "record" || guards.has(action.to)) continue;
@@ -48,9 +61,9 @@ export async function guardsOf(plan: Plan, roots: Roots): Promise<Map<string, Li
         rendered !== undefined && "text" in rendered
           ? { file: writtenFile(action), text: rendered.text }
           : undefined;
-      guards.set(action.to, await guardLink(action.to, action.recorded, roots, text));
+      guards.set(action.to, await guardLink(action.to, action.recorded, scope, text));
     } else if (action.kind === "unlink" && action.link !== undefined) {
-      guards.set(action.to, await guardLink(action.to, action.link.mode, roots));
+      guards.set(action.to, await guardLink(action.to, action.link.mode, scope));
     }
   }
   return guards;
@@ -78,90 +91,52 @@ function writtenFile(action: ActionOf<"link">): string {
 }
 
 /** Pointing a target at a whole namespace is what makes that directory a plugin. */
-export async function assemblePlugin(run: Run, action: ActionOf<"link">): Promise<void> {
-  if (action.plugin !== true || action.content === undefined) return;
-  if (!(await exists(action.content))) return;
-  const found = run.plugins.get(action.from) ?? {
-    content: action.content,
-    targets: new Set<string>(),
-    document: action.document,
+export async function assemblePlugin(
+  { roots, env }: Pick<RunInputs, "roots" | "env">,
+  action: ActionOf<"link">,
+  found: PluginSource | undefined,
+): Promise<PluginSource | undefined> {
+  if (action.plugin !== true || action.content === undefined) return undefined;
+  if (!(await exists(action.content))) return undefined;
+  const plugin: PluginSource = {
+    content: found?.content ?? action.content,
+    targets: new Set([...(found?.targets ?? []), action.target]),
+    document: found === undefined ? action.document : found.document,
   };
-  found.targets.add(action.target);
-  run.plugins.set(action.from, found);
-  await guardManagedPath(action.from, run.roots);
-  await assemble(action.from, action.content, found.targets, found.document);
+  await assertManagedPath(action.from, roots, { env });
+  await assemble(action.from, action.content, plugin.targets, plugin.document);
+  return plugin;
 }
 
-export async function linkInto(run: Run, action: ActionOf<"link">): Promise<void> {
-  const { roots } = run;
-  const key = linkKey(action.name, action.to);
-  let guard = run.guards.get(action.to) ?? "replace";
-  // Its source may have been copied in by this run, after the guard was taken.
+export async function linkInto(run: Run, action: ActionOf<"link">): Promise<Linked> {
   const rendered = await rendering(action);
-  if (guard === "keep" && rendered !== undefined && "text" in rendered) {
-    guard = await guardLink(action.to, action.recorded, roots, {
-      file: writtenFile(action),
-      text: rendered.text,
-    });
-  }
+  const guard = await settledGuard(run, action, rendered);
   if (guard === "keep") {
-    if (action.adopt === true) {
-      await adoptOrKeep(run, action, key);
-      return;
-    }
-    run.kept.push({ name: action.name, path: action.to });
-    run.skipped.add(key);
-    return;
+    if (action.adopt === true) return adoptOrKeep(action);
+    return { kept: { name: action.name, path: action.to } };
   }
   // Assembled here, before the link that will read it.
-  await assemblePlugin(run, action);
-  // The source is inside our own tree, so a missing one was never staged.
-  if (!(await exists(action.from))) {
-    run.skipped.add(key);
-    return;
-  }
-  const files = await keyFiles(run, action, rendered, key);
-  if (files === undefined) return;
-  // A committed symlink can appear on the way after planning; the write would follow it.
-  const verdict = removal(action.to, roots);
-  if (roots.scope === "project" && verdict.how === "refuse") {
-    run.kept.push({ name: action.name, path: action.to, reason: verdict.reason });
-    run.skipped.add(key);
-    return;
-  }
-  // Whatever is there is about to go, so it is checked again now.
-  await assertRemovable(action.to, roots);
-  if (guard === "backup") {
-    await moveAside(run, action.to, action.target);
-    run.guards.set(action.to, "replace");
-  }
-  // A target that will not load a linked plugin gets a real directory of links instead.
-  const fan = action.fan === true && !action.copy;
-  // A file a key adds goes into a copy, never into the store a link would lead to.
-  const copy = action.copy || files.length > 0;
-  const mode = await place(run, action, rendered, { fan, copy, files });
-  if (mode === undefined) {
-    run.skipped.add(key);
-    return;
-  }
-  if (action.rename !== undefined && !writes(action) && mode === "copy") {
-    await renameCopy(action.to, action.rename);
-  }
-  if (fan) run.fanned.set(action.to, action.from);
-  if (action.plugin === true && mode === "copy") run.copiedPlugins.set(action.to, action);
-  run.modes.set(key, mode);
-  run.pathModes.set(action.to, mode);
-  if (mode === "copy") run.copies.set(action.to, await digest(action.to));
-  if (!copy && mode === "copy") run.degraded.add(action.target);
-  run.performed.link += 1;
-  run.installed.add(action.name);
+  const plugin = await assemblePlugin(run.inputs, action, run.results.plugins.get(action.from));
+  const linked = await placeLink(run.inputs, action, rendered, guard);
+  return plugin === undefined ? linked : { ...linked, plugin };
 }
 
-/**
- * A copy another tool left where this link goes is taken over as aireg's own when it holds exactly
- * what this run installs, and is never rewritten; one that differs reads as edited and stays.
- */
-async function adoptOrKeep(run: Run, action: ActionOf<"link">, key: string): Promise<void> {
+/** Its source may have been copied in by this run, after the guard was taken. */
+async function settledGuard(
+  run: Run,
+  action: ActionOf<"link">,
+  rendered: Rendered | undefined,
+): Promise<LinkGuard> {
+  const guard = run.results.guards.get(action.to) ?? "replace";
+  if (guard !== "keep" || rendered === undefined || !("text" in rendered)) return guard;
+  return guardLink(action.to, action.recorded, run.inputs, {
+    file: writtenFile(action),
+    text: rendered.text,
+  });
+}
+
+/** A matching copy another tool left is taken over as aireg's; one that differs stays as edited. */
+async function adoptOrKeep(action: ActionOf<"link">): Promise<Linked> {
   const state = await inspect(action.to);
   const same =
     state.exists &&
@@ -169,82 +144,131 @@ async function adoptOrKeep(run: Run, action: ActionOf<"link">, key: string): Pro
     (await exists(action.from)) &&
     (await digest(action.to)) === (await digest(action.from));
   if (!same) {
-    run.kept.push({
-      name: action.name,
-      path: action.to,
-      reason:
-        "it holds other bytes than aireg installs, so it reads as edited and was left as it is",
-    });
-    run.skipped.add(key);
-    return;
+    return {
+      kept: {
+        name: action.name,
+        path: action.to,
+        reason:
+          "it holds other bytes than aireg installs, so it reads as edited and was left as it is",
+      },
+    };
   }
-  run.modes.set(key, "copy");
-  run.pathModes.set(action.to, "copy");
-  run.copies.set(action.to, await digest(action.to));
-  run.adopted.push({ name: action.name, path: action.to });
-  run.performed.link += 1;
-  run.installed.add(action.name);
+  return {
+    made: { mode: "copy", digest: await digest(action.to) },
+    adopted: { name: action.name, path: action.to },
+  };
 }
 
-/** The files its keys add; undefined once it is left out for a target that cannot keep one. */
-async function keyFiles(
-  run: Run,
+async function placeLink(
+  inputs: RunInputs,
   action: ActionOf<"link">,
   rendered: Rendered | undefined,
-  key: string,
-): Promise<KeyFile[] | undefined> {
+  guard: Exclude<LinkGuard, "keep">,
+): Promise<Linked> {
+  const { roots, env } = inputs;
+  // The source is inside our own tree, so a missing one was never staged.
+  if (!(await exists(action.from))) return {};
+  const needs = await keyFiles(action, rendered);
+  if ("unrendered" in needs) return needs;
+  // A committed symlink can appear on the way after planning; the write would follow it.
+  const verdict = removal(action.to, roots, env);
+  if (roots.scope === "project" && verdict.how === "refuse") {
+    return { kept: { name: action.name, path: action.to, reason: verdict.reason } };
+  }
+  // Whatever is there is about to go, so it is checked again now.
+  await assertRemovable(action.to, roots, env);
+  const backedUp =
+    guard === "backup" ? await moveAside(inputs, action.to, action.target) : undefined;
+  const made = await makeLink(action, rendered, needs.files);
+  return backedUp === undefined ? made : { ...made, backedUp };
+}
+
+async function keyFiles(
+  action: ActionOf<"link">,
+  rendered: Rendered | undefined,
+): Promise<{ files: KeyFile[] } | Required<Pick<Linked, "unrendered">>> {
   const needs = await keyNeeds(
     action,
     rendered !== undefined && "text" in rendered ? rendered.text : undefined,
   );
-  if ("files" in needs) return needs.files;
-  run.unrendered.push({
-    name: action.command ?? action.name,
-    target: action.target,
-    reason: needs.refused,
-  });
-  run.skipped.add(key);
-  return undefined;
+  if ("files" in needs) return needs;
+  return {
+    unrendered: {
+      name: action.command ?? action.name,
+      target: action.target,
+      reason: needs.refused,
+    },
+  };
 }
 
-/** A person's own file or folder where the lockfile recorded a link goes to backups, never away. */
-async function moveAside(run: Run, path: string, target: string): Promise<void> {
-  const { roots } = run;
+/** A person's own file at a recorded link goes to backups, never away. */
+async function moveAside(inputs: RunInputs, path: string, target: string): Promise<BackedUp> {
+  const { roots, env } = inputs;
   const info = await lstat(path);
-  run.stamp ??= backupStamp();
-  await guardManagedPath(roots.artifacts, roots);
-  run.backedUp.push({
-    path,
-    to: await backUp(path, target, roots, run.stamp),
-    what: info.isSymbolicLink() ? "link" : info.isDirectory() ? "folder" : "file",
-  });
+  const stamp = inputs.stamp();
+  await assertManagedPath(roots.artifacts, roots, { env });
+  return { path, to: await backUp(path, target, inputs, stamp), what: whatIs(info) };
+}
+
+function whatIs(info: Stats): BackedUp["what"] {
+  if (info.isSymbolicLink()) return "link";
+  return info.isDirectory() ? "folder" : "file";
+}
+
+async function makeLink(
+  action: ActionOf<"link">,
+  rendered: Rendered | undefined,
+  files: readonly KeyFile[],
+): Promise<Linked> {
+  // A target that will not load a linked plugin gets a real directory of links instead.
+  const fan = action.fan === true && !action.copy;
+  // A file a key adds goes into a copy, never into the store a link would lead to.
+  const copy = action.copy || files.length > 0;
+  const mode = await place(action, rendered, { fan, copy, files });
+  if (typeof mode !== "string") return { unrendered: mode };
+  if (action.rename !== undefined && !writes(action) && mode === "copy") {
+    await renameCopy(action.to, action.rename);
+  }
+  const copied = mode === "copy";
+  return {
+    made: {
+      mode,
+      ...(copied ? { digest: await digest(action.to) } : {}),
+      ...(fan ? { fanned: true } : {}),
+      ...(action.plugin === true && copied ? { copiedPlugin: true } : {}),
+      ...(!copy && copied ? { degraded: true } : {}),
+    },
+  };
 }
 
 async function place(
-  run: Run,
   action: ActionOf<"link">,
   rendered: Rendered | undefined,
   how: { fan: boolean; copy: boolean; files: readonly KeyFile[] },
-): Promise<LinkMode | undefined> {
-  const mode = writes(action)
-    ? await writeRendered(run, action, rendered)
-    : how.fan
-      ? await fanOut(action.from, action.to)
-      : await link(action.from, action.to, how.copy);
+): Promise<LinkMode | Unrendered> {
+  const mode = await placed(action, rendered, how);
   if (mode === "copy") await writeKeyFiles(action.to, how.files);
   return mode;
 }
 
-/** Never linked: a target reading its own format may refuse a link. */
-async function writeRendered(
-  run: Run,
+function placed(
   action: ActionOf<"link">,
   rendered: Rendered | undefined,
-): Promise<LinkMode | undefined> {
+  how: { fan: boolean; copy: boolean },
+): Promise<LinkMode | Unrendered> {
+  if (writes(action)) return writeRendered(action, rendered);
+  if (how.fan) return fanOut(action.from, action.to);
+  return link(action.from, action.to, how.copy);
+}
+
+/** Never linked: a target reading its own format may refuse a link. */
+async function writeRendered(
+  action: ActionOf<"link">,
+  rendered: Rendered | undefined,
+): Promise<LinkMode | Unrendered> {
   if (rendered === undefined || "problem" in rendered) {
     const reason = rendered?.problem ?? "its file could not be read";
-    run.unrendered.push({ name: action.name, target: action.target, reason });
-    return undefined;
+    return { name: action.name, target: action.target, reason };
   }
   await remove(action.to);
   await mkdir(dirname(writtenFile(action)), { recursive: true });
@@ -259,14 +283,16 @@ async function renameCopy(to: string, name: string): Promise<void> {
   if (text !== undefined) await writeAtomic(file, withName(text, name));
 }
 
-export async function unlink(run: Run, action: ActionOf<"unlink">): Promise<void> {
-  if (run.guards.get(action.to) === "backup" && action.link !== undefined) {
-    await assertRemovable(action.to, run.roots);
-    await moveAside(run, action.to, action.link.target);
+export async function unlink(run: Run, action: ActionOf<"unlink">): Promise<BackedUp | undefined> {
+  const { inputs } = run;
+  let backedUp: BackedUp | undefined;
+  if (run.results.guards.get(action.to) === "backup" && action.link !== undefined) {
+    await assertRemovable(action.to, inputs.roots, inputs.env);
+    backedUp = await moveAside(inputs, action.to, action.link.target);
   } else {
-    await removeContained(action.to, run.roots);
+    await removeContained(action.to, inputs.roots, inputs.env);
   }
   // The kind subdir is ours to tidy; the namespace above it is not, outside the store.
-  await pruneEmptyParent(action.to, run.roots.artifacts);
-  run.performed.unlink += 1;
+  await pruneEmptyParent(action.to, inputs.roots.artifacts);
+  return backedUp;
 }

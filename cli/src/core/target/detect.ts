@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { onPath } from "#adapter/paths.ts";
 import { present } from "#core/env.ts";
 import { expandUserPath } from "#core/fs/path.ts";
+import type { Where } from "#core/store/paths.ts";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
 import type { Target, Targets } from "./contract.ts";
 import { names } from "./ids.ts";
@@ -24,16 +25,12 @@ export interface Detection {
   by: DetectionRule | undefined;
 }
 
-export function detectAll(
-  targetTable: Targets,
-  cwd: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Detection[] {
-  return names(targetTable).map((name) => detect(targetTable[name] as Target, cwd, env));
+export function detectAll(targetTable: Targets, where: Pick<Where, "cwd" | "env">): Detection[] {
+  return names(targetTable).map((name) => detect(targetTable[name] as Target, where));
 }
 
 /** Prefer an explicit signal - env, then binary - over a directory that may be stale. */
-function detect(target: Target, cwd: string, env: NodeJS.ProcessEnv = process.env): Detection {
+function detect(target: Target, { cwd, env }: Pick<Where, "cwd" | "env">): Detection {
   const signals = target.detect;
   if (signals === "never") return { target, detected: false, by: undefined };
 

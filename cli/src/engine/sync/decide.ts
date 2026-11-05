@@ -143,7 +143,7 @@ export function classify(
     if (owner !== undefined && owner !== registry) continue;
     if (!relevant(mode, item.disposition)) continue;
     const chosen = withoutPublishing(
-      taken(item, decide(job, overrides, item, item.disposition)),
+      withLocalRemoval(item, decide(job, overrides, item, item.disposition)),
       publishable(item.kind),
     );
     outcomes.set(artifactKey(item.kind, item.name), decided(item, chosen));
@@ -151,8 +151,10 @@ export function classify(
     if (item.disposition === "synced" && unrecorded(scan, item)) writes.add(item.name);
     if (chosen === "publish" || chosen === "archive") mutates = true;
   }
-  if (mode !== "pull" && adopt(scan, job, scoped, overrides, outcomes, publishable)) {
-    mutates = true;
+  if (mode !== "pull") {
+    const adopted = adopt(scan, job, scoped, overrides, publishable);
+    for (const item of adopted.outcomes) outcomes.set(artifactKey(item.kind, item.artifact), item);
+    if (adopted.mutates) mutates = true;
   }
   return { outcomes, writes, mutates };
 }
@@ -190,7 +192,7 @@ function withoutPublishing(chosen: SyncOperation, publishable: boolean): SyncOpe
 export type Publishable = (kind: ArtifactKind) => boolean;
 
 /** Taking the registry's copy of one it deleted removes this one, and the run must say so. */
-function taken(item: SyncItem, chosen: SyncOperation): SyncOperation {
+function withLocalRemoval(item: SyncItem, chosen: SyncOperation): SyncOperation {
   const deleted =
     item.digests.upstream === undefined &&
     (item.disposition === "conflict" || item.disposition === "pull-delete");
@@ -233,15 +235,15 @@ function unrecorded(scan: Scan, item: SyncItem): boolean {
   return served !== undefined && entry.content !== served;
 }
 
-/** Local artifacts the registry does not carry yet. Returns whether one will be published. */
+/** Local artifacts the registry does not carry yet, and whether one will be published. */
 function adopt(
   scan: Scan,
   job: ScopeWork,
   scoped: Scoped,
   overrides: Overrides,
-  outcomes: Map<string, SyncOutcome>,
   publishable: Publishable,
-): boolean {
+): { outcomes: SyncOutcome[]; mutates: boolean } {
+  const outcomes: SyncOutcome[] = [];
   let mutates = false;
   const takesNone = !SCANNED_KINDS.some((kind) => publishable(kind));
   for (const candidate of scan.local) {
@@ -251,7 +253,7 @@ function adopt(
     const chosen = takesNone
       ? "ignore"
       : withoutPublishing(decide(job, overrides, candidate, "adopt"), publishable(candidate.kind));
-    outcomes.set(artifactKey(candidate.kind, candidate.name), {
+    outcomes.push({
       artifact: candidate.name,
       kind: candidate.kind,
       disposition: "adopt",
@@ -259,10 +261,10 @@ function adopt(
     });
     if (chosen === "publish") mutates = true;
   }
-  return mutates;
+  return { outcomes, mutates };
 }
 
-export function execution(outcomes: SyncOutcome[]): SyncExecution {
+export function summarizeExecution(outcomes: SyncOutcome[]): SyncExecution {
   const failed = outcomes.filter(({ failure }) => failure !== undefined).length;
   const settled = outcomes.map(({ operation: item }) => outcomeOf(item));
   const changed = settled.filter((outcome) => outcome === "changed").length;

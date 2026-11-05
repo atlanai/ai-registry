@@ -55,7 +55,13 @@ export async function refsFrom(
   if (common.select === undefined || common.select.includes("*")) return undefined;
   const read = await probeAddress(throughManifest(alias, registries, {}), base, []);
   try {
-    const addresses = qualify(common.select, alias, read.catalog.entries, false, alias);
+    const addresses = qualify({
+      picks: common.select,
+      shown: alias,
+      entries: read.catalog.entries,
+      partial: false,
+      alias,
+    });
     return addresses.map((address) => `${alias}/${address}`);
   } finally {
     await read.close();

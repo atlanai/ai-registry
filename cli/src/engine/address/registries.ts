@@ -13,7 +13,7 @@ import { readManifest } from "#core/manifest/repository.ts";
 import { roots as makeRoots, type Scope, scopeName } from "#core/store/paths.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
-import type { Probed } from "./probe.ts";
+import { aliasIn, type Probed } from "./probe.ts";
 
 export function sameLocation(a: string, b: string): boolean {
   return comparable(a) === comparable(b);
@@ -90,13 +90,22 @@ function rooted(
   );
 }
 
+export interface Addressing {
+  address: string;
+  /** Plus a repository the address names that none of them declares. */
+  known: Readonly<Record<string, RegistrySource>>;
+}
+
 /**
  * A repository URL with an address after it names a place inside that
  * registry, so `github.com/acme/registry/platform` is `<alias>/platform`.
  */
-export function asAddress(input: string, known: Record<string, RegistrySource>): string {
+export function asAddress(
+  input: string,
+  known: Readonly<Record<string, RegistrySource>>,
+): Addressing {
   const split = splitRepository(input);
-  if (split === undefined) return input;
+  if (split === undefined) return { address: input, known };
   const alias =
     declaredAlias(known, split.location) ?? registryNameFromLocation(split.location, "git");
   // The name is the repository's only when it is free: a declaration of another
@@ -111,8 +120,12 @@ export function asAddress(input: string, known: Record<string, RegistrySource>):
       },
     );
   }
-  known[alias] ??= { location: split.location, adapter: undefined, config: {} };
-  return `${alias}/${split.rest}`;
+  const address = `${alias}/${split.rest}`;
+  if (holder !== undefined) return { address, known };
+  return {
+    address,
+    known: { ...known, [alias]: { location: split.location, adapter: undefined, config: {} } },
+  };
 }
 
 /**
@@ -126,21 +139,18 @@ export async function undeclaredRegistry(
   cwd: string,
 ): Promise<AiregError | undefined> {
   if (namesHost(input)) return undefined;
-  const alias = (input.split("@")[0] ?? input).split("/")[0] ?? input;
+  const alias = aliasIn(input);
   const scope = (await load(common, cwd, "user")).roots.scope;
   const project =
     common.scope === "user" ? await load({ ...common, scope: undefined }, cwd, "user") : undefined;
   const there =
     project?.roots.scope === "project" && project.manifest.registries[alias] !== undefined;
-  return unknownRegistry(
-    alias,
-    scope,
-    Object.keys(known),
-    there
+  return unknownRegistry(alias, scope, Object.keys(known), {
+    hint: there
       ? `This project declares ${alias}, so run it without -g, or add it to your user scope with \`aireg registry add <address> -g\`.`
       : undefined,
-    knownIn(scope),
-  );
+    searched: knownIn(scope),
+  });
 }
 
 /** A project also reaches the registries your user scope declares, so both were looked in. */

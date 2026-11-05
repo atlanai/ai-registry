@@ -1,6 +1,6 @@
 import type { SourceAdapter } from "#adapter/index.ts";
 import type { LockArtifact } from "#core/lock.ts";
-import { namespaceOf, type ProjectionOptions, pluginLinkAt } from "./projection.ts";
+import { namespaceOf, type ProjectionScope, pluginLinkAt } from "./projection.ts";
 
 /** Whether a source's namespaces install as plugins at user scope, rather than as their parts. */
 export function wrapsNamespaces(adapter: Pick<SourceAdapter, "capabilities">): boolean {
@@ -13,7 +13,7 @@ export function wrapsNamespaces(adapter: Pick<SourceAdapter, "capabilities">): b
  */
 export function wrappedInLock(
   rows: readonly (readonly [string, LockArtifact])[],
-  options: Pick<ProjectionOptions, "roots" | "targetTable">,
+  options: ProjectionScope,
 ): boolean {
   return rows.some(
     ([name, row]) =>

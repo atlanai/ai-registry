@@ -6,9 +6,9 @@ import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { dropUnusedSources, lockSourceOf } from "#core/plan/acquire/sources.ts";
 import { closure, dependentsByName, nameClashes } from "#core/plan/depends.ts";
-import type { Acquired, Clash, Incompatible, Plan, Selected, Warning } from "#core/plan/model.ts";
+import type { Acquired, Clash, Plan, Selected, Warning } from "#core/plan/model.ts";
 import { crowdedContainers } from "#core/plan/projection.ts";
-import { addressOf, select, type Untrusted } from "#core/plan/select.ts";
+import { addressOf, select } from "#core/plan/select.ts";
 import type { Survey } from "#core/plan/survey.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
 import {
@@ -61,25 +61,23 @@ function planWith(
   { manifest, lock, acquired, survey, options }: Inputs,
   renames: ReadonlyMap<string, string>,
 ): { plan: Plan; selected: Selected[] } {
-  const warnings: Warning[] = acquired.flatMap((source) =>
-    source.catalog.warnings.map((message) => ({ name: source.alias, message })),
-  );
-  const incompatible: Incompatible[] = [];
-  const clashes: Clash[] = [];
-  const top = select(manifest, lock, acquired, [], options.cliVersion, [], [], renames);
+  const { cliVersion } = options;
+  const top = select({ manifest, lock, acquired, cliVersion, renames }).selected;
   const needs = closure(top, acquired);
-  const untrusted: Untrusted[] = [];
-  const selected = select(
-    { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
+  const selection = select({
+    manifest: { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
     lock,
     acquired,
-    warnings,
-    options.cliVersion,
-    incompatible,
-    clashes,
+    cliVersion,
     renames,
-    untrusted,
-  );
+  });
+  const { selected, incompatible, clashes, untrusted } = selection;
+  const warnings: Warning[] = [
+    ...acquired.flatMap((source) =>
+      source.catalog.warnings.map((message) => ({ name: source.alias, message })),
+    ),
+    ...selection.warnings,
+  ];
   const next = emptyLock();
   for (const source of acquired) {
     next.registries[source.alias] = lockSourceOf(source.origin);

@@ -1,22 +1,24 @@
 import { resolve } from "node:path";
 import type { ArtifactKind } from "#adapter/kinds.ts";
-import type { Scope } from "#core/store/paths.ts";
+import type { Scope, Where } from "#core/store/paths.ts";
 import type { Target, Targets } from "./contract.ts";
-import { targetRoot } from "./roots.ts";
+import { userTargetRoot } from "./roots.ts";
+
+/** Placement compares a project's target roots as relative paths, so it needs no folder. */
+export type PlacementWhere = Pick<Where, "scope" | "env">;
 
 /** The folders a target reads a kind from, most preferred first. */
 export function readsFor(
   targetTable: Targets,
   name: string,
   kind: ArtifactKind,
-  scope?: Scope,
-  env: NodeJS.ProcessEnv = process.env,
+  where?: PlacementWhere,
 ): string[] {
   const target = targetTable[name];
   if (target === undefined) return [];
   const reads = target.reads[kind] ?? (target.kinds[kind] === undefined ? [] : [name]);
   // A summary passes no scope; a project's shared folder still counts as the target's own there.
-  const shared = sharedOwnFolder(targetTable, target, kind, scope ?? "project", env);
+  const shared = sharedOwnFolder(targetTable, target, kind, where);
   return shared === undefined
     ? reads
     : [...new Set(reads.map((read) => (read === name ? shared : read)))];
@@ -27,13 +29,13 @@ function sharedOwnFolder(
   targetTable: Targets,
   target: Target,
   kind: ArtifactKind,
-  scope: Scope,
-  env: NodeJS.ProcessEnv,
+  where: PlacementWhere | undefined,
 ): string | undefined {
+  const scope = where?.scope ?? "project";
   const own = target.kinds[kind];
   if (target.shared || own === undefined || !placeable(target, kind, scope)) return undefined;
   const root = (each: Target) =>
-    scope === "project" ? each.projectRoot : targetRoot(each, "user", "", env);
+    where?.scope === "user" ? userTargetRoot(each, where.env) : each.projectRoot;
   return Object.values(targetTable).find((other) => {
     const theirs = other.kinds[kind];
     return (
@@ -60,24 +62,27 @@ export interface KindTargets {
   unreadable: string[];
 }
 
-/**
- * The fewest folders reaching every selected target that reads this kind, so a shared one is
- * written once. `wrapped` items sit in plugin folders, which another tool cannot read through.
- */
+export interface PlacementOptions {
+  targetTable: Targets;
+  where: PlacementWhere;
+  /** Items sit in plugin folders, which another tool cannot read through. */
+  wrapped?: boolean;
+}
+
+/** The fewest folders reaching every selected target, so a shared one is written once. */
 export function placementFor(
   kind: ArtifactKind,
   selected: readonly string[],
-  targetTable: Targets,
-  scope: Scope,
-  wrapped = false,
-  env: NodeJS.ProcessEnv = process.env,
+  options: PlacementOptions,
 ): KindTargets {
+  const { targetTable, where, wrapped = false } = options;
+  const { scope } = where;
   const needs: string[][] = [];
   const unreadable: string[] = [];
   for (const name of new Set(selected)) {
     if (targetTable[name] === undefined) continue;
     // Another tool's plugin folder nests each item a level deeper than this one looks.
-    const reads = readsFor(targetTable, name, kind, scope, env).filter(
+    const reads = readsFor(targetTable, name, kind, where).filter(
       (read) =>
         placeable(targetTable[read], kind, scope) &&
         (read === name || !wrapped || !takesPlugin(targetTable[read] as Target, scope)),

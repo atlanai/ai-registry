@@ -18,7 +18,7 @@ import {
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
 import { authored, refusal } from "#core/fs/tree.ts";
-import { type Problem, text, unparsed } from "./read.ts";
+import { type Problem, textAt, unparsed } from "./read.ts";
 
 /** What `<kind> init` could not fill in, and an author has not yet. */
 const PLACEHOLDER = "TODO";
@@ -96,7 +96,8 @@ export async function folderProblems(
   const present = new Set(records.map((record) => record.path));
   const contents = new Map<string, string>();
   for (const path of present) {
-    if (/\.(md|json)$/.test(path)) contents.set(path, (await text(root, `${where}/${path}`)) ?? "");
+    if (/\.(md|json)$/.test(path))
+      contents.set(path, (await textAt(root, `${where}/${path}`)) ?? "");
   }
   for (const message of versionProblems(manifest, folder, present, contents)) {
     problems.push({ path: where, message });
@@ -160,6 +161,7 @@ interface FolderContext {
 
 /** The refs a version's envelope says it depends on, as written there. */
 async function dependsOn(root: string, at: string): Promise<string[]> {
+  // The drift check reports an envelope that will not read.
   const raw = await readJson(rootReader(root), `${at}/${ENVELOPE}`).catch(() => undefined);
   const edges = isRecord(raw) ? raw.relationships : undefined;
   if (!Array.isArray(edges)) return [];
@@ -171,6 +173,7 @@ async function dependsOn(root: string, at: string): Promise<string[]> {
 
 /** Paths a version's envelope describes that no client writes: the grammar every reader enforces. */
 async function unwritable(root: string, at: string): Promise<Problem[]> {
+  // As in `dependsOn`.
   const raw = await readJson(rootReader(root), `${at}/${ENVELOPE}`).catch(() => undefined);
   const files = isRecord(raw) && Array.isArray(raw.files) ? raw.files : [];
   const paths = files.flatMap((file) =>
@@ -216,13 +219,18 @@ async function drifted(
   present: ReadonlySet<string>,
   pinned: unknown,
 ): Promise<{ path: string; message: string; blobOf?: string } | undefined> {
-  let envelope: Envelope | undefined;
+  let raw: unknown;
   try {
-    envelope = (await readJson(rootReader(root), `${at}/${ENVELOPE}`)) as Envelope | undefined;
+    raw = await readJson(rootReader(root), `${at}/${ENVELOPE}`);
   } catch (error) {
     if (unparsed(error)) return { path: `${at}/${ENVELOPE}`, message: "is not valid JSON" };
   }
-  if (envelope === undefined) return { path: `${at}/${ENVELOPE}`, message: "is missing" };
+  if (raw === undefined) return { path: `${at}/${ENVELOPE}`, message: "is missing" };
+  // Released as an object with metadata, so JSON of any other shape is an edit.
+  if (!isRecord(raw) || !isRecord(raw.metadata)) {
+    return { path: `${at}/${ENVELOPE}`, message: "was edited" };
+  }
+  const envelope = raw as unknown as Envelope;
   if (
     envelope.metadata?.digest !== contentDigest(envelope) ||
     envelope.metadata.digest !== pinned

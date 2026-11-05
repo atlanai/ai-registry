@@ -66,6 +66,7 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
     ): Promise<PublishResult> {
       return translating(async () => {
         // Refused before anything is written: aireg only reads a folder of skills.
+        // Undetectable is not read-only; the publish itself then says what is wrong.
         const layout = forced ?? (await detectLayout(root).catch(() => undefined));
         if (isReadOnlyLayout(layout)) {
           throw fail(

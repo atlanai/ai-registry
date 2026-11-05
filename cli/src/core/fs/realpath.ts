@@ -9,6 +9,7 @@ export function canonical(path: string): string {
   try {
     return realpathSync.native(path);
   } catch {
+    // Any path that will not resolve, a link loop as much as a missing one, compares as written.
     return path;
   }
 }

@@ -5,13 +5,36 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { LeaseError } from "#core/lease/errors.ts";
 import { ManifestError } from "#core/manifest/errors.ts";
 import { RpcErrorCode } from "./codes.ts";
-import { rpcError } from "./errors.ts";
+import { invalidParams, noAccount, noJob, noRun, rpcError, staleSettings } from "./errors.ts";
 import { ProtocolError } from "./protocol.ts";
 
 describe("rpcError", () => {
   test("keeps a protocol failure as-is", () => {
     const error = new ProtocolError(RpcErrorCode.NotFound, "account not found");
     expect(rpcError(error)).toBe(error);
+  });
+
+  test("sends a handler's refusal as its code, with only the data it gave", () => {
+    const missing = rpcError(noJob("job_demo"));
+    expect([missing.code, missing.message, missing.data]).toEqual([
+      RpcErrorCode.NotFound,
+      'No job named "job_demo".',
+      undefined,
+    ]);
+    expect(rpcError(noAccount("acc_demo")).message).toBe('No account named "acc_demo".');
+    expect(rpcError(noRun("run_demo"))).toMatchObject({
+      code: RpcErrorCode.NotFound,
+      message: 'No run named "run_demo".',
+    });
+    expect(rpcError(invalidParams("Bad.", { hint: "Fix it." }))).toMatchObject({
+      code: RpcErrorCode.InvalidParams,
+      message: "Bad.",
+      data: { hint: "Fix it." },
+    });
+    expect(rpcError(staleSettings(7))).toMatchObject({
+      code: RpcErrorCode.StaleRevision,
+      data: { revision: 7 },
+    });
   });
 
   test("names an adapter failure instead of swallowing it as internal", () => {
@@ -79,7 +102,9 @@ describe("rpcError", () => {
   });
 
   test("names a lease failure instead of calling it internal", () => {
-    expect(rpcError(new LeaseError("Another process took over", "lease_lost"))).toMatchObject({
+    expect(
+      rpcError(new LeaseError("Another process took over", { reason: "lease_lost" })),
+    ).toMatchObject({
       code: RpcErrorCode.Server,
       message: "Another process took over",
     });

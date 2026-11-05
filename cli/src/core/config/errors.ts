@@ -1,9 +1,9 @@
-import { AiregError, ErrorCode } from "#core/errors.ts";
+import { AiregError, ErrorCode, type ErrorOptions } from "#core/errors.ts";
 import { readers } from "#core/fields.ts";
 
 export class ConfigError extends AiregError {
-  constructor(message: string, code: ErrorCode = ErrorCode.Invalid, hint?: string) {
-    super(message, { code, hint });
+  constructor(message: string, options: ErrorOptions = {}) {
+    super(message, { ...options, code: options.code ?? ErrorCode.Invalid });
     this.name = "ConfigError";
   }
 }
@@ -16,11 +16,10 @@ export class ConfigConflictError extends ConfigError {
   readonly currentRevision: number;
 
   constructor(currentRevision: number) {
-    super(
-      `Another aireg process changed config.yml first.`,
-      ErrorCode.Conflict,
-      "Run the command again.",
-    );
+    super(`Another aireg process changed config.yml first.`, {
+      code: ErrorCode.Conflict,
+      hint: "Run the command again.",
+    });
     this.name = "ConfigConflictError";
     this.currentRevision = currentRevision;
   }

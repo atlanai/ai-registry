@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { expandSteps, orderSteps } from "./jobs.ts";
+import { policyOf } from "#core/sync/policy.ts";
+import { expandSteps, orderSteps, scopeSteps } from "./jobs.ts";
 import { isNamespaceAddress, isStepPolicy, type Step } from "./model.ts";
 
 function step(over: Partial<Step> = {}): Step {
@@ -87,5 +88,25 @@ describe("isStepPolicy", () => {
   test("takes on, report and off, and nothing else", () => {
     for (const value of ["on", "report", "off"]) expect(isStepPolicy(value)).toBe(true);
     for (const value of ["apply", "yes", ""]) expect(isStepPolicy(value)).toBe(false);
+  });
+});
+
+describe("scopeSteps", () => {
+  test("gates every leaf on the pull, and the pull on what it is told to wait for", () => {
+    const steps = scopeSteps("/tmp/scope", { pull: "on", publish: "report", delete: "off" }, [
+      "origins",
+    ]);
+    expect(steps.map(({ name, needs, root }) => ({ name, needs, root }))).toEqual([
+      { name: "pull", needs: ["origins"], root: "/tmp/scope" },
+      { name: "publish", needs: ["pull"], root: "/tmp/scope" },
+      { name: "prune", needs: ["pull"], root: "/tmp/scope" },
+    ]);
+  });
+
+  test("adds adopt and claim only when the policy names them, and reads back as that policy", () => {
+    const policy = { pull: "on", publish: "on", delete: "report", claim: "on" } as const;
+    const steps = scopeSteps("/tmp/scope", policy);
+    expect(steps.map((item) => item.kind)).toEqual(["pull", "publish", "prune", "claim"]);
+    expect(policyOf(steps)).toEqual(policy);
   });
 });

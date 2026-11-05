@@ -1,5 +1,6 @@
 import type { SourceAdapter } from "#adapter/index.ts";
 import { loadAdapters } from "#core/adapter/load.ts";
+import { BUILT_IN_VIEWS } from "#core/console/model.ts";
 import {
   type AdapterExtension,
   type CommandContribution,
@@ -81,12 +82,12 @@ export async function stepForFlags(
   return undefined;
 }
 
-/** Console tabs, in load order. A duplicate id is dropped, as for commands. */
+/** Console tabs, in load order. A duplicate id, or one of aireg's own views, is dropped. */
 // biome-ignore lint/suspicious/noExplicitAny: each panel names its own state.
 export async function contributedPanels(): Promise<readonly PanelContribution<any>[]> {
   // biome-ignore lint/suspicious/noExplicitAny: each panel names its own state.
   const panels: PanelContribution<any>[] = [];
-  const seen = new Set<string>();
+  const seen = new Set<string>(BUILT_IN_VIEWS);
   for (const { extend } of await loadedExtensions()) {
     for (const panel of extend.panels ?? []) {
       if (seen.has(panel.id)) continue;

@@ -27,20 +27,13 @@ export async function reconcile(
   acquired: readonly Acquired[],
   roots: Pick<Roots, "artifacts">,
 ): Promise<SyncItem[]> {
-  // What the manifest's artifacts depend on is theirs too, though it names none of it.
-  const needs = closure(select(manifest, lock, acquired, []), acquired);
-  const untrusted: Untrusted[] = [];
-  const selected = select(
-    { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
+  // Dependencies of declared artifacts are tracked too, though the manifest names none.
+  const needs = closure(select({ manifest, lock, acquired }).selected, acquired);
+  const { selected, untrusted } = select({
+    manifest: { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
     lock,
     acquired,
-    [],
-    undefined,
-    [],
-    [],
-    new Map(),
-    untrusted,
-  );
+  });
   const content = fetchFrom(acquired);
   const byName = new Map(selected.map((item) => [item.name, item]));
   // Content in the writable copy that neither the lock nor the catalog claims

@@ -61,15 +61,14 @@ export const { run } = defineCommand<Options>({
   actions: {
     [LISTING]: action({
       run: async (_options, context): Promise<Listing> => {
-        // Every name `--for` takes; a shared folder such as `.agents` is never detected.
-        const targetTable = resolveTargets();
-        const detected = detectAll(targetTable, context.cwd);
+        const targetTable = resolveTargets(process.env);
+        const detected = detectAll(targetTable, { cwd: context.cwd, env: process.env });
         // Shared folders last: not a coding agent, and always installed into when asked.
         const rows = [
           ...detected.filter((item) => !item.target.shared),
           ...detected.filter((item) => item.target.shared),
         ];
-        return { targetTable, rows, ...loadTargetFiles() };
+        return { targetTable, rows, ...loadTargetFiles(process.env) };
       },
       data: ({ targetTable, rows, files, skipped }): TargetsList => ({
         targets: rows.map((item) => ({
@@ -108,7 +107,7 @@ export const { run } = defineCommand<Options>({
           "a file",
           "Name the file to check: `aireg targets check <file>`.",
         );
-        const checked = await check(context.cwd, file);
+        const checked = await checkFile(context.cwd, file);
         if ("problems" in checked.result) context.exit = ExitCode.Error;
         return checked;
       },
@@ -225,7 +224,7 @@ function needed(argument: string | undefined, verb: string, what: string, hint: 
 }
 
 function show(id: string): TargetShown {
-  const targetTable = resolveTargets();
+  const targetTable = resolveTargets(process.env);
   const target = targetTable[canonicalId(targetTable, id)];
   if (target === undefined) {
     throw new AiregError(`No target named ${quoted(id)}.`, {
@@ -240,8 +239,8 @@ function show(id: string): TargetShown {
   return { target: shown, harness };
 }
 
-/** A file checked as aireg would read it from your user scope, wherever it is now. */
-async function check(cwd: string, file: string): Promise<Checked> {
+/** Read as aireg would read it from your user scope, wherever the file is now. */
+async function checkFile(cwd: string, file: string): Promise<Checked> {
   const path = resolve(cwd, file);
   let text: string;
   try {
@@ -249,7 +248,7 @@ async function check(cwd: string, file: string): Promise<Checked> {
   } catch (cause) {
     throw new AiregError(`Could not read ${file}.`, { code: ErrorCode.Usage, cause });
   }
-  return { file, path, result: checkTargetText(path, text) };
+  return { file, path, result: checkTargetText(path, text, process.env) };
 }
 
 function printCheck(

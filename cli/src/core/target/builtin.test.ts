@@ -32,9 +32,9 @@ describe("codex", () => {
     const codex = resolveTargets(env).codex!;
     expect(takesPlugin(codex)).toBe(true);
     expect(codex.kinds.plugin?.place).toBe("fan");
-    expect(pluginProjection(codex, "sales", "user", "/tmp/proj", env, "acme-prod")).toBe(
-      resolve("/tmp/home/.codex/plugins/cache/acme-prod/sales/local"),
-    );
+    expect(
+      pluginProjection(codex, "sales", { scope: "user", cwd: "/tmp/proj", env }, "acme-prod"),
+    ).toBe(resolve("/tmp/home/.codex/plugins/cache/acme-prod/sales/local"));
     // Plugins are read from the user installation alone.
     expect(takesPlugin(codex, "project")).toBe(false);
   });

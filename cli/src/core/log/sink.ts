@@ -61,6 +61,7 @@ export function fileSink(options: FileSinkOptions): Sink {
     try {
       return fstatSync(fd).ino === statSync(path).ino;
     } catch {
+      // Whatever the stat failed on, a reopen settles it, and logging never throws.
       return false;
     }
   }
@@ -84,6 +85,7 @@ export function fileSink(options: FileSinkOptions): Sink {
   try {
     open();
   } catch {
+    // A log that cannot be opened turns logging off; it never fails the command.
     return { write: () => {}, close: () => {} };
   }
 
@@ -118,6 +120,7 @@ function withRotateLock(path: string, rotate: () => void): boolean {
   try {
     mkdirSync(lock);
   } catch {
+    // Held by another rotation, or left by a crash: only a stale one is taken over.
     if (!reclaim(lock)) return false;
   }
   try {
@@ -143,6 +146,7 @@ function reclaim(lock: string): boolean {
     mkdirSync(lock);
     return true;
   } catch {
+    // Raced by another process reclaiming it: the rotation is that one's.
     return false;
   }
 }
@@ -153,7 +157,7 @@ function shift(path: string, keep: number): void {
     try {
       renameSync(`${path}.${index}`, `${path}.${index + 1}`);
     } catch {
-      // Absent rung.
+      // Absent, or held open by a reader on Windows: that rung is skipped.
     }
   }
   try {

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { isMissing } from "#core/fs/path.ts";
-import { guardManagedPath } from "#core/store/managed-paths.ts";
+import { assertManagedPath } from "#core/store/managed-paths.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { canonicalIds } from "#core/target/ids.ts";
 import { resolveTargets } from "#core/target/table.ts";
@@ -21,7 +21,7 @@ export async function readManifest(path: string): Promise<Manifest> {
 
 /** Each target by its canonical id, so a command never writes an alias back. */
 function canonicalTargets(manifest: Manifest): Manifest {
-  const table = resolveTargets();
+  const table = resolveTargets(process.env);
   return {
     ...manifest,
     targets: canonicalIds(table, manifest.targets),
@@ -37,7 +37,7 @@ function canonicalTargets(manifest: Manifest): Manifest {
  */
 export async function writeManifest(roots: Roots, manifest: Manifest): Promise<string> {
   const path = roots.manifest;
-  await guardManagedPath(path, roots);
+  await assertManagedPath(path, roots, { env: process.env });
   const before = await readFile(path, "utf8").catch((cause: unknown) => {
     if (isMissing(cause)) return undefined;
     throw cause;

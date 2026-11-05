@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { LogLevelError, resolveLevel } from "./level.ts";
+import { isLevel } from "./model.ts";
 
 describe("resolveLevel", () => {
   test.each([
@@ -21,4 +22,10 @@ describe("resolveLevel", () => {
       'AIREG_LOG_LEVEL takes trace, debug, info, warn, error, fatal or off, not "bogus".',
     );
   });
+});
+
+test("knows only the levels it names, not what every object inherits", () => {
+  expect(isLevel("warn")).toBe(true);
+  expect(isLevel("constructor")).toBe(false);
+  expect(isLevel("toString")).toBe(false);
 });

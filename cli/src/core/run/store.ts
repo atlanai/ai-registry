@@ -44,6 +44,9 @@ export interface FinishRun {
   retryable?: boolean;
 }
 
+/** Per read, of runs or of run events. */
+export const MAX_PAGE_SIZE = 500;
+
 export interface RunQuery {
   jobId?: string;
   accountId?: string;

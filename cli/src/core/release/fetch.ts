@@ -89,6 +89,7 @@ export async function fetchOriginBytes(
   });
   const declared = Number(response.headers.get("content-length") ?? Number.NaN);
   if (!response.ok || (Number.isFinite(declared) && declared > limit)) {
+    // The error thrown next says what went wrong; a failed cancel adds nothing to it.
     await response.body?.cancel().catch(() => {});
     if (!response.ok)
       throw new AiregError(`The release server answered ${response.status} for ${url}.`, {
@@ -102,6 +103,7 @@ export async function fetchOriginBytes(
   }
   const reader = response.body.getReader();
   const abort = (): void => {
+    // The read in flight rejects with the abort reason; a failed cancel adds nothing to it.
     void reader.cancel(signal?.reason).catch(() => {});
   };
   signal?.addEventListener("abort", abort, { once: true });
@@ -129,6 +131,7 @@ export async function fetchOriginBytes(
     }
     return size === bytes.byteLength ? bytes : bytes.slice(0, size);
   } catch (error) {
+    // The read's own error is the one to report.
     await reader.cancel(error).catch(() => {});
     throw error;
   } finally {

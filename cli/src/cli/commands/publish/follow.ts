@@ -52,7 +52,15 @@ export async function follow(
       }
       if (served.size > 0) {
         const sentAs = new Map([...served].map((row) => [row, rows.get(row)]));
-        await applyLocal(fresh, common, found, served, sentAs, true, () => {});
+        await applyLocal({
+          loaded: fresh,
+          common,
+          scan: found,
+          names: served,
+          published: sentAs,
+          force: true,
+          onStep: () => {},
+        });
       } else await writeLock(fresh.roots, fresh.lock);
     } finally {
       await closeScan(found);

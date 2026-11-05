@@ -2,23 +2,65 @@ import type { ReactElement } from "react";
 import { windowAround } from "#cli/console/data/list.ts";
 import { summaryStrip } from "#cli/console/ui/chrome.ts";
 import { action, box, dim, faint, heading, plain, text } from "#cli/console/ui/elements.ts";
+import { LAYOUT } from "#cli/console/ui/mouse.ts";
+import { defineView } from "#cli/console/ui/screen.ts";
 import { failureWords } from "#cli/render/run.ts";
+import * as commands from "#core/console/actions.ts";
 import type { ConsoleState, JobRow, RunRow } from "#core/console/model.ts";
 import { isFailed } from "#core/run/model.ts";
 import { ago, clock, interval, pad, truncate } from "#core/term/format.ts";
 import { COLOR, GLYPH, runColor, runGlyph } from "#core/term/theme.ts";
 
-export type JobLine = { kind: "job"; job: JobRow } | { kind: "run"; run: RunRow };
+type JobLine = { kind: "job"; job: JobRow } | { kind: "run"; run: RunRow };
 
-export function jobLines(state: ConsoleState): JobLine[] {
+export const JOBS_VIEW = defineView<JobLine[]>("jobs", {
+  model: ({ state }) => jobLines(state),
+  length: (lines) => lines.length,
+  body: ({ frame, model, cursor }) =>
+    jobsView({
+      width: frame.width,
+      height: frame.height,
+      state: frame.state,
+      lines: model,
+      cursor,
+    }),
+  strip: ({ frame, model, cursor }) =>
+    jobsSummaryStrip({ width: frame.width, line: model[cursor], nowMs: frame.nowMs }),
+  rowAt: ({ frame, model, cursor }, screenRow) => {
+    const runs = runWindow(model, cursor, frame.height);
+    const index = jobsIndexAt(screenRow, frame.state.jobs.length, runs.from);
+    return index !== undefined && index < model.length ? index : undefined;
+  },
+  keys: {
+    "run-job": ({ model, cursor }, { run }) => {
+      const line = model[cursor];
+      if (line?.kind === "job") run(`running ${line.job.id}`, commands.runJob(line.job.id));
+    },
+    "toggle-job": ({ model, cursor }, { run }) => {
+      const line = model[cursor];
+      if (line?.kind !== "job") return;
+      const job = line.job;
+      run(
+        `${job.enabled ? "disabling" : "enabling"} ${job.id}`,
+        commands.setJobEnabled(job.id, !job.enabled),
+      );
+    },
+    "retry-run": ({ model, cursor }, { run }) => {
+      const line = model[cursor];
+      if (line?.kind === "run") run(`retrying ${line.run.id}`, commands.retryRun(line.run.id));
+    },
+  },
+});
+
+function jobLines(state: ConsoleState): JobLine[] {
   return [
     ...state.jobs.map((job) => ({ kind: "job" as const, job })),
     ...state.runs.map((run) => ({ kind: "run" as const, run })),
   ];
 }
 
-/** Which runs are on screen; shared with the click mapping so a click retries the run it hit. */
-export function runWindow(
+/** Shared with the click mapping, so a click retries the run it hit. */
+function runWindow(
   lines: readonly JobLine[],
   cursor: number,
   height: number,
@@ -31,7 +73,7 @@ export function runWindow(
   );
 }
 
-export function jobsView(props: {
+function jobsView(props: {
   width: number;
   height: number;
   state: ConsoleState;
@@ -128,7 +170,7 @@ function runLine(run: RunRow, selected: boolean, width: number): ReactElement {
   );
 }
 
-export function jobsSummaryStrip(props: {
+function jobsSummaryStrip(props: {
   width: number;
   line: JobLine | undefined;
   nowMs: number;
@@ -194,4 +236,15 @@ export function jobsSummaryStrip(props: {
     ],
     hint: isFailed(run.state) ? "r retry" : undefined,
   });
+}
+
+function jobsIndexAt(row: number, jobCount: number, firstRun: number): number | undefined {
+  // The JOBS heading, the jobs, then a blank and RUNS.
+  const top = LAYOUT.body + 1;
+  if (row < top) return undefined;
+  const offset = row - top;
+  if (offset < jobCount) return offset;
+  // Two rows of heading sit between the jobs and the runs.
+  const runOffset = offset - jobCount - 2;
+  return runOffset < 0 ? undefined : jobCount + firstRun + runOffset;
 }

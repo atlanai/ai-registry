@@ -60,11 +60,12 @@ describe("codex plugins as a local marketplace", () => {
   test("places a real directory Codex will load, and lists it in a marketplace of its own", async () => {
     const sales = await projected("acme-prod", "sales");
     const ops = await projected("acme-prod", "ops");
-    const result = await apply(
-      plan([linkTo("acme-prod", "sales", sales), linkTo("acme-prod", "ops", ops)]),
+    const result = await apply({
+      plan: plan([linkTo("acme-prod", "sales", sales), linkTo("acme-prod", "ops", ops)]),
       roots,
-      noFetch,
-    );
+      fetch: noFetch,
+      env: process.env,
+    });
 
     const local = join(cache("acme-prod"), "sales", "local");
     expect((await lstat(local)).isDirectory()).toBe(true);
@@ -93,19 +94,30 @@ describe("codex plugins as a local marketplace", () => {
   test("drops a removed plugin from the index, and the marketplace with its last one", async () => {
     const sales = await projected("acme-prod", "sales");
     const ops = await projected("acme-prod", "ops");
-    await apply(
-      plan([linkTo("acme-prod", "sales", sales), linkTo("acme-prod", "ops", ops)]),
+    await apply({
+      plan: plan([linkTo("acme-prod", "sales", sales), linkTo("acme-prod", "ops", ops)]),
       roots,
-      noFetch,
-    );
+      fetch: noFetch,
+      env: process.env,
+    });
 
-    await apply(plan([unlinkOf("acme-prod", "ops")]), roots, noFetch);
+    await apply({
+      plan: plan([unlinkOf("acme-prod", "ops")]),
+      roots,
+      fetch: noFetch,
+      env: process.env,
+    });
     expect(JSON.parse(await readFile(index("acme-prod"), "utf8")).plugins).toEqual([
       { name: "sales", source: { path: "./sales/local", source: "local" } },
     ]);
     await expect(lstat(join(cache("acme-prod"), "ops"))).rejects.toThrow();
 
-    await apply(plan([unlinkOf("acme-prod", "sales")]), roots, noFetch);
+    await apply({
+      plan: plan([unlinkOf("acme-prod", "sales")]),
+      roots,
+      fetch: noFetch,
+      env: process.env,
+    });
     await expect(lstat(join(cache("acme-prod"), ".agents"))).rejects.toThrow();
     // aireg made config.toml, so it goes with the last entry it held.
     await expect(lstat(config)).rejects.toThrow();
@@ -116,7 +128,12 @@ describe("codex plugins as a local marketplace", () => {
     const theirs = `[marketplaces.acme-prod]\nsource_type = "git"\nsource = "https://example.com/acme.git"\n`;
     await writeFile(config, theirs);
     const sales = await projected("acme-prod", "sales");
-    const result = await apply(plan([linkTo("acme-prod", "sales", sales)]), roots, noFetch);
+    const result = await apply({
+      plan: plan([linkTo("acme-prod", "sales", sales)]),
+      roots,
+      fetch: noFetch,
+      env: process.env,
+    });
 
     const text = await readFile(config, "utf8");
     expect(text.startsWith(theirs)).toBe(true);
@@ -147,11 +164,12 @@ describe("codex plugins as a local marketplace", () => {
     lock.artifacts["acme-prod/sales/skill/pitch"] = row("pitch");
 
     // One plugin directory, so the planner relinks it once, for the first artifact.
-    await apply(
-      plan([linkTo("acme-prod", "sales", sales), { kind: "record", lock }]),
+    await apply({
+      plan: plan([linkTo("acme-prod", "sales", sales), { kind: "record", lock }]),
       roots,
-      noFetch,
-    );
+      fetch: noFetch,
+      env: process.env,
+    });
     const written = await readFile(roots.lock, "utf8");
     expect(written.match(/mode: fanout/g)).toHaveLength(2);
     expect(written).not.toContain("mode: copy");

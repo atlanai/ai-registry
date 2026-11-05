@@ -15,8 +15,9 @@ const KIT = "https://github.com/acme/kit.git";
 /** A project at `/work` projecting into Claude Code. */
 export const PLAN_OPTIONS: BuildOptions = {
   roots: roots("project", "/work"),
+  env: process.env,
   targets: ["claude-code"],
-  targetTable: resolveTargets(),
+  targetTable: resolveTargets(process.env),
   force: false,
   copy: false,
 };

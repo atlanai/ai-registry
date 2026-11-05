@@ -169,3 +169,12 @@ export function emptyCounts(): Record<ArtifactState, number> {
     missing: 0,
   };
 }
+
+/** aireg's own console views, in tab order; an adapter's tab may not take one's id. */
+export const BUILT_IN_VIEWS = ["overview", "artifacts", "jobs", "accounts", "settings"] as const;
+
+export type BuiltInView = (typeof BUILT_IN_VIEWS)[number];
+
+export function isBuiltInView(id: string): id is BuiltInView {
+  return (BUILT_IN_VIEWS as readonly string[]).includes(id);
+}

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
-import { AccountService } from "#accounts/service.ts";
 import type { Fields } from "#adapter/fields.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { updateAdapters } from "#core/adapter/installed/update.ts";
@@ -22,6 +21,7 @@ import {
   type RunEvent,
   type RunRecord,
 } from "#core/run/model.ts";
+import { MAX_PAGE_SIZE } from "#core/run/store.ts";
 import { scopeName, toolHome, userScopeDir } from "#core/store/paths.ts";
 import { refreshAutostart, supervised } from "#daemon/autostart/index.ts";
 import { RESTART_EXIT_CODE } from "#daemon/autostart/model.ts";
@@ -31,15 +31,9 @@ import { createJob, patchSettings } from "#daemon/handlers/job.ts";
 import * as inputs from "#daemon/handlers/params.ts";
 import { startDaemon } from "#daemon/process/lifecycle.ts";
 import { liveDaemonPid, releaseDaemonPid, writeDaemonPid } from "#daemon/process/pid-file.ts";
-import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { privateDirectory, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
-import {
-  type DaemonInfo,
-  MAX_PAGE_SIZE,
-  PROTOCOL_VERSION,
-  type RpcContext,
-} from "#daemon/rpc/methods.ts";
-import { ProtocolError } from "#daemon/rpc/protocol.ts";
+import { invalidParams, noJob, noRun } from "#daemon/rpc/errors.ts";
+import { type DaemonInfo, PROTOCOL_VERSION, type RpcContext } from "#daemon/rpc/methods.ts";
 import { DaemonAlreadyRunningError, RpcServer } from "#daemon/rpc/server.ts";
 import { SyncRunner } from "#daemon/runs/runner.ts";
 import { JobScheduler } from "#daemon/runs/scheduler.ts";
@@ -58,19 +52,13 @@ const EVENT_PAGE_SIZE = 200;
 /** How often the daemon checks that its home still exists. */
 const HOME_WATCH_MS = 15_000;
 
-function noRun(runId: string): ProtocolError {
-  return new ProtocolError(RpcErrorCode.NotFound, `No run named ${quoted(runId)}.`);
-}
-
 export class DaemonRuntime {
   readonly #server: RpcServer;
   readonly #runs: SqliteRunStore;
   readonly #version: string;
-  readonly #accounts = new AccountService();
   readonly #runner: SyncRunner;
   readonly #scheduler: JobScheduler;
   readonly #minUpdate = new DaemonMinUpdate(() => this.#applyMinUpdate());
-  #homeWatch: ReturnType<typeof setInterval> | undefined;
   readonly #follow = new DaemonMinUpdate(
     () => applyDaemonFollowInstalled(this.#replaceHooks()),
     FOLLOW_INTERVAL_MS,
@@ -78,18 +66,24 @@ export class DaemonRuntime {
   readonly #instanceId = `daemon_${randomUUID()}`;
   readonly #startedAtMs = Date.now();
   readonly #stopped = new Set<() => void>();
+  readonly #log: Logger;
+  #homeWatch: ReturnType<typeof setInterval> | undefined;
   #closing: Promise<void> | undefined;
   #exitCode = 0;
-  readonly #log: Logger;
 
   private constructor(runs: SqliteRunStore, version: string, log: Logger) {
     this.#runs = runs;
     this.#version = version;
     this.#log = log;
     this.#server = new RpcServer(log);
-    this.#runner = new SyncRunner(runs, (event) => this.#emit(event), version, log);
+    this.#runner = new SyncRunner(runs, (event) => this.#emit(event), { version, log });
     this.#scheduler = new JobScheduler(runs, this.#runner, log);
     this.#register();
+  }
+
+  /** Non-zero only when the daemon asks its supervisor to start it again. */
+  get exitCode(): number {
+    return this.#exitCode;
   }
 
   static async open(version: string, log: Logger = nullLogger()): Promise<DaemonRuntime> {
@@ -99,6 +93,43 @@ export class DaemonRuntime {
       log.warn("run history could not be read, so it was moved aside and started again", { to }),
     );
     return new DaemonRuntime(store, version, log);
+  }
+
+  async listen(): Promise<void> {
+    // A daemon busy starting up can miss the socket probe; its pid file still names it.
+    if ((await liveDaemonPid()) !== undefined) throw new DaemonAlreadyRunningError();
+    // Owning the endpoint is what makes this the single daemon, so only now
+    // is it safe to declare another process's runs dead.
+    const endpoint = rpcEndpoint();
+    await privateDirectory(dirname(endpoint));
+    await this.#server.listen(endpoint);
+    await writeDaemonPid(process.pid);
+    const abandoned = this.#runs.abandonActive(Date.now());
+    this.#log.debug("reclaimed runs left active by a previous process", { abandoned });
+    this.#scheduler.start();
+    this.#minUpdate.start();
+    this.#follow.start();
+    // A home deleted under it leaves a daemon nobody can reach or stop.
+    const home = toolHome();
+    this.#homeWatch = setInterval(() => {
+      if (existsSync(home)) return;
+      this.#log.warn("aireg's home is gone, so the daemon is stopping", { home });
+      void this.close();
+    }, HOME_WATCH_MS);
+    this.#homeWatch.unref();
+  }
+
+  onceStopped(listener: () => void): void {
+    if (this.#closing !== undefined) listener();
+    else this.#stopped.add(listener);
+  }
+
+  async close(): Promise<void> {
+    if (this.#closing === undefined) this.#closing = this.#finish();
+    await this.#closing;
+    const listeners = [...this.#stopped];
+    this.#stopped.clear();
+    for (const listener of listeners) listener();
   }
 
   #register(): void {
@@ -125,17 +156,17 @@ export class DaemonRuntime {
       "conflict.resolve": (raw, context) => resolveConflict(raw, context, this.#runner),
       "account.login": async (raw, context) => {
         // Never the credential, only that one was written: enough to answer "am I signed in".
-        const result = await loginAccount(raw, context, this.#accounts);
+        const result = await loginAccount(raw, context);
         this.#log.info("account authenticated", { accountId: result.account.id });
         return result;
       },
       "account.logout": async (raw, context) => {
-        const result = await logoutAccount(raw, context, this.#accounts);
+        const result = await logoutAccount(raw, context);
         this.#log.info("account signed out");
         return result;
       },
       "account.remove": async (raw, context) => {
-        const result = await removeAccount(raw, context, this.#accounts);
+        const result = await removeAccount(raw, context);
         this.#log.info("account removed");
         return result;
       },
@@ -158,17 +189,11 @@ export class DaemonRuntime {
 
   async #listRuns(raw: unknown): Promise<{ runs: RunRecord[] }> {
     const params = inputs.object(raw);
-    const limit = params.limit === undefined ? undefined : inputs.integer(params, "limit");
+    const limit = inputs.pageLimit(params, "limit", undefined);
     const jobId = inputs.optionalText(params, "jobId");
     const accountId = inputs.optionalText(params, "accountId");
     const state =
       params.state === undefined ? undefined : inputs.oneOf(params, "state", RUN_STATES);
-    if (limit !== undefined && (limit < 1 || limit > MAX_PAGE_SIZE)) {
-      throw new ProtocolError(
-        RpcErrorCode.InvalidParams,
-        `The limit must be between 1 and ${MAX_PAGE_SIZE}.`,
-      );
-    }
     return {
       runs: this.#runs.list({
         ...(jobId === undefined ? {} : { jobId }),
@@ -250,14 +275,9 @@ export class DaemonRuntime {
     const mode = inputs.text(params, "mode");
     const config = await readConfig();
     const job = config.jobs.find(({ id }) => id === jobId);
-    if (job === undefined) {
-      throw new ProtocolError(RpcErrorCode.NotFound, `No job named ${quoted(jobId)}.`);
-    }
+    if (job === undefined) throw noJob(jobId);
     if (!isRunMode(mode)) {
-      throw new ProtocolError(
-        RpcErrorCode.InvalidParams,
-        `Unknown run mode ${quoted(mode)}. Use ${list(RUN_MODES, "or")}.`,
-      );
+      throw invalidParams(`Unknown run mode ${quoted(mode)}. Use ${list(RUN_MODES, "or")}.`);
     }
     const refs = inputs.optionalNames(params, "refs");
     return {
@@ -271,15 +291,8 @@ export class DaemonRuntime {
     const run = this.#runs.get(runId);
     if (run === undefined) throw noRun(runId);
     const after = params.afterEventId === undefined ? 0 : inputs.integer(params, "afterEventId");
-    if (after < 0)
-      throw new ProtocolError(RpcErrorCode.InvalidParams, "afterEventId must not be negative.");
-    const limit = params.limit === undefined ? EVENT_PAGE_SIZE : inputs.integer(params, "limit");
-    if (limit < 1 || limit > MAX_PAGE_SIZE) {
-      throw new ProtocolError(
-        RpcErrorCode.InvalidParams,
-        `The limit must be between 1 and ${MAX_PAGE_SIZE}.`,
-      );
-    }
+    if (after < 0) throw invalidParams("afterEventId must not be negative.");
+    const limit = inputs.pageLimit(params, "limit", EVENT_PAGE_SIZE);
     const page = this.#runs.events(runId, after, limit + 1);
     return { events: page.slice(0, limit), hasMore: page.length > limit };
   }
@@ -317,6 +330,13 @@ export class DaemonRuntime {
       );
     }
     return { run: await this.#runner.start(original.jobId, original.mode, "manual") };
+  }
+
+  async #cancel(raw: unknown): Promise<{ run: RunRecord }> {
+    const runId = inputs.text(inputs.object(raw), "runId");
+    const run = this.#runner.cancel(runId);
+    if (run === undefined) throw noRun(runId);
+    return { run };
   }
 
   #emit(event: RunEvent): void {
@@ -364,55 +384,6 @@ export class DaemonRuntime {
           }
         : {}),
     };
-  }
-
-  /** Non-zero only when the daemon asks its supervisor to start it again. */
-  get exitCode(): number {
-    return this.#exitCode;
-  }
-
-  async #cancel(raw: unknown): Promise<{ run: RunRecord }> {
-    const runId = inputs.text(inputs.object(raw), "runId");
-    const run = this.#runner.cancel(runId);
-    if (run === undefined) throw noRun(runId);
-    return { run };
-  }
-
-  async listen(): Promise<void> {
-    // A daemon busy starting up can miss the socket probe; its pid file still names it.
-    if ((await liveDaemonPid()) !== undefined) throw new DaemonAlreadyRunningError();
-    // Owning the endpoint is what makes this the single daemon, so only now
-    // is it safe to declare another process's runs dead.
-    const endpoint = rpcEndpoint();
-    await privateDirectory(dirname(endpoint));
-    await this.#server.listen(endpoint);
-    await writeDaemonPid(process.pid);
-    const abandoned = this.#runs.abandonActive(Date.now());
-    this.#log.debug("reclaimed runs left active by a previous process", { abandoned });
-    this.#scheduler.start();
-    this.#minUpdate.start();
-    this.#follow.start();
-    // A home deleted under it leaves a daemon nobody can reach or stop.
-    const home = toolHome();
-    this.#homeWatch = setInterval(() => {
-      if (existsSync(home)) return;
-      this.#log.warn("aireg's home is gone, so the daemon is stopping", { home });
-      void this.close();
-    }, HOME_WATCH_MS);
-    this.#homeWatch.unref();
-  }
-
-  onceStopped(listener: () => void): void {
-    if (this.#closing !== undefined) listener();
-    else this.#stopped.add(listener);
-  }
-
-  async close(): Promise<void> {
-    if (this.#closing === undefined) this.#closing = this.#finish();
-    await this.#closing;
-    const listeners = [...this.#stopped];
-    this.#stopped.clear();
-    for (const listener of listeners) listener();
   }
 
   async #finish(): Promise<void> {

@@ -73,6 +73,7 @@ async function abilities(
     );
     return { signIn: canSignIn(adapter), publishes: adapter.capabilities.publish };
   } catch {
+    // An adapter that will not load yet offers every action; taking one says why it fails.
     return { signIn: true, publishes: true };
   }
 }

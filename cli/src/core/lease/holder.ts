@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { isRecord } from "#adapter/fields.ts";
+import { ifPresent, isAbsent } from "#adapter/files.ts";
 import { metaPath } from "./location.ts";
 
 export interface LeaseHolder {
@@ -12,11 +14,31 @@ export interface LeaseHolder {
 }
 
 export async function readHolder(dir: string): Promise<LeaseHolder | undefined> {
+  return holderOf(await ifPresent(readFile(metaPath(dir), "utf8")));
+}
+
+/** For a signal handler, which cannot wait for a read. */
+export function readHolderSync(dir: string): LeaseHolder | undefined {
+  let text: string;
   try {
-    return parseHolder(JSON.parse(await readFile(metaPath(dir), "utf8")));
+    text = readFileSync(metaPath(dir), "utf8");
+  } catch (error) {
+    if (isAbsent(error)) return undefined;
+    throw error;
+  }
+  return holderOf(text);
+}
+
+function holderOf(text: string | undefined): LeaseHolder | undefined {
+  if (text === undefined) return undefined;
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
   } catch {
+    // Written by a claim not yet finished, so there is no holder to read yet.
     return undefined;
   }
+  return parseHolder(value);
 }
 
 /**

@@ -142,7 +142,7 @@ beforeEach(() => {
 function namesPassedToApply(): string[] {
   const call = applyLocal.mock.calls.at(-1);
   if (call === undefined) throw new Error("applyLocal was not called");
-  return [...(call[3] as ReadonlySet<string>)].sort();
+  return [...(call[0] as { names: ReadonlySet<string> }).names].sort();
 }
 
 test("applies what the first scan classified when nothing was published", async () => {
@@ -153,7 +153,13 @@ test("applies what the first scan classified when nothing was published", async 
     archived: new Set<string>(),
   });
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks,
+  });
 
   expect(namesPassedToApply()).toEqual(["alpha"]);
 });
@@ -165,9 +171,15 @@ test("reports what the apply did to a person's files as a run warning", async ()
   applyLocal.mockResolvedValueOnce({ changed: 1, notices: [moved] });
   const event = vi.fn();
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, {
-    ...hooks,
-    event,
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks: {
+      ...hooks,
+      event,
+    },
   });
 
   expect(event).toHaveBeenCalledWith("run.warning", "applying", undefined, moved);
@@ -186,14 +198,20 @@ test("closes every source each scan opened once the run ends, even when it fails
     archived: new Set<string>(),
   });
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks,
+  });
   expect(opened).toHaveLength(2);
   for (const close of opened) expect(close).toHaveBeenCalledTimes(1);
 
   opened.length = 0;
   applyLocal.mockRejectedValueOnce(new Error("disk full"));
   await expect(
-    executeSync(job, account, "sync", undefined, new AbortController().signal, hooks),
+    executeSync({ work: job, account, mode: "sync", signal: new AbortController().signal, hooks }),
   ).rejects.toThrow("disk full");
   expect(opened).toHaveLength(2);
   for (const close of opened) expect(close).toHaveBeenCalledTimes(1);
@@ -209,7 +227,13 @@ test("rebases on the lock as it is inside the lease, not as it was outside", asy
     archived: new Set<string>(),
   });
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks,
+  });
 
   // `alpha` is settled and recorded, so only `beta` is still this run's to write.
   expect(namesPassedToApply()).toEqual(["beta"]);
@@ -224,7 +248,13 @@ test("records an artifact that agrees with the registry but is locked nowhere", 
     archived: new Set<string>(),
   });
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks,
+  });
 
   expect(namesPassedToApply()).toEqual(["beta"]);
 });
@@ -245,7 +275,13 @@ test("records a newer upstream identity when its bytes already match the copy", 
     archived: new Set<string>(),
   });
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks,
+  });
 
   expect(namesPassedToApply()).toEqual(["beta"]);
 });
@@ -264,7 +300,13 @@ test("applies the re-scan's classification, not the stale one, after a publish",
     archived: new Set<string>(),
   });
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks,
+  });
 
   // "alpha" was published; "beta" comes only from the scan taken after it.
   expect(namesPassedToApply()).toEqual(["alpha", "beta"]);
@@ -278,7 +320,7 @@ test("applies classified pulls when a publish is refused", async () => {
   mutateRemote.mockRejectedValue(new Error("HTTP 422"));
 
   await expect(
-    executeSync(job, account, "sync", undefined, new AbortController().signal, hooks),
+    executeSync({ work: job, account, mode: "sync", signal: new AbortController().signal, hooks }),
   ).rejects.toThrow("HTTP 422");
 
   expect(namesPassedToApply()).toEqual(["alpha"]);
@@ -296,7 +338,7 @@ test("re-scans when an archive landed and the publish after it failed", async ()
   );
 
   await expect(
-    executeSync(job, account, "sync", undefined, new AbortController().signal, hooks),
+    executeSync({ work: job, account, mode: "sync", signal: new AbortController().signal, hooks }),
   ).rejects.toThrow("HTTP 422");
 
   // "beta" comes only from the scan taken after the archive changed the remote.
@@ -324,7 +366,13 @@ test("carries the adapter's refusal detail onto the item event, and no data othe
     },
   };
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, capturing);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks: capturing,
+  });
 
   const alpha = seen.find((entry) => entry.artifact === "alpha");
   expect(alpha?.data).toEqual({ detail: "alpha is not served by this registry" });
@@ -344,14 +392,13 @@ test("a publish the catalog has not listed yet stays changed, not attention", as
     archived: new Set<string>(),
   });
 
-  const result = await executeSync(
-    job,
+  const result = await executeSync({
+    work: job,
     account,
-    "sync",
-    undefined,
-    new AbortController().signal,
+    mode: "sync",
+    signal: new AbortController().signal,
     hooks,
-  );
+  });
 
   expect(result.state).toBe("succeeded");
   expect(result.counts.attention).toBe(0);
@@ -363,14 +410,14 @@ test("refuses a ref that reaches nothing instead of reporting an empty success",
 
   // The address grammar `manifest.yml` uses, for an artifact that is not there.
   await expect(
-    executeSync(
-      job,
+    executeSync({
+      work: job,
       account,
-      "sync",
-      [`${REGISTRY}/sales/skill/absent`],
-      new AbortController().signal,
+      mode: "sync",
+      refs: [`${REGISTRY}/sales/skill/absent`],
+      signal: new AbortController().signal,
       hooks,
-    ),
+    }),
   ).rejects.toThrow(RunScopeError);
 
   expect(applyLocal).not.toHaveBeenCalled();
@@ -403,14 +450,14 @@ test("a run narrowed to one kind publishes nothing of another kind with the same
     },
   };
 
-  await executeSync(
-    job,
-    { ...account, defaultNamespace: "engineering" },
-    "sync",
-    [`${REGISTRY}/engineering/skill/lint`],
-    new AbortController().signal,
-    capturing,
-  );
+  await executeSync({
+    work: job,
+    account: { ...account, defaultNamespace: "engineering" },
+    mode: "sync",
+    refs: [`${REGISTRY}/engineering/skill/lint`],
+    signal: new AbortController().signal,
+    hooks: capturing,
+  });
 
   expect(offered.map(({ name, kind }) => ({ name, kind }))).toEqual([
     { name: "lint", kind: "skill" },
@@ -472,9 +519,15 @@ describe("a folder the registry already publishes", () => {
     const { scan: found, copy } = await scanWithCopy("same\n");
     scan.mockResolvedValue(found);
     const settled: unknown[] = [];
-    await executeSync(job, account, "sync", undefined, new AbortController().signal, {
-      ...hooks,
-      item: (name: string, _phase: string, outcome: unknown) => settled.push([name, outcome]),
+    await executeSync({
+      work: job,
+      account,
+      mode: "sync",
+      signal: new AbortController().signal,
+      hooks: {
+        ...hooks,
+        item: (name: string, _phase: string, outcome: unknown) => settled.push([name, outcome]),
+      },
     });
     await expect(stat(copy)).resolves.toBeDefined();
     await expect(stat(join(root, ".registry", "backups"))).rejects.toThrow();
@@ -484,7 +537,13 @@ describe("a folder the registry already publishes", () => {
   test("moves an identical copy aside and links the registry's in its place", async () => {
     const { scan: found, copy } = await scanWithCopy("same\n");
     scan.mockResolvedValue(found);
-    await executeSync(claiming, account, "sync", undefined, new AbortController().signal, hooks);
+    await executeSync({
+      work: claiming,
+      account,
+      mode: "sync",
+      signal: new AbortController().signal,
+      hooks,
+    });
     await expect(stat(copy)).rejects.toThrow();
     const stamps = await readdir(join(root, ".registry", "backups"));
     expect(stamps).toHaveLength(1);
@@ -498,9 +557,15 @@ describe("a folder the registry already publishes", () => {
     const { scan: found, copy } = await scanWithCopy("edited\n");
     scan.mockResolvedValue(found);
     const settled: unknown[] = [];
-    await executeSync(claiming, account, "sync", undefined, new AbortController().signal, {
-      ...hooks,
-      item: (name: string, _phase: string, outcome: unknown) => settled.push([name, outcome]),
+    await executeSync({
+      work: claiming,
+      account,
+      mode: "sync",
+      signal: new AbortController().signal,
+      hooks: {
+        ...hooks,
+        item: (name: string, _phase: string, outcome: unknown) => settled.push([name, outcome]),
+      },
     });
     await expect(stat(copy)).resolves.toBeDefined();
     expect(settled).toContainEqual([
@@ -512,21 +577,26 @@ describe("a folder the registry already publishes", () => {
   test("moves nothing on a publish-only run, which pulls nothing into its place", async () => {
     const { scan: found, copy } = await scanWithCopy("same\n");
     scan.mockResolvedValue(found);
-    await executeSync(claiming, account, "publish", undefined, new AbortController().signal, hooks);
+    await executeSync({
+      work: claiming,
+      account,
+      mode: "publish",
+      signal: new AbortController().signal,
+      hooks,
+    });
     await expect(stat(copy)).resolves.toBeDefined();
   });
 
   test("moves nothing when the job only reports pulls", async () => {
     const { scan: found, copy } = await scanWithCopy("same\n");
     scan.mockResolvedValue(found);
-    await executeSync(
-      { ...claiming, policy: { ...claiming.policy, pull: "report" } },
+    await executeSync({
+      work: { ...claiming, policy: { ...claiming.policy, pull: "report" } },
       account,
-      "sync",
-      undefined,
-      new AbortController().signal,
+      mode: "sync",
+      signal: new AbortController().signal,
       hooks,
-    );
+    });
     await expect(stat(copy)).resolves.toBeDefined();
   });
 });
@@ -544,7 +614,13 @@ test("releases the token again for where the registry is declared after a reload
   scan.mockResolvedValue(scanOf([item("alpha", "pull")]));
   mutateRemote.mockResolvedValue({ published: new Set<string>(), archived: new Set<string>() });
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks,
+  });
 
   const sent = scan.mock.calls.map(([scanned, , options]) => ({
     at: (scanned as Loaded).manifest.registries[REGISTRY]?.location,
@@ -563,7 +639,7 @@ test("stops when the reload no longer declares the registry, sending nothing", a
   scan.mockResolvedValue(scanOf([item("alpha", "pull")]));
 
   await expect(
-    executeSync(job, account, "sync", undefined, new AbortController().signal, hooks),
+    executeSync({ work: job, account, mode: "sync", signal: new AbortController().signal, hooks }),
   ).rejects.toThrow(`No registry named "${REGISTRY}"`);
   expect(scan).toHaveBeenCalledTimes(1);
   expect(mutateRemote).not.toHaveBeenCalled();
@@ -576,7 +652,13 @@ test("checks every declared registry for a shared token when it releases a sync'
   scan.mockResolvedValue(scanOf([item("alpha", "pull")]));
   mutateRemote.mockResolvedValue({ published: new Set<string>(), archived: new Set<string>() });
 
-  await executeSync(job, account, "sync", undefined, new AbortController().signal, hooks);
+  await executeSync({
+    work: job,
+    account,
+    mode: "sync",
+    signal: new AbortController().signal,
+    hooks,
+  });
 
   expect(Object.keys(releaseCredentials.mock.calls[0]?.[0] ?? {})).toEqual([REGISTRY, "other"]);
 });

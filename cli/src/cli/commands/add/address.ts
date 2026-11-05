@@ -22,6 +22,7 @@ import {
   wantOf,
 } from "#engine/address/probe.ts";
 import {
+  type Addressing,
   aliasFor,
   asAddress,
   knownRegistries,
@@ -36,13 +37,12 @@ export async function openAddress(
   { positionals, common, own }: Parsed,
   step: Interaction,
 ) {
-  // An address may name a registry this scope declares, or one declared for
-  // the user; a project that installs through a user alias records it as its own.
-  const known = await knownRegistries(common, context.cwd);
-  const typed = own.registry ?? positionals[0] ?? (await chooseRegistry(step, known));
+  // A project that installs through a user alias records it as its own.
+  const declared = await knownRegistries(common, context.cwd);
+  const typed = own.registry ?? positionals[0] ?? (await chooseRegistry(step, declared));
   if (typed === undefined) return undefined;
-  const address = await commandLineAddress(own, positionals, typed, known, common, context.cwd);
-  const { input, inside: within, exact, picks } = address;
+  const address = await commandLineAddress(own, positionals, typed, declared, common, context.cwd);
+  const { input, inside: within, exact, picks, known } = address;
   let { resolved } = address;
   if (!resolved.declared) {
     const unknown = await undeclaredRegistry(input, known, common, context.cwd);
@@ -74,7 +74,8 @@ export async function openAddress(
     : (own.as ?? aliasFor(input, false, known, source));
   return {
     alias,
-    known,
+    // Not `known`: for an undeclared repository that holds a stand-in the scope never declared.
+    declared,
     input,
     within,
     resolved,
@@ -92,7 +93,7 @@ async function commandLineAddress(
   own: AddFlags,
   positionals: string[],
   typed: string,
-  known: Record<string, RegistrySource>,
+  known: Readonly<Record<string, RegistrySource>>,
   common: CommonOptions,
   cwd: string,
 ): Promise<Addressed> {
@@ -114,13 +115,13 @@ function addressed(
   typed: string,
   registry: string | undefined,
   positionals: string[],
-  known: Record<string, RegistrySource>,
+  known: Readonly<Record<string, RegistrySource>>,
   flags: SourceFlags,
   common: CommonOptions,
 ): Addressed {
   if (registry === undefined) {
     refuseExtra(positionals);
-    return through(asAddress(typed, known), known, flags, common);
+    return through(asAddress(typed, known), flags, common);
   }
   // One word reads as -s reads it, an artifact before a namespace, unless -s
   // picks inside it; then it is the namespace to pick from.
@@ -133,15 +134,22 @@ function addressed(
         hint: "Use one: `aireg add <namespace>/<name>... -r <registry>` or `aireg add <namespace> -r <registry> -s <name>`.",
       });
     }
-    const whole = through(asAddress(typed, known), known, flags, common);
+    const whole = through(asAddress(typed, known), flags, common);
     return { ...whole, picks: { ...common, select: common.select ?? positionals }, exact: true };
   }
   const relative = first;
-  if (relative === undefined) return through(asAddress(typed, known), known, flags, common);
+  if (relative === undefined) return through(asAddress(typed, known), flags, common);
   const resolved = throughRegistry(typed, relative, known, flags);
   return resolved.declared
-    ? { input: `${typed}/${relative}`, resolved, picks: common, inside: undefined, exact: true }
-    : { input: typed, resolved, picks: common, inside: relative, exact: true };
+    ? {
+        input: `${typed}/${relative}`,
+        resolved,
+        picks: common,
+        inside: undefined,
+        exact: true,
+        known,
+      }
+    : { input: typed, resolved, picks: common, inside: relative, exact: true, known };
 }
 
 /** One address per command; several artifacts are picked inside it with -s. */
@@ -165,14 +173,13 @@ function inside(entries: readonly Entry[], namespace: string | undefined): reado
 }
 
 function through(
-  input: string,
-  known: Record<string, RegistrySource>,
+  { address: input, known }: Addressing,
   flags: SourceFlags,
   common: CommonOptions,
 ): Addressed {
   const resolved = throughManifest(input, known, flags);
   const exact = resolved.declared && input.includes("/");
-  return { input, resolved, picks: common, inside: undefined, exact };
+  return { input, resolved, picks: common, inside: undefined, exact, known };
 }
 
 /**
@@ -227,6 +234,7 @@ interface Addressed {
   inside: string | undefined;
   /** Whether the command line says exactly what to install, so nothing is asked. */
   exact: boolean;
+  known: Readonly<Record<string, RegistrySource>>;
 }
 
 /** Reads the source once, under a spinner on a terminal; a source that publishes nothing is an error. */

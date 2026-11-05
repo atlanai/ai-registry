@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { posix } from "node:path";
 import { isRecord } from "#adapter/fields.ts";
+import { ifPresent } from "#adapter/files.ts";
 import { isArtifactName } from "#adapter/filespec/names.ts";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
@@ -40,15 +41,15 @@ const text = (value: unknown): string | undefined =>
  * name to where it came from. Fields aireg does not know are passed over, never copied anywhere.
  */
 export async function readSkillLock(path: string): Promise<SkillLock> {
+  const contents = await ifPresent(readFile(path, "utf8"));
+  if (contents === undefined) {
+    throw new AiregError(`${path} does not exist.`, { code: ErrorCode.NotFound });
+  }
   let document: unknown;
   try {
-    document = JSON.parse(await readFile(path, "utf8"));
+    document = JSON.parse(contents);
   } catch (cause) {
-    const missing = (cause as NodeJS.ErrnoException).code === "ENOENT";
-    throw new AiregError(missing ? `${path} does not exist.` : `${path} is not valid JSON.`, {
-      code: missing ? ErrorCode.NotFound : ErrorCode.Invalid,
-      cause,
-    });
+    throw new AiregError(`${path} is not valid JSON.`, { code: ErrorCode.Invalid, cause });
   }
   if (!isRecord(document) || typeof document.version !== "number" || !isRecord(document.skills)) {
     throw new AiregError(

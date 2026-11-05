@@ -322,7 +322,7 @@ function refuseAlias(alias: string): void {
 
 /** `--for` takes a target's aliases too; everything after it sees the canonical id. */
 function canonicalFor(ids: string[] | undefined): string[] | undefined {
-  return ids === undefined ? undefined : canonicalIds(resolveTargets(), ids);
+  return ids === undefined ? undefined : canonicalIds(resolveTargets(process.env), ids);
 }
 
 /** `--for claude-code,cursor` and `--for claude-code --for cursor` both mean the same thing. */

@@ -19,7 +19,7 @@ import { editedAnywhere, survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
 import type { Printer } from "#core/term/printer.ts";
-import { run as runPipeline } from "#engine/install/pipeline.ts";
+import { runPipeline } from "#engine/install/pipeline.ts";
 import { selectTargets } from "#engine/install/targets.ts";
 import { matchInstalled, rowsNamed, shownNames } from "#engine/installed-names.ts";
 import type { CommonOptions } from "#engine/options.ts";
@@ -92,13 +92,13 @@ async function remove(
   let approved = true;
   // --force here deletes the named edits; it must not also restore every other edited copy.
   const scoped = { ...common, force: false };
-  const result = await runPipeline(
-    loaded.roots,
-    scoped,
-    context.printer,
-    context.cwd,
-    planReport(context.printer),
-    async (fresh) => {
+  const result = await runPipeline({
+    roots: loaded.roots,
+    common: scoped,
+    printer: context.printer,
+    cwd: context.cwd,
+    report: planReport(context.printer),
+    edit: async (fresh) => {
       const lock = fresh.lock;
       const declared = new Set(fresh.manifest.artifacts.map(formatAddress));
       // A namespace the manifest still takes is named even when nothing it covers is installed.
@@ -130,17 +130,13 @@ async function remove(
         ...(removeAll ? {} : { aliases: touched.filter((alias) => alias !== "") }),
         held: true,
         discard: new Set(edited),
-        approve: async (plan, targets) => {
-          approved = await confirmPlan(step, plan, {
-            verb: "Remove",
-            targets,
-            targetTable: fresh.targetTable,
-          });
-          return approved;
-        },
       };
     },
-  );
+    approve: async (plan, chosen) => {
+      approved = await confirmPlan(step, plan, { verb: "Remove", ...chosen });
+      return approved;
+    },
+  });
 
   if (!approved) {
     cancel(step);

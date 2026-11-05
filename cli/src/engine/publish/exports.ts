@@ -11,7 +11,7 @@ import { artifactFor } from "#core/manifest/match.ts";
 import type { Export, ExportDependency, Manifest, RegistrySource } from "#core/manifest/model.ts";
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { artifactRoot } from "./reach.ts";
-import type { Destination, Planned, Published } from "./target.ts";
+import { artifactKey, type Destination, type Planned, type Published } from "./target.ts";
 import { fromPath, type Work } from "./work.ts";
 
 /** Collect publishable exports and reject duplicate kind/name identities. */
@@ -231,7 +231,7 @@ async function localEdge(
   const sent = await context.planned(path);
   const { name, kind } = sent?.work ?? (await fromPath(path));
   const version =
-    sent?.version ?? context.published.latest.get(`${namespace}/${kind}/${name}`)?.version;
+    sent?.version ?? context.published.latest.get(artifactKey(namespace, kind, name))?.version;
   if (version === undefined) {
     const where = `${registry}/${namespace}`;
     throw new AiregError(`${work.name} depends on ${name}, which is not published to ${where}.`, {
@@ -311,9 +311,9 @@ export async function publishWants(
   base: string,
 ): Promise<Map<string, Want[]>> {
   const wants = new Map<string, Map<string, Want>>();
-  const ask = (registry: string, want: Want) => {
+  const ask = (registry: string, want: { name: string; namespace: string; kind: ArtifactKind }) => {
     const into = wants.get(registry) ?? new Map<string, Want>();
-    into.set(`${want.namespace}/${want.kind}/${want.name}`, want);
+    into.set(artifactKey(want.namespace, want.kind, want.name), want);
     wants.set(registry, into);
   };
   for (const work of works) {

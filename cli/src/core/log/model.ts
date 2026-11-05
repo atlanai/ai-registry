@@ -14,7 +14,7 @@ export const LEVEL_WEIGHT: Record<Level, number> = Object.freeze({
 });
 
 export function isLevel(value: string): value is Level {
-  return value in LEVEL_WEIGHT;
+  return (LEVELS as readonly string[]).includes(value);
 }
 
 /** Base of each OTel range, so the sub-levels stay available to an exporter. */

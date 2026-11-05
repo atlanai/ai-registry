@@ -6,7 +6,7 @@ import { emptyRegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { readCredential, saveCredential } from "#core/credentials/store.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { AccountService } from "./service.ts";
+import { accountCredential, signIn } from "./service.ts";
 
 const ENDPOINT = "https://registry.acme.example";
 
@@ -68,13 +68,13 @@ async function revoked(tmp: string): Promise<string[]> {
   return text.split("\n").filter(Boolean);
 }
 
-describe("AccountService", () => {
+describe("account sign-in", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   test("ends a session a new sign-in replaces, never an operator's token", async ({ tmp }) => {
     await signedIn(tmp, { type: "bearer", accessToken: "operator-1" });
     const login = (refreshToken: string) =>
-      new AccountService().login(
+      signIn(
         { registry: "acme" },
         { oauth: { type: "bearer", accessToken: `a-${refreshToken}`, refreshToken } },
         signal,
@@ -89,7 +89,7 @@ describe("AccountService", () => {
     await signedIn(tmp, { type: "bearer", accessToken: "unused" });
     await writeConfig({ ...emptyRegistryConfig(), adapters: { rotating: await rotating(tmp) } }, 1);
     const login = (refreshToken: string) =>
-      new AccountService().login(
+      signIn(
         { registry: "acme" },
         { oauth: { type: "bearer", accessToken: `a-${refreshToken}`, refreshToken } },
         signal,
@@ -109,10 +109,9 @@ describe("AccountService", () => {
       expiresAtMs: 0,
     });
 
-    const service = new AccountService();
     const both = await Promise.all([
-      service.credential(account, ENDPOINT, signal),
-      new AccountService().credential(account, ENDPOINT, signal),
+      accountCredential(account, ENDPOINT, signal),
+      accountCredential(account, ENDPOINT, signal),
     ]);
 
     expect(

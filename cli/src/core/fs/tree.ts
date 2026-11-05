@@ -13,7 +13,14 @@ import {
   stat,
 } from "node:fs/promises";
 import { basename, dirname, join, posix } from "node:path";
-import { copyRegular, EXECUTABLE, EXECUTE_BITS, isAbsent, PUBLIC_FILE } from "#adapter/files.ts";
+import {
+  copyRegular,
+  EXECUTABLE,
+  EXECUTE_BITS,
+  ifPresent,
+  isAbsent,
+  PUBLIC_FILE,
+} from "#adapter/files.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isStrictlyWithin, posixRelative } from "#core/fs/path.ts";
 
@@ -28,20 +35,11 @@ export interface FileRecord {
 }
 
 export async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch {
-    return false;
-  }
+  return (await ifPresent(stat(path))) !== undefined;
 }
 
 export async function isDirectory(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory();
-  } catch {
-    return false;
-  }
+  return (await ifPresent(stat(path)))?.isDirectory() ?? false;
 }
 
 /** The folders directly in `path`, sorted, without dot folders; none when it is not a folder. */
@@ -64,7 +62,7 @@ export async function entries(dir: string): Promise<Dirent[]> {
 
 /** Whether anything is at `path`, a dangling link included. */
 export async function present(path: string): Promise<boolean> {
-  return (await lstat(path).catch(() => undefined)) !== undefined;
+  return (await ifPresent(lstat(path))) !== undefined;
 }
 
 /** VCS metadata, OS litter and installed dependencies: never an artifact's content. */
@@ -238,8 +236,9 @@ export async function copyInto(source: string, dest: string): Promise<void> {
 /** A file-shaped kind is one file, not a directory, so both shapes are handled. */
 async function mode(root: string, executable: number, plain: number): Promise<void> {
   if (!(await isDirectory(root))) {
-    const info = await stat(root).catch(() => undefined);
+    const info = await ifPresent(stat(root));
     if (info === undefined) return;
+    // A mode is a convenience: a file it cannot be set on still installs.
     await chmod(root, (info.mode & EXECUTE_BITS) !== 0 ? executable : plain).catch(() => {});
     return;
   }

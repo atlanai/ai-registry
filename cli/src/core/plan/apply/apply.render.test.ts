@@ -72,19 +72,34 @@ describe("a rendered placement", () => {
   test("adopts a file already holding what it would write, and keeps any other", async () => {
     await mkdir(join(target, ".."), { recursive: true });
     await writeFile(target, TOML);
-    const adopted = await apply(renderPlan(), roots, () => Promise.reject(new Error("no fetch")));
+    const adopted = await apply({
+      plan: renderPlan(),
+      roots,
+      fetch: () => Promise.reject(new Error("no fetch")),
+      env: process.env,
+    });
     expect(adopted.kept).toEqual([]);
     expect(adopted.lock?.artifacts.reviewer?.links[0]?.mode).toBe("copy");
 
     await writeFile(target, 'name = "mine"\n');
-    const kept = await apply(renderPlan(), roots, () => Promise.reject(new Error("no fetch")));
+    const kept = await apply({
+      plan: renderPlan(),
+      roots,
+      fetch: () => Promise.reject(new Error("no fetch")),
+      env: process.env,
+    });
     expect(kept.kept).toEqual([{ name: "reviewer", path: target }]);
     expect(await readFile(target, "utf8")).toBe('name = "mine"\n');
   });
 
   test("is not written when the agent has nothing to put in it, and says why", async () => {
     await writeFile(copy, "---\nname: reviewer\n---\nReview it.\n");
-    const applied = await apply(renderPlan(), roots, () => Promise.reject(new Error("no fetch")));
+    const applied = await apply({
+      plan: renderPlan(),
+      roots,
+      fetch: () => Promise.reject(new Error("no fetch")),
+      env: process.env,
+    });
     expect(applied.unrendered).toEqual([
       { name: "reviewer", target: "codex", reason: "it has no description" },
     ]);
@@ -99,16 +114,22 @@ describe("a rendered placement", () => {
     await mkdir(folder, { recursive: true });
     await writeFile(join(folder, "AGENT.md"), AGENT);
     await writeFile(join(folder, "notes.md"), "mine\n");
-    const kept = await apply(renderPlan(undefined, entry), roots, () =>
-      Promise.reject(new Error("no fetch")),
-    );
+    const kept = await apply({
+      plan: renderPlan(undefined, entry),
+      roots,
+      fetch: () => Promise.reject(new Error("no fetch")),
+      env: process.env,
+    });
     expect(kept.kept).toEqual([{ name: "reviewer", path: folder }]);
     expect(await readFile(join(folder, "notes.md"), "utf8")).toBe("mine\n");
 
     await rm(join(folder, "notes.md"));
-    const adopted = await apply(renderPlan(undefined, entry), roots, () =>
-      Promise.reject(new Error("no fetch")),
-    );
+    const adopted = await apply({
+      plan: renderPlan(undefined, entry),
+      roots,
+      fetch: () => Promise.reject(new Error("no fetch")),
+      env: process.env,
+    });
     expect(adopted.kept).toEqual([]);
     expect(await readFile(join(folder, "AGENT.md"), "utf8")).toBe(AGENT);
   });

@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -74,3 +74,14 @@ describe("newestEntries", () => {
     expect(newestEntries(path, {}, 0)).toEqual([]);
   });
 });
+
+// Root reads any file, and Windows has no mode bits to take away.
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+  "names a log it may not read, rather than failing with a bare EACCES",
+  async ({ tmp }) => {
+    const path = join(tmp, "daemon.log");
+    await writeFile(path, "");
+    await chmod(path, 0o000);
+    expect(() => newestEntries(path, {}, 5)).toThrow(`Cannot read ${path}: permission denied.`);
+  },
+);

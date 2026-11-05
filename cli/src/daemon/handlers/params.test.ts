@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
-import { ProtocolError } from "#daemon/rpc/protocol.ts";
-import { job, scope, syncPolicy } from "./params.ts";
+import { rpcError } from "#daemon/rpc/errors.ts";
+import type { ProtocolError } from "#daemon/rpc/protocol.ts";
+import { job, pageLimit, scope, syncPolicy } from "./params.ts";
 
 const STEP = {
   name: "pull",
@@ -24,8 +25,7 @@ function rejected(value: unknown): ProtocolError {
   try {
     job(value);
   } catch (error) {
-    if (error instanceof ProtocolError) return error;
-    throw error;
+    return rpcError(error);
   }
   throw new Error("The job was accepted");
 }
@@ -97,5 +97,18 @@ describe("scope input", () => {
     expect(() => scope({ scope: "local" }, "scope", "user")).toThrow(
       "`scope` must be user or project.",
     );
+  });
+});
+
+describe("page limit input", () => {
+  test("takes the fallback when absent and refuses a limit outside one page", () => {
+    expect(pageLimit({}, "limit", undefined)).toBeUndefined();
+    expect(pageLimit({}, "limit", 200)).toBe(200);
+    expect(pageLimit({ limit: 500 }, "limit", undefined)).toBe(500);
+    for (const limit of [0, 501]) {
+      expect(() => pageLimit({ limit }, "limit", 200)).toThrow(
+        "The limit must be between 1 and 500.",
+      );
+    }
   });
 });
