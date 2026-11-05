@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { envName } from "#core/env.ts";
 import { HOME_DIR, NAME } from "#core/product.ts";
@@ -46,10 +46,11 @@ export function renderTemplate(source: string, values: Readonly<Record<string, s
   return rendered;
 }
 
+/** Read, then checked: a missing file or a folder fails to read, and an empty file is no build. */
 function digestOf(path: string): string {
-  const stats = statSync(path);
-  if (!stats.isFile() || stats.size === 0) throw new Error(`${path} is not a built binary`);
-  return createHash("sha256").update(readFileSync(path)).digest("hex");
+  const bytes = readFileSync(path);
+  if (bytes.length === 0) throw new Error(`${path} is not a built binary`);
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 /** `windows` selects which platforms' digests go in. */
