@@ -1,6 +1,6 @@
-import { isArtifactName, isNamespace } from "#adapter/filespec/names.ts";
+import { isArtifactName, isKindSegment, isNamespace } from "#adapter/filespec/names.ts";
 import type { Envelope, Want } from "#adapter/index.ts";
-import { type ArtifactKind, isKind } from "#adapter/kinds.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isVersion } from "#adapter/spec/ref.ts";
 import { entryFor } from "#core/catalog/catalog.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
@@ -86,7 +86,12 @@ function parseNeed(to: string): Need | undefined {
   const parts = to.slice(0, at).split("/");
   if (parts.length !== 3) return undefined;
   const [namespace, kind, name] = parts as [string, string, string];
-  if (!isNamespace(namespace) || !isKind(kind) || !isArtifactName(name) || !isVersion(version)) {
+  if (
+    !isNamespace(namespace) ||
+    !isKindSegment(kind) ||
+    !isArtifactName(name) ||
+    !isVersion(version)
+  ) {
     return undefined;
   }
   return { namespace, kind, name, version };

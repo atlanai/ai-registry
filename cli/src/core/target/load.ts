@@ -80,6 +80,25 @@ function readOne(path: string, text: string, folder?: Folder): TargetFile | Skip
   return { path, definition: withBuiltinAliases(named), warnings };
 }
 
+const WRAPPER = "contributed";
+
+/** A mapping an adapter contributes for `kind`, checked as a target file's would be. */
+export function mappingProblems(kind: string, mapping: unknown): string[] {
+  const document = {
+    id: WRAPPER,
+    displayName: WRAPPER,
+    roots: { project: `.${WRAPPER}`, user: { default: `~/.${WRAPPER}` } },
+    kinds: { [kind]: mapping },
+  };
+  const problems = schemaProblems(document);
+  if (problems.length > 0) return problems;
+  // A required key missing inside one shape is not always described, but it still fails.
+  if (validate(document).length > 0) return [`The mapping for ${kind} does not fit its shape.`];
+  return targetProblems([document as TargetDefinition]).map((problem) =>
+    problem.startsWith(`${WRAPPER}: `) ? problem.slice(WRAPPER.length + 2) : problem,
+  );
+}
+
 function schemaProblems(document: unknown): string[] {
   const errors = validate(document);
   const { said, dropped } = alternatives(errors);

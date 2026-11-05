@@ -22,7 +22,7 @@ export interface ApplyResult {
   /** Artifacts or members the source would not serve intact; each keeps its previous lock row. */
   unstaged: { name: string; reason: string; error: unknown }[];
   /** Links not made: a person's own file or folder is at the destination, or `reason` says why. */
-  kept: { name: string; path: string; reason?: string; config?: true }[];
+  kept: { name: string; path: string; reason?: string; config?: true; key?: string }[];
   /** Copies already on disk that match this run byte for byte, recorded as aireg's in place. */
   adopted: { name: string; path: string }[];
   /** A person's own file or folder that stood where a recorded link was, and where it was moved. */

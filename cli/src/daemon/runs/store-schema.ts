@@ -1,10 +1,9 @@
-import { KINDS } from "#adapter/index.ts";
 import { ACTIVE_RUN_STATES, ITEM_OUTCOMES, RUN_STATES, RUN_TRIGGERS } from "#core/run/model.ts";
 import { DISPOSITIONS } from "#core/sync/model.ts";
 import { SYNC_OPERATIONS } from "#core/sync/policy.ts";
 
-/** History is a cache, so any other layout is rebuilt. */
-export const RUN_SCHEMA_VERSION = 1;
+/** History is a cache, so any other layout is rebuilt. 2: `kind` holds any kind name. */
+export const RUN_SCHEMA_VERSION = 2;
 
 export const RUN_HISTORY_PER_JOB = 200;
 
@@ -60,7 +59,7 @@ CREATE TABLE run_events (
   step TEXT,
   -- The item this is about: an artifact ref, or an adapter job's own key.
   artifact TEXT,
-  kind TEXT CHECK (kind IS NULL OR kind IN (${oneOf(KINDS)})),
+  kind TEXT,
   -- What the two sides were found to be, and what was chosen about it. Kept
   -- apart because one is observed and the other is policy.
   disposition TEXT CHECK (disposition IS NULL OR disposition IN (${oneOf(DISPOSITIONS)})),

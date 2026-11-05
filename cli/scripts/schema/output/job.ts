@@ -1,5 +1,4 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import type {
   JobList,
   JobRemoved,
@@ -14,13 +13,14 @@ import { STEP_POLICIES } from "#core/config/model.ts";
 import { ITEM_OUTCOMES, RUN_MODES, RUN_STATES, RUN_TRIGGERS } from "#core/run/model.ts";
 import { DISPOSITIONS } from "#core/sync/model.ts";
 import { SYNC_OPERATIONS } from "#core/sync/policy.ts";
+import { Kind } from "#scripts/schema/kind.ts";
 import { absent, matching, oneOf, outputDocument, readonlyArray, readonlyRecord } from "./match.ts";
 
 const Selector = Type.Object(
   {
     from: Type.String(),
     match: Type.Optional(Type.String()),
-    kinds: Type.Optional(readonlyArray(oneOf(KINDS))),
+    kinds: Type.Optional(readonlyArray(Kind)),
     target: Type.Optional(readonlyArray(Type.String())),
     harness: Type.Optional(readonlyArray(Type.String())),
   },
@@ -101,7 +101,7 @@ const RunEvent = Type.Object(
     eventType: Type.String({ description: "A daemon of another version may send a new type." }),
     step: absent(Type.String()),
     artifact: absent(Type.String()),
-    kind: absent(oneOf(KINDS)),
+    kind: absent(Kind),
     disposition: absent(oneOf(DISPOSITIONS)),
     operation: absent(oneOf(SYNC_OPERATIONS)),
     outcome: absent(oneOf(ITEM_OUTCOMES)),

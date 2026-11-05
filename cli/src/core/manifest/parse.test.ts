@@ -177,10 +177,12 @@ describe("exports and publish", () => {
     expect(formatManifest(manifest)).toBe(`${declared}${text}`);
   });
 
-  test("refuses a `kind` it does not export", () => {
+  test("refuses a `kind` it does not export, and reads one an adapter may declare", () => {
     expect(refused(entry("    kind: plugin\n"))).toThrow(
-      'manifest.yml: `kind` of export ".claude/agents/reviewer.md" must be skill or agent.',
+      'manifest.yml: `kind` of export ".claude/agents/reviewer.md" must be skill, agent or a kind an adapter declares.',
     );
+    expect(refused(entry("    kind: Knowledge\n"))).toThrow("must be skill, agent or a kind");
+    expect(read(entry("    kind: knowledge\n")).exports[0]?.kind).toBe("knowledge");
   });
 
   test("refuses an `exclude` name that is not directly inside the folder", () => {

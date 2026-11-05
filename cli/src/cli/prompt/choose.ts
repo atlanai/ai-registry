@@ -1,9 +1,9 @@
 import { relative } from "node:path";
-import { type ArtifactKind, KINDS } from "#adapter/kinds.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, plural } from "#adapter/text.ts";
 import { underHome } from "#cli/render/home.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
-import { kindDir } from "#core/kinds.ts";
+import { kindPlural, knownKinds } from "#core/kinds.ts";
 import type { Selected } from "#core/plan/model.ts";
 import { loadsFrom, type ProjectionOptions } from "#core/plan/projection.ts";
 import type { Scope } from "#core/store/paths.ts";
@@ -50,7 +50,7 @@ export async function chooseArtifacts(
       label: entry.name,
       hint: entry.kind,
       group: entry.group !== undefined && names.has(entry.group) ? entry.group : undefined,
-      section: kindDir(entry.kind),
+      section: kindPlural(entry.kind),
       detail: entry.description,
     }));
 
@@ -88,15 +88,18 @@ function contents(members: readonly Choice<string>[]): string {
     const kind = member.hint ?? "artifact";
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
-  const ordered = KINDS.filter((kind) => counts.has(kind));
-  return ordered.map((kind) => plural(counts.get(kind) as number, kind)).join(", ");
+  const ordered = knownKinds().filter((kind) => counts.has(kind));
+  return ordered
+    .map((kind) => plural(counts.get(kind) as number, kind, kindPlural(kind)))
+    .join(", ");
 }
 
 /** Keep group and kind runs contiguous so headings cover the correct rows. */
 function sortForDisplay(choices: readonly Choice<string>[]): Choice<string>[] {
   const rank = (choice: Choice<string>): number => {
-    const index = KINDS.findIndex((kind) => kindDir(kind) === choice.section);
-    return index === -1 ? KINDS.length : index;
+    const kinds = knownKinds();
+    const index = kinds.findIndex((kind) => kindPlural(kind) === choice.section);
+    return index === -1 ? kinds.length : index;
   };
   return [...choices].sort((a, b) => {
     const groupA = a.group ?? "\uffff";

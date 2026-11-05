@@ -3,6 +3,7 @@ import { isAdapterError } from "#adapter/index.ts";
 import { type Withheld, withheldAt, withheldMessage } from "#core/catalog/withheld.ts";
 import { digest } from "#core/fs/digest.ts";
 import { exists } from "#core/fs/tree.ts";
+import { kindSpec } from "#core/kinds.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { fetchFrom, listedAt } from "#core/plan/acquire/sources.ts";
@@ -39,7 +40,11 @@ export async function reconcile(
       .filter((copy) => !byName.has(copy.name) && lock.artifacts[copy.name] === undefined)
       .map((copy) => [copy.name, copy]),
   );
-  const names = new Set([...byName.keys(), ...Object.keys(lock.artifacts), ...unlocked.keys()]);
+  // A kind no loaded adapter declares is never compared: its row stays as it is.
+  const declared = Object.entries(lock.artifacts).flatMap(([name, row]) =>
+    kindSpec(row.kind) === undefined ? [] : [name],
+  );
+  const names = new Set([...byName.keys(), ...declared, ...unlocked.keys()]);
   const unlisted = new Map(unlistedRows(manifest, lock, acquired).map((row) => [row.name, row]));
 
   const items: SyncItem[] = [];

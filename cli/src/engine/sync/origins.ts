@@ -10,7 +10,7 @@ import { authoredDigest } from "#core/fs/digest.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { canonical, canonicalAsync } from "#core/fs/realpath.ts";
 import { authoredArtifact, copyAuthored, exists, type Irregular, refusal } from "#core/fs/tree.ts";
-import { KIND_SPECS } from "#core/kinds.ts";
+import { kindSpec, knownKinds } from "#core/kinds.ts";
 import { type Lock, type LockArtifact, readLock, writeLock } from "#core/lock.ts";
 import { listedAt } from "#core/plan/acquire/sources.ts";
 import { removeContained } from "#core/plan/removable.ts";
@@ -92,12 +92,12 @@ export async function surveyOrigins(
 async function found(step: Step, selector: Selector): Promise<Origin[]> {
   const { registry, namespace } = destination(step);
   const kind = kindOfDir(selector.from);
-  if (kind === undefined) return [];
+  const shape = kind === undefined ? undefined : kindSpec(kind)?.shape;
+  if (kind === undefined || shape === undefined) return [];
   if (selector.kinds !== undefined && !selector.kinds.includes(kind)) return [];
 
   const entries = (await ifReadable(readdir(selector.from))) ?? [];
 
-  const shape = KIND_SPECS[kind].shape;
   // A selector's id, or a folder's name such as `claude` from `.claude`, may be an alias.
   const target = canonicalId(
     resolveTargets(process.env),
@@ -130,10 +130,7 @@ function destination(step: Step): { registry: string; namespace: string } {
 
 function kindOfDir(dir: string): ArtifactKind | undefined {
   const leaf = basename(dir);
-  for (const [kind, spec] of Object.entries(KIND_SPECS)) {
-    if (spec.dir === leaf) return kind as ArtifactKind;
-  }
-  return undefined;
+  return knownKinds().find((kind) => kindSpec(kind)?.dir === leaf);
 }
 
 /** For the record only, not for behavior. */

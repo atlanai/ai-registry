@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
+import { quoted } from "#adapter/text.ts";
 import { withheldAt } from "#core/catalog/withheld.ts";
+import { kindSpec } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import type { Closure } from "#core/plan/depends.ts";
@@ -168,5 +170,20 @@ export function carryUnresolved(build: BuildState, needs: Closure): void {
     keep(build, name, { ...row, neededBy: build.neededBy.get(name) });
     const source = build.lock.registries[alias];
     if (source !== undefined) build.next.registries[alias] ??= source;
+  }
+}
+
+/** A row of a kind no loaded adapter declares is kept as it is: aireg never guesses where it goes. */
+export function carryUndeclared(build: BuildState): void {
+  for (const [name, row] of Object.entries(build.lock.artifacts)) {
+    if (kindSpec(row.kind) !== undefined || build.next.artifacts[name] !== undefined) continue;
+    keep(build, name, row);
+    const source = build.lock.registries[row.registry];
+    if (source !== undefined) build.next.registries[row.registry] ??= source;
+    build.warnings.push({
+      name,
+      message: `Left ${quoted(name)} as it is: no loaded adapter declares its kind, ${quoted(row.kind)}.`,
+      hint: "Install the adapter that declares it to update it.",
+    });
   }
 }

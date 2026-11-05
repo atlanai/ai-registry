@@ -4,6 +4,7 @@ import { dict } from "#core/fields.ts";
 import { digest } from "#core/fs/digest.ts";
 import { inspect } from "#core/fs/link.ts";
 import { exists } from "#core/fs/tree.ts";
+import { kindSpec } from "#core/kinds.ts";
 import type { LinkMode, Lock, LockArtifact } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
@@ -35,6 +36,11 @@ export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
           }),
         );
 
+        // Without its spec aireg cannot find the copy, so it is taken as installed.
+        if (kindSpec(entry.kind) === undefined) {
+          artifacts[name] = { staged: true, digest: entry.digest, links };
+          return;
+        }
         // An edit is this scope's copy against what was installed.
         const copy = artifactPath(
           roots,

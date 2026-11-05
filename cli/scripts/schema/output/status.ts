@@ -1,7 +1,7 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import type { StatusResult } from "#cli/commands/status/result.ts";
-import { matching, oneOf, outputDocument } from "./match.ts";
+import { Kind } from "#scripts/schema/kind.ts";
+import { matching, outputDocument } from "./match.ts";
 
 const LinkState = Type.Union(
   [
@@ -53,7 +53,7 @@ const Artifact = Type.Object(
 const Unmanaged = Type.Object(
   {
     name: Type.String(),
-    kind: oneOf(KINDS),
+    kind: Kind,
     targets: Type.Array(Type.String()),
     path: Type.String(),
     harnesses: Type.Array(Type.String()),

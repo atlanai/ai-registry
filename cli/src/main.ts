@@ -113,6 +113,7 @@ async function setup(printer: Printer, rest: string[]): Promise<ExitCode> {
       hint: "Run `aireg --setup`, or `aireg --setup --yes` to accept every default.",
     });
   }
+  await declareAdapterKinds(printer);
   const { install } = await import("#cli/onboarding/setup.ts");
   const context = { argv: [], cwd: homedir(), printer, host: extensionHost(VERSION) };
   const code = (await install(context, yes)) as ExitCode;
@@ -288,6 +289,7 @@ async function runCommand(
       const outcome = await applyMinimumUpdate(printer, argv, recycleDaemon);
       if (outcome.kind === "reexec") return outcome.code as ExitCode;
     }
+    if (!WITHOUT_KINDS.has(name)) await declareAdapterKinds(printer);
     const { run } = await spec.load();
     const context: CommandContext = {
       argv: rest,
@@ -317,6 +319,16 @@ async function runCommand(
     }
     log.close();
   }
+}
+
+/** Commands that never read a kind, so they import no adapter module to learn them. */
+const WITHOUT_KINDS = new Set(["adapter", "auth", "config", "daemon", "logs", "self"]);
+
+/** Before the command reads a kind; a config that cannot be read is reported by the command. */
+async function declareAdapterKinds(printer: Printer): Promise<void> {
+  const { loadDeclaredKinds } = await import("#core/host/kinds.ts");
+  const warnings = await loadDeclaredKinds().catch(() => []);
+  for (const warning of warnings) printer.warning(warning);
 }
 
 // Node's fetch keeps an aborted connection open until its 10 s connect timeout, so a finished

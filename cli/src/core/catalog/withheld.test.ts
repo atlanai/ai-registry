@@ -9,7 +9,7 @@ import {
 } from "./withheld.ts";
 
 describe("what a registry withholds", () => {
-  test("drops what it cannot name, and shows a reason without its escapes", () => {
+  test("drops what it cannot name, keeps any kind name, and shows a reason without its escapes", () => {
     const withheld = withheldFrom([
       {
         name: "gate",
@@ -19,10 +19,11 @@ describe("what a registry withholds", () => {
         status: "blocked",
         reason: "x\u001B]0;t\u0007y",
       },
-      { name: "gate", kind: "tool", version: "1.0.0", status: "blocked" },
+      { name: "gate", kind: "Tool", version: "1.0.0", status: "blocked" },
       { kind: "skill", version: "1.0.0", status: "blocked" },
+      { name: "accounts", kind: "knowledge", version: "1.0.0", status: "draft" },
     ]);
-    expect(withheld).toHaveLength(1);
+    expect(withheld.map((each) => each.kind)).toEqual(["skill", "knowledge"]);
     expect(withheldMessage(withheld[0] as (typeof withheld)[number])).toBe(
       "ops/gate 1.1.0 is blocked (xy)",
     );

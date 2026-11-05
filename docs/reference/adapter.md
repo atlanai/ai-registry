@@ -95,6 +95,58 @@ A failure is an `AdapterError` with one of six `Failure` classes, which decide w
 
 The package also exports what the built-in adapters use: readers and writers for a registry laid out as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) (`resolveFromRoot`, `openFolderRegistry`, `readIndex`, `readVersions`, `mergedIndex`, `mergedVersions`), envelope and digest helpers (`buildEnvelope`, `describeFile`, `contentDigest`, `sha256`), RFC 9457 problem helpers for an adapter that speaks HTTP (`readProblem`, `failureFromStatus`, `retryAfterMs`), SemVer ordering, and the text helpers aireg's messages are written with.
 
+### Declaring kinds
+
+An adapter can add kinds beyond `plugin`, `skill` and `agent`, as data on `extend.kinds`. `extend` is a field of the adapter object beside the contract, and is not part of the published `@atlanai/aireg` types. aireg stores, places, publishes and lists a declared kind as its declaration says, so a new kind needs no new release of aireg.
+
+```js
+export default {
+  ...defineAdapter({ id: "acme", artifactKinds: ["skill", "knowledge", "prompt"] /* ... */ }),
+  extend: {
+    kinds: [
+      { name: "knowledge", dir: "knowledge", shape: "directory" },
+      {
+        name: "prompt",
+        dir: "prompt_files",
+        shape: "file",
+        extensions: [".md"],
+        targets: { universal: { shape: "file", subdir: "prompts", extension: ".md" } },
+      },
+    ],
+  },
+};
+```
+
+| Field | What it is |
+|---|---|
+| `name` | The kind in addresses and on the wire, in the file spec's kind grammar: a lowercase letter, then lowercase letters, digits or underscores, at most 32 characters. |
+| `dir` | Its folder in aireg's own copies: one lowercase folder name. aireg keeps these copies under `.kinds/` in its artifacts folder, apart from every namespace folder. |
+| `shape` | `directory`, or `file` for a kind that is one file. |
+| `extensions` | For a `file` kind, the extensions it takes, such as `[".md"]`. |
+| `entry` | For a `directory` kind, the file that marks a folder as one and holds its front matter. Without it, any folder is one, so aireg never looks for such a kind in a target's folders. |
+| `description` | One line about the kind. |
+| `targets` | Where each target places it, by target id, in the `directory` or `file` mapping a [target file](targets.md#target-files) uses, `register` entries included. A target left out does not load the kind. |
+
+aireg checks every adapter's kinds when `aireg adapter install` installs one, and when it loads adapters before a command that reads kinds and before each background job run:
+
+- These cost that adapter all its kinds, with a warning; other adapters are not affected:
+    - a name outside the grammar, or a built-in kind's name or folder
+    - a `dir` that a plugin loader reads, such as `commands`, `prompts`, `hooks`, `bin`, `rules`, `agents`, `skills`, `plugins`, `mcp`, `lsp`, `monitors`, `output-styles` or `themes`, or a folder a built-in target keeps plugins in
+    - a `file` kind without `extensions`
+    - a target that does not exist, or a mapping a target file could not hold
+    - a `contents` mapping, a `subdir` that is the target's own folder, or one inside or around a folder where the target keeps a built-in kind
+    - a `register` entry in a target's own settings file, such as `settings.json`, or one in a file the target shares, such as `config.toml`, outside a table named for each artifact (`{name}` in the last key of `at`)
+- An adapter that does not load is named with its error, since aireg then does not know the kinds it declares.
+- Two adapters may declare one kind alike. When they declare it differently, or two kinds share one folder, neither is loaded, and aireg names both adapters.
+- A target that already maps the kind, in its own definition or a target file, keeps its own mapping. A target file never maps a declared kind as a plugin's `contents`, and is checked again once the kinds are declared.
+- A `register` entry never replaces or removes a table someone else wrote: aireg leaves it, with a warning naming the file and the table, and never deletes a config file on removal.
+
+A declared kind always takes the full address `<registry>/<namespace>/<kind>/<name>`. Only a built-in kind reads as a kind in the short form `<registry>/<kind>/<name>`, so installing or removing an adapter never changes what an address in a manifest means. An address you type with a kind aireg does not know is refused.
+
+A declared kind that no target maps is publish-only. `aireg add` refuses it with exit status 2; `aireg install` and `aireg sync` leave it out with a warning. An export entry with `kind: <name>` publishes its path as one artifact of that kind, every file under a folder, and sends the entry's front matter, its `name` and its `description` as the artifact's fields. `aireg search --kind` takes declared kinds too. A namespace installed as a plugin never carries a declared kind.
+
+A lockfile row of a kind no loaded adapter declares is left exactly as it is, links included, by `install`, `update` and `sync`, each with a warning, and `aireg status` says it did not check its copy.
+
 ### Testing an adapter
 
 ```sh

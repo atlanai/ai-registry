@@ -2,16 +2,15 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import type { ArtifactKind } from "#adapter/kinds.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { type ArtifactKind, isBuiltinKind, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
-import { quoted } from "#adapter/text.ts";
+import { list, quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { frontmatter } from "#core/frontmatter.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { canonicalAsync } from "#core/fs/realpath.ts";
 import { isDirectory } from "#core/fs/tree.ts";
-import { AGENT_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, kindPlural, kindSpec } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import { type ExportFile, isGlob } from "#core/manifest/export-fields.ts";
 import type { Export, ExportDependency, Manifest } from "#core/manifest/model.ts";
@@ -99,6 +98,9 @@ interface Reach {
 const SINGLE = ["version", "publish", "kind"] as const;
 
 async function reachedBy(entry: Export, reading: Reading): Promise<Reaching> {
+  if (entry.kind !== undefined && !isBuiltinKind(entry.kind)) {
+    return declaredAt(entry, entry.kind, reading.base);
+  }
   const reached = isGlob(entry.path)
     ? { ...(await reachEach(entry, await expand(entry.path, reading.base), reading)), named: false }
     : await namedBy(entry, reading);
@@ -145,6 +147,55 @@ async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
     code: ErrorCode.Invalid,
     hint: NAME_HINT,
   });
+}
+
+/** A declared kind has no entry file to be found by, so only `kind:` names one: the path itself. */
+async function declaredAt(entry: Export, kind: ArtifactKind, base: string): Promise<Reaching> {
+  const spec = kindSpec(kind);
+  const refuse = (problem: string, hint: string) =>
+    new AiregError(`Export ${quoted(entry.path)} ${problem}.`, { code: ErrorCode.Invalid, hint });
+  if (spec === undefined) {
+    throw refuse(
+      `is of the kind ${quoted(kind)}, which no loaded adapter declares`,
+      "Install the adapter that declares it, or remove `kind`.",
+    );
+  }
+  const one = spec.shape === "directory" ? "one folder" : "one file";
+  const path = resolve(base, entry.path);
+  if (!existsSync(path)) {
+    throw new AiregError(`Export ${quoted(entry.path)} names nothing in this project.`, {
+      code: ErrorCode.NotFound,
+      hint: "Check its path under `exports:`, or remove the entry.",
+    });
+  }
+  await refuseOutside(entry, path, base);
+  const folder = await isDirectory(path);
+  const fix = `Name the ${spec.shape === "directory" ? "folder" : "file"} it is, or change \`kind\`.`;
+  if (folder !== (spec.shape === "directory")) {
+    throw refuse(
+      `is a ${folder ? "folder" : "file"}, but each of the ${kindPlural(kind)} is ${one}`,
+      fix,
+    );
+  }
+  if (!folder && !spec.extensions.includes(extname(path))) {
+    throw refuse(`is not a ${list(spec.extensions, "or")} file, as ${kindPlural(kind)} are`, fix);
+  }
+  if (folder && spec.entry !== undefined && !existsSync(join(path, spec.entry))) {
+    throw refuse(`holds no ${spec.entry}, which each of the ${kindPlural(kind)} has`, fix);
+  }
+  if (entry.exclude !== undefined) {
+    throw refuse(
+      "sets `exclude`, but it is one artifact, not a folder of them",
+      "Remove `exclude`.",
+    );
+  }
+  if (!folder && (entry.include !== undefined || entry.ignore !== undefined)) {
+    throw refuse(
+      `sets \`${entry.include === undefined ? "ignore" : "include"}\`, but it is one file`,
+      "Remove it.",
+    );
+  }
+  return { roots: new Map([[path, kind]]), notes: [], named: true };
 }
 
 async function refuseOutside(entry: Export, path: string, base: string): Promise<void> {
@@ -286,14 +337,12 @@ function untracked(path: string, reading: Reading): boolean {
   return tracked !== undefined && !tracked.some((file) => isWithin(path, file));
 }
 
-const aKind = (kind: ArtifactKind) => `${kind === "agent" ? "an" : "a"} ${kind}`;
-
 function refuseKind(entry: Export, roots: ReadonlyMap<string, ArtifactKind>, base: string): void {
   if (entry.kind === undefined) return;
   for (const [root, kind] of roots) {
     if (kind === entry.kind) continue;
     throw new AiregError(
-      `Export ${quoted(entry.path)} reaches ${shownAt(root, base)}, which is ${aKind(kind)}, not ${aKind(entry.kind)}.`,
+      `Export ${quoted(entry.path)} reaches ${shownAt(root, base)}, which is of the kind ${kind}, not ${entry.kind}.`,
       {
         code: ErrorCode.Invalid,
         hint: isGlob(entry.path)

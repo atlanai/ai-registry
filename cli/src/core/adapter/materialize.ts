@@ -21,7 +21,7 @@ import { sha256 } from "#adapter/spec/canonical.ts";
 import { plural } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { exists } from "#core/fs/tree.ts";
-import { KIND_SPECS } from "#core/kinds.ts";
+import { kindSpec } from "#core/kinds.ts";
 
 const fetching = limiter(CONCURRENCY);
 
@@ -208,7 +208,7 @@ export async function materialize(
 }
 
 function contentAt(artifact: Artifact, root: string): string {
-  if (KIND_SPECS[artifact.kind].shape === "directory") return root;
+  if (kindSpec(artifact.kind)?.shape !== "file") return root;
   const only = artifact.files[0] as Artifact["files"][number];
   return join(root, ...only.path.split(posix.sep));
 }

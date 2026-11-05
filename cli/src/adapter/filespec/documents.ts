@@ -1,6 +1,6 @@
 import type { RegistryIdentity } from "../contract.ts";
 import { type Fields, isRecord, textOf } from "../fields.ts";
-import { type ArtifactKind, isKind } from "../kinds.ts";
+import { type ArtifactKind, isBuiltinKind } from "../kinds.ts";
 import { compareVersion, parseVersion, type Version } from "../semver.ts";
 import { isVersion } from "../spec/ref.ts";
 import { SUPPORTED_FORMAT } from "../spec/types.ts";
@@ -188,8 +188,8 @@ export async function readIndex(read: ReadPath): Promise<IndexRow[]> {
 function entryOf(raw: unknown, at: string): IndexRow | undefined {
   const item = object(raw, at);
   const kind = text(item, "kind", at);
-  // Section 5 rule 4: an unknown kind is skipped, not refused.
-  if (!isKind(kind)) return undefined;
+  // Section 5 rule 4: an unknown kind is skipped, not refused. A file registry serves built-ins.
+  if (!isBuiltinKind(kind)) return undefined;
   return {
     namespace: text(item, "namespace", at),
     kind,

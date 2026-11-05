@@ -1,7 +1,7 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import type { SearchResult } from "#cli/commands/search/result.ts";
-import { matching, oneOf, outputDocument } from "./match.ts";
+import { Kind } from "#scripts/schema/kind.ts";
+import { matching, outputDocument } from "./match.ts";
 
 const Search = matching<SearchResult>()(
   Type.Object(
@@ -13,7 +13,7 @@ const Search = matching<SearchResult>()(
             address: Type.String({ description: "What `aireg add` takes for it." }),
             registry: Type.String(),
             namespace: Type.Optional(Type.String()),
-            kind: oneOf(KINDS),
+            kind: Kind,
             name: Type.String(),
             version: Type.Optional(Type.String()),
             description: Type.Optional(Type.String()),

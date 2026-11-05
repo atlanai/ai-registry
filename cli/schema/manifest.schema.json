@@ -243,17 +243,12 @@
                 "type": "string"
               },
               "kind": {
-                "description": "When set, every artifact the entry reaches must be this kind.",
-                "anyOf": [
-                  {
-                    "const": "skill",
-                    "type": "string"
-                  },
-                  {
-                    "const": "agent",
-                    "type": "string"
-                  }
-                ]
+                "pattern": "^[a-z][a-z0-9_]{0,31}$",
+                "not": {
+                  "const": "plugin"
+                },
+                "description": "When set, every artifact the entry reaches must be this kind: skill, agent, or a kind an adapter declares.",
+                "type": "string"
               },
               "version": {
                 "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-(0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*))*)?$",

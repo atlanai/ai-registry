@@ -1,5 +1,5 @@
 import { isAbsolute } from "node:path";
-import { isKind } from "#adapter/kinds.ts";
+import { isKindSegment } from "#adapter/filespec/names.ts";
 import { expandHome } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { parseDuration, type Readers } from "#core/fields.ts";
@@ -159,10 +159,10 @@ function selector(read: Readers, value: unknown, where: string): Selector {
   if (entry.kinds !== undefined) {
     const kinds = read.textList(entry.kinds, `${where}.kinds`);
     for (const kind of kinds) {
-      if (!isKind(kind))
-        throw read.fail(`\`${where}.kinds\` names an unknown kind, ${quoted(kind)}.`);
+      if (!isKindSegment(kind))
+        throw read.fail(`\`${where}.kinds\` names ${quoted(kind)}, which is not a kind name.`);
     }
-    selected.kinds = kinds.filter(isKind);
+    selected.kinds = kinds;
   }
   return { ...selected, ...selectedTargets(read, entry, where) };
 }

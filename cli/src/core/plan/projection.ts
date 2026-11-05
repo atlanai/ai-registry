@@ -1,6 +1,6 @@
 import { dirname, join, posix, resolve } from "node:path";
 import type { ArtifactKind } from "#adapter/kinds.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { isBuiltinKind, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
@@ -224,7 +224,9 @@ export function linksFor(
     // Its plugins carry only kinds it places as they are; the rest are placed flat or not at all.
     const mapping = target.kinds[item.kind];
     const written = mapping?.codec !== undefined || mapping?.entry !== undefined;
-    if (!wrapped || !takesPlugin(target, where.scope) || mapping === undefined || written) {
+    // A plugin carries the built-in kinds alone; a declared kind stays at its own place.
+    const carried = mapping !== undefined && !written && isBuiltinKind(item.kind);
+    if (!wrapped || !takesPlugin(target, where.scope) || !carried) {
       rest.push(name);
       continue;
     }

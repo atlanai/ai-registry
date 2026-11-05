@@ -2,6 +2,7 @@ import type { SourceAdapter, SourceContext } from "#adapter/index.ts";
 import type { Account, Step } from "#core/config/model.ts";
 import type { ItemSettled, RunCounts, TerminalRunState } from "#core/run/model.ts";
 import type { RunStore } from "#core/run/store.ts";
+import type { KindMapping } from "#core/target/contract.ts";
 import type { Printer } from "#core/term/printer.ts";
 import type { PanelContribution, UpstreamContribution } from "./panel.ts";
 
@@ -97,6 +98,26 @@ export interface StepContribution {
   steady?: boolean;
 }
 
+/** A kind an adapter adds, as data: aireg stores, places and publishes it as its spec says. */
+export interface KindContribution {
+  /** The kind on the wire and in addresses, in the file spec's kind grammar `^[a-z][a-z0-9_]{0,31}$`. */
+  name: string;
+  /** Its folder, and its plural in messages: one path segment, such as `knowledge`. */
+  dir: string;
+  shape: "directory" | "file";
+  /** Required for a file-shaped kind, such as `[".md"]`; absent for a directory. */
+  extensions?: readonly string[];
+  /** For a directory kind: the file that marks it and holds its front matter. Absent: any folder. */
+  entry?: string;
+  /** One line for help and search. */
+  description?: string;
+  /**
+   * Where each target places it, by target id, in a target file's `directory` or `file` mapping.
+   * A target left out does not load it; with no mapping anywhere the kind is publish-only.
+   */
+  targets?: Readonly<Record<string, KindMapping>>;
+}
+
 /**
  * Merged by the host at load so a new command is never a branch in the client.
  * Kept out of the published types.
@@ -107,6 +128,8 @@ export interface AdapterExtension {
   // biome-ignore lint/suspicious/noExplicitAny: each panel names its own state.
   panels?: readonly PanelContribution<any>[];
   upstream?: UpstreamContribution;
+  /** Checked at load: a built-in's name or folder, or a bad entry, costs this adapter its kinds. */
+  kinds?: readonly KindContribution[];
 }
 
 export function extensionOf(adapter: SourceAdapter): AdapterExtension | undefined {

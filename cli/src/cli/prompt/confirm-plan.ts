@@ -1,6 +1,7 @@
-import { type ArtifactKind, KINDS } from "#adapter/kinds.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, plural } from "#adapter/text.ts";
 import { loadedBy, skipLine, toolName, unhandled } from "#cli/render/tools.ts";
+import { kindPlural, knownKinds } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Plan } from "#core/plan/model.ts";
 import type { Targets } from "#core/target/contract.ts";
@@ -202,7 +203,7 @@ function explainMissed(missed: readonly string[], context: PlanContext): string[
     reason === ""
       ? vague(targets)
       : `${named(targets)} ${receive(targets)} nothing: ${targets.length === 1 ? "it does not" : "they do not"} load ${list(
-          reason.split(",").map((kind) => `${kind}s`),
+          reason.split(",").map(kindPlural),
         )}.`,
   );
 }
@@ -258,7 +259,7 @@ export function unreached(plan: Plan, targets: readonly string[], targetTable?: 
   const reads = (name: string) =>
     targetTable === undefined
       ? [name]
-      : [name, ...KINDS.flatMap((kind) => readsFor(targetTable, name, kind))];
+      : [name, ...knownKinds().flatMap((kind) => readsFor(targetTable, name, kind))];
   return targets.filter((name) => !reads(name).some((read) => reached.has(read))).sort();
 }
 

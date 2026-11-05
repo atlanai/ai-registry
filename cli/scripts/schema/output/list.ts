@@ -1,7 +1,7 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import type { ListResult } from "#cli/commands/list/result.ts";
 import { LINK_MODES } from "#core/lock.ts";
+import { Kind } from "#scripts/schema/kind.ts";
 import { matching, oneOf, outputDocument } from "./match.ts";
 
 const Watched = Type.Object(
@@ -53,7 +53,7 @@ const Listing = Type.Object(
 const Detail = Type.Object(
   {
     name: Type.String({ description: "As the command line named it." }),
-    kind: oneOf(KINDS),
+    kind: Kind,
     registry: Type.String(),
     address: Type.Optional(Type.String()),
     adapter: Type.Optional(Type.String()),

@@ -553,6 +553,15 @@
       ]
     },
     "reads": {
+      "patternProperties": {
+        "^[a-z][a-z0-9_]{0,31}$": {
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      },
       "additionalProperties": false,
       "type": "object",
       "properties": {
@@ -580,6 +589,11 @@
       }
     },
     "kinds": {
+      "patternProperties": {
+        "^[a-z][a-z0-9_]{0,31}$": {
+          "$ref": "#/$defs/kind"
+        }
+      },
       "additionalProperties": false,
       "type": "object",
       "properties": {
@@ -624,6 +638,29 @@
       }
     },
     "trust": {
+      "patternProperties": {
+        "^[a-z][a-z0-9_]{0,31}$": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "run"
+          ],
+          "properties": {
+            "run": {
+              "minLength": 1,
+              "description": "Printed, never run.",
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "project",
+                "user"
+              ]
+            }
+          }
+        }
+      },
       "additionalProperties": false,
       "type": "object",
       "properties": {
