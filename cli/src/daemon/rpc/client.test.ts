@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { NAME } from "#core/product.ts";
 import type { RunEvent } from "#core/run/model.ts";
+import { RunEventType } from "#core/run/model.ts";
 import { homeTest } from "#test/kit/fixtures.ts";
 import { cliClient, followRun, RpcClient, RpcClientError, withFreshConfig } from "./client.ts";
 import { RpcErrorCode } from "./codes.ts";
@@ -228,7 +229,7 @@ describe("followRun", () => {
           notify("run.event", event(2));
           return { events: [event(1), event(2)], hasMore: false };
         }
-        setTimeout(() => notify("run.event", event(3, "run.finished")), 5);
+        setTimeout(() => notify("run.event", event(3, RunEventType.Finished)), 5);
         return { run: { state: "running" } };
       },
       onNotification: (listener: typeof notify) => {

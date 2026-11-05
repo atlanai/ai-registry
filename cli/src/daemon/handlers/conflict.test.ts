@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { emptyRegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
-import { ITEM_EVENT } from "#core/run/model.ts";
+import { RunEventType } from "#core/run/model.ts";
 import type { RpcClient } from "#daemon/rpc/client.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { ADAPTER, ENDPOINT, finished, jobStatus, NAMESPACE, testClient } from "#test/kit/daemon.ts";
@@ -104,7 +104,7 @@ describe("conflict methods", () => {
     expect((await finished(setup.client, run.id)).state).toBe("succeeded");
 
     const { events } = await setup.client.request("run.events", { runId: run.id });
-    expect(events.find((event) => event.eventType === ITEM_EVENT)).toMatchObject({
+    expect(events.find((event) => event.eventType === RunEventType.ItemSettled)).toMatchObject({
       artifact: SKILL,
       kind: "skill",
       disposition: "conflict",

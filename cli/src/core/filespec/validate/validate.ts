@@ -1,7 +1,9 @@
 import { join } from "node:path";
+import { messageOf } from "#adapter/errors.ts";
 import { DEFAULT_BLOB_URL, readRegistry } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import {
+  ARTIFACTS_DIR,
   INDEX_DOCUMENT,
   isArtifactName,
   isDeviceName,
@@ -46,7 +48,7 @@ export async function validateRoot(
       problems.push({ path: REGISTRY_DOCUMENT, message: 'capabilities must include "files"' });
     }
   } catch (error) {
-    problems.push({ path: REGISTRY_DOCUMENT, message: (error as Error).message });
+    problems.push({ path: REGISTRY_DOCUMENT, message: messageOf(error) });
   }
   const index = await jsonAt(root, INDEX_DOCUMENT, problems);
   if (index === undefined && !problems.some((p) => p.path === INDEX_DOCUMENT)) {
@@ -133,5 +135,5 @@ async function layout(root: string, problems: Problem[]): Promise<void> {
       await visit(join(dir, child), at, depth + 1);
     }
   }
-  await visit(join(root, "artifacts"), "artifacts", 0);
+  await visit(join(root, ARTIFACTS_DIR), ARTIFACTS_DIR, 0);
 }

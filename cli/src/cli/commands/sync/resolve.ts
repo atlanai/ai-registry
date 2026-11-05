@@ -1,6 +1,6 @@
 import { actionOf, type CommandContext } from "#cli/commands/command.ts";
 import { attentionHints, type Followed, follow, stoppedError } from "#cli/commands/sync/follow.ts";
-import { parse } from "#cli/options/parse.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import { loadAdapter } from "#core/adapter/load.ts";
 import { findJob } from "#core/config/jobs.ts";
 import type { Job } from "#core/config/model.ts";
@@ -27,16 +27,18 @@ export async function run(context: CommandContext): Promise<void> {
   const { common, positionals, own } = parse<Own>(context.argv, actionOf(SYNC_COMMAND, "resolve"));
   const name = positionals[0];
   if (name === undefined) {
-    throw new AiregError("`aireg sync resolve` needs an artifact name.", {
-      code: ErrorCode.Usage,
-      hint: "Name it: `aireg sync resolve <name> --mine | --theirs`, with `--job <job>` for one a job left waiting.",
-    });
+    throw needsInput(
+      "sync resolve",
+      "an artifact name",
+      "Name it: `aireg sync resolve <name> --mine | --theirs`, with `--job <job>` for one a job left waiting.",
+    );
   }
   if (own.mine === own.theirs) {
-    throw new AiregError("`aireg sync resolve` needs exactly one of --mine or --theirs.", {
-      code: ErrorCode.Usage,
-      hint: "Pass `--mine` to publish your copy as a new version, or `--theirs` to take the registry's copy.",
-    });
+    throw needsInput(
+      "sync resolve",
+      "exactly one of --mine or --theirs",
+      "Pass `--mine` to publish your copy as a new version, or `--theirs` to take the registry's copy.",
+    );
   }
   const resolution = own.mine === true ? "mine" : "theirs";
 

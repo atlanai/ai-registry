@@ -10,6 +10,7 @@ import {
   PROJECTIONS_DIR,
   roots,
   scopeFor,
+  stateDir,
   toolHome,
   userScopeDir,
 } from "./paths.ts";
@@ -49,6 +50,13 @@ describe("toolHome", () => {
     const user = home.dir;
     expect(toolHome({ AIREG_HOME: "/a", AIREG_USER_SCOPE: "/b" })).toBe(resolve("/a"));
     expect(toolHome({ AIREG_USER_SCOPE: "/b" })).toBe(join(user, ".aireg"));
+  });
+});
+
+describe("stateDir", () => {
+  test("keeps the daemon's and the update check's files together under the home", () => {
+    const env = { AIREG_HOME: "/tmp/aireg-home-paths" };
+    expect(stateDir(env)).toBe(join(toolHome(env), "state"));
   });
 });
 

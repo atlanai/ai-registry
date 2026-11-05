@@ -1,5 +1,6 @@
 import { quoted } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { StepContribution } from "#core/host/extend.ts";
 import { type RpcClient, withFreshConfig } from "#daemon/rpc/client.ts";
@@ -14,10 +15,11 @@ export async function addContributedJob(
 ): Promise<void> {
   if (typeof flags.account !== "string") {
     const flag = contribution.flag ?? contribution.kind;
-    throw new AiregError(`\`aireg job add --${flag}\` needs an account.`, {
-      code: ErrorCode.Usage,
-      hint: `Name the account: \`aireg job add --${flag} --account <account>\`.`,
-    });
+    throw needsInput(
+      `job add --${flag}`,
+      "an account",
+      `Name the account: \`aireg job add --${flag} --account <account>\`.`,
+    );
   }
   const extra = contribution.params?.(flags) ?? {};
   const { config: updated, job } = await withFreshConfig(client, (config) => {

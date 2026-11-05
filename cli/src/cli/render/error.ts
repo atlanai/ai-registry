@@ -1,4 +1,4 @@
-import { adapterOf, adapterProblem } from "#adapter/errors.ts";
+import { adapterOf, adapterProblem, messageOf } from "#adapter/errors.ts";
 import { type AdapterError, SpecError } from "#adapter/index.ts";
 import { AiregError, ErrorCode, type ExitCode, exitCodeFor } from "#core/errors.ts";
 import type { Printer } from "#core/term/printer.ts";
@@ -42,7 +42,7 @@ function classify(error: unknown): Classified {
   // A wrapper with no hint of its own keeps the adapter's, which says what to do.
   return {
     code,
-    message: error instanceof Error ? error.message : String(error),
+    message: messageOf(error),
     hint:
       (error instanceof AiregError || error instanceof SpecError ? error.hint : undefined) ??
       adapter?.hint ??

@@ -1,7 +1,6 @@
 import { isAdapterError } from "#adapter/index.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { withheldMessage } from "#core/catalog/withheld.ts";
-import { unmetEngine } from "#core/engines.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { type Lock, lockChanges } from "#core/lock.ts";
 import { formatManifest } from "#core/manifest/format.ts";
@@ -165,12 +164,6 @@ export function refuseUntrusted(untrusted: readonly Untrusted[]): void {
     code: ErrorCode.Usage,
     hint: trustHint(untrusted),
   });
-}
-
-export function refuseOldCli(engine: string | undefined): void {
-  const why = unmetEngine(VERSION, engine);
-  if (why === undefined) return;
-  throw new AiregError(`This project ${why}.`, { hint: "Run `aireg self update`." });
 }
 
 /** The refusals every plan passes before a single byte is written. */

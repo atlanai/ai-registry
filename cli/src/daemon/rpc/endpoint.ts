@@ -8,7 +8,7 @@ import { shortHash } from "#core/fs/hash.ts";
 import { OPEN_TO_OTHERS, PRIVATE_DIR, PRIVATE_FILE } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { NAME } from "#core/product.ts";
-import { ensureHome, toolHome } from "#core/store/paths.ts";
+import { ensureHome, stateDir, toolHome } from "#core/store/paths.ts";
 
 /** `sun_path` holds 104 bytes on macOS and 108 on Linux, its terminating NUL included. */
 const SOCKET_PATH_BYTES = process.platform === "darwin" ? 103 : 107;
@@ -34,7 +34,7 @@ export function daemonProof(challenge: unknown): string | undefined {
 
 /** A random value kept in this home, written whole and then linked into place. */
 function homeSecret(env: NodeJS.ProcessEnv, file: string): string {
-  const path = join(toolHome(env), "state", file);
+  const path = join(stateDir(env), file);
   try {
     return readSecret(path);
   } catch (error) {

@@ -1,4 +1,5 @@
 import { credentialFor } from "#accounts/credentials.ts";
+import { messageOf } from "#adapter/errors.ts";
 import { contentDigest, type ResolveOptions, type Want } from "#adapter/index.ts";
 import { OUTDATED_COMMAND } from "#cli/commands/outdated/spec.ts";
 import { noArguments, parse } from "#cli/options/parse.ts";
@@ -17,7 +18,7 @@ import { type Request, wanted } from "#core/plan/acquire/request.ts";
 import { listedAt } from "#core/plan/acquire/sources.ts";
 import { excluded } from "#core/plan/select.ts";
 import type { Ref } from "#core/ref.ts";
-import { scopeName } from "#core/store/paths.ts";
+import { type Scope, scopeFlag, scopeName } from "#core/store/paths.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { abbreviate, type Printer, sentence } from "#core/term/printer.ts";
 import { table } from "#core/term/table.ts";
@@ -196,7 +197,7 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
       await open.handle.close();
     }
   } catch (error) {
-    return { byAddress: new Map(), entries: [], why: (error as Error).message };
+    return { byAddress: new Map(), entries: [], why: messageOf(error) };
   }
 }
 
@@ -332,8 +333,8 @@ function wholes(manifest: Manifest, alias: string): Ref[] {
   return manifest.artifacts.filter((ref) => ref.registry === alias && ref.name === undefined);
 }
 
-function next(printer: Printer, moved: readonly Row[], scope: string): void {
-  const flag = scope === "user" ? " -g" : "";
+function next(printer: Printer, moved: readonly Row[], scope: Scope): void {
+  const flag = scopeFlag(scope);
   // A pin that is holding is not something to act on, and `update` never moves a watched row.
   if (moved.some((entry) => entry.pinned === undefined && entry.watched === undefined)) {
     printer.note("next", `aireg update${flag}`);

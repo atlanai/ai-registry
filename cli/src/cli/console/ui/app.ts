@@ -1,6 +1,7 @@
 import { useApp, useInput, useWindowSize } from "ink";
 import type { ReactElement, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { messageOf } from "#adapter/errors.ts";
 import { step, windowAround } from "#cli/console/data/list.ts";
 import { collect, type Progress, progress } from "#cli/console/data/state.ts";
 import { accountsView } from "#cli/console/ui/views/accounts.ts";
@@ -948,7 +949,7 @@ function attempt(label: string, draw: () => PanelNode): ReactNode {
   try {
     return draw() as ReactNode;
   } catch (error) {
-    return unreadable(label, error instanceof Error ? error.message : String(error));
+    return unreadable(label, messageOf(error));
   }
 }
 

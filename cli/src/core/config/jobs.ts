@@ -1,6 +1,7 @@
 import type { Scope } from "#core/store/paths.ts";
+import { scopeFlag } from "#core/store/paths.ts";
 import { shellWord } from "#core/term/format.ts";
-import { COMPOSITE_STEPS, isScopeStep, type Job, type RegistryConfig, type Step } from "./model.ts";
+import { compositeLeaves, isScopeStep, type Job, type RegistryConfig, type Step } from "./model.ts";
 
 /** A job by id, or by the name a person typed. */
 export function findJob(config: RegistryConfig, wanted: string): Job | undefined {
@@ -21,7 +22,7 @@ export function jobRoot(job: Pick<Job, "steps">): string | undefined {
 
 /** What stops publishing these folders, written so a shell runs it as printed. */
 export function unwatchCommand(folders: readonly string[], scope: Scope): string {
-  return `aireg watch remove ${folders.map(shellWord).join(" ")}${scope === "user" ? " -g" : ""}`;
+  return `aireg watch remove ${folders.map(shellWord).join(" ")}${scopeFlag(scope)}`;
 }
 
 /**
@@ -34,7 +35,7 @@ export function expandSteps(steps: readonly Step[]): Step[] {
   const terminals = new Map<string, string[]>();
 
   for (const step of steps) {
-    const leaves = COMPOSITE_STEPS[step.kind];
+    const leaves = compositeLeaves(step.kind);
     if (leaves === undefined) {
       expanded.push({
         ...step,

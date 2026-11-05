@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { executableFile } from "#core/product.ts";
-import { toolHome } from "#core/store/paths.ts";
+import { stateDir, toolHome } from "#core/store/paths.ts";
 
 export function cliRoot(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), "cli");
@@ -34,5 +34,5 @@ export function shimPath(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 export function updateCheckPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(toolHome(env), "state", "update-check.json");
+  return join(stateDir(env), "update-check.json");
 }

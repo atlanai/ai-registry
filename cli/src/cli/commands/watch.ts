@@ -2,7 +2,7 @@ import { list as listOf } from "#adapter/text.ts";
 import { add as addJob } from "#cli/commands/job/add.ts";
 import { folderKey, jobNamed, jobScope, scopeLabel, typedFolder } from "#cli/commands/job/find.ts";
 import { WATCH_COMMAND } from "#cli/commands/watch/spec.ts";
-import { parse } from "#cli/options/parse.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import { underHome } from "#cli/render/home.ts";
 import { jobRoot, unwatchCommand, watchedFolders } from "#core/config/jobs.ts";
 import type { Job, Step } from "#core/config/model.ts";
@@ -97,13 +97,13 @@ async function add(
 }
 
 function needsFolder(action: string): AiregError {
-  return new AiregError(`\`aireg watch ${action}\` needs a folder.`, {
-    code: ErrorCode.Usage,
-    hint:
-      action === "add"
-        ? "Name it: `aireg watch add <folder> --to <registry>/<namespace>`."
-        : "Name it: `aireg watch remove <folder>`. Run `aireg watch list` to see them.",
-  });
+  return needsInput(
+    `watch ${action}`,
+    "a folder",
+    action === "add"
+      ? "Name it: `aireg watch add <folder> --to <registry>/<namespace>`."
+      : "Name it: `aireg watch remove <folder>`. Run `aireg watch list` to see them.",
+  );
 }
 
 async function remove(

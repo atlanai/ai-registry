@@ -1,4 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { limiter } from "#adapter/concurrency.ts";
+import { messageOf } from "#adapter/errors.ts";
 import { AdapterError, type Failure, programPath } from "#adapter/index.ts";
 import { gitEnv } from "./env.ts";
 import { ID } from "./errors.ts";
@@ -89,7 +91,7 @@ export async function git(args: readonly string[], options: GitOptions): Promise
     if (options.signal?.aborted === true) throw error;
     if (error instanceof GitError) throw error;
     const stderr = (error as { stderr?: string }).stderr ?? "";
-    throw notInstalled(error) ?? new GitError("unavailable", (error as Error).message, stderr);
+    throw notInstalled(error) ?? new GitError("unavailable", messageOf(error), stderr);
   }
   if (ran.timedOut) {
     throw new GitError(
@@ -126,7 +128,7 @@ function spawnOne(args: readonly string[], options: GitOptions, timeout: number)
       reject(
         new GitError(
           "invalid",
-          (error as Error).message,
+          messageOf(error),
           "",
           "Set PATH to the absolute folders that hold git, then run the command again.",
         ),
@@ -199,9 +201,8 @@ interface Ran {
 
 /** At most this many git network calls at once, keeping dozens of registries under host limits. */
 const NETWORK_AT_ONCE = 6;
+const inNetworkSlot = limiter(NETWORK_AT_ONCE);
 const NETWORK = new Set(["clone", "fetch", "ls-remote"]);
-let networking = 0;
-const queued: (() => void)[] = [];
 
 function aborted(signal: AbortSignal): Error {
   return Object.assign(new Error("The operation was aborted"), {
@@ -209,20 +210,6 @@ function aborted(signal: AbortSignal): Error {
     code: "ABORT_ERR",
     cause: signal.reason,
   });
-}
-
-/** Runs `task` once a network slot is free; local git work is never held back. */
-async function inNetworkSlot<T>(task: () => Promise<T>): Promise<T> {
-  if (networking >= NETWORK_AT_ONCE) await new Promise<void>((admit) => queued.push(admit));
-  else networking += 1;
-  try {
-    return await task();
-  } finally {
-    // Handed over, not released and retaken, which would let another in.
-    const next = queued.shift();
-    if (next === undefined) networking -= 1;
-    else next();
-  }
 }
 
 function notInstalled(error: unknown): GitError | undefined {
@@ -256,25 +243,6 @@ function firstFatal(stderr: string): string {
     .filter(Boolean);
   const fatal = lines.find((line) => line.startsWith("fatal:") || line.startsWith("error:"));
   return (fatal ?? lines[0] ?? "git failed").replace(/^(fatal|error):\s*/, "");
-}
-
-export interface GitAttempt {
-  code: number;
-  stdout: string;
-  stderr: string;
-}
-
-/** Run git when a non-zero exit is data rather than an exception. */
-export async function gitTry(args: readonly string[], options: GitOptions): Promise<GitAttempt> {
-  let ran: Ran;
-  try {
-    ran = await spawnTool(args, options, options.timeoutMs);
-  } catch (error) {
-    if (options.signal?.aborted === true) throw error;
-    throw notInstalled(error) ?? error;
-  }
-  if (ran.timedOut) throw new GitError("unavailable", "git timed out.", ran.stderr);
-  return { code: ran.code ?? 1, stdout: ran.stdout, stderr: ran.stderr };
 }
 
 export async function gitVersion(): Promise<string | undefined> {

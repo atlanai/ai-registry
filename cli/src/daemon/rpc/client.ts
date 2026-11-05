@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { createConnection, type Socket } from "node:net";
+import { isRecord } from "#adapter/fields.ts";
 import { plural } from "#adapter/text.ts";
 import type { RegistryConfig } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { isRecord } from "#core/fields.ts";
 import { NAME } from "#core/product.ts";
-import { isTerminal, type RunEvent } from "#core/run/model.ts";
+import { isTerminal, type RunEvent, RunEventType } from "#core/run/model.ts";
 import { RpcErrorCode } from "./codes.ts";
 import { assertOwnSocket, daemonChallenge, provesDaemon } from "./endpoint.ts";
 import { FrameDecoder } from "./frames.ts";
@@ -325,7 +325,7 @@ export async function followRun(
     if (event.id <= shown) return;
     shown = event.id;
     onEvent(event);
-    if (event.eventType === "run.finished") {
+    if (event.eventType === RunEventType.Finished) {
       finishedSeen = true;
       resolveFinished();
     }

@@ -4,7 +4,7 @@ import { stringify } from "yaml";
 import { list as listed, plural, quoted } from "#adapter/text.ts";
 import { foundBy } from "#cli/commands/targets/render.ts";
 import { TARGETS_COMMAND } from "#cli/commands/targets/spec.ts";
-import { parse } from "#cli/options/parse.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import { underHome } from "#cli/render/home.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { targetsDir } from "#core/store/paths.ts";
@@ -188,10 +188,7 @@ async function show(context: CommandContext, id: string): Promise<void> {
 
 function needed(argument: string | undefined, action: string, what: string, hint: string): string {
   if (argument !== undefined) return argument;
-  throw new AiregError(`\`aireg targets ${action}\` needs ${what}.`, {
-    code: ErrorCode.Usage,
-    hint,
-  });
+  throw needsInput(`targets ${action}`, what, hint);
 }
 
 /** A file checked as aireg would read it from your user scope, wherever it is now. */

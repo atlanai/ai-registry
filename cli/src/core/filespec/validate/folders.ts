@@ -1,4 +1,5 @@
 import { join, posix } from "node:path";
+import { isRecord } from "#adapter/fields.ts";
 import { hashRegular } from "#adapter/files.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
@@ -8,7 +9,6 @@ import { contentDigest, type Envelope } from "#adapter/index.ts";
 import { collidingPaths, isSafePath } from "#adapter/paths.ts";
 import { compareVersion, parseVersion } from "#adapter/semver.ts";
 import { list, quoted } from "#adapter/text.ts";
-import { isRecord } from "#core/fields.ts";
 import { listed, type versionFolders } from "#core/filespec/indexer.ts";
 import {
   fileProblems,

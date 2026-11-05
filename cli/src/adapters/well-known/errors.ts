@@ -1,11 +1,11 @@
-import { AdapterError } from "#adapter/index.ts";
+import { AdapterError, type Failure } from "#adapter/index.ts";
 
 export const ID = "well-known";
 
 export function fail(
-  failure: "invalid" | "not_found" | "unavailable",
+  failure: Extract<Failure, "invalid" | "not_found" | "unavailable">,
   message: string,
-  hint?: string,
+  options: { artifact?: string | undefined; hint?: string | undefined } = {},
 ): AdapterError {
-  return new AdapterError(ID, failure, message, { hint });
+  return new AdapterError(ID, failure, message, options);
 }

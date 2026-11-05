@@ -1,4 +1,4 @@
-import type { Fields } from "#core/fields.ts";
+import type { Fields } from "#adapter/fields.ts";
 import { serializeError } from "./error.ts";
 import {
   LEVEL_WEIGHT,

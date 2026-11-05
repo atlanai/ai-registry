@@ -1,5 +1,5 @@
 import { createPublicKey, type KeyObject, verify } from "node:crypto";
-import { isRecord } from "#core/fields.ts";
+import { isRecord } from "#adapter/fields.ts";
 
 export const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const PUBLIC_KEY_BYTES = 32;

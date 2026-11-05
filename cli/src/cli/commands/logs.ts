@@ -1,3 +1,4 @@
+import { messageOf } from "#adapter/errors.ts";
 import { list, quoted, sanitizeText } from "#adapter/text.ts";
 import { LOGS_COMMAND } from "#cli/commands/logs/spec.ts";
 import { noArguments, parse } from "#cli/options/parse.ts";
@@ -130,7 +131,7 @@ function filterOf(own: Own): Filter {
     if (own.since !== undefined) filter.sinceMs = parseSince(own.since);
     if (own.until !== undefined) filter.untilMs = parseSince(own.until);
   } catch (error) {
-    throw new AiregError(error instanceof Error ? error.message : String(error), {
+    throw new AiregError(messageOf(error), {
       code: ErrorCode.Usage,
       hint: "Use a duration such as 15m, or a date.",
     });

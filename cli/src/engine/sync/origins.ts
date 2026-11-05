@@ -1,9 +1,9 @@
 import { readdir } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
+import { CONCURRENCY, limiter } from "#adapter/concurrency.ts";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { sanitizeName } from "#adapter/text.ts";
-import { CONCURRENCY, limiter } from "#core/concurrency.ts";
 import type { Selector, Step } from "#core/config/model.ts";
 import { authoredDigest } from "#core/fs/digest.ts";
 import { posixRelative } from "#core/fs/path.ts";

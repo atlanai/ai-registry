@@ -1,3 +1,5 @@
+import { messageOf } from "#adapter/errors.ts";
+import { isRecord } from "#adapter/fields.ts";
 import {
   type Artifact,
   buildEnvelope,
@@ -10,6 +12,7 @@ import {
   sha256,
   type Want,
 } from "#adapter/index.ts";
+import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { readFrontmatter, textField } from "#adapter/layouts/frontmatter.ts";
 import { unpack } from "./archive.ts";
 import { fail } from "./errors.ts";
@@ -29,9 +32,6 @@ const MAX_INDEX = 4 * 1024 * 1024;
 const MAX_SKILL = 4 * 1024 * 1024;
 const MAX_ARCHIVE = 50 * 1024 * 1024;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 export async function connect(context: SourceContext): Promise<SourceHandle> {
   const { location, registry } = context.source;
   let site: URL;
@@ -50,7 +50,7 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
         throw fail(
           "invalid",
           `${registry} is a site's skills index, which has no versions, so ${pinned.name}@${pinned.version} cannot be installed.`,
-          "Leave off the `@<version>`: aireg installs what the site serves now.",
+          { hint: "Leave off the `@<version>`: aireg installs what the site serves now." },
         );
       }
       const warnings: string[] = [];
@@ -119,7 +119,7 @@ async function readIndex(
     `${location} has no Agent Skills index at ${indexUrls(location)
       .map((url) => url.href)
       .join(" or ")}.`,
-    `If it is a git repository, add it with \`--adapter git\`.`,
+    { hint: `If it is a git repository, add it with \`--adapter git\`.` },
   );
 }
 
@@ -155,7 +155,7 @@ async function get(
     response = await fetch(url, { signal, credentials: "omit", redirect: "follow" });
   } catch (error) {
     if (context.signal.aborted) throw error;
-    throw fail("unavailable", `Could not read ${url.href}: ${(error as Error).message}.`);
+    throw fail("unavailable", `Could not read ${url.href}: ${messageOf(error)}.`);
   }
   const landed = new URL(response.url || url.href);
   if (!isSecure(landed)) {
@@ -245,18 +245,18 @@ async function filesOf(context: SourceContext, entry: Entry): Promise<Files> {
   }
   const files: Files = new Map();
   if (entry.type === "skill-md") {
-    files.set("SKILL.md", { bytes, executable: false });
+    files.set(SKILL_ENTRY, { bytes, executable: false });
     return files;
   }
   for (const file of unpack(entry.name, bytes)) files.set(file.path, file);
-  if (!files.has("SKILL.md")) {
+  if (!files.has(SKILL_ENTRY)) {
     throw fail("invalid", `${entry.name}'s archive has no SKILL.md at its root.`);
   }
   return files;
 }
 
 function artifactOf(entry: Entry, files: Files, namespace: string): Artifact {
-  const front = readFrontmatter(new TextDecoder().decode(files.get("SKILL.md")?.bytes));
+  const front = readFrontmatter(new TextDecoder().decode(files.get(SKILL_ENTRY)?.bytes));
   const description = textField(front, "description") ?? (entry.description || undefined);
   const envelope = buildEnvelope({
     kind: "skill",

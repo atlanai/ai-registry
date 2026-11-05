@@ -1,3 +1,4 @@
+import { isRecord } from "../fields.ts";
 import type { ArtifactKind } from "../kinds.ts";
 import { compareVersion, parseVersion, type Version } from "../semver.ts";
 import { isVersion } from "../spec/ref.ts";
@@ -106,10 +107,6 @@ export function mergedVersions(
 function objectAt(value: unknown, path: string): Record<string, unknown> {
   if (!isRecord(value)) throw new SpecError(`${path} is not a JSON object.`, { path });
   return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function entriesOf(document: Record<string, unknown>, key: string, path: string): unknown[] {

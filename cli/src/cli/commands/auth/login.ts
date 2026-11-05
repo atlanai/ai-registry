@@ -9,6 +9,7 @@ import {
 } from "#adapter/index.ts";
 import { withoutCredentials } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
 import { cancel, interaction, interactive } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
@@ -40,10 +41,11 @@ export async function login(
   yes: boolean,
 ): Promise<void> {
   if (registry === undefined) {
-    throw new AiregError("`aireg auth login` needs a registry name.", {
-      code: ErrorCode.Usage,
-      hint: "Name the registry: `aireg auth login <registry>`, and pass `--address <address>` for one you have not declared.",
-    });
+    throw needsInput(
+      "auth login",
+      "a registry name",
+      "Name the registry: `aireg auth login <registry>`, and pass `--address <address>` for one you have not declared.",
+    );
   }
 
   const found =

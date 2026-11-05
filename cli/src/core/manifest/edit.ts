@@ -9,7 +9,7 @@ import {
   type YAMLMap,
   type YAMLSeq,
 } from "yaml";
-import { isRecord } from "#core/fields.ts";
+import { isRecord } from "#adapter/fields.ts";
 import { FORMAT, formatManifest, inEarlierNames, manifestData } from "./format.ts";
 import { LEGACY_TARGETS_KEY, type Manifest } from "./model.ts";
 

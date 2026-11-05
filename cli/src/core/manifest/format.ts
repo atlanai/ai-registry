@@ -1,5 +1,6 @@
 import { stringify } from "yaml";
-import { isRecord, withoutUndefined } from "#core/fields.ts";
+import { isRecord } from "#adapter/fields.ts";
+import { withoutUndefined } from "#core/fields.ts";
 import { NAME } from "#core/product.ts";
 import { formatAddress, formatRef } from "#core/ref.ts";
 import { earlierId } from "#core/target/ids.ts";

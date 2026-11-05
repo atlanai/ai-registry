@@ -1,5 +1,10 @@
 import { BUILTIN_TARGETS } from "#targets/index.ts";
-import type { EarlierTarget, TargetCategory, Targets } from "./contract.ts";
+import {
+  type EarlierTarget,
+  TARGET_CATEGORIES,
+  type TargetCategory,
+  type Targets,
+} from "./contract.ts";
 
 /** The tools a manifest installs into when it names none, in the order they are listed. */
 export const DEFAULT_TARGETS: readonly string[] = BUILTIN_TARGETS.filter(
@@ -25,11 +30,16 @@ export function earlierId(targetTable: Targets, id: string): string {
   return at === -1 ? was : `${was}${id.slice(at)}`;
 }
 
+/** aireg 0.1's name for each category, still read as `kind`. */
 const EARLIER_KINDS = {
   "coding-agent": "coding",
   "personal-agent": "personal",
   "shared-folder": "shared",
 } as const satisfies Record<TargetCategory, EarlierTarget["kind"]>;
+
+export function categoryOfEarlier(kind: string): TargetCategory | undefined {
+  return TARGET_CATEGORIES.find((category) => EARLIER_KINDS[category] === kind);
+}
 
 /** A record keyed by target id, keyed instead by `earlierId`. */
 export function byEarlierIds<T>(targetTable: Targets, byId: Record<string, T>): Record<string, T> {

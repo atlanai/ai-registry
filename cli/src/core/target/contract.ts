@@ -174,7 +174,8 @@ interface Trust {
 }
 
 /** What a target is; a `shared-folder` is several tools' folder, never detected nor a default. */
-export type TargetCategory = "coding-agent" | "personal-agent" | "shared-folder";
+export const TARGET_CATEGORIES = ["coding-agent", "personal-agent", "shared-folder"] as const;
+export type TargetCategory = (typeof TARGET_CATEGORIES)[number];
 
 /** One target aireg installs into, as its module under `src/targets` defines it. */
 export interface TargetDefinition {

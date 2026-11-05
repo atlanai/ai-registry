@@ -22,6 +22,7 @@ import { NAME } from "#core/product.ts";
 import { type ReleaseStamp, releaseStamp } from "#core/release/stamp.ts";
 import { cacheDir, credentialsPath, toolHome, userScopeDir } from "#core/store/paths.ts";
 import { displayWidth, pad } from "#core/term/format.ts";
+import { GLYPH } from "#core/term/theme.ts";
 import { nodeTooOld, VERSION } from "#core/version.ts";
 import { autostartState } from "#daemon/autostart/index.ts";
 import { readUpdateCache, type UpdateCache } from "#self/update-cache.ts";
@@ -286,12 +287,12 @@ function render(context: CommandContext, checks: readonly Check[]): void {
   const width = Math.max(...rows.map((check) => displayWidth(check.name)));
   for (const check of rows) {
     const mark = !check.ok
-      ? style.red("✗")
+      ? style.red(GLYPH.failed)
       : check.fix !== undefined
         ? style.yellow("!")
         : check.info === true
           ? style.dim("i")
-          : style.green("✓");
+          : style.green(GLYPH.ok);
     const label = pad(check.name, width);
     context.printer.info(
       `  ${mark}  ${label}  ${check.ok ? style.dim(check.detail) : check.detail}`,
@@ -306,5 +307,6 @@ function render(context: CommandContext, checks: readonly Check[]): void {
   const suggested = rows.filter((check) => check.ok && check.fix !== undefined).length;
   const more = suggested === 0 ? "" : ` ${plural(suggested, "suggestion")} above.`;
   if (failed === 0) context.printer.success(`This machine is ready.${more}`);
-  else context.printer.info(`${style.red("✗")} ${plural(failed, "problem")} to fix.${more}`);
+  else
+    context.printer.info(`${style.red(GLYPH.failed)} ${plural(failed, "problem")} to fix.${more}`);
 }

@@ -1,4 +1,5 @@
 import type { RegistryIdentity } from "../contract.ts";
+import { type Fields, isRecord, textOf } from "../fields.ts";
 import { type ArtifactKind, isKind } from "../kinds.ts";
 import { compareVersion, parseVersion, type Version } from "../semver.ts";
 import { isVersion } from "../spec/ref.ts";
@@ -41,8 +42,6 @@ export class SpecError extends Error {
     this.artifact = options.artifact;
   }
 }
-
-type Fields = Record<string, unknown>;
 
 /** The JSON document at `path`, or undefined when there is none. */
 export async function readJson(read: ReadPath, path: string): Promise<unknown | undefined> {
@@ -105,10 +104,6 @@ export interface VersionsDocument {
 
 export const DEFAULT_BLOB_URL = "blobs/sha256/{digest}";
 
-function isRecord(value: unknown): value is Fields {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 export function identityOf(registry: RegistryDocument): RegistryIdentity {
   return {
     name: registry.name,
@@ -167,10 +162,6 @@ export async function readRegistry(read: ReadPath): Promise<RegistryDocument> {
     blobUrl: textOf(entry.blob_url) ?? DEFAULT_BLOB_URL,
     kinds,
   };
-}
-
-function textOf(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
 function text(entry: Fields, key: string, path: string): string {

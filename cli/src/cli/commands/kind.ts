@@ -2,8 +2,7 @@ import { list } from "#adapter/text.ts";
 import { version } from "#cli/commands/kind/bump.ts";
 import { init } from "#cli/commands/kind/new.ts";
 import { newFrom } from "#cli/commands/kind/new-from.ts";
-import { parse } from "#cli/options/parse.ts";
-import { AiregError, ErrorCode } from "#core/errors.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import type { KindManifest } from "#core/filespec/kind-manifests.ts";
 import { type CommandContext, type CommandSpec, runAction } from "./command.ts";
 
@@ -26,10 +25,7 @@ export async function runKind(
   const [action, argument, extra] = positionals;
   if (action === undefined) {
     const actions = (spec.actions ?? []).map((a) => a.name);
-    throw new AiregError(`\`aireg ${kind}\` needs an action.`, {
-      code: ErrorCode.Usage,
-      hint: `Use ${list(actions, "or")}.`,
-    });
+    throw needsInput(kind, "an action", `Use ${list(actions, "or")}.`);
   }
   // A shell glob after --from lands as more positionals, so `new` takes them as more paths.
   return runAction(spec, action, {

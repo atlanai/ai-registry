@@ -3,10 +3,11 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, vi } from "vitest";
 import { sha256Hex } from "#core/fs/hash.ts";
+import { releaseBinary } from "#core/product.ts";
 import { decodeTrustedKeys } from "#core/release/keyring.ts";
 import { versionBin } from "#core/release/layout.ts";
 import { canonicalPayload, type ReleaseManifest } from "#core/release/manifest.ts";
-import { binaryName, releasePlatform } from "#core/release/platform.ts";
+import { releasePlatform } from "#core/release/platform.ts";
 import type { ReleaseStamp } from "#core/release/stamp.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { installedVersion } from "./install.ts";
@@ -28,7 +29,7 @@ const ORIGIN = "https://releases.example.com/aireg";
 const MANIFEST = `${ORIGIN}/channels/stable/manifest.json`;
 const PLATFORM = releasePlatform();
 if (PLATFORM === undefined) throw new Error(`no release platform for ${process.platform}`);
-const BINARY = binaryName(PLATFORM);
+const BINARY = releaseBinary(PLATFORM);
 
 beforeEach(() => {
   stub.stamp = undefined;

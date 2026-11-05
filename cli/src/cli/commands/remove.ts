@@ -1,6 +1,6 @@
 import { list, sanitizeName } from "#adapter/text.ts";
 import { REMOVE_COMMAND } from "#cli/commands/remove/spec.ts";
-import { parse } from "#cli/options/parse.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
 import { chooseRemovals } from "#cli/prompt/choose.ts";
 import { confirmPlan } from "#cli/prompt/confirm-plan.ts";
@@ -165,10 +165,11 @@ async function pickRemovals(
   if (!interactive(step)) {
     // Name the reason: on a terminal this command would have offered a list,
     // and "nothing to remove" alone reads as though nothing is installed.
-    throw new AiregError("`aireg remove` needs an artifact name.", {
-      code: ErrorCode.Usage,
-      hint: `Name one: \`aireg remove <name>\`, or pass \`--all\`. No list was offered because ${silence(step)}.`,
-    });
+    throw needsInput(
+      "remove",
+      "an artifact name",
+      `Name one: \`aireg remove <name>\`, or pass \`--all\`. No list was offered because ${silence(step)}.`,
+    );
   }
   const picked = await chooseRemovals(
     step,

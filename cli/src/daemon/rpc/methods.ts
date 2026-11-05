@@ -193,4 +193,16 @@ export interface DaemonNotifications {
 }
 
 export type DaemonMethod = keyof DaemonMethods;
+
+export interface RpcContext {
+  signal: AbortSignal;
+}
+
+/** Its params arrive unchecked, and it must answer with its declared result. */
+type DaemonHandler<M extends DaemonMethod> = (
+  params: unknown,
+  context: RpcContext,
+) => Promise<DaemonMethods[M]["result"]>;
+
+export type DaemonHandlers = { [M in DaemonMethod]: DaemonHandler<M> };
 export type DaemonNotification = keyof DaemonNotifications;

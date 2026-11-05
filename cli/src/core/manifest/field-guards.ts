@@ -1,5 +1,6 @@
+import type { Fields } from "#adapter/fields.ts";
 import { quoted } from "#adapter/text.ts";
-import { type Fields, namesOf, unknownKeysProblem } from "#core/fields.ts";
+import { namesOf, unknownKeysProblem } from "#core/fields.ts";
 import { ManifestError } from "./errors.ts";
 
 export function optionalString(root: Record<string, unknown>, key: string): string | undefined {

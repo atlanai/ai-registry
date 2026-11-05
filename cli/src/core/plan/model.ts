@@ -163,25 +163,6 @@ export interface Kept {
   absent: boolean;
 }
 
-export function emptyPlan(): Plan {
-  return {
-    actions: [],
-    unchanged: [],
-    warnings: [],
-    incompatible: [],
-    rewritten: [],
-    clashes: [],
-    renamed: [],
-    neededBy: {},
-    pruned: [],
-    unresolved: [],
-    conflicts: [],
-    withheld: [],
-    unlisted: [],
-    untrusted: [],
-  };
-}
-
 /** One artifact inside a plugin, as the plugin's own directory holds it. */
 export interface Contained {
   name: string;

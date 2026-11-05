@@ -30,12 +30,9 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
     existsSync(join(root, "HEAD")) &&
     existsSync(join(root, "objects"))
   ) {
-    throw fail(
-      "invalid",
-      `${root} is a bare git repository.`,
-      undefined,
-      `Add it by its URL instead: ${pathToFileURL(root).href}`,
-    );
+    throw fail("invalid", `${root} is a bare git repository.`, {
+      hint: `Add it by its URL instead: ${pathToFileURL(root).href}`,
+    });
   }
 
   await translating(() => registryPath(root, "", true));
@@ -74,8 +71,9 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
           throw fail(
             "invalid",
             `${registry} is a folder of skills, not a registry, so aireg reads it but does not publish to it.`,
-            undefined,
-            "Publish to a registry of your own: create one with `aireg registry init <folder>`.",
+            {
+              hint: "Publish to a registry of your own: create one with `aireg registry init <folder>`.",
+            },
           );
         }
         const written = await writeOffer(
@@ -110,7 +108,9 @@ function refuseVersions(registry: string, want: readonly Want[]): void {
   throw fail(
     "invalid",
     `${registry} is a folder of skills, which has no versions, so ${pinned.name}@${pinned.version} cannot be installed.`,
-    pinned.name,
-    "Leave off the `@<version>`: aireg installs what the folder holds now.",
+    {
+      artifact: pinned.name,
+      hint: "Leave off the `@<version>`: aireg installs what the folder holds now.",
+    },
   );
 }

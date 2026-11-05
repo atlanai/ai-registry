@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { FAILURES } from "#adapter/errors.ts";
-import { RunErrorCode, type RunEvent } from "#core/run/model.ts";
+import { RunErrorCode, type RunEvent, RunEventType } from "#core/run/model.ts";
 import { Printer } from "#core/term/printer.ts";
 import { eventLine, failureWords } from "./run.ts";
 
@@ -28,14 +28,16 @@ function event(eventType: string, fields: Partial<RunEvent> = {}): RunEvent {
 
 describe("eventLine", () => {
   test("names each phase in words", () => {
-    expect(eventLine(printer, event("run.phase", { step: "listing" }))).toBe(
+    expect(eventLine(printer, event(RunEventType.Phase, { step: "listing" }))).toBe(
       "  reading the registry",
     );
-    expect(eventLine(printer, event("run.phase", { step: "classifying" }))).toBe("  comparing");
+    expect(eventLine(printer, event(RunEventType.Phase, { step: "classifying" }))).toBe(
+      "  comparing",
+    );
   });
 
   test("leaves progress out, since each artifact's own line says what happened", () => {
-    expect(eventLine(printer, event("artifact.progress", { artifact: "lint" }))).toBeUndefined();
+    expect(eventLine(printer, event(RunEventType.Progress, { artifact: "lint" }))).toBeUndefined();
   });
 
   test("says what happened to an artifact, and why it needs you", () => {
@@ -56,11 +58,14 @@ describe("eventLine", () => {
   });
 
   test("ends with the state the run finished in, and why it failed in words", () => {
-    const failed = event("run.finished", { errorCode: "sync_failed", data: { state: "failed" } });
+    const failed = event(RunEventType.Finished, {
+      errorCode: "sync_failed",
+      data: { state: "failed" },
+    });
     expect(eventLine(printer, failed)).toBe("  finished   failed  stopped by an error");
     const reason = 'manifest.yml: Artifact "pr-review" names registry "pr-review".';
     expect(eventLine(printer, failed, reason)).toBe(`  finished   failed  ${reason}`);
-    const refused = event("run.finished", {
+    const refused = event(RunEventType.Finished, {
       errorCode: "adapter_unauthorized",
       data: { state: "failed" },
     });

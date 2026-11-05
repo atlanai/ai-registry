@@ -4,6 +4,7 @@ import type { SyncOperation } from "#core/sync/policy.ts";
 import type {
   ItemOutcome,
   RunEvent,
+  RunEventType,
   RunMode,
   RunRecord,
   RunState,
@@ -24,7 +25,7 @@ export interface CreateRun {
 
 export interface AppendRunEvent {
   occurredAtMs: number;
-  eventType: string;
+  eventType: RunEventType;
   step?: string;
   artifact?: string;
   kind?: ArtifactKind;

@@ -3,6 +3,7 @@ import { isAdapterError } from "#adapter/index.ts";
 import { plural, withoutCredentials } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { type Move, moveOf, recordMove, signInLeftBehind } from "#cli/commands/registry/move.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { noteUserScope } from "#cli/render/where.ts";
 import { loadAdapter } from "#core/adapter/load.ts";
 import { expandLocation, recordedLocation } from "#core/adapter/location.ts";
@@ -24,10 +25,11 @@ export async function add(
   common: CommonOptions,
 ): Promise<void> {
   if (input === undefined) {
-    throw new AiregError("`aireg registry add` needs a registry address.", {
-      code: ErrorCode.Usage,
-      hint: "Name the address: `aireg registry add <address>`, such as github.com/owner/repo, a URL or a folder.",
-    });
+    throw needsInput(
+      "registry add",
+      "a registry address",
+      "Name the address: `aireg registry add <address>`, such as github.com/owner/repo, a URL or a folder.",
+    );
   }
 
   const loaded = await load(common, context.cwd, "user");
@@ -90,7 +92,7 @@ export async function add(
     context.printer.info(
       `Would add registry ${alias} at ${withoutCredentials(declared.location)}.`,
     );
-    context.printer.info(context.printer.style.dim("Dry run. Nothing was changed."));
+    context.printer.dryRun();
     return;
   }
   context.printer.success(`Added registry ${alias} at ${withoutCredentials(declared.location)}.`);
@@ -151,7 +153,7 @@ async function moved(
   const kept = plural(move.kept, "installed artifact");
   if (dryRun) {
     context.printer.info(`Would move ${what}, keeping ${kept}.`);
-    context.printer.info(context.printer.style.dim("Dry run. Nothing was changed."));
+    context.printer.dryRun();
     return;
   }
   context.printer.success(`Moved ${what}.`);

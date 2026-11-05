@@ -1,4 +1,4 @@
-import { isRecord } from "#core/fields.ts";
+import { isRecord } from "#adapter/fields.ts";
 import { RpcErrorCode } from "./codes.ts";
 
 export type RpcId = string | number;

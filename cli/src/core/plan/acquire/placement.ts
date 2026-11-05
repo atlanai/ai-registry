@@ -1,8 +1,8 @@
+import { isRecord } from "#adapter/fields.ts";
 import { isArtifactName } from "#adapter/filespec/names.ts";
 import type { Artifact } from "#adapter/index.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { sanitizeName, sanitizeText } from "#adapter/text.ts";
-import { isRecord } from "#core/fields.ts";
 import type { Lock } from "#core/lock.ts";
 import { carriedIn } from "#core/plan/carries.ts";
 import type { Acquired, Placement } from "#core/plan/model.ts";

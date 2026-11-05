@@ -5,7 +5,7 @@ import { watchedFolders } from "#core/config/jobs.ts";
 import type { Job, RegistryConfig } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { readManifest } from "#core/manifest/repository.ts";
-import { roots, scopeFor } from "#core/store/paths.ts";
+import { roots, scopeFlag, scopeFor } from "#core/store/paths.ts";
 import { withDaemon } from "#daemon/process/lifecycle.ts";
 import { withFreshConfig } from "#daemon/rpc/client.ts";
 
@@ -48,7 +48,7 @@ async function warnUnkept(context: CommandContext, job: Job, after: RegistryConf
   context.printer.warning(
     `Artifacts from ${registry} in ${scopeLabel(root, context.cwd)} are no longer kept up to date in the background.`,
   );
-  const again = `aireg job add${scope === "user" ? " -g" : ""} --registry ${registry}`;
+  const again = `aireg job add${scopeFlag(scope)} --registry ${registry}`;
   context.printer.hint(
     elsewhere
       ? `To keep them up to date, run \`${again}\` in ${underHome(root)}.`

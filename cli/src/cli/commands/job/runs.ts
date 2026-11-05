@@ -1,5 +1,6 @@
 import { list, plural, quoted } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { underHome } from "#cli/render/home.ts";
 import { eventLine, failureWords } from "#cli/render/run.ts";
 import { findJob } from "#core/config/jobs.ts";
@@ -11,6 +12,7 @@ import {
   isTerminal,
   RUN_STATES,
   type RunEvent,
+  RunEventType,
   type RunRecord,
   type RunState,
 } from "#core/run/model.ts";
@@ -90,7 +92,7 @@ async function detail(
   if (follow) {
     let end: RunEvent | undefined;
     await followRun(client, runId, (event) => {
-      if (event.eventType === "run.finished") end = event;
+      if (event.eventType === RunEventType.Finished) end = event;
       else printEvent(context, event);
     });
     if (end !== undefined) await printEnd(context, end);
@@ -101,7 +103,7 @@ async function detail(
   const events: RunEvent[] = [];
   for await (const event of runEvents(client, runId)) {
     if (context.printer.format === "json") events.push(event);
-    else if (event.eventType === "run.finished") await printEnd(context, event);
+    else if (event.eventType === RunEventType.Finished) await printEnd(context, event);
     else printEvent(context, event);
   }
   if (context.printer.format === "json") context.printer.json({ ok: true, data: { run, events } });
@@ -228,10 +230,7 @@ export async function retry(context: CommandContext, runId: string | undefined):
 /** Checked before connecting, so a missing or mistyped run never starts the daemon. */
 function needsRun(action: string, runId: string | undefined): string {
   if (runId === undefined) {
-    throw new AiregError(`\`aireg job ${action}\` needs a run id.`, {
-      code: ErrorCode.Usage,
-      hint: `Name the run: \`aireg job ${action} <run>\`.`,
-    });
+    throw needsInput(`job ${action}`, "a run id", `Name the run: \`aireg job ${action} <run>\`.`);
   }
   checkRunId(runId);
   return runId;

@@ -5,13 +5,13 @@ import { loadAdapter } from "#core/adapter/load.ts";
 import { readOnlyLayout } from "#core/adapter/read-only.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import {
-  ITEM_EVENT,
   isFailed,
   isInterrupted,
   RunErrorCode,
+  RunEventType,
   type RunRecord,
-  WARNING_EVENT,
 } from "#core/run/model.ts";
+import { scopeFlag } from "#core/store/paths.ts";
 import { followRun, type RpcClient } from "#daemon/rpc/client.ts";
 import { publishInstead } from "#engine/publish/target.ts";
 import type { load } from "#engine/scope/load.ts";
@@ -30,7 +30,7 @@ export async function conflictHint(
   const id = loaded.lock.registries[registry]?.adapter;
   const adapter = id === undefined ? undefined : await loadAdapter(id).catch(() => undefined);
   // Run as printed from anywhere: without `-g` a user scope's conflict is not found.
-  const resolve = `aireg sync resolve ${first}${loaded.roots.scope === "user" ? " -g" : ""}`;
+  const resolve = `aireg sync resolve ${first}${scopeFlag(loaded.roots.scope)}`;
   const theirs = `take the registry's copy with \`${resolve} --theirs\``;
   const ownRegistry = `Take the registry's copy with \`${resolve} --theirs\`, or keep yours by publishing it to a registry of your own, made with \`aireg registry init <folder>\`.`;
   const config = loaded.manifest.registries[registry]?.config ?? {};
@@ -103,7 +103,7 @@ export async function follow(
   const warnings: string[] = [];
 
   await followRun(client, runId, (event) => {
-    if (event.eventType === WARNING_EVENT) {
+    if (event.eventType === RunEventType.Warning) {
       const { message, hint } = (event.data ?? {}) as { message?: unknown; hint?: unknown };
       if (typeof message !== "string") return;
       warnings.push(message);
@@ -111,7 +111,7 @@ export async function follow(
       if (typeof hint === "string") context.printer.hint(hint);
       return;
     }
-    if (event.artifact === undefined || event.eventType !== ITEM_EVENT) return;
+    if (event.artifact === undefined || event.eventType !== RunEventType.ItemSettled) return;
     if (event.outcome === "unchanged" || event.outcome === "skipped") return;
     context.printer.info(itemLine(context.printer, event));
     artifacts.push({
