@@ -104,12 +104,16 @@ async function isManifest(path: string, entry: string): Promise<boolean> {
   return info !== undefined && (!info.isDirectory() || entry.startsWith("."));
 }
 
-/** Whether a copied manifest file holds the source's bytes; a manifest folder is recopied. */
+/**
+ * Whether a copied manifest file holds the source's bytes; a manifest folder is recopied.
+ * Read, then check: a folder fails to read, and a link where the copy belongs is not a copy.
+ */
 async function sameFile(source: string, copy: string): Promise<boolean> {
-  const info = await ifPresent(lstat(copy));
-  if (info === undefined || !info.isFile() || !(await stat(source)).isFile()) return false;
-  const [left, right] = await Promise.all([readFile(source), readFile(copy)]);
-  return left.equals(right);
+  const [left, right] = await Promise.all(
+    [readFile(source), readFile(copy)].map((read) => read.catch(() => undefined)),
+  );
+  if (left === undefined || right === undefined || !left.equals(right)) return false;
+  return (await ifPresent(lstat(copy)))?.isFile() === true;
 }
 
 /** Compared resolved, since a Windows junction names its target in full. */
