@@ -5,9 +5,8 @@ import { registerBuiltinAdapters } from "#adapters/index.ts";
 import type { TrustedKeys } from "#core/release/keyring.ts";
 import type { ReleaseStamp } from "#core/release/stamp.ts";
 import { resolveTargets } from "#core/target/table.ts";
-import { Printer } from "#core/term/printer.ts";
+import { commandContext } from "#test/kit/command.ts";
 import { test } from "#test/kit/fixtures.ts";
-import type { CommandContext } from "./command.ts";
 import { run } from "./doctor.ts";
 
 // The stamp is build-time only, so a test substitutes one rather than reading env.
@@ -32,24 +31,8 @@ async function checks(cwd: string): Promise<Map<string, { ok: boolean; detail: s
   return new Map(payload.data.checks.map((check) => [check.name, check]));
 }
 
-function context(cwd: string, writes: string[]): CommandContext {
-  return {
-    argv: [],
-    cwd,
-    printer: new Printer({
-      format: "json",
-      out: { write: (chunk: string) => writes.push(chunk), isTTY: false },
-    }),
-    host: {
-      version: "test",
-      connectAccount: async () => {
-        throw new Error("no host");
-      },
-      openRunStore: async () => {
-        throw new Error("no host");
-      },
-    },
-  };
+function context(cwd: string, printed: string[]) {
+  return commandContext([], { cwd, printed });
 }
 
 describe("doctor", () => {

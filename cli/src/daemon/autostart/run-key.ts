@@ -4,10 +4,7 @@ import type { AutostartBackend, Exec, ServiceSpec } from "./model.ts";
 
 const RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
-/**
- * A login hook, not a supervisor: `daemon start` runs once at sign-in and a
- * crash waits for the next command that needs the daemon.
- */
+/** Not a supervisor: a crash waits for the next command that needs the daemon. */
 export function runKeyBackend(spec: ServiceSpec, exec: Exec): AutostartBackend {
   const value = runKeyValue(spec.suffix);
   const location = `${RUN_KEY}\\${value}`;
@@ -62,7 +59,7 @@ export function runKeyBackend(spec: ServiceSpec, exec: Exec): AutostartBackend {
     async starts(program) {
       return (await read())?.startsWith(`"${program}"`) === true;
     },
-    // A Run key value is read at each sign-in, so writing it is all a reload would do.
+    // A Run key is read at each sign-in, so writing it is all a reload would do.
     rewrite: () => backend.install(),
   };
   return backend;
@@ -72,7 +69,6 @@ function runKeyValue(suffix: string): string {
   return suffix === "" ? SERVICE.runKey : `${SERVICE.runKey}-${suffix}`;
 }
 
-/** The data column of `reg query` output: name, type, then the rest of the line. */
 function queried(stdout: string, value: string): string | undefined {
   for (const row of stdout.split(/\r?\n/)) {
     const match = /^\s*(\S+)\s+REG_SZ\s+(.*)$/.exec(row);

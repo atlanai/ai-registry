@@ -38,7 +38,7 @@ export interface AutostartOptions {
 
 const defaultExec: Exec = (file, args) => exec(file, args, { timeoutMs: EXEC_MS });
 
-/** True in a daemon a service manager started, which will start it again after a non-zero exit. */
+/** A service manager restarts this daemon after a non-zero exit. */
 export function supervised(env: NodeJS.ProcessEnv = process.env): boolean {
   const value = env[SUPERVISOR_ENV];
   return value !== undefined && value !== "";
@@ -56,7 +56,7 @@ export function serviceSpec(options: AutostartOptions = {}): ServiceSpec {
   };
 
   const home = toolHome(env);
-  // Compared with the account's real home, so a second HOME gets its own service rather than replacing yours.
+  // A second HOME gets its own service rather than replacing the account's.
   const account = canonical(join(canonical(options.accountHome ?? userInfo().homedir), HOME_DIR));
   const overridden = home !== account;
   const user = userHome(env);
@@ -65,7 +65,7 @@ export function serviceSpec(options: AutostartOptions = {}): ServiceSpec {
   // A service manager starts with a bare PATH, and git sources need `git` on it.
   if (env.PATH !== undefined && env.PATH !== "") service.PATH = env.PATH;
   if (overridden) service[envName("HOME")] = home;
-  // It moves only your user scope, so the service needs it too.
+  // The setting moves only the user scope, so the service needs it too.
   const scope = setting("USER_SCOPE", env);
   if (scope !== undefined) service[envName("USER_SCOPE")] = scope;
 
@@ -81,10 +81,7 @@ export function serviceSpec(options: AutostartOptions = {}): ServiceSpec {
   };
 }
 
-/**
- * `execPath` is resolved, so it can name a versioned directory that an
- * upgrade deletes; the PATH entry linking to it survives.
- */
+/** A resolved `execPath` can name a versioned directory an upgrade deletes; the PATH link survives. */
 function stableNode(execPath: string, path: string | undefined): string {
   const target = real(execPath);
   if (target === undefined || path === undefined) return execPath;
@@ -107,8 +104,8 @@ function real(path: string): string | undefined {
 export const NO_EXECUTABLE = "aireg cannot find its own executable, so it cannot start the daemon.";
 
 /**
- * Pruning deletes versioned directories, so the service names a path every update relinks: the
- * signed binary under `current`, trusted over a shell script, else the shim or the Windows copy.
+ * Pruning deletes versioned directories, so name a path every update relinks: the signed
+ * binary under `current` (trusted over a script), else the shim or the Windows copy.
  */
 function stableEntry(entry: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
   if (!isWithin(cliRoot(env), entry)) return entry;
@@ -123,7 +120,6 @@ export async function autostartState(
   return backendFor(options)?.state();
 }
 
-/** Undefined where this CLI knows no per-user login mechanism. */
 function backendFor(options: AutostartOptions): AutostartBackend | undefined {
   const platform = options.platform ?? process.platform;
   const exec = options.exec ?? defaultExec;
@@ -138,10 +134,7 @@ export interface AutostartChange {
   state: AutostartState;
 }
 
-/**
- * Idempotent. `stopDaemon` hands a daemon started by hand over to the service
- * manager: left running it would hold the socket and the managed one would exit.
- */
+/** Stops a hand-started daemon, which would otherwise hold the socket so the managed one exits. */
 export async function enableAutostart(
   stopDaemon: () => Promise<void>,
   options: AutostartOptions = {},
@@ -183,7 +176,7 @@ export async function disableAutostart(
   return { changed, state: await backend.state() };
 }
 
-/** False, never an error, so a broken service definition falls back to a plain spawn. */
+/** Never throws, so a broken service definition falls back to a plain spawn. */
 export async function startManaged(options: AutostartOptions = {}): Promise<boolean> {
   try {
     return (await backendFor(options)?.start()) ?? false;

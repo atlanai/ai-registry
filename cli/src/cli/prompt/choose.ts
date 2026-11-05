@@ -17,10 +17,7 @@ import { type Canceled, canceled } from "./model.ts";
 import { type Choice, multiselect } from "./multiselect.ts";
 import { select } from "./select.ts";
 
-/**
- * Groups by plugin where the source publishes plugins, and by namespace where
- * it does not; a whole group is one selection, so it keeps what it adds later.
- */
+/** By plugin, else namespace; a whole group is one selection, so it keeps what is added later. */
 export async function chooseArtifacts(
   step: Interaction,
   entries: readonly Entry[],
@@ -116,7 +113,6 @@ export async function chooseTargets(
   targetTable: Targets,
   roots: ProjectionOptions["roots"],
   preselected: readonly string[],
-  /** What is being installed, so each target can show where it would load it from. */
   items: readonly Selected[],
   /** Its source installs each namespace as a plugin in the user scope. */
   wrapped = false,
@@ -137,8 +133,7 @@ export async function chooseTargets(
     label: item.target.displayName,
   }));
 
-  // The scope's own targets, or the defaults every scope starts with, so the
-  // answer a person accepts is the one a command without --for would take.
+  // The scope's targets or the defaults, so the accepted answer matches a command without --for.
   const selectable = new Set(all.map((item) => item.target.name));
   const remembered = preselected.filter((name) => selectable.has(name));
   const wanted =
@@ -162,10 +157,8 @@ export async function chooseTargets(
   return canceled(picked) ? picked : [...picked, ...kept.filter((name) => !picked.includes(name))];
 }
 
-/** Group removal choices by their registry. */
 export async function chooseRemovals(
   step: Interaction,
-  /** Each with the targets that load it, by name. */
   installed: readonly { name: string; kind: string; source: string; targets: string[] }[],
 ): Promise<string[] | Canceled> {
   return await multiselect(

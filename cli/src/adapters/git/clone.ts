@@ -93,7 +93,6 @@ async function cloneShallow(
   });
 }
 
-/** Commit currently checked out; the pin recorded in the lock. */
 export async function headCommit(dir: string, limits: GitLimits): Promise<string> {
   return (await git(["rev-parse", "--verify", "HEAD"], { ...limits, cwd: dir })).trim();
 }

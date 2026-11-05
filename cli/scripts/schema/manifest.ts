@@ -3,7 +3,7 @@ import { LAYOUT_IDS, type LayoutId } from "#adapter/layouts/ids.ts";
 import { LEGACY_TARGETS_KEY } from "#core/manifest/model.ts";
 import { DEFAULT_TARGETS } from "#core/target/ids.ts";
 
-/** `harnesses`, as aireg 0.1 spells `targets`, which aireg still writes so that version reads it. */
+/** `harnesses`: aireg 0.1's name for `targets`, still written so that version reads it. */
 const Legacy = (minItems: number) =>
   Type.Optional(
     Type.Array(Type.String({ minLength: 1 }), {

@@ -8,7 +8,6 @@ import { skillFile } from "#test/kit/builders/layouts.ts";
 
 const SCHEMA = "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
 
-/** A folder served over http on loopback, as a site would serve it, for the length of a test. */
 export async function serveFolder(
   root: string,
 ): Promise<{ url: string; close: () => Promise<void> }> {
@@ -100,7 +99,6 @@ export function zip(files: Readonly<Record<string, string>>): Uint8Array {
   return Buffer.concat([...locals, directory, end]);
 }
 
-/** One skill a site lists: its bytes, as a SKILL.md or an archive, and the digest the index gives. */
 export interface SiteSkill {
   name: string;
   type?: "skill-md" | "archive";
@@ -112,7 +110,6 @@ export interface SiteSkill {
   digest?: string;
 }
 
-/** A site with an Agent Skills index at `/.well-known/agent-skills/index.json`, listing `skills`. */
 export async function wellKnownSite(
   root: string,
   skills: readonly SiteSkill[],

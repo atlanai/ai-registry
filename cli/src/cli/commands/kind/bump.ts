@@ -56,7 +56,7 @@ export async function version(
     });
 
   const bump = how ?? "patch";
-  // `v1.2.0` names a tag; the folder is the bare version, as the file spec names it.
+  // `v1.2.0` names a tag; the folder is the bare version.
   const next =
     bump === "patch" || bump === "minor" || bump === "major"
       ? bumpVersion(latest, bump)
@@ -74,7 +74,7 @@ export async function version(
       hint: "Edit it there, or name a newer version.",
     });
   }
-  // Any entry at all where the version goes, such as a link a folder listing skips, is refused.
+  // Refuses any entry where the version goes, even a link a folder listing skips.
   refuseRedirect(root, join(home, next));
   if (await present(join(home, next))) {
     throw new AiregError(`${input} ${next} already exists.`, {

@@ -1,27 +1,28 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { TARGETS } from "#packaging/targets.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { renderInstaller, renderTemplate, renderWindowsInstaller } from "./render.ts";
 
-/** This test's folder, which the kit removes after it. */
 let scratch: string;
+let made = 0;
 test.beforeEach(({ tmp }) => {
   scratch = tmp;
 });
 
+/** One test renders and runs several times, so each gets its own folder. */
+function folder(label: string): string {
+  made += 1;
+  const dir = join(scratch, `${label}-${made}`);
+  mkdirSync(dir);
+  return dir;
+}
+
 function binaries(body: (filename: string) => string | Uint8Array = (name) => name): string {
-  const dir = mkdtempSync(join(scratch, "aireg-binaries-"));
+  const dir = folder("binaries");
   for (const target of TARGETS) {
     writeFileSync(join(dir, target.filename), body(target.filename));
   }
@@ -37,9 +38,8 @@ function render(overrides: Record<string, string> = {}): string {
   });
 }
 
-/** Runs a script under `sh` in a throwaway HOME and returns its exit status. */
 function runSh(script: string, env: Record<string, string> = {}): number | null {
-  const dir = mkdtempSync(join(scratch, "aireg-run-"));
+  const dir = folder("run");
   const file = join(dir, "install.sh");
   writeFileSync(file, script);
   return spawnSync("sh", [file], {
@@ -134,11 +134,11 @@ describe("renderInstaller", () => {
   });
 
   test("refuses a missing or empty binary", () => {
-    const empty = mkdtempSync(join(scratch, "aireg-binaries-"));
+    const empty = folder("binaries");
     expect(() => render({ binaryDir: empty })).toThrow();
     for (const target of TARGETS) writeFileSync(join(empty, target.filename), "");
     expect(() => render({ binaryDir: empty })).toThrow(/not a built binary/);
-    const dir = mkdtempSync(join(scratch, "aireg-binaries-"));
+    const dir = folder("binaries");
     mkdirSync(join(dir, TARGETS[0]?.filename ?? "x"));
     expect(() => render({ binaryDir: dir })).toThrow();
   });
@@ -202,7 +202,7 @@ describe.skipIf(process.platform === "win32")("the rendered installer", () => {
   }, 30_000);
 
   test("removes another release's installer when that install is interrupted", () => {
-    const bin = mkdtempSync(join(scratch, "aireg-bin-"));
+    const bin = folder("bin");
     const downloads = join(bin, "downloads");
     // The downloaded installer interrupts the one that started it, as a Ctrl-C would.
     writeFileSync(

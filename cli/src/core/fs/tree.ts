@@ -29,7 +29,7 @@ export interface FileRecord {
   path: string;
   executable: boolean;
   size: number;
-  /** When and which file it was, so a caller can tell an unchanged file without reading it. */
+  /** With `ino`, lets a caller tell an unchanged file without reading it. */
   mtimeMs: number;
   ino: number;
 }
@@ -81,7 +81,6 @@ const SECRET_NAMES = new Set([
   "id_ed25519",
   "id_rsa",
 ]);
-/** What index, validate and publish all say about an entry they refuse. */
 export function refusal(entry: Irregular): string {
   if (entry.reason === "may hold credentials") {
     return `${entry.reason}; move it out of the artifact folder, since everything there is published`;
@@ -94,7 +93,6 @@ export async function walk(root: string): Promise<FileRecord[]> {
   return (await scan(root, false)).files;
 }
 
-/** An entry an artifact cannot hold, and why. */
 export interface Irregular {
   path: string;
   reason: "is a symlink" | "is not a regular file" | "may hold credentials";
@@ -160,10 +158,7 @@ export function authored(root: string): Promise<{ files: FileRecord[]; irregular
   return scan(root, true);
 }
 
-/**
- * A person's own artifact, a folder or one file, read as `authored` reads a folder
- * and refused the same way when it is itself a link. The one file is `path: ""`.
- */
+/** A folder or one file (`path: ""`), refused the same way when it is itself a link. */
 export async function authoredArtifact(
   source: string,
 ): Promise<{ files: FileRecord[]; irregular: Irregular[] }> {
@@ -186,10 +181,7 @@ export async function authoredArtifact(
   return { files: [file], irregular: [] };
 }
 
-/**
- * A person's own folder or file copied into a scope as a publish would read it:
- * regular files only, never through a link. Returns what it refused instead, if anything.
- */
+/** Regular files only, never through a link; returns what it refused, if anything. */
 export async function copyAuthored(source: string, dest: string): Promise<Irregular | undefined> {
   const { files, irregular } = await authoredArtifact(source);
   if (irregular[0] !== undefined) return irregular[0];
@@ -219,10 +211,7 @@ export async function copyAuthored(source: string, dest: string): Promise<Irregu
   }
 }
 
-/**
- * Copy-on-write where the filesystem offers it, so a projection shares blocks
- * until written. `FICLONE` is advisory: elsewhere this is a plain copy.
- */
+/** Copy-on-write where offered; `FICLONE` is advisory, so elsewhere this is a plain copy. */
 export async function copyInto(source: string, dest: string): Promise<void> {
   await mkdir(dirname(dest), { recursive: true });
   await cp(source, dest, {
@@ -233,7 +222,7 @@ export async function copyInto(source: string, dest: string): Promise<void> {
   });
 }
 
-/** A file-shaped kind is one file, not a directory, so both shapes are handled. */
+/** A file-shaped kind is one file, not a directory. */
 async function mode(root: string, executable: number, plain: number): Promise<void> {
   if (!(await isDirectory(root))) {
     const info = await ifPresent(stat(root));
@@ -257,10 +246,7 @@ export async function remove(path: string): Promise<void> {
   await rm(path, { recursive: true, force: true });
 }
 
-/**
- * Only the immediate parent, since a target root holds the tool's settings;
- * below `ours` every empty folder is aireg's, so those go too.
- */
+/** Only the immediate parent, as a target root holds tool settings; below `ours` all go. */
 export async function pruneEmptyParent(path: string, ours?: string): Promise<void> {
   let parent = dirname(path);
   do {

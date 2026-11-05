@@ -11,13 +11,12 @@ import { targetProblems } from "./check.ts";
 import type { TargetDefinition } from "./contract.ts";
 import { categoryOfEarlier } from "./ids.ts";
 
-/** Where a target that no file defines comes from. */
 export const BUILT_IN = "built-in";
 
 export interface TargetFile {
   path: string;
   definition: TargetDefinition;
-  /** What it says as aireg 0.1 did, which it still loads with. */
+  /** Settings written for aireg 0.1, which still load. */
   warnings: string[];
 }
 
@@ -26,10 +25,7 @@ export interface SkippedFile {
   problems: string[];
 }
 
-/**
- * A file anyone can check, whatever folder it is in, against the built-in targets and the
- * ones your other files define.
- */
+/** Checks a file in any folder against the built-in targets and the ones your files define. */
 export function checkTargetText(
   path: string,
   text: string,
@@ -42,7 +38,6 @@ export function checkTargetText(
   return problems.length > 0 ? { path, problems } : read;
 }
 
-/** What each pattern in the schema asks for, in words. */
 const PATTERNS: Record<string, string> = {
   "^~/.": "must start with ~/",
   "^[a-z][a-z0-9-]{0,63}$": "must be a lowercase name of letters, digits and dashes",
@@ -56,10 +51,7 @@ const ARGV = /^\/(detect\/binary|verified\/command)/;
 
 const at = (path: string) => (path === "" ? "The file" : quoted(path.slice(1)));
 
-/**
- * A file's own problems, before it is compared with any other definition. One found in a
- * folder must be named for the id it defines.
- */
+/** A file found in a folder must be named for the id it defines. */
 function readOne(path: string, text: string, folder?: Folder): TargetFile | SkippedFile {
   let document: unknown;
   try {
@@ -109,13 +101,9 @@ function validate(document: unknown): ErrorObject[] {
   return validator(document) ? [] : (validator.errors ?? []);
 }
 
-/** A JSON type as a person names it. */
 const TYPES: Record<string, string> = { object: "an object", array: "a list", string: "text" };
 
-/**
- * A value that fits no alternative fails each one at its own path. Said once, unless an
- * error further in shows which alternative it meant.
- */
+/** A value fitting no alternative fails each; said once unless a deeper error shows which. */
 function alternatives(errors: readonly ErrorObject[]): {
   said: string[];
   dropped: Set<ErrorObject>;
@@ -175,7 +163,6 @@ function describe(error: ErrorObject): string | undefined {
   return `${where} ${error.message ?? "is not valid"}.`;
 }
 
-/** The values a tag may take, read off the branches it picks between. */
 function tags(error: ErrorObject, tag: string): string[] {
   const branches = (error.parentSchema?.oneOf ?? []) as {
     properties?: Record<string, { const?: string }>;
@@ -214,7 +201,7 @@ function upgraded({ kind, instances, ...definition }: Earlier): {
   return { definition: upgrade, warnings, problems };
 }
 
-/** Keys a file written for aireg 0.1 may carry, read as what replaced them. */
+/** Keys aireg 0.1 read, loaded as what replaced them. */
 type Earlier = TargetDefinition & { kind?: string; instances?: TargetDefinition["profiles"] };
 
 /** aireg 0.1 named a built-in by the id that is now its alias, so such a file replaces it. */
@@ -246,7 +233,6 @@ function withBuiltinAliases(definition: TargetDefinition): TargetDefinition {
   return aliases === undefined ? definition : { ...definition, aliases };
 }
 
-/** What only another definition shows: a read of a target that is not there, for one. */
 function crossProblems(file: TargetFile, others: readonly TargetDefinition[]): string[] {
   const { id } = file.definition;
   const known = others.filter((each) => each.id !== id);
@@ -280,7 +266,7 @@ function readFolder(
   dir: string,
   read: TargetFile[],
   skipped: SkippedFile[],
-  /** Set for the folder aireg 0.1 used: where its files belong now. */
+  /** For the folder aireg 0.1 used: where its files belong now. */
   moveTo?: string,
 ): void {
   let names: string[];
@@ -310,10 +296,7 @@ function readFolder(
 
 const cache = new Map<string, { stamp: string; read: TargetFile | SkippedFile }>();
 
-/**
- * Read once per change, since every command resolves the targets more than once. The stamp
- * and the text come from one open file, so neither can describe a file the other did not.
- */
+/** Commands resolve targets repeatedly; stamp and text come from one open file, so they agree. */
 function cachedRead(path: string, folder: Folder): TargetFile | SkippedFile {
   let fd: number;
   try {

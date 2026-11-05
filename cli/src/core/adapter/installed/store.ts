@@ -63,7 +63,7 @@ async function pinAdapter(
     replaced = adapters[id];
     return { ...adapters, [id]: specifier };
   }, env);
-  // Nothing loads the version this replaces, so it goes.
+  // Nothing loads the replaced version; if removal fails it costs only disk.
   if (replaced !== undefined && replaced !== specifier) {
     await removeManaged(id, replaced, env).catch(() => undefined);
   }

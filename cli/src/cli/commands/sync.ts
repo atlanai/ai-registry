@@ -52,10 +52,7 @@ interface Preview {
   next: string[];
 }
 
-/**
- * Reconciles this scope with its registries, under a policy that pulls but
- * never publishes unasked. `--dry-run` reports without writing.
- */
+/** Reconciles this scope with its registries; pulls, but never publishes unasked. */
 export async function run(context: CommandContext): Promise<void> {
   // Dispatched before parsing: `parse` is strict and knows only the common
   // options, so it would reject resolve's own flags such as `--mine`.
@@ -80,15 +77,14 @@ const sync = defineCommand({
   },
   data: (result) => result.data,
   text(result, printer, { only }) {
-    renderSync(
-      printer,
-      result.shown,
-      result.local,
-      result.undeclared,
-      result.roots,
-      result.claims,
-      only,
-    );
+    renderSync(printer, {
+      items: result.shown,
+      found: result.local,
+      undeclared: result.undeclared,
+      roots: result.roots,
+      claims: result.claims,
+      registry: only,
+    });
     for (const hint of result.next) printer.hint(hint);
   },
 });
@@ -110,7 +106,6 @@ function policyFrom(own: Own): SyncPolicy {
   return policy;
 }
 
-/** `--dry-run`: scans the registries a sync would cover and reports what it would do. */
 async function report(
   context: CommandContext,
   { common, policy, only }: Options,
@@ -139,7 +134,6 @@ async function report(
   }
 }
 
-/** The registries a run covers: the one named, or every one the scope declares. */
 function covered(loaded: Loaded, only: string | undefined): string[] {
   const declared = Object.keys(loaded.manifest.registries).sort();
   const wanted = only === undefined ? declared : declared.filter((alias) => alias === only);
@@ -218,10 +212,7 @@ function previewItem(item: SyncItem): SyncPreview["artifacts"][number] {
   };
 }
 
-/**
- * A copy of what a registry this scope installs publishes is linked by the
- * next sync when its bytes match, and held when someone changed it.
- */
+/** Copies whose bytes match are linked next sync; changed ones are held. */
 async function claimable(found: Scanned): Promise<{ linkable: Candidate[]; changed: Candidate[] }> {
   const linkable: Candidate[] = [];
   const changed: Candidate[] = [];
@@ -268,8 +259,8 @@ async function nextSteps(
 }
 
 /**
- * Through the daemon rather than in this process: a run belongs in the run store
- * whoever asked for it, so `aireg job runs` shows this one and `--follow` reads it.
+ * Through the daemon, not in this process: every run belongs in the run store,
+ * so `aireg job runs` shows it and `--follow` reads it.
  */
 async function reconcile(
   context: CommandContext,

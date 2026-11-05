@@ -16,7 +16,6 @@ export const GROUPS = ["Set up", "Install", "Check", "Share", "Automate", "Maint
 
 export type Group = (typeof GROUPS)[number];
 
-/** One verb of a command that has several: `aireg registry add`. */
 export interface ActionSpec {
   readonly name: string;
   readonly aliases?: readonly string[];
@@ -33,7 +32,7 @@ export interface ActionSpec {
 export interface CommandSpec {
   name: string;
   aliases?: string[];
-  /** Earlier names it still answers to, which help never lists. */
+  /** Old names it still answers to; help never lists them. */
   formerly?: string[];
   summary: string;
   group: Group;
@@ -52,7 +51,6 @@ export interface Command extends CommandSpec {
   load: () => Promise<{ run: CommandRun }>;
 }
 
-/** An action that parses its own argv, as `sync resolve` and `job runs` do. */
 export function actionOf(spec: CommandSpec, name: string): Accepts {
   const action = spec.actions?.find((a) => a.name === name);
   return {
@@ -65,10 +63,7 @@ export function actionOf(spec: CommandSpec, name: string): Accepts {
 /** Each action's handler under the name the spec gives it, so help and dispatch agree. */
 export type ActionHandlers = Readonly<Record<string, () => Promise<void>>>;
 
-/**
- * Runs the handler for `action`, which parsing has already resolved from an alias,
- * or refuses it with the spec's own list. `more` follows that list in the hint.
- */
+/** `action` is already resolved from an alias; an unknown one is refused with the spec's list. */
 export function runAction(
   spec: CommandSpec,
   action: string,

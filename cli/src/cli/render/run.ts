@@ -53,7 +53,6 @@ export function failureWords(code: string): string {
 /** Wide enough for every word a line starts with, so the artifact names line up. */
 const WIDTH = 9;
 
-/** One settled artifact: what happened to it, its name, and why. */
 export function itemLine(printer: Printer, event: RunEvent): string {
   const { style } = printer;
   const { origin } = (event.data ?? {}) as { origin?: unknown };
@@ -63,14 +62,10 @@ export function itemLine(printer: Printer, event: RunEvent): string {
         (typeof origin === "string" ? "imported" : "changed"))
       : (event.outcome ?? "settled");
   const padded = word.padEnd(WIDTH);
-  const verb =
-    event.outcome === "failed"
-      ? style.red(padded)
-      : event.outcome === "attention"
-        ? style.yellow(padded)
-        : event.outcome === "changed"
-          ? style.green(padded)
-          : style.dim(padded);
+  let verb = style.dim(padded);
+  if (event.outcome === "failed") verb = style.red(padded);
+  else if (event.outcome === "attention") verb = style.yellow(padded);
+  else if (event.outcome === "changed") verb = style.green(padded);
   const why = detailOf(event);
   return `  ${verb}  ${event.artifact ?? ""}${why === undefined ? "" : style.dim(`  ${why}`)}`;
 }

@@ -11,7 +11,7 @@ import {
 } from "#core/release/manifest.ts";
 import { artifactUrl, type Channel } from "#core/release/origin.ts";
 
-/** PKCS#8 header for a 32-byte Ed25519 seed (RFC 8410); only the signer ever holds a private key. */
+/** PKCS#8 header for a 32-byte Ed25519 seed (RFC 8410). */
 const PKCS8_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 
 interface SignOptions {

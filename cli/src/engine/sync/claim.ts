@@ -13,22 +13,19 @@ export interface Copy {
   target: string;
 }
 
-/**
- * A folder in a target directory holding an artifact the registry already
- * publishes, as a person who uploaded it before this machine synced it has.
- */
+/** A target folder holding an artifact the registry already publishes, uploaded from elsewhere. */
 export interface Claim {
   name: string;
   kind: ArtifactKind;
-  /** Catalog paths of the registry's artifacts of this kind and name. */
+  /** Catalog paths. */
   entries: string[];
-  /** Copies holding exactly the registry's bytes: redundant once it is pulled. */
+  /** Redundant once the registry's copy is pulled. */
   identical: Copy[];
-  /** Copies someone changed, left where they are for a person to decide. */
+  /** Left where they are for a person to decide. */
   different: Copy[];
 }
 
-/** Compares against the bytes the scan already staged, so a claim costs no request of its own. */
+/** Compares against the bytes the scan staged, so a claim costs no request. */
 export async function surveyClaims(
   undeclared: readonly Candidate[],
   acquired: readonly Acquired[],
@@ -81,8 +78,8 @@ export async function moveAside(
 }
 
 /**
- * New registry artifacts a folder of yours already stands in for, so installing would add a
- * second copy. A locked row is yours to keep in step, and the link guard keeps the folder anyway.
+ * Installing these would add a second copy. A locked row is yours to keep in step, and the link
+ * guard keeps the folder anyway.
  */
 export function shadowedByYours(
   scan: Pick<Scan, "items" | "undeclared" | "pinned">,

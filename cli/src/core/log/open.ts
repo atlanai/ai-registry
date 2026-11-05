@@ -20,10 +20,7 @@ export interface LogBootstrap {
   close(): void;
 }
 
-/**
- * The daemon writes to a file always. Nobody is watching its stderr - it is
- * spawned detached - so the file is the only account of a scheduled run.
- */
+/** Always to a file: the daemon is spawned detached, so nobody watches its stderr. */
 export function openDaemonLog(version: string, env: NodeJS.ProcessEnv = process.env): LogBootstrap {
   const home = ensureHome(env);
   // Here, not in whatever started the daemon, so a service manager's capture is trimmed too.
@@ -48,7 +45,7 @@ function build(
   };
 }
 
-/** Foreground runs stay silent until asked, and never write to stdout. */
+/** Silent until asked, and never on stdout. */
 export function openCliLog(
   version: string,
   flag?: string,

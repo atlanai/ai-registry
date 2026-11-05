@@ -21,20 +21,15 @@ export function posixRelative(from: string, to: string): string {
   return relative(from, to).split(sep).join(posix.sep);
 }
 
-/** `path` is inside `dir` and is not `dir` itself. */
 export function isStrictlyWithin(dir: string, path: string): boolean {
   return isWithin(dir, path) && relative(resolve(dir), resolve(path)) !== "";
 }
 
-/** Nothing is at the path a filesystem call was given. */
 export function isMissing(error: unknown): boolean {
   return (error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
 }
 
-/**
- * Your home folder as `env` names it, canonical: the user scope's base and every
- * target root under it then compare alike, even with the home behind a symlink.
- */
+/** Canonical, so the user scope's base and target roots under it compare alike behind a symlink. */
 export function homeDir(env: NodeJS.ProcessEnv = process.env): string {
   return canonical(userHome(env));
 }

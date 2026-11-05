@@ -1,29 +1,12 @@
 import { afterEach, describe, expect, vi } from "vitest";
 import { readConfig } from "#core/config/repository.ts";
 import { ErrorCode } from "#core/errors.ts";
-import { Printer } from "#core/term/printer.ts";
+import { commandContext } from "#test/kit/command.ts";
 import { test } from "#test/kit/fixtures.ts";
-import type { CommandContext } from "./command.ts";
 import { run } from "./config.ts";
 
-function context(argv: string[], printed: string[] = []): CommandContext {
-  return {
-    argv,
-    cwd: process.cwd(),
-    printer: new Printer({
-      format: "json",
-      out: { write: (chunk: string) => printed.push(chunk) > 0, isTTY: false },
-    }),
-    host: {
-      version: "test",
-      connectAccount: async () => {
-        throw new Error("no host");
-      },
-      openRunStore: async () => {
-        throw new Error("no host");
-      },
-    },
-  };
+function context(argv: string[], printed: string[] = []) {
+  return commandContext(argv, { printed });
 }
 
 describe("config unset", () => {

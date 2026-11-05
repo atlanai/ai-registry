@@ -6,10 +6,7 @@ import type { Scope } from "#core/store/paths.ts";
 import { invalidParams } from "#daemon/rpc/errors.ts";
 import * as inputs from "./params.ts";
 
-/**
- * One job per registry and folder, so a second project gets its own job rather
- * than taking over the first's. The first keeps the plain id.
- */
+/** One job per registry and folder, so a second project does not take over the first's job. */
 export function skillsJobId(
   config: RegistryConfig,
   params: Record<string, unknown>,
@@ -43,12 +40,11 @@ function rootOf(job: Job): string | undefined {
   return job.steps.find((step) => step.root !== undefined)?.root;
 }
 
-/** The plain id while it is free, then one that names the folder. */
 function nextFree(config: RegistryConfig, alias: string, folder: string): string {
   const used = new Set(config.jobs.map((job) => job.id));
   const plain = productJobId("skills", alias);
   if (!used.has(plain)) return plain;
-  // Short enough that the id, with a counter, stays within 64 characters.
+  // With a counter, the id stays within 64 characters.
   const base = productJobId("skills", `${alias}-${folder}`.slice(0, 48));
   let id = base;
   for (let n = 2; used.has(id); n += 1) id = `${base}-${n}`;
@@ -63,7 +59,6 @@ function productJobId(kind: string, label: string): string {
   return id;
 }
 
-/** One job per account per contributed kind, so aireg names none of them. */
 export function contributedJobId(
   config: RegistryConfig,
   params: Record<string, unknown>,

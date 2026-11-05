@@ -148,7 +148,6 @@ describe("native kind contracts", async () => {
   });
 });
 
-/** A registry root that lists `kinds` and serves `note`'s manifest with these file rules. */
 async function servingNote(root: string, kinds: unknown[], files: unknown): Promise<void> {
   await mkdir(join(root, "kinds"), { recursive: true });
   await writeFile(join(root, "registry.json"), JSON.stringify({ name: "team", kinds }));

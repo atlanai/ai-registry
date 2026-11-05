@@ -10,7 +10,7 @@ export interface Stamps {
   commit: string;
 }
 
-/** The names tsup and `bun build --compile` replace, JSON-encoded so a value is never read as code. */
+/** JSON-encoded so a value is never read as code. */
 export function defines(stamps: Stamps): Record<string, string> {
   return {
     __VERSION__: JSON.stringify(stamps.version),

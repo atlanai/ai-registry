@@ -16,10 +16,7 @@ function remoteRoot() {
   return join(home === undefined || home === "" ? join(homedir(), ".aireg") : home, "dev-remote");
 }
 
-/**
- * The registry's config, a manifest and the host's ids all reach the paths below, so
- * each name is one plain folder, as `isSafePath` in src/adapter/paths.ts keeps a path.
- */
+/** Config, manifests and host ids reach these paths, so each name must be one plain folder. */
 function segment(value, what) {
   if (
     typeof value !== "string" ||
@@ -117,10 +114,7 @@ function namespaceDir(context) {
   return join(remoteRoot(), segment(namespace, "namespace"));
 }
 
-/**
- * No digest is computed here: the client derives the one content identity from
- * the envelope itself.
- */
+/** No digest here: the client derives the content identity from the envelope. */
 async function describe(kind, name, path) {
   const files = [];
   const described = [];

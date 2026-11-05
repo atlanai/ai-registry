@@ -37,8 +37,7 @@ describe("the git route, end to end", () => {
   });
 
   test("reports an edit and exits 3, then repairs under --force", async ({ aireg, project }) => {
-    // Edited where a person edits it: through the target's folder, which links into
-    // the plugin, which links into the mirror.
+    // Edited through the target's folder, which links via the plugin into the mirror.
     await writeFile(projected(project, "lint"), "edited", "utf8");
 
     const edited = await aireg(["status"]);
@@ -139,8 +138,7 @@ describe("the git route, end to end", () => {
     const scratch = join(tmp, "sync-flow");
     const mp = join(tmp, "sync-flow-repo");
     let release = 0;
-    // Every upstream change is a new version, because that is what a registry
-    // publishes: the version directory is written once and never edited.
+    // A version directory is written once, so every upstream change is a new version.
     const upstream = (body: string) => {
       release += 1;
       return registry(mp).skill(`acme/note@1.${release}.0`, { description: "n", body }).write();
@@ -177,8 +175,7 @@ describe("the git route, end to end", () => {
     const conflict = await aireg(["sync", "--dry-run"], { cwd: scratch });
     expect(conflict.code).toBe(3);
     expect(conflict.stdout).toMatch(/conflict/);
-    // Which files differ would need the base bytes, which nothing keeps: a
-    // conflict says both sides moved, and the person looks.
+    // Which files differ needs base bytes nothing keeps, so a conflict only says both moved.
     expect(conflict.stdout).toMatch(/edited here and changed in the registry/);
     expect(conflict.stderr).toMatch(/sync resolve \S+ --theirs/);
 
@@ -208,8 +205,7 @@ describe("the git route, end to end", () => {
         "  - kit/skill/lint",
       ].join("\n"),
     );
-    // One named target, so which links exist does not depend on what the
-    // machine running this happens to have installed.
+    // One named target, so the links do not depend on what this machine has installed.
     expect((await aireg(["install", "--for", "claude-code"], { cwd })).code).toBe(0);
     expect((await aireg(["status"], { cwd })).code).toBe(0);
 

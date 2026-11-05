@@ -5,7 +5,7 @@ import { emptyRegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { followRun } from "#daemon/rpc/client.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
-import { ADAPTER, ENDPOINT, NAMESPACE, testClient } from "#test/kit/daemon.ts";
+import { ADAPTER, declareUserRegistry, ENDPOINT, NAMESPACE, testClient } from "#test/kit/daemon.ts";
 import { test } from "#test/kit/fixtures.ts";
 
 const REGISTRY = "acme";
@@ -26,13 +26,7 @@ describe("onboarding through the daemon", () => {
     await skill(join(home, ".claude", "skills"), "local-one");
     await skill(join(home, ".codex", "skills"), "local-two");
     await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
-    await mkdir(userScope, { recursive: true });
-    await writeFile(
-      join(userScope, "manifest.yml"),
-      ["registries:", `  ${REGISTRY}:`, `    source: ${ENDPOINT}`, "    adapter: dev", ""].join(
-        "\n",
-      ),
-    );
+    await declareUserRegistry(userScope, REGISTRY);
 
     const { client } = await daemon.start(CLIENT);
     const { account, created, identity } = await client.request("account.login", {

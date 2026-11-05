@@ -22,7 +22,7 @@ interface Checked {
 }
 
 /**
- * The merge gate: every problem with where it is and how to fix it, exit 1 on any.
+ * The merge gate: exit 1 on any problem.
  * In a pull request, released versions are compared with the branch it targets.
  */
 export const validate = action({

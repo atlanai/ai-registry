@@ -1,20 +1,28 @@
 import { randomUUID } from "node:crypto";
-import { link, lstat, rm, writeFile } from "node:fs/promises";
+import { link, lstat, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import type { RunEvent } from "#core/run/model.ts";
 import { RunEventType } from "#core/run/model.ts";
-import { RpcErrorCode } from "./codes.ts";
-import { PROTOCOL_VERSION } from "./methods.ts";
-import { DaemonAlreadyRunningError, RpcServer } from "./server.ts";
+import { RpcErrorCode } from "#daemon/rpc/codes.ts";
+import { PROTOCOL_VERSION } from "#daemon/rpc/methods.ts";
+import { DaemonAlreadyRunningError, RpcServer } from "#daemon/rpc/server.ts";
 
 const paths: string[] = [];
+let dir: string;
 
-/** Socket paths are length-limited, so they go straight in the temp root under a short name. */
+// Socket paths are length-limited, so a short private folder in the temp root holds them.
+beforeAll(async () => {
+  dir = await mkdtemp(join(tmpdir(), "aireg-rpc-"));
+});
+afterAll(async () => {
+  await rm(dir, { recursive: true, force: true });
+});
+
 function endpoint(): string {
-  const path = join(tmpdir(), `aireg-rpc-${randomUUID().slice(0, 8)}.sock`);
+  const path = join(dir, `${randomUUID().slice(0, 8)}.sock`);
   paths.push(path);
   return path;
 }
@@ -97,7 +105,6 @@ describe.skipIf(process.platform === "win32")("rpc server endpoints", () => {
   });
 });
 
-/** A connected client that collects every frame the server sends it. */
 async function client(
   path: string,
 ): Promise<{ socket: Socket; frames: unknown[]; closed: Promise<void> }> {

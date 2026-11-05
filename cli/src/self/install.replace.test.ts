@@ -7,10 +7,7 @@ import { standaloneShim } from "#core/release/shim.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { installBinary, installedVersion } from "./install.ts";
 
-/**
- * Announces itself, then blocks on stdin: the announcement is what proves the
- * kernel has already exec'd this inode before the replacement lands.
- */
+/** The announcement proves the kernel has exec'd this inode before the replacement lands. */
 function blockingScript(version: string): Uint8Array {
   return new TextEncoder().encode(`#!/bin/sh\necho running\nread -r _line\necho "${version}"\n`);
 }
@@ -56,8 +53,7 @@ describe.skipIf(process.platform === "win32")("replacing a running executable", 
     const finished = new Promise<void>((resolve) => running.on("close", () => resolve()));
     await started;
 
-    // Same version, same path: this is the case that would otherwise try to
-    // write through a file the kernel is executing.
+    // Same version and path: the case that would otherwise write through a running file.
     await installBinary("0.1.0", versionScript("0.1.1"), env);
     const after = await stat(bin);
     expect(after.ino).not.toBe(before.ino);
@@ -114,7 +110,6 @@ describe("launchArgv", () => {
 describe.runIf(process.platform === "win32")("replacing a running executable on Windows", () => {
   test("moves the running copies aside and puts the new one on PATH", async ({ tmp }) => {
     const env = { AIREG_HOME: tmp };
-    // Any real executable will do; Node's own is at hand.
     const bytes = new Uint8Array(await readFile(process.execPath));
     const bin = await installBinary("0.1.0", bytes, env);
     expect(await installedVersion(env)).toBe("0.1.0");

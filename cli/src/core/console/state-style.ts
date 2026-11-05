@@ -25,7 +25,6 @@ export function stateTone(state: ArtifactState): "green" | "yellow" | "red" | "d
   return color === COLOR.yellow || color === COLOR.orange ? "yellow" : "dim";
 }
 
-/** What each state means, one line, shown wherever the glyph legend appears. */
 export const STATE_MEANING: Record<ArtifactState, string> = {
   ok: "matches the lockfile, links intact",
   edited: "you edited it after installing it",

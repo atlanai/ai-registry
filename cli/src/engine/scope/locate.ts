@@ -13,13 +13,11 @@ import {
 } from "#core/store/paths.ts";
 import type { CommonOptions } from "#engine/options.ts";
 
-/** Where a command acts: its scope, and the directory that scope is rooted at. */
 export interface Located {
   scope: Scope;
   base: string;
 }
 
-/** What a command does outside any project when no scope was named. */
 export type Outside = "user" | "fail";
 
 /** The closest folder holding a `.registry/` manifest or `.git`, as git finds its repository. */

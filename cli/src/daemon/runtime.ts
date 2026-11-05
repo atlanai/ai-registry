@@ -49,7 +49,6 @@ import { jobOfWork, type ScopeWork } from "#engine/sync/work.ts";
 
 const EVENT_PAGE_SIZE = 200;
 
-/** How often the daemon checks that its home still exists. */
 const HOME_WATCH_MS = 15_000;
 
 export class DaemonRuntime {
@@ -87,8 +86,7 @@ export class DaemonRuntime {
   }
 
   static async open(version: string, log: Logger = nullLogger()): Promise<DaemonRuntime> {
-    // Reclaiming here would let a daemon that loses the bind race mark the
-    // winner's live runs abandoned; listen() does it instead.
+    // Reclaiming here would let the loser of the bind race abandon the winner's live runs.
     const store = await SqliteRunStore.open(runDatabasePath(), (to) =>
       log.warn("run history could not be read, so it was moved aside and started again", { to }),
     );
@@ -98,8 +96,7 @@ export class DaemonRuntime {
   async listen(): Promise<void> {
     // A daemon busy starting up can miss the socket probe; its pid file still names it.
     if ((await liveDaemonPid()) !== undefined) throw new DaemonAlreadyRunningError();
-    // Owning the endpoint is what makes this the single daemon, so only now
-    // is it safe to declare another process's runs dead.
+    // Only once this owns the endpoint is it safe to declare another process's runs dead.
     const endpoint = rpcEndpoint();
     await privateDirectory(dirname(endpoint));
     await this.#server.listen(endpoint);
@@ -155,8 +152,8 @@ export class DaemonRuntime {
       "job.create": async (raw, context) => createJob(raw, context.signal),
       "conflict.resolve": (raw, context) => resolveConflict(raw, context, this.#runner),
       "account.login": async (raw, context) => {
-        // Never the credential, only that one was written: enough to answer "am I signed in".
         const result = await loginAccount(raw, context);
+        // Never the credential, only that one was written: enough to answer "am I signed in".
         this.#log.info("account authenticated", { accountId: result.account.id });
         return result;
       },
@@ -211,23 +208,19 @@ export class DaemonRuntime {
     return { run };
   }
 
-  /**
-   * Never written to config, so the run it drives records no job id - which is
-   * what `runs.job_id` being nullable is for.
-   */
+  /** Never written to config, so its run records no job id (`runs.job_id` is nullable). */
   async #foregroundTarget(
     params: Record<string, unknown>,
   ): Promise<{ job: ScopeWork; account: Account }> {
     const registry = inputs.text(params, "registry");
     const config = await readConfig();
-    // A public repository or a local directory needs no sign-in, so an account
-    // is synthesized to name the registry rather than to carry a credential.
+    // A public repository or local directory needs no sign-in; this account only names the registry.
     const account = config.accounts.find((entry) => entry.registry === registry) ?? {
       id: `acc_anonymous_${registry}`,
       registry,
     };
-    // The runner rebuilds the scope from the step root alone, so a user-scope
-    // run must be rooted at the user scope or every registry looks undeclared.
+    // The runner rebuilds the scope from the root alone, so a user-scope run must be rooted
+    // there or every registry looks undeclared.
     const scope = inputs.scope(params, "scope", "project");
     const job: ScopeWork = {
       id: `job_foreground_${randomUUID()}`,
@@ -240,10 +233,6 @@ export class DaemonRuntime {
     return { job, account };
   }
 
-  /**
-   * A sync of a scope no job covers, which is what a person running `aireg sync`
-   * in a project is asking for.
-   */
   async #syncStart(raw: unknown): Promise<{ run: RunRecord }> {
     const params = inputs.object(raw);
     const refs = inputs.optionalNames(params, "refs");
@@ -256,7 +245,6 @@ export class DaemonRuntime {
     }));
   }
 
-  /** The same ephemeral job as `sync.start`, over one artifact, with its operation forced. */
   async #syncResolve(raw: unknown, context: RpcContext): Promise<{ run: RunRecord }> {
     const params = inputs.object(raw);
     const { job, account } = await this.#foregroundTarget(params);
@@ -387,8 +375,7 @@ export class DaemonRuntime {
   }
 
   async #finish(): Promise<void> {
-    // Unbind last. A replacement that listened during runner.stop() would
-    // abandonActive the same rows this process is still finishing.
+    // Unbind last, or a replacement could abandon the rows this process is still finishing.
     clearInterval(this.#homeWatch);
     this.#minUpdate.stop();
     this.#follow.stop();

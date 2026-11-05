@@ -21,8 +21,8 @@ export interface SignInPrompt {
 }
 
 /**
- * Signs in through the system browser as RFC 8252 has a native app do: a PKCE code returned
- * to a loopback port. `finish` stores the sign-in; the tab says it worked only once it has.
+ * RFC 8252 native app sign-in: a PKCE code returned to a loopback port. `finish` stores the
+ * sign-in; the tab says it worked only once it has.
  */
 export async function signInWithOAuth<T>(
   client: OAuthClient,

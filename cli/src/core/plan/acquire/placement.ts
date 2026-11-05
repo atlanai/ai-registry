@@ -83,7 +83,6 @@ export function heldAs(
   )?.[0];
 }
 
-/** Yanked versions this run would install that the lock does not already hold. */
 export function newlyYanked(acquired: readonly Acquired[], lock: Lock): string[] {
   return acquired.flatMap((source) =>
     [...source.placements].flatMap(([path, { name, version, yanked }]) =>

@@ -47,13 +47,13 @@ export function updateConfig(
   return write;
 }
 
-/** The revision check and the write are one step across processes, so no writer silently undoes another. */
+/** One lease holds the revision check and the write, so no writer silently undoes another. */
 function underLease<T>(env: NodeJS.ProcessEnv, run: () => Promise<T>): Promise<T> {
   ensureHome(env);
   return withLease({ scope: "user", lock: configPath(env) }, { wait: true, env }, run);
 }
 
-/** A whole config written over the revision it was read at, refused if another writer moved it on. */
+/** Refused if another writer moved the config on since it was read. */
 export function writeConfig(
   next: RegistryConfig,
   expectedRevision: number,

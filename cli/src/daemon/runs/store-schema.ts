@@ -6,13 +6,12 @@ import { SYNC_OPERATIONS } from "#core/sync/policy.ts";
 /** History is a cache, so any other layout is rebuilt. */
 export const RUN_SCHEMA_VERSION = 1;
 
-/** Newest runs kept per job. Older ones take their events with them. */
 export const RUN_HISTORY_PER_JOB = 200;
 
-/** Events kept per job across its newest runs: one run writes a row per artifact, so a run cap alone does not bound the file. */
+/** One run writes a row per artifact, so a run cap alone does not bound the file. */
 export const RUN_EVENTS_PER_JOB = 50_000;
 
-/** Newest one-off runs kept per account, which have no job to prune under. */
+/** One-off runs have no job to prune under. */
 export const RUN_HISTORY_PER_ACCOUNT = 50;
 
 /** The CHECK lists come from the same arrays the code reads, so they cannot drift apart. */
@@ -87,5 +86,4 @@ CREATE INDEX run_events_by_item ON run_events(run_id, artifact);
 CREATE INDEX run_events_counts ON run_events(run_id, event_type, outcome);
 `;
 
-/** Dropped before the schema is recreated. */
 export const RUN_TABLES = ["run_events", "runs"] as const;

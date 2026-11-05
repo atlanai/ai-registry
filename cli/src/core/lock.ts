@@ -80,8 +80,7 @@ export function parseLock(text: string, path = "The lockfile", scope: Scope = "p
     const artifact = isSafePath(name) ? parseArtifact(raw, scope) : undefined;
     if (artifact === undefined)
       throw unreadable(path, `has an artifact ${quoted(name)} it cannot read`);
-    // An artifact whose registry vanished is unusable; drop it and rebuild.
-    // A row from your own folder is yours whether or not anything was installed.
+    // A row whose registry vanished is dropped, unless your own folder supplied it.
     if (lock.registries[artifact.registry] !== undefined || artifact.origin !== undefined) {
       lock.artifacts[name] = artifact;
     }
@@ -89,10 +88,7 @@ export function parseLock(text: string, path = "The lockfile", scope: Scope = "p
   return lock;
 }
 
-/**
- * One resolved registry, recorded once and referenced by every artifact from
- * it. A source that versions rows independently leaves `revision` absent.
- */
+/** `revision` is absent for a source that versions each row on its own. */
 export interface LockRegistry {
   location: string;
   adapter: string;
@@ -111,10 +107,7 @@ interface LockLink {
   digest?: string | undefined;
 }
 
-/**
- * Where the bytes came from when a folder on this machine supplied them. Its
- * presence is what makes a row yours: `publish` sends only these.
- */
+/** Set when a folder here supplied the bytes: it makes a row yours, and `publish` sends only those. */
 interface LockOrigin {
   target: string;
   /** Relative to the scope base, so the lock stays portable. */
@@ -131,9 +124,8 @@ export interface LockArtifact {
   /** What the source called it when this was written. */
   name: string;
   kind: ArtifactKind;
-  /** The owner inside the source. Absent where the source has none. */
   namespace: string | undefined;
-  /** The address the source publishes it at, POSIX separators. Absent until published. */
+  /** POSIX separators. Absent until published. */
   address: string | undefined;
   /** Did upstream move? Absent until published. */
   content: string | undefined;
@@ -147,23 +139,19 @@ export interface LockArtifact {
   path: string;
   /** Did you edit it? Digest of this scope's own copy, which is what a target loads. */
   digest: string;
-  /** Set when the bytes come from a folder here, absent when they came from upstream. */
   origin: LockOrigin | undefined;
   /** Prune consults only this list, so a file we never wrote is never removed. */
   links: LockLink[];
   /** Installed names whose `depends_on` edges name this version. Absent when nothing needs it. */
   neededBy?: string[] | undefined;
   /**
-   * Links asked for but not made, because something of yours is at the path.
-   * Read by status, never by prune: nothing listed here is ours to remove.
+   * Links not made because something of yours is at the path. Read by status, never by prune:
+   * nothing listed here is ours to remove.
    */
   blocked?: { target: string; path: string; by?: string | undefined }[] | undefined;
 }
 
-/**
- * Timestamp-free on purpose: two branches adding different artifacts produce
- * non-overlapping keys, so git merges the lockfile without a conflict.
- */
+/** Timestamp-free so two branches adding different artifacts merge without a conflict. */
 export interface Lock {
   version: number;
   registries: Record<string, LockRegistry>;
@@ -236,10 +224,7 @@ function isLeafName(name: string): boolean {
   return isSafePath(name) && !name.includes("/");
 }
 
-/**
- * A project's lockfile is committed, so a clone chooses it: its paths stay relative and below
- * the scope. The user's own lock may name a scope or target home outside HOME.
- */
+/** A committed project lock must keep paths below the scope; the user lock may point outside HOME. */
 function scopePathOf(value: unknown, scope: Scope): string | undefined {
   const path = textOf(value);
   return path !== undefined && (scope === "user" || isSafePath(path)) ? path : undefined;
@@ -294,7 +279,6 @@ function optional<K extends string>(key: K, value: string | undefined): { [P in 
   return (value === undefined ? {} : { [key]: value }) as { [P in K]?: string };
 }
 
-/** A lockfile that is there but cannot be read. */
 export class LockError extends AiregError {
   constructor(message: string, options: { hint: string }) {
     super(message, { code: ErrorCode.Invalid, hint: options.hint });
@@ -322,10 +306,7 @@ function parseBlocked(raw: unknown, scope: Scope): LockArtifact["blocked"] {
   return held.length === 0 ? undefined : held;
 }
 
-/**
- * The registries and rows `after` would write differently from `before`. A row
- * about to be restaged has no digest until its copy lands, so that is no change.
- */
+/** A row about to be restaged has no digest until its copy lands, so that alone is no change. */
 export function lockChanges(before: Lock, after: Lock): string[] {
   const table = resolveTargets(process.env);
   const changed = new Set<string>();
@@ -444,7 +425,7 @@ export function formatLock(lock: Lock): string {
 export async function writeLock(roots: Roots, lock: Lock): Promise<void> {
   await assertManagedPath(roots.lock, roots, { env: process.env });
   const text = formatLock(lock);
-  // One an earlier aireg wrote that already says this stays as it is, so it still reads it.
+  // An earlier aireg's lock that already says this stays as written, so that aireg still reads it.
   // One that will not read is simply replaced.
   const held = await readLock(roots).catch(() => undefined);
   if (held !== undefined && formatLock(held) === text) return;

@@ -10,8 +10,8 @@ export function findAccount(accounts: readonly Account[], wanted: string): Accou
 }
 
 /**
- * A job keeps an account for a folder or git registry too, which has nothing to sign in
- * to. One whose registry cannot be read now is taken to need a sign-in.
+ * A folder or git registry has nothing to sign in to. One whose registry cannot be
+ * read now is taken to need a sign-in.
  */
 export async function needsSignIn(account: Account): Promise<boolean> {
   try {

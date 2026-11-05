@@ -5,7 +5,6 @@ import { sha256 } from "../spec/canonical.ts";
 import { buildEnvelope, describeFile } from "../spec/envelope.ts";
 import type { Tree } from "./tree.ts";
 
-/** One file an artifact is made of: where it sits in the artifact, and where in the source. */
 export interface ContentFile {
   /** POSIX, relative to the artifact. */
   path: string;
@@ -14,23 +13,22 @@ export interface ContentFile {
   executable: boolean;
 }
 
-/** What a layout knows about an artifact before its files are read. */
 export interface ContentInput {
-  /** Stable for as long as the artifact sits where it does, such as its folder in the source. */
+  /** Stable while the artifact sits where it does, such as its folder in the source. */
   id: string;
   kind: ArtifactKind;
   name: string;
   description?: string | undefined;
-  /** The namespace it is listed under, outside the envelope so it never changes the digest. */
+  /** Kept outside the envelope, so it never changes the digest. */
   group?: string | undefined;
   files: readonly ContentFile[];
-  /** The kind's own document, built from the files alone. */
+  /** Built from the files alone. */
   spec?: Record<string, unknown> | undefined;
 }
 
 /**
- * An artifact whose identity is its content alone: nothing that varies by commit, clock, machine or
- * path enters the envelope, so the same bytes have the same digest wherever they are read.
+ * Nothing that varies by commit, clock, machine or path enters the envelope, so the same bytes
+ * have the same digest wherever they are read.
  */
 export async function contentArtifact(tree: Tree, input: ContentInput): Promise<Artifact> {
   const described = [];

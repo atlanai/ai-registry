@@ -14,7 +14,7 @@ import { artifactRoot } from "./reach.ts";
 import { artifactKey, type Destination, type Planned, type Published } from "./target.ts";
 import { fromPath, type Work } from "./work.ts";
 
-/** Collect publishable exports and reject duplicate kind/name identities. */
+/** Rejects duplicate kind/name identities. */
 export async function exportWork(
   found: ReadonlyMap<string, Export>,
   base: string,
@@ -39,11 +39,9 @@ export async function exportWork(
   return works;
 }
 
-/** Whether a `publish.to` target is the destination `--to` names, as typed or as a folder. */
 export function namesTarget(
   listed: string,
   to: Destination,
-  /** The registry folder `--to` named, when it named one. */
   folder: string | undefined,
   base: string,
 ): boolean {
@@ -52,7 +50,7 @@ export function namesTarget(
   return canonical(resolve(base, listed)) === canonical(join(folder, to.namespace));
 }
 
-/** Exports go to the manifest's one `publish.to` target, so a `--to` naming another is refused. */
+/** Exports go to the manifest's one `publish.to` target, so `--to` naming another is refused. */
 export function chooseTarget(
   target: string,
   to: string | undefined,
@@ -65,11 +63,11 @@ export function chooseTarget(
   });
 }
 
-/** An export left out of this run, and why, as a lowercase clause. */
+/** The reason is a lowercase clause. */
 export interface Skipped {
   name: string;
   kind: ArtifactKind;
-  /** Where it is, relative to the project. */
+  /** Relative to the project. */
   path: string;
   reason: string;
 }
@@ -81,7 +79,6 @@ const skip = (work: Work, base: string, reason: string): Skipped => ({
   reason,
 });
 
-/** The work that goes to the target, and the exports that set `publish: false` to stay here. */
 export function forTarget(
   works: readonly Work[],
   base: string,
@@ -95,7 +92,6 @@ export function forTarget(
   return { works: kept, skipped };
 }
 
-/** Skip unsupported exports and warn when their dependency edges are omitted. */
 export async function takenBy(
   works: readonly Work[],
   registryOf: (work: Work) => Promise<{ alias: string; adapter: SourceAdapter }>,
@@ -128,11 +124,10 @@ export async function takenBy(
   return taken;
 }
 
-/** The work its registry takes, the exports it does not, and a warning for each edge left out. */
 export interface Taken {
   works: Work[];
   skipped: Skipped[];
-  /** The exports left out, by path, so an edge to one is left out too. */
+  /** By path, so an edge to one is left out too. */
   left: Set<string>;
   warnings: string[];
 }
@@ -155,7 +150,7 @@ function localNeeds(entry: Export, found: ReadonlyMap<string, Export>, base: str
     .filter((path) => found.has(path));
 }
 
-/** Order exports after their dependencies and reject cycles. */
+/** Rejects cycles. */
 export function inDependencyOrder(
   works: readonly Work[],
   found: ReadonlyMap<string, Export>,
@@ -185,22 +180,20 @@ export function inDependencyOrder(
   return [...works].sort((left, right) => of(left) - of(right));
 }
 
-/** What a dependency edge is written against: this run's target, and what it holds now. */
 export interface EdgeContext {
   base: string;
-  /** The exports this run leaves out because their registry does not take them, by path. */
+  /** Exports their registry does not take, by path. */
   left?: ReadonlySet<string> | undefined;
   manifest: Manifest;
   lock: Lock;
-  /** Every registry this scope reaches, with folders as absolute paths. */
+  /** Folders as absolute paths. */
   known: Readonly<Record<string, RegistrySource>>;
   target: { registry: string; namespace: string };
   published: Published;
-  /** What this run plans for an export at this path, into the same target. */
   planned: (path: string) => Promise<Planned | undefined>;
 }
 
-/** Resolve local exports and installed artifacts to exact dependency release labels. */
+/** Resolves local exports and installed artifacts to exact release labels. */
 export async function dependsOnFor(
   work: Work,
   context: EdgeContext,
@@ -226,7 +219,7 @@ async function localEdge(
   const { namespace, registry } = context.target;
 
   const path = artifactRoot(resolve(context.base, needed));
-  // Left out because its registry does not take it, so its dependents go without the edge.
+  // Its registry does not take it, so its dependents go without the edge.
   if (context.left?.has(path) === true) return undefined;
   const sent = await context.planned(path);
   const { name, kind } = sent?.work ?? (await fromPath(path));
@@ -304,7 +297,7 @@ function placeOf(location: string): string {
   return isAbsolute(location) ? resolve(location) : comparableLocation(location);
 }
 
-/** Request only publish targets and dependencies by name, without version pins. */
+/** By name, without version pins. */
 export async function publishWants(
   works: readonly Work[],
   where: ReadonlyMap<Work, { registry: string; namespace: string }>,

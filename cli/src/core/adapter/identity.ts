@@ -40,10 +40,7 @@ export function comparableLocation(location: string): string {
   }
 }
 
-/**
- * One spelling for one address, so an endpoint typed with a trailing slash and
- * the same endpoint without one are recognized as the same place.
- */
+/** One spelling per address, so a trailing slash does not make a second place. */
 function canonicalLocation(location: string): string {
   let url: URL;
   try {

@@ -4,8 +4,8 @@ import type { Lock } from "#core/lock.ts";
 import type { ApplyResult } from "#core/plan/apply/run.ts";
 import type { Action } from "#core/plan/model.ts";
 import { resolveTargets } from "#core/target/table.ts";
-import { Printer } from "#core/term/printer.ts";
 import { emptyPlan } from "#test/kit/builders/plan.ts";
+import { capturedPrinter } from "#test/kit/printer.ts";
 import { planReport, summarize } from "./plan.ts";
 
 function printed(
@@ -16,8 +16,7 @@ function printed(
   targetTable = resolveTargets({ HOME: "/home/dev" }),
 ): string[] {
   const lines: string[] = [];
-  const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
-  const printer = new Printer({ out: sink, err: sink, color: "never" });
+  const { printer } = capturedPrinter({ printed: lines, errors: lines });
   const result = {
     performed: {},
     installed: [],
@@ -36,7 +35,7 @@ function printed(
     targetTable,
     scope: "project",
   });
-  return lines;
+  return lines.map((line) => line.trimEnd());
 }
 
 const link = (name: string, target: string) =>
@@ -299,12 +298,14 @@ describe("planReport", () => {
 
   function report(verbose: boolean): string[] {
     const lines: string[] = [];
-    const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
-    const printer = new Printer({ out: sink, err: sink, color: "never", verbose });
+    const { printer } = capturedPrinter({ printed: lines, errors: lines, verbose });
     const shown = planReport(printer);
     shown.plan(plan, { scope: "project", base: process.cwd() } as never, new Set(), chosen);
     for (const action of plan.actions) shown.step(action, plan, chosen);
-    return lines.join("\n").split("\n");
+    return lines
+      .map((line) => line.trimEnd())
+      .join("\n")
+      .split("\n");
   }
 
   test("names the targets each link is for, not the folder it is in", () => {

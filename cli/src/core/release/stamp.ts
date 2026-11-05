@@ -2,10 +2,7 @@ import { setting } from "#core/env.ts";
 import { decodeTrustedKeys, type TrustedKeys } from "./keyring.ts";
 import { type Channel, DEFAULT_CHANNEL, isChannel, normalizeOrigin } from "./origin.ts";
 
-/**
- * Stamped at build time by both builders from one map, never from config or env:
- * a redirectable origin would make the check decorative.
- */
+/** Stamped at build time, never from config or env: a redirectable origin defeats the check. */
 declare const __RELEASE_ORIGIN__: string;
 declare const __RELEASE_KEYRING__: string;
 
@@ -23,10 +20,7 @@ export interface ReleaseStamp {
   readonly keys: TrustedKeys;
 }
 
-/**
- * What this build resolves updates from; undefined for a source or unstamped build,
- * which has no signed channel to read. The parameters are for tests.
- */
+/** Undefined for a source or unstamped build. The parameters are for tests. */
 export function releaseStamp(
   env: NodeJS.ProcessEnv = process.env,
   origin: string = ORIGIN,
@@ -38,10 +32,7 @@ export function releaseStamp(
   return { origin: base, channel: channelFrom(env), keys };
 }
 
-/**
- * The one thing an install may choose, from a closed set: it picks which signed
- * document on the stamped host to read, never a host.
- */
+/** An install may pick which signed document on the stamped host to read, never a host. */
 function channelFrom(env: NodeJS.ProcessEnv): Channel {
   const requested = setting("RELEASE_CHANNEL", env);
   return requested !== undefined && isChannel(requested) ? requested : DEFAULT_CHANNEL;

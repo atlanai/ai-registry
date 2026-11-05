@@ -97,12 +97,19 @@ describe("scopedKeys", () => {
   });
 
   test("names every ref that missed, so one call fixes them all", () => {
-    try {
-      scopedKeys(["sales/deploy", "nope", "also/nope"], catalog, REGISTRY);
-      expect.unreachable("should have thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(RunScopeError);
-      expect((error as RunScopeError).refs).toEqual(["nope", "also/nope"]);
-    }
+    const error = thrownBy(() =>
+      scopedKeys(["sales/deploy", "nope", "also/nope"], catalog, REGISTRY),
+    );
+    expect(error).toBeInstanceOf(RunScopeError);
+    expect((error as RunScopeError).refs).toEqual(["nope", "also/nope"]);
   });
 });
+
+function thrownBy(run: () => unknown): unknown {
+  try {
+    run();
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}

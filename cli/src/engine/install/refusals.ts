@@ -85,8 +85,8 @@ export function keptLines(kept: readonly Kept[]): string[] {
 }
 
 /**
- * A copy the registry now withholds stays installed. A blocked one this run was moving fails it,
- * once the rest is in; one it only held is a warning, so an unrelated add still succeeds.
+ * A withheld copy stays installed. One this run was moving fails it once the rest is in; one it
+ * only held is a warning, so an unrelated add still succeeds.
  */
 export function refuseWithheld(
   plan: Plan,
@@ -115,15 +115,14 @@ function absentLines(absent: readonly Kept[]): string[] {
   );
 }
 
-/** The commands that take each kept row out, said once for all of them. */
 function removeHint(names: readonly string[]): string {
   const commands = names.map((name) => `\`aireg remove ${name}\``);
   return `Run ${list(commands)} to take ${names.length === 1 ? "it" : "them"} out.`;
 }
 
 /**
- * A copy its registry stopped listing stays installed, never removed by a short listing. One this
- * run was moving fails it, once the rest is in; one it only held is a warning.
+ * An unlisted copy stays installed, never removed by a short listing. One this run was moving
+ * fails it once the rest is in; one it only held is a warning.
  */
 export function refuseUnlisted(
   unlisted: readonly Unlisted[],
@@ -155,8 +154,8 @@ export function trustHint(untrusted: readonly Untrusted[]): string {
 }
 
 /**
- * A plugin from a source that is not a registry carrying what a target runs as you installs only
- * once trusted by name; one left out fails the run after the rest is in.
+ * A plugin from a non-registry source carrying what a target runs as you installs only once
+ * trusted by name; one left out fails the run after the rest is in.
  */
 export function refuseUntrusted(untrusted: readonly Untrusted[]): void {
   if (untrusted.length === 0) return;
@@ -166,7 +165,7 @@ export function refuseUntrusted(untrusted: readonly Untrusted[]): void {
   });
 }
 
-/** The refusals every plan passes before a single byte is written. */
+/** Checked before a single byte is written. */
 export function refusePlan(plan: Plan, acquired: readonly Acquired[], lock: Lock): void {
   refuseIncompatible(plan);
   refuseRewritten(plan);
@@ -214,8 +213,8 @@ function refuseConflicts(plan: Plan): void {
 }
 
 /**
- * A target root the run cannot write into fails partway through `apply`,
- * with an errno naming a path but not the target. Asking first leaves it untouched.
+ * An unwritable target root would fail partway through `apply`, with an errno naming a path but
+ * not the target. Asking first leaves it untouched.
  */
 export async function refuseBlocked(plan: Plan): Promise<void> {
   const blocked = await blockedTargets(plan);

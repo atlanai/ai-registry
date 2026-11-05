@@ -23,7 +23,6 @@ export function moved(
   );
 }
 
-/** What the registry serves at the row's address now. */
 function head(found: Scan, entry: LockArtifact): Placement | undefined {
   const acquired = found.acquired.find((item) => item.alias === entry.registry);
   const at = acquired === undefined ? undefined : listedAt(entry, acquired.catalog.entries);
@@ -36,13 +35,11 @@ function older(served: string | undefined, sent: string | undefined): boolean {
   return left !== undefined && right !== undefined && compareVersion(left, right) < 0;
 }
 
-/** Said of a published row the manifest pins, so the lock keeps it where it was. */
 export function pinnedNote(row: string, pinned: string, sent: string | undefined): string {
   const to = sent === undefined ? "" : ` to ${sent}`;
   return `${row} stays at ${pinned} here because the manifest pins it. Change the pin${to} to install what you published.`;
 }
 
-/** Said of a published row the registry does not serve at what was sent, so its copy stays. */
 export function unservedNote(
   found: Scan,
   entry: LockArtifact,

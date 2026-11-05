@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
 import { stopEverything, survey } from "./uninstall.ts";
 
-// Never the real service manager or daemon: each is what this machine happens to run.
+// Never the real service manager or daemon, which depend on this machine.
 const machine = vi.hoisted(() => ({
   running: false,
   registered: false,

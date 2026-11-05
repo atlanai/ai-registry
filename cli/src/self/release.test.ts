@@ -1,15 +1,13 @@
-import { generateKeyPairSync, sign } from "node:crypto";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { releaseBinary } from "#core/product.ts";
-import { decodeTrustedKeys } from "#core/release/keyring.ts";
 import { canonicalPayload, type ReleaseManifest } from "#core/release/manifest.ts";
 import { releasePlatform } from "#core/release/platform.ts";
 import type { ReleaseStamp } from "#core/release/stamp.ts";
+import { manifestDocument, RELEASE_ORIGIN, releaseSigner } from "#test/kit/release.ts";
 import { downloadRelease, resolveRelease } from "./release.ts";
 
-// The stamp is build-time only by design, so a test substitutes one here
-// rather than the code growing an environment override to let it in.
+// The stamp is build-time only by design, so a test mocks it instead of an env override.
 const stub = vi.hoisted(() => ({ stamp: undefined as ReleaseStamp | undefined }));
 
 vi.mock("#core/release/stamp.ts", async (importOriginal) => {
@@ -20,7 +18,7 @@ vi.mock("#core/release/stamp.ts", async (importOriginal) => {
   };
 });
 
-const ORIGIN = "https://releases.example.com/aireg";
+const ORIGIN = RELEASE_ORIGIN;
 const MANIFEST = `${ORIGIN}/channels/stable/manifest.json`;
 /** This host's own artifact, so the derived URL is the one the client builds. */
 const PLATFORM = releasePlatform();
@@ -30,17 +28,6 @@ const ARTIFACT = `${ORIGIN}/artifacts/v0.2.0/${BINARY}`;
 const EVIL = "https://evil.example/pwn";
 
 const payload = new TextEncoder().encode("a standalone executable");
-
-function stamped(): { stamp: ReleaseStamp; sign: (bytes: Uint8Array) => string } {
-  const pair = generateKeyPairSync("ed25519");
-  const jwk = pair.publicKey.export({ format: "jwk" });
-  const encoded = Buffer.from(String(jwk.x), "base64url").toString("base64");
-  const keyring = Buffer.from(JSON.stringify({ release: encoded }), "utf8").toString("base64");
-  const keys = decodeTrustedKeys(keyring);
-  if (keys === undefined) throw new Error("keyring did not decode");
-  const stamp: ReleaseStamp = { origin: ORIGIN, channel: "stable", keys };
-  return { stamp, sign: (bytes) => sign(null, bytes, pair.privateKey).toString("base64") };
-}
 
 function manifestOf(over: Partial<ReleaseManifest> = {}): ReleaseManifest {
   return {
@@ -60,16 +47,7 @@ function document(
   url = ARTIFACT,
   keyId = "release",
 ): string {
-  return JSON.stringify({
-    schema: "aireg-manifest.v1",
-    adapter: manifest.adapter,
-    channel: manifest.channel,
-    version: manifest.version,
-    minimum_version: manifest.minimumVersion,
-    published_at: manifest.publishedAt,
-    artifacts: manifest.artifacts.map((artifact) => ({ ...artifact, url })),
-    signatures: [{ algorithm: "ed25519", key_id: keyId, value: signature }],
-  });
+  return JSON.stringify(manifestDocument(manifest, signature, url, keyId));
 }
 
 function origin(body: string, bytes: Uint8Array, seen: string[]): typeof fetch {
@@ -89,7 +67,7 @@ beforeEach(() => {
 
 describe("resolveRelease from the signed channel", () => {
   test("reads the stable manifest and derives the artifact URL", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     stub.stamp = keys.stamp;
     const manifest = manifestOf();
     const seen: string[] = [];
@@ -111,7 +89,7 @@ describe("resolveRelease from the signed channel", () => {
   });
 
   test("never fetches the manifest's own url field", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     stub.stamp = keys.stamp;
     const manifest = manifestOf();
     const seen: string[] = [];
@@ -125,7 +103,7 @@ describe("resolveRelease from the signed channel", () => {
   });
 
   test("aborts the update when the payload does not match the signed digest", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     stub.stamp = keys.stamp;
     const manifest = manifestOf();
     const body = document(manifest, keys.sign(canonicalPayload(manifest)));
@@ -137,7 +115,7 @@ describe("resolveRelease from the signed channel", () => {
   });
 
   test("aborts the update when the payload is not the signed size", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     stub.stamp = keys.stamp;
     const manifest = manifestOf();
     const body = document(manifest, keys.sign(canonicalPayload(manifest)));
@@ -148,7 +126,7 @@ describe("resolveRelease from the signed channel", () => {
   });
 
   test("refuses a manifest this build has no key for", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     stub.stamp = keys.stamp;
     const signature = keys.sign(canonicalPayload(manifestOf()));
     const body = document(manifestOf(), signature, ARTIFACT, "rotated-out");
@@ -158,7 +136,7 @@ describe("resolveRelease from the signed channel", () => {
   });
 
   test("refuses a release the channel does not carry the payload for", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     stub.stamp = keys.stamp;
     const manifest = manifestOf({
       artifacts: [{ name: "aireg-plan9-sparc", sha256: "c".repeat(64), size: 9 }],
@@ -170,7 +148,7 @@ describe("resolveRelease from the signed channel", () => {
   });
 
   test("refuses an adapter's release served as its own", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     stub.stamp = keys.stamp;
     const manifest = manifestOf({ adapter: "acme" });
     const body = document(manifest, keys.sign(canonicalPayload(manifest)));
@@ -180,8 +158,6 @@ describe("resolveRelease from the signed channel", () => {
   });
 });
 
-// There is no second source: an unverifiable update is refused rather than
-// resolved to a download that cannot exist.
 describe("with no channel to read", () => {
   test("refuses an unstamped build rather than reach for an unsigned binary", async () => {
     await expect(resolveRelease({}, async () => new Response())).rejects.toThrow(

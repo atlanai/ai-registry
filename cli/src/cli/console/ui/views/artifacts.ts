@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { windowAround } from "#cli/console/data/list.ts";
-import { summaryStrip } from "#cli/console/ui/chrome.ts";
+import { groupTag, summaryStrip } from "#cli/console/ui/chrome.ts";
 import { action, box, dim, faint, plain, text } from "#cli/console/ui/elements.ts";
 import { LAYOUT, listRowAt } from "#cli/console/ui/mouse.ts";
 import { importNow, planForLine } from "#cli/console/ui/publish.ts";
@@ -180,11 +180,7 @@ function groupLine(
       text({ color: COLOR.yellow }, `${folded ? GLYPH.folded : GLYPH.open} `),
       text({ color: COLOR.white, bold: true }, pad(group.label, cols.name)),
       dim(pad(`${group.rows.length} artifacts`, cols.version + 4)),
-      group.isDefault
-        ? text({ color: COLOR.yellow }, pad("default", cols.targets))
-        : group.authoredHere
-          ? faint(pad("authored here", cols.targets))
-          : plain(" ".repeat(cols.targets)),
+      groupTag(group, cols.targets),
       counts(group),
     ),
     publishes
@@ -238,16 +234,14 @@ function artifactLine(
         ),
       ),
     ),
-    !publishes
-      ? row.state === "edited"
-        ? faint("publish into your clone")
-        : plain("")
-      : canPublish
-        ? action("p", row.carriedBy === undefined ? "publish" : "import now")
-        : row.state === "duplicate"
-          ? faint("rename to publish")
-          : plain(""),
+    rowAction(row, publishes, canPublish),
   );
+}
+
+function rowAction(row: ArtifactRow, publishes: boolean, canPublish: boolean): ReactElement {
+  if (!publishes) return row.state === "edited" ? faint("publish into your clone") : plain("");
+  if (canPublish) return action("p", row.carriedBy === undefined ? "publish" : "import now");
+  return row.state === "duplicate" ? faint("rename to publish") : plain("");
 }
 
 function tally(state: ConsoleState): ReactElement {

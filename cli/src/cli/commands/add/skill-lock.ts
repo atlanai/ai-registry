@@ -8,27 +8,21 @@ import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeText } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 
-/** One skill another installer recorded, as aireg reads it again. */
 export interface LockedSkill {
-  /** The name it was installed under, which is the key it is recorded by. */
   name: string;
-  /** Where aireg reads it from: a repository's address, or a site's. */
   address: string;
   ref: string | undefined;
-  /** Its folder in the source, from the path the file gives its SKILL.md. */
   folder: string;
 }
 
-/** What a lock file of another installer asks for, and what aireg could not read of it. */
 export interface SkillLock {
   skills: LockedSkill[];
-  /** One sentence for each entry left out. */
   skipped: string[];
   /** The file describes a user's own skills, which go into the user scope. */
   user: boolean;
 }
 
-/** `owner/repo` on a code host, as these files write a repository there. */
+/** `owner/repo` shorthand for a code host repository. */
 const SHORTHAND = /^[\w.-]+\/[\w.-]+$/;
 
 const HOSTS: Readonly<Record<string, string>> = { github: "github.com", gitlab: "gitlab.com" };
@@ -36,10 +30,7 @@ const HOSTS: Readonly<Record<string, string>> = { github: "github.com", gitlab: 
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 
-/**
- * Reads a project's `skills-lock.json` or a user's `.skill-lock.json`: a version and a map of skill
- * name to where it came from. Fields aireg does not know are passed over, never copied anywhere.
- */
+/** Reads `skills-lock.json` or `.skill-lock.json`; unknown fields are never copied anywhere. */
 export async function readSkillLock(path: string): Promise<SkillLock> {
   const contents = await ifPresent(readFile(path, "utf8"));
   if (contents === undefined) {
@@ -85,7 +76,7 @@ export async function readSkillLock(path: string): Promise<SkillLock> {
   return { skills, skipped, user };
 }
 
-/** The address an entry's source names, or why aireg does not read it. Nothing else is taken from it. */
+/** The address an entry names, or why it is skipped; nothing else is taken from it. */
 function addressOf(entry: Record<string, unknown>): string | { skip: string } {
   const type = text(entry.sourceType);
   const source = text(entry.sourceUrl) ?? text(entry.source);

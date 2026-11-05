@@ -9,7 +9,7 @@ const RELEASE_CODES: ReadonlySet<ErrorCode> = new Set([
 ]);
 
 /**
- * A release check's failure with the command's hint attached and its code kept;
+ * A release check's failure gets the hint and keeps its code;
  * any other deliberate failure passes through unchanged.
  */
 export function withReleaseHint(error: unknown, hint: string): AiregError {

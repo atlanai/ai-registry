@@ -4,7 +4,7 @@ import type { Lock, LockArtifact } from "#core/lock.ts";
 import { reaches } from "#core/manifest/match.ts";
 import { parseRef, type Ref } from "#core/ref.ts";
 
-/** Each installed artifact's shortest name that no other artifact in the scope shares. */
+/** Each installed artifact's shortest name no other artifact shares. */
 export function shownNames(lock: Lock): Map<string, string> {
   const rows = Object.entries(lock.artifacts);
   const written = rows.map(([key, row]) => forms(key, row));
@@ -20,10 +20,10 @@ export function shownNames(lock: Lock): Map<string, string> {
   );
 }
 
-/** The ways to write one installed artifact, shortest first; the last is unique in any scope. */
+/** Shortest first; the last is unique in any scope. */
 function forms(key: string, row: LockArtifact): string[] {
   const namespace = row.namespace === undefined ? [] : [row.namespace];
-  // Installed under a name of its own, that name is the one its target shows.
+  // A row installed under its own name shows that name in its target.
   const own = !key.includes("/") && key !== row.name ? [key] : [];
   return [
     ...own,
@@ -35,10 +35,7 @@ function forms(key: string, row: LockArtifact): string[] {
   ];
 }
 
-/**
- * The installed rows a name or address reaches. `whole` says it named a whole
- * registry or namespace, which means several; a name meaning several is ambiguous.
- */
+/** `whole`: it named a whole registry or namespace; otherwise a name meaning several is ambiguous. */
 export function matchInstalled(input: string, lock: Lock): { rows: string[]; whole: boolean } {
   const written = Object.entries(lock.artifacts).filter(
     ([key, row]) => forms(key, row).includes(input) || row.name === sanitizeName(input),
@@ -60,10 +57,7 @@ function parsed(input: string): Ref | undefined {
   }
 }
 
-/**
- * Accepts any address `add` does, as well as installed names, so
- * `remove acme/platform/skill/lint` undoes `add acme/platform/skill/lint`.
- */
+/** Takes any address `add` does, so `remove <address>` undoes `add <address>`. */
 export function rowsNamed(input: string, lock: Lock): string[] {
   const { rows, whole } = matchInstalled(input, lock);
   if (rows.length === 0) {

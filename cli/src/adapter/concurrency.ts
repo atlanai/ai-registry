@@ -19,10 +19,7 @@ export function limiter(limit: number): <T>(task: () => Promise<T>) => Promise<T
   };
 }
 
-/**
- * Like `limiter`, but weighted: light tasks run together and a heavy one waits for room. A task
- * heavier than the whole budget still runs, alone, rather than never.
- */
+/** Light tasks run together and a heavy one waits for room; one over the whole budget runs alone. */
 export function weighted(
   budget: number,
 ): <T>(weight: number, task: () => Promise<T>) => Promise<T> {

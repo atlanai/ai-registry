@@ -3,7 +3,7 @@ import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 
 export interface Problem {
-  /** Root-relative, POSIX: the file or folder to look at. */
+  /** Root-relative, POSIX. */
   path: string;
   message: string;
   /** The command, or the edit, that fixes it. */

@@ -36,10 +36,11 @@ describe("a watch job over a namespace your user scope installs", () => {
       expect((await aireg(["registry", "index"], { cwd: reg })).code).toBe(0);
     };
     // Tests about the job's configuration alone skip the first publish.
-    if (published) {
+    const publishFirst = async () => {
       await run();
       expect(await readFile(versions, "utf8")).toContain('"0.1.0"');
-    }
+    };
+    if (published) await publishFirst();
     return { notes, versions, run, teammate, job };
   };
 

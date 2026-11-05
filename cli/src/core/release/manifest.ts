@@ -16,17 +16,14 @@ import { type Channel, isAdapterId, isChannel } from "./origin.ts";
 export const MANIFEST_SCHEMA = `${NAME}-manifest.v1`;
 export const MAX_MANIFEST_BYTES = 1 << 20;
 
-/**
- * A sanity bound on a signed number, not a security boundary: the download is
- * held to the exact `size` the manifest states.
- */
+/** A sanity bound, not a security boundary: the download is held to the stated `size`. */
 const MAX_ARTIFACT_BYTES = 192 * 1024 * 1024;
 const MAX_ARTIFACTS = 8;
 const MAX_SIGNATURES = 8;
 const ARTIFACT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 
-/** Strict on the way in: an unknown field is refused, not ignored. */
+/** An unknown field is refused, not ignored. */
 const MANIFEST_KEYS = [
   "schema",
   "adapter",
@@ -37,7 +34,7 @@ const MANIFEST_KEYS = [
   "artifacts",
   "signatures",
 ];
-/** `url` is published for people to download by hand; it is unsigned and never read. */
+/** `url` is for downloading by hand; it is unsigned and never read. */
 const ARTIFACT_KEYS = ["name", "sha256", "size", "url"];
 const SIGNATURE_KEYS = ["algorithm", "key_id", "value"];
 
@@ -62,10 +59,7 @@ interface ManifestSignature {
   readonly value: Uint8Array;
 }
 
-/**
- * The exact bytes every manifest signature covers, rebuilt from the validated
- * fields so transport whitespace and key order cannot change them.
- */
+/** Rebuilt from validated fields so whitespace and key order cannot change the signed bytes. */
 export function canonicalPayload(manifest: ReleaseManifest): Uint8Array {
   // `adapter` is omitted when absent, so releases signed before the field still verify.
   return new TextEncoder().encode(
@@ -192,8 +186,8 @@ function parseSignatures(raw: unknown): ManifestSignature[] | undefined {
 }
 
 /**
- * One trusted signature is enough, but a bad signature from a trusted key is
- * fatal: that is a broken or substituted publisher, not an unknown one.
+ * One trusted signature is enough, but a bad one from a trusted key is fatal:
+ * that is a broken or substituted publisher, not an unknown one.
  */
 function verifySignatures(
   payload: Uint8Array,

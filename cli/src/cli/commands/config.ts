@@ -11,8 +11,8 @@ import { table } from "#core/term/table.ts";
 import { action, defineCommand } from "./define.ts";
 
 /**
- * Only the settings a person sets by hand. Accounts and jobs have their own
- * commands: writing them here would mean editing a credential or a schedule.
+ * Only settings a person sets by hand. Accounts and jobs have their own commands:
+ * writing them here would mean editing a credential or a schedule.
  */
 const SETTINGS = {
   "defaults.namespace": {

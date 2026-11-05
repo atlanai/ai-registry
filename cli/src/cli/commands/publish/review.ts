@@ -13,15 +13,19 @@ export function describeSkip(skip: Skipped, namespace: string): string {
   return `  skip    ${namespace}/${skip.kind}/${skip.name}  ${skip.reason}`;
 }
 
+interface Review {
+  planned: Sending;
+  open: (alias: string) => Promise<Published>;
+  dryRun: boolean;
+  asks: (alias: string) => Promise<boolean>;
+  skipped: { into: string; namespace: string; skipped: readonly Skipped[] } | undefined;
+}
+
 /** The plan, then one question; what is already published is shown and never sent. */
 export async function review(
   context: CommandContext,
   step: Interaction,
-  planned: Sending,
-  open: (alias: string) => Promise<Published>,
-  dryRun: boolean,
-  asks: (alias: string) => Promise<boolean>,
-  skipped: { into: string; namespace: string; skipped: readonly Skipped[] } | undefined,
+  { planned, open, dryRun, asks, skipped }: Review,
 ): Promise<Sending | undefined> {
   const printer = context.printer;
   const lines: string[] = [];

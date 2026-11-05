@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { ArtifactStatus } from "#core/plan/status.ts";
 import { resolveTargets } from "#core/target/table.ts";
-import { Printer } from "#core/term/printer.ts";
+import { capturedPrinter } from "#test/kit/printer.ts";
 import { withoutKind } from "#test/kit/target.ts";
 import type { Installed } from "./installed.ts";
 import { renderStatus } from "./status.ts";
@@ -13,10 +13,9 @@ const chosen = {
 
 function rendered(statuses: ArtifactStatus[], rows: Installed[], targetTable = chosen.targetTable) {
   const lines: string[] = [];
-  const sink = { write: (chunk: string) => lines.push(chunk.trimEnd()), isTTY: false };
-  const printer = new Printer({ out: sink, err: sink, color: "never" });
+  const { printer } = capturedPrinter({ printed: lines, errors: lines });
   renderStatus(printer, statuses, rows, "project", { ...chosen, targetTable });
-  return lines;
+  return lines.map((line) => line.trimEnd());
 }
 
 const row = (name: string, kind: string, extra: Partial<Installed> = {}): Installed => ({

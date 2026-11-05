@@ -11,7 +11,6 @@ import type { Conflict, Need, Unresolved } from "./depends.ts";
 import type { Untrusted } from "./select.ts";
 import type { Unlisted } from "./unlisted.ts";
 
-/** One resolved registry, in the shape the lock stores. */
 export interface Origin {
   adapter: string;
   /** Expanded for the adapter to read; absolute where it is a path. */
@@ -45,7 +44,6 @@ export interface Placement {
   leftOut?: { entry: string; files: readonly string[] } | undefined;
 }
 
-/** A resolved registry with lazy access to artifact content. */
 export interface Acquired {
   alias: string;
   origin: Origin;
@@ -155,7 +153,6 @@ export interface Plan {
   untrusted: Untrusted[];
 }
 
-/** An installed artifact the plan keeps, by its installed name, at the version it has. */
 export interface Kept {
   name: string;
   installed: string | undefined;

@@ -4,15 +4,14 @@ import { join, posix } from "node:path";
 import { EXECUTE_BITS, isAbsent } from "../files.ts";
 import { type ReadPath, SpecError } from "../filespec/documents.ts";
 import { registryPath, rootReader } from "../filespec/folder.ts";
-import { plural } from "../text.ts";
+import { byCodeUnit, plural } from "../text.ts";
 
-/** How much of a source one read may walk. A source is untrusted, so each is a hard stop. */
+/** A source is untrusted, so each limit is a hard stop. */
 export interface TreeLimits {
-  /** Folders below the folder a walk starts at. */
+  /** Counted from the folder a walk starts at. */
   depth: number;
-  /** Files across every walk of one source. */
+  /** Counted across every walk of one source, as `bytes` is. */
   files: number;
-  /** Bytes across every walk of one source. */
   bytes: number;
 }
 
@@ -20,52 +19,43 @@ const MB = 1024 * 1024;
 
 export const TREE_LIMITS: TreeLimits = { depth: 12, files: 10_000, bytes: 256 * MB };
 
-/** Folders a source keeps for its own tooling, never content. */
 const SKIPPED_FOLDERS = new Set(["node_modules", ".git", "dist", "build"]);
 
-/** A hidden folder is skipped unless a layout reads it, as Claude Code and Codex folders are. */
+// Hidden folders are skipped except these, which layouts read.
 const READ_HIDDEN = new Set([".claude", ".agents", ".claude-plugin", ".codex-plugin"]);
 
-/** Files an operating system leaves behind, which no artifact means to ship. */
 const OS_FILES = new Set([".DS_Store", "Thumbs.db", "desktop.ini"]);
 
-/** One regular file, POSIX and relative to the tree's root. */
 interface TreeFile {
   path: string;
   size: number;
   executable: boolean;
 }
 
-/** Something a walk left out, for a warning. */
 export interface Skip {
   path: string;
-  /** Lowercase, to end a sentence with: `is a symlink`. */
+  /** Ends a sentence, such as `is a symlink`. */
   reason: string;
 }
 
-/** One entry of a folder, as `list` gives it. */
 interface TreeEntry {
   name: string;
-  /** POSIX, relative to the root. */
   path: string;
   type: "file" | "folder" | "link" | "other";
 }
 
-/** A folder on disk read without following a link, within the limits it was opened with. */
+/** A folder on disk read without following a link, within its limits. */
 export interface Tree {
-  /** The folder every path is relative to. */
   root: string;
-  /** What a folder holds, sorted by name; nothing when it is not there. */
+  /** Sorted by name; empty when the folder is not there. */
   list(dir: string): Promise<TreeEntry[]>;
-  /** Every regular file below `dir`, sorted by path, with what was left out. */
+  /** Regular files sorted by path. */
   walk(dir: string): Promise<{ files: TreeFile[]; skipped: Skip[] }>;
-  /** One file's bytes, refusing a link anywhere on the way. */
+  /** Refuses a link anywhere on the way. */
   read: ReadPath;
-  /** Whether `path` is a regular file, reached without a link. */
   isFile(path: string): Promise<boolean>;
 }
 
-/** Whether a walk descends into a folder of this name. */
 export function walksInto(name: string): boolean {
   if (SKIPPED_FOLDERS.has(name)) return false;
   return !name.startsWith(".") || READ_HIDDEN.has(name);
@@ -73,7 +63,7 @@ export function walksInto(name: string): boolean {
 
 const at = (dir: string, name: string) => (dir === "" ? name : `${dir}/${name}`);
 
-/** Opens `root` for bounded reading. The root itself must not be a link. */
+/** The root itself must not be a link. */
 export async function openTree(root: string, limits: TreeLimits = TREE_LIMITS): Promise<Tree> {
   await registryPath(root, "", true);
   const reader = rootReader(root);
@@ -90,7 +80,7 @@ export async function openTree(root: string, limits: TreeLimits = TREE_LIMITS): 
     );
     return entries
       .map((entry) => ({ name: entry.name, path: at(dir, entry.name), type: typeOf(entry) }))
-      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      .sort((a, b) => byCodeUnit(a.name, b.name));
   };
 
   const count = (path: string, size: number): void => {
@@ -133,7 +123,7 @@ export async function openTree(root: string, limits: TreeLimits = TREE_LIMITS): 
       }
     };
     await descend(dir, 0);
-    found.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    found.sort((a, b) => byCodeUnit(a.path, b.path));
     return { files: found, skipped };
   };
 
@@ -164,7 +154,6 @@ type Step =
   | { kind: "file"; file: TreeFile }
   | { kind: "none" };
 
-/** What a walk does with one entry: descend into it, keep it, or say why it was left out. */
 async function stepOf(
   entry: TreeEntry,
   depth: number,

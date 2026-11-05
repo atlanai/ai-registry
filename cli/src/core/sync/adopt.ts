@@ -17,18 +17,17 @@ import { targetRoot } from "#core/target/roots.ts";
 export interface Candidate {
   name: string;
   kind: ArtifactKind;
-  /** Absolute path to the content a person wrote. */
+  /** Absolute. */
   from: string;
-  /** Target it was found in, so a report can say where. */
   target: string;
-  /** Where it would sit in a registry laid out the standard way. */
+  /** Where a standard registry layout would file it. */
   suggestedPath: string;
   description: string | undefined;
-  /** The same artifact in the other target directories, which a report names once. */
+  /** The same artifact in other target directories, which a report names once. */
   elsewhere: { from: string; target: string }[];
 }
 
-/** Where a registry would file this kind: the scanner's table read the other way, so a scan finds it again. */
+/** The scanner's table read in reverse, so a scan finds the result again. */
 export function registryPath(kind: ArtifactKind, name: string, from: string): string {
   const spec = KIND_SPECS[kind];
   if (spec.shape === "directory") return posix.join(spec.dir, name);
@@ -37,29 +36,23 @@ export function registryPath(kind: ArtifactKind, name: string, from: string): st
   return posix.join(spec.dir, `${name}${extension}`);
 }
 
-/**
- * The reverse of projection: anything in a target directory that is not a link
- * into this scope's own trees, and that the lock does not claim, is local work.
- */
+/** Anything in a target directory that is not our link and not in the lock is local work. */
 export async function candidates(
   roots: Roots,
   targetTable: Targets,
   targets: readonly string[],
   lock: Lock,
-  /**
-   * `kind:name` for everything the registries publish. A name they already
-   * publish is not local work; it is an artifact this project has not declared.
-   */
+  /** `kind:name` the registries publish: such a name is undeclared, not local work. */
   published: ReadonlySet<string> = new Set(),
   { report = false }: ScanOptions = {},
 ): Promise<{ local: Candidate[]; undeclared: Candidate[] }> {
   const claimed = claimedPaths(roots, lock);
   const found = new Map<string, Candidate>();
 
-  for (const { target, root, kind, mapping } of kindDirs(roots, targetTable, targets, report)) {
-    const items = await collectKindCandidates(roots, root, target, kind, mapping, claimed, report);
+  for (const dir of kindDirs(roots, targetTable, targets, report)) {
+    const items = await collectKindCandidates({ ...dir, roots, claimed, followLinks: report });
     for (const item of items) {
-      const key = `${kind}:${item.name}`;
+      const key = `${dir.kind}:${item.name}`;
       const first = found.get(key);
       if (first === undefined) found.set(key, item);
       else first.elsewhere.push({ from: item.from, target: item.target });
@@ -85,8 +78,7 @@ function claimedPaths(roots: Roots, lock: Lock): Set<string> {
       // A link whose target is gone does not resolve, so it is also claimed by its own place.
       claimed.add(join(canonical(dirname(path)), basename(path)));
     }
-    // A row authored here has no link - the folder it came from is already
-    // where the target reads it - so its origin is what marks it as spoken for.
+    // A row authored here has no link, since the target reads its folder, so its origin claims it.
     if (entry.origin !== undefined) {
       claimed.add(canonical(resolve(roots.base, entry.origin.path)));
     }
@@ -112,8 +104,7 @@ function kindDirs(
     const target = targetTable[name];
     if (target === undefined) continue;
     const root = targetRoot(target, { scope: roots.scope, cwd: roots.cwd, env: process.env });
-    // `SCANNED_KINDS`, not every kind: a target may keep plugins and skills in
-    // one folder, so walking both would report every skill twice.
+    // A target may keep plugins and skills in one folder; walking both would report skills twice.
     for (const kind of SCANNED_KINDS) {
       const mapping = target.kinds[kind];
       if (mapping?.subdir === undefined) continue;
@@ -125,16 +116,21 @@ function kindDirs(
   return dirs;
 }
 
-/** Everything of one kind sitting in a target directory that is neither claimed nor assembled by us. */
-async function collectKindCandidates(
-  roots: Roots,
-  root: string,
-  targetName: string,
-  kind: ArtifactKind,
-  mapping: KindMapping & { subdir: string },
-  claimed: ReadonlySet<string>,
-  followLinks: boolean,
-): Promise<Candidate[]> {
+interface KindScan extends KindDir {
+  roots: Roots;
+  claimed: ReadonlySet<string>;
+  followLinks: boolean;
+}
+
+async function collectKindCandidates({
+  roots,
+  root,
+  target,
+  kind,
+  mapping,
+  claimed,
+  followLinks,
+}: KindScan): Promise<Candidate[]> {
   const dir = join(root, mapping.subdir);
 
   const listing = (await ifReadable(readdir(dir))) ?? [];
@@ -166,7 +162,7 @@ async function collectKindCandidates(
       name: entry.name,
       kind,
       from: full,
-      target: targetName,
+      target,
       suggestedPath: registryPath(kind, entry.name, full),
       description: entry.description,
       elsewhere: [],
@@ -175,24 +171,17 @@ async function collectKindCandidates(
   return found;
 }
 
-/**
- * A report lists everything a target loads, links of yours and files in its own
- * format included; adoption reads only what it could publish.
- */
+/** A report lists everything a target loads; adoption reads only what it could publish. */
 interface ScanOptions {
   report?: boolean;
 }
 
-/** The kind's own entry file, where it declares one; a target lays out the rest. */
 function entryOf(kind: ArtifactKind): { entry?: string } {
   const entry = KIND_SPECS[kind].entry;
   return entry === undefined ? {} : { entry };
 }
 
-/**
- * A directory we assembled rather than one a person wrote: a namespace is
- * projected as a directory of links into this scope's own tree.
- */
+/** A namespace is projected as a directory of links into our tree, so it is ours, not a person's. */
 async function holdsStagedLink(roots: Roots, full: string): Promise<boolean> {
   const names = (await ifReadable(readdir(full))) ?? [];
   for (const name of names) {
@@ -233,7 +222,7 @@ export async function danglingLinks(
 
 export interface DanglingLink {
   path: string;
-  /** What the link names, as written. */
+  /** As written. */
   linksTo: string;
   target: string;
 }
@@ -248,7 +237,6 @@ async function reachable(path: string): Promise<boolean> {
   }
 }
 
-/** Relative and POSIX, for reporting where inside the project it sits. */
 export function displayPath(roots: Roots, path: string): string {
   return posixRelative(roots.base, path);
 }

@@ -2,7 +2,7 @@ import { posix } from "node:path";
 import type { Artifact } from "../contract.ts";
 import { isArtifactName, isNamespace } from "../filespec/names.ts";
 import { SKILL_ENTRY } from "../kinds.ts";
-import { quoted } from "../text.ts";
+import { byCodeUnit, quoted } from "../text.ts";
 import { type ContentFile, contentArtifact } from "./content-artifact.ts";
 import { type Frontmatter, readFrontmatter, textField } from "./frontmatter.ts";
 import type { Found, Layout, LayoutContext } from "./model.ts";
@@ -14,13 +14,12 @@ export const ROOT_ID = ".";
 /** The file an agent travels as, as the file spec names it. */
 const AGENT_FILE = "AGENT.md";
 
-/** How far below the root a skill's folder may sit: `skills/<group>/<name>` is three. */
+/** `skills/<group>/<name>` is three. */
 const SKILL_DEPTH = 3;
 
-/** Folders whose `*.md` files are agents, each one file. */
 const AGENT_FOLDERS = ["agents", ".claude/agents"];
 
-/** Folders that hold only skills, where a link left out is worth saying. */
+/** Folders that hold only skills, where a skipped link is worth a warning. */
 const SKILL_FOLDERS = ["skills", ".claude/skills", ".agents/skills"];
 
 const holdsSkills = (dir: string) =>
@@ -28,7 +27,6 @@ const holdsSkills = (dir: string) =>
 
 export interface Candidate {
   kind: "skill" | "agent";
-  /** The skill's folder, or the agent's file. */
   at: string;
   name: string;
   namespace: string;
@@ -58,7 +56,7 @@ async function candidates(tree: Tree, context: LayoutContext, warnings: string[]
   return found;
 }
 
-/** Skill folders up to `SKILL_DEPTH` below the root, never looking inside one it found. */
+/** Never looks inside a skill folder it found. */
 async function skillFolders(tree: Tree, warnings: string[]): Promise<string[]> {
   if (await tree.isFile(SKILL_ENTRY)) return [""];
   const found: string[] = [];
@@ -98,10 +96,10 @@ async function agentFiles(tree: Tree, warnings: string[]): Promise<string[]> {
 
 const shown = (candidate: Candidate) => candidate.at;
 
-/** Duplicates of one namespace, kind and name keep the first in path order, loudly. */
+/** Duplicates keep the first in path order, with a warning. */
 function deduplicated(found: readonly Candidate[], warnings: string[]): Candidate[] {
   const kept = new Map<string, Candidate>();
-  for (const candidate of [...found].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))) {
+  for (const candidate of [...found].sort((a, b) => byCodeUnit(a.at, b.at))) {
     if (!isArtifactName(candidate.name)) {
       warnings.push(
         `Skipped ${shown(candidate)}: ${quoted(candidate.name)} is not a name aireg installs, which takes lowercase letters, digits and hyphens.`,
@@ -121,7 +119,6 @@ function deduplicated(found: readonly Candidate[], warnings: string[]): Candidat
   return [...kept.values()];
 }
 
-/** One skill folder or agent file as an artifact with a content-only envelope. */
 export async function artifactOf(
   tree: Tree,
   candidate: Candidate,

@@ -1,30 +1,17 @@
-import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, test } from "vitest";
 import { ErrorCode } from "#core/errors.ts";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { RELEASE_ADAPTER_FILE } from "#core/product.ts";
-import { decodeTrustedKeys } from "#core/release/keyring.ts";
 import { canonicalPayload, type ReleaseManifest } from "#core/release/manifest.ts";
-import type { ReleaseStamp } from "#core/release/stamp.ts";
+import { manifestDocument, RELEASE_ORIGIN, releaseSigner } from "#test/kit/release.ts";
 import { downloadAdapter, resolveAdapter } from "./fetch.ts";
 
-const ORIGIN = "https://releases.example.com/aireg";
+const ORIGIN = RELEASE_ORIGIN;
 const CHANNEL = `${ORIGIN}/adapters/acme/channels/stable/manifest.json`;
 const VERSION_MANIFEST = `${ORIGIN}/adapters/acme/artifacts/v1.4.0/manifest.json`;
 const ARTIFACT = `${ORIGIN}/adapters/acme/artifacts/v1.4.0/${RELEASE_ADAPTER_FILE}`;
 const EVIL = "https://evil.example/pwn";
 const payload = new TextEncoder().encode("export default { id: 'acme' };\n");
-
-function stamped(): { stamp: ReleaseStamp; sign: (bytes: Uint8Array) => string } {
-  const pair = generateKeyPairSync("ed25519");
-  const jwk = pair.publicKey.export({ format: "jwk" });
-  const encoded = Buffer.from(String(jwk.x), "base64url").toString("base64");
-  const keyring = Buffer.from(JSON.stringify({ release: encoded }), "utf8").toString("base64");
-  const keys = decodeTrustedKeys(keyring);
-  if (keys === undefined) throw new Error("keyring did not decode");
-  const stamp: ReleaseStamp = { origin: ORIGIN, channel: "stable", keys };
-  return { stamp, sign: (bytes) => sign(null, bytes, pair.privateKey).toString("base64") };
-}
 
 function manifestOf(over: Partial<ReleaseManifest> = {}): ReleaseManifest {
   return {
@@ -41,16 +28,7 @@ function manifestOf(over: Partial<ReleaseManifest> = {}): ReleaseManifest {
 }
 
 function document(manifest: ReleaseManifest, signature: string, url = ARTIFACT): string {
-  return JSON.stringify({
-    schema: "aireg-manifest.v1",
-    adapter: manifest.adapter,
-    channel: manifest.channel,
-    version: manifest.version,
-    minimum_version: manifest.minimumVersion,
-    published_at: manifest.publishedAt,
-    artifacts: manifest.artifacts.map((artifact) => ({ ...artifact, url })),
-    signatures: [{ algorithm: "ed25519", key_id: "release", value: signature }],
-  });
+  return JSON.stringify(manifestDocument(manifest, signature, url));
 }
 
 function origin(bodies: Record<string, string>, bytes: Uint8Array, seen: string[]): typeof fetch {
@@ -66,7 +44,7 @@ function origin(bodies: Record<string, string>, bytes: Uint8Array, seen: string[
 
 describe("resolveAdapter", () => {
   test("reads the channel manifest and derives the artifact URL", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     const manifest = manifestOf();
     const seen: string[] = [];
     const $fetch = origin(
@@ -93,7 +71,7 @@ describe("resolveAdapter", () => {
   });
 
   test("pins through the version directory, and never fetches the manifest url field", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     const manifest = manifestOf();
     const seen: string[] = [];
     const $fetch = origin(
@@ -111,7 +89,7 @@ describe("resolveAdapter", () => {
   });
 
   test("accepts a pinned version signed for stable on a canary CLI", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     const stamp = { ...keys.stamp, channel: "canary" as const };
     const manifest = manifestOf();
     const seen: string[] = [];
@@ -128,7 +106,7 @@ describe("resolveAdapter", () => {
 
   test("resolves an adapter whose minimum_version floor is above the CLI's own version", async () => {
     // `minimum_version` is a floor on the adapter's own line, not on the client.
-    const keys = stamped();
+    const keys = releaseSigner();
     const manifest = manifestOf({ version: "1.4.0", minimumVersion: "1.2.0" });
     const $fetch = origin(
       { [CHANNEL]: document(manifest, keys.sign(canonicalPayload(manifest))) },
@@ -140,7 +118,7 @@ describe("resolveAdapter", () => {
   });
 
   test("refuses another adapter's signed release before downloading it", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     const manifest = manifestOf({ adapter: "other" });
     const seen: string[] = [];
     const $fetch = origin(
@@ -158,7 +136,7 @@ describe("resolveAdapter", () => {
   });
 
   test("refuses a release that names no adapter", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     const { adapter: _, ...manifest } = manifestOf();
     const $fetch = origin(
       { [CHANNEL]: document(manifest, keys.sign(canonicalPayload(manifest))) },
@@ -174,7 +152,7 @@ describe("resolveAdapter", () => {
   });
 
   test("accepts atlan's releases, which were signed before releases named their adapter", async () => {
-    const keys = stamped();
+    const keys = releaseSigner();
     const { adapter: _, ...manifest } = manifestOf();
     const url = `${ORIGIN}/adapters/atlan/channels/stable/manifest.json`;
     const $fetch = origin(

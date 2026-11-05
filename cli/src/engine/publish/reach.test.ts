@@ -137,7 +137,6 @@ describe("exportsOn", () => {
     await writeFile(join(base, "skills", "review", "scratch.md"), "Not tracked.\n");
     const manifest = manifestWith("  - skills/review\n  - skills/style\n  - agents/reviewer.md\n");
     const stored = (paths: string[]) => paths.map((path) => ({ from: path, as: path }));
-    // Outside a repository every file goes.
     expect(
       (await exportsOn(manifest, base)).found.get(join(base, "skills", "review"))?.files,
     ).toEqual(stored(["SKILL.md", "checklist.md", "scratch.md"]));
@@ -302,7 +301,6 @@ describe("exportsOn, choosing an artifact's files", () => {
       { from: "workspace/SOUL.md", as: "identity/SOUL.md" },
       { from: "workspace/AGENTS.md", as: "workspace/AGENTS.md" },
     ]);
-    // A folder maps to another folder, file by file.
     expect(
       await filesOf("  - path: skills/review\n    include: [{ from: docs, as: guide }]\n"),
     ).toEqual([

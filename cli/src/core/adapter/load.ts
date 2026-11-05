@@ -20,7 +20,6 @@ import type { SourceConfig } from "./identity.ts";
 
 type Loader = () => Promise<unknown>;
 
-/** What every adapter is allowed unless the host says otherwise for it. */
 const DEFAULT_LIMITS: SourceLimits = { timeoutMs: 30_000, retries: 3 };
 
 const BUILTIN = new Map<string, Loader>();
@@ -32,7 +31,6 @@ export function isBuiltinAdapter(id: string): boolean {
   return BUILTIN.has(id);
 }
 
-/** The application composition root owns which adapters it bundles. */
 export function registerBuiltinAdapter(
   id: string,
   loader: Loader,
@@ -48,7 +46,7 @@ export function limitsFor(id: string): SourceLimits {
   return { ...DEFAULT_LIMITS, ...LIMITS.get(id)?.() };
 }
 
-/** Load a file we just wrote, so install can record dispatch without going through config. */
+/** Lets install record a just-written module's dispatch without going through config. */
 export async function inspectAdapterModule(path: string, id: string): Promise<SourceAdapter> {
   return validate(await import(pathToFileURL(path).href), id, path);
 }

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import { BUILTIN_TARGETS } from "#targets/index.ts";
 import { gitRegistry } from "#test/kit/builders/registry.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
@@ -55,9 +56,8 @@ describe("a first-run mistake", () => {
     const refused = await aireg(["install"]);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('No target named "myagent".');
-    expect(refused.stderr).toContain(
-      "Use antigravity, claude-code, codex, cursor, gemini-cli, github-copilot, grok, opencode, pi or universal",
-    );
+    const ids = BUILTIN_TARGETS.map((target) => target.id).sort();
+    expect(refused.stderr).toContain(`Use ${ids.slice(0, -1).join(", ")} or ${ids.at(-1)},`);
 
     await manifest("claude-code");
     const installed = await aireg(["install"]);

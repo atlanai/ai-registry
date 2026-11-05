@@ -3,10 +3,7 @@ import { writeAtomic } from "#core/fs/atomic.ts";
 import { exists } from "#core/fs/tree.ts";
 import type { Roots } from "./paths.ts";
 
-/**
- * `.registry/` is meant to be committed, so what is machine-local is named here
- * rather than in the project's own ignore file, which is theirs.
- */
+/** `.registry/` is committed, so machine-local files are named here, not in the project's own. */
 const CONTENTS = [
   "# Files of yours that were in an install's way, moved aside.",
   "backups/",
@@ -15,7 +12,7 @@ const CONTENTS = [
   "",
 ].join("\n");
 
-/** Create-only: once it is there, what a project shares is the project's call. */
+/** Create-only: once it exists, the project decides what it shares. */
 export async function ensureScopeIgnore(roots: Pick<Roots, "scope" | "artifacts">): Promise<void> {
   if (roots.scope === "user") return;
   const path = join(dirname(roots.artifacts), ".gitignore");

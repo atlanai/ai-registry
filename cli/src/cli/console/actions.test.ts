@@ -5,24 +5,28 @@ import { parse, takeGlobals } from "#cli/options/parse.ts";
 import { isStepPolicy } from "#core/config/model.ts";
 import * as actions from "#core/console/actions.ts";
 
-/** Read as `aireg` reads it: the command, its action when it has them, then the options. */
+/** Parsed as aireg parses it: the command, its action if any, then the options. */
 function accepted(argv: readonly string[]): void {
   const [name = "", ...rest] = argv;
   const spec = builtin(name);
   const action = spec.actions?.find((each) => each.name === rest[0]);
   // A command that takes no options of its own only runs through an action.
-  if (spec.options === undefined) expect(action, `an action of aireg ${name}`).toBeDefined();
+  expect(spec.options !== undefined || action !== undefined, `an action of aireg ${name}`).toBe(
+    true,
+  );
   const accepts = action === undefined ? spec : actionOf(spec, action.name);
   const { own } = parse<Record<string, unknown>>(
     action === undefined ? rest : rest.slice(1),
     accepts,
   );
-  for (const option of accepts.options ?? []) {
+  const policies = (accepts.options ?? []).flatMap((option) => {
     const value = own[option.flag.slice(2)];
-    if (option.value === "<policy>" && typeof value === "string") {
-      expect(isStepPolicy(value), `${option.flag} ${value}`).toBe(true);
-    }
-  }
+    return option.value === "<policy>" && typeof value === "string"
+      ? [{ flag: option.flag, value }]
+      : [];
+  });
+  for (const { flag, value } of policies)
+    expect(isStepPolicy(value), `${flag} ${value}`).toBe(true);
 }
 
 describe("console actions", () => {

@@ -85,7 +85,6 @@ export async function connectSource(
   return { adapter, handle, key };
 }
 
-/** One resolved artifact, keyed by the catalog entry everything else addresses it by. */
 interface Listed {
   path: string;
   artifact: Artifact;
@@ -97,7 +96,6 @@ export interface Listing {
   listed: Listed[];
   sourceRevision: string | undefined;
   registry: RegistryIdentity | undefined;
-  /** How the source lays out what it holds, when its adapter says. */
   layout: LayoutId | undefined;
 }
 

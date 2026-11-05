@@ -15,7 +15,7 @@ export const FAILURES = [
   "invalid",
 ] as const;
 
-/** How a failure is classified, which decides whether aireg retries it and what it tells the person. */
+/** Decides whether aireg retries a failure and what it tells the person. */
 export type Failure = (typeof FAILURES)[number];
 
 interface AdapterErrorOptions {
@@ -30,15 +30,13 @@ interface AdapterErrorOptions {
 export class AdapterError extends Error {
   /** The adapter's id. */
   readonly adapter: string;
-  /** How the failure is classified. */
   readonly failure: Failure;
-  /** The artifact this failure concerns, when it concerns one. */
   readonly artifact: string | undefined;
-  /** Milliseconds the server asked to be left alone for, when it said. */
+  /** How long the server asked to be left alone, when it said. */
   readonly retryAfterMs: number | undefined;
   /** RFC 9457 problem. Always set when this process constructed the error. */
   readonly problem: Problem;
-  /** What the person should do next, shown under the message. */
+  /** What to do next, shown under the message. */
   readonly hint: string | undefined;
 
   constructor(
@@ -96,7 +94,6 @@ export function failureOf(problem: Problem): Failure {
   return "invalid";
 }
 
-/** The adapter failure behind an error, raised directly or wrapped as its cause. */
 export function adapterOf(error: unknown) {
   if (isAdapterError(error)) return error;
   if (error instanceof Error && isAdapterError(error.cause)) return error.cause;

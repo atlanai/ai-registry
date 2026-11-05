@@ -40,16 +40,12 @@ export interface PlannedLink {
   /** The plugin name, when it had to differ from the namespace it holds. */
   renamed?: { namespace: string; name: string };
   codec?: Codec;
-  /** Written as a real folder holding this file. */
   entry?: string;
   /** Written as a real copy, for a target that rewrites or refuses links. */
   copy?: boolean;
-  /** A plugin's command, written as a skill a person invokes under this name. */
   command?: string;
   document?: PluginDocument;
-  /** The kind of the plugin part this places, where a target takes the plugin as its parts. */
   part?: ArtifactKind;
-  /** Front-matter keys a target reading this folder does not read as written. */
   keys?: Record<string, KeyRule>;
 }
 
@@ -57,18 +53,15 @@ function whereOf({ roots, env }: Pick<ProjectionOptions, "roots" | "env">): Wher
   return { scope: roots.scope, cwd: roots.cwd, env };
 }
 
-/**
- * A plugin artifact is its own; anything else wrapped joins the plugin its namespace
- * becomes, or the registry's when it publishes no namespaces.
- */
+/** A plugin is its own; anything else joins its namespace's plugin, or the registry's. */
 export function namespaceOf(item: Pick<Selected, "kind" | "name" | "group" | "source">): string {
   if (item.kind === "plugin") return item.name;
   return item.group ?? item.source;
 }
 
 /**
- * Plugin directories two registries' namespaces want under a bare name; equal qualified names
- * are left to clash in claim().
+ * Plugin directories two registries' namespaces want under a bare name, repeated until no
+ * qualified name lands on another's bare name; equal qualified names are left to clash in claim().
  */
 export function crowdedContainers(
   wants: Iterable<NamespaceWant>,
@@ -124,7 +117,6 @@ export function projectionsOf(
   return dirs;
 }
 
-/** One registry's namespace, as a target would hold it. */
 export interface NamespaceWant {
   target: string;
   namespace: string;
@@ -309,10 +301,7 @@ function pluginLinks(
   return links;
 }
 
-/**
- * A target that loads plugins is pointed at the whole namespace: one entry in a
- * directory we do not own, holding the layout it already reads.
- */
+/** A target that loads plugins gets one entry for the whole namespace, in a folder we do not own. */
 function pluginLink(
   item: Selected,
   name: string,
@@ -381,7 +370,6 @@ function copyAt(
   return copied ? { copy: true } : {};
 }
 
-/** The key rules of every selected target that reads `folder`. */
 function keysAt(
   folder: string,
   kind: ArtifactKind,

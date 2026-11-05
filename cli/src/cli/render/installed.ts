@@ -73,7 +73,6 @@ export function installed(lock: Lock, manifest: Manifest, targetTable: Targets):
     });
 }
 
-/** What an installed artifact is and where it came from, the same in every listing. */
 export function identity<R>(printer: Printer, of: (row: R) => Installed): Column<R>[] {
   const { style } = printer;
   return [

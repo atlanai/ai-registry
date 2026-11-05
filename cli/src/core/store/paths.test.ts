@@ -26,8 +26,7 @@ describe("adapterDataDir", () => {
 });
 
 describe("the reserved directories", () => {
-  // `artifacts/<registry>/…` is content and `artifacts/.<name>/` is ours: it holds
-  // because `sanitizeName` strips the dot, so no alias can ever name one.
+  // Holds because `sanitizeName` strips the leading dot.
   test("cannot be named by any registry alias", () => {
     for (const reserved of [PROJECTIONS_DIR]) {
       expect(sanitizeName(reserved)).not.toBe(reserved);

@@ -44,7 +44,7 @@ function waited(ms: number): string {
   return ms < 1_000 ? plural(ms, "millisecond") : plural(Math.round(ms / 1_000), "second");
 }
 
-/** The daemon's package version, which can differ while the protocol version matches. */
+/** The package version, which can differ while the protocol version matches. */
 function handshakeVersion(value: unknown): string | undefined {
   if (!compatibleHandshake(value)) return undefined;
   const server = (value as Record<string, unknown>).server;
@@ -123,7 +123,6 @@ export class RpcClient {
     return this.#serverVersion;
   }
 
-  /** The daemon is finishing its runs on the way out, and answers nothing else. */
   get stopping(): boolean {
     return this.#stopping;
   }
@@ -162,7 +161,7 @@ export class RpcClient {
     return () => this.#closeListeners.delete(listener);
   }
 
-  /** A daemon at its client limit drops new connections, so those wait for a slot. */
+  /** A daemon at its client limit drops new connections, so wait for a slot. */
   static async connect(endpoint: string, clientInfo: ClientInfo): Promise<RpcClient> {
     const deadline = Date.now() + BUSY_WAIT_MS;
     for (;;) {
@@ -248,22 +247,17 @@ export class RpcClient {
 
 const CLOSED = "The aireg daemon closed the connection.";
 
-/** How long a command waits for a daemon serving as many clients as it allows. */
 const BUSY_WAIT_MS = 5_000;
 
-/** Closed before the handshake finished: what a daemon at its client limit does. */
+/** Closed before the handshake, as a daemon at its client limit does. */
 function dropped(error: unknown): boolean {
   const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
   return message === CLOSED || code === "ECONNRESET" || code === "EPIPE" || code === "ENOTCONN";
 }
 
-/** How many times a write is redone after another writer moved the config first. */
 const STALE_RETRIES = 30;
 
-/**
- * A config write made against a fresh snapshot, redone while another writer
- * keeps moving the revision first, so parallel commands both land.
- */
+/** Redone while another writer moves the revision first, so parallel commands both land. */
 export async function withFreshConfig<T>(
   client: RpcClient,
   write: (config: RegistryConfig) => Promise<T>,
@@ -281,7 +275,6 @@ export async function withFreshConfig<T>(
   }
 }
 
-/** Every event of a run after `afterEventId`, fetched a page at a time. */
 export async function* runEvents(
   client: RpcClient,
   runId: string,
@@ -300,16 +293,13 @@ export async function* runEvents(
   }
 }
 
-/**
- * Every event of one run, in order and each once: what the store holds, then the
- * daemon's broadcasts, until the run finishes. Rejects if the connection closes first.
- */
+/** Each event once, in order: stored, then broadcast, until the run finishes or the connection closes. */
 export async function followRun(
   client: RpcClient,
   runId: string,
   onEvent: (event: RunEvent) => void,
 ): Promise<void> {
-  // Event ids only go up, so the newest shown is all that skipping repeats needs.
+  // Event ids only go up, so the newest shown is enough to skip repeats.
   let shown = 0;
   let catchingUp = true;
   let finishedSeen = false;

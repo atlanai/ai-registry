@@ -50,37 +50,30 @@ export interface SourceFlags extends Record<string, unknown> {
 }
 
 export interface Probed {
-  /** Default registry name, used when this is written into a manifest. */
   alias: string;
-  /** Whether that name is the registry's own, or only derived from the address. */
+  /** Whether the alias is the registry's own name or derived from the address. */
   named: "registry" | "address";
-  /** What the registry says it is, shown beside its name. */
   label: string | undefined;
   location: string;
   declared: RegistrySource;
   catalog: Catalog;
   /** Set only when the source reports one revision covering everything. */
   revision: string | undefined;
-  /** How the source lays out what it holds, when its adapter says. */
   layout: LayoutId | undefined;
-  /** Its adapter declares each namespace a plugin, which the user scope installs as one. */
+  /** The adapter declares each namespace a plugin, which the user scope installs as one. */
   namespacePlugins: boolean;
-  /** The version the source serves an entry at, which `@<version>` can pin. */
   versionOf: (entry: Entry) => string | undefined;
-  /** The spec's indexable string pairs on an entry, which a search reads as tags. */
   labelsOf: (entry: Entry) => Readonly<Record<string, string>> | undefined;
   /** What a plugin from a source that is not a registry would have a target start. */
   carriesOf: (entry: Entry) => readonly Carried[];
   /** Fetches the entry's bytes if they are not staged yet. */
   stage: (entry: Entry) => Promise<string>;
-  /** The adapter that read it, as a lockfile records it. */
   adapter: string;
-  /** The content digest the source serves for one want, or undefined when it serves none. */
   digestOf: (want: Want) => Promise<string | undefined>;
   close: () => Promise<void>;
 }
 
-/** Manifest `config:` plus `--ref` / `--path`. Flags win. */
+/** Flags win over `--config` entries. */
 export function sourceConfig(flags: SourceFlags) {
   const config: Record<string, string> = {};
   for (const value of flags.config ?? []) {
@@ -118,10 +111,7 @@ export function rememberSource(
   return { ...existing, config: probed.config };
 }
 
-/**
- * An address may name a registry this scope already declares; otherwise its first
- * segment would reach the git adapter as a repository name.
- */
+/** Checks declared aliases first, or the address's first segment reaches git as a repository. */
 export function throughManifest(
   input: string,
   registries: Readonly<Record<string, RegistrySource>>,
@@ -145,8 +135,7 @@ export function throughManifest(
   try {
     ref = parseRef(input);
   } catch (cause) {
-    // An address carrying a version said plainly what it wanted, so falling
-    // back to the whole registry would install the opposite of the ask.
+    // A versioned address asked for one thing, so never fall back to the whole registry.
     if (input.includes("@")) throw cause;
     // A declared alias with an address we cannot read is still that alias.
     return {
@@ -189,28 +178,20 @@ function overlay(declared: RegistrySource, flags: SourceFlags): SourceFlags {
 }
 
 export interface Resolved {
-  /** What to hand `probe`, whichever way the registry was named. */
   input: string;
   flags: SourceFlags;
-  /** The artifact the address singled out, when it named one. */
   name: string | undefined;
-  /** The namespace and kind the address wrote, which narrow that name. */
   namespace?: string | undefined;
   kind?: ArtifactKind | undefined;
-  /** The version that address pinned, when it carried one. */
   version: string | undefined;
-  /** Whether the address named a registry this scope already declares. */
   declared: boolean;
-  /** The declared alias, whose account is the one to read with. */
+  /** The declared alias, whose account reads the registry. */
   alias: string | undefined;
-  /** Every alias the same declarations hold, any of which may read the same token. */
+  /** Every declared alias, any of which may hold the token. */
   aliases: readonly string[];
 }
 
-/**
- * What follows a registry's name in an address, read on its own. Any one-segment
- * name stands in for the registry, so only the rest is parsed.
- */
+/** Parses what follows a registry's name; the placeholder segment stands in for it. */
 export function relativeRef(address: string): Ref {
   try {
     return parseRef(`registry/${address}`);
@@ -223,10 +204,6 @@ export function relativeRef(address: string): Ref {
   }
 }
 
-/**
- * `--registry` names the registry apart from the address, which is then whatever
- * follows the registry's name. A source is declared later, under its own name.
- */
 export function throughRegistry(
   registry: string,
   address: string,
@@ -249,10 +226,7 @@ export function throughRegistry(
   };
 }
 
-/**
- * The entries a name picks out, narrowed by the namespace and kind written beside
- * it. Never a silent pick: a name two kinds or two namespaces share is refused.
- */
+/** Never a silent pick: a name two kinds or two namespaces share is refused. */
 export function among(
   entries: readonly Entry[],
   alias: string,
@@ -283,10 +257,7 @@ export function among(
   return found;
 }
 
-/**
- * What to read for one address: every artifact of its name, so a miss can say
- * which one was meant, and the version only on the one the address names.
- */
+/** Every artifact of the name, so a miss can say which was meant; the version on the named one. */
 export function wantOf(resolved: Resolved): Want[] {
   if (resolved.name === undefined) return [];
   const named = { name: resolved.name };
@@ -296,8 +267,8 @@ export function wantOf(resolved: Resolved): Want[] {
 }
 
 /**
- * Reads what one address names. A version with no kind is asked of every kind of that
- * name, so one that lacks it fails the read; when two kinds share the name, that is the problem.
+ * A version with no kind is asked of every kind of that name, so one that lacks it fails the read;
+ * a bare read then checks whether two kinds share the name.
  */
 export async function probeAddress(
   resolved: Resolved,
@@ -315,7 +286,6 @@ export async function probeAddress(
     if (!versioned || kind !== undefined || name === undefined) throw error;
     const failure = adapterOf(error)?.failure;
     if (failure !== "invalid" && failure !== "not_found") throw error;
-    // Read again only after such a failure, so a versioned address costs one read otherwise.
     // The first failure is the one to report, whatever this read hits.
     const bare = await read([{ name }]).catch(() => undefined);
     if (bare === undefined) throw error;
@@ -328,10 +298,7 @@ export async function probeAddress(
   }
 }
 
-/**
- * The entries one address names; with no name, the whole catalog. A namespace
- * is an owner, so an address it does not hold never falls back to another's.
- */
+/** A namespace is an owner, so an address it does not hold never falls back to another's. */
 export function atAddress(resolved: Resolved, entries: readonly Entry[], alias: string): Entry[] {
   if (resolved.name === undefined) return [...entries];
   const { name, namespace, kind, version } = resolved;
@@ -348,10 +315,7 @@ export function atAddress(resolved: Resolved, entries: readonly Entry[], alias: 
   });
 }
 
-/**
- * A pasted link or a folder that points at one artifact inside a registry, not
- * at the registry: the registry is the folder above `artifacts`, holding registry.json.
- */
+/** A pasted link or folder naming one artifact; its registry is the folder above `artifacts`. */
 export async function insideRegistry(
   input: string,
   cwd: string,
@@ -375,7 +339,7 @@ export async function insideRegistry(
   const folder = expandLocation(input, cwd);
   if (!existsSync(folder) || existsSync(join(folder, REGISTRY_DOCUMENT))) return undefined;
   const root = findRegistry(folder);
-  // A folder no registry holds is a source of its own, such as a folder of skills.
+  // A folder outside any registry is a source of its own, such as a folder of skills.
   if (root === undefined) return undefined;
   const place = artifactAt(posixRelative(root, folder));
   if (place === undefined || place.root !== "") {
@@ -384,18 +348,17 @@ export async function insideRegistry(
       hint: "Name an artifact's folder, artifacts/<namespace>/<kind>/<name>, or a version folder inside it.",
     });
   }
-  // Typed relative, it stays relative, so the manifest records it relative to the project.
+  // Typed relative stays relative, so the manifest records it relative to the project.
   const typedAbsolute = input.startsWith("~") || isAbsolute(expandHome(input));
   const registry = typedAbsolute ? root : dotRelative(cwd, root);
   return { registry, flags: {}, address: addressOf(place) };
 }
 
 export interface ArtifactLink {
-  /** The registry's address, what `--registry` would take. */
   registry: string;
-  /** Where in a repository the registry sits, from a pasted link. */
+  /** Where in a pasted repository the registry sits. */
   flags: SourceFlags;
-  /** The artifact inside it: `<namespace>/<kind>/<name>[@<version>]`. */
+  /** `<namespace>/<kind>/<name>[@<version>]` */
   address: string;
 }
 
@@ -423,7 +386,6 @@ export async function probe({
   declared,
 }: ProbeOptions): Promise<Probed> {
   const declaredAlias = declared?.alias;
-  // A pasted link names the repository, a ref and a folder; each is recorded where it belongs.
   const pasted = await settlePastedLink(
     pastedRepository(input.replace(/#.*$/, "")),
     limitsFor(GIT),
@@ -452,7 +414,6 @@ export async function probe({
     alias = declaredAlias ?? registryNameFromLocation(location, open.adapter.id);
     listing = await resolveArtifacts(open, want);
   } catch (cause) {
-    // A refusal of our own already carries its code and what to do.
     if (cause instanceof AiregError) throw cause;
     const failure = isAdapterError(cause) ? cause.failure : undefined;
     const refused = isAuthFailure(failure);
@@ -527,15 +488,14 @@ export async function probe({
   };
 }
 
-/** A registry's slug, else its name made identifier-safe: the name clients use for it. */
 function ownName(registry: RegistryIdentity | undefined): string | undefined {
   const raw = registry?.slug ?? registry?.name;
   return raw === undefined ? undefined : sanitizeName(raw);
 }
 
 /**
- * Detection runs once: a layout other than a registry is recorded with the source, so every later
- * run reads it the same way. A registry is the default and is recorded only when forced.
+ * Detection runs once: a non-registry layout is recorded so later runs read it the same way.
+ * A registry is the default and is recorded only when forced.
  */
 function withLayout(
   config: Readonly<Record<string, string>>,
@@ -549,7 +509,6 @@ function withLayout(
   return canonicalConfig({ ...config, layout });
 }
 
-/** The description, else a name that says more than the alias already does. */
 function labelOf(registry: RegistryIdentity | undefined, alias: string): string | undefined {
   if (registry?.description !== undefined) return registry.description;
   return registry?.name === undefined || sanitizeName(registry.name) === alias

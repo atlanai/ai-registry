@@ -13,7 +13,6 @@ import {
 } from "./index.ts";
 import { renderPlist } from "./launchd.ts";
 
-/** A standalone install as a release lays it out: the version, `current` and the shim. */
 async function standalone(
   aireg: string,
 ): Promise<{ version: string; current: string; shim: string }> {
@@ -33,7 +32,6 @@ async function standalone(
 const unix = describe.skipIf(process.platform === "win32");
 
 unix("autostart", () => {
-  // The account's defaults: aireg's home and the config folder both follow HOME.
   test.beforeEach(({ home: _ }) => {
     vi.stubEnv("AIREG_HOME", "");
     vi.stubEnv("XDG_CONFIG_HOME", "");
@@ -205,7 +203,6 @@ unix("autostart", () => {
 
   describe("refreshAutostart", () => {
     const plist = (home: string) => join(home, "Library", "LaunchAgents", "sh.aireg.daemon.plist");
-    /** The definition this install wrote before it named the binary under current. */
     async function shimDefinition(
       home: { dir: string; aireg: string },
       shim: string,
@@ -253,7 +250,6 @@ unix("autostart", () => {
       await expect(readFile(plist(home.dir), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
     });
 
-    // Turned off in System Settings, it stays off.
     test("leaves a definition that is not loaded alone", async ({ home }) => {
       const install = await standalone(home.aireg);
       await shimDefinition(home, install.shim, install.version);

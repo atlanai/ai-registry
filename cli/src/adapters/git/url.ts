@@ -18,26 +18,20 @@ export interface SourceSpec {
   /** Clone URL, or an absolute directory for a local source. */
   location: string;
   kind: "git" | "path";
-  /** Tag, branch or sha the user asked for. */
+  /** Tag, branch or sha. */
   ref: string | undefined;
-  /** Default registry alias, derived from the repository name. */
+  /** Derived from the repository name. */
   alias: string;
   /** `owner/repo` when the host is recognizable, for the SSH fallback. */
   slug: string | undefined;
   host: string | undefined;
   /** The folder inside the repository that holds the registry, from a pasted link. */
   path?: string | undefined;
-  /**
-   * The address names an account or a port of its own, which a fallback rebuilt from
-   * the host and slug would drop, so it is tried only as written.
-   */
+  /** Names an account or port a fallback rebuilt from host and slug would drop: tried only as written. */
   exact?: boolean | undefined;
 }
 
-/**
- * A link copied from a code host's page: `…/owner/repo/tree/<ref>/<folder>` is the
- * repository at that ref with its registry in that folder.
- */
+/** `…/owner/repo/tree/<ref>/<folder>` is the repository at that ref with its registry in that folder. */
 export function pastedRepository(
   input: string,
 ): { location: string; ref: string | undefined; path: string | undefined } | undefined {
@@ -60,10 +54,7 @@ export function pastedRepository(
   return { location: `${host.toLowerCase()}/${owner}/${repo}`, ref, path };
 }
 
-/**
- * A GitHub repository is always `owner/repo`, so any path after it is an
- * address inside that registry rather than part of the repository's name.
- */
+/** GitHub is always `owner/repo`, so any path after it is an address inside that registry. */
 export function splitRepository(input: string): { location: string; rest: string } | undefined {
   const match = /^(?:https:\/\/)?(github\.com\/[^/\s]+\/[^/\s@]+?)(?:\.git)?\/(\S+)$/i.exec(input);
   if (match === null) return undefined;
@@ -160,10 +151,7 @@ export function parseSource(input: string, cwd = process.cwd()): SourceSpec {
   };
 }
 
-/**
- * A `@ref` suffix only counts after the final `/`, so `git@github.com:o/r`
- * keeps its user and `o/r@v2` is split.
- */
+/** A `@ref` suffix counts only after the final `/`, so `git@github.com:o/r` keeps its user. */
 function splitRef(input: string): { address: string; ref: string | undefined } {
   const at = input.lastIndexOf("@");
   if (at <= 0 || at < input.lastIndexOf("/")) return { address: input, ref: undefined };
@@ -184,7 +172,6 @@ function namesSshUser(url: URL): boolean {
   return url.protocol === "ssh:" && url.username !== "" && url.username !== "git";
 }
 
-/** The SSH form of an HTTPS clone URL, for the auth fallback. */
 export function sshUrl(spec: SourceSpec): string | undefined {
   if (spec.host === undefined || spec.slug === undefined) return undefined;
   return `git@${spec.host}:${spec.slug}.git`;

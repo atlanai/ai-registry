@@ -5,26 +5,12 @@ import { ErrorCode } from "#core/errors.ts";
 import { indexRoot } from "#core/filespec/indexer.ts";
 import { writeRoot } from "#core/filespec/init.ts";
 import { validateRoot } from "#core/filespec/validate/validate.ts";
-import { Printer } from "#core/term/printer.ts";
+import { commandContext } from "#test/kit/command.ts";
 import { test } from "#test/kit/fixtures.ts";
-import type { CommandContext } from "./command.ts";
 import { lookup } from "./index.ts";
 
-function context(cwd: string, argv: string[]): CommandContext {
-  return {
-    argv,
-    cwd,
-    printer: new Printer({ format: "json", out: { write: () => undefined, isTTY: false } }),
-    host: {
-      version: "test",
-      connectAccount: async () => {
-        throw new Error("no host");
-      },
-      openRunStore: async () => {
-        throw new Error("no host");
-      },
-    },
-  };
+function context(cwd: string, argv: string[]) {
+  return commandContext(argv, { cwd });
 }
 
 describe("skill new --set", () => {
@@ -129,7 +115,6 @@ describe("native agent import and indexing", () => {
 });
 
 describe("writes stay inside the registry", () => {
-  /** A registry with `eng/skill/lint` at 0.1.0, and an empty folder outside it. */
   async function registry(tmp: string): Promise<{ root: string; outside: string; lint: string }> {
     const root = join(tmp, "registry");
     const outside = join(tmp, "outside");

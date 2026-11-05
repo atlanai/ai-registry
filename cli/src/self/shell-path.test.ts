@@ -6,10 +6,7 @@ import { shimPath } from "#core/release/layout.ts";
 import { test as base } from "#test/kit/fixtures.ts";
 import { addToPath, isOurs, onPathIn, removeFromPath } from "./shell-path.ts";
 
-/**
- * A home of startup files, with aireg's folder in its default place. The kit
- * home matters: the default folder is found through os.homedir(), not env.HOME.
- */
+/** The kit home matters: aireg's default folder comes from os.homedir(), not env.HOME. */
 const test = base.extend("shell", ({ home }) => {
   const tmp = home.dir;
   const env = (shell: string, more: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({

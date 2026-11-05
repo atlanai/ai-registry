@@ -59,12 +59,11 @@ export async function withCoordination<T>(
   }
 }
 
-/** Since when entering has kept failing, so a refusal that never clears ends the wait. */
+/** So a refusal that never clears ends the wait. */
 interface Failing {
   since?: number;
 }
 
-/** One try at the coordination folder: entered, try again now, or wait a poll first. */
 async function enterOnce(
   dir: string,
   failing: Failing,

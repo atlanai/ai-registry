@@ -24,10 +24,7 @@ export function signInFailed(message: string, cause?: unknown): AiregError {
   return new AiregError(message, { code: ErrorCode.Unauthorized, cause });
 }
 
-/**
- * The loopback redirect of RFC 8252: one answer for this `state`, then the tab moves to a
- * page without the code in its address, held until `close` says how the sign-in ended.
- */
+/** RFC 8252 loopback redirect: one answer per `state`, then a page without the code in its URL. */
 export async function listenForCode(
   expected: Expected,
   ports: readonly number[],

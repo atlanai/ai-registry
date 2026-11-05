@@ -5,6 +5,7 @@ import type { Step } from "#core/config/model.ts";
 import { digest } from "#core/fs/digest.ts";
 import { emptyLock, type Lock, writeLock } from "#core/lock.ts";
 import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
+import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
 import {
   applyOrigins,
@@ -120,21 +121,19 @@ describe("an origins step", () => {
     const placed = join(home, ".claude", "skills", "eng", "skills", "stamp");
     await mkdir(placed, { recursive: true });
     await writeFile(join(placed, "SKILL.md"), "---\nname: stamp\ndescription: theirs\n---\nbody\n");
-    const lock = emptyLock();
-    lock.artifacts["eng/stamp"] = {
-      registry: "other",
-      id: "artifacts/eng/skill/stamp/0.1.0",
-      name: "stamp",
-      kind: "skill",
-      namespace: "eng",
-      address: "artifacts/eng/skill/stamp",
-      content: "sha256:0",
-      version: "0.1.0",
-      path: ".registry/artifacts/other/eng/skills/stamp",
-      digest: "sha256:0",
-      origin: undefined,
-      links: [{ target: "claude-code", path: ".claude/skills/eng", mode: "copy" }],
-    };
+    const lock = lockOf()
+      .artifact("eng/stamp", {
+        registry: "other",
+        id: "artifacts/eng/skill/stamp/0.1.0",
+        namespace: "eng",
+        address: "artifacts/eng/skill/stamp",
+        content: "sha256:0",
+        version: "0.1.0",
+        path: ".registry/artifacts/other/eng/skills/stamp",
+        digest: "sha256:0",
+        links: [{ target: "claude-code", path: ".claude/skills/eng", mode: "copy" }],
+      })
+      .build();
 
     const outcomes = await surveyOrigins([step()], lock, roots);
     expect(outcomes.map((outcome) => outcome.origin.name)).toEqual(["my-helper"]);

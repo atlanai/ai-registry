@@ -222,7 +222,6 @@ describe("plan with relationships", () => {
       code: "usage",
     });
     expect(offerFrom).not.toHaveBeenCalled();
-    // Without any, the same adapter still takes the work.
     await expect(
       plan({
         work,

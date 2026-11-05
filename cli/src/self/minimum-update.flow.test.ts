@@ -1,15 +1,14 @@
-import { generateKeyPairSync, sign } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, vi } from "vitest";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { releaseBinary } from "#core/product.ts";
-import { decodeTrustedKeys } from "#core/release/keyring.ts";
 import { versionBin } from "#core/release/layout.ts";
 import { canonicalPayload, type ReleaseManifest } from "#core/release/manifest.ts";
 import { releasePlatform } from "#core/release/platform.ts";
 import type { ReleaseStamp } from "#core/release/stamp.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { manifestDocument, RELEASE_ORIGIN, releaseSigner } from "#test/kit/release.ts";
 import { installedVersion } from "./install.ts";
 import { installRelease, probeRelease } from "./minimum-update.ts";
 
@@ -25,7 +24,7 @@ vi.mock("#core/release/stamp.ts", async (importOriginal) => {
   };
 });
 
-const ORIGIN = "https://releases.example.com/aireg";
+const ORIGIN = RELEASE_ORIGIN;
 const MANIFEST = `${ORIGIN}/channels/stable/manifest.json`;
 const PLATFORM = releasePlatform();
 if (PLATFORM === undefined) throw new Error(`no release platform for ${process.platform}`);
@@ -40,22 +39,9 @@ function executable(version: string): Uint8Array {
   return new TextEncoder().encode(`#!/bin/sh\necho "${version}"\n`);
 }
 
-function stamped(): { stamp: ReleaseStamp; sign: (bytes: Uint8Array) => string } {
-  const pair = generateKeyPairSync("ed25519");
-  const jwk = pair.publicKey.export({ format: "jwk" });
-  const encoded = Buffer.from(String(jwk.x), "base64url").toString("base64");
-  const keyring = Buffer.from(JSON.stringify({ release: encoded }), "utf8").toString("base64");
-  const keys = decodeTrustedKeys(keyring);
-  if (keys === undefined) throw new Error("keyring did not decode");
-  return {
-    stamp: { origin: ORIGIN, channel: "stable", keys },
-    sign: (bytes) => sign(null, bytes, pair.privateKey).toString("base64"),
-  };
-}
-
 /** The signed channel document, and the artifact bytes it vouches for. */
 function channel(version: string, minimumVersion: string, binary: Uint8Array) {
-  const keys = stamped();
+  const keys = releaseSigner();
   const manifest: ReleaseManifest = {
     channel: "stable",
     version,
@@ -63,26 +49,8 @@ function channel(version: string, minimumVersion: string, binary: Uint8Array) {
     publishedAt: "2026-09-17T09:00:00.000Z",
     artifacts: [{ name: BINARY, sha256: sha256Hex(binary), size: binary.byteLength }],
   };
-  const document = {
-    schema: "aireg-manifest.v1",
-    channel: manifest.channel,
-    version: manifest.version,
-    minimum_version: manifest.minimumVersion,
-    published_at: manifest.publishedAt,
-    artifacts: manifest.artifacts.map((entry) => ({
-      name: entry.name,
-      sha256: entry.sha256,
-      size: entry.size,
-      url: `${ORIGIN}/artifacts/v${version}/${entry.name}`,
-    })),
-    signatures: [
-      {
-        algorithm: "ed25519",
-        key_id: "release",
-        value: keys.sign(canonicalPayload(manifest)),
-      },
-    ],
-  };
+  const url = `${ORIGIN}/artifacts/v${version}/${BINARY}`;
+  const document = manifestDocument(manifest, keys.sign(canonicalPayload(manifest)), url);
   return { keys, document };
 }
 
@@ -119,7 +87,8 @@ describe("minimum update from the signed channel", () => {
     const bin = versionBin("0.2.0", env);
     expect(await readFile(bin, "utf8")).toContain("0.2.0");
     // Placed executable, not left for a later chmod: the shim execs it directly.
-    if (process.platform !== "win32") expect((await stat(bin)).mode & 0o111).not.toBe(0);
+    const mode = process.platform === "win32" ? 0o111 : (await stat(bin)).mode;
+    expect(mode & 0o111).not.toBe(0);
   });
 
   test("aborts before writing anything when the binary fails its checksum", async ({ tmp }) => {
@@ -153,7 +122,7 @@ describe("minimum update from the signed channel", () => {
   });
 
   test("answers nothing when the channel is unreachable", async () => {
-    stub.stamp = stamped().stamp;
+    stub.stamp = releaseSigner().stamp;
     let asked = false;
     const offline: typeof fetch = async () => {
       asked = true;

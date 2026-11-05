@@ -32,7 +32,6 @@ import {
 } from "./refusals.ts";
 import { selectTargets } from "./targets.ts";
 
-/** The targets a run installs for, so a report can name them as they were chosen. */
 export interface Chosen {
   targets: readonly string[];
   targetTable: Targets;
@@ -40,9 +39,8 @@ export interface Chosen {
 
 export interface RunResult extends Chosen {
   plan: Plan;
-  /** What apply did; absent for a dry run, or a plan that was not approved. */
+  /** Absent for a dry run or an unapproved plan. */
   applied: ApplyResult | undefined;
-  /** The lockfile as the run found it, so a report can say what moved. */
   before: Lock;
   scope: Scope;
 }
@@ -50,25 +48,22 @@ export interface RunResult extends Chosen {
 export interface RunRequest {
   /** Re-read every source instead of trusting what the lock pins. */
   refresh?: boolean;
-  /** Lock rows this run takes the registry's newest of; every other row installs as locked. */
+  /** Rows that take the registry's newest; every other row installs as locked. */
   moving?: ReadonlySet<string>;
-  /** Registries this run changes; the others are left as the lock has them, unopened. */
+  /** Registries this run changes; the others stay as locked, unopened. */
   aliases?: readonly string[];
   /** Take nothing the lock does not hold, so a removal never installs what was published since. */
   held?: boolean;
   /** Edited rows this run may delete, which `remove` settles before planning. */
   discard?: ReadonlySet<string>;
-  /** Artifacts this run names: one left out for another's name is refused, not skipped. */
+  /** One left out for another's name is refused, not skipped. */
   adding?: ReadonlySet<string>;
-  /** Installed names whose identical copy already on disk this run takes over in place. */
+  /** Names whose identical copy on disk this run takes over in place. */
   adopt?: ReadonlySet<string>;
 }
 
-/** How a run is shown, which the caller decides: the engine only says what happens. */
 export interface PlanReport {
-  /** The whole plan, for a dry run, and the paths a real run would move to backups. */
   plan(plan: Plan, roots: Roots, aside: ReadonlySet<string>, chosen: Chosen): void;
-  /** Each action as apply reaches it. */
   step(action: Action, plan: Plan, chosen: Chosen): void;
 }
 
@@ -169,7 +164,7 @@ async function write(
     if (approve !== undefined && !(await approve(planned, chosen))) return result(undefined);
 
     const edited = formatManifest(manifest) !== loaded.manifestAsRead;
-    // Read under the restore's lease, so only this run's edit is undone.
+    // Read under the lease, so only this run's edit is undone.
     const before = edited ? await readTextIfPresent(roots.manifest) : undefined;
     const written = edited ? await writeManifest(roots, manifest) : undefined;
     const applied = await commit({
@@ -188,8 +183,7 @@ async function write(
     warn(printer, appliedNotices(roots, applied, targetTable));
 
     const landed = applied.installed.length > 0;
-    // An edit none of whose artifacts landed, whether unstaged or left out for want of trust,
-    // must not leave the manifest asking for them.
+    // An edit none of whose artifacts landed must not leave the manifest asking for them.
     if (edited && !landed && (applied.unstaged.length > 0 || planned.untrusted.length > 0))
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);

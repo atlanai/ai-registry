@@ -9,7 +9,6 @@ import type { GitLimits } from "./exec.ts";
 import type { SourceSpec } from "./url.ts";
 
 export interface Snapshot {
-  /** Directory holding the repository contents at `commit`. */
   root: string;
   commit: string | undefined;
   /** False when this run had to clone. */
@@ -35,10 +34,7 @@ const KEPT_PER_REPOSITORY = 2;
 /** Checkouts an open connection in this process still reads, which no prune removes. */
 const IN_USE = new Map<string, number>();
 
-/**
- * A local registry is read where it lies: copying it into the store would
- * mean edits to the directory a person is authoring in never take effect.
- */
+/** A local registry is read where it lies, so edits a person makes there take effect. */
 export async function snapshot(
   cache: () => string,
   spec: SourceSpec,
@@ -85,10 +81,7 @@ export async function snapshot(
   }
 }
 
-/**
- * Keyed by repository and commit, because for git the commit already is the
- * content address. Shared, so two aliases for one repository clone it once.
- */
+/** Keyed by commit, which for git is the content address; shared, so two aliases clone once. */
 function snapshotPath(cache: string, spec: SourceSpec, commit: string): string {
   const segments =
     spec.host !== undefined && spec.slug !== undefined

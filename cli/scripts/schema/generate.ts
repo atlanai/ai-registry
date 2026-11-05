@@ -24,10 +24,9 @@ export const GENERATED: Readonly<Record<string, object>> = {
   ...Object.fromEntries(outputs),
 };
 
-/** Published, so the generated documents live apart from the definitions. */
 export const SCHEMA_DIR = join(import.meta.dirname, "..", "..", "schema");
 
-/** The spec owns the kind manifests; the CLI bundles copies, since an import cannot leave the package. */
+/** Owned by the spec; bundled as copies, since a package cannot import outside itself. */
 const SPEC_KINDS = join(import.meta.dirname, "..", "..", "..", "spec", "schemas", "kinds");
 
 /** Each kind manifest's path under `schema/`, with the spec's bytes it must hold. */

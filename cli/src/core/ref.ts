@@ -7,7 +7,7 @@ import { AiregError, ErrorCode } from "./errors.ts";
 /** A whole registry, a whole namespace, or one artifact, which alone takes `@version`. */
 export interface Ref {
   registry: string;
-  /** The namespace asked for, if any. Absent is "wherever it is". */
+  /** Absent means wherever it is. */
   namespace?: string | undefined;
   /** Absent for a whole registry or namespace, and for a name whose kind the catalog settles. */
   kind?: ArtifactKind | undefined;
@@ -22,10 +22,7 @@ export interface Ref {
   targets?: string[] | undefined;
   /** Copied into each target folder rather than linked. */
   copy?: boolean | undefined;
-  /**
-   * Plugins from a source that is not a registry, by name, that a person agreed may install
-   * with the hooks, servers or executables they carry.
-   */
+  /** Non-registry plugins a person let install with the hooks or servers they carry. */
   trust?: string[] | undefined;
 }
 
@@ -58,8 +55,7 @@ export function parseRef(input: string): Ref {
       "it has too many parts; an address is at most <registry>/<namespace>/<kind>/<name>",
     );
   }
-  // Pinning anything broader than one artifact has no meaning: a namespace's
-  // members are versioned one by one, so there is no version to hold them at.
+  // A namespace's members are versioned one by one, so there is no version to hold them at.
   if (version !== undefined && parts.length < 3) {
     throw new RefParseError(input, "only one artifact can be pinned to a version");
   }
@@ -93,8 +89,7 @@ function splitVersion(input: string, trimmed: string): { address: string; versio
 
   const version = trimmed.slice(at + 1);
   if (version === "") throw new RefParseError(input, "no version follows the @");
-  // `latest` is what absence already means, so it normalizes away rather than
-  // becoming a pin that can never match a published version.
+  // `latest` is what absence means, so it normalizes away rather than pinning to no version.
   if (version === LATEST) return { address: trimmed.slice(0, at) };
   if (!isVersion(version)) throw new RefParseError(input, `${quoted(version)} is not a version`);
   return { address: trimmed.slice(0, at), version };
@@ -110,10 +105,9 @@ function segments(input: string, trimmed: string): string[] {
   return parts;
 }
 
-/** Every kind an address may name. A plugin is addressed as the namespace it is. */
+/** A plugin is addressed as the namespace it is. */
 const ADDRESSABLE = KINDS.filter((kind) => kind !== "plugin");
 
-/** The one place that turns a kind segment into a kind, so the error reads the same everywhere. */
 function kindOf(input: string, segment: string, registry: string, name: string): ArtifactKind {
   // A plugin and the namespace it publishes under are one thing to install, and
   // naming the plugin alone would leave out the loose artifacts beside it.
@@ -191,7 +185,6 @@ export function isWholeRegistry(ref: Ref): boolean {
   return ref.namespace === undefined && ref.name === undefined;
 }
 
-/** A whole namespace: every artifact its registry publishes under that owner. */
 export function isWholeNamespace(ref: Ref): boolean {
   return ref.namespace !== undefined && ref.name === undefined;
 }

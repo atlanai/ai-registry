@@ -29,13 +29,13 @@ export type DaemonProbe =
   | { status: "outdated"; pid: number }
   | { status: "foreign" };
 
-/** How long a listening daemon may take to answer before it counts as foreign. */
 const ANSWER_MS = 1_500;
 
 export async function probeDaemon(clientVersion: string): Promise<DaemonProbe> {
   // Refused outright: a socket someone else planted is not a daemon to stop.
   await assertOwnSocket(rpcEndpoint());
-  // A daemon still starting, or busy, listens before it answers, so one failed handshake is not foreign.
+  // A daemon still starting, or busy, listens before it answers, so one failed handshake
+  // is not foreign.
   const deadline = Date.now() + ANSWER_MS;
   for (;;) {
     if (!(await listening(rpcEndpoint()))) return { status: "down" };
@@ -120,15 +120,12 @@ async function terminate(pid: number): Promise<void> {
   }
 }
 
-/**
- * Anything reaching stderr escaped the logger, and is all a daemon dying on startup leaves.
- * Opened for appending, so the daemon can trim it in place when it starts.
- */
+/** All a daemon dying on startup leaves; appended so the daemon can trim it in place. */
 export function stderrCapture(): number | "ignore" {
   try {
     const path = logPath(ensureHome(), DAEMON_STDERR_FILE);
     mkdirSync(dirname(path), { recursive: true });
-    // 0600 like every other log: a stack trace carries paths and arguments.
+    // Private like every other log: a stack trace carries paths and arguments.
     return openSync(path, "a", PRIVATE_FILE);
   } catch {
     return "ignore";
@@ -136,13 +133,13 @@ export function stderrCapture(): number | "ignore" {
 }
 
 export async function startDaemon(entry: string, version: string): Promise<void> {
-  // With autostart on, the service manager owns the process; a spawn beside it would be unsupervised.
+  // With autostart on, a spawn beside the service manager's process would be unsupervised.
   if (await startManaged()) {
     if (await waitFor(version, START_MS)) return;
-    // The service runs whatever its definition names, so another version gives way to this one.
+    // The service may run another version, which gives way to this one.
     await stopDaemon();
   }
-  // Here as well as in the daemon, so a directory it would refuse is named to the user.
+  // Also checked here so a directory the daemon would refuse is named to the user.
   await privateDirectory(dirname(rpcEndpoint()));
   const launch = launchArgv(entry, [DAEMON_FLAG]);
   const stderr = stderrCapture();
@@ -174,16 +171,12 @@ function waitFor(version: string, timeoutMs: number): Promise<boolean> {
   );
 }
 
-/**
- * What one command was given stays with it: a floor check turned off after a self update,
- * and any `AIREG_TOKEN_<NAME>`, which would otherwise reach every later job the daemon runs.
- */
+/** One command's floor-check skip and `AIREG_TOKEN_<NAME>` must not reach later daemon jobs. */
 export function daemonEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const { [envName("SKIP_MIN_UPDATE")]: _skip, ...rest } = withoutTokens(env);
   return rest;
 }
 
-/** Starts the daemon if it is not running, and hands `work` a connection closed however it ends. */
 export async function withDaemon<T>(work: (client: RpcClient) => Promise<T>): Promise<T> {
   await ensureDaemon(VERSION);
   const client = await RpcClient.connect(rpcEndpoint(), cliClient(VERSION));

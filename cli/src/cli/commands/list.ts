@@ -95,14 +95,11 @@ export const { run } = defineCommand({
         ...identity(printer, (row: Installed) => row),
         {
           header: "targets",
-          value: (row: Installed) =>
-            printer.style.dim(
-              row.targets.length > 0
-                ? tools(row)
-                : row.watched !== undefined
-                  ? `${toolName(targetTable, row.watched.target)} (watched)`
-                  : "in no target",
-            ),
+          value: (row: Installed) => {
+            if (row.targets.length > 0) return printer.style.dim(tools(row));
+            if (row.watched === undefined) return printer.style.dim("in no target");
+            return printer.style.dim(`${toolName(targetTable, row.watched.target)} (watched)`);
+          },
         },
       ],
       rows,

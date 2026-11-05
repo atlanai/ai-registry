@@ -5,8 +5,8 @@ import type { SyncPolicy } from "#core/sync/policy.ts";
 import { policyOf } from "#core/sync/policy.ts";
 
 /**
- * `publish: report` is the invariant, not a default: taking what someone else
- * published is recoverable, sending your half-finished work upstream is not.
+ * `publish: report` is an invariant: taking what someone else published is recoverable, sending
+ * your half-finished work upstream is not.
  */
 export const FOREGROUND_POLICY: SyncPolicy = {
   pull: "on",
@@ -14,22 +14,17 @@ export const FOREGROUND_POLICY: SyncPolicy = {
   delete: "report",
 };
 
-/**
- * The executor is handed this rather than the job, so a scheduled run and
- * `aireg sync` take the identical path.
- */
+/** Handed to the executor instead of the job, so a scheduled run and `aireg sync` match. */
 export interface ScopeWork {
-  /** The job this came from, or a synthetic id when a command started it. */
+  /** Synthetic when a command started the run. */
   id: string;
   root: string;
   scope: Scope;
   account: string;
   policy: SyncPolicy;
-  /** The steps that produced the policy, in declaration order. */
   steps: readonly Step[];
 }
 
-/** The scope one job reconciles, derived from the steps that name a root. */
 export function workOf(job: { id: string; account: string; steps: readonly Step[] }): ScopeWork {
   // A composite step settles nothing until expanded.
   const scoped = expandSteps(job.steps).filter(isScopeStep);
@@ -44,7 +39,6 @@ export function workOf(job: { id: string; account: string; steps: readonly Step[
   };
 }
 
-/** The runner executes a graph, so a foreground run takes the steps a configured job would have. */
 export function jobOfWork(work: ScopeWork): Job {
   return {
     id: work.id,

@@ -45,12 +45,10 @@ export function printList({ accounts }: AuthList, printer: Printer): void {
       { header: "registry", value: (row: ListedAccount) => row.registry },
       {
         header: "state",
-        value: (row: ListedAccount) =>
-          !row.needsSignIn
-            ? style.dim("no sign-in")
-            : row.signedIn
-              ? style.green("signed in")
-              : style.yellow("signed out"),
+        value: (row: ListedAccount) => {
+          if (!row.needsSignIn) return style.dim("no sign-in");
+          return row.signedIn ? style.green("signed in") : style.yellow("signed out");
+        },
       },
       {
         header: "namespace",

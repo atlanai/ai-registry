@@ -1,7 +1,6 @@
 import { NAME } from "#core/product.ts";
 import type { Scope } from "#core/store/paths.ts";
 
-/** Render the equivalent non-interactive command. */
 export function equivalent(
   command: string,
   source: string | undefined,

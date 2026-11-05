@@ -28,7 +28,6 @@ describe("entriesIn", () => {
     expect(found.map((entry) => [entry.name, entry.description])).toEqual([["mine", "Mine."]]);
   });
 
-  // The reader knows no kind by name: whatever entry a kind declares is the one it checks.
   test("checks the entry a kind declares, and lists every directory when it declares none", async () => {
     await folder("plugins/kit", { "MANIFEST.md": "---\nname: kit\n---\n" });
     await folder("plugins/loose");

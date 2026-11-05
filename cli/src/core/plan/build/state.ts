@@ -10,9 +10,8 @@ export interface BuildOptions {
   roots: Roots;
   /** Locates the store and target folders; `targetTable` was resolved with it. */
   env: NodeJS.ProcessEnv;
-  /** Target names to project into, already resolved from manifest or detection. */
+  /** Already resolved from the manifest or detection. */
   targets: readonly string[];
-  /** Every target, built in or defined by a file of yours. */
   targetTable: Targets;
   /** Overwrite or remove a copy that was edited after installation. */
   force: boolean;
@@ -22,25 +21,18 @@ export interface BuildOptions {
   restate?: ReadonlySet<string>;
   /** Place real copies instead of links, for targets that will not follow them. */
   copy: boolean;
-  /**
-   * Re-read every source rather than trusting the lock. A source that reports
-   * no revision has nothing else to compare, so only an explicit ask looks again.
-   */
+  /** Re-read every source; one that reports no revision is only read again on request. */
   refresh?: boolean;
   /** Running CLI version, for artifact `engines.aireg` checks. */
   cliVersion?: string;
-  /**
-   * Registries this run opened. Absent means every one; any other keeps its
-   * lock rows and source as they are, and nothing is planned for it.
-   */
+  /** Absent means every registry; one not opened keeps its lock rows and gets no plan. */
   opened?: readonly string[];
   /** What an artifact whose name another holds gets. Absent, it is left out, never renamed. */
   nameCollision?: NameCollision;
-  /** Installed names whose copy already on disk, byte for byte what aireg installs, it takes over. */
+  /** Installed names whose copy on disk matches byte for byte, which aireg takes over. */
   adopt?: ReadonlySet<string>;
 }
 
-/** What planning one run accumulates, shared by every step that plans part of it. */
 export interface BuildState {
   lock: Lock;
   survey: Survey;
@@ -65,10 +57,7 @@ export interface BuildState {
   wrapping: ReadonlySet<string>;
   /** Plugin directories two registries' namespaces would share. */
   crowded: ReadonlySet<string>;
-  /**
-   * Held back until every item is planned. A plugin directory outlives any one
-   * artifact, so a rename or a removal must not unlink what a sibling still needs.
-   */
+  /** Held back to the end: a plugin directory outlives one artifact and a sibling may need it. */
   unlinks: Extract<Action, { kind: "unlink" }>[];
   /** By installed name, the installed names of what needs it. */
   neededBy: Map<string, string[]>;

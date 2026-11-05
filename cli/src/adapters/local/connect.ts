@@ -56,6 +56,7 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
         return resolution;
       }),
 
+    // The version folder already is spec content, so it is copied from where it sits, not staged.
     localRoot: (artifact) => translating(() => files.localRoot(artifact)),
 
     fetch: (artifact, file) => translating(() => files.fetch(artifact, file)),

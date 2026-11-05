@@ -24,10 +24,7 @@ export function newestFinished(runs: readonly RunRecord[], mode?: RunMode): RunR
     .sort((left, right) => right.requestedAtMs - left.requestedAtMs)[0];
 }
 
-/**
- * What the registry refused, and what it has not approved yet: an artifact
- * the catalog lost is not on disk, so nothing else would report it at all.
- */
+/** An artifact the catalog lost is not on disk, so nothing else would report it. */
 export function upstreamFacts(events: readonly RunEvent[]): UpstreamFacts {
   const failed = new Map<string, string>();
   const pending = new Set<string>();
@@ -60,7 +57,6 @@ function field(event: RunEvent, name: string): unknown {
   return isRecord(event.data) ? event.data[name] : undefined;
 }
 
-/** A job that settled a local folder, and why it is held if it is. */
 export interface Carrier {
   job: string;
   jobId: string;
@@ -72,10 +68,7 @@ export interface Carrier {
 
 const CARRIED = new Set<ItemOutcome | undefined>(["changed", "unchanged", "attention"]);
 
-/**
- * Folders a job's items name in `data.paths`, by path. The bag is the adapter's
- * own, so anything but an array of strings is ignored.
- */
+/** `data.paths` is the adapter's own bag, so anything but an array of strings is ignored. */
 export function carriedPaths(
   runs: readonly {
     job: string;
@@ -106,10 +99,7 @@ export function carriedPaths(
   return found;
 }
 
-/**
- * The prose behind a `sync_failed`. The run record carries only the code, so
- * the console reads the daemon's own log for the message beside that run id.
- */
+/** The run record carries only the code, so the message comes from the daemon's log. */
 export async function failureReasons(
   ids: ReadonlySet<string>,
   env: NodeJS.ProcessEnv = process.env,
@@ -124,8 +114,7 @@ export async function failureReasons(
   try {
     // Newest last, and a later line for the same run is the better answer.
     for await (const line of lines) {
-      // The log runs to megabytes and few lines name a failed run, so only
-      // those are parsed.
+      // The log runs to megabytes, so only lines naming a wanted run are parsed.
       if (!wanted.some((id) => line.includes(id))) continue;
       const entry = parseLine(line);
       if (entry === undefined || isRaw(entry)) continue;

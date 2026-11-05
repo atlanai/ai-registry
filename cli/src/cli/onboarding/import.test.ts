@@ -6,7 +6,6 @@ import { roots } from "#core/store/paths.ts";
 import { test as base } from "#test/kit/fixtures.ts";
 import { applyImport, planImport } from "./import.ts";
 
-/** A git project in the test's home holding one skill to import. */
 const test = base.extend("project", async ({ home }) => {
   const dir = join(home.dir, "project");
   await mkdir(join(dir, ".git"), { recursive: true });

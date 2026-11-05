@@ -28,7 +28,6 @@ export interface AppProps {
   /** Already loaded so the render stays sync. */
   panels: readonly AnyPanel[];
   upstream: UpstreamContribution | undefined;
-  /** Resolved once per account by the upstream, for links that scope by viewer. */
   viewer: string | undefined;
 }
 
@@ -100,8 +99,7 @@ function drawFrame(options: FrameOptions): ReactElement {
   const activity = ui.activity;
   const overlaid = overlayNode(options);
 
-  // The console owns the whole screen: the body takes whatever the chrome does
-  // not, and is cut rather than squeezing the chrome when it has more to show.
+  // The body is cut rather than squeezing the chrome when it has more to show.
   const fixed = (node: ReactNode) => box({ flexDirection: "column", flexShrink: 0 }, node);
   return box(
     { flexDirection: "column", width, height },
@@ -175,7 +173,6 @@ function overlayNode({ frame, screen, live }: FrameOptions): ReactNode {
   return null;
 }
 
-/** One line of what a run has got through, from its own counts. */
 function describe(live: Progress | undefined): string | undefined {
   if (live === undefined) return undefined;
   const { examined, changed, failed } = live.counts;

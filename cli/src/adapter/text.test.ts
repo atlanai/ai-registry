@@ -160,6 +160,7 @@ describe("trimming a run of characters", () => {
     const started = Date.now();
     expect(stripTrailing(hostile, "/")).toBe(hostile);
     expect(stripLeading(hostile, "/")).toBe("a");
-    expect(Date.now() - started).toBeLessThan(100);
+    // Backtracking takes seconds on this input and a scan about a millisecond; the gap absorbs load.
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 });

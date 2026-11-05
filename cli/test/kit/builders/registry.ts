@@ -18,7 +18,6 @@ interface VersionOptions {
   status?: string;
 }
 
-/** `acme/lint@1.0.0`: a namespace, a name and a version, as a test names one. */
 function parse(ref: string): { namespace: string; name: string; version: string } {
   const match = /^([^/@]+)\/([^/@]+)@([^/@]+)$/.exec(ref);
   if (match === null) throw new Error(`Expected namespace/name@version, got "${ref}".`);
@@ -26,7 +25,6 @@ function parse(ref: string): { namespace: string; name: string; version: string 
   return { namespace, name, version };
 }
 
-/** A file spec registry, built up one published version at a time. */
 class RegistryBuilder {
   readonly #root: string;
   readonly #options: { name?: string; slug?: string };
@@ -47,7 +45,7 @@ class RegistryBuilder {
     return this.#publish("agent", ref, options);
   }
 
-  /** Withdraws a version already published here: skipped for `latest`, still resolvable by pin. */
+  /** Withdraws a version: skipped for `latest`, still resolvable by pin. */
   yank(ref: string, reason?: string): this {
     const version = this.#version(ref);
     version.yanked = true;
@@ -55,12 +53,11 @@ class RegistryBuilder {
     return this;
   }
 
-  /** Blocks a version already published here, which nothing then installs. */
+  /** Nothing installs a blocked version. */
   block(ref: string, reason?: string): this {
     return this.status(ref, "blocked", reason);
   }
 
-  /** Sets a version's status in `versions.json`, as a status change in a pull request does. */
   status(ref: string, status: string, reason?: string): this {
     const version = this.#version(ref);
     version.status = status;
@@ -68,7 +65,6 @@ class RegistryBuilder {
     return this;
   }
 
-  /** Writes registry.json, index.json and every version, returning the registry's root. */
   async write(): Promise<string> {
     const kinds = await kindsOf(undefined);
     for (const artifact of this.#artifacts) {

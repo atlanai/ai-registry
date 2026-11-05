@@ -36,10 +36,7 @@ function comparable(location: string): string {
   return `url:${stripTrailing(bare, "/").toLowerCase()}`;
 }
 
-/**
- * An address keeps the alias it named; a URL takes the alias it is already
- * declared under, and only a new source is named after itself.
- */
+/** A URL takes the alias it is already declared under; only a new source is named after itself. */
 export function aliasFor(
   input: string,
   declared: boolean,
@@ -50,7 +47,7 @@ export function aliasFor(
   return declaredAlias(known, source.declared.location) ?? source.alias;
 }
 
-/** The alias a location is already declared under, so a second spelling of it reuses the name. */
+/** So a second spelling of a location reuses its alias. */
 function declaredAlias(
   registries: Readonly<Record<string, RegistrySource>>,
   location: string,
@@ -62,8 +59,8 @@ function declaredAlias(
 }
 
 /**
- * This scope's registries over the user's, so a project sees every alias its
- * user declared. A relative folder is read from the scope that declares it.
+ * This scope's registries over the user's. A relative folder is read from the scope that
+ * declares it.
  */
 export async function knownRegistries(
   common: CommonOptions,
@@ -96,10 +93,7 @@ export interface Addressing {
   known: Readonly<Record<string, RegistrySource>>;
 }
 
-/**
- * A repository URL with an address after it names a place inside that
- * registry, so `github.com/acme/registry/platform` is `<alias>/platform`.
- */
+/** `github.com/acme/registry/platform` is `<alias>/platform`. */
 export function asAddress(
   input: string,
   known: Readonly<Record<string, RegistrySource>>,
@@ -108,8 +102,8 @@ export function asAddress(
   if (split === undefined) return { address: input, known };
   const alias =
     declaredAlias(known, split.location) ?? registryNameFromLocation(split.location, "git");
-  // The name is the repository's only when it is free: a declaration of another
-  // source under it would otherwise be read in place of the repository named.
+  // The name is the repository's only when free, or another source declared under it
+  // would be read in place of the repository named.
   const holder = known[alias];
   if (holder !== undefined && !sameLocation(holder.location, split.location)) {
     throw new AiregError(
@@ -128,10 +122,7 @@ export function asAddress(
   };
 }
 
-/**
- * An address whose registry this scope does not know. The likeliest cause is the
- * other scope, so a registry declared there is named with the flag that reaches it.
- */
+/** The likeliest cause is the other scope, so a registry declared there is named with its flag. */
 export async function undeclaredRegistry(
   input: string,
   known: Readonly<Record<string, RegistrySource>>,

@@ -145,8 +145,7 @@ async function remove(
   }
   trackRun("remove", result);
 
-  // An artifact something else depends on leaves the manifest but stays
-  // installed for as long as something needs it.
+  // An artifact something else depends on leaves the manifest but stays installed while needed.
   const record = result.plan.actions.find((action) => action.kind === "record");
   const needed = (name: string) => record?.lock.artifacts[name]?.neededBy;
   // What was named is removed, not pruned, even when something in a cycle needed it.
@@ -182,7 +181,6 @@ async function remove(
   };
 }
 
-/** Asks which installed artifacts to remove; undefined when the person cancels. */
 async function pickRemovals(
   step: ReturnType<typeof interaction>,
   loaded: Loaded,
@@ -227,7 +225,6 @@ async function pickRemovals(
   return canceled(picked) ? undefined : picked;
 }
 
-/** A name written as a whole registry or namespace's address, such as `acme/frontend`. */
 function wholeAddress(name: string): string[] {
   try {
     const ref = parseRef(name);
@@ -246,7 +243,7 @@ async function editedAmong(lock: Lock, names: readonly string[], roots: Roots): 
 
 /**
  * A ref naming a dropped artifact goes, as does a whole ref removed by its own address;
- * any other keeps taking the rest minus what was dropped, so later members still arrive.
+ * any other keeps the rest minus what was dropped, so later members still arrive.
  */
 function without(ref: Ref, drop: ReadonlySet<string>, lock: Lock, whole: boolean): Ref[] {
   const covered = Object.entries(lock.artifacts).filter(([, entry]) => reaches(ref, entry));

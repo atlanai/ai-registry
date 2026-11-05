@@ -4,13 +4,13 @@ export type TomlScalar = string | number | boolean;
 
 const MAX_BYTES = 1_000_000;
 const BARE_KEY = /^[A-Za-z0-9_-]+$/;
+const ESCAPES: Readonly<Record<string, string>> = { n: "\n", t: "\t", r: "\r" };
 
 /** A basic string: the quote, the backslash and every control character escaped. */
 export function quote(value: string): string {
   return `"${escaped(value).replaceAll('"', '\\"')}"`;
 }
 
-/** The backslash and every control character escaped, except those in `kept`. */
 function escaped(value: string, kept = ""): string {
   let out = "";
   for (const char of value) {
@@ -34,7 +34,7 @@ export function multilineQuote(value: string): string {
   return `"""\n${text}"""`;
 }
 
-/** The keys the table at `at` sets, or undefined when there is no such table; `[]` is the root. */
+/** Undefined when there is no such table; `[]` is the root. */
 export function readTable(
   text: string,
   at: readonly string[],
@@ -49,7 +49,7 @@ export function readTable(
   return out;
 }
 
-/** The root table's single-line keys: every statement before the first heading. Read only. */
+/** Single-line keys before the first heading. Read only. */
 function readRoot(text: string): Record<string, TomlScalar | null> {
   checked(text);
   const out: Record<string, TomlScalar | null> = {};
@@ -99,7 +99,6 @@ function statements(lines: readonly string[]): Statement[] {
   return out;
 }
 
-/** The segments of a `[table]` or `[[table]]` heading, or undefined for any other line. */
 function parseHeading(line: string): { at: string[]; array: boolean } | undefined {
   const trimmed = line.trim();
   const array = trimmed.startsWith("[[");
@@ -110,7 +109,6 @@ function parseHeading(line: string): { at: string[]; array: boolean } | undefine
   return close.test(key.rest) ? { at: key.keys, array } : undefined;
 }
 
-/** A dotted key, bare or quoted segments, at the start of `raw`, and what follows it. */
 function readKey(raw: string): { keys: string[]; rest: string } | undefined {
   let rest = raw.trimStart();
   const keys: string[] = [];
@@ -130,7 +128,6 @@ function readKey(raw: string): { keys: string[]; rest: string } | undefined {
   }
 }
 
-/** A basic or literal string at the start of `raw`, and what follows it. */
 function readString(raw: string): { value: string; rest: string } | undefined {
   const basic = /^"((?:[^"\\]|\\.)*)"/.exec(raw);
   if (basic !== null) {
@@ -138,7 +135,7 @@ function readString(raw: string): { value: string; rest: string } | undefined {
       if (escaped.startsWith("u") && escaped.length === 5) {
         return String.fromCharCode(Number.parseInt(escaped.slice(1), 16));
       }
-      return escaped === "n" ? "\n" : escaped === "t" ? "\t" : escaped === "r" ? "\r" : escaped;
+      return ESCAPES[escaped] ?? escaped;
     });
     return { value, rest: raw.slice(basic[0].length) };
   }
@@ -147,20 +144,18 @@ function readString(raw: string): { value: string; rest: string } | undefined {
   return undefined;
 }
 
-/** What a value left open at the end of a line: brackets, or a multi-line string. */
+/** Brackets or a multi-line string left open at the end of a line. */
 interface Open {
   depth: number;
   quote: string | undefined;
 }
 
-/** The key a `key = value` line sets, and its raw value. */
 function parseEntry(line: string): { keys: string[]; raw: string } | undefined {
   const key = readKey(line);
   const value = key === undefined ? null : /^=\s*(.*)$/.exec(key.rest);
   return key === undefined || value === null ? undefined : { keys: key.keys, raw: value[1] ?? "" };
 }
 
-/** What is still open after one more line of a value, outside strings and comments. */
 function carry(text: string, open: Open): Open {
   let { depth, quote } = open;
   let i = 0;
@@ -188,12 +183,11 @@ function carry(text: string, open: Open): Open {
   return { depth, quote };
 }
 
-/** Where `quote` closes at or after `from`; only a basic (double-quoted) string has escapes. */
+/** Only a basic (double-quoted) string has escapes. */
 function stringEnd(text: string, from: number, quote: string): number {
   return quote.startsWith('"') ? basicClose(text, from, quote) : text.indexOf(quote, from);
 }
 
-/** Where a basic string's closing `quote` sits at or after `from`, skipping escapes; -1 when absent. */
 function basicClose(text: string, from: number, quote: string): number {
   for (let i = from; i < text.length; i++) {
     if (text[i] === "\\") i += 1;
@@ -202,7 +196,6 @@ function basicClose(text: string, from: number, quote: string): number {
   return -1;
 }
 
-/** The string delimiter that starts at `i`, longest first, if one does. */
 function quoteAt(text: string, i: number): string | undefined {
   const triple = text.slice(i, i + 3);
   if (triple === '"""' || triple === "'''") return triple;
@@ -210,7 +203,7 @@ function quoteAt(text: string, i: number): string | undefined {
   return char === '"' || char === "'" ? char : undefined;
 }
 
-/** One heading or `key = value` line with the lines its value runs on to, or any other line. */
+/** A heading or `key = value` line plus the lines its value runs on to, or any other line. */
 interface Statement {
   start: number;
   end: number;
@@ -242,7 +235,6 @@ interface Span {
   /** -1 when the table is absent. */
   start: number;
   end: number;
-  /** The table's own `key = value` statements. */
   entries: (Statement & { entry: { keys: [string]; raw: string } })[];
   /** The file also sets the table by a dotted key, an inline table or `[[...]]`. */
   elsewhere: boolean;
@@ -315,7 +307,7 @@ function renderValue(value: TomlScalar): string {
   return typeof value === "string" ? quote(value) : String(value);
 }
 
-/** The table's lines with each of its entries passed through `edit`, which may drop or replace it. */
+/** `edit` returns null to drop an entry, a line to replace it, or undefined to keep it. */
 function rewrite(
   found: Span,
   edit: (key: string) => string | null | undefined,
@@ -337,17 +329,18 @@ function rewrite(
 
 function render({ nl, trailing }: Span, lines: readonly string[]): string {
   const rendered = lines.join(nl);
-  return rendered === "" ? "" : trailing ? `${rendered}${nl}` : rendered;
+  if (rendered === "" || !trailing) return rendered;
+  return `${rendered}${nl}`;
 }
 
-/** Deletes each key from the table at `at`, leaving the table itself. */
+/** Leaves the table itself. */
 export function unsetKeys(text: string, at: readonly string[], keys: readonly string[]): string {
   const found = span(text, at);
   if (found.start < 0) return text;
   return rewrite(found, (key) => (keys.includes(key) ? null : undefined));
 }
 
-/** Deletes the table at `at` and the blank lines that set it apart. */
+/** Also deletes the blank lines that set it apart. */
 export function dropTable(text: string, at: readonly string[]): string {
   const found = span(text, at);
   const { lines, start, end } = found;

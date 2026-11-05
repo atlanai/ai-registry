@@ -20,10 +20,7 @@ let root: string;
 let market: string;
 let project: string;
 
-/**
- * Republishes the whole root, which is how a registry gains a version. `lint`
- * can be given other bytes or yanked; `format` is published beside it.
- */
+/** Republishes the whole root, which is how a registry gains a version. */
 async function publish(
   versions: readonly string[],
   lint: { rewrite?: string; yank?: string } = {},

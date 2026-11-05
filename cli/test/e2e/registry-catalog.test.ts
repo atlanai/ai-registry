@@ -182,8 +182,11 @@ describe("a change that edits a released version", () => {
     expect(checked.stdout).toContain(`fix: ${fix}`);
     for (const command of fix.split(" && ")) {
       const [program, ...args] = command.split(" ");
-      if (program === "git") await git(reg, ...args);
-      else expect((await aireg(args, { cwd: reg })).code).toBe(0);
+      if (program === "git") {
+        await git(reg, ...args);
+        continue;
+      }
+      expect((await aireg(args, { cwd: reg })).code).toBe(0);
     }
 
     const fixed = await aireg(["registry", "validate", "--base", "main"], { cwd: reg });

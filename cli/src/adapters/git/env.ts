@@ -22,10 +22,7 @@ export function gitEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   });
 }
 
-/**
- * What `git rev-parse --local-env-vars` lists, less its config entries. Inside a
- * git hook these name the caller's repository, and a clone would write into it.
- */
+/** `git rev-parse --local-env-vars` less config: in a hook these name the caller's repository. */
 const REPOSITORY_VARIABLES: readonly string[] = [
   "GIT_ALTERNATE_OBJECT_DIRECTORIES",
   "GIT_COMMON_DIR",
@@ -41,7 +38,6 @@ const REPOSITORY_VARIABLES: readonly string[] = [
   "GIT_WORK_TREE",
 ];
 
-/** The caller's environment with nothing that points git at the caller's repository. */
 function withoutRepository(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const kept = { ...env };
   for (const name of REPOSITORY_VARIABLES) delete kept[name];

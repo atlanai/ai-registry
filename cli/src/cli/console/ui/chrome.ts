@@ -1,8 +1,8 @@
 import type { ReactElement, ReactNode } from "react";
-import type { AccountRow } from "#core/console/model.ts";
+import type { AccountRow, ArtifactGroup } from "#core/console/model.ts";
 import { BUILT_IN_VIEWS } from "#core/console/model.ts";
 import type { HintKey } from "#core/host/panel.ts";
-import { clock, displayWidth, truncate, truncateStart } from "#core/term/format.ts";
+import { clock, displayWidth, pad, truncate, truncateStart } from "#core/term/format.ts";
 import { COLOR, GLYPH } from "#core/term/theme.ts";
 import { box, faint, hints, plain, rule, text } from "./elements.ts";
 import { VIEW_LABELS } from "./view.ts";
@@ -25,7 +25,6 @@ export function tabsWith(panels: readonly { id: string; label: string; after?: s
 
 export interface Activity {
   label: string;
-  /** The newest line the running command printed, shown in the header. */
   line: string | undefined;
   done: boolean;
   failed: boolean;
@@ -43,7 +42,7 @@ const piece = (color: string, value: string, bold = false): Piece => ({
 
 const widthOf = (pieces: readonly Piece[]) => pieces.reduce((sum, p) => sum + p.width, 0);
 
-/** One line, never wrapped: as the width shrinks the daemon goes first, then the pull. */
+/** Never wraps: as the width shrinks the daemon goes first, then the pull. */
 export function header(props: {
   width: number;
   activity: Activity | undefined;
@@ -77,7 +76,6 @@ export function header(props: {
   );
 }
 
-/** A running command, in the slot the pull hint takes, with its line cut to `room`. */
 function running(activity: Activity, room: number): Piece[] {
   const label = piece(
     activity.failed ? COLOR.red : COLOR.yellow,
@@ -93,19 +91,16 @@ function row(pieces: readonly Piece[]): ReactElement {
   return box(null, ...pieces.map((p) => p.node));
 }
 
-/** Rendered width of each registry tab, so a click can be mapped back to one. */
 export function accountTabWidths(accounts: readonly AccountRow[]): number[] {
   return accounts.map(
     (account, index) => displayWidth(account.registry) + ` [${index + 1}]    `.length,
   );
 }
 
-/** The registries, labeled with the digit that picks each, and the scope's folder. */
 export function accountTabs(props: {
   width: number;
   accounts: readonly AccountRow[];
   activeId: string | undefined;
-  /** The scope's folder, as the reader would type it. */
   root: string;
 }): ReactElement {
   const tabs: ReactNode[] = [];
@@ -137,10 +132,7 @@ export function accountTabs(props: {
   );
 }
 
-/**
- * No digit here: the digits pick a registry. Views move with the arrows, and
- * by clicking.
- */
+/** No digit here: the digits pick a registry. */
 export function viewTabWidths(tabs: readonly Tab[]): number[] {
   return tabs.map((tab) => tab.label.length + 5);
 }
@@ -177,10 +169,7 @@ export function footer(props: {
   );
 }
 
-/**
- * The two-line strip under a list. It follows the cursor rather than sitting in
- * a side pane, which is what keeps the list itself full width.
- */
+/** Follows the cursor rather than a side pane, which keeps the list full width. */
 export function summaryStrip(props: {
   width: number;
   title: ReactNode;
@@ -207,4 +196,10 @@ export function summaryStrip(props: {
       box({ key: `l${index}` }, text({ color: COLOR.faint }, `${GLYPH.pipe} `), line),
     ),
   );
+}
+
+export function groupTag(group: ArtifactGroup, width: number): ReactElement {
+  if (group.isDefault) return text({ color: COLOR.yellow }, pad("default", width));
+  if (group.authoredHere) return faint(pad("authored here", width));
+  return plain(" ".repeat(width));
 }

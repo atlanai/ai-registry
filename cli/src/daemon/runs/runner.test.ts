@@ -1,21 +1,18 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import type { Account } from "#core/config/model.ts";
 import { jobOfWork, type ScopeWork } from "#engine/sync/work.ts";
+import { homeTest as test } from "#test/kit/fixtures.ts";
 import { SyncRunner } from "./runner.ts";
 import { SqliteRunStore } from "./store.ts";
 
 const sync = vi.hoisted(() => ({
   waiting: [] as (() => void)[],
   calls: 0,
-  /** Lets every run still syncing finish. */
   release() {
     for (const resolve of this.waiting.splice(0)) resolve();
   },
 }));
 
-vi.mock("#core/config/repository.ts", () => ({
-  readConfig: async () => ({ revision: 1, jobs: [], accounts: [] }),
-}));
 vi.mock("#engine/sync/execute.ts", () => ({
   executeSync: async () => {
     sync.calls += 1;
@@ -29,7 +26,6 @@ vi.mock("#engine/sync/execute.ts", () => ({
 
 const account: Account = { id: "acc_anonymous_shop", registry: "shop" };
 
-/** What `sync.start` builds for each request: the same work under a fresh id. */
 function oneOff(root = "/project") {
   const work: ScopeWork = {
     id: `job_foreground_${Math.random()}`,

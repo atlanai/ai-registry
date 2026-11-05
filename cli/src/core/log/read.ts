@@ -121,10 +121,7 @@ export function newestEntries(path: string, filter: Filter, limit: number): Entr
   return found.reverse();
 }
 
-/**
- * `--since 15m` reads as a duration before now, the common shorthand;
- * anything else must be a date the platform can parse.
- */
+/** `--since 15m` reads as a duration before now; anything else must parse as a date. */
 export function parseSince(value: string, now = Date.now()): number {
   // A bare number would read as a year, so a duration here names its unit.
   const ago = /[smhd]$/.test(value.trim()) ? parseDuration(value) : undefined;

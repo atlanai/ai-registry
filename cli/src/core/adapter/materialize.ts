@@ -25,10 +25,7 @@ import { KIND_SPECS } from "#core/kinds.ts";
 
 const fetching = limiter(CONCURRENCY);
 
-/**
- * A fetch arrives whole, so the files in flight are bounded by their bytes as
- * well as their number: sixteen large assets would otherwise all be held at once.
- */
+/** A fetch arrives whole, so bytes in flight are bounded too, not only the file count. */
 const holding = weighted(128 * 1024 * 1024);
 
 const STAGING_PREFIX = ".staging-";
@@ -43,10 +40,7 @@ export function reasonOf(error: unknown): string {
   return messageOf(error);
 }
 
-/**
- * A version read where its source keeps it, copied file by file from its
- * envelope: nothing it does not describe lands, and no link is followed.
- */
+/** Copies only what the envelope describes, file by file, and follows no link. */
 export async function copyDescribed(
   from: { root: string; path: string; envelope: Envelope },
   to: string,
@@ -62,17 +56,15 @@ export async function copyDescribed(
     await assertUnredirected(to, target);
     await mkdir(dirname(target), { recursive: true });
     await assertUnredirected(to, target);
-    // Streamed beside the target and landed only once its digest checks out,
-    // so a large file is never held whole and a bad one never lands.
+    // Streamed beside the target, so a large file is never held whole, and landed only once its
+    // digest checks out.
     const part = `${target}.${randomUUID()}.part`;
     try {
       const read = await copyRegular(from.root, descriptor.path, part);
-      const problem =
-        read.kind === "missing"
-          ? "is missing"
-          : read.kind === "refused"
-            ? read.reason
-            : mismatch(read, descriptor);
+      let problem: string | undefined;
+      if (read.kind === "missing") problem = "is missing";
+      else if (read.kind === "refused") problem = read.reason;
+      else problem = mismatch(read, descriptor);
       if (problem !== undefined) {
         throw new AiregError(`${from.envelope.metadata.name}: ${descriptor.path} ${problem}.`, {
           code: ErrorCode.Integrity,
@@ -142,8 +134,7 @@ export async function materialize(
     dropped,
   });
 
-  // A source that is already a content store is read where it lies, and only
-  // what its envelope describes is ever copied out of it (`copyDescribed`).
+  // A source that is already a content store is read in place; only described files leave it.
   const local = await handle.localRoot?.(artifact);
   if (local !== undefined) {
     await verifyAt(local, artifact.files, artifact.envelope, fail);
@@ -222,10 +213,7 @@ function contentAt(artifact: Artifact, root: string): string {
   return join(root, ...only.path.split(posix.sep));
 }
 
-/**
- * Content already on this machine still has to be what the envelope describes,
- * so it is checked against the same descriptors rather than hashed a second way.
- */
+/** Content already here is checked against the same descriptors, not hashed a second way. */
 async function verifyAt(
   root: string,
   files: readonly FileRef[],
@@ -253,9 +241,8 @@ function describedBy(envelope: Envelope): Map<string, FileDescriptor> {
 
 interface Written {
   kept: FileDescriptor[];
-  /** Members the source would not serve. Only ever non-empty for a collection. */
+  /** Only ever non-empty for a collection. */
   missing: string[];
-  /** Why each missing member was dropped, so the caller can say so. */
   reasons: Map<string, AdapterError>;
 }
 
@@ -296,8 +283,7 @@ async function writeFiles(
       await writeFile(target, bytes);
       if (file.executable) await chmod(target, EXECUTABLE);
     } catch (error) {
-      // Dropping one bad member is the safe half of the choice - the bytes never
-      // land either way - and it is what keeps the other members installable.
+      // Dropping a bad member keeps the rest installable; its bytes never land either way.
       const droppable =
         isAdapterError(error) && (error.failure === "not_found" || error.failure === "invalid");
       if (collection && droppable) {
@@ -310,8 +296,7 @@ async function writeFiles(
     }
   };
 
-  // Settled rather than raced, so nothing is still writing into the staging
-  // directory when the caller starts removing it.
+  // Settled, not raced, so nothing still writes into staging when the caller removes it.
   const results = await Promise.allSettled(
     artifact.files.map((file) =>
       fetching(() => holding(described.get(file.path)?.size ?? 0, () => one(file))),
@@ -355,7 +340,6 @@ function memberOf(path: string): string {
   return parts.length > 2 ? parts.slice(0, 2).join(posix.sep) : path;
 }
 
-/** A member of a collection that did not land, and why. */
 interface Dropped {
   member: string;
   reason: string;
@@ -363,10 +347,7 @@ interface Dropped {
 }
 
 export interface MaterializeOptions {
-  /**
-   * Where bytes with this content digest are kept between runs. Keyed by what
-   * they are, so a cached copy can be checked against the envelope asking for it.
-   */
+  /** Keyed by content digest, so a cached copy is checked against the envelope asking for it. */
   into: (contentId: string) => string;
   /** No folder from this root down to a cache path may be a link; unchecked when absent. */
   boundary?: string;

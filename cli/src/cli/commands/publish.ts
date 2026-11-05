@@ -122,7 +122,13 @@ async function publish(
       to === undefined
         ? undefined
         : { into: to.registry, namespace: to.namespace, skipped: outcome.skipped };
-    const sending = await review(context, step, planned, open, common.dryRun, asks, skips);
+    const sending = await review(context, step, {
+      planned,
+      open,
+      dryRun: common.dryRun,
+      asks,
+      skipped: skips,
+    });
     if (sending === undefined) return report(planned, new Map(), outcome);
 
     const results = new Map<string, PublishResult | undefined>();

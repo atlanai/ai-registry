@@ -1,8 +1,6 @@
 import { isLocalPath } from "./paths.ts";
 import { sanitizeName } from "./text.ts";
 
-// How a registry's address reads to a person: its host, and the name it suggests.
-
 /** `user@host:path`, the form git takes a remote in without a scheme. */
 export const SCP_LOCATION = /^(?:([\w.-]+)@)?([\w.-]+):(?!\/)(.+)$/;
 

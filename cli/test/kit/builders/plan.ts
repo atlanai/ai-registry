@@ -12,7 +12,6 @@ import { manifest } from "./manifest.ts";
 /** The one registry the planner tests read, a git checkout at `/snap`. */
 const KIT = "https://github.com/acme/kit.git";
 
-/** A project at `/work` projecting into Claude Code. */
 export const PLAN_OPTIONS: BuildOptions = {
   roots: roots("project", "/work"),
   env: process.env,
@@ -22,7 +21,6 @@ export const PLAN_OPTIONS: BuildOptions = {
   copy: false,
 };
 
-/** A catalog entry for `skills/lint` unless overridden. */
 export function entry(over: Partial<Entry> = {}): Entry {
   return {
     name: "lint",
@@ -82,7 +80,6 @@ export function acquired(
   ];
 }
 
-/** A manifest that declares `kit` and asks for `refs` from it. */
 export function kitManifest(refs = ["kit/skill/lint"]): Manifest {
   return manifest()
     .registry("kit", KIT)
@@ -128,7 +125,6 @@ export const DRIFTED: Survey = {
 
 export const kinds = (plan: { actions: Action[] }) => plan.actions.map((a) => a.kind);
 
-/** Where a plan links one target, sorted. */
 export function linksTo(actions: readonly Action[], target: string): string[] {
   return actions
     .filter((action): action is Extract<Action, { kind: "link" }> => action.kind === "link")
@@ -142,7 +138,6 @@ export function wrapping(sources: readonly Acquired[]): Acquired[] {
   return sources.map((source) => ({ ...source, namespacePlugins: true }));
 }
 
-/** A plugin and the two artifacts it holds, as a registry publishes them. */
 export function pluginCatalog(name = "toolkit"): Entry[] {
   return [
     entry({ name, kind: "plugin", path: `plugins/${name}`, group: undefined }),
@@ -156,10 +151,8 @@ export function pluginCatalog(name = "toolkit"): Entry[] {
   ];
 }
 
-/** The content id `kit` places the toolkit plugin at. */
 export const PLUGIN_TREES = new Map([["plugins/toolkit", "tp"]]);
 
-/** A plan with nothing in it, for a test to add the actions it applies. */
 export function emptyPlan(): Plan {
   return {
     actions: [],

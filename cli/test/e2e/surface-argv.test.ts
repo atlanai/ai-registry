@@ -14,8 +14,7 @@ describe("the command line", () => {
     });
   });
 
-  // The --log-level rows check a global's value is never left behind as a positional and
-  // taken as the subcommand.
+  // The --log-level rows check a global's value is never taken as the subcommand.
   test("takes the global flags anywhere, and refuses bad combinations", async ({ aireg }) => {
     const taken = [
       ["targets", "--log-level", "debug"],
@@ -163,38 +162,36 @@ describe("starting up", () => {
 
   test.for([
     {
-      failure: "an old Node.js",
-      args: ["--version"],
-      hook: 'Object.defineProperty(process.versions,"node",{value:"22.18.0"})',
-      error: "error: aireg requires Node.js ^22.23.4 || ^24.22.1 || >=26.12.1; this is 22.18.0.",
-    },
-    {
       failure: "a failure before the command starts",
-      args: ["--json", "status"],
       hook: 'process.cwd=()=>{throw new Error("ENOENT: no such file or directory, uv_cwd")}',
       error: "uv_cwd",
     },
     {
       failure: "a stray failure",
-      args: ["--json", "status"],
       hook: 'const on=process.stdout.on;process.stdout.on=function(e,f){if(e==="error")setTimeout(()=>{throw new Error("stray")});return on.call(this,e,f)}',
       error: "stray",
     },
-  ])("reports $failure without a stack trace", async ({ args, hook, error }, { aireg }) => {
-    const ran = await aireg(args, { node: ["--import", `data:text/javascript,${hook}`] });
+  ])("reports $failure without a stack trace", async ({ hook, error }, { aireg }) => {
+    const ran = await aireg(["--json", "status"], {
+      node: ["--import", `data:text/javascript,${hook}`],
+    });
     expect(ran.code).toBe(1);
-    if (args[0] === "--json") {
-      expect(JSON.parse(ran.stdout)).toMatchObject({
-        ok: false,
-        error: { code: "error", message: expect.stringContaining(error) },
-      });
-    } else {
-      expect(ran.stderr).toContain(error);
-      if (args[0] === "--version") {
-        expect(ran.stderr).toContain("Install a supported Node.js version");
-        expect(ran.stderr).not.toContain("standalone");
-      }
-    }
+    expect(JSON.parse(ran.stdout)).toMatchObject({
+      ok: false,
+      error: { code: "error", message: expect.stringContaining(error) },
+    });
+    expect(ran.stderr).not.toMatch(/\n\s+at /);
+  });
+
+  test("reports an old Node.js without a stack trace", async ({ aireg }) => {
+    const hook = 'Object.defineProperty(process.versions,"node",{value:"22.18.0"})';
+    const ran = await aireg(["--version"], { node: ["--import", `data:text/javascript,${hook}`] });
+    expect(ran.code).toBe(1);
+    expect(ran.stderr).toContain(
+      "error: aireg requires Node.js ^22.23.4 || ^24.22.1 || >=26.12.1; this is 22.18.0.",
+    );
+    expect(ran.stderr).toContain("Install a supported Node.js version");
+    expect(ran.stderr).not.toContain("standalone");
     expect(ran.stderr).not.toMatch(/\n\s+at /);
   });
 });

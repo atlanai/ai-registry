@@ -4,7 +4,6 @@ import { STEP_POLICIES } from "#core/config/model.ts";
 import type { OptionSpec } from "#core/host/extend.ts";
 import { COLOR_WHEN } from "#core/term/printer.ts";
 
-/** Scope follows the package-manager convention: this project, unless `-g`. */
 export const USER: OptionSpec = {
   flag: "--user",
   short: "-g",
@@ -126,14 +125,13 @@ const LAYOUT: OptionSpec = {
   describe: `How to read the source, instead of telling from what it holds: ${list([...LAYOUT_IDS], "or")}`,
 };
 
-/** Taken by every command that reads a registry from its address. */
 export const SOURCE: readonly OptionSpec[] = [REF, PATH, ADAPTER, LAYOUT, CONFIG];
 
 export const MAP_FORMATS = ["tree", "compact", "json"] as const;
 
 export type MapFormat = (typeof MAP_FORMATS)[number];
 
-/** Read before the command by main.ts, except --yes, which every command's parse accepts. */
+/** Read before the command, except --yes, which every command's parse accepts. */
 export const GLOBAL_OPTIONS: readonly OptionSpec[] = [
   { flag: "--json", describe: "Machine-readable output" },
   { flag: "--verbose", describe: "Print each step" },

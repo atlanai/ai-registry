@@ -50,12 +50,10 @@ async function execute({ dryRun, force, check, rollback: back }: Options): Promi
   const upToDate = gte(current, release.version);
 
   if (check || dryRun) {
-    return {
-      current,
-      latest: release.version,
-      action: upToDate ? "already-latest" : dryRun ? "would-update" : "update-available",
-      dryRun,
-    };
+    let action: SelfUpdate["action"] = "update-available";
+    if (upToDate) action = "already-latest";
+    else if (dryRun) action = "would-update";
+    return { current, latest: release.version, action, dryRun };
   }
 
   if (upToDate && !force) {

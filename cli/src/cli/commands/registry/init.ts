@@ -122,7 +122,7 @@ export const init = action({
   },
 });
 
-/** `init` in a registry adds only the namespaces it was given; the registry itself is left as it is. */
+/** In a registry already, only the namespaces given are added; the rest is left as it is. */
 async function extend(
   context: CommandContext,
   root: string,
@@ -149,7 +149,6 @@ function canceled(step: Interaction): typeof STREAMED {
   return STREAMED;
 }
 
-/** Each namespace once, or a usage error naming the ones that cannot be one. */
 function namespacesOf(listed: readonly string[]): string[] {
   const namespaces = [...new Set(listed.map((item) => item.trim()).filter(Boolean))];
   const invalid = namespaces.filter((item) => !isNamespace(item));
@@ -168,7 +167,7 @@ function namespacesOf(listed: readonly string[]): string[] {
 /** Anything that reads as an address somewhere else, not a folder here. */
 const REMOTE = /^[a-z+]+:\/\/|^[\w.-]+@[\w.-]+:|^[\w-]+(\.[\w-]+)+\//i;
 
-/** The owner of the repository this folder pushes to, which is who the registry is usually named for. */
+/** The registry is usually named for the owner of the repository this folder pushes to. */
 async function remoteOwner(root: string): Promise<string | undefined> {
   const attempt = await gitIn(existsSync(root) ? root : dirname(root), [
     "remote",
@@ -183,7 +182,7 @@ async function remoteOwner(root: string): Promise<string | undefined> {
   }
 }
 
-/** Asked on a terminal; anywhere else, and under --yes, the suggestion is the answer. */
+/** Off a terminal, and under --yes, the suggestion is the answer. */
 async function ask(
   step: Interaction,
   message: string,

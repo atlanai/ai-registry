@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import type { SourceContext } from "#adapter/index.ts";
 
-/** A context as the host gives an adapter, with no other process to wait for. `cache` is the test's own. */
-export function sourceContext(source: SourceContext["source"], cache: string): SourceContext {
+/** Without its own `cache`, an adapter that asks for one fails the test. */
+export function sourceContext(source: SourceContext["source"], cache?: string): SourceContext {
   return {
     source,
     credential: undefined,
@@ -10,6 +10,7 @@ export function sourceContext(source: SourceContext["source"], cache: string): S
     limits: { timeoutMs: 30_000, retries: 0 },
     onBytes: () => {},
     cacheDir: () => {
+      if (cache === undefined) throw new Error(`${source.registry} asked for a cache.`);
       mkdirSync(cache, { recursive: true });
       return cache;
     },

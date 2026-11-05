@@ -51,7 +51,7 @@ export async function openAddress(
 
   let namespace = selectScope(input, resolved, picks, within);
   let { asked, named, partial } = selection(resolved, picks);
-  // An address that says what to install is the whole answer; only a bare one is asked about.
+  // Only a bare address is asked about.
   const complete = picks.select !== undefined || exact;
   const asking: Interaction = complete
     ? { ...step, blocked: step.blocked ?? { kind: "yes" } }
@@ -67,8 +67,6 @@ export async function openAddress(
   }
   const { catalogAlias, entries } = entriesFor(source, resolved, partial, namespace);
 
-  // An address the manifest already resolves keeps the alias it was declared
-  // under; anything else is named after the source it came from.
   const alias = resolved.declared
     ? aliasFor(input, true, known, source)
     : (own.as ?? aliasFor(input, false, known, source));
@@ -88,7 +86,6 @@ export async function openAddress(
   };
 }
 
-/** What the command line names, with a link to one artifact read as that artifact. */
 async function commandLineAddress(
   own: AddFlags,
   positionals: string[],
@@ -107,10 +104,7 @@ async function commandLineAddress(
   return addressed(link.registry, link.registry, [link.address], known, flags, common);
 }
 
-/**
- * What the command line names. With --registry, one positional is an address
- * inside it and several are picks, read as -s reads them.
- */
+/** With --registry, one positional is an address inside it and several are picks. */
 function addressed(
   typed: string,
   registry: string | undefined,
@@ -152,7 +146,6 @@ function addressed(
     : { input: typed, resolved, picks: common, inside: relative, exact: true, known };
 }
 
-/** One address per command; several artifacts are picked inside it with -s. */
 function refuseExtra(positionals: readonly string[]): void {
   if (positionals.length <= 1) return;
   throw new AiregError("`aireg add` takes one address.", {
@@ -162,8 +155,8 @@ function refuseExtra(positionals: readonly string[]): void {
 }
 
 /**
- * A namespace address narrows the catalog, so `-s` cannot reach past it. A plugin's namespace
- * holds its parts, and the plugin itself, which sits in none.
+ * A namespace address narrows the catalog, so `-s` cannot reach past it. A plugin's
+ * namespace holds its parts and the plugin itself, which sits in none.
  */
 function inside(entries: readonly Entry[], namespace: string | undefined): readonly Entry[] {
   if (namespace === undefined) return entries;
@@ -182,10 +175,7 @@ function through(
   return { input, resolved, picks: common, inside: undefined, exact, known };
 }
 
-/**
- * The namespace `-s` reads inside, when the address names one. An address that
- * already names one artifact leaves `-s` nothing to pick.
- */
+/** The namespace `-s` reads inside; none when the address already names one artifact. */
 function selectScope(
   input: string,
   resolved: Resolved,
@@ -210,7 +200,6 @@ function selectScope(
   }
 }
 
-/** What an address selects: the names it carries, read the way `--select` would be. */
 function selection(resolved: Resolved, picks: CommonOptions) {
   const asked: CommonOptions =
     picks.select !== undefined || resolved.name === undefined
@@ -228,16 +217,14 @@ function selection(resolved: Resolved, picks: CommonOptions) {
 interface Addressed {
   input: string;
   resolved: Resolved;
-  /** The options with any picks the positionals made. */
   picks: CommonOptions;
-  /** For a source named with --registry, the address inside it. */
+  /** With --registry, the address inside it. */
   inside: string | undefined;
-  /** Whether the command line says exactly what to install, so nothing is asked. */
+  /** The command line says exactly what to install, so nothing is asked. */
   exact: boolean;
   known: Readonly<Record<string, RegistrySource>>;
 }
 
-/** Reads the source once, under a spinner on a terminal; a source that publishes nothing is an error. */
 async function read(
   step: Interaction,
   context: CommandContext,
@@ -300,8 +287,8 @@ async function read(
 }
 
 /**
- * `acme/pdf` names a namespace. When the registry has no namespace `pdf` but exactly one artifact
- * of that name, it names that artifact instead; the manifest records its full name.
+ * `acme/pdf` names a namespace, or, when there is none but exactly one artifact `pdf`,
+ * that artifact; the manifest records its full name.
  */
 function shortForm(
   source: Probed,
@@ -320,7 +307,6 @@ function shortForm(
   return { ...resolved, name: only.name, namespace: only.group, kind: only.kind };
 }
 
-/** The catalog entries an address reaches; one address picks one entry. */
 function entriesFor(
   source: Probed,
   resolved: Resolved,

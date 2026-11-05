@@ -1,5 +1,4 @@
 import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import type { PublishInput } from "#adapter/index.ts";
@@ -7,6 +6,7 @@ import type { Account } from "#core/config/model.ts";
 import type { SyncItem } from "#core/sync/model.ts";
 import type { Loaded } from "#engine/scope/load.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { testRoot } from "#test/kit/temp.ts";
 import { executeSync } from "./execute.ts";
 import { RunScopeError } from "./narrow.ts";
 import type { Scan } from "./scan.ts";
@@ -19,9 +19,9 @@ const ENDPOINT = "https://shop.test/";
 const loaded = {
   roots: {
     scope: "project",
-    cwd: tmpdir(),
-    artifacts: join(tmpdir(), "aireg-execute-test-artifacts"),
-    base: tmpdir(),
+    cwd: testRoot(),
+    artifacts: join(testRoot(), "aireg-execute-test-artifacts"),
+    base: testRoot(),
   },
   manifest: {
     registries: { [REGISTRY]: { location: ENDPOINT, adapter: "acme", config: {} } },
@@ -86,7 +86,7 @@ vi.mock("./remote.ts", () => ({ mutateRemote, partialMutation }));
 vi.mock("./local.ts", () => ({ applyLocal }));
 const load = vi.hoisted(() => vi.fn());
 vi.mock("#engine/scope/load.ts", () => ({ load }));
-// A token named after the place it was released for, so a test can see where each one went.
+// Named after where it was released for, so a test can see where each one went.
 const releaseCredentials = vi.hoisted(() =>
   vi.fn(
     async (
@@ -109,7 +109,6 @@ vi.mock("#accounts/credentials.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("#accounts/credentials.ts")>()),
   credentialsForManifest: releaseCredentials,
 }));
-// Only for a test that runs the real publish: where it opens, and what it is handed.
 const offered = vi.hoisted(() => [] as PublishInput[]);
 vi.mock("#accounts/registry.ts", () => ({
   readRootManifest: async () => ({ registries: { [REGISTRY]: { location: ENDPOINT } } }),
@@ -240,8 +239,7 @@ test("rebases on the lock as it is inside the lease, not as it was outside", asy
 });
 
 test("records an artifact that agrees with the registry but is locked nowhere", async () => {
-  // What an adopt-then-publish leaves behind: the bytes match, and without this
-  // the lock never learns the artifact exists, so nothing can be compared later.
+  // After adopt-then-publish the bytes match, but the lock must still learn the artifact exists.
   scan.mockResolvedValue(scanOf([item("beta", "synced")]));
   mutateRemote.mockResolvedValue({
     published: new Set<string>(),
@@ -260,8 +258,7 @@ test("records an artifact that agrees with the registry but is locked nowhere", 
 });
 
 test("records a newer upstream identity when its bytes already match the copy", async () => {
-  // A job that published the copy: the registry now serves exactly those bytes
-  // under a new version, and the lock still names the one before it.
+  // The registry serves the published bytes under a new version; the lock names the old one.
   const found = scanOf([item("beta", "synced")]);
   found.pinned.artifacts.beta = { name: "beta", content: "sha256:old" } as never;
   found.acquired.push({
@@ -408,7 +405,6 @@ test("a publish the catalog has not listed yet stays changed, not attention", as
 test("refuses a ref that reaches nothing instead of reporting an empty success", async () => {
   scan.mockResolvedValue(scanOf([item("alpha", "pull")]));
 
-  // The address grammar `manifest.yml` uses, for an artifact that is not there.
   await expect(
     executeSync({
       work: job,
@@ -471,7 +467,7 @@ describe("a folder the registry already publishes", () => {
 
   test.beforeEach(async ({ tmp }) => {
     root = tmp;
-    // Claiming moves only copies inside the scope, so the project is where the copies sit.
+    // Claiming moves only copies inside the scope.
     Object.assign(loaded.roots, { cwd: root, artifacts: join(root, ".registry", "artifacts") });
     mutateRemote.mockResolvedValue({
       published: new Set<string>(),
@@ -603,7 +599,6 @@ describe("a folder the registry already publishes", () => {
 
 const ELSEWHERE = "https://elsewhere.test/";
 
-/** The same scope, with its manifest now declaring the registry at another place. */
 function moved(): Loaded {
   const registries = { [REGISTRY]: { location: ELSEWHERE, adapter: "acme", config: {} } };
   return { ...loaded, manifest: { registries } } as unknown as Loaded;
@@ -630,7 +625,7 @@ test("releases the token again for where the registry is declared after a reload
     { at: ENDPOINT, token: `released for ${ENDPOINT}` },
     { at: ELSEWHERE, token: `released for ${ELSEWHERE}` },
   ]);
-  expect(mutateRemote.mock.calls[0]?.[2]).toMatchObject({ location: ELSEWHERE });
+  expect(mutateRemote.mock.calls[0]?.[0]?.source).toMatchObject({ location: ELSEWHERE });
 });
 
 test("stops when the reload no longer declares the registry, sending nothing", async () => {

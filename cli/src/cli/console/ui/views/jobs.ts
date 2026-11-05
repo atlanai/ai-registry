@@ -244,7 +244,6 @@ function jobsIndexAt(row: number, jobCount: number, firstRun: number): number | 
   if (row < top) return undefined;
   const offset = row - top;
   if (offset < jobCount) return offset;
-  // Two rows of heading sit between the jobs and the runs.
   const runOffset = offset - jobCount - 2;
   return runOffset < 0 ? undefined : jobCount + firstRun + runOffset;
 }

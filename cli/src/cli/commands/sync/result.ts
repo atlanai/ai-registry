@@ -27,7 +27,6 @@ interface Found {
 }
 
 interface Written extends Found {
-  /** Where it would sit in a registry laid out the standard way. */
   suggestedPath: string;
 }
 
@@ -57,7 +56,6 @@ interface SyncedRegistry {
   state: RunState;
   counts: RunCounts;
   artifacts: SettledArtifact[];
-  /** What the run did to your own files, or left undone. */
   warnings: string[];
 }
 

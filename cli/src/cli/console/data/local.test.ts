@@ -5,12 +5,12 @@ import type { Carrier } from "#core/console/runs.ts";
 import { emptyLock, type Lock } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import type { Targets } from "#core/target/contract.ts";
+import { lock } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { type Carried, localWork } from "./local.ts";
 
 let root: string;
 
-/** One target whose skills live in `skills/`, which is all this reads. */
 function targetTable(): Targets {
   return {
     "claude-code": {
@@ -39,7 +39,6 @@ async function skill(name: string): Promise<void> {
   await writeFile(join(root, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
 }
 
-/** Your user scope, rooted where these target folders are. */
 function scope(): Roots {
   return {
     scope: "user",
@@ -50,15 +49,7 @@ function scope(): Roots {
 }
 
 function locked(name: string, source = "acme"): Lock {
-  const lock = emptyLock();
-  lock.artifacts[`my-team/${name}`] = {
-    name,
-    kind: "skill",
-    registry: source,
-    namespace: "my-team",
-    links: [],
-  } as unknown as Lock["artifacts"][string];
-  return lock;
+  return lock().artifact(`my-team/${name}`, { registry: source, namespace: "my-team" }).build();
 }
 
 function carried(name: string, over: Partial<Carrier> = {}): Carried {
@@ -110,7 +101,6 @@ describe("localWork", () => {
     expect(row?.detail).toContain("rename this folder to publish it");
   });
 
-  // Every lock row comes from a registry, whatever name it was declared under.
   test("names a registry aliased local like any other", async () => {
     await skill("mine");
     const [row] = await localWork(scope(), targetTable(), locked("mine", "local"));

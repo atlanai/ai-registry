@@ -1,20 +1,20 @@
-import { generateKeyPairSync, type KeyObject } from "node:crypto";
+import type { KeyObject } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { releaseBinary } from "#core/product.ts";
 import { RELEASE_PLATFORMS } from "#core/release/platform.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { encodeKeyring, releaseKey } from "#test/kit/release.ts";
 import { privateKeyFromSeed, signManifest, verifySigned } from "./manifest.ts";
 
 const MAX_ARTIFACTS = 8;
 
 function keys(id: string): { privateKey: KeyObject; keyring: string; seed: string } {
-  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
-  const raw = publicKey.export({ format: "der", type: "spki" }).subarray(12);
+  const { privateKey, encoded } = releaseKey();
   return {
     privateKey,
-    keyring: Buffer.from(JSON.stringify({ [id]: raw.toString("base64") })).toString("base64"),
+    keyring: encodeKeyring({ [id]: encoded }),
     seed: privateKey.export({ format: "der", type: "pkcs8" }).subarray(16).toString("base64"),
   };
 }

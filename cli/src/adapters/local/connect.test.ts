@@ -4,6 +4,7 @@ import { describe, expect } from "vitest";
 import type { PublishInput, SourceContext } from "#adapter/index.ts";
 import { skillsFolder } from "#test/kit/builders/layouts.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { sourceContext } from "#test/kit/source-context.ts";
 import { connect } from "./connect.ts";
 
 const body = (text: string) => new TextEncoder().encode(text);
@@ -32,15 +33,7 @@ async function emptyRoot(dir: string): Promise<void> {
 }
 
 function context(root: string): SourceContext {
-  return {
-    source: { registry: "mine", location: root, config: {}, key: "sha256:k" },
-    credential: undefined,
-    signal: new AbortController().signal,
-    limits: { timeoutMs: 1000, retries: 0 },
-    onBytes: () => {},
-    cacheDir: () => "",
-    exclusive: (_key, run) => run(),
-  };
+  return sourceContext({ registry: "mine", location: root, config: {}, key: "sha256:k" });
 }
 
 function scout(text = "One.\n"): PublishInput {

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { FAILURES } from "#adapter/errors.ts";
 import { RunErrorCode, type RunEvent, RunEventType } from "#core/run/model.ts";
-import { Printer } from "#core/term/printer.ts";
+import { capturedPrinter } from "#test/kit/printer.ts";
 import { eventLine, failureWords } from "./run.ts";
 
-const printer = new Printer({ out: { write: () => true, isTTY: false }, color: "never" });
+const { printer } = capturedPrinter();
 
 function event(eventType: string, fields: Partial<RunEvent> = {}): RunEvent {
   return {

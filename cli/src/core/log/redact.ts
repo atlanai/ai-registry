@@ -104,15 +104,8 @@ export function redactKeyedText(text: string): { text: string; count: number } {
   });
   out = out.replace(
     /(^|[\s,;{(])([A-Za-z_][A-Za-z0-9_.-]{1,64})(\s*[=:]\s*)(["']?)([^\s"',;}\])]{4,})(\4)/g,
-    (
-      whole,
-      lead: string,
-      key: string,
-      sep: string,
-      quote: string,
-      value: string,
-      close: string,
-    ) => {
+    (whole: string, ...groups: string[]) => {
+      const [lead = "", key = "", sep = "", quote = "", value = "", close = ""] = groups;
       // A kept scheme word such as `Bearer` is not the secret; the marker after it is.
       if (!isSecretKey(key) || isMarker(value) || SCHEME_WORDS.has(value.toLowerCase())) {
         return whole;
@@ -144,7 +137,7 @@ export function maskUserinfo(text: string): string {
   );
 }
 
-/** Every free-text pass: what a string must go through before it reaches a log line. */
+/** What a string must go through before it reaches a log line. */
 export function redactText(text: string): string {
   return maskUserinfo(redactKeyedText(text).text);
 }

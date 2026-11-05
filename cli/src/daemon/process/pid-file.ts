@@ -42,10 +42,7 @@ export async function releaseDaemonPid(
   if ((await readDaemonPid(env)) === pid) await clearDaemonPid(env);
 }
 
-/**
- * Another daemon that owns this home, from the pid file it wrote on binding.
- * The socket probe alone misses a daemon too busy starting up to answer.
- */
+/** The socket probe alone misses a daemon too busy starting up to answer. */
 export async function liveDaemonPid(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<number | undefined> {

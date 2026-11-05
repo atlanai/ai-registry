@@ -12,8 +12,8 @@ import { closeScan, scan } from "#engine/sync/scan.ts";
 import { moved, pinnedNote, unservedNote } from "#engine/sync/served.ts";
 
 /**
- * An installed copy that was published holds exactly what landed, so its row is
- * restated from the source. A pinned row is left, or the pin would undo the edit.
+ * A published copy holds exactly what landed, so its row is restated from the source.
+ * A pinned row is left alone, or the pin would undo the edit.
  */
 export async function follow(
   context: CommandContext,

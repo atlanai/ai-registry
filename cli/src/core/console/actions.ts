@@ -28,15 +28,12 @@ export function pullLatest(alias: string | undefined, scope: Scope): Command {
   return shown(argv);
 }
 
-/** The tree the console is reading, so a child command acts on the same one. */
+/** So a child command acts on the same tree the console reads. */
 function scoped(scope: Scope): string[] {
   return scope === "user" ? ["-g"] : [];
 }
 
-/**
- * Names read from a lockfile or a config, after `--` and every option: a name
- * such as `-g` or `--yes` then stays a name and cannot change what the child does.
- */
+/** After `--` and every option, so a name such as `-g` or `--yes` cannot steer the child. */
 function data(values: readonly string[]): string[] {
   return values.length === 0 ? [] : ["--", ...values];
 }
@@ -73,7 +70,6 @@ export function retryRun(id: string): Command {
 }
 
 export interface Running {
-  /** Resolves with the exit code once the child has finished. */
   done: Promise<number>;
   cancel(): void;
 }
@@ -106,8 +102,8 @@ export function start(command: Command, root: string, onLine: (line: string) => 
 }
 
 /**
- * The command that opens `link` in the default browser, or undefined for anything but a
- * web page: `open` would also launch a file or an app, and `cmd /c start` runs what follows a `&`.
+ * Undefined for anything but a web page: `open` would also launch a file or an app, and
+ * `cmd /c start` runs what follows a `&`.
  */
 export function browserCommand(
   link: string,
@@ -129,7 +125,7 @@ export function browserCommand(
   return [platform === "darwin" ? "open" : "xdg-open", [url.href]];
 }
 
-/** Opens a link in the default browser, best effort: a failure is not an error. */
+/** Best effort: a failure is not an error. */
 export function open(link: string): void {
   const command = browserCommand(link);
   if (command === undefined) return;

@@ -23,7 +23,7 @@ export async function contributedCommands(): Promise<readonly CommandContributio
   return commands;
 }
 
-/** Every loaded adapter's extension. A broken module is skipped, not fatal. */
+/** A broken module is skipped, not fatal. */
 async function loadedExtensions(): Promise<readonly { extend: AdapterExtension }[]> {
   return (await loadAdapters()).loaded.flatMap((adapter) => {
     const extend = extensionOf(adapter);
@@ -35,7 +35,7 @@ export function stepOn(adapter: SourceAdapter, kind: string): StepContribution |
   return extensionOf(adapter)?.steps?.find((step) => step.kind === kind);
 }
 
-/** First adapter that registered this kind. Prefer `stepOn` the account's adapter. */
+/** The first adapter that registered the kind; prefer `stepOn` the account's adapter. */
 export async function stepContribution(kind: string): Promise<StepContribution | undefined> {
   for (const { extend } of await loadedExtensions()) {
     const found = (extend.steps ?? []).find((step: StepContribution) => step.kind === kind);
@@ -44,7 +44,6 @@ export async function stepContribution(kind: string): Promise<StepContribution |
   return undefined;
 }
 
-/** Step kinds whose jobs keep their interval when nothing changes. */
 export async function steadyStepKinds(): Promise<ReadonlySet<string>> {
   const kinds = new Set<string>();
   for (const { extend } of await loadedExtensions()) {
@@ -53,7 +52,6 @@ export async function steadyStepKinds(): Promise<ReadonlySet<string>> {
   return kinds;
 }
 
-/** Selector booleans plus each kind's own options, for `parse`. */
 export async function contributedStepFlags(): Promise<Readonly<Record<string, FlagSpec>>> {
   const flags: Record<string, FlagSpec> = {};
   for (const { extend } of await loadedExtensions()) {
@@ -82,7 +80,7 @@ export async function stepForFlags(
   return undefined;
 }
 
-/** Console tabs, in load order. A duplicate id, or one of aireg's own views, is dropped. */
+/** In load order; a duplicate id, or one of aireg's own views, is dropped. */
 // biome-ignore lint/suspicious/noExplicitAny: each panel names its own state.
 export async function contributedPanels(): Promise<readonly PanelContribution<any>[]> {
   // biome-ignore lint/suspicious/noExplicitAny: each panel names its own state.
@@ -98,7 +96,7 @@ export async function contributedPanels(): Promise<readonly PanelContribution<an
   return panels;
 }
 
-/** First adapter that described its upstream. Only one app can own `o`. */
+/** The first adapter that described one wins: only one app can own `o`. */
 export async function contributedUpstream(): Promise<UpstreamContribution | undefined> {
   for (const { extend } of await loadedExtensions()) {
     if (extend.upstream !== undefined) return extend.upstream;

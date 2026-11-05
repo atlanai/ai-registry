@@ -16,10 +16,7 @@ export interface UnlockedCopy {
   path: string;
 }
 
-/**
- * Content in the writable copy that neither the lock nor the catalog claims, read
- * with the same rules `candidates()` applies, so a stray directory is not publishable.
- */
+/** Read with the same rules `candidates()` applies, so a stray directory is not publishable. */
 export async function unlockedCopies(
   manifest: Manifest,
   lock: Lock,
@@ -31,7 +28,7 @@ export async function unlockedCopies(
     claimed.add(`${entry.registry}\u0000${entry.kind}:${name}`);
   }
 
-  // A plugin's copy, a folder named after it, holds its parts, which its own row accounts for.
+  // A plugin's folder holds its parts, which the plugin's own row accounts for.
   const plugins = new Set(
     Object.values(lock.artifacts).flatMap((entry) =>
       entry.kind === "plugin" ? [`${entry.registry}\u0000${posix.basename(entry.path)}`] : [],

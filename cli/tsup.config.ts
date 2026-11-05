@@ -2,7 +2,6 @@ import { defineConfig } from "tsup";
 import { releaseDefines } from "#packaging/defines.ts";
 
 export default defineConfig({
-  // Two entries: the command the bin runs, and the contract an adapter imports.
   entry: { main: "src/main.ts", adapter: "src/adapter/index.ts" },
   format: ["esm"],
   target: "node22",
@@ -11,8 +10,7 @@ export default defineConfig({
   bundle: true,
   noExternal: [
     "yaml",
-    // The console imports these, and a packed CLI has no node_modules beside it
-    // to resolve them from. They sit behind a dynamic import.
+    // The console imports these dynamically, and a packed CLI has no node_modules to resolve them.
     "ink",
     "react",
     "react/jsx-runtime",

@@ -8,8 +8,8 @@ import { posixRelative } from "#core/fs/path.ts";
 import { ensureHome, LEASES_DIR, leasesDir, type Roots } from "#core/store/paths.ts";
 
 /**
- * Canonical, because `/tmp` and `/private/tmp`, or `~/Desktop` and `~/desktop`, reaching one
- * project must not take two leases. The lock may not exist yet, so resolve the closest folder that does.
+ * Two routes to one project, such as `/tmp` and `/private/tmp`, must not take two leases.
+ * The lock may not exist yet, so the closest folder that does is resolved.
  */
 export function canonicalLock(lock: string): string {
   const full = resolve(lock);
@@ -34,10 +34,7 @@ export function leaseDir(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.Proce
   return join(parentOf(roots, env), `${leaseKey(roots)}.lease`);
 }
 
-/**
- * In the project's own `.registry/`, so every writer of the project shares it
- * whatever its `AIREG_HOME`. The user scope's stay in `AIREG_HOME`.
- */
+/** In the project's `.registry/`, so every writer shares it whatever its `AIREG_HOME`. */
 function parentOf(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.ProcessEnv): string {
   return roots.scope === "user"
     ? leasesDir(env)

@@ -41,15 +41,15 @@ test("offers new local work in the namespace the account publishes into", async 
     pinned: { registries: {}, artifacts: {} },
   } as unknown as Scan;
 
-  await mutateRemote(
+  await mutateRemote({
     scan,
-    { scope: "project", cwd: tmp },
-    { config: {} } as never,
-    { id: "acc_1", registry: "acme", defaultNamespace: "engineering" },
-    new Map([["skill:hello", "publish"]]),
-    new AbortController().signal,
-    { event: () => {} },
-  );
+    roots: { scope: "project", cwd: tmp },
+    source: { config: {} } as never,
+    account: { id: "acc_1", registry: "acme", defaultNamespace: "engineering" },
+    operations: new Map([["skill:hello", "publish"]]),
+    signal: new AbortController().signal,
+    hooks: { event: () => {} },
+  });
 
   expect(offered.map(({ name, namespace }) => ({ name, namespace }))).toEqual([
     { name: "hello", namespace: "engineering" },
@@ -89,18 +89,18 @@ test("fails only the installed copy reached through a symlinked namespace folder
   } as unknown as Scan;
   const failed: string[] = [];
 
-  const sent = mutateRemote(
+  const sent = mutateRemote({
     scan,
-    { scope: "project", cwd: roots.cwd },
-    { config: {} } as never,
-    { id: "acc_1", registry: "acme" },
-    new Map([
+    roots: { scope: "project", cwd: roots.cwd },
+    source: { config: {} } as never,
+    account: { id: "acc_1", registry: "acme" },
+    operations: new Map([
       [artifactKey("skill", "lint"), "publish"],
       [artifactKey("skill", "deploy"), "publish"],
     ]),
-    new AbortController().signal,
-    { event: () => {}, failed: (name) => failed.push(name) },
-  );
+    signal: new AbortController().signal,
+    hooks: { event: () => {}, failed: (name) => failed.push(name) },
+  });
 
   await expect(sent).rejects.toThrow(/lint was not published because .* is a symlink/);
   expect(offered.map(({ name }) => name)).toEqual(["deploy"]);

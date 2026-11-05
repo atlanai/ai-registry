@@ -263,10 +263,7 @@ function shownFrom(cwd: string, manifest: string): string {
   return shown !== "" && isWithin(cwd, manifest) ? shown : manifest;
 }
 
-/**
- * The project folders those targets read, which `aireg list` and `aireg status` name:
- * a shared one such as `.agents` stands in for every target that reads it.
- */
+/** A shared folder such as `.agents` stands in for every target that reads it. */
 function foldersFor(chosen: readonly string[]): string[] {
   const targetTable = resolveTargets(process.env);
   const where = { scope: "project", env: process.env } as const;
@@ -276,21 +273,17 @@ function foldersFor(chosen: readonly string[]): string[] {
   return [...placed].sort().map((name) => targetTable[name]?.projectRoot ?? name);
 }
 
-/**
- * Whether git would leave `path` out of a commit. False outside a repository or
- * without git, where there is nothing to warn about.
- */
+/** False outside a repository or without git, where there is nothing to warn about. */
 async function gitIgnores(path: string): Promise<boolean> {
   return (await gitIn(dirname(path), ["check-ignore", "-q", "--", path])).code === 0;
 }
 
 /** A registry that is not there leaves the project set up, and a rerun picks up from it. */
 function carryOn(error: unknown, alias: string | undefined): unknown {
-  const adapter = isAdapterError(error)
-    ? error
-    : error instanceof Error && isAdapterError(error.cause)
-      ? error.cause
-      : undefined;
+  let adapter = isAdapterError(error) ? error : undefined;
+  if (adapter === undefined && error instanceof Error && isAdapterError(error.cause)) {
+    adapter = error.cause;
+  }
   if (adapter?.failure !== "not_found" || adapter.hint !== undefined) return error;
   const as = alias === undefined ? "" : ` --as ${alias}`;
   return new AiregError(adapter.message, {

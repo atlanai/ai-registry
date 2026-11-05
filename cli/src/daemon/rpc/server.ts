@@ -27,14 +27,10 @@ type RpcHandler = (params: unknown, context: RpcContext) => Promise<unknown>;
 type Sender = (message: Parameters<typeof encodeMessage>[0]) => boolean;
 const MAX_CLIENTS = 32;
 const MAX_REQUESTS_PER_SECOND = 200;
-/**
- * A rate alone lets a client keep thousands of slow requests running, each
- * holding a full scan, so how many may be unanswered at once is capped too.
- */
+/** A rate alone lets a client keep thousands of slow scans running, so this caps them too. */
 const MAX_INFLIGHT_PER_CLIENT = 16;
 /** A client that connects and never says who it is would hold a slot for good. */
 const INITIALIZE_WITHIN_MS = 10_000;
-/** How long closing waits for handlers still running before it goes anyway. */
 const CLOSE_GRACE_MS = 15_000;
 const MAX_CLIENT_FIELD_LENGTH = 128;
 const CONTROL_CHARACTER = /\p{Cc}/u;
@@ -68,14 +64,11 @@ function failure(
 }
 
 /**
- * Unread reply a client may hold before it is dropped. Paged run events queue faster than a
- * host relays them, so this is well above one frame; each frame still has the frame limit.
+ * Unread output a client may hold before it is dropped: well above one frame, since paged
+ * run events queue faster than a host relays them.
  */
 const MAX_QUEUED_BYTES = 16 * MAX_RPC_FRAME_BYTES;
-/**
- * Notifications go to every client whether or not it asked, so one that has
- * stopped reading, such as a suspended `aireg job runs --follow`, is dropped sooner.
- */
+/** Notifications reach every client, so one that stopped reading (a suspended `--follow`) goes sooner. */
 const MAX_QUEUED_NOTIFICATION_BYTES = 4 * MAX_RPC_FRAME_BYTES;
 
 function sendFrame(socket: Socket, frame: string, queued = MAX_QUEUED_BYTES): boolean {
@@ -97,7 +90,6 @@ function proven(result: unknown, params: unknown): unknown {
   return proof === undefined || !isRecord(result) ? result : { ...result, proof };
 }
 
-/** Separates a socket another daemon answers on from every other reason listening failed. */
 export class DaemonAlreadyRunningError extends AiregError {
   constructor() {
     super("The aireg daemon is already running.", { code: ErrorCode.Busy });
@@ -149,7 +141,7 @@ export class RpcServer {
   readonly #log: Logger;
   #server: Server | undefined;
   #endpoint: string | undefined;
-  /** The socket file this server bound, so close never removes a successor's. */
+  /** So close never removes a successor's socket. */
   #bound: { dev: number; ino: number } | undefined;
   #draining = false;
 
@@ -196,8 +188,8 @@ export class RpcServer {
       this.#endpoint = endpoint;
       return;
     }
-    // Closing unlinks the bound path whoever holds it by then, so binding a private name and
-    // linking it into place means a stopping daemon never removes a successor's socket.
+    // Closing unlinks the bound path whoever holds it, so bind a private name and link it into
+    // place: a stopping daemon then never removes a successor's socket.
     const staging = join(dirname(endpoint), `.rpc-${randomUUID().slice(0, 8)}.sock`);
     const server = await bind(staging, (socket) => this.#accept(socket));
     try {
@@ -218,8 +210,8 @@ export class RpcServer {
   }
 
   /**
-   * Drop clients but keep the bind so a replacement cannot listen yet. A new
-   * client can still initialize, which is how it learns the daemon is stopping.
+   * Keeps the bind so a replacement cannot listen yet; a new client can still
+   * initialize, which is how it learns the daemon is stopping.
    */
   drain(): void {
     this.#draining = true;
@@ -233,8 +225,7 @@ export class RpcServer {
         this.#server?.close((error) => (error === undefined ? resolve() : reject(error))),
       );
     }
-    // A handler stuck on a wait it cannot leave would otherwise keep the daemon
-    // from ever stopping, and so from ever being replaced.
+    // A stuck handler would otherwise keep the daemon from ever stopping or being replaced.
     await settledWithin(this.#inflight, CLOSE_GRACE_MS);
     if (this.#endpoint !== undefined && this.#bound !== undefined) {
       await unlinkOwn(this.#endpoint, this.#bound);
@@ -266,8 +257,7 @@ export class RpcServer {
     const send = (message: Parameters<typeof encodeMessage>[0]): boolean => {
       const frame = encodeMessage(message);
       if (Buffer.byteLength(frame) <= MAX_RPC_FRAME_BYTES) return sendFrame(socket, frame);
-      // Sent as it is, a frame past the limit would drop the client with no word
-      // of why: a reply says so instead, and a notification is left out.
+      // An oversize frame would drop the client silently: a reply says why, a notification is left out.
       const method = "method" in message ? message.method : undefined;
       this.#log.warn("left out a message larger than the frame limit", { method });
       if (!("id" in message)) return false;
@@ -326,8 +316,7 @@ export class RpcServer {
           }
         }
       } catch (error) {
-        // The client is dropped with no reply, so this is the only record that
-        // it was refused rather than lost.
+        // The only record that the client was refused rather than lost.
         this.#log.warn("dropping a client after a bad frame or rate limit", { error });
         socket.destroy();
       }
@@ -412,8 +401,7 @@ export class RpcServer {
       if (requestId !== undefined) send({ jsonrpc: "2.0", id: requestId, result });
     } catch (error) {
       const mapped = rpcError(error);
-      // An unmapped failure reaches the caller as "internal error", so unless
-      // the cause is recorded here it is gone.
+      // The caller sees only "internal error", so record the cause here.
       if (mapped.code === RpcErrorCode.Internal) {
         this.#log.error("method failed", { method: message.method, error });
       }

@@ -35,7 +35,6 @@ export function expandValue<T extends ConfigValue>(value: T, vars: Vars): T {
   return value;
 }
 
-/** Where one placement of a kind sits under its target root, as a template. */
 export function placementTemplate(mapping: KindMapping): string | undefined {
   if (mapping.subdir === undefined) return undefined;
   if (mapping.subdir.includes("{")) return mapping.subdir;
@@ -109,20 +108,17 @@ function compile(template: string): Segment[] {
 
 export interface PlacedPath {
   path: string;
-  /** The target root it is under, which the template does not name. */
+  /** The template does not name it. */
   root: string;
   vars: Record<string, string>;
 }
 
-/** Placement paths of one kind, read in both directions. */
 export interface PlacementPattern {
-  /** The variables an absolute path of this shape carries, and the root it is under. */
   match(path: string): PlacedPath | undefined;
-  /** Every path under `root` this template could have placed. */
   scan(root: string): Promise<PlacedPath[]>;
 }
 
-/** Reads one segment's variables off a path segment into `into`; false when it does not fit. */
+/** False when the part does not fit the segment. */
 function bind(segment: Segment, part: string, into: Record<string, string>): boolean {
   const match = segment.pattern.exec(part);
   if (match === null) return false;

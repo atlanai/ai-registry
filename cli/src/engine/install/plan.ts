@@ -57,7 +57,6 @@ export async function plan({
   const state = await survey(surveyed, roots);
 
   const moving = request.moving ?? new Set<string>();
-  // What the manifest's artifacts depend on, asked of their registry once a plan finds it missing.
   const needs = new Map<string, Want[]>();
   const settled = new Map<string, Acquired>();
   const view = lockView(lock);
@@ -65,7 +64,7 @@ export async function plan({
     if (view.rows(alias).some(([name]) => moving.has(name))) continue;
     const source = view.source(alias);
     if (source === undefined || !answers(manifest, source, request.held)) continue;
-    // Only user scope wraps; an adapter that will not load leaves its rows as the lock has them.
+    // An adapter that will not load leaves its rows as locked.
     const namespacePlugins =
       roots.scope === "user" &&
       (await loadAdapter(source.origin.adapter).then(wrapsNamespaces, () =>
@@ -133,10 +132,7 @@ export async function plan({
   }
 }
 
-/**
- * Registries planned from the lock alone that the plan needs the registry for
- * after all: their bytes, or a plugin, whose members only the registry lists.
- */
+/** Lock-planned registries needed after all: for bytes, or a plugin whose members only it lists. */
 function needsRegistry(plan: Plan, lock: Lock, settled: ReadonlyMap<string, Acquired>): string[] {
   const next = recordOf(plan);
   const needed = new Set<string>();
@@ -150,8 +146,8 @@ function needsRegistry(plan: Plan, lock: Lock, settled: ReadonlyMap<string, Acqu
 }
 
 /**
- * A need its registry withholds by status is not asked for again: the lock keeps the copy it holds,
- * and one it does not hold is refused, since nothing installs a blocked version.
+ * A withheld need is not asked for again: the lock keeps the copy it holds, and one it does not
+ * hold is refused, since nothing installs a blocked version.
  */
 function keptWithheld(missing: Unresolved, sources: readonly Acquired[], lock: Lock): boolean {
   const { alias, need, by } = missing;

@@ -48,7 +48,13 @@ describe("rpcEndpoint on Windows", () => {
     expect(rpcEndpoint(env, "win32")).toBe(name);
     const file = join(env.AIREG_HOME, "state", "pipe-name");
     expect((await readFile(file, "utf8")).trim()).toBe(secret);
-    if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600);
+  });
+
+  test.skipIf(process.platform === "win32")("keeps the pipe secret to its owner", async () => {
+    const env = { AIREG_HOME: await mkdtemp(join(tmpdir(), PREFIX)) };
+    rpcEndpoint(env, "win32");
+    const file = join(env.AIREG_HOME, "state", "pipe-name");
+    expect((await stat(file)).mode & 0o777).toBe(0o600);
   });
 
   test("gives every home a pipe of its own", async () => {

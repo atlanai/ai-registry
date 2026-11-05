@@ -21,7 +21,6 @@ export type DetectionRule = "env" | "binary" | "project" | "user";
 export interface Detection {
   target: Target;
   detected: boolean;
-  /** Which rule fired, so `aireg targets` can explain itself. */
   by: DetectionRule | undefined;
 }
 

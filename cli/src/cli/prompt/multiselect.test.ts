@@ -50,7 +50,6 @@ async function answer(options: Options, keys: string[], rows = 40, columns = 80)
   return { value: await run, screen: term.screen(), term };
 }
 
-/** The frame drawn after `keys`, before the prompt is left with escape. */
 async function frameAfter(options: Options, keys: string[], rows = 40, columns = 80) {
   const term = terminal(rows, columns);
   const run = multiselect({ message: "Pick", style, ...options }, term.io);

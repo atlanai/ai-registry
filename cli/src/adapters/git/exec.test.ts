@@ -6,10 +6,7 @@ import { GitError, git, stopGit } from "./exec.ts";
 
 const unix = describe.skipIf(process.platform === "win32");
 
-/**
- * A `git` that starts a helper, as `git fetch` starts `git-remote-http`, and hangs.
- * It writes its own pid before anything else and the helper's once that runs.
- */
+/** A `git` that starts a helper, as `git fetch` starts `git-remote-http`, and hangs; each writes its pid. */
 async function hungGit(
   bin: string,
 ): Promise<{ git: () => Promise<number>; helper: () => Promise<number> }> {

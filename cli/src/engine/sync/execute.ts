@@ -142,10 +142,7 @@ async function executeScanned(
   return finalizeRun(run.hooks, outcomes);
 }
 
-/**
- * An adapter that cannot publish a kind reports those candidates and settles, rather than
- * failing the whole run at write time every interval.
- */
+/** A kind the adapter cannot publish is reported, not failed at write time every interval. */
 async function publishableTo(account: Account, source: RegistrySource): Promise<Publishable> {
   // An adapter that fails to load is reported when the publish opens it.
   const adapter = await adapterFor(
@@ -232,21 +229,19 @@ async function classifyRun(run: SyncRun, loaded: Loaded, current: Scan): Promise
 }
 
 function classifyScan(run: SyncRun, scoped: Scoped, current: Scan): ReturnType<typeof classify> {
-  return classify(
-    current,
-    run.work,
-    run.account.registry,
+  return classify({
+    scan: current,
+    job: run.work,
+    registry: run.account.registry,
     scoped,
-    run.mode,
-    run.overrides,
-    run.publishable,
-  );
+    mode: run.mode,
+    overrides: run.overrides,
+    publishable: run.publishable,
+  });
 }
 
-/**
- * Reports each classified outcome now, except a publish or archive, which waits for its answer,
- * and one an import is about to change, which is held for the rescan after it.
- */
+// Reports each outcome now, except a publish or archive, which waits for its answer,
+// and one an import is about to change, which waits for the rescan after it.
 function reportClassified(
   outcomes: readonly SyncOutcome[],
   hooks: SyncExecutionHooks,
@@ -287,10 +282,8 @@ function reportOutcome(outcome: SyncOutcome, hooks: SyncExecutionHooks): void {
   );
 }
 
-/**
- * Already-published folders in a target directory, when the job claims them: a differing copy
- * is held for a person, and identical ones are moved aside once the registry's copy is pulled.
- */
+// Folders already published in a target directory, when the job claims them: a differing
+// copy waits for a person; identical ones move aside once the registry's copy is pulled.
 async function claims(
   { work, account, mode, hooks }: SyncRun,
   current: Scan,
@@ -348,15 +341,15 @@ async function applyRun(
     // A refused publish must not skip pulls the run already classified.
     const { remote, remoteError } = await publishAndSettle(
       (hooksFor) =>
-        mutateRemote(
-          imported.current,
-          rebased.loaded.roots,
-          registryOf(rebased.loaded, account),
+        mutateRemote({
+          scan: imported.current,
+          roots: rebased.loaded.roots,
+          source: registryOf(rebased.loaded, account),
           account,
-          imported.operations,
+          operations: imported.operations,
           signal,
-          hooksFor,
-        ),
+          hooks: hooksFor,
+        }),
       imported.deferred,
       hooks,
     );
@@ -374,7 +367,6 @@ async function applyRun(
   });
 }
 
-/** The identical copies a claim found, moved aside so the pull can link the registry's. */
 async function moveClaimedAside(
   claimed: readonly Claim[],
   roots: Parameters<typeof moveAside>[3],
@@ -472,10 +464,8 @@ function withRefreshed(
   return updated;
 }
 
-/**
- * A folder found before the import is a lock row after it, under the row's name: it settles
- * once, as that row, and the outcome classified for the folder is dropped.
- */
+// A folder found before the import is a lock row after it: it settles once, as that row,
+// and the outcome classified for the folder is dropped.
 function importedDeferred(
   deferred: readonly SyncOutcome[],
   current: Scan,
@@ -519,7 +509,6 @@ function settleHeld(
   return { deferred, settled };
 }
 
-/** Publishes, then settles each deferred outcome on what its own artifact met. */
 async function publishAndSettle(
   mutate: (hooks: RemoteMutationHooks) => Promise<RemoteMutationResult>,
   deferred: readonly SyncOutcome[],
@@ -581,7 +570,15 @@ async function writeLocal(run: SyncRun, write: LocalWrite): Promise<void> {
   ]);
   signal.throwIfAborted();
   enter(hooks, "applying");
-  await applyReported(loaded, common, current, names, remote.published, overrides, hooks);
+  await applyReported({
+    loaded,
+    common,
+    current,
+    names,
+    published: remote.published,
+    overrides,
+    hooks,
+  });
   await takeTheirs(overrides, current, loaded.roots, account.registry, hooks);
 }
 
@@ -601,15 +598,18 @@ async function reloadKeeping(
   return fresh;
 }
 
-async function applyReported(
-  loaded: Loaded,
-  common: CommonOptions,
-  current: Scan,
-  names: ReadonlySet<string>,
-  published: ReadonlyMap<string, string | undefined>,
-  overrides: Overrides,
-  hooks: SyncExecutionHooks,
-): Promise<void> {
+interface ReportedApply {
+  loaded: Loaded;
+  common: CommonOptions;
+  current: Scan;
+  names: ReadonlySet<string>;
+  published: ReadonlyMap<string, string | undefined>;
+  overrides: Overrides;
+  hooks: SyncExecutionHooks;
+}
+
+async function applyReported(apply: ReportedApply): Promise<void> {
+  const { loaded, common, current, names, published, overrides, hooks } = apply;
   // An override is a person overruling the edit that caused the conflict, so
   // the guard against an unasked-for overwrite has nothing left to protect.
   const forced = [...overrides.values()].some((item) => item === "pull" || item === "remove-local");
@@ -626,7 +626,6 @@ async function applyReported(
       }
     },
   });
-  // What it did to a person's files, said wherever the run is followed.
   for (const notice of applied.notices) {
     hooks.event(RunEventType.Warning, "applying", undefined, notice);
   }

@@ -99,7 +99,7 @@ function published(entry: Entry, version: string | undefined): PublishedArtifact
   };
 }
 
-/** `aireg registry show` with no argument means the one this project declares. */
+/** With no argument, the one registry this project declares. */
 async function onlyDeclared(context: CommandContext, common: CommonOptions): Promise<string> {
   const loaded = await load(common, context.cwd, "user");
   const aliases = Object.keys(loaded.manifest.registries);

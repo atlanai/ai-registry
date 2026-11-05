@@ -21,10 +21,7 @@ export function descriptionText(text: string): string {
   return sanitizeText(text, DESCRIPTION_LIMIT);
 }
 
-/**
- * The front-matter description in an artifact's own Markdown: SKILL.md, AGENT.md, <name>.md,
- * or its only file. A malformed block is ignored, never fatal.
- */
+/** From SKILL.md, AGENT.md, <name>.md or the only file; a malformed block is ignored. */
 export function ownDescription(
   files: ReadonlyMap<string, Uint8Array>,
   name?: string,
@@ -60,7 +57,6 @@ export function withName(text: string, name: string): string {
   return match[0].replace(/^name:.*$/m, `name: ${name}`) + text.slice(match[0].length);
 }
 
-/** The front-matter text and what follows it; undefined when there is no block. */
 export function splitFrontmatter(text: string): { yaml: string; body: string } | undefined {
   const match = FENCE.exec(text);
   if (match === null) return undefined;

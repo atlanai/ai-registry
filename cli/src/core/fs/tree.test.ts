@@ -119,14 +119,20 @@ describe("copyAuthored", () => {
     await mkdir(join(skill, "scripts"), { recursive: true });
     await writeFile(join(skill, "SKILL.md"), "body");
     await writeFile(join(skill, "scripts", "run.sh"), "echo");
-    await chmod(join(skill, "scripts", "run.sh"), 0o755);
     await writeFile(join(skill, ".DS_Store"), "x");
 
     expect(await copyAuthored(skill, join(root, "copy"))).toBeUndefined();
     expect((await readdir(join(root, "copy"))).sort()).toEqual(["SKILL.md", "scripts"]);
-    if (process.platform !== "win32") {
-      expect((await stat(join(root, "copy", "scripts", "run.sh"))).mode & 0o111).not.toBe(0);
-    }
+  });
+
+  test.skipIf(process.platform === "win32")("keeps the executable bit", async () => {
+    const skill = join(root, "skill");
+    await mkdir(join(skill, "scripts"), { recursive: true });
+    await writeFile(join(skill, "scripts", "run.sh"), "echo");
+    await chmod(join(skill, "scripts", "run.sh"), 0o755);
+
+    expect(await copyAuthored(skill, join(root, "copy"))).toBeUndefined();
+    expect((await stat(join(root, "copy", "scripts", "run.sh"))).mode & 0o111).not.toBe(0);
   });
 
   test("refuses a link inside the folder and copies nothing", async () => {

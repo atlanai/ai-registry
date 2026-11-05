@@ -137,11 +137,19 @@ describe("misplacedOption", () => {
       message: "-g must come after the command name.",
       fix: "aireg --color never list -g",
     },
-    { argv: ["--dry-run=yes", "add"], message: "--dry-run must come after the command name." },
   ])("moves $argv after the command", async ({ argv, message, fix }) => {
     const error = await misplacedOption(argv, findCommand(argv), known);
     expect(error).toMatchObject({ code: ErrorCode.Usage, message });
-    if (fix !== undefined) expect(error?.hint).toContain(`Did you mean \`${fix}\`?`);
+    expect(error?.hint).toContain(`Did you mean \`${fix}\`?`);
+  });
+
+  test("rejects an inline value placed before the command", async () => {
+    const argv = ["--dry-run=yes", "add"];
+    const error = await misplacedOption(argv, findCommand(argv), known);
+    expect(error).toMatchObject({
+      code: ErrorCode.Usage,
+      message: "--dry-run must come after the command name.",
+    });
   });
 
   // `--for claude add` makes `claude` the command, so no fix is offered for it.

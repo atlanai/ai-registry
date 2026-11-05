@@ -53,7 +53,6 @@ export function collidingPaths(paths: readonly string[]): [string, string] | und
   return undefined;
 }
 
-/** True when `target` resolves to `base` itself or something underneath it. */
 export function isWithin(base: string, target: string): boolean {
   const rel = relative(resolve(base), resolve(target));
   if (rel === "") return true;

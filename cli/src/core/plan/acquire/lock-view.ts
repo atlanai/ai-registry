@@ -12,7 +12,7 @@ import type { Ref } from "#core/ref.ts";
 export interface LockView {
   /** The rows recorded from one registry, by installed name. */
   rows(alias: string): readonly (readonly [string, LockArtifact])[];
-  /** The registry as the lock last resolved it, or undefined when the lock has none. */
+  /** The registry as the lock last resolved it, never opened; undefined when the lock has none. */
   source(alias: string): Acquired | undefined;
   /** The locked rows a reference reaches, by installed name. */
   reached(ref: Ref): string[];
@@ -104,7 +104,6 @@ function fromRows(
   };
 }
 
-/** The locked rows a reference reaches, by installed name. */
 export function reached(lock: Lock, ref: Ref): string[] {
   return lockView(lock).reached(ref);
 }

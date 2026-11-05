@@ -41,7 +41,7 @@ export async function chooseFiles(choosing: Choosing, base: string): Promise<Cho
 
   const unique = [...new Map(files.map((file) => [`${file.from}\0${file.as}`, file])).values()];
   const [first, ...rest] = unique;
-  const sorted = rest.sort((a, b) => (a.as < b.as ? -1 : a.as > b.as ? 1 : 0));
+  const sorted = rest.sort((a, b) => byPath(a.as, b.as));
   return { files: [first as ExportFile, ...sorted], matched };
 }
 
@@ -50,7 +50,6 @@ export function ignoredBy(entry: Export, pattern: string): string {
   return `${entry.path}\0${pattern}`;
 }
 
-/** What one folder artifact's files are chosen against. */
 export interface Choosing {
   root: string;
   kind: ArtifactKind;
@@ -127,6 +126,11 @@ function unmatched(
         : "Check the path under `include`, relative to the artifact's folder.",
     },
   );
+}
+
+function byPath(a: string, b: string): number {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
 }
 
 function refuseShared(files: readonly ExportFile[], shown: string): void {

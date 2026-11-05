@@ -1,20 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { GLOBAL_OPTIONS } from "#cli/options/flags.ts";
 import { ErrorCode, ExitCode } from "#core/errors.ts";
-import { Printer } from "#core/term/printer.ts";
 import { homeTest } from "#test/kit/fixtures.ts";
+import { capturedPrinter } from "#test/kit/printer.ts";
 import { buildMap, findMapFormat, type MapNode, runMap } from "./map.ts";
-
-function capture(format: "text" | "json") {
-  const out: string[] = [];
-  const err: string[] = [];
-  const printer = new Printer({
-    format,
-    out: { write: (chunk: string) => out.push(chunk), isTTY: false },
-    err: { write: (chunk: string) => err.push(chunk), isTTY: false },
-  });
-  return { printer, out, err };
-}
 
 describe("findMapFormat", () => {
   test.each([
@@ -87,7 +76,7 @@ describe("buildMap", () => {
 
 describe("runMap", () => {
   homeTest("prints an indented tree by default, root before children before actions", async () => {
-    const { printer, out } = capture("text");
+    const { printer, printed: out } = capturedPrinter({ format: "text" });
     const code = await runMap(printer, "tree");
     expect(code).toBe(ExitCode.Ok);
     const text = out.join("");
@@ -99,7 +88,7 @@ describe("runMap", () => {
   });
 
   homeTest("prints one path per line, parents before children, in compact format", async () => {
-    const { printer, out } = capture("text");
+    const { printer, printed: out } = capturedPrinter({ format: "text" });
     await runMap(printer, "compact");
     const lines = out.join("").trimEnd().split("\n");
     expect(lines[0]).toBe("aireg");
@@ -108,7 +97,7 @@ describe("runMap", () => {
   });
 
   homeTest("prints the indented JSON tree directly when --json was not given", async () => {
-    const { printer, out } = capture("text");
+    const { printer, printed: out } = capturedPrinter({ format: "text" });
     await runMap(printer, "json");
     const tree = JSON.parse(out.join(""));
     expect(tree.path).toBe("aireg");
@@ -116,7 +105,7 @@ describe("runMap", () => {
   });
 
   homeTest("wraps the tree in the ok envelope when the global --json flag is given", async () => {
-    const { printer, out } = capture("json");
+    const { printer, printed: out } = capturedPrinter({ format: "json" });
     await runMap(printer, "tree");
     const payload = JSON.parse(out.join(""));
     expect(payload).toMatchObject({ ok: true });
@@ -124,7 +113,7 @@ describe("runMap", () => {
   });
 
   homeTest("rejects an unknown format as a usage error naming the valid ones", async () => {
-    const { printer } = capture("text");
+    const { printer } = capturedPrinter({ format: "text" });
     await expect(runMap(printer, "yaml")).rejects.toMatchObject({
       name: "AiregError",
       code: ErrorCode.Usage,

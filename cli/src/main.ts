@@ -41,10 +41,8 @@ import { hintUpdate, refreshUpdates, scheduleUpdateCheck } from "#self/update-ch
 
 registerBuiltinAdapters();
 
-/**
- * Drops `node:sqlite`'s experimental warning, which a user of this CLI cannot
- * act on, and a color warning that is untrue of aireg. Every other warning stays.
- */
+// Drops `node:sqlite`'s experimental warning, which a user cannot act on, and a color warning
+// that is untrue of aireg. Every other warning stays.
 function ignoreNodeWarnings(): void {
   // Node prints warnings from its own listener, so ours has to replace it
   // rather than sit beside it.
@@ -56,10 +54,7 @@ function ignoreNodeWarnings(): void {
   });
 }
 
-/**
- * `aireg list | head` closes stdout early. Without this, node raises an
- * unhandled EPIPE and prints a stack trace over the output the user wanted.
- */
+// `aireg list | head` closes stdout early; without this, node prints an EPIPE stack trace.
 function ignoreClosedPipe(): void {
   for (const stream of [process.stdout, process.stderr]) {
     stream.on("error", (error: NodeJS.ErrnoException) => {
@@ -69,10 +64,7 @@ function ignoreClosedPipe(): void {
   }
 }
 
-/**
- * `--map` runs instead of any command, so it is read from the raw argv rather
- * than the command's own: `findCommand` may have picked a different word.
- */
+// Read from the raw argv, since `findCommand` may have picked a different word.
 async function mapIfRequested(printer: Printer, argv: string[]): Promise<ExitCode | undefined> {
   const format = findMapFormat(argv);
   if (format === undefined) return undefined;
@@ -248,7 +240,8 @@ async function answerWithoutCommand(
   if (name === "help" || values.help === true) {
     const strict = name === "help";
     const words = rest.filter((arg) => !arg.startsWith("-"));
-    const asked = strict ? words : name === undefined ? [] : [name, ...words.slice(0, 1)];
+    let asked = words;
+    if (!strict) asked = name === undefined ? [] : [name, ...words.slice(0, 1)];
     return await printHelp(printer, asked, strict);
   }
 
@@ -323,10 +316,8 @@ async function runCommand(
   }
 }
 
-/**
- * Node's fetch keeps an aborted connection open until its own 10 s connect timeout,
- * so a finished command exits once its output is written instead of waiting on it.
- */
+// Node's fetch keeps an aborted connection open until its 10 s connect timeout, so a finished
+// command exits once its output is written.
 function exitWhenWritten(code: number): void {
   let pending = 2;
   for (const stream of [process.stdout, process.stderr]) {

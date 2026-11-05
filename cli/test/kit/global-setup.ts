@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { envName } from "#core/env.ts";
 import { TEST_ROOT, testRoot } from "./temp.ts";
 
 const exec = promisify(execFile);
@@ -48,7 +49,8 @@ async function cwdOf(pid: number): Promise<string | undefined> {
 function homeOf(pid: number): string | undefined {
   if (process.platform !== "linux") return undefined;
   const env = readFileSync(`/proc/${pid}/environ`, "utf8").split("\0");
-  return env.find((pair) => pair.startsWith("AIREG_HOME="))?.slice("AIREG_HOME=".length);
+  const prefix = `${envName("HOME")}=`;
+  return env.find((pair) => pair.startsWith(prefix))?.slice(prefix.length);
 }
 
 /** A daemon chdirs to its HOME, so its cwd (or its AIREG_HOME) says which test started it. */

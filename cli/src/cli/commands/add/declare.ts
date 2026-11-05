@@ -53,8 +53,8 @@ export function recordRegistry(
 }
 
 /**
- * Recorded on the entry only when they differ from the scope's, so a narrowed add
- * never unlinks anything else; picking exactly the scope's widens it back.
+ * Recorded only when they differ from the scope's, so a narrowed add never unlinks
+ * anything else; picking exactly the scope's widens it back.
  */
 export function narrowedTargets(
   loaded: Awaited<ReturnType<typeof load>>,
@@ -77,17 +77,15 @@ export interface Repin {
 }
 
 /**
- * Keyed by address, not the whole reference, so adding again at another version
- * re-pins the entry; a member a whole ref excludes is taken back into that ref.
+ * Keyed by address, not the whole ref, so adding again at another version re-pins
+ * the entry; a member a whole ref excludes is taken back into that ref.
  */
 export function declare(
   artifacts: Ref[],
   refs: readonly string[],
   narrowed: string[] | "scope" | undefined,
   copy: boolean,
-  /** Plugins the person trusts to run what they carry, recorded on each entry this adds. */
   trust: readonly string[],
-  /** The lockfile's name for what a ref already installs, if anything. */
   installedAs: (ref: Ref) => string | undefined,
 ): Repin[] {
   const repinned: Repin[] = [];
@@ -116,7 +114,6 @@ export function declare(
   return repinned;
 }
 
-/** The entry an add writes, keeping what the entry it replaces already said. */
 function entryOf(
   text: string,
   held: Ref | undefined,

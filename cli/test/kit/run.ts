@@ -20,9 +20,7 @@ export interface Ran {
   code: number;
   stdout: string;
   stderr: string;
-  /** Stdout parsed as the `--json` envelope. */
   json<T = unknown>(): Envelope<T>;
-  /** The error code a `--json` run failed with, undefined when it succeeded. */
   error(): string | undefined;
 }
 
@@ -33,7 +31,7 @@ export interface RunOptions {
   env?: NodeJS.ProcessEnv;
   /** Flags for node itself, ahead of the entry point. */
   node?: string[];
-  /** Written to standard input, which is then closed. */
+  /** Written to stdin, then closed. */
   input?: string;
 }
 

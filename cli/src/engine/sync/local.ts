@@ -45,14 +45,13 @@ export async function applyLocal({
   force,
   onStep,
 }: ApplyLocalOptions): Promise<{ changed: number; notices: ApplyNotice[] }> {
-  // A run that only published still has something to record, or the lock never
-  // learns what this project sent and every later comparison has no base.
+  // A publish-only run still records, or later comparisons have no base.
   const recording = new Set([...names, ...published.keys()]);
   const opened = new Set(scan.acquired.map((source) => source.alias));
   const moved = movedPluginLinks(loaded.lock, loaded, opened);
   const relinks = relinksIn(moved, recording);
   if (recording.size === 0 && relinks.size === 0) return { changed: 0, notices: [] };
-  // The caller holds the lease: it has to cover the publish that precedes this.
+  // The caller holds the lease, so it covers the publish before this.
   const notices = recoveredNotices(loaded.roots, await prepareWrite(loaded));
   const targets = selectTargets(loaded.manifest, loaded.targetTable, common);
   const followed = followPublished(loaded, scan, published);
@@ -80,15 +79,13 @@ export async function applyLocal({
     [...published.keys()].filter((name) => !restate.has(name)),
   );
   recordServed(recordOf(plan), scan, recording);
-  // The lock as it stands, not as the scan found it: a folder step writes its
-  // own rows inside this run, and the plan must not reclaim them.
+  // The lock as it stands, not as scanned: a folder step's rows from this run must not be reclaimed.
   const narrowed = narrowToRelinks(
     mergePlan(plan, loaded.lock, new Set([...recording, ...relinks])),
     relinks,
   );
   await refuseBlocked(narrowed);
   const result = await commit({ loaded, plan: narrowed, acquired: scan.acquired, targets, onStep });
-  // What the plan said about a row this run wrote, such as a deprecated version it pulled.
   for (const { name, message, hint } of plan.warnings) {
     // A published row's own note says why its copy stayed; the plan only saw an edit.
     if (name === undefined || !recording.has(name) || published.has(name)) continue;
@@ -106,8 +103,8 @@ export async function applyLocal({
 }
 
 /**
- * Follows what this run published as `aireg publish` does: a row the source serves at the version
- * sent is restated from it, and one pinned or not served yet is said. A folder of yours keeps its row.
+ * As `aireg publish` does: a row served at the sent version is restated from it, and one pinned
+ * or not served yet is reported. A folder of yours keeps its row.
  */
 function followPublished(
   loaded: Loaded,
@@ -154,8 +151,7 @@ function mergePlan(plan: Plan, previous: Lock, names: ReadonlySet<string>): Plan
   const next = cloneLock(previous);
   for (const name of names) {
     const artifact = generated.artifacts[name];
-    // Absent from the fresh plan means nothing asks for it any more, so the row
-    // goes. A name that was never locked has nothing to remove.
+    // Absent from the fresh plan means nothing asks for it any more.
     if (artifact === undefined) delete next.artifacts[name];
     else next.artifacts[name] = artifact;
   }

@@ -38,7 +38,6 @@ function saysTargets(doc: Document): boolean {
   return targetMaps(doc).some((map) => map.has("targets"));
 }
 
-/** The mappings that can hold a target list: the root, and each artifact entry. */
 function targetMaps(doc: Document): YAMLMap[] {
   const maps: unknown[] = [doc.contents];
   const artifacts = isMap(doc.contents) ? doc.contents.get("artifacts") : undefined;

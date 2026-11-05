@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { plural } from "#adapter/text.ts";
+import { groupTag } from "#cli/console/ui/chrome.ts";
 import { box, dim, faint, heading, plain, text } from "#cli/console/ui/elements.ts";
 import { defineView } from "#cli/console/ui/screen.ts";
 import { health } from "#core/console/artifacts.ts";
@@ -127,11 +128,7 @@ function namespaces(state: ConsoleState, width: number, cursor: number): ReactEl
           { color: group.authoredHere ? COLOR.yellow : COLOR.white, bold: true },
           pad(group.label, nameWidth),
         ),
-        group.isDefault
-          ? text({ color: COLOR.yellow }, pad("default", 16))
-          : group.authoredHere
-            ? faint(pad("authored here", 16))
-            : plain(" ".repeat(16)),
+        groupTag(group, 16),
         text({ color: COLOR.white }, pad(String(group.rows.length), 12)),
         text(
           { color: settled === group.rows.length ? COLOR.green : COLOR.yellow },

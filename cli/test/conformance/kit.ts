@@ -170,11 +170,10 @@ export function conformance(spec: Conformance): void {
     probes.every((probe) => onPath(probe.argv[0] as string, process.env));
   const programs = [...new Set(probes.map((probe) => probe.argv[0]))].join(", ");
   // A skipped test shows only its name, so the name says what would run it.
-  const l2 = live
-    ? "L2: the target lists what aireg placed"
-    : probes.length === 0
-      ? "L2: not run, since no command of the target lists what it loaded"
-      : `L2: runs with AIREG_CONFORMANCE=1 and ${programs} on PATH`;
+  let l2 = `L2: runs with AIREG_CONFORMANCE=1 and ${programs} on PATH`;
+  if (live) l2 = "L2: the target lists what aireg placed";
+  else if (probes.length === 0)
+    l2 = "L2: not run, since no command of the target lists what it loaded";
 
   // Windows places a link as a junction or a copy, so its trees differ by design.
   describe.skipIf(process.platform === "win32")(`${spec.id} conformance`, () => {

@@ -23,8 +23,8 @@ interface DirectoryMapping {
   /** For a target that reads this kind from the user installation alone. */
   scope?: "user" | undefined;
   /**
-   * `fan` places a real directory of links, for a target that will not load a linked one;
-   * `copy` real files, for one that rewrites or refuses links.
+   * `fan`: a real folder of links, for a target that will not load a linked one; `copy`: real
+   * files, for one that rewrites or refuses links.
    */
   place?: "link" | "fan" | "copy" | undefined;
   /** For a file-shaped kind: the file's name inside its folder, written as a copy. */
@@ -72,8 +72,8 @@ export interface Render {
 }
 
 /**
- * A built-in rewrite of the file a target reads, chosen by id; a definition never carries code.
- * A strict or set codec never drops or changes a key that limits an agent, `restrictions` included.
+ * A built-in rewrite chosen by id, so a definition never carries code. Strict and set codecs
+ * never drop or change a key that limits an agent, `restrictions` included.
  */
 export type Codec =
   /** The front-matter `fields`, each required, and the Markdown body under `body`; nothing else. */
@@ -87,10 +87,8 @@ export type Codec =
       restrictions?: string[] | undefined;
     };
 
-/** Where one artifact kind lands inside a target root. */
 export type KindMapping = ContentsMapping | DirectoryMapping | FileMapping;
 
-/** One manifest in a plugin directory, as a target reads it. */
 interface ManifestEntry {
   /** Relative to the plugin directory. */
   path: string;
@@ -106,8 +104,8 @@ export type ConfigValue =
   | { [key: string]: ConfigValue };
 
 /**
- * One edit to a config file a target reads. Every placement whose templates
- * expand to the same entry shares it, and it is removed with the last of them.
+ * One edit to a config file the target reads; placements whose templates expand to the same
+ * entry share it, and the last one removes it.
  */
 interface RegisterBase {
   /** Relative to the target root. */
@@ -155,7 +153,7 @@ interface Detect {
   binary?: string[] | undefined;
   /** Folders beyond its roots that mean it is installed: `~/` for home, else the project. */
   paths?: string[] | undefined;
-  /** `false` when its project folder is one many repositories hold anyway, so it proves nothing. */
+  /** `false` when many repositories hold its project folder anyway, so it proves nothing. */
   projectRoot?: false | undefined;
   /** Variables that, set, mean this process runs inside it. */
   caller?: string[] | undefined;
@@ -180,30 +178,27 @@ export type TargetCategory = (typeof TARGET_CATEGORIES)[number];
 /** One target aireg installs into, as its module under `src/targets` defines it. */
 export interface TargetDefinition {
   id: string;
-  /** Other ids it answers to wherever an id is read, such as an earlier one; output names `id`. */
+  /** Other ids it answers to wherever an id is read; output names `id`. */
   aliases?: string[] | undefined;
   displayName: string;
   /** `coding-agent` when absent. */
   category?: TargetCategory | undefined;
-  /**
-   * Installed into when a manifest names none. Fixed rather than detected, so
-   * teammates with different tools still write the same lock.
-   */
+  /** Used when a manifest names none; fixed, so teammates with other tools write one lock. */
   default?: boolean | undefined;
   /** Its folders hold artifacts `init --import` reads. */
   importable?: boolean | undefined;
   roots: {
     project: string;
     /**
-     * `default` is under `~/`; `env` names the variable the target itself reads to move it,
-     * and `within` the root's path inside the folder that variable names, when not the folder itself.
+     * `default` is under `~/`; `env` is the variable the target reads to move it; `within` the
+     * root's path inside that folder, when not the folder itself.
      */
     user: { default: string; env?: string | undefined; within?: string | undefined };
   };
   detect?: Detect | "never" | undefined;
   /**
-   * The folders this tool reads each kind from, most preferred first, named by
-   * their entry. Absent means its own folder for every kind it maps.
+   * Folders it reads each kind from, most preferred first, each named by the target that lays
+   * it out; absent means its own folder.
    */
   reads?: Partial<Record<ArtifactKind, string[]>> | undefined;
   kinds: Partial<Record<ArtifactKind, KindMapping>>;
@@ -216,7 +211,6 @@ export interface TargetDefinition {
   reload?: string | undefined;
 }
 
-/** What `detect` checks, every list present. */
 interface Signals {
   env: string[];
   binary: string[];
@@ -224,7 +218,7 @@ interface Signals {
   projectRoot?: false | undefined;
 }
 
-/** A definition with its user root expanded and every default filled in. Data only. */
+/** A definition with its user root expanded and every default filled in. */
 export interface Target {
   name: string;
   aliases: string[];
@@ -239,7 +233,7 @@ export interface Target {
   /** Only the kinds whose reads differ from this target's own folder. */
   reads: Partial<Record<ArtifactKind, string[]>>;
   category: TargetCategory;
-  /** A `shared-folder`, which is what most callers ask. */
+  /** True for a `shared-folder`, which is what most callers ask. */
   shared: boolean;
   verified: { command: string[]; range: string } | undefined;
   trust: Partial<Record<ArtifactKind, Trust>>;

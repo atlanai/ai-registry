@@ -71,7 +71,6 @@ export async function sendTo(
   return published;
 }
 
-/** What the change is, in the words a commit or a changelog would use. */
 function subjectOf(items: readonly Planned[]): string {
   return releaseSubject(
     items.map((item) => ({

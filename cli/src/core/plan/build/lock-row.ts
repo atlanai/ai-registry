@@ -9,7 +9,6 @@ interface RowInput {
   links: readonly PlannedLink[];
   previous: LockArtifact | undefined;
   state: ArtifactSurvey | undefined;
-  /** This run stages the item's bytes again. */
   restage: boolean;
   /** Path to this scope's copy of the item. */
   copy: string;
@@ -115,7 +114,6 @@ export function keepUnmovedRevisions(before: Lock, next: Lock): void {
   }
 }
 
-/** Whether a registry's rows resolved to exactly what the lock already held. */
 function unmoved(before: Lock, after: Lock, alias: string): boolean {
   const rows = (lock: Lock) =>
     Object.entries(lock.artifacts).filter(([, row]) => row.registry === alias);

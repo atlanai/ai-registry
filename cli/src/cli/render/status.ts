@@ -36,7 +36,6 @@ export function renderStatus(
     const watched = watching(item);
     return watched === undefined ? [] : toolsOf(item, [watched]);
   };
-  // One column per target, in the order aireg lists them.
   const order = Object.keys(chosen.targetTable);
   const tools = [
     ...new Set(

@@ -4,11 +4,11 @@ import type { Action, PluginDocument, Staged } from "#core/plan/model.ts";
 import type { Roots } from "#core/store/paths.ts";
 import type { LinkGuard } from "./link-guard.ts";
 
-/** The actions apply carries out; `record` only writes the lock. */
+/** `record` only writes the lock, so it is not counted. */
 type Performed = Record<Exclude<Action["kind"], "record">, number>;
 
 export interface ApplyResult {
-  /** What ran: a link kept back for a person's own file, or never made, is not counted. */
+  /** A link kept back for a person's own file, or never made, is not counted. */
   performed: Performed;
   /** Artifacts this run linked into a target. */
   installed: string[];
@@ -17,19 +17,13 @@ export interface ApplyResult {
   /** Artifacts some target had before this run that none has now. */
   removed: string[];
   lock: Lock | undefined;
-  /**
-   * Targets that asked for a symlink and got a copy. Worth reporting: an edit
-   * to the project's artifact no longer reaches that target.
-   */
+  /** Targets that asked for a symlink and got a copy, so project edits no longer reach them. */
   degraded: string[];
-  /**
-   * Artifacts, or members of one, the source would not serve intact. The run
-   * installs the rest and keeps each one's previous lock row.
-   */
+  /** Artifacts or members the source would not serve intact; each keeps its previous lock row. */
   unstaged: { name: string; reason: string; error: unknown }[];
   /** Links not made: a person's own file or folder is at the destination, or `reason` says why. */
   kept: { name: string; path: string; reason?: string; config?: true }[];
-  /** Copies already on disk, byte for byte what this run installs, recorded as aireg's in place. */
+  /** Copies already on disk that match this run byte for byte, recorded as aireg's in place. */
   adopted: { name: string; path: string }[];
   /** A person's own file or folder that stood where a recorded link was, and where it was moved. */
   backedUp: {

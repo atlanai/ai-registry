@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, test } from "vitest";
+import { sourceContext } from "#test/kit/source-context.ts";
 import { assertAdapterCompliance, ComplianceError } from "./compliance.ts";
 import { ADAPTER_PROTOCOL, type SourceAdapter, type SourceContext } from "./contract.ts";
 import { defineAdapter } from "./define.ts";
@@ -9,15 +10,7 @@ const BODY = new TextEncoder().encode("# lint\n");
 const DIGEST = `sha256:${createHash("sha256").update(BODY).digest("hex")}`;
 
 function context(): SourceContext {
-  return {
-    source: { registry: "probe", location: "probe://x", config: {}, key: "sha256:k" },
-    credential: undefined,
-    signal: new AbortController().signal,
-    limits: { timeoutMs: 1000, retries: 0 },
-    onBytes: () => {},
-    cacheDir: () => "",
-    exclusive: (_key, run) => run(),
-  };
+  return sourceContext({ registry: "probe", location: "probe://x", config: {}, key: "sha256:k" });
 }
 
 function serving(): SourceAdapter {

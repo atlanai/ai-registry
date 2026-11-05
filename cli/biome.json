@@ -34,45 +34,112 @@
         "noUnusedImports": "error",
         "noUnusedVariables": "error",
         "noUnusedFunctionParameters": "error",
-        "noUnusedPrivateClassMembers": "error"
+        "noUnusedPrivateClassMembers": "error",
+        "useImportExtensions": "error",
+        "useSingleJsDocAsterisk": "error"
       },
       "suspicious": {
-        "noConsole": { "level": "error", "options": { "allow": ["error"] } },
-        "noExplicitAny": "error"
+        "noConsole": {
+          "level": "error",
+          "options": {
+            "allow": ["error"]
+          }
+        },
+        "noExplicitAny": "error",
+        "noFocusedTests": "error",
+        "noSkippedTests": "error",
+        "noIdenticalTestTitle": "error",
+        "noExportsInTest": "error",
+        "useExpect": "error",
+        "noConditionalExpect": "error",
+        "noImportCycles": {
+          "level": "error",
+          "options": {
+            "ignoreTypes": true
+          }
+        }
       },
       "complexity": {
         "noExcessiveCognitiveComplexity": {
-          "level": "warn",
-          "options": { "maxAllowedComplexity": 25 }
+          "level": "error",
+          "options": {
+            "maxAllowedComplexity": 25
+          }
         },
         "noExcessiveLinesPerFunction": {
           "level": "warn",
-          "options": { "maxLines": 100, "skipBlankLines": true }
-        }
+          "options": {
+            "maxLines": 100,
+            "skipBlankLines": true
+          }
+        },
+        "useMaxParams": {
+          "level": "error",
+          "options": {
+            "max": 6
+          }
+        },
+        "noExcessiveNestedTestSuites": "error"
       },
       "style": {
         "noExcessiveLinesPerFile": {
           "level": "warn",
-          "options": { "maxLines": 1000, "skipBlankLines": true }
+          "options": {
+            "maxLines": 1000,
+            "skipBlankLines": true
+          }
         },
         "noNonNullAssertion": "error",
         "noParameterAssign": "warn",
-        "useConsistentArrayType": { "level": "error", "options": { "syntax": "shorthand" } },
+        "useConsistentArrayType": {
+          "level": "error",
+          "options": {
+            "syntax": "shorthand"
+          }
+        },
         "useImportType": "error",
         "useNodejsImportProtocol": "error",
-        "useThrowOnlyError": "error"
+        "useThrowOnlyError": "error",
+        "useImportsFirst": "error",
+        "noExportedImports": "error",
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "filenameCases": ["kebab-case"]
+          }
+        },
+        "noShoutyConstants": "error",
+        "noNestedTernary": "error",
+        "useTestHooksInOrder": "error",
+        "useConsistentTestIt": {
+          "level": "error",
+          "options": {
+            "function": "test",
+            "withinDescribe": "test"
+          }
+        }
       },
       "performance": {
-        "noDelete": "error"
+        "noDelete": "error",
+        "noBarrelFile": "error",
+        "noReExportAll": "error"
       },
       "nursery": {
-        "noFloatingPromises": "error"
+        "noFloatingPromises": "error",
+        "useExhaustiveSwitchCases": {
+          "level": "error",
+          "options": {
+            "requireExplicitCase": true
+          }
+        }
       }
     }
   },
   "assist": {
     "actions": {
-      "source": { "organizeImports": "on" }
+      "source": {
+        "organizeImports": "on"
+      }
     }
   },
   "overrides": [
@@ -80,9 +147,26 @@
       "includes": ["**/*.test.ts", "test/**"],
       "linter": {
         "rules": {
-          "complexity": { "noExcessiveLinesPerFunction": "off" },
-          "suspicious": { "noConsole": "off" },
-          "style": { "noExcessiveLinesPerFile": "off", "noNonNullAssertion": "off" }
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off"
+          },
+          "suspicious": {
+            "noConsole": "off"
+          },
+          "style": {
+            "noExcessiveLinesPerFile": "off",
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/adapter/index.ts", "src/adapters/*/api.ts"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
         }
       }
     }

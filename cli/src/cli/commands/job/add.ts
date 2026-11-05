@@ -91,7 +91,7 @@ export function savedText(result: Saved, printer: Printer): void {
   );
 }
 
-/** What `job add` checks on its own, so a command that fails it never starts the daemon. */
+/** Checked on its own, so a command that fails it never starts the daemon. */
 async function plannedJob(
   context: CommandContext,
   root: string | undefined,
@@ -127,7 +127,6 @@ async function plannedJob(
   return { origins, alias, scope, jobRoot, source, refs, policy: policy(own) };
 }
 
-/** What the job does now; one replaced under the id it had is updated, not added. */
 function saved(job: Job, existed: boolean): string {
   const verb = existed ? "Updated" : "Added";
   const to = job.steps.find((step) => step.kind === "origins")?.to;

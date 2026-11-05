@@ -147,7 +147,6 @@ describe("launchdBackend", () => {
     expect(await backend.starts("/Users/u/.aireg/bin/aireg")).toBe(true);
   });
 
-  // launchd keeps running what it loaded, so a rewrite never restarts the daemon.
   test("rewrites the definition without reloading it", async () => {
     const fake = fakeExec();
     await launchdBackend(spec(home), fake.exec).rewrite();

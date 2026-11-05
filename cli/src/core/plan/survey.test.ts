@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { LOCK_VERSION, type Lock } from "#core/lock.ts";
+import type { Lock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
+import { lock } from "#test/kit/builders/lock.ts";
 import { survey } from "./survey.ts";
 
 const hashing = vi.hoisted(() => ({ active: 0, peak: 0 }));
@@ -21,24 +22,18 @@ vi.mock("#core/fs/digest.ts", () => ({
 }));
 
 function lockOf(count: number): Lock {
-  const artifacts: Lock["artifacts"] = {};
+  const built = lock();
   for (let index = 0; index < count; index += 1) {
-    artifacts[`skill-${index}`] = {
+    built.artifact(`skill-${index}`, {
       registry: "kit",
       id: `skills/skill-${index}`,
-      name: `skill-${index}`,
-      kind: "skill",
-      namespace: undefined,
       address: `skills/skill-${index}`,
       path: `skills/skill-${index}`,
-      origin: undefined,
       content: "t",
-      version: undefined,
       digest: "sha256:copy",
-      links: [],
-    };
+    });
   }
-  return { version: LOCK_VERSION, registries: {}, artifacts };
+  return built.build();
 }
 
 describe("survey", () => {

@@ -5,10 +5,7 @@ import { type Interaction, interactive } from "./interaction.ts";
 import { canceled } from "./model.ts";
 import { select } from "./select.ts";
 
-/**
- * With nothing named, a terminal offers what is declared; anywhere else that
- * is a usage error, because there is nobody to ask.
- */
+/** Offers the declared registries on a terminal; elsewhere it is a usage error. */
 export async function chooseRegistry(
   step: Interaction,
   known: Readonly<Record<string, RegistrySource>>,

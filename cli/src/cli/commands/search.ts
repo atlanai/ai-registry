@@ -16,7 +16,6 @@ import type { CommonOptions } from "#engine/options.ts";
 import { scopeRoots } from "#engine/scope/locate.ts";
 import { defineCommand } from "./define.ts";
 
-/** Room for the description once the other columns are printed. */
 const DESCRIPTION_WIDTH = 60;
 
 interface Match {
@@ -154,7 +153,6 @@ export const { run } = defineCommand({
   },
 });
 
-/** Read through the same listing `aireg registry show` prints. */
 async function matchesIn(target: Resolved, cwd: string): Promise<Match[]> {
   const source = await probe({ input: target.input, flags: target.flags, cwd, declared: target });
   try {

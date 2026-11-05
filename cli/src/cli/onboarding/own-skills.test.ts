@@ -1,8 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
-import { emptyLock, writeLock } from "#core/lock.ts";
+import { writeLock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
+import { lock } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { ownSkillsCommand, ownSkillsRef, staleOwnSkillsPin } from "./own-skills.ts";
 
@@ -32,7 +33,6 @@ describe("ownSkillsCommand", () => {
 describe("staleOwnSkillsPin", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  /** Installed at `locked`, as the lockfile says, and declared at `declared` in the manifest. */
   const pinned = async (
     tmp: string,
     locked: string | undefined,
@@ -47,29 +47,23 @@ describe("staleOwnSkillsPin", () => {
       join(scope, "manifest.yml"),
       `registries:\n  ai-registry:\n    source: ${JSON.stringify(location)}\n${declared === undefined ? "" : `    ref: ${declared}\n`}    path: examples/aireg\nartifacts: []\n`,
     );
-    const lock = emptyLock();
-    lock.registries["ai-registry"] = {
-      location,
-      adapter: "git",
-      key: "key",
-      config: { ...ref(locked), path: "examples/aireg" },
-      revision: "abc",
-    };
-    lock.artifacts.add = {
-      registry: "ai-registry",
-      id: "aireg/skills/add",
-      name: "add",
-      kind: "skill",
-      namespace: "aireg",
-      address: "aireg/skills/add",
-      path: "artifacts/add",
-      origin: undefined,
-      content: "",
-      version: "0.1.0",
-      digest: "",
-      links: [],
-    };
-    await writeLock(roots("user", tmp), lock);
+    const installed = lock()
+      .registry("ai-registry", {
+        location,
+        key: "key",
+        config: { ...ref(locked), path: "examples/aireg" },
+        revision: "abc",
+      })
+      .artifact("add", {
+        id: "aireg/skills/add",
+        namespace: "aireg",
+        address: "aireg/skills/add",
+        content: "",
+        version: "0.1.0",
+        digest: "",
+      })
+      .build();
+    await writeLock(roots("user", tmp), installed);
     return staleOwnSkillsPin(tmp, version);
   };
 

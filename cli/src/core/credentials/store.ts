@@ -39,15 +39,12 @@ export class CredentialStoreError extends AiregError {
   }
 }
 
-/** A fresh account id, in the one shape credentials.json keys accept. */
+/** In the one shape credentials.json keys accept. */
 export function newAccountId(): string {
   return `${ACCOUNT_PREFIX}${randomUUID()}`;
 }
 
-/**
- * Why a credentials file someone else could read or swap is unsafe, from its own (unfollowed)
- * stat: the store refuses it, and `doctor` reports it, by this one rule.
- */
+/** From its own unfollowed stat; the store refuses and `doctor` reports by this one rule. */
 export function fileExposure(info: Stats): string | undefined {
   if (info.isSymbolicLink()) return "is a symbolic link";
   if (!info.isFile()) return "is not a regular file";
@@ -84,8 +81,8 @@ const EXPOSURE_HINT: Readonly<Record<string, (path: string) => string>> = {
 };
 
 /**
- * As ssh and libpq do: a token file someone else could read or swap is refused, not used.
- * Checked through the open handle, so the file cannot change between the check and the read.
+ * As ssh and libpq do, a token file someone else could read or swap is refused. Checked through
+ * the open handle, so the file cannot change between the check and the read.
  */
 async function readPrivate(path: string): Promise<string | undefined> {
   let handle: FileHandle;

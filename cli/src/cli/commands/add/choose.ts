@@ -20,7 +20,6 @@ import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
 import { locate, resolveScope } from "#engine/scope/locate.ts";
 
-/** Require explicit confirmation before a large implicit selection. */
 const CONFIRM_ABOVE = 10;
 
 interface Choices {
@@ -38,19 +37,30 @@ interface Gathered {
   loaded: Awaited<ReturnType<typeof load>>;
 }
 
-/** Gather missing choices; cancellation returns no choices. */
-export async function gather(
-  step: Interaction,
-  common: CommonOptions,
-  cwd: string,
+interface Gather {
+  step: Interaction;
+  common: CommonOptions;
+  cwd: string;
   /** What `aireg registry show` takes for this registry. */
-  shown: string,
-  all: readonly Entry[],
-  partial: boolean,
-  alias: string,
+  shown: string;
+  all: readonly Entry[];
+  partial: boolean;
+  alias: string;
   /** Its source installs each namespace as a plugin in the user scope. */
-  wrapped: boolean,
-): Promise<Gathered | undefined> {
+  wrapped: boolean;
+}
+
+/** Undefined when canceled. */
+export async function gather({
+  step,
+  common,
+  cwd,
+  shown,
+  all,
+  partial,
+  alias,
+  wrapped,
+}: Gather): Promise<Gathered | undefined> {
   const picked = await pickArtifacts(step, common, shown, all, partial, alias);
   if (picked === undefined) return undefined;
 
@@ -63,10 +73,10 @@ export async function gather(
     if (canceled(picked)) return undefined;
     scope = picked;
   }
-  // Outside a project the user scope is the only one there is, as for `aireg registry add`.
+  // Outside a project only the user scope exists, as for `aireg registry add`.
   scope ??= resolveScope(undefined, cwd, "user").scope;
 
-  // Loaded under the chosen scope, so the paths shown in the prompt are real.
+  // Loaded under the chosen scope so the prompt shows real paths.
   const loaded = await load({ ...common, scope }, cwd);
   const { manifest, targetTable } = loaded;
   const chosen = chosenEntries(picked.addresses, all);
@@ -140,7 +150,6 @@ interface Picked {
   addresses: string[] | undefined;
 }
 
-/** A catalog entry as the plan would place it, for showing where each target loads it from. */
 function asSelected(entry: Entry, alias: string): Selected {
   return {
     name: entry.name,

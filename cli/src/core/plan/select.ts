@@ -26,7 +26,6 @@ import type {
   Warning,
 } from "./model.ts";
 
-/** The address that reaches this entry, through `registry` when one is given. */
 export function addressOf(
   entry: Pick<Entry, "group" | "kind" | "name">,
   registry?: string,
@@ -36,10 +35,7 @@ export function addressOf(
     .join("/");
 }
 
-/**
- * What a reference that matches nothing says, and the addresses with its name: the
- * commonest way to get one wrong is a name written where a kind belongs.
- */
+/** A miss and its likely fix: the common mistake is a name written where a kind belongs. */
 export function unmatched(ref: Ref, entries: readonly Entry[]): { message: string; guess: string } {
   const wanted = address(ref.name ?? ref.namespace);
   const shown = entries
@@ -78,10 +74,7 @@ export function candidates(ref: Ref, source: Acquired): Entry[] {
   );
 }
 
-/**
- * A namespace holds the artifacts grouped under it, plus the plugin the source
- * publishes for it; `withoutCoveredLeaves` keeps a member from landing twice.
- */
+/** A namespace's members plus the plugin published for it, with no member landing twice. */
 function inNamespace(namespace: string, entries: readonly Entry[]): Entry[] {
   const wanted = address(namespace);
   return withoutCoveredLeaves(
@@ -367,10 +360,7 @@ function installedName(entry: Entry, ref: Ref, source: Acquired): string {
   return `${entry.group}/${entry.name}`;
 }
 
-/**
- * Membership is the group, not a path prefix: upstream addresses a member by
- * its own namespace, so the plugin's address is not a prefix of it.
- */
+/** Membership is the group, not a path prefix: a member is addressed by its own namespace. */
 function contentsOf(
   plugin: Entry,
   entries: readonly Entry[],

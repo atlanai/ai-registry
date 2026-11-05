@@ -4,34 +4,25 @@ import { describe, expect, vi } from "vitest";
 import { registerBuiltinAdapters } from "#adapters/index.ts";
 import { emptyRegistryConfig, type Job, type RegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
+import type { RunRecord } from "#core/run/model.ts";
+import type { RpcClient } from "#daemon/rpc/client.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
-import { ADAPTER, ENDPOINT, finished, jobStatus, NAMESPACE, testClient } from "#test/kit/daemon.ts";
+import {
+  ADAPTER,
+  declareUserRegistry,
+  ENDPOINT,
+  finished,
+  jobStatus,
+  NAMESPACE,
+  publishUpstream,
+  terminal,
+  testClient,
+  wait,
+} from "#test/kit/daemon.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { projected } from "#test/kit/target.ts";
 
 const CLIENT = testClient("watch_test");
-
-async function publish(remote: string, body: string): Promise<void> {
-  const path = join(remote, NAMESPACE, "skill", "quality-check");
-  await mkdir(path, { recursive: true });
-  await writeFile(
-    join(path, "SKILL.md"),
-    `---\nname: quality-check\ndescription: Reviews a change.\n---\n\n${body}\n`,
-  );
-  await writeFile(
-    join(path, "meta.json"),
-    `${JSON.stringify({ id: "skill_quality-check", description: "Reviews a change." })}\n`,
-  );
-}
-
-/** So `account.login` can resolve the alias against the user's own manifest. */
-async function declareUserRegistry(scope: string): Promise<void> {
-  await mkdir(scope, { recursive: true });
-  await writeFile(
-    join(scope, "manifest.yml"),
-    ["registries:", "  personal:", `    source: ${ENDPOINT}`, "    adapter: dev", ""].join("\n"),
-  );
-}
 
 describe("job methods", () => {
   test("creates a job, syncs it, and reports drift without applying it", async ({
@@ -41,7 +32,7 @@ describe("job methods", () => {
     daemon,
   }) => {
     const remote = join(tmp, "remote");
-    await publish(remote, "Read the diff.");
+    await publishUpstream(remote, "quality-check", "Read the diff.");
     await declareUserRegistry(home.scope);
     vi.stubEnv("AIREG_DEV_REMOTE", remote);
     await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
@@ -86,7 +77,7 @@ describe("job methods", () => {
       }),
     ]);
 
-    await publish(remote, "Read the diff, then name the risk.");
+    await publishUpstream(remote, "quality-check", "Read the diff, then name the risk.");
     const drifted = await jobStatus("watch_dev");
     expect(drifted.artifacts).toEqual([
       expect.objectContaining({ name: "quality-check", disposition: "pull", operation: "pull" }),
@@ -285,6 +276,13 @@ describe("job.create without login", () => {
   });
 });
 
+async function scheduled(client: RpcClient, jobId: string): Promise<RunRecord> {
+  return wait("Scheduled run", async () => {
+    const { runs } = await client.request("run.list", { jobId });
+    return runs.length > 0 && runs.every(terminal) ? runs[0] : undefined;
+  });
+}
+
 describe("adapter jobs", () => {
   test("is config alone: no manifest, no lease, and nothing to reconcile", async ({
     home,
@@ -344,5 +342,42 @@ describe("adapter jobs", () => {
       },
     });
     expect(patched.config.jobs[0]?.schedule.enabled).toBe(false);
+  });
+
+  test("runs an adapter's step on the schedule, in the ordinary run mode", async ({
+    tmp,
+    home,
+    daemon,
+  }) => {
+    vi.stubEnv("AIREG_DEV_REMOTE", join(tmp, "remote"));
+    await declareUserRegistry(home.scope);
+    await writeConfig({ ...emptyRegistryConfig(), adapters: { dev: ADAPTER } }, 0);
+
+    const { client } = await daemon.start(testClient("adapter_job_test"));
+    const { account } = await client.request("account.login", { registry: "personal" });
+    const before = await client.request("state.snapshot", {});
+    const created = await client.request("job.create", {
+      type: "probe",
+      expectedRevision: before.config.revision,
+      account: account.id,
+      name: "watch_probe",
+      intervalSeconds: 3600,
+    });
+    expect(created.job.steps.map((step: { kind: string }) => step.kind)).toEqual(["probe"]);
+
+    const run = await scheduled(client, "watch_probe");
+    expect(run.mode).toBe("sync");
+    expect(run.state).toBe("succeeded");
+
+    // An adapter's step takes the run's mode, never the kind's.
+    const manual = await client.request("run.start", {
+      jobId: "watch_probe",
+      mode: "sync",
+    });
+    const settled = await wait("Manual run", async () => {
+      const { run: latest } = await client.request("run.get", { runId: manual.run.id });
+      return terminal(latest) ? latest : undefined;
+    });
+    expect(settled.state).toBe("succeeded");
   });
 });

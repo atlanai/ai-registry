@@ -12,17 +12,14 @@ import {
 } from "#self/minimum-update.ts";
 
 export const MIN_UPDATE_INTERVAL_MS = 15 * 60 * 1000;
-/** A local readlink, so it can run far more often than the network floor check. */
+/** A local readlink, so it can run far more often than the network check. */
 export const FOLLOW_INTERVAL_MS = 60 * 1000;
 
 export interface DaemonReplaceHooks {
   busy: () => boolean;
   close: () => Promise<void>;
   start: (entry: string, version: string) => Promise<void>;
-  /**
-   * Set under a service manager, which starts the installed version through the
-   * shim. A spawned replacement would be unsupervised, or killed with the service.
-   */
+  /** Set under a service manager; a spawned replacement would be unsupervised or killed with it. */
   restart?: () => Promise<void>;
   env?: NodeJS.ProcessEnv;
   current?: string;
@@ -42,8 +39,8 @@ export interface DaemonFollowHooks extends DaemonReplaceHooks {
 }
 
 /**
- * Keeps an installed daemon on the channel head. A version already on disk is
- * never fetched again, so a rollback holds until a newer release or the floor.
+ * A version already on disk is never fetched again, so a rollback holds until a newer
+ * release or the floor.
  */
 export async function applyDaemonCliUpdate(
   hooks: DaemonMinUpdateHooks,
@@ -90,7 +87,7 @@ export async function replaceWith(
   version: string,
   env: NodeJS.ProcessEnv,
 ): Promise<"skip" | "replace"> {
-  // Asked again after a download: the other check may have replaced us meanwhile.
+  // The other check may have replaced us during the download.
   if (hooks.busy()) return "skip";
   if (hooks.restart !== undefined) {
     await hooks.restart();

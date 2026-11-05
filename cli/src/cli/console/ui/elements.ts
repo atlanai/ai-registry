@@ -16,10 +16,7 @@ export function text(props: TextProps, ...children: ReactNode[]): ReactElement {
   return createElement(Text, props, ...children.map(inert));
 }
 
-/**
- * The console shows manifest, lockfile and registry text, and Ink keeps hyperlinks and any
- * styling in it. The console styles through props, so no string it draws needs an escape.
- */
+/** Manifest, lockfile and registry text may carry escapes Ink would honor; styling goes through props. */
 function inert(node: ReactNode): ReactNode {
   if (typeof node === "string") return sanitizeBlock(node);
   return Array.isArray(node) ? node.map(inert) : node;
@@ -37,17 +34,15 @@ export function faint(value: ReactNode): ReactElement {
   return createElement(Text, { color: COLOR.faint }, inert(value));
 }
 
-/** A full-width rule. Ink has no border-only-top, so it is drawn as text. */
+/** Ink has no top-only border, so the rule is drawn as text. */
 export function rule(width: number): ReactElement {
   return createElement(Text, { color: COLOR.faint }, "─".repeat(Math.max(0, width)));
 }
 
-/** A section heading: small, dim, and the same everywhere. */
 export function heading(label: string): ReactElement {
   return createElement(Text, { color: COLOR.dim }, inert(label.toUpperCase()));
 }
 
-/** `[k] label`, the shape every action in the console is announced in. */
 export function action(key: string, label: string, active = true): ReactElement {
   const color = active ? COLOR.green : COLOR.faint;
   return createElement(

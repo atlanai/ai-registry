@@ -1,32 +1,21 @@
 import { describe, expect, test } from "vitest";
-import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
+import { lock } from "#test/kit/builders/lock.ts";
 import { matchInstalled, rowsNamed, shownNames } from "./installed-names.ts";
 
-const row = (registry: string, namespace: string, name: string): LockArtifact => ({
+const row = (registry: string, namespace: string, name: string) => ({
   registry,
-  id: undefined,
-  name,
-  kind: "skill",
   namespace,
-  address: undefined,
-  content: undefined,
   version: "1.0.0",
   path: `.registry/artifacts/${registry}/${namespace}/skills/${name}`,
   digest: "",
-  origin: undefined,
-  links: [],
 });
 
-function lock(rows: Record<string, LockArtifact>): Lock {
-  return { ...emptyLock(), artifacts: rows };
-}
-
 describe("installed names", () => {
-  const scope = lock({
-    "personal/pr-review": row("mine", "personal", "pr-review"),
-    lint: row("acme", "eng", "lint"),
-    "frontend/lint": row("acme", "frontend", "lint"),
-  });
+  const scope = lock()
+    .artifact("personal/pr-review", row("mine", "personal", "pr-review"))
+    .artifact("lint", row("acme", "eng", "lint"))
+    .artifact("frontend/lint", row("acme", "frontend", "lint"))
+    .build();
 
   test("shows the shortest name no other artifact shares", () => {
     const shown = shownNames(scope);

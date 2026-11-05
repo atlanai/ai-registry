@@ -149,7 +149,6 @@ function parseHooks(value: unknown): PipelineHook[] {
   });
 }
 
-/** Each pin maps an adapter id to the module config.yml loads for it. */
 function adapterPins(value: unknown): Readonly<Record<string, string>> {
   if (value === undefined) return {};
   const entries = Object.entries(record(value, "adapters"));

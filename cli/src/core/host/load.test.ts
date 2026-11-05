@@ -12,7 +12,6 @@ import {
   stepContribution,
 } from "./load.ts";
 
-/** An adapter module whose hook contributes one of everything. */
 const CONTRIBUTING = `export default {
   id: "kit",
   displayName: "Kit",

@@ -109,7 +109,6 @@ export const { run } = defineCommand<Options>({
   },
 });
 
-/** The folder a job keeps in sync: its own, else your user scope's. */
 const rootOf = (job: Job) => jobRoot(job) ?? userScopeDir();
 
 function watches(jobs: readonly Job[]): Watch[] {
@@ -157,7 +156,6 @@ async function remove(
   return changed;
 }
 
-/** Each folder named, as a key, under the job in this scope that watches it. */
 function byJob(all: readonly Job[], folders: readonly string[], scope: Roots, cwd: string) {
   const here = canonical(scope.manifest);
   const found = new Map<Job, Set<string>>();
@@ -183,7 +181,6 @@ function byJob(all: readonly Job[], folders: readonly string[], scope: Roots, cw
   return found;
 }
 
-/** How to stop a folder another scope publishes: with -g, or in that project. */
 function elsewhere(job: Job, folder: string, cwd: string): string {
   const root = rootOf(job);
   const scope = scopeFor(root);
@@ -209,8 +206,8 @@ async function unwatch(job: Job, dropped: ReadonlySet<string>): Promise<Changed>
 }
 
 /**
- * The job without those folders. With none left it goes back to the job `aireg add`
- * makes: no folder step, and edits made here reported rather than published.
+ * With no folders left it goes back to the job `aireg add` makes: no folder step,
+ * and edits made here reported rather than published.
  */
 function withoutFolders(job: Job, dropped: ReadonlySet<string>): Job {
   const steps = job.steps.flatMap((step): Step[] => {

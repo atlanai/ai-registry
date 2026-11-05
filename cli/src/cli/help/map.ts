@@ -8,7 +8,6 @@ import { DOCS_URL, NAME } from "#core/product.ts";
 import type { Printer } from "#core/term/printer.ts";
 import pkg from "#package.json" with { type: "json" };
 
-/** A node in the `--map` tree: a command, an action, or the root. */
 export interface MapNode {
   readonly path: string;
   readonly summary?: string;
@@ -30,7 +29,6 @@ export const ROOT_USAGE: readonly string[] = [
   "aireg <command> [options]",
   "aireg help <command> [<action>]",
 ];
-/** What aireg is, in the one line `--help`, the bare command and `--map` open with. */
 export const ROOT_SUMMARY = "Install agent artifacts from any registry into any coding agent.";
 
 export const ISSUES_URL = pkg.bugs.url;
@@ -44,7 +42,7 @@ export function actionNode(command: CommandSpec, action: ActionSpec): MapNode {
   };
 }
 
-/** `usage` and `options` only when there are some, so a key's presence means something. */
+/** Omits empty `usage` and `options`, so a key's presence means something. */
 function described(of: CommandSpec | ActionSpec) {
   const options = of.options ?? [];
   return {
@@ -70,7 +68,6 @@ export function commandNode(command: CommandSpec): MapNode {
   };
 }
 
-/** The whole command tree, built-in and adapter-contributed alike. */
 export async function buildMap(): Promise<MapNode> {
   const commands = await allCommands();
   return {
@@ -82,10 +79,7 @@ export async function buildMap(): Promise<MapNode> {
   };
 }
 
-/**
- * Only a known format is swallowed, so `aireg --map add` keeps `add` a
- * positional rather than an unknown-format error.
- */
+/** Only a known format is taken, so `aireg --map add` keeps `add` a positional. */
 export function mapTakesValue(next: string | undefined): boolean {
   return next !== undefined && isMapFormat(next);
 }
@@ -94,10 +88,7 @@ function isMapFormat(value: string): value is MapFormat {
   return (MAP_FORMATS as readonly string[]).includes(value);
 }
 
-/**
- * Bare `--map` means tree. The `=` form is unambiguous, so an unknown format
- * there is an error rather than a silent default.
- */
+/** Bare `--map` means tree; the `=` form is unambiguous, so an unknown format there is an error. */
 export function findMapFormat(argv: readonly string[]): string | undefined {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i] as string;
@@ -109,10 +100,7 @@ export function findMapFormat(argv: readonly string[]): string | undefined {
 
 const MAP_FLAG = "--map";
 
-/**
- * Runs instead of any command: exists so a coding agent gets the whole tree
- * in one call, instead of paying a `--help` round trip per level.
- */
+/** Lets a coding agent get the whole tree in one call instead of one `--help` per level. */
 export async function runMap(printer: Printer, format: string): Promise<ExitCode> {
   if (!isMapFormat(format)) {
     throw new AiregError(`Unknown --map format ${quoted(format)}.`, {
@@ -137,7 +125,7 @@ export async function runMap(printer: Printer, format: string): Promise<ExitCode
   return ExitCode.Ok;
 }
 
-/** Tree text omits usage and options; they stay a JSON-only affordance. */
+/** Usage and options are JSON-only on purpose. */
 function writeTree(node: MapNode, indent: string, lines: string[]): void {
   const head =
     node.summary === undefined ? `${indent}${node.path}` : `${indent}${node.path}\t${node.summary}`;

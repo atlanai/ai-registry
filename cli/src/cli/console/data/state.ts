@@ -33,7 +33,7 @@ import { readDaemonPid } from "#daemon/process/pid-file.ts";
 import { readAccounts } from "./accounts.ts";
 import { localWork } from "./local.ts";
 
-/** Enough history to see the shape of a day without reading the whole run database. */
+/** Enough to see a day's shape without reading the whole run database. */
 const RUN_HISTORY = 40;
 
 /** Opens no socket and takes no lease, so it is safe while the daemon syncs. */
@@ -70,14 +70,12 @@ export async function collect(
         ? undefined
         : { ...chosen, defaultNamespace: defaultNamespace(config, chosen) };
 
-    // Every view is about the account whose tab is selected, runs included:
-    // what another account's sync refused is that account's problem.
+    // Every view, runs included, is about the selected account.
     const ours = runs.filter((run) => account === undefined || run.accountId === account.id);
     const jobs = config.jobs.filter((job) => account === undefined || job.account === account.id);
     const syncRun = newestFinished(ours, "sync");
     const syncEvents = syncRun === undefined ? [] : store.notableEvents(syncRun.id);
     const syncJob = jobs.find((job) => job.steps.some((step) => step.root !== undefined));
-    // Every other job's newest finished run says which local folders it already carries.
     const carried = carriedPaths(
       jobs
         .filter((job) => job !== syncJob)
@@ -107,7 +105,6 @@ export async function collect(
       local: await localWork(roots, targetTable, mine, declaredNames(resolved), carried),
     });
 
-    // Named as they were chosen, by the module every listing uses.
     const scope = scopeTargets(resolved, targetTable);
     for (const row of groups.flatMap((group) => group.rows)) {
       const entry = mine.artifacts[row.key];
@@ -120,7 +117,6 @@ export async function collect(
       ).map((name) => toolName(targetTable, name));
     }
 
-    // A panel that throws is reported, not fatal.
     const panels: Record<string, unknown> = {};
     for (const panel of await contributedPanels()) {
       try {
@@ -201,7 +197,7 @@ function countByAlias(lock: Awaited<ReturnType<typeof readLock>>) {
 }
 
 export interface CollectOptions {
-  /** Which account the views are about. Defaults to the first configured one. */
+  /** Defaults to the first configured account. */
   accountId?: string | undefined;
 }
 
@@ -210,10 +206,7 @@ function pick(accounts: readonly AccountRow[], wanted: string | undefined): Acco
   return accounts.find((row) => row.id === wanted || row.registry === wanted) ?? accounts[0];
 }
 
-/**
- * Where an unqualified publish lands. The account holds it once onboarding has
- * chosen one; before that it is only in `defaults.namespace`.
- */
+/** The account holds it once onboarding chose one; before that only `defaults.namespace` does. */
 function defaultNamespace(
   config: RegistryConfig,
   account: AccountRow | undefined,
@@ -255,10 +248,7 @@ export interface Progress {
   counts: RunCounts;
 }
 
-/**
- * What the run started by the last key is doing. The child writes to the same
- * run store, so these counts are the real figure rather than a parsed line.
- */
+/** The child writes to the same run store, so these counts are real, not parsed. */
 export async function progress(context: HostCommandContext): Promise<Progress | undefined> {
   const store = await context.host.openRunStore();
   try {

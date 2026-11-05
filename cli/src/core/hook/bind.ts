@@ -9,7 +9,7 @@ import type {
 import type { PipelineHook } from "#core/config/hook-stages.ts";
 import { configuredHooks, runPipelineHooks } from "./run.ts";
 
-/** Wrap connect so a host that calls it itself still hits config checks and hooks. */
+/** So a host that calls connect itself still runs config checks and hooks. */
 export function bindAdapter(adapter: SourceAdapter, alias: string): SourceAdapter {
   return {
     ...adapter,
@@ -35,7 +35,6 @@ export function bindAdapter(adapter: SourceAdapter, alias: string): SourceAdapte
   };
 }
 
-/** Wrap a handle so resolve/publish/unpublish/close fire the matching pipeline stages. */
 function bindHandle(
   handle: SourceHandle,
   alias: string,

@@ -53,6 +53,7 @@ describe("a namespaced skill, projected", () => {
   });
 
   test("points Claude and Codex at the namespace's plugin directory, when its source says so", () => {
+    // At user scope, where Claude and Codex read plugins from.
     const at = { ...OPTIONS, roots: roots("user", "/work") };
     const links = linksOf(planned(ENTRIES, at, true).actions);
     const froms = links

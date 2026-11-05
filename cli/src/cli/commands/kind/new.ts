@@ -42,7 +42,7 @@ export async function init(
   const step = interaction(context.printer, defaultIo(), yes);
 
   const place = inRegistry
-    ? await registryPlace(kind, root, context, own, yes, given, step)
+    ? await registryPlace({ kind, root, context, own, yes, given, step })
     : outsidePlace(kind, files, context, given);
   if (place === undefined) return STREAMED;
   const { name, at } = place;

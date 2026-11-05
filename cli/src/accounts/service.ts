@@ -117,10 +117,7 @@ function signedOut(account: Account): CredentialStoreError {
   });
 }
 
-/**
- * A sign-in goes only to the origin it was issued for, so a project that points
- * the name somewhere else gets none.
- */
+/** A sign-in goes only to its issuing origin, so a project pointing the name elsewhere gets none. */
 function assertBound(account: Account, stored: StoredCredential, location: string): void {
   const origin = credentialOrigin(location);
   if (origin === stored.origin) return;

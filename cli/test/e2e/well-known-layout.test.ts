@@ -20,7 +20,6 @@ const fill = tarGz([
   { path: "scripts/fill.sh", body: "#!/bin/sh\necho fill\n", mode: 0o755 },
 ]);
 
-/** Runs `body` against `root` served on loopback, and stops serving it after. */
 async function serving<T>(root: string, body: (url: string) => Promise<T>): Promise<T> {
   const site = await serveFolder(root);
   try {

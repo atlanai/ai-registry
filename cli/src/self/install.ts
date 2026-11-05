@@ -48,8 +48,8 @@ export async function installedVersion(env: NodeJS.ProcessEnv = process.env): Pr
 }
 
 /**
- * The caller has already held `bytes` to the signed sha256 and size. A running
- * executable cannot be written through on POSIX, so the write is renamed over it.
+ * The caller has already checked `bytes` against the signed sha256 and size.
+ * A running executable cannot be written through on POSIX, so the write is renamed over it.
  */
 export async function installBinary(
   version: string,
@@ -69,10 +69,7 @@ export async function installBinary(
   return await goLive(version, bin, env);
 }
 
-/**
- * Renames `staged` over `target`. Windows refuses that while `target` runs, but lets the
- * running file be renamed, so it moves aside until nothing runs it.
- */
+/** Windows refuses to rename over a running file but lets it be renamed, so it moves aside. */
 async function swapIn(staged: string, target: string): Promise<void> {
   if (WINDOWS) {
     await rename(target, `${target}.${randomBytes(4).toString("hex")}.old`).catch(
@@ -101,8 +98,8 @@ async function activate(version: string, env: NodeJS.ProcessEnv): Promise<void> 
 }
 
 /**
- * A symlink the shim follows. Windows runs a copy instead of a shim, and a link there needs
- * Developer Mode, so `current` is a file that names the version.
+ * Windows runs a copy instead of a shim, and a symlink there needs Developer Mode,
+ * so there `current` is a file that names the version.
  */
 async function pointCurrent(version: string, env: NodeJS.ProcessEnv): Promise<void> {
   const current = currentLink(env);
@@ -134,7 +131,7 @@ async function writeShims(version: string, env: NodeJS.ProcessEnv): Promise<void
   await sweepReplaced(binDir(env));
 }
 
-/** Deletes what `swapIn` moved aside; one a process still runs stays until a later install. */
+/** A file a process still runs, or one that fails to go, stays until a later install. */
 async function sweepReplaced(dir: string): Promise<void> {
   if (!WINDOWS) return;
   for (const entry of await readdir(dir).catch(() => [])) {
@@ -142,10 +139,7 @@ async function sweepReplaced(dir: string): Promise<void> {
   }
 }
 
-/**
- * Places an executable already on disk. The installer's staged copy, inside aireg's
- * home, is renamed into place; any other file is copied beside the target and renamed.
- */
+/** A staged copy inside aireg's home is renamed into place; any other file is copied first. */
 export async function installBinaryFrom(
   version: string,
   path: string,
@@ -224,7 +218,8 @@ export function versionsToPrune(versions: readonly string[], keep = 2): string[]
 
 export async function pruneOld(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const current = await installedVersion(env);
-  // An installer killed mid-download leaves its staging folder behind.
+  // An installer killed mid-download leaves its staging folder behind; one that will not go
+  // now is tried again on the next update.
   for (const entry of await readdir(cliRoot(env))) {
     if (entry.startsWith(".incoming-")) {
       await rm(join(cliRoot(env), entry), { recursive: true, force: true }).catch(() => undefined);

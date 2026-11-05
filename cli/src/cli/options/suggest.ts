@@ -19,9 +19,10 @@ export function closest(typed: string, candidates: readonly string[]): string | 
 /** Optimal string alignment: an adjacent swap costs one, as `stauts` should. */
 function distance(a: string, b: string): number {
   const width = b.length + 1;
-  const d = Array.from({ length: (a.length + 1) * width }, (_, k) =>
-    k < width ? k : k % width === 0 ? k / width : 0,
-  );
+  const d = Array.from({ length: (a.length + 1) * width }, (_, k) => {
+    if (k < width) return k;
+    return k % width === 0 ? k / width : 0;
+  });
   const at = (i: number, j: number) => d[i * width + j] as number;
   for (let i = 1; i <= a.length; i += 1) {
     for (let j = 1; j <= b.length; j += 1) {

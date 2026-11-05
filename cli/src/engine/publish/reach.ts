@@ -26,7 +26,6 @@ export function artifactRoot(path: string): string {
   return name === SKILL_ENTRY || name === AGENT_ENTRY ? dirname(path) : path;
 }
 
-/** Where this scope's lockfile says aireg put an installed artifact: its copy and each link to it. */
 export function installedPaths(lock: Lock, base: string): Set<string> {
   return new Set(
     Object.values(lock.artifacts).flatMap((row) => [
@@ -36,7 +35,7 @@ export function installedPaths(lock: Lock, base: string): Set<string> {
   );
 }
 
-/** Expand and merge exports by absolute path; repository globs and folders reach only tracked files. */
+/** Repository globs and folders reach only tracked files. */
 export async function exportsOn(
   manifest: Manifest,
   base: string,
@@ -91,10 +90,9 @@ async function trackedFiles(base: string): Promise<string[] | undefined> {
     .map((file) => resolve(base, file));
 }
 
-/** One entry's say over an artifact. */
 interface Reach {
   entry: Export;
-  /** It names the artifact itself, rather than reaching it through a glob or its folder. */
+  /** Names the artifact itself rather than reaching it through a glob or folder. */
   named: boolean;
 }
 
@@ -176,7 +174,6 @@ async function heldAt(path: string, base: string): Promise<Held> {
   return { root: path, kind: "agent" };
 }
 
-/** What a path an entry reaches holds: an artifact, by its root and kind, or why it is none. */
 type Held = { root: string; kind: ArtifactKind } | { stray: string };
 
 const NOT_AGENT = "has no name and description in its front matter, so it is no agent";
@@ -435,26 +432,22 @@ function combined<T>(
   return [...out.values()];
 }
 
-/** What `exports:` reaches, a note on each path it skipped that is no artifact, and warnings. */
 export interface Reached {
   found: Map<string, Exported>;
   notes: string[];
   warnings: string[];
 }
 
-/** An artifact `exports:` publishes, by its kind and its entries merged. */
 interface Exporting {
   kind: ArtifactKind;
   exported: Export;
 }
 
-/** A dependency and the export that lists it, as shown in a refusal. */
 interface Needing {
-  /** The dependent, relative to the project. */
+  /** Paths relative to the project. */
   dependent: string;
-  /** The dependency, relative to the project. */
   needed: string;
-  /** The dependent's export, by its path in `exports:`. */
+  /** The dependent's path in `exports:`. */
   entry: string;
 }
 

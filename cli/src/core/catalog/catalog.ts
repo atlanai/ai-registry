@@ -34,7 +34,7 @@ export interface Catalog {
   withheld?: Withheld[];
   /** The adapter read the listing to its end, so what it leaves out was deleted. */
   complete?: boolean;
-  /** Each artifact's newest version where the registry served another, so a publish goes past it. */
+  /** Newest versions where the registry served another, so a publish goes past them. */
   newest?: Newest[];
 }
 
@@ -83,7 +83,6 @@ interface Index {
   byGroup: Map<string, Entry[]>;
 }
 
-/** The one entry a registry lists at this namespace, kind and name. */
 export function entryFor(
   entries: readonly Entry[],
   group: string | undefined,
@@ -93,7 +92,7 @@ export function entryFor(
   return indexOf(entries).byIdentity.get(identity({ group, kind, name }));
 }
 
-/** Built once per entry list and rebuilt only if it grew, so a lookup per artifact stays linear overall. */
+/** Rebuilt only when the list grew, so a lookup per artifact stays linear overall. */
 const INDEXES = new WeakMap<readonly Entry[], Index>();
 
 function indexOf(entries: readonly Entry[]): Index {

@@ -31,15 +31,11 @@ export async function assertManagedPath(
   }
 }
 
-/** Where the walk for links starts: a project from its own folder, the user scope from its own. */
 function scopeRoot(roots: Roots): string {
   return roots.scope === "project" ? roots.cwd : dirname(roots.artifacts);
 }
 
-/**
- * Refuses a copy reached through a link: a repository ships its .registry, so a link
- * there could publish a folder from your home.
- */
+/** A repository ships its .registry, so a link there could publish a folder from your home. */
 export function refuseRedirectedCopy(name: string, path: string, roots: Roots): void {
   const found = redirection(scopeRoot(roots), path);
   if (found === undefined) return;

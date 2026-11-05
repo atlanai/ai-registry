@@ -23,10 +23,7 @@ import { type Problem, textAt, unparsed } from "./read.ts";
 /** What `<kind> init` could not fill in, and an author has not yet. */
 const PLACEHOLDER = "TODO";
 
-/**
- * What one version's own files get wrong: the files its kind needs, its fields,
- * placeholders, and the name it sits under. `publish` asks before sending.
- */
+/** The files its kind needs, fields, placeholders and name; `publish` asks before sending. */
 export function versionProblems(
   manifest: KindManifest,
   at: { kind: string; name: string },
@@ -159,7 +156,6 @@ interface FolderContext {
   newest: ReadonlyMap<string, string>;
 }
 
-/** The refs a version's envelope says it depends on, as written there. */
 async function dependsOn(root: string, at: string): Promise<string[]> {
   // The drift check reports an envelope that will not read.
   const raw = await readJson(rootReader(root), `${at}/${ENVELOPE}`).catch(() => undefined);
@@ -171,7 +167,7 @@ async function dependsOn(root: string, at: string): Promise<string[]> {
   });
 }
 
-/** Paths a version's envelope describes that no client writes: the grammar every reader enforces. */
+/** Described paths no client writes, by the grammar every reader enforces. */
 async function unwritable(root: string, at: string): Promise<Problem[]> {
   // As in `dependsOn`.
   const raw = await readJson(rootReader(root), `${at}/${ENVELOPE}`).catch(() => undefined);
@@ -208,10 +204,7 @@ function moveEdit(folder: Folder, context: Pick<FolderContext, "restoreFrom" | "
     : `${restore}, then make the change in a new version: ${bump}`;
 }
 
-/**
- * The first way a released version's files no longer match its envelope, if any. A file
- * the blob store holds is named by its blob, since the version folder never held it.
- */
+/** A file the blob store holds is named by its blob, since the version folder never held it. */
 async function drifted(
   root: string,
   at: string,

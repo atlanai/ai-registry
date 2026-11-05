@@ -54,13 +54,12 @@ export interface Sink {
 }
 
 /**
- * One signature at every level, because a warning carries a cause as often as
- * an error does. `error` is lifted out of the fields and serialized.
+ * One signature at every level: a warning carries a cause as often as an error does.
+ * `error` is lifted out of the fields and serialized.
  */
 export interface Logger {
-  /** Bind context once per unit of work; every line below carries it. */
   child(bindings: Fields): Logger;
-  /** True when the level would be emitted, for callers building costly fields. */
+  /** For callers building costly fields. */
   enabled(level: Level): boolean;
   trace(message: string, fields?: Fields): void;
   debug(message: string, fields?: Fields): void;

@@ -38,7 +38,7 @@ export function withheldFrom(reported: unknown): Withheld[] {
   });
 }
 
-/** The newest version a registry holds of one artifact, whatever its status, a yanked one included. */
+/** Whatever its status, a yanked one included. */
 export interface Newest {
   name: string;
   group: string | undefined;

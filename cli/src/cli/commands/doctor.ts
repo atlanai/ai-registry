@@ -110,7 +110,6 @@ async function checksFor(
   ];
 }
 
-/** Can this machine make the links projection depends on? */
 async function canLink(): Promise<Check> {
   const dir = await mkdtemp(join(tmpdir(), `${NAME}-doctor-`));
   try {
@@ -298,13 +297,10 @@ function render(printer: Printer, checks: readonly Check[]): void {
   );
   const width = Math.max(...rows.map((check) => displayWidth(check.name)));
   for (const check of rows) {
-    const mark = !check.ok
-      ? style.red(GLYPH.failed)
-      : check.fix !== undefined
-        ? style.yellow("!")
-        : check.info === true
-          ? style.dim("i")
-          : style.green(GLYPH.ok);
+    let mark = style.green(GLYPH.ok);
+    if (!check.ok) mark = style.red(GLYPH.failed);
+    else if (check.fix !== undefined) mark = style.yellow("!");
+    else if (check.info === true) mark = style.dim("i");
     const label = pad(check.name, width);
     printer.info(`  ${mark}  ${label}  ${check.ok ? style.dim(check.detail) : check.detail}`);
     // One copyable command per line, never joined with `&&`.

@@ -8,7 +8,6 @@ export class ConfigError extends AiregError {
   }
 }
 
-/** The readers every part of config.yml is parsed with. */
 export const fields = readers((message) => new ConfigError(message), "a mapping");
 
 /** Only a stale snapshot is worth retrying, so callers can tell it from a malformed file. */

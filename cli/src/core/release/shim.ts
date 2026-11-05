@@ -1,7 +1,7 @@
 import { envName } from "#core/env.ts";
 import { HOME_DIR, NAME } from "#core/product.ts";
 
-/** Execs the binary under `cli/current`, so moving that symlink is what goes live. */
+/** Moving the `cli/current` symlink is what goes live. */
 export function standaloneShim(): string {
   return `#!/bin/sh
 set -eu

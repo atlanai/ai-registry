@@ -128,7 +128,6 @@ async function detail(client: RpcClient, runId: string): Promise<Detailed> {
   return { run, events, reasons, root: await attentionRoot(run) };
 }
 
-/** The daemon's bare "run not found", as an error that names the run and where to look. */
 async function existing<T>(runId: string, request: () => Promise<T>): Promise<T> {
   try {
     return await request();

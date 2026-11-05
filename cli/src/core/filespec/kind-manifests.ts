@@ -55,10 +55,7 @@ const BUNDLED: Readonly<Record<string, KindManifest>> = dict([
 
 type Served = { manifest: KindManifest } | { problem: string };
 
-/**
- * The kinds a registry holds: those its `registry.json` lists with a manifest it
- * serves, else the ones the spec defines.
- */
+/** Those `registry.json` lists with a manifest it serves, else the ones the spec defines. */
 export async function kindsOf(root: string | undefined): Promise<Record<string, KindManifest>> {
   if (root === undefined) return dict(Object.entries(BUNDLED));
   const listed = await listedKinds(root);
@@ -81,7 +78,6 @@ interface Listed {
   invalid?: true;
 }
 
-/** Each kind `registry.json` lists, with the manifest it serves when it names one in the root. */
 async function listedKinds(root: string): Promise<Listed[]> {
   // A registry.json that will not read lists no kinds; reading the registry reports why.
   const registry = await readJson(rootReader(root), REGISTRY_DOCUMENT).catch(() => undefined);
@@ -140,7 +136,6 @@ function filePaths(files: unknown): unknown[] {
     .flatMap((rule) => (isRecord(rule) && "path" in rule ? [rule.path] : []));
 }
 
-/** Each manifest `registry.json` names in the root that cannot be used, and what becomes of its kind. */
 export async function manifestProblems(root: string): Promise<{ path: string; message: string }[]> {
   return (await listedKinds(root)).flatMap(({ name, url, served, invalid }) => {
     if (invalid === true) {
@@ -224,10 +219,7 @@ export function specFile(
   );
 }
 
-/**
- * The `spec` a new envelope carries (section 3.4, required): the kind's own
- * document, read from its files, or an empty one for a kind that has none.
- */
+/** Section 3.4, required: the kind's own document read from its files, or an empty one. */
 export function envelopeSpec(
   kind: string,
   files: ReadonlyMap<string, Uint8Array>,
@@ -251,12 +243,9 @@ export function specOf(
   const markdown = specFile(manifest, files);
   if (markdown !== undefined) return frontmatterRecord(files.get(markdown) ?? "");
   if (manifest.title === "skill") return undefined;
-  const json =
-    manifest.title === "agent"
-      ? files.has(AGENT_CARD_ENTRY)
-        ? AGENT_CARD_ENTRY
-        : undefined
-      : [...files.keys()].find((path) => path.endsWith(".json"));
+  let json: string | undefined;
+  if (manifest.title !== "agent") json = [...files.keys()].find((path) => path.endsWith(".json"));
+  else if (files.has(AGENT_CARD_ENTRY)) json = AGENT_CARD_ENTRY;
   if (json === undefined) return undefined;
   let card: unknown;
   try {

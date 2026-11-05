@@ -18,7 +18,6 @@ export function isGlob(path: string): boolean {
   return GLOB.test(path);
 }
 
-/** Why a path cannot name something below the project, or undefined when it can. */
 export function pathProblem(path: string): string | undefined {
   if (path.includes("\\")) return "uses a backslash, where a path uses /";
   if (path.startsWith("/") || /^[A-Za-z]:/.test(path)) return "is absolute";

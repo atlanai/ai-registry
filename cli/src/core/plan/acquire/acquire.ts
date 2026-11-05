@@ -27,35 +27,29 @@ import { because, heldAs, leftOutOf, pluginOf, revisionOf, statusOf } from "./pl
 import { type Locked, lockedRequest, type Request, wanted } from "./request.ts";
 
 export interface AcquireOptions {
-  /** The scope's root, which a relative location in its manifest is relative to. */
+  /** Root that relative manifest locations resolve against. */
   base: string;
-  /**
-   * Registries to open. Absent means every one the manifest asks for; a job
-   * names its own, because the others are another account's to authenticate.
-   */
+  /** Registries to open; absent means all. A job names its own, since others need another account. */
   aliases?: readonly string[];
   onStep?: (message: string) => void;
   credentials?: Readonly<Record<string, Credential>>;
   signal?: AbortSignal;
   onBytes?: (count: number) => void;
   onDownload?: (artifact: Artifact, bytes: number) => void;
-  /** Names to read beyond what the manifest asks for, by alias: what your own folders published. */
+  /** Extra names to read per alias: what your own folders published. */
   also?: ReadonlyMap<string, readonly string[]>;
   /**
-   * Holds each request to the lock, except the rows `moving` names. Absent asks for latest.
-   * `held` takes nothing the lock does not hold, as a removal must not install.
+   * Holds requests to the lock except rows in `moving`; absent asks for latest.
+   * `held` takes nothing the lock lacks, as a removal must not install.
    */
   locked?: Locked;
-  /** Exact versions to ask for beyond the manifest, by alias: what its artifacts depend on. */
+  /** Exact versions to ask for per alias: what installed artifacts depend on. */
   needs?: ReadonlyMap<string, readonly Want[]>;
-  /** The lockfile, whose adapter for a registry the manifest names none for keeps reading it. */
+  /** The lockfile whose adapter keeps reading a registry the manifest names none for. */
   recorded?: Lock;
 }
 
-/**
- * A registry the manifest names no adapter for keeps the one its lockfile recorded, so a new
- * adapter claiming its address does not take over a registry already read another way.
- */
+/** Keeps the locked adapter when the manifest names none, so a new adapter cannot take over. */
 export function recordedAdapter(
   declared: RegistrySource,
   lock: Lock | undefined,
@@ -73,7 +67,7 @@ export async function acquire(manifest: Manifest, options: AcquireOptions): Prom
   const view = locked === undefined ? undefined : lockView(locked.lock);
   // A registry the manifest names no artifact from is never opened or downloaded.
   const asked = Object.entries(manifest.registries)
-    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .sort(([left], [right]) => Number(left > right) - Number(left < right))
     .filter(([alias]) => owned === undefined || owned.has(alias))
     .map(([alias, declared]) => ({
       alias,
@@ -113,7 +107,7 @@ function withNeeds(
   return { ...request, want: [...held, ...needs] };
 }
 
-/** A name your folder published may not exist yet, so the catalog is listed rather than asked by name. */
+/** A name your folder published may not exist yet, so list the whole catalog. */
 function withAlso(
   request: Request | undefined,
   names: readonly string[] | undefined,
@@ -160,7 +154,6 @@ async function acquireOne(
     const lock = options.locked?.lock;
     const held = lock === undefined ? undefined : heldAs(lock, alias, path, version);
     if (lock !== undefined && held === undefined) continue;
-    // Named as the lockfile and every other line name it.
     const shown = held ?? [namespace, name].filter(Boolean).join("/");
     listing.catalog.warnings.push(
       `${sanitizeText(shown)} ${version} is yanked${because(artifact.yanked)}; the lockfile holds it, so it stays installed.`,
@@ -191,8 +184,7 @@ async function acquireOne(
     });
   }
 
-  // One placement per artifact however often it is asked for, so a command that
-  // stages and then digests the same content pays for it once.
+  // Memoized so staging then digesting the same content downloads it once.
   const placed = new Map<string, Promise<Staged>>();
 
   return {

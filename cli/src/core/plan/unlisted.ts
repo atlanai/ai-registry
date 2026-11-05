@@ -8,7 +8,6 @@ import type { Acquired } from "./model.ts";
 
 /** An installed artifact the manifest still asks for, which its registry no longer lists. */
 export interface Unlisted {
-  /** Its installed name. */
   name: string;
   registry: string;
   /** The registry lists nothing at all, which reads as a broken listing, not one retired artifact. */

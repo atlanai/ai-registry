@@ -12,25 +12,22 @@ import {
   type StepPolicy,
 } from "./model.ts";
 
-/** A job by id, or by the name a person typed. */
 export function findJob(config: RegistryConfig, wanted: string): Job | undefined {
   return config.jobs.find((job) => job.id === wanted || job.name === wanted);
 }
 
-/** The folders a job watches and publishes from, as its folder steps store them. */
 export function watchedFolders(job: Pick<Job, "steps">): string[] {
   return job.steps.flatMap((step) =>
     step.kind === "origins" ? step.select.map((selector) => selector.from) : [],
   );
 }
 
-/** The folder a job keeps in sync, as the runner reads it: its first scope step that names one. */
 export function jobRoot(job: Pick<Job, "steps">): string | undefined {
   // A composite such as `artifacts` names its root too; its leaves carry it once expanded.
   return expandSteps(job.steps).find((step) => isScopeStep(step) && step.root !== undefined)?.root;
 }
 
-/** What stops publishing these folders, written so a shell runs it as printed. */
+/** Quoted so a shell runs it as printed. */
 export function unwatchCommand(folders: readonly string[], scope: Scope): string {
   return `aireg watch remove ${folders.map(shellWord).join(" ")}${scopeFlag(scope)}`;
 }

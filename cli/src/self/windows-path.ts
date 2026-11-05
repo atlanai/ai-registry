@@ -1,7 +1,6 @@
 import { exec } from "#core/process.ts";
 import { PATH_REFRESH_VARIABLE } from "#core/product.ts";
 
-/** Where `addToUserPath` writes, as messages name it. */
 export const USER_PATH = "your Windows user environment";
 
 const TIMEOUT_MS = 30_000;

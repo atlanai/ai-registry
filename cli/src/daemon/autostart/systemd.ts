@@ -7,7 +7,7 @@ import { readTextIfPresent } from "#core/fs/path.ts";
 import { SERVICE } from "#core/product.ts";
 import { type AutostartBackend, type Exec, type ServiceSpec, SUPERVISOR_ENV } from "./model.ts";
 
-/** Restart=on-failure leaves a clean `daemon stop` down and brings a crash or an update restart back. */
+/** Restart=on-failure leaves a clean `daemon stop` down but restarts a crash or an update. */
 export function renderUnit(spec: ServiceSpec): string {
   const env = { ...spec.env, [SUPERVISOR_ENV]: "systemd" };
   return [
@@ -73,7 +73,6 @@ export function systemdBackend(spec: ServiceSpec, exec: Exec): AutostartBackend 
       };
     },
     async install() {
-      // A session without systemd has no user manager to hand the unit to.
       if ((await systemctl("show-environment")).code !== 0) {
         throw new Error(
           "The systemd user manager is not available in this session, so the daemon cannot start at login.",

@@ -11,14 +11,13 @@ import type { ScopeWork } from "./work.ts";
 interface WatchArtifactStatus {
   name: string;
   kind: ArtifactKind;
-  /** Path inside the registry, POSIX separators. */
+  /** POSIX separators. */
   path: string;
   disposition: Disposition;
   operation: SyncOperation;
   detail: string | undefined;
 }
 
-/** Work found in the project that no registry entry accounts for yet. */
 interface WatchLocalArtifact {
   name: string;
   kind: ArtifactKind;
@@ -35,14 +34,13 @@ export interface WatchStatus {
   targets: string[];
 }
 
-/** What a job would do right now, reported without writing anything. */
+/** Writes nothing. */
 export async function watchStatus(
   job: ScopeWork,
   account: Account,
   signal: AbortSignal,
 ): Promise<WatchStatus> {
   const { loaded, common, found } = await inspect(job, account, signal);
-  // Status is asked for often, so the sources its scan opened are closed at once.
   await closeScan(found);
   const place = (item: Candidate): WatchLocalArtifact => ({
     name: item.name,

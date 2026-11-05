@@ -58,7 +58,7 @@ export async function baseDiff(root: string, base: string): Promise<BaseDiff> {
 }
 
 interface BaseDiff {
-  /** The ref as the author gave it, for the fixes printed. */
+  /** As the author gave it, for the fixes printed. */
   ref: string;
   /** Root-relative, under `artifacts/`. */
   paths: string[];
@@ -112,13 +112,14 @@ export async function droppedReleases(root: string, diff: BaseDiff): Promise<Pro
     const listed = rowsOf(now);
     for (const [version, digest] of await diff.released(path)) {
       if (listed.get(version) === digest) continue;
+      let message = `no longer lists ${version}, which was released`;
+      if (gone) message = `is missing, but ${version} was released`;
+      else if (listed.has(version)) {
+        message = `changes the digest of ${version}, which was released as ${String(digest)}`;
+      }
       problems.push({
         path,
-        message: gone
-          ? `is missing, but ${version} was released`
-          : listed.has(version)
-            ? `changes the digest of ${version}, which was released as ${String(digest)}`
-            : `no longer lists ${version}, which was released`,
+        message,
         fix: gone ? `git checkout ${diff.ref} -- ${posix.dirname(path)}; ${WITHDRAW}` : undefined,
       });
     }

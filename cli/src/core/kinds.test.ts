@@ -11,8 +11,7 @@ describe("KIND_SPECS", () => {
   test("requires an extension for every file-shaped kind", () => {
     for (const kind of KINDS) {
       const spec = KIND_SPECS[kind];
-      if (spec.shape === "file") expect(spec.extensions.length).toBeGreaterThan(0);
-      else expect(spec.extensions).toEqual([]);
+      expect(spec.extensions.length > 0, kind).toBe(spec.shape === "file");
     }
   });
 });
@@ -27,13 +26,11 @@ describe("stagedLeaf", () => {
 
   test("keeps the extension the source actually used", () => {
     expect(stagedLeaf("agent", "reviewer", "agents/reviewer.md")).toBe("reviewer.md");
-    // The source decides, so the extension cannot come from a table.
     expect(stagedLeaf("agent", "style", "agents/style.mdc")).toBe("style.mdc");
   });
 
   test("takes the stem from the name, not the filename", () => {
-    // Front matter renames the artifact; the staged path follows the address,
-    // which is what the manifest prints.
+    // Front matter renames the artifact, and the staged path follows the address.
     expect(stagedLeaf("agent", "reviewer", "agents/doctor.md")).toBe("reviewer.md");
   });
 

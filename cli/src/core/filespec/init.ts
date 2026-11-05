@@ -29,10 +29,7 @@ export function requireRegistry(from: string): string {
   });
 }
 
-/**
- * An empty registry: the two documents a reader opens first, and nothing to list.
- * Refused over an existing one, whose catalog this would erase.
- */
+/** Refused over an existing registry, whose catalog this would erase. */
 export async function writeRoot(
   root: string,
   identity: { name: string; description?: string | undefined },

@@ -31,14 +31,14 @@ export const ACTIVE_RUN_STATES = ["queued", "running"] as const satisfies readon
 type ActiveRunState = (typeof ACTIVE_RUN_STATES)[number];
 export type TerminalRunState = Exclude<RunState, ActiveRunState>;
 
-/** Ended without doing its work, as opposed to one that was stopped or did part of it. */
+/** Ended without doing its work, unlike one stopped or partly done. */
 const FAILED_RUN_STATES = ["failed", "timed_out"] as const satisfies readonly TerminalRunState[];
 
 export function isActive(state: RunState): state is ActiveRunState {
   return (ACTIVE_RUN_STATES as readonly RunState[]).includes(state);
 }
 
-/** Every state but the active ones, so a state added to `RUN_STATES` is terminal by default. */
+/** A state added to `RUN_STATES` is terminal by default. */
 export function isTerminal(state: RunState): state is TerminalRunState {
   return !isActive(state);
 }
@@ -67,7 +67,6 @@ export const RunErrorCode = {
 
 export type RunErrorCode = (typeof RunErrorCode)[keyof typeof RunErrorCode] | `adapter_${Failure}`;
 
-/** The code an error fails a run or an item with when nothing more specific applies. */
 export function failureCode(error: unknown): { errorCode: RunErrorCode; retryable: boolean } {
   if (isAdapterError(error)) {
     return { errorCode: `adapter_${error.failure}`, retryable: isRetryable(error) };
@@ -75,14 +74,11 @@ export function failureCode(error: unknown): { errorCode: RunErrorCode; retryabl
   return { errorCode: RunErrorCode.SyncFailed, retryable: false };
 }
 
-/**
- * How one item settled, in the one vocabulary both planes share. An artifact's
- * `disposition` and `operation` are plane detail; this is what a count is taken over.
- */
+/** Shared by both planes; counts are taken over this, not `disposition` or `operation`. */
 export const ITEM_OUTCOMES = ["changed", "unchanged", "skipped", "attention", "failed"] as const;
 export type ItemOutcome = (typeof ITEM_OUTCOMES)[number];
 
-/** One item's result, reported by the executor rather than inferred from a data bag. */
+/** Reported by the executor, never inferred from an event's data. */
 export interface ItemSettled {
   outcome: ItemOutcome;
   kind?: ArtifactKind;
@@ -112,10 +108,7 @@ export function isRunPhase(value: string | undefined): value is RunPhase {
   return (RUN_PHASES as readonly (string | undefined)[]).includes(value);
 }
 
-/**
- * Derived from `run_events`, never stored: a count written beside the events it
- * summarizes is a second answer that can disagree with the first.
- */
+/** Derived from `run_events`, never stored, so it cannot disagree with them. */
 export interface RunCounts {
   examined: number;
   changed: number;
@@ -144,23 +137,23 @@ export function addCounts(a: RunCounts, b: RunCounts): RunCounts {
 
 export interface RunRecord {
   id: string;
-  /** Absent for a one-off run started by hand rather than by a job. */
+  /** Absent for a one-off run started by hand. */
   jobId: string | undefined;
   /** One run is one account, so history filters without joining the config. */
   accountId: string;
-  /** The config this run read. A later edit is a different question. */
+  /** The config this run read; a later edit does not change it. */
   configRevision: number;
   mode: RunMode;
   trigger: RunTrigger;
   state: RunState;
-  /** The step a running run has reached; absent once it is terminal. */
+  /** Absent once terminal. */
   step: string | undefined;
   requestedAtMs: number;
   startedAtMs: number | undefined;
   deadlineAtMs: number;
   finishedAtMs: number | undefined;
   counts: RunCounts;
-  /** Run-level failure only. A single bad artifact is an event, not this. */
+  /** Run-level failure only; a single bad artifact is an event. */
   errorCode: string | undefined;
   retryable: boolean;
 }
@@ -173,14 +166,13 @@ export interface RunEvent {
   /** A daemon of another version may send a type this one does not know. */
   eventType: string;
   step: string | undefined;
-  /** The item this is about, as the step that emitted it names it. */
+  /** As the emitting step names it. */
   artifact: string | undefined;
   kind: ArtifactKind | undefined;
-  /** What the two sides were found to be. Observed, not chosen. */
+  /** Observed, not chosen; `operation` is what policy chose. */
   disposition: Disposition | undefined;
-  /** What policy chose about that. */
   operation: SyncOperation | undefined;
-  /** Set on an item event; absent on a run transition. */
+  /** Absent on a run transition. */
   outcome: ItemOutcome | undefined;
   /** Per-item failure, so one bad artifact does not fail the whole run. */
   errorCode: string | undefined;

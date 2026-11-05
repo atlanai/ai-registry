@@ -22,33 +22,33 @@ function scan(local: Scan["local"]): Scan {
 
 describe("classify", () => {
   test("holds a local artifact of a kind the adapter cannot publish, and publishes the rest", () => {
-    const { outcomes, mutates } = classify(
-      scan([
+    const { outcomes, mutates } = classify({
+      scan: scan([
         { name: "helper", kind: "agent" },
         { name: "lint", kind: "skill" },
       ] as Scan["local"]),
       job,
-      "acme",
-      undefined,
-      "sync",
-      new Map(),
-      (kind) => kind === "skill",
-    );
+      registry: "acme",
+      scoped: undefined,
+      mode: "sync",
+      overrides: new Map(),
+      publishable: (kind) => kind === "skill",
+    });
     expect(outcomeFor(outcomes, "agent", "helper")?.operation).toBe("report");
     expect(outcomeFor(outcomes, "skill", "lint")?.operation).toBe("publish");
     expect(mutates).toBe(true);
   });
 
   test("skips local work for a registry that takes no publishes at all", () => {
-    const { outcomes, mutates } = classify(
-      scan([{ name: "lint", kind: "skill" }] as Scan["local"]),
+    const { outcomes, mutates } = classify({
+      scan: scan([{ name: "lint", kind: "skill" }] as Scan["local"]),
       job,
-      "acme",
-      undefined,
-      "sync",
-      new Map(),
-      () => false,
-    );
+      registry: "acme",
+      scoped: undefined,
+      mode: "sync",
+      overrides: new Map(),
+      publishable: () => false,
+    });
     expect(outcomeFor(outcomes, "skill", "lint")?.operation).toBe("ignore");
     expect(mutates).toBe(false);
   });
@@ -58,7 +58,14 @@ describe("classify", () => {
       { name: "lint", kind: "agent" },
       { name: "lint", kind: "skill" },
     ] as Scan["local"]);
-    const all = classify(both, job, "acme", undefined, "sync", new Map());
+    const all = classify({
+      scan: both,
+      job,
+      registry: "acme",
+      scoped: undefined,
+      mode: "sync",
+      overrides: new Map(),
+    });
     expect([...all.outcomes.values()]).toEqual([
       expect.objectContaining({ artifact: "lint", kind: "agent" }),
       expect.objectContaining({ artifact: "lint", kind: "skill" }),
@@ -88,7 +95,14 @@ describe("classify across registries", () => {
       },
       acquired: [],
     } as unknown as Scan;
-    const { outcomes, mutates } = classify(shared, job, "second", undefined, "sync", new Map());
+    const { outcomes, mutates } = classify({
+      scan: shared,
+      job,
+      registry: "second",
+      scoped: undefined,
+      mode: "sync",
+      overrides: new Map(),
+    });
     expect(outcomeFor(outcomes, "skill", "shared/evals")).toBeUndefined();
     expect(mutates).toBe(false);
   });
@@ -123,7 +137,14 @@ describe("a folder of yours with a registry name", () => {
     }) as unknown as Scan;
 
   test("keeps the registry's copy out, without asking anyone to act", () => {
-    const { outcomes, writes } = classify(withFolder(), job, "acme", undefined, "sync", new Map());
+    const { outcomes, writes } = classify({
+      scan: withFolder(),
+      job,
+      registry: "acme",
+      scoped: undefined,
+      mode: "sync",
+      overrides: new Map(),
+    });
     expect(outcomeFor(outcomes, "skill", "ws/hello")).toMatchObject({
       operation: "ignore",
       detail: "a folder of yours with this name is in use",
@@ -133,10 +154,24 @@ describe("a folder of yours with a registry name", () => {
 
   test("installs it when claiming is asked for, or when the lock already holds it", () => {
     const claiming = { ...job, policy: { ...job.policy, claim: "on" as const } };
-    const claimed = classify(withFolder(), claiming, "acme", undefined, "sync", new Map());
+    const claimed = classify({
+      scan: withFolder(),
+      job: claiming,
+      registry: "acme",
+      scoped: undefined,
+      mode: "sync",
+      overrides: new Map(),
+    });
     expect(outcomeFor(claimed.outcomes, "skill", "ws/hello")?.operation).toBe("pull");
     const locked = withFolder({ "ws/hello": { registry: "acme", kind: "skill" } });
-    const held = classify(locked, job, "acme", undefined, "sync", new Map());
+    const held = classify({
+      scan: locked,
+      job,
+      registry: "acme",
+      scoped: undefined,
+      mode: "sync",
+      overrides: new Map(),
+    });
     expect(outcomeFor(held.outcomes, "skill", "ws/hello")?.operation).toBe("pull");
   });
 });
@@ -164,7 +199,14 @@ describe("taking the registry's side", () => {
       ["skill:gone", "pull" as const],
       ["skill:held", "pull" as const],
     ]);
-    const { outcomes } = classify(taken, job, "acme", undefined, "sync", overrides);
+    const { outcomes } = classify({
+      scan: taken,
+      job,
+      registry: "acme",
+      scoped: undefined,
+      mode: "sync",
+      overrides,
+    });
     expect(outcomeFor(outcomes, "skill", "gone")?.operation).toBe("remove-local");
     expect(outcomeFor(outcomes, "skill", "held")?.operation).toBe("pull");
   });

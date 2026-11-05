@@ -31,7 +31,7 @@ export interface SyncOutcome {
   operation: SyncOperation;
   /** Set when the registry would not serve this one artifact. */
   failure?: { code: string; retryable: boolean };
-  /** Why it is in this state, or what the adapter said about a refusal, so the run can be read back. */
+  /** Why it is in this state, or the adapter's words on a refusal. */
   detail?: string;
 }
 
@@ -67,18 +67,12 @@ export function outcomeOf(operation: SyncOperation): ItemOutcome {
   return OUTCOMES[operation];
 }
 
-/**
- * What outcomes and the operations taken from them are keyed by: a skill and an
- * agent may share a name, and what is chosen for one must never reach the other.
- */
+// A skill and an agent may share a name, and what is chosen for one must never reach the other.
 export function artifactKey(kind: ArtifactKind, name: string): string {
   return `${kind}:${name}`;
 }
 
-/**
- * Read-only, so this runs before the lease and decides whether one is needed at
- * all: a run with nothing to publish still refreshes the copies an edit moved.
- */
+// Read-only, so it runs before the lease and decides whether one is needed at all.
 export async function pendingOrigins(
   job: ScopeWork,
   loaded: Loaded,
@@ -107,19 +101,19 @@ export async function pendingOrigins(
   return steps.every((step) => step.policy === "on") ? changed : [];
 }
 
-/**
- * Every input is a value the impure half already resolved, which is what lets a
- * dry run and a real run agree about the plan.
- */
-export function classify(
-  scan: Scan,
-  job: ScopeWork,
-  registry: string,
-  scoped: Scoped,
-  mode: RunMode,
-  overrides: Overrides,
-  publishable: Publishable = () => true,
-): Classified {
+// Every input is already resolved, which is what lets a dry run and a real run agree.
+export interface ClassifyInput {
+  scan: Scan;
+  job: ScopeWork;
+  registry: string;
+  scoped: Scoped;
+  mode: RunMode;
+  overrides: Overrides;
+  publishable?: Publishable;
+}
+
+export function classify(input: ClassifyInput): Classified {
+  const { scan, job, registry, scoped, mode, overrides, publishable = () => true } = input;
   const outcomes = new Map<string, SyncOutcome>();
   const writes = new Set<string>();
   let mutates = false;
@@ -170,7 +164,6 @@ interface Classified {
   outcomes: Map<string, SyncOutcome>;
   /** Settled in the same pass, so what a run reports and what it writes cannot drift apart. */
   writes: Set<string>;
-  /** Same pass again: whether this round will touch the registry at all. */
   mutates: boolean;
 }
 
@@ -220,10 +213,8 @@ function decided(item: SyncItem, operation: SyncOperation): SyncOutcome {
   };
 }
 
-/**
- * Agreed with the registry, but the lock records nothing or an older serve, as after a publish.
- * Left alone, `outdated` reports an update whose bytes are already here.
- */
+// Agreed with the registry, but the lock records nothing or an older serve, as after a publish:
+// left alone, `outdated` would report an update whose bytes are already here.
 function unrecorded(scan: Scan, item: SyncItem): boolean {
   const entry = scan.pinned.artifacts[item.name];
   if (entry === undefined) return true;

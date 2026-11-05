@@ -30,17 +30,11 @@ function config(jobs: Job[], paused = false): RegistryConfig {
   };
 }
 
-/** Only the one member the scheduler actually reads. */
 function storeReturning(runs: Record<string, RunRecord[]>): RunStore {
   return {
     list: ({ jobId }: { jobId?: string }) => (jobId === undefined ? [] : (runs[jobId] ?? [])),
     forgetJobs: () => 0,
   } as unknown as RunStore;
-}
-
-/** One tick, awaited to its end: what start() fires at once and then every second. */
-function tickOnce(scheduler: JobScheduler): Promise<void> {
-  return (scheduler as unknown as { tick(): Promise<void> }).tick();
 }
 
 describe("JobScheduler", () => {
@@ -66,7 +60,7 @@ describe("JobScheduler", () => {
     await writeConfig(config([job("watch_on", home.aireg)], true), 0);
     const start = vi.fn(async () => ({}) as RunRecord);
 
-    await tickOnce(new JobScheduler(storeReturning({}), { start } as unknown as SyncRunner));
+    await new JobScheduler(storeReturning({}), { start } as unknown as SyncRunner).tick();
 
     expect(start).not.toHaveBeenCalled();
   });
@@ -82,7 +76,7 @@ describe("JobScheduler", () => {
       }),
     } as unknown as SyncRunner;
 
-    await tickOnce(new JobScheduler(storeReturning({}), runner));
+    await new JobScheduler(storeReturning({}), runner).tick();
 
     expect(started).toEqual(["watch_b"]);
   });
@@ -94,9 +88,9 @@ describe("JobScheduler", () => {
     });
     const scheduler = new JobScheduler(storeReturning({}), { start } as unknown as SyncRunner);
 
-    // Without a deferral each tick retries, which is the 1 Hz hot loop this guards against.
-    await tickOnce(scheduler);
-    await tickOnce(scheduler);
+    // Without a deferral each tick retries: a 1 Hz hot loop.
+    await scheduler.tick();
+    await scheduler.tick();
 
     expect(start.mock.calls.length).toBe(1);
   });
@@ -104,7 +98,6 @@ describe("JobScheduler", () => {
   test("skips a job whose next run is not yet due", async ({ home }) => {
     await writeConfig(config([job("watch_a", home.aireg)]), 0);
     const start = vi.fn(async () => ({}) as RunRecord);
-    // A run that just settled leaves the job's own interval still ahead of it.
     const store = storeReturning({
       watch_a: [
         {
@@ -127,7 +120,7 @@ describe("JobScheduler", () => {
       ],
     });
 
-    await tickOnce(new JobScheduler(store, { start } as unknown as SyncRunner));
+    await new JobScheduler(store, { start } as unknown as SyncRunner).tick();
 
     expect(start).not.toHaveBeenCalled();
   });
@@ -139,7 +132,7 @@ describe("JobScheduler", () => {
       watch_a: [{ id: "run_1", state: "running" } as RunRecord],
     });
 
-    await tickOnce(new JobScheduler(store, { start } as unknown as SyncRunner));
+    await new JobScheduler(store, { start } as unknown as SyncRunner).tick();
 
     expect(start).not.toHaveBeenCalled();
   });
@@ -170,11 +163,11 @@ describe("JobScheduler", () => {
     const start = vi.fn(async () => ({}) as RunRecord);
     const runner = { start } as unknown as SyncRunner;
 
-    await tickOnce(new JobScheduler(storeReturning({ watch_a: quiet }), runner));
+    await new JobScheduler(storeReturning({ watch_a: quiet }), runner).tick();
     expect(start).not.toHaveBeenCalled();
 
     const steady = async () => new Set(["pull"]);
-    await tickOnce(new JobScheduler(storeReturning({ watch_a: quiet }), runner, undefined, steady));
+    await new JobScheduler(storeReturning({ watch_a: quiet }), runner, undefined, steady).tick();
     expect(start).toHaveBeenCalledOnce();
   });
 });

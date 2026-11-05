@@ -20,7 +20,7 @@ export function object(value: unknown, what = "params"): Fields {
 export const { flag, integer, oneOf, optionalFlag, optionalText, text } = fields;
 const { choice } = fields;
 
-/** An empty list is a caller bug: it asks for a scoped run over nothing. */
+/** An empty list is refused: it asks for a scoped run over nothing. */
 export function optionalNames(entry: Fields, key: string): readonly string[] | undefined {
   if (entry[key] === undefined) return undefined;
   const value = names(entry, key);
@@ -85,7 +85,7 @@ export function intervalSeconds(entry: Fields, key: string, fallback: number) {
   return entry[key] === undefined ? fallback : interval(integer(entry, key));
 }
 
-/** A day at most, beyond config's floor: a job left longer reads as one that stopped. */
+/** A day at most: a job left longer reads as one that stopped. */
 function interval(seconds: number): number {
   if (seconds < MINIMUM_INTERVAL_SECONDS || seconds > MAXIMUM_INTERVAL_SECONDS) {
     throw invalidParams(
@@ -102,7 +102,7 @@ export function syncPolicy(entry: Fields, key: string, fallback: SyncPolicy = NO
     publish: choice(raw, "publish", STEP_POLICIES, fallback.publish),
     delete: choice(raw, "delete", STEP_POLICIES, fallback.delete),
   };
-  // Optional axes stay absent unless named, so a caller that does not know them gets the defaults.
+  // Absent unless named, so a caller that does not know an axis gets the default.
   for (const axis of OPTIONAL_AXES) {
     if (raw[axis] === undefined && fallback[axis] === undefined) continue;
     policy[axis] = choice(raw, axis, STEP_POLICIES, fallback[axis] ?? "off");
@@ -131,10 +131,10 @@ export function jobId(entry: Fields, key: string): string {
 
 const JOB_FIELDS = ["id", "name", "account", "schedule", "steps"];
 
-/** Held to every rule config.yml is, so the daemon never stores a job it cannot read back. */
+/** Held to config.yml's rules, so the daemon never stores a job it cannot read back. */
 export function job(value: unknown): Job {
   const raw = object(value, "job");
-  // A newer host may send fields this daemon does not know; they are dropped, never stored.
+  // A newer host may send fields this daemon does not know; drop them.
   const known = Object.fromEntries(Object.entries(raw).filter(([key]) => JOB_FIELDS.includes(key)));
   const steps = Array.isArray(raw.steps) ? raw.steps.map(flattened) : raw.steps;
   const parsed = parseJob({ ...known, steps }, "job", fields);
@@ -143,7 +143,7 @@ export function job(value: unknown): Job {
   return parsed;
 }
 
-/** A step as config.yml holds it: its adapter's fields beside aireg's, not in a bag. */
+/** As config.yml holds it: the adapter's fields beside aireg's, not in a bag. */
 function flattened(value: unknown): unknown {
   if (!isRecord(value)) return value;
   const { extra, ...rest } = value;

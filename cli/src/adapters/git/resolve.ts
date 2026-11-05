@@ -18,10 +18,7 @@ export interface RemoteRef {
   name: string;
 }
 
-/**
- * Walks the same transport ladder as the clone. Resolving over HTTPS while
- * cloning over SSH would fail a private repository before the fallback ran.
- */
+/** The clone's ladder: resolving over HTTPS while cloning over SSH would fail before the fallback ran. */
 export async function lsRemote(
   spec: SourceSpec,
   patterns: string[],
@@ -45,20 +42,14 @@ export async function lsRemote(
     .filter((entry) => entry.commit !== "");
 }
 
-/**
- * `ls-remote` lists an annotated tag's own object and the commit it points at,
- * as `<ref>^{}`. Everything downstream keys on the commit, so the peel wins.
- */
+/** `ls-remote` lists an annotated tag and, as `<ref>^{}`, its commit. Everything keys on the commit. */
 export function peel(refs: readonly RemoteRef[], name: string): RemoteRef | undefined {
   const peeled = refs.find((entry) => entry.name === `${name}^{}`);
   if (peeled !== undefined) return peeled;
   return refs.find((entry) => entry.name === name);
 }
 
-/**
- * A ref that is both a tag and a branch is an error rather than a guess: git's
- * own precedence would silently pick one.
- */
+/** A ref that is both a tag and a branch is an error: git's own precedence would silently pick one. */
 export async function resolveRef(
   spec: SourceSpec,
   ref: string | undefined,
@@ -77,8 +68,7 @@ export async function resolveRef(
     return { ref: undefined, refKind: "branch", commit };
   }
 
-  // The peeled pattern has to be asked for by name: with an explicit refspec
-  // `ls-remote` lists only what was named.
+  // With an explicit refspec `ls-remote` lists only what was named, so the peel is asked for.
   const found = await lsRemote(
     spec,
     [`refs/tags/${ref}`, `refs/tags/${ref}^{}`, `refs/heads/${ref}`],

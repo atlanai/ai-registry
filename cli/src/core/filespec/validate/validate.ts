@@ -29,10 +29,6 @@ export interface Validated {
   problems: Problem[];
 }
 
-/**
- * Everything a pull request could get wrong: path grammar, documents, digests, kind manifests,
- * released versions left alone, and an index matching what the indexer would write.
- */
 export async function validateRoot(
   root: string,
   options: { base?: string | undefined } = {},

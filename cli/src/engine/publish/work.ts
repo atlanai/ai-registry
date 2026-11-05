@@ -21,7 +21,6 @@ import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/scope/load.ts";
 import { closeScan, scan } from "#engine/sync/scan.ts";
 
-/** One artifact to publish: what it is, and where its bytes are. */
 export interface Work {
   name: string;
   kind: ArtifactKind;
@@ -110,11 +109,7 @@ export async function fromArgs(
   const rows = loaded.lock.artifacts;
   const works: Work[] = [];
   for (const arg of args) {
-    const key = existsSync(resolve(cwd, arg))
-      ? undefined
-      : matchInstalled(arg, loaded.lock).rows.length > 0
-        ? rowsNamed(arg, loaded.lock)[0]
-        : undefined;
+    const key = existsSync(resolve(cwd, arg)) ? undefined : installedKey(arg, loaded);
     if (key !== undefined) {
       works.push(installed(key, rows[key] as LockArtifact, loaded));
       continue;
@@ -144,6 +139,12 @@ export async function fromArgs(
   return works;
 }
 
+function installedKey(arg: string, loaded: Loaded): string | undefined {
+  return matchInstalled(arg, loaded.lock).rows.length > 0
+    ? rowsNamed(arg, loaded.lock)[0]
+    : undefined;
+}
+
 function installed(key: string, entry: LockArtifact, loaded: Loaded): Work {
   const path = copyPath(key, entry, loaded);
   refuseRedirectedCopy(key, path, loaded.roots);
@@ -170,7 +171,6 @@ function copyPath(key: string, entry: LockArtifact, loaded: Loaded): string {
   );
 }
 
-/** Where `path` leads when it is itself a link, else undefined. */
 function linkTarget(path: string): string | undefined {
   if (!lstatSync(path).isSymbolicLink()) return undefined;
   return existsSync(path) ? realpathSync(path) : undefined;

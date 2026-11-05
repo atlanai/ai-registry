@@ -43,8 +43,8 @@ export function policy(own: Own): Record<string, StepPolicy> {
 }
 
 /**
- * `-s` names inside the registry, each as the full address the manifest records, so a
- * bare name never reads as a registry of its own. Undefined without `-s` or with `*`.
+ * Each `-s` name becomes the full address the manifest records, so a bare name never
+ * reads as a registry of its own. Undefined without `-s` or with `*`.
  */
 export async function refsFrom(
   common: CommonOptions,

@@ -1,10 +1,7 @@
 import { isCI, present } from "#core/env.ts";
 import { CALLER_SIGNALS } from "#core/target/detect.ts";
 
-/**
- * Agents that run aireg without being a target it installs into. One that
- * becomes a target takes its variables into its own definition.
- */
+/** Agents that run aireg without being a target; a target declares its variables itself. */
 const OTHER_SIGNALS: readonly { agent: string; env: readonly string[] }[] = [
   { agent: "antigravity", env: ["ANTIGRAVITY_AGENT"] },
   { agent: "augment", env: ["AUGMENT_AGENT"] },
@@ -13,7 +10,6 @@ const OTHER_SIGNALS: readonly { agent: string; env: readonly string[] }[] = [
 
 export const SIGNALS = [...CALLER_SIGNALS, ...OTHER_SIGNALS];
 
-/** The agent driving this process, or undefined when a person is. */
 export function callingAgent(env: NodeJS.ProcessEnv = process.env): string | undefined {
   // Prefer the cross-vendor declaration over inferred vendor signals.
   const declared = env.AI_AGENT?.trim();
@@ -21,7 +17,6 @@ export function callingAgent(env: NodeJS.ProcessEnv = process.env): string | und
   return SIGNALS.find((signal) => signal.env.some((name) => present(name, env)))?.agent;
 }
 
-/** Why a prompt was skipped. Every value maps to something the user can see. */
 export type Blocker =
   | { kind: "json" }
   | { kind: "yes" }

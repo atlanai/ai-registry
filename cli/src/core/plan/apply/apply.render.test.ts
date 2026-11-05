@@ -1,9 +1,10 @@
 import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
-import { emptyLock, type LinkMode, type Lock } from "#core/lock.ts";
+import type { LinkMode } from "#core/lock.ts";
 import type { Plan } from "#core/plan/model.ts";
 import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
+import { lock } from "#test/kit/builders/lock.ts";
 import { emptyPlan } from "#test/kit/builders/plan.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { apply } from "./apply.ts";
@@ -35,21 +36,18 @@ afterEach(() => {
 });
 
 function renderPlan(recorded?: LinkMode, entry?: { to: string; entry: string }): Plan {
-  const lock: Lock = emptyLock();
-  lock.artifacts.reviewer = {
-    registry: "kit",
-    id: "agents/reviewer.md",
-    name: "reviewer",
-    kind: "agent",
-    namespace: undefined,
-    address: "agents/reviewer.md",
-    path: ".registry/artifacts/kit/kit/agents/reviewer.md",
-    origin: undefined,
-    content: "sha256:c",
-    version: undefined,
-    digest: "sha256:d",
-    links: [{ target: "codex", path: ".codex/agents/reviewer.toml", mode: "symlink" }],
-  };
+  const recording = lock()
+    .artifact("reviewer", {
+      registry: "kit",
+      id: "agents/reviewer.md",
+      kind: "agent",
+      address: "agents/reviewer.md",
+      path: ".registry/artifacts/kit/kit/agents/reviewer.md",
+      content: "sha256:c",
+      digest: "sha256:d",
+      links: [{ target: "codex", path: ".codex/agents/reviewer.toml", mode: "symlink" }],
+    })
+    .build();
   return {
     ...emptyPlan(),
     actions: [
@@ -63,7 +61,7 @@ function renderPlan(recorded?: LinkMode, entry?: { to: string; entry: string }):
         ...(entry === undefined ? { codec: CODEC } : entry),
         ...(recorded === undefined ? {} : { recorded }),
       },
-      { kind: "record", lock },
+      { kind: "record", lock: recording },
     ],
   };
 }

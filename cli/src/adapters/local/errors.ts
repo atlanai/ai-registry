@@ -23,7 +23,6 @@ export function translated(error: unknown): AdapterError {
   return fail("invalid", messageOf(error));
 }
 
-/** One boundary where a thrown failure becomes an `AdapterError`. */
 export async function translating<T>(work: () => Promise<T>): Promise<T> {
   try {
     return await work();

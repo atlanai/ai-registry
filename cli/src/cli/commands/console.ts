@@ -9,8 +9,8 @@ import { defineCommand, STREAMED } from "./define.ts";
 type Options = OptionsOf<typeof CONSOLE_COMMAND.options>;
 
 /**
- * The renderer sits behind a dynamic import, so nothing that only syncs pays for
- * it. Contributed tabs load first: the render is synchronous.
+ * The renderer is a dynamic import, so nothing that only syncs pays for it.
+ * Contributed tabs load first because the render is synchronous.
  */
 export const { run } = defineCommand({
   spec: CONSOLE_COMMAND,

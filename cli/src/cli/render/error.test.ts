@@ -2,24 +2,13 @@ import { describe, expect, test } from "vitest";
 import { AdapterError } from "#adapter/index.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { LeaseError } from "#core/lease/errors.ts";
-import { Printer } from "#core/term/printer.ts";
 import { RpcClientError } from "#daemon/rpc/client.ts";
+import { capturedPrinter } from "#test/kit/printer.ts";
 import { reportError } from "./error.ts";
-
-function capture(format: "text" | "json") {
-  const out: string[] = [];
-  const err: string[] = [];
-  const printer = new Printer({
-    format,
-    out: { write: (chunk: string) => out.push(chunk), isTTY: false },
-    err: { write: (chunk: string) => err.push(chunk), isTTY: false },
-  });
-  return { printer, out, err };
-}
 
 describe("reportError", () => {
   test("keeps the code and hint of a failure the daemon classified", () => {
-    const { printer, out } = capture("json");
+    const { printer, printed: out } = capturedPrinter({ format: "json" });
     const refused = new RpcClientError(-32602, "acme is elsewhere.", {
       code: "usage",
       hint: "Declare it under another name.",
@@ -33,7 +22,7 @@ describe("reportError", () => {
   });
 
   test("keeps the AiregError hint on --json", () => {
-    const { printer, out } = capture("json");
+    const { printer, printed: out } = capturedPrinter({ format: "json" });
     const code = reportError(
       printer,
       new AiregError("Unknown command `why`.", { hint: "Run `aireg --help` for the list." }),
@@ -50,7 +39,7 @@ describe("reportError", () => {
   });
 
   test("tells a writer that lost its write lock to run again", () => {
-    const { printer, err } = capture("text");
+    const { printer, errors: err } = capturedPrinter({ format: "text" });
     const lost = new LeaseError("Another aireg process took over this project.", {
       reason: "lease_lost",
       hint: "Run the command again.",
@@ -61,13 +50,13 @@ describe("reportError", () => {
   });
 
   test("prints no code line for a plain error", () => {
-    const { printer, err } = capture("text");
+    const { printer, errors: err } = capturedPrinter({ format: "text" });
     reportError(printer, new AiregError("Nothing to add."));
     expect(err.join("")).toBe("error: Nothing to add.\n");
   });
 
   test("prints the code, hint and trace of a registry's failure", () => {
-    const { printer, err } = capture("text");
+    const { printer, errors: err } = capturedPrinter({ format: "text" });
     const error = new AdapterError("acme", "unauthorized", "Token expired: sign in again", {
       problem: {
         code: "token_expired",
@@ -86,7 +75,7 @@ describe("reportError", () => {
   });
 
   test("keeps the code and hint of an AdapterError carried as a AiregError cause", () => {
-    const { printer, out } = capture("json");
+    const { printer, printed: out } = capturedPrinter({ format: "json" });
     const cause = new AdapterError("git", "not_found", "repository not found", {
       hint: "Check the address.",
     });
@@ -103,7 +92,7 @@ describe("reportError", () => {
   });
 
   test("reports a usage AiregError with the usage code", () => {
-    const { printer, out } = capture("json");
+    const { printer, printed: out } = capturedPrinter({ format: "json" });
     expect(reportError(printer, new AiregError("Nothing to add.", { code: ErrorCode.Usage }))).toBe(
       ExitCode.Usage,
     );

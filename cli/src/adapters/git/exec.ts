@@ -65,10 +65,8 @@ function kill(child: ChildProcess): void {
   }
 }
 
-/** What the host allows a git operation: from the connection's limits, or set for the call. */
 export interface GitLimits {
   timeoutMs: number;
-  /** The setting that allows more time, which a timeout's hint names. */
   timeoutSetting?: string | undefined;
   /** Aborting kills git, so a stopped run does not wait out a hung fetch. */
   signal?: AbortSignal | undefined;
@@ -120,7 +118,6 @@ function spawnTool(args: readonly string[], options: GitOptions, timeout: number
   return args.some((arg) => NETWORK.has(arg)) ? inNetworkSlot(run) : run();
 }
 
-/** Subprocess handling is confined to this module. */
 function spawnOne(args: readonly string[], options: GitOptions, timeout: number): Promise<Ran> {
   const { signal } = options;
   return new Promise((resolve, reject) => {
@@ -225,10 +222,7 @@ function notInstalled(error: unknown): GitError | undefined {
     : undefined;
 }
 
-/**
- * Failures are classified once, here. Repeating substring checks at each call
- * site is how a new caller silently loses the SSO hint.
- */
+/** Classified once, here: a check repeated at each call site is how a caller loses the SSO hint. */
 function classify(stderr: string): GitFailure {
   const text = stderr.toLowerCase();
   if (SSO_MARKERS.some((m) => text.includes(m))) return "unauthorized";

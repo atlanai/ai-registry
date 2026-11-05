@@ -127,8 +127,8 @@ export async function login(
 }
 
 /**
- * Signing in declares a project's address in your user scope, which is what tokens are
- * bound to, so an address only a cloned project chose is shown and agreed to first.
+ * Tokens are bound to the user scope, so an address only a cloned project chose
+ * is shown and agreed to first.
  */
 async function signsInThere(
   context: CommandContext,
@@ -177,8 +177,8 @@ const prompt: SignInPrompt = {
 };
 
 /**
- * Never an argument: argv is visible to `ps` and lands in shell history, so it comes
- * from a pipe. One in the environment is used where it is set and never written to disk.
+ * Never an argument, since argv is visible to `ps` and shell history. One in the
+ * environment is used where set and never written to disk.
  */
 async function resolveToken(registry: string, flags: LoginFlags): Promise<string | undefined> {
   // A stored sign-in would never be used while it is set, so storing one would mislead.
@@ -223,6 +223,7 @@ async function oauthClientFor(
   return named?.auth?.oauth?.(flags.address, {});
 }
 
+// Signing in may switch orgs and end a replaced session, each a round trip of its own.
 const LOGIN_TIMEOUT_MS = 2 * 60_000;
 
 /** The daemon's identity holds no undefined, having come over JSON. */

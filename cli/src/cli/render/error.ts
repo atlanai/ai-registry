@@ -52,7 +52,6 @@ function classify(error: unknown): Classified {
   };
 }
 
-/** The code a failure names itself: ours, or a registry document the file spec refuses. */
 function ownCode(error: unknown): ErrorCode {
   if (error instanceof AiregError) return error.code;
   if (error instanceof SpecError)

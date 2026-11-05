@@ -19,10 +19,7 @@ import { holdSnapshot, snapshot } from "./snapshot.ts";
 import { parseSource } from "./url.ts";
 import { GitVersions, releaseTag } from "./versions.ts";
 
-/**
- * A repository that is a file spec root, or a plain folder of skills. The clone is only a cache,
- * so this is a layout's reader over a checkout plus a revision to pin.
- */
+/** A file spec root or a plain folder of skills; the clone is only a cache. */
 export async function connect(context: SourceContext): Promise<SourceHandle> {
   const spec = parseSource(context.source.location);
   if (spec.kind !== "git") {
@@ -130,8 +127,7 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
           layout,
           context: layoutContext,
         });
-        // The revision pins the source, not the content, so an unrelated commit
-        // cannot re-identify bytes that never moved.
+        // Pins the source, not the content, so an unrelated commit cannot re-identify unmoved bytes.
         return { ...resolution, sourceRevision: at.commit };
       }),
 

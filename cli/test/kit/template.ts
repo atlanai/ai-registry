@@ -6,10 +6,7 @@ import { runCli } from "./run.ts";
 /** Copies the project a template set up into `dir`, which may already exist. */
 export type CopyProject = (dir: string) => Promise<void>;
 
-/**
- * A project the CLI sets up once, in a home of its own, for each test to copy. Only for steps
- * whose result lives in the project, such as `init` and declaring a folder registry.
- */
+/** Set up once per home for tests to copy; only for steps whose result lives in the project. */
 export async function projectTemplate(
   dir: string,
   steps: readonly (readonly string[])[],
