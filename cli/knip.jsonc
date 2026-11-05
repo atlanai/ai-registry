@@ -11,6 +11,8 @@
     "types"
   ],
   "project": ["src/**/*.ts", "packaging/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
+  // generate.ts imports each command's output schema by reading the folder.
+  "entry": ["scripts/schema/output/*.ts"],
   // util-linux's, which a test runs to give aireg a terminal of its own.
   "ignoreBinaries": ["script"]
 }

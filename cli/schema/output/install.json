@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/install.json",
+  "title": "aireg install --json",
+  "description": "The `data` each `aireg install` action prints under --json, by action.",
+  "$defs": {
+    "install": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dryRun",
+        "changed",
+        "installed",
+        "kept",
+        "unchanged"
+      ],
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
+        },
+        "changed": {
+          "description": "The changes made; for a dry run, the changes it would make.",
+          "type": "number"
+        },
+        "installed": {
+          "description": "The artifacts linked into a target.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kept": {
+          "description": "Links not made because something of the person's is already there; empty for a dry run.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "path"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "config": {
+                "const": true,
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "renamed": {
+          "description": "Installed under another name because its own is taken.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "artifact",
+              "as",
+              "by"
+            ],
+            "properties": {
+              "artifact": {
+                "type": "string"
+              },
+              "as": {
+                "type": "string"
+              },
+              "by": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "unlinked": {
+          "description": "Not installed because its name is taken.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "artifact",
+              "by"
+            ],
+            "properties": {
+              "artifact": {
+                "type": "string"
+              },
+              "by": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "unchanged": {
+          "description": "The artifacts already up to date.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,31 +1,76 @@
 import { list, sanitizeName } from "#adapter/text.ts";
+import type { RemoveResult } from "#cli/commands/remove/result.ts";
 import { REMOVE_COMMAND } from "#cli/commands/remove/spec.ts";
-import { needsInput, parse } from "#cli/options/parse.ts";
+import { needsInput, type Parsed, parse } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
 import { chooseRemovals } from "#cli/prompt/choose.ts";
 import { confirmPlan } from "#cli/prompt/confirm-plan.ts";
 import { cancel, interaction, interactive, preparing, silence } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
-import { settleCollisions } from "#cli/render/collisions.ts";
-import { planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
+import { exitOnClash, reportCollisions } from "#cli/render/collisions.ts";
+import { planReport, type Ran, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { loadedBy, toolName } from "#cli/render/tools.ts";
 import { trackRun } from "#cli/telemetry/events.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import type { Lock } from "#core/lock.ts";
 import { reaches } from "#core/manifest/match.ts";
+import type { Plan } from "#core/plan/model.ts";
 import { editedAnywhere, survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { run as runPipeline } from "#engine/install/pipeline.ts";
 import { selectTargets } from "#engine/install/targets.ts";
 import { matchInstalled, rowsNamed, shownNames } from "#engine/installed-names.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { type Loaded, load } from "#engine/scope/load.ts";
 import type { CommandContext } from "./command.ts";
+import { defineCommand, STREAMED } from "./define.ts";
 
-export async function run(context: CommandContext): Promise<void> {
-  const { positionals, common } = parse(context.argv, REMOVE_COMMAND);
+type Options = Omit<Parsed<unknown>, "own">;
+
+interface Removed {
+  data: RemoveResult;
+  said: Said;
+}
+
+interface Said {
+  /** Kept for a job that publishes them, by the names `aireg list` shows. */
+  watched: string[];
+  needed: { name: string; by: string[] }[];
+  /** Absent for a dry run, whose plan was shown as it ran. */
+  ran: Ran | undefined;
+  told: ReadonlySet<string>;
+  plan: Plan;
+}
+
+export const { run } = defineCommand({
+  spec: REMOVE_COMMAND,
+  parse(argv): Options {
+    const { positionals, common } = parse(argv, REMOVE_COMMAND);
+    return { positionals, common };
+  },
+  run: remove,
+  data: (result) => result.data,
+  text({ said }, printer) {
+    keptWatched(printer, said.watched);
+    // A removal refused for a dependent is said as such, never as an update.
+    for (const { name, by } of said.needed) {
+      printer.warning(`Kept ${name}: ${whoNeeds(by)} it.`);
+      printer.hint(
+        `Remove ${list(by)} too, and ${name} goes with ${by.length === 1 ? "it" : "them"}.`,
+      );
+    }
+    if (said.ran !== undefined) summarize(printer, said.ran, said.told);
+    reportCollisions(printer, said.plan);
+  },
+});
+
+async function remove(
+  { positionals, common }: Options,
+  context: CommandContext,
+): Promise<Removed | typeof STREAMED> {
   const named = [...positionals, ...(common.select ?? [])].filter((name) => name !== "*");
   const removeAll = common.all || common.select?.includes("*") === true;
 
@@ -38,7 +83,7 @@ export async function run(context: CommandContext): Promise<void> {
     const picked = await pickRemovals(step, loaded, common);
     if (picked === undefined) {
       cancel(step);
-      return;
+      return STREAMED;
     }
     names = picked;
   }
@@ -100,7 +145,7 @@ export async function run(context: CommandContext): Promise<void> {
 
   if (!approved) {
     cancel(step);
-    return;
+    return STREAMED;
   }
   trackRun("remove", result);
 
@@ -113,39 +158,32 @@ export async function run(context: CommandContext): Promise<void> {
   const plan = { ...result.plan, pruned: result.plan.pruned.filter((name) => !removing.has(name)) };
   // A folder a job publishes is yours, and the job goes on reading it, so its row stays.
   const watched = dropped.filter((name) => record?.lock.artifacts[name]?.origin !== undefined);
-  if (context.printer.format === "json") {
-    context.printer.json({
-      ok: true,
-      data: {
-        dryRun: common.dryRun,
-        removed: dropped.filter((name) => needed(name) === undefined && !watched.includes(name)),
-        pruned: plan.pruned,
-        watched,
-      },
-    });
-    settleCollisions(context, plan);
-    return;
-  }
-  keptWatched(context, loaded.lock, watched);
-  // A removal refused for a dependent is said as such, never as an update.
-  const kept = new Set<string>();
-  for (const name of dropped) {
+  exitOnClash(context, plan);
+  const needing = dropped.flatMap((name) => {
     const by = needed(name);
-    if (by === undefined) continue;
-    kept.add(name);
-    context.printer.warning(`Kept ${name}: ${whoNeeds(by)} it.`);
-    context.printer.hint(
-      `Remove ${list(by)} too, and ${name} goes with ${by.length === 1 ? "it" : "them"}.`,
-    );
-  }
-  const told = new Set([...kept, ...watched]);
+    return by === undefined ? [] : [{ name, by }];
+  });
+  const told = new Set([...needing.map(({ name }) => name), ...watched]);
   // A dropped entry takes the tools it named out of the manifest, yet those tools still reload.
   const targets = [
     ...new Set([...result.targets, ...asked.filter((name) => name in result.targetTable)]),
   ];
-  if (result.applied)
-    summarize(context.printer, { ...result, targets, plan, applied: result.applied }, told);
-  settleCollisions(context, plan);
+  const shown = shownNames(loaded.lock);
+  return {
+    data: {
+      dryRun: common.dryRun,
+      removed: dropped.filter((name) => needed(name) === undefined && !watched.includes(name)),
+      pruned: plan.pruned,
+      watched,
+    },
+    said: {
+      watched: watched.map((name) => shown.get(name) ?? name),
+      needed: needing,
+      ran: result.applied ? { ...result, targets, plan, applied: result.applied } : undefined,
+      told,
+      plan,
+    },
+  };
 }
 
 /** Asks which installed artifacts to remove; undefined when the person cancels. */
@@ -232,13 +270,12 @@ function without(ref: Ref, drop: ReadonlySet<string>, lock: Lock, whole: boolean
 }
 
 /** Said whenever a removal leaves a row a job publishes, so it is never kept silently. */
-function keptWatched(context: CommandContext, lock: Lock, watched: readonly string[]): void {
+function keptWatched(printer: Printer, watched: readonly string[]): void {
   if (watched.length === 0) return;
-  const shown = shownNames(lock);
-  context.printer.warning(
-    `Kept ${list(watched.map((name) => shown.get(name) ?? name))}, which a job publishes from your own ${watched.length === 1 ? "folder" : "folders"}.`,
+  printer.warning(
+    `Kept ${list(watched)}, which a job publishes from your own ${watched.length === 1 ? "folder" : "folders"}.`,
   );
-  context.printer.hint(
+  printer.hint(
     "Run `aireg watch list` to see the folder, and `aireg watch remove <folder>` to stop publishing it.",
   );
 }

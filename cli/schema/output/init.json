@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/init.json",
+  "title": "aireg init --json",
+  "description": "The `data` each `aireg init` action prints under --json, by action.",
+  "$defs": {
+    "init": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "manifest",
+            "scope",
+            "targets",
+            "imported",
+            "next"
+          ],
+          "properties": {
+            "manifest": {
+              "description": "The manifest's absolute path.",
+              "type": "string"
+            },
+            "scope": {
+              "const": "project",
+              "type": "string"
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "imported": {
+              "description": "How many artifacts `--import` copied in.",
+              "type": "number"
+            },
+            "next": {
+              "description": "The commands to run next.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "manifest",
+            "scope",
+            "targets",
+            "imported",
+            "steps"
+          ],
+          "properties": {
+            "manifest": {
+              "description": "The manifest's absolute path.",
+              "type": "string"
+            },
+            "scope": {
+              "const": "project",
+              "type": "string"
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "imported": {
+              "description": "How many artifacts `--import` copied in.",
+              "type": "number"
+            },
+            "steps": {
+              "description": "With `--registry`, each step `init` took, in place of `next`.",
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "detail"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

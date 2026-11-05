@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/logs.json",
+  "title": "aireg logs --json",
+  "description": "The `data` each `aireg logs` action prints under --json, by action.",
+  "$defs": {
+    "logs": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "entries"
+      ],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "log",
+              "entry"
+            ],
+            "properties": {
+              "log": {
+                "anyOf": [
+                  {
+                    "const": "daemon",
+                    "type": "string"
+                  },
+                  {
+                    "const": "cli",
+                    "type": "string"
+                  },
+                  {
+                    "const": "stderr",
+                    "type": "string"
+                  }
+                ]
+              },
+              "entry": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "description": "One record, in the OTel log data model.",
+                    "type": "object",
+                    "required": [
+                      "timestamp",
+                      "severity_text",
+                      "severity_number",
+                      "body",
+                      "attributes"
+                    ],
+                    "properties": {
+                      "timestamp": {
+                        "description": "An RFC 3339 time in UTC.",
+                        "type": "string"
+                      },
+                      "severity_text": {
+                        "anyOf": [
+                          {
+                            "const": "trace",
+                            "type": "string"
+                          },
+                          {
+                            "const": "debug",
+                            "type": "string"
+                          },
+                          {
+                            "const": "info",
+                            "type": "string"
+                          },
+                          {
+                            "const": "warn",
+                            "type": "string"
+                          },
+                          {
+                            "const": "error",
+                            "type": "string"
+                          },
+                          {
+                            "const": "fatal",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "severity_number": {
+                        "type": "number"
+                      },
+                      "body": {
+                        "type": "string"
+                      },
+                      "attributes": {
+                        "type": "object",
+                        "patternProperties": {
+                          "^(.*)$": {}
+                        }
+                      },
+                      "error": {
+                        "$id": "T0",
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "message"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "stack": {
+                            "type": "string"
+                          },
+                          "cause": {
+                            "$ref": "T0"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "additionalProperties": false,
+                    "description": "A line that is not a record, kept whole.",
+                    "type": "object",
+                    "required": [
+                      "raw"
+                    ],
+                    "properties": {
+                      "raw": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

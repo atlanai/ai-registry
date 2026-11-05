@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/list.json",
+  "title": "aireg list --json",
+  "description": "The `data` each `aireg list` action prints under --json, by action.",
+  "$defs": {
+    "list": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "description": "Everything installed.",
+          "type": "object",
+          "required": [
+            "scope",
+            "artifacts"
+          ],
+          "properties": {
+            "scope": {
+              "anyOf": [
+                {
+                  "const": "user",
+                  "type": "string"
+                },
+                {
+                  "const": "project",
+                  "type": "string"
+                }
+              ]
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "shown",
+                  "kind",
+                  "registry",
+                  "address",
+                  "ref",
+                  "pinned",
+                  "targets",
+                  "harnesses"
+                ],
+                "properties": {
+                  "name": {
+                    "description": "The artifact's name in the lockfile.",
+                    "type": "string"
+                  },
+                  "shown": {
+                    "description": "The name the table prints.",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "registry": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "description": "Where its registry lives.",
+                    "type": "string"
+                  },
+                  "ref": {
+                    "description": "The version; else the registry's short commit, or empty for a watched folder's.",
+                    "type": "string"
+                  },
+                  "pinned": {
+                    "type": "boolean"
+                  },
+                  "targets": {
+                    "description": "Linked into, by target id.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "watched": {
+                    "additionalProperties": false,
+                    "description": "The folder it is published from, where its target reads it; nothing is linked.",
+                    "type": "object",
+                    "required": [
+                      "target",
+                      "harness",
+                      "path"
+                    ],
+                    "properties": {
+                      "target": {
+                        "type": "string"
+                      },
+                      "harness": {
+                        "description": "`target` by the id aireg 0.1 used.",
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "neededBy": {
+                    "description": "What it is installed for, when the manifest does not ask for it.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "harnesses": {
+                    "description": "`targets` by the ids aireg 0.1 printed under it.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "With a name: where that one artifact came from.",
+          "type": "object",
+          "required": [
+            "name",
+            "kind",
+            "registry",
+            "upstreamName",
+            "path",
+            "copy",
+            "links"
+          ],
+          "properties": {
+            "name": {
+              "description": "As the command line named it.",
+              "type": "string"
+            },
+            "kind": {
+              "anyOf": [
+                {
+                  "const": "plugin",
+                  "type": "string"
+                },
+                {
+                  "const": "skill",
+                  "type": "string"
+                },
+                {
+                  "const": "agent",
+                  "type": "string"
+                }
+              ]
+            },
+            "registry": {
+              "type": "string"
+            },
+            "address": {
+              "type": "string"
+            },
+            "adapter": {
+              "type": "string"
+            },
+            "registryKey": {
+              "type": "string"
+            },
+            "config": {
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "type": "string"
+                }
+              }
+            },
+            "revision": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "upstreamName": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "copy": {
+              "description": "The stored copy every link leads to.",
+              "type": "string"
+            },
+            "watched": {
+              "additionalProperties": false,
+              "description": "The folder it is published from, where its target reads it; nothing is linked.",
+              "type": "object",
+              "required": [
+                "target",
+                "harness",
+                "path"
+              ],
+              "properties": {
+                "target": {
+                  "type": "string"
+                },
+                "harness": {
+                  "description": "`target` by the id aireg 0.1 used.",
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              }
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "target",
+                  "path",
+                  "mode",
+                  "harness"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "anyOf": [
+                      {
+                        "const": "symlink",
+                        "type": "string"
+                      },
+                      {
+                        "const": "junction",
+                        "type": "string"
+                      },
+                      {
+                        "const": "copy",
+                        "type": "string"
+                      },
+                      {
+                        "const": "fanout",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "digest": {
+                    "type": "string"
+                  },
+                  "harness": {
+                    "description": "`target` by the id aireg 0.1 used.",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "neededBy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/search.json",
+  "title": "aireg search --json",
+  "description": "The `data` each `aireg search` action prints under --json, by action.",
+  "$defs": {
+    "search": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "query",
+        "matches",
+        "skipped"
+      ],
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "matches": {
+          "description": "Best first.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "address",
+              "registry",
+              "kind",
+              "name"
+            ],
+            "properties": {
+              "address": {
+                "description": "What `aireg add` takes for it.",
+                "type": "string"
+              },
+              "registry": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "plugin",
+                    "type": "string"
+                  },
+                  {
+                    "const": "skill",
+                    "type": "string"
+                  },
+                  {
+                    "const": "agent",
+                    "type": "string"
+                  }
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "labels": {
+                "description": "The spec's indexable string pairs, read as tags.",
+                "type": "object",
+                "patternProperties": {
+                  "^(.*)$": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "description": "A registry that could not be read.",
+            "type": "object",
+            "required": [
+              "registry",
+              "message"
+            ],
+            "properties": {
+              "registry": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

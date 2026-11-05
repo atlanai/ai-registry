@@ -1,26 +1,55 @@
 import { list } from "#adapter/text.ts";
+import type { UpdateResult } from "#cli/commands/update/result.ts";
 import { UPDATE_COMMAND } from "#cli/commands/update/spec.ts";
 import { parse } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
 import { confirmIfDestructive } from "#cli/prompt/confirm-plan.ts";
 import { cancel, interaction } from "#cli/prompt/interaction.ts";
-import { settleCollisions } from "#cli/render/collisions.ts";
+import { exitOnClash, reportCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { trackUpdate } from "#cli/telemetry/events.ts";
 import { asksFor } from "#core/manifest/match.ts";
 import { lockView } from "#core/plan/acquire/lock-view.ts";
 import { formatRef, refName } from "#core/ref.ts";
-import { run as runPipeline } from "#engine/install/pipeline.ts";
+import { type RunResult, run as runPipeline } from "#engine/install/pipeline.ts";
 import { rowsNamed } from "#engine/installed-names.ts";
+import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
 import type { CommandContext } from "./command.ts";
+import { defineCommand, STREAMED } from "./define.ts";
+
+interface Options {
+  positionals: string[];
+  common: CommonOptions;
+}
+
+interface Updated {
+  data: UpdateResult;
+  ran: RunResult;
+}
 
 /**
  * The one command that moves locked versions: the rows it names, or every row,
  * resolve again. A version the manifest pinned survives, so it is reported.
  */
-export async function run(context: CommandContext): Promise<void> {
-  const { positionals, common } = parse(context.argv, UPDATE_COMMAND);
+export const { run } = defineCommand({
+  spec: UPDATE_COMMAND,
+  parse(argv): Options {
+    const { positionals, common } = parse(argv, UPDATE_COMMAND);
+    return { positionals, common };
+  },
+  run: update,
+  data: (result) => result.data,
+  text({ ran }, printer) {
+    if (ran.applied) summarize(printer, { ...ran, applied: ran.applied });
+    reportCollisions(printer, ran.plan);
+  },
+});
+
+async function update(
+  { positionals, common }: Options,
+  context: CommandContext,
+): Promise<Updated | typeof STREAMED> {
   const step = interaction(context.printer, defaultIo(), common.yes);
   const loaded = await load(common, context.cwd);
 
@@ -88,14 +117,9 @@ export async function run(context: CommandContext): Promise<void> {
 
   if (!approved) {
     cancel(step);
-    return;
+    return STREAMED;
   }
   trackUpdate(result);
-
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: outcome(result, common.dryRun) });
-  } else if (result.applied) {
-    summarize(context.printer, { ...result, applied: result.applied });
-  }
-  settleCollisions(context, result.plan);
+  exitOnClash(context, result.plan);
+  return { data: outcome(result, common.dryRun), ran: result };
 }

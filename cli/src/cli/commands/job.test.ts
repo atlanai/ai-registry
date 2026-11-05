@@ -75,7 +75,7 @@ describe("job add --interval", () => {
     async (value) => {
       await expect(
         run(context(["add", "--registry", "undeclared", "--interval", value])),
-      ).rejects.toThrow(/--interval must be a whole number of seconds/);
+      ).rejects.toThrow(/--interval takes a whole number of at least 60, not/);
     },
   );
 });

@@ -1,6 +1,7 @@
-import { type ArtifactKind, isKind, KINDS } from "#adapter/kinds.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, plural, quoted, withoutCredentials } from "#adapter/text.ts";
 import { search } from "#cli/commands/search/rank.ts";
+import type { SearchMatch, SearchResult, SkippedRegistry } from "#cli/commands/search/result.ts";
 import { SEARCH_COMMAND } from "#cli/commands/search/spec.ts";
 import { needsInput, parse } from "#cli/options/parse.ts";
 import { trackSearch } from "#cli/telemetry/events.ts";
@@ -11,8 +12,9 @@ import { truncate } from "#core/term/format.ts";
 import { table } from "#core/term/table.ts";
 import { probe, type Resolved, throughManifest } from "#engine/address/probe.ts";
 import { knownRegistries, undeclaredRegistry } from "#engine/address/registries.ts";
+import type { CommonOptions } from "#engine/options.ts";
 import { scopeRoots } from "#engine/scope/locate.ts";
-import type { CommandContext } from "./command.ts";
+import { defineCommand } from "./define.ts";
 
 /** Room for the description once the other columns are printed. */
 const DESCRIPTION_WIDTH = 60;
@@ -30,90 +32,127 @@ interface Match {
   add: string;
 }
 
-interface Skipped {
-  registry: string;
-  message: string;
+interface Options {
+  query: string;
+  registry: string | undefined;
+  kind: ArtifactKind | undefined;
+  common: CommonOptions;
 }
 
-export async function run(context: CommandContext): Promise<void> {
-  const { positionals, common, own } = parse<{ registry?: string; kind?: string }>(
-    context.argv,
-    SEARCH_COMMAND,
-  );
-  const query = positionals.join(" ").trim();
-  if (query === "") {
-    throw needsInput(
-      "search",
-      "something to search for",
-      "Name it: `aireg search <query>`, such as `aireg search review`.",
-    );
-  }
-  const kind = own.kind === undefined ? undefined : kindOf(own.kind);
+interface Searched {
+  data: SearchResult;
+  /** What `aireg add` takes for the best match, which the data leaves out. */
+  next: string | undefined;
+}
 
-  const known = await knownRegistries(common, context.cwd);
-  const targets =
-    own.registry === undefined
-      ? Object.keys(known)
-          .sort()
-          .map((alias) => throughManifest(alias, known, {}))
-      : [throughManifest(own.registry, known, {})];
-  const [first] = targets;
-  if (first === undefined) {
-    throw new AiregError(
-      `There are no registries to search in ${scopeName(scopeRoots(common, context.cwd, "user").scope)}.`,
-      {
-        code: ErrorCode.NotFound,
-        hint: "Declare one with `aireg registry add <address>`, or name one with `--registry`.",
-      },
+export const { run } = defineCommand({
+  spec: SEARCH_COMMAND,
+  parse(argv): Options {
+    const { positionals, common, own } = parse<{ registry?: string; kind?: ArtifactKind }>(
+      argv,
+      SEARCH_COMMAND,
     );
-  }
-  if (own.registry !== undefined && !first.declared) {
-    const unknown = await undeclaredRegistry(own.registry, known, common, context.cwd);
-    if (unknown !== undefined) throw unknown;
-  }
+    const query = positionals.join(" ").trim();
+    if (query === "") {
+      throw needsInput(
+        "search",
+        "something to search for",
+        "Name it: `aireg search <query>`, such as `aireg search review`.",
+      );
+    }
+    return { query, registry: own.registry, kind: own.kind, common };
+  },
+  async run({ query, registry, kind, common }, context): Promise<Searched> {
+    const known = await knownRegistries(common, context.cwd);
+    const targets =
+      registry === undefined
+        ? Object.keys(known)
+            .sort()
+            .map((alias) => throughManifest(alias, known, {}))
+        : [throughManifest(registry, known, {})];
+    const [first] = targets;
+    if (first === undefined) {
+      throw new AiregError(
+        `There are no registries to search in ${scopeName(scopeRoots(common, context.cwd, "user").scope)}.`,
+        {
+          code: ErrorCode.NotFound,
+          hint: "Declare one with `aireg registry add <address>`, or name one with `--registry`.",
+        },
+      );
+    }
+    if (registry !== undefined && !first.declared) {
+      const unknown = await undeclaredRegistry(registry, known, common, context.cwd);
+      if (unknown !== undefined) throw unknown;
+    }
 
-  const read = await Promise.allSettled(targets.map((target) => matchesIn(target, context.cwd)));
-  const matches: Match[] = [];
-  const skipped: Skipped[] = [];
-  read.forEach((outcome, at) => {
-    if (outcome.status === "fulfilled") {
-      matches.push(...outcome.value);
+    const read = await Promise.allSettled(targets.map((target) => matchesIn(target, context.cwd)));
+    const matches: Match[] = [];
+    const skipped: SkippedRegistry[] = [];
+    read.forEach((outcome, at) => {
+      if (outcome.status === "fulfilled") {
+        matches.push(...outcome.value);
+        return;
+      }
+      // One registry named on its own is the whole search, so its failure is the answer.
+      if (targets.length === 1) throw outcome.reason;
+      const target = targets[at] as Resolved;
+      const reason =
+        outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      skipped.push({ registry: target.alias ?? target.input, message: reason });
+    });
+    if (skipped.length === targets.length) {
+      throw new AiregError(`Could not read ${list(skipped.map((item) => item.registry))}.`, {
+        code: ErrorCode.Unavailable,
+        hint: "Run `aireg registry show <registry>` to see why.",
+      });
+    }
+
+    const found = search(
+      matches.filter((match) => kind === undefined || match.kind === kind),
+      query,
+    );
+    const searched = targets.map((target) => ({
+      location: target.input,
+      adapter: target.flags.adapter,
+    }));
+    trackSearch(query, found.length, kind, searched);
+    return { data: { query, matches: found.map(published), skipped }, next: found[0]?.add };
+  },
+  data: (result) => result.data,
+  text({ data, next }, printer) {
+    const { query, matches, skipped } = data;
+    for (const item of skipped) {
+      printer.warning(
+        `Skipped ${item.registry}, which could not be read: ${item.message.replace(/\.$/, "")}.`,
+      );
+    }
+    if (matches.length === 0) {
+      printer.info(`No artifacts match ${quoted(query)}.`);
+      printer.hint("Run `aireg registry show <registry>` to see everything a registry publishes.");
       return;
     }
-    // One registry named on its own is the whole search, so its failure is the answer.
-    if (targets.length === 1) throw outcome.reason;
-    const target = targets[at] as Resolved;
-    const reason =
-      outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
-    skipped.push({ registry: target.alias ?? target.input, message: reason });
-  });
-  if (skipped.length === targets.length) {
-    throw new AiregError(`Could not read ${list(skipped.map((item) => item.registry))}.`, {
-      code: ErrorCode.Unavailable,
-      hint: "Run `aireg registry show <registry>` to see why.",
-    });
-  }
-
-  const found = search(
-    matches.filter((match) => kind === undefined || match.kind === kind),
-    query,
-  );
-  const searched = targets.map((target) => ({
-    location: target.input,
-    adapter: target.flags.adapter,
-  }));
-  trackSearch(query, found.length, kind, searched);
-  report(context, query, found, skipped);
-}
-
-function kindOf(raw: string): ArtifactKind {
-  const kind = raw.trim().toLowerCase();
-  if (isKind(kind)) return kind;
-  throw new AiregError(`${quoted(raw)} is not a kind.`, {
-    code: ErrorCode.Usage,
-    hint: `Use ${list(KINDS, "or")}.`,
-  });
-}
+    const style = printer.style;
+    printer.info(style.bold(`${plural(matches.length, "match", "matches")} for ${quoted(query)}`));
+    table(
+      printer,
+      [
+        {
+          header: "name",
+          value: (match: SearchMatch) => [match.namespace, match.name].filter(Boolean).join("/"),
+        },
+        { header: "kind", value: (match: SearchMatch) => style.dim(match.kind) },
+        { header: "version", value: (match: SearchMatch) => match.version ?? "", optional: true },
+        { header: "registry", value: (match: SearchMatch) => match.registry },
+        {
+          header: "description",
+          value: (match: SearchMatch) => truncate(match.description ?? "", DESCRIPTION_WIDTH),
+        },
+      ],
+      matches,
+    );
+    if (next !== undefined) printer.note("next", next);
+  },
+});
 
 /** Read through the same listing `aireg registry show` prints. */
 async function matchesIn(target: Resolved, cwd: string): Promise<Match[]> {
@@ -157,58 +196,16 @@ async function matchesIn(target: Resolved, cwd: string): Promise<Match[]> {
   }
 }
 
-function report(
-  context: CommandContext,
-  query: string,
-  found: readonly Match[],
-  skipped: readonly Skipped[],
-): void {
-  if (context.printer.format === "json") {
-    context.printer.json({
-      ok: true,
-      data: {
-        query,
-        matches: found.map(({ add: _, labels, ...match }) => ({
-          ...match,
-          ...(labels === undefined ? {} : { labels }),
-        })),
-        skipped,
-      },
-    });
-    return;
-  }
-  for (const item of skipped) {
-    context.printer.warning(
-      `Skipped ${item.registry}, which could not be read: ${item.message.replace(/\.$/, "")}.`,
-    );
-  }
-  if (found.length === 0) {
-    context.printer.info(`No artifacts match ${quoted(query)}.`);
-    context.printer.hint(
-      "Run `aireg registry show <registry>` to see everything a registry publishes.",
-    );
-    return;
-  }
-  const style = context.printer.style;
-  context.printer.info(
-    style.bold(`${plural(found.length, "match", "matches")} for ${quoted(query)}`),
-  );
-  table(
-    context.printer,
-    [
-      {
-        header: "name",
-        value: (match: Match) => [match.namespace, match.name].filter(Boolean).join("/"),
-      },
-      { header: "kind", value: (match: Match) => style.dim(match.kind) },
-      { header: "version", value: (match: Match) => match.version ?? "", optional: true },
-      { header: "registry", value: (match: Match) => match.registry },
-      {
-        header: "description",
-        value: (match: Match) => truncate(match.description ?? "", DESCRIPTION_WIDTH),
-      },
-    ],
-    found,
-  );
-  context.printer.note("next", (found[0] as Match).add);
+function published(match: Match): SearchMatch {
+  const { address, registry, namespace, kind, name, version, description, labels } = match;
+  return {
+    address,
+    registry,
+    ...(namespace === undefined ? {} : { namespace }),
+    kind,
+    name,
+    ...(version === undefined ? {} : { version }),
+    ...(description === undefined ? {} : { description }),
+    ...(labels === undefined ? {} : { labels }),
+  };
 }

@@ -1,0 +1,756 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/console.json",
+  "title": "aireg console --json",
+  "description": "The `data` each `aireg console` action prints under --json, by action.",
+  "$defs": {
+    "console": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "version",
+        "accounts",
+        "groups",
+        "summary",
+        "jobs",
+        "runs",
+        "daemon",
+        "scope",
+        "root",
+        "readAtMs",
+        "problems",
+        "panels"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "account": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "registry",
+            "address",
+            "config",
+            "signedIn",
+            "signIn",
+            "publishes",
+            "artifactCount",
+            "namespaceCount"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "registry": {
+              "type": "string"
+            },
+            "address": {
+              "type": "string"
+            },
+            "config": {
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "type": "string"
+                }
+              }
+            },
+            "credentialsFile": {
+              "type": "string"
+            },
+            "signedIn": {
+              "type": "boolean"
+            },
+            "signIn": {
+              "description": "The registry's adapter has a sign-in at all.",
+              "type": "boolean"
+            },
+            "publishes": {
+              "type": "boolean"
+            },
+            "defaultNamespace": {
+              "type": "string"
+            },
+            "artifactCount": {
+              "type": "number"
+            },
+            "namespaceCount": {
+              "type": "number"
+            }
+          }
+        },
+        "accounts": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "registry",
+              "address",
+              "config",
+              "signedIn",
+              "signIn",
+              "publishes",
+              "artifactCount",
+              "namespaceCount"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "registry": {
+                "type": "string"
+              },
+              "address": {
+                "type": "string"
+              },
+              "config": {
+                "type": "object",
+                "patternProperties": {
+                  "^(.*)$": {
+                    "type": "string"
+                  }
+                }
+              },
+              "credentialsFile": {
+                "type": "string"
+              },
+              "signedIn": {
+                "type": "boolean"
+              },
+              "signIn": {
+                "description": "The registry's adapter has a sign-in at all.",
+                "type": "boolean"
+              },
+              "publishes": {
+                "type": "boolean"
+              },
+              "defaultNamespace": {
+                "type": "string"
+              },
+              "artifactCount": {
+                "type": "number"
+              },
+              "namespaceCount": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "key",
+              "label",
+              "isDefault",
+              "authoredHere",
+              "rows",
+              "counts",
+              "versions"
+            ],
+            "properties": {
+              "key": {
+                "description": "The namespace, or `~local` for work authored here.",
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "isDefault": {
+                "type": "boolean"
+              },
+              "authoredHere": {
+                "type": "boolean"
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "key",
+                    "name",
+                    "kind",
+                    "registry",
+                    "id",
+                    "lockDigest",
+                    "state",
+                    "targets",
+                    "copy",
+                    "links"
+                  ],
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "anyOf": [
+                        {
+                          "const": "plugin",
+                          "type": "string"
+                        },
+                        {
+                          "const": "skill",
+                          "type": "string"
+                        },
+                        {
+                          "const": "agent",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "registry": {
+                      "description": "`local` for work authored on this machine.",
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "lockDigest": {
+                      "type": "string"
+                    },
+                    "diskDigest": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "anyOf": [
+                        {
+                          "const": "ok",
+                          "type": "string"
+                        },
+                        {
+                          "const": "missing",
+                          "type": "string"
+                        },
+                        {
+                          "const": "dangling",
+                          "type": "string"
+                        },
+                        {
+                          "const": "edited",
+                          "type": "string"
+                        },
+                        {
+                          "const": "failed",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pending",
+                          "type": "string"
+                        },
+                        {
+                          "const": "imported",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unpublished",
+                          "type": "string"
+                        },
+                        {
+                          "const": "duplicate",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "copy": {
+                      "type": "string"
+                    },
+                    "changedAtMs": {
+                      "description": "Milliseconds since the Unix epoch.",
+                      "type": "number"
+                    },
+                    "carriedBy": {
+                      "type": "string"
+                    },
+                    "links": {
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "target",
+                          "path",
+                          "present",
+                          "ok"
+                        ],
+                        "properties": {
+                          "target": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "present": {
+                            "type": "boolean"
+                          },
+                          "ok": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "counts": {
+                "additionalProperties": false,
+                "description": "Rows in each state.",
+                "type": "object",
+                "required": [
+                  "ok",
+                  "missing",
+                  "dangling",
+                  "edited",
+                  "failed",
+                  "pending",
+                  "imported",
+                  "unpublished",
+                  "duplicate"
+                ],
+                "properties": {
+                  "ok": {
+                    "type": "number"
+                  },
+                  "missing": {
+                    "type": "number"
+                  },
+                  "dangling": {
+                    "type": "number"
+                  },
+                  "edited": {
+                    "type": "number"
+                  },
+                  "failed": {
+                    "type": "number"
+                  },
+                  "pending": {
+                    "type": "number"
+                  },
+                  "imported": {
+                    "type": "number"
+                  },
+                  "unpublished": {
+                    "type": "number"
+                  },
+                  "duplicate": {
+                    "type": "number"
+                  }
+                }
+              },
+              "versions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "skillsImported",
+            "skillsExamined",
+            "failed",
+            "edited",
+            "dangling",
+            "missing",
+            "pending",
+            "imported",
+            "unpublished",
+            "duplicate"
+          ],
+          "properties": {
+            "skillsImported": {
+              "type": "number"
+            },
+            "skillsExamined": {
+              "type": "number"
+            },
+            "failed": {
+              "type": "number"
+            },
+            "edited": {
+              "type": "number"
+            },
+            "dangling": {
+              "type": "number"
+            },
+            "missing": {
+              "type": "number"
+            },
+            "pending": {
+              "type": "number"
+            },
+            "imported": {
+              "type": "number"
+            },
+            "unpublished": {
+              "type": "number"
+            },
+            "duplicate": {
+              "type": "number"
+            }
+          }
+        },
+        "jobs": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "accountId",
+              "enabled",
+              "intervalSeconds",
+              "summary"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "description": "What a person called it, falling back to the id.",
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "accountId": {
+                "type": "string"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "intervalSeconds": {
+                "type": "number"
+              },
+              "summary": {
+                "description": "The steps, on one line.",
+                "type": "string"
+              },
+              "lastRunAtMs": {
+                "description": "Milliseconds since the Unix epoch.",
+                "type": "number"
+              },
+              "nextRunAtMs": {
+                "description": "Milliseconds since the Unix epoch.",
+                "type": "number"
+              }
+            }
+          }
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "mode",
+              "trigger",
+              "state",
+              "requestedAtMs",
+              "counts"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "jobId": {
+                "type": "string"
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "const": "sync",
+                    "type": "string"
+                  },
+                  {
+                    "const": "pull",
+                    "type": "string"
+                  },
+                  {
+                    "const": "publish",
+                    "type": "string"
+                  }
+                ]
+              },
+              "trigger": {
+                "anyOf": [
+                  {
+                    "const": "manual",
+                    "type": "string"
+                  },
+                  {
+                    "const": "schedule",
+                    "type": "string"
+                  },
+                  {
+                    "const": "startup",
+                    "type": "string"
+                  }
+                ]
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "const": "queued",
+                    "type": "string"
+                  },
+                  {
+                    "const": "running",
+                    "type": "string"
+                  },
+                  {
+                    "const": "succeeded",
+                    "type": "string"
+                  },
+                  {
+                    "const": "attention",
+                    "type": "string"
+                  },
+                  {
+                    "const": "partial",
+                    "type": "string"
+                  },
+                  {
+                    "const": "failed",
+                    "type": "string"
+                  },
+                  {
+                    "const": "timed_out",
+                    "type": "string"
+                  },
+                  {
+                    "const": "canceled",
+                    "type": "string"
+                  },
+                  {
+                    "const": "abandoned",
+                    "type": "string"
+                  }
+                ]
+              },
+              "requestedAtMs": {
+                "description": "Milliseconds since the Unix epoch.",
+                "type": "number"
+              },
+              "finishedAtMs": {
+                "description": "Milliseconds since the Unix epoch.",
+                "type": "number"
+              },
+              "counts": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "examined",
+                  "changed",
+                  "skipped",
+                  "attention",
+                  "failed"
+                ],
+                "properties": {
+                  "examined": {
+                    "type": "number"
+                  },
+                  "changed": {
+                    "type": "number"
+                  },
+                  "skipped": {
+                    "type": "number"
+                  },
+                  "attention": {
+                    "type": "number"
+                  },
+                  "failed": {
+                    "type": "number"
+                  }
+                }
+              },
+              "errorCode": {
+                "type": "string"
+              },
+              "reason": {
+                "description": "Why it failed, from the daemon's log.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "daemon": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "running",
+            "jobsEnabled",
+            "jobsTotal"
+          ],
+          "properties": {
+            "running": {
+              "type": "boolean"
+            },
+            "pid": {
+              "type": "number"
+            },
+            "jobsEnabled": {
+              "type": "number"
+            },
+            "jobsTotal": {
+              "type": "number"
+            }
+          }
+        },
+        "policy": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "pull",
+            "publish",
+            "delete"
+          ],
+          "properties": {
+            "pull": {
+              "anyOf": [
+                {
+                  "const": "on",
+                  "type": "string"
+                },
+                {
+                  "const": "report",
+                  "type": "string"
+                },
+                {
+                  "const": "off",
+                  "type": "string"
+                }
+              ]
+            },
+            "publish": {
+              "anyOf": [
+                {
+                  "const": "on",
+                  "type": "string"
+                },
+                {
+                  "const": "report",
+                  "type": "string"
+                },
+                {
+                  "const": "off",
+                  "type": "string"
+                }
+              ]
+            },
+            "delete": {
+              "anyOf": [
+                {
+                  "const": "on",
+                  "type": "string"
+                },
+                {
+                  "const": "report",
+                  "type": "string"
+                },
+                {
+                  "const": "off",
+                  "type": "string"
+                }
+              ]
+            },
+            "adopt": {
+              "anyOf": [
+                {
+                  "const": "on",
+                  "type": "string"
+                },
+                {
+                  "const": "report",
+                  "type": "string"
+                },
+                {
+                  "const": "off",
+                  "type": "string"
+                }
+              ]
+            },
+            "claim": {
+              "anyOf": [
+                {
+                  "const": "on",
+                  "type": "string"
+                },
+                {
+                  "const": "report",
+                  "type": "string"
+                },
+                {
+                  "const": "off",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "const": "user",
+              "type": "string"
+            },
+            {
+              "const": "project",
+              "type": "string"
+            }
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "readAtMs": {
+          "description": "Milliseconds since the Unix epoch.",
+          "type": "number"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "panels": {
+          "type": "object",
+          "patternProperties": {
+            "^(.*)$": {}
+          }
+        }
+      }
+    }
+  }
+}

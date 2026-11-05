@@ -15,7 +15,12 @@ export const SEARCH_COMMAND: CommandSpec = {
   docs: "search",
   options: [
     { ...REGISTRY, describe: "Search only this registry, by name or address" },
-    { flag: "--kind", value: "<kind>", describe: `Only this kind: ${list(KINDS, "or")}` },
+    {
+      flag: "--kind",
+      value: "<kind>",
+      choices: KINDS,
+      describe: `Only this kind: ${list(KINDS, "or")}`,
+    },
     USER,
   ],
 };

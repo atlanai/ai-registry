@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/doctor.json",
+  "title": "aireg doctor --json",
+  "description": "The `data` each `aireg doctor` action prints under --json, by action.",
+  "$defs": {
+    "doctor": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "problems",
+        "checks",
+        "adapters"
+      ],
+      "properties": {
+        "problems": {
+          "description": "How many checks are not ok.",
+          "type": "number"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "ok",
+              "detail"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "detail": {
+                "type": "string"
+              },
+              "fix": {
+                "description": "What fixes or improves it; commands joined with ` && `.",
+                "type": "string"
+              },
+              "info": {
+                "description": "Worth knowing, with nothing to do.",
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "adapters": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "displayName",
+              "capabilities"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "capabilities": {
+                "additionalProperties": false,
+                "description": "A flag it does not advertise is false.",
+                "type": "object",
+                "required": [
+                  "pinsSource",
+                  "publish",
+                  "auth"
+                ],
+                "properties": {
+                  "pinsSource": {
+                    "type": "boolean"
+                  },
+                  "publish": {
+                    "type": "boolean"
+                  },
+                  "auth": {
+                    "type": "boolean"
+                  },
+                  "messages": {
+                    "type": "boolean"
+                  },
+                  "fileSpec": {
+                    "type": "boolean"
+                  },
+                  "namespacePlugins": {
+                    "type": "boolean"
+                  },
+                  "relationships": {
+                    "type": "boolean"
+                  },
+                  "agentFolders": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

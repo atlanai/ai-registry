@@ -85,7 +85,7 @@ error: `aireg search` needs something to search for.
 hint: Name it: `aireg search <query>`, such as `aireg search review`.
 $ aireg search lint --kind widget
 ? 2
-error: "widget" is not a kind.
+error: --kind takes plugin, skill or agent, not "widget".
   code: usage
-hint: Use plugin, skill or agent.
+hint: Run `aireg search --help` for the options it takes.
 ```

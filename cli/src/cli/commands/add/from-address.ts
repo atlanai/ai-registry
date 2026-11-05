@@ -4,9 +4,8 @@ import { defaultIo } from "#cli/prompt/ask.ts";
 import { confirmPlan, confirmTrust } from "#cli/prompt/confirm-plan.ts";
 import { equivalent } from "#cli/prompt/equivalent.ts";
 import { cancel, type Interaction, interaction, interactive } from "#cli/prompt/interaction.ts";
-import { settleCollisions } from "#cli/render/collisions.ts";
+import { exitOnClash } from "#cli/render/collisions.ts";
 import { planReport } from "#cli/render/plan.ts";
-import { noteUserScope } from "#cli/render/where.ts";
 import { trackRun } from "#cli/telemetry/events.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
 import { coveredByWhole } from "#core/manifest/match.ts";
@@ -19,19 +18,21 @@ import { run as runPipeline } from "#engine/install/pipeline.ts";
 import { openAddress, showable } from "./address.ts";
 import { chosenEntries, gather, shortened } from "./choose.ts";
 import { declare, narrowedTargets, type Repin, recordRegistry } from "./declare.ts";
+import { type Kept, keepCurrent } from "./keep-current.ts";
 import type { Parsed } from "./options.ts";
-import { printAdded, reportAdded } from "./render.ts";
+import { type Added, addedData } from "./render.ts";
 
+/** Undefined when the person canceled, which is already reported. */
 export async function addAddress(
   context: CommandContext,
   { positionals, common, own }: Parsed,
   adopt?: ReadonlySet<string>,
-): Promise<void> {
+): Promise<Added | undefined> {
   const step = interaction(context.printer, defaultIo(), common.yes);
   const opened = await openAddress(context, { positionals, common, own }, step);
   if (opened === undefined) {
     cancel(step);
-    return;
+    return undefined;
   }
   const { known, input, within, resolved, asked, partial, asking, source, alias } = opened;
   const { catalogAlias, entries } = opened;
@@ -48,7 +49,7 @@ export async function addAddress(
   );
   if (gathered === undefined) {
     cancel(step);
-    return;
+    return undefined;
   }
   const { choices, loaded } = gathered;
 
@@ -116,48 +117,45 @@ export async function addAddress(
 
   if (!approved) {
     cancel(step);
-    return;
+    return undefined;
   }
   trackRun("install", result, "add");
+  exitOnClash(context, result.plan);
 
   // `--json` changes only what is printed, so the background job is still added.
-  let jobId: string | undefined;
-  if (result.applied !== undefined) {
-    jobId = await reportAdded(context, {
-      alias,
-      source,
-      location,
-      config,
-      named: own.as !== undefined,
-      introduced,
-      copied,
-      repinned,
-      ran: { ...result, applied: result.applied },
-      scope: choices.scope,
-      autoUpdate: own["no-auto-update"] !== true,
-      pinned: refs.every((text) => parseRef(text).version !== undefined),
-    });
-  } else {
-    // An applied add says it with its summary; a dry run has none.
-    settleCollisions(context, result.plan);
+  const { applied } = result;
+  let kept: Kept | undefined;
+  if (applied !== undefined && choices.scope === "user" && own["no-auto-update"] !== true) {
+    const pinned = refs.every((text) => parseRef(text).version !== undefined);
+    kept = await keepCurrent(alias, config, pinned);
   }
-  if (context.printer.format === "json") {
-    printAdded(
-      context,
+  const jobId = kept !== undefined && "jobId" in kept ? kept.jobId : undefined;
+  return {
+    data: addedData(
       { registry: alias, layout: source.layout, artifacts: refs, jobId },
       result,
       common.dryRun,
-    );
-    return;
-  }
-  if (choices.scope === "user") noteUserScope(context.printer, common.scope, context.cwd);
-  if (interactive(asking) && result.applied !== undefined) {
-    context.printer.info(
-      context.printer.style.dim(
-        `  ${equivalent("add", input, { ...choices, select: shortened(choices.select, entries) })}`,
-      ),
-    );
-  }
+    ),
+    said: {
+      plan: result.plan,
+      applied: applied && {
+        alias,
+        source,
+        location,
+        named: own.as !== undefined,
+        introduced,
+        copied,
+        repinned,
+        ran: { ...result, applied },
+      },
+      kept,
+      where: choices.scope === "user" ? { asked: common.scope, cwd: context.cwd } : undefined,
+      equivalent:
+        interactive(asking) && applied !== undefined
+          ? equivalent("add", input, { ...choices, select: shortened(choices.select, entries) })
+          : undefined,
+    },
+  };
 }
 
 /**

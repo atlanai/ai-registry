@@ -1,26 +1,25 @@
 import { gte } from "#adapter/semver.ts";
-import { actionOf, type CommandContext } from "#cli/commands/command.ts";
-import { parse } from "#cli/options/parse.ts";
+import type { SelfUpdate } from "#cli/commands/self/result.ts";
 import { withReleaseHint } from "#core/release/errors.ts";
 import { shimPath, versionBin } from "#core/release/layout.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { VERSION } from "#core/version.ts";
 import { recycleDaemon } from "#daemon/process/lifecycle.ts";
 import { installedVersion, previousInstalled, rollback } from "#self/install.ts";
 import { installRelease } from "#self/minimum-update.ts";
 import { resolveRelease } from "#self/release.ts";
 import { cacheFrom, writeUpdateCache } from "#self/update-cache.ts";
-import { SELF_COMMAND } from "./spec.ts";
 
-interface Own extends Record<string, unknown> {
-  check?: boolean;
-  rollback?: boolean;
+interface Options {
+  dryRun: boolean;
+  force: boolean;
+  check: boolean;
+  rollback: boolean;
 }
 
-export async function run(context: CommandContext): Promise<void> {
-  const { common, own } = parse<Own>(context.argv, actionOf(SELF_COMMAND, "update"));
-
+export async function update(options: Options): Promise<SelfUpdate> {
   try {
-    await execute(context, common.dryRun, common.force, own);
+    return await execute(options);
   } catch (error) {
     throw withReleaseHint(
       error,
@@ -29,25 +28,19 @@ export async function run(context: CommandContext): Promise<void> {
   }
 }
 
-async function execute(
-  context: CommandContext,
-  dryRun: boolean,
-  force: boolean,
-  own: Own,
-): Promise<void> {
-  if (own.rollback === true) {
+async function execute({ dryRun, force, check, rollback: back }: Options): Promise<SelfUpdate> {
+  if (back) {
     if (dryRun) {
-      report(context, dryRun, {
+      return {
         current: VERSION,
         latest: await previousInstalled(),
         action: "would-rollback",
-      });
-      return;
+        dryRun,
+      };
     }
     const version = await rollback();
     await recycleDaemon(versionBin(version), version);
-    report(context, dryRun, { current: VERSION, latest: version, action: "rolled-back" });
-    return;
+    return { current: VERSION, latest: version, action: "rolled-back", dryRun };
   }
 
   const current = await installedVersion();
@@ -56,69 +49,52 @@ async function execute(
   await writeUpdateCache(cacheFrom(release, Date.now())).catch(() => undefined);
   const upToDate = gte(current, release.version);
 
-  if (own.check === true || dryRun) {
-    report(context, dryRun, {
+  if (check || dryRun) {
+    return {
       current,
       latest: release.version,
       action: upToDate ? "already-latest" : dryRun ? "would-update" : "update-available",
-    });
-    return;
+      dryRun,
+    };
   }
 
   if (upToDate && !force) {
-    report(context, dryRun, {
-      current,
-      latest: release.version,
-      action: "already-latest",
-    });
-    return;
+    return { current, latest: release.version, action: "already-latest", dryRun };
   }
 
   await installRelease(release);
   await recycleDaemon(versionBin(release.version), release.version);
-  report(context, dryRun, {
+  return {
     current: release.version,
     latest: release.version,
     action: "updated",
     bin: shimPath(),
-  });
+    dryRun,
+  };
 }
 
-function report(
-  context: CommandContext,
-  dryRun: boolean,
-  data: {
-    current: string;
-    latest: string;
-    action: string;
-    bin?: string | undefined;
-  },
-): void {
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { ...data, dryRun } });
+export function printUpdate(result: SelfUpdate, printer: Printer): void {
+  if (result.action === "already-latest") {
+    printer.info(`aireg ${result.current} is up to date.`);
     return;
   }
-  if (data.action === "already-latest") {
-    context.printer.info(`aireg ${data.current} is up to date.`);
+  if (result.action === "would-update") {
+    printer.info(`Would update aireg ${result.current} → ${result.latest}.`);
     return;
   }
-  if (data.action === "would-update") {
-    context.printer.info(`Would update aireg ${data.current} → ${data.latest}.`);
+  if (result.action === "update-available") {
+    printer.info(`aireg ${result.latest} is available (you have ${result.current}).`);
+    printer.note("next", "aireg self update");
     return;
   }
-  if (data.action === "update-available") {
-    context.printer.info(`aireg ${data.latest} is available (you have ${data.current}).`);
-    context.printer.note("next", "aireg self update");
+  if (result.action === "would-rollback") {
+    printer.info(`Would roll back to aireg ${result.latest}.`);
     return;
   }
-  if (data.action === "would-rollback") {
-    context.printer.info(`Would roll back to aireg ${data.latest}.`);
+  if (result.action === "rolled-back") {
+    printer.success(`Rolled back to aireg ${result.latest}.`);
     return;
   }
-  if (data.action === "rolled-back") {
-    context.printer.success(`Rolled back to aireg ${data.latest}.`);
-    return;
-  }
-  context.printer.success(`Updated to aireg ${data.latest}.`);
-  if (data.bin !== undefined) context.printer.note("path", data.bin);
+  printer.success(`Updated to aireg ${result.latest}.`);
+  if (result.bin !== undefined) printer.note("path", result.bin);
 }
