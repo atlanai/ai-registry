@@ -10,6 +10,7 @@
 | `AIREG_LOG_LEVEL` | The same as `--log-level`. The option wins when both are set. |
 | `AIREG_GIT_TIMEOUT_MS` | How long a git operation may take, in whole milliseconds, such as `60000`. Defaults to `300000` (five minutes). Any other value is refused. |
 | `AIREG_DISABLE_UPDATE_CHECK` | Any value stops aireg checking for and installing newer versions of itself and of its installed adapters. |
+| `AIREG_DISABLE_TELEMETRY`, `DO_NOT_TRACK` | Any value stops aireg sending usage events. |
 | `AIREG_RELEASE_CHANNEL` | The release channel aireg updates from. Defaults to `stable`, the only channel published. |
 | `AIREG_TOKEN_<NAME>` | A token for the registry named `<NAME>` in capitals, with other characters as `_`, such as `AIREG_TOKEN_ACME_PROD`. How CI signs in. Sent only to the registry of that name the current scope declares: the project's manifest in a project, otherwise your user scope. See [`aireg auth`](auth.md). |
 | `AIREG_NO_MODIFY_PATH` | Any value stops the installer adding aireg to your shell's `PATH`. |
@@ -64,15 +65,21 @@ aireg keeps its settings, caches and logs in `~/.aireg/` (or `AIREG_HOME`). Noth
 | `journals/` | What an install in progress has done, so an interrupted one can be finished. |
 | `bin/aireg` | The `aireg` on your `PATH`. |
 | `cli/` | The installed versions of aireg. |
+| `telemetry-id` | The random ID usage events carry, made once and derived from nothing on your machine. Delete it for a new one. |
+| `telemetry-notice` | Which version of the usage-events notice you were shown. |
 
 ## Network and privacy
 
-aireg collects no usage analytics. It makes two kinds of request:
+aireg makes four kinds of request:
 
 - **To your registries.** aireg reads each registry you add from where it is: a folder, or a git repository it fetches with your own git configuration and credentials.
 - **To its release server.** An installed aireg asks `https://aireg.sh` for its newest release at most every 15 minutes, from a background process after a command and from the [daemon](daemon.md), and installs a newer release it finds. It does the same for each adapter installed with [`aireg adapter install`](adapter.md). When the release server says this version is below the minimum it supports, the next command installs the newer release before it runs. These requests carry no identifiers beyond a `User-Agent: aireg/<version>` header.
+- **Usage events.** An installed aireg sends an event to `https://aireg.sh/t` as a JSON `POST` body, from a background process, when `add`, `install`, `remove`, `update`, `search`, `sync` or `publish` changes something or finishes. Event fields stay out of the request URL, and the sender does not follow redirects. Each carries aireg's version, OS and architecture, `ci=1` when `CI` is set, the coding agent running aireg, and a random ID kept in `telemetry-id`. A registry's `owner/repo`, the names of what was installed from it and a search query are sent only for a repository GitHub confirms is public.
+- **To GitHub, for that check.** aireg asks `https://api.github.com/repos/<owner>/<repo>` whether a github.com registry is public, without a token. A private repository, an error or no answer counts as private.
 
-Set `AIREG_DISABLE_UPDATE_CHECK=1` to stop the requests to the release server, then update with [`aireg self update`](self.md) when you choose. aireg also skips them when `CI` is set. A build from source doesn't check or update itself.
+The first command after install prints a notice about usage events on stderr and sends nothing; later commands send. Run `aireg config set telemetry false`, or set `DO_NOT_TRACK=1` or `AIREG_DISABLE_TELEMETRY=1`, to stop usage events and the GitHub check. A build from source sends none.
+
+Set `AIREG_DISABLE_UPDATE_CHECK=1` to stop the update requests, then update with [`aireg self update`](self.md) when you choose. aireg also skips them when `CI` is set. A build from source doesn't check or update itself.
 
 ## See also
 

@@ -18,11 +18,19 @@ import {
 } from "#cli/options/globals.ts";
 import { closest, didYouMean } from "#cli/options/suggest.ts";
 import { reportError } from "#cli/render/error.ts";
+import { flushTelemetry, noticeFirst } from "#cli/telemetry/queue.ts";
+import { sendQueued } from "#cli/telemetry/send.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { releaseLeasesOnInterrupt } from "#core/lease/lease.ts";
 import { LogLevelError } from "#core/log/level.ts";
 import { type LogBootstrap, openCliLog } from "#core/log/open.ts";
-import { DAEMON_FLAG, REMOVE_AFTER_FLAG, UPDATE_CHECK_FLAG } from "#core/product.ts";
+import { readStdin } from "#core/process.ts";
+import {
+  DAEMON_FLAG,
+  REMOVE_AFTER_FLAG,
+  TELEMETRY_FLAG,
+  UPDATE_CHECK_FLAG,
+} from "#core/product.ts";
 import { Printer } from "#core/term/printer.ts";
 import { NODE_REQUIREMENT, nodeTooOld, VERSION, versionInfo } from "#core/version.ts";
 import { extensionHost } from "#daemon/extension-host.ts";
@@ -115,7 +123,10 @@ async function setup(printer: Printer, rest: string[]): Promise<ExitCode> {
   }
   const { install } = await import("#cli/onboarding/setup.ts");
   const context = { argv: [], cwd: homedir(), printer, host: extensionHost(VERSION) };
-  return (await install(context, yes)) as ExitCode;
+  const code = (await install(context, yes)) as ExitCode;
+  await noticeFirst(printer);
+  await flushTelemetry();
+  return code;
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<ExitCode> {
@@ -176,6 +187,10 @@ async function dispatch(
   if (argv.length === 1 && argv[0] === UPDATE_CHECK_FLAG) {
     // A background check: a failure only means asking again next time.
     await refreshUpdates(recycleDaemon).catch(() => undefined);
+    return ExitCode.Ok;
+  }
+  if (argv.length === 1 && argv[0] === TELEMETRY_FLAG) {
+    await sendQueued(await readStdin()).catch(() => undefined);
     return ExitCode.Ok;
   }
   // After the daemon branch: the daemon installs its own, which log instead.
@@ -302,6 +317,8 @@ async function runCommand(
   } finally {
     // As above: scheduling the check never changes how the command ended.
     if (checksUpdates) await scheduleUpdateCheck().catch(() => undefined);
+    await noticeFirst(printer);
+    await flushTelemetry();
     log.close();
   }
 }

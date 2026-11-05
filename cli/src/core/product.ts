@@ -25,6 +25,11 @@ export const DATABASE_FILE = `${NAME}.db`;
 
 export const LOG_FILE = `${NAME}.log`;
 
+/** Usage events: the install ID and the notice shown, in the home, and the path on the release server. */
+export const TELEMETRY_ID_FILE = "telemetry-id";
+export const TELEMETRY_NOTICE_FILE = "telemetry-notice";
+export const TELEMETRY_PATH = "/t";
+
 /** The CLI's executable on disk; Windows finds a program by its extension. */
 export function executableFile(platform: NodeJS.Platform = process.platform): string {
   return platform === "win32" ? `${NAME}.exe` : NAME;
@@ -71,3 +76,4 @@ export const AGENT_CARD_ENTRY = "agent-card.json";
 export const DAEMON_FLAG = "--internal-daemon";
 export const UPDATE_CHECK_FLAG = "--internal-update-check";
 export const REMOVE_AFTER_FLAG = "--internal-remove-after";
+export const TELEMETRY_FLAG = "--internal-telemetry";

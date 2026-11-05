@@ -69,6 +69,20 @@ const SETTINGS = {
     },
     clear: (config: RegistryConfig): RegistryConfig => ({ ...config, paused: false }),
   },
+  telemetry: {
+    value: "true | false",
+    read: (config: RegistryConfig) => config.telemetry,
+    write: (config: RegistryConfig, value: string): RegistryConfig => {
+      if (value !== "true" && value !== "false") {
+        throw new AiregError(`\`telemetry\` takes true or false, not ${quoted(value)}.`, {
+          code: ErrorCode.Usage,
+          hint: "Run `aireg config set telemetry false` to stop usage events.",
+        });
+      }
+      return { ...config, telemetry: value === "true" };
+    },
+    clear: (config: RegistryConfig): RegistryConfig => ({ ...config, telemetry: true }),
+  },
 } as const;
 
 type Key = keyof typeof SETTINGS;

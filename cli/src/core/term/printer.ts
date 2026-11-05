@@ -202,6 +202,12 @@ export class Printer {
     this.err.write(`${this.errStyle.cyan("hint:")} ${sanitizeBlock(message)}\n`);
   }
 
+  /** Shown in every format: it goes to stderr, so `--json` output stays clean. */
+  notice(message: string): void {
+    this.followsProblem = false;
+    this.err.write(`${this.errStyle.bold("notice:")} ${sanitizeBlock(message)}\n`);
+  }
+
   /** One envelope shape for every command, so callers branch on `ok` alone. */
   json(payload: {
     ok: boolean;

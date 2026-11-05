@@ -4,6 +4,7 @@ import { search } from "#cli/commands/search/rank.ts";
 import type { SearchMatch, SearchResult, SkippedRegistry } from "#cli/commands/search/result.ts";
 import { SEARCH_COMMAND } from "#cli/commands/search/spec.ts";
 import { needsInput, parse } from "#cli/options/parse.ts";
+import { trackSearch } from "#cli/telemetry/events.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { formatAddress } from "#core/ref.ts";
 import { scopeName } from "#core/store/paths.ts";
@@ -110,6 +111,11 @@ export const { run } = defineCommand({
       matches.filter((match) => kind === undefined || match.kind === kind),
       query,
     );
+    const searched = targets.map((target) => ({
+      location: target.input,
+      adapter: target.flags.adapter,
+    }));
+    trackSearch(query, found.length, kind, searched);
     return { data: { query, matches: found.map(published), skipped }, next: found[0]?.add };
   },
   data: (result) => result.data,

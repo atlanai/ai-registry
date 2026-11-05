@@ -37,6 +37,9 @@ to the user, then run `sh install`; on Windows, download `install.ps1` and run i
 `~/.aireg/bin` and adds that folder to the PATH of new shells only, so in this session run
 `~/.aireg/bin/aireg`.
 
+The first aireg command prints a notice on stderr that aireg collects usage data. Tell the user,
+and offer to turn it off with `aireg config set telemetry false`.
+
 ## 2. Install the aireg skills
 
 The aireg skills cover the rest: `aireg-new` sets up a registry, `aireg-add` installs from one,

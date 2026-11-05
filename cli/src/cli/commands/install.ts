@@ -6,6 +6,7 @@ import { confirmIfDestructive } from "#cli/prompt/confirm-plan.ts";
 import { cancel, interaction } from "#cli/prompt/interaction.ts";
 import { exitOnClash, reportCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize } from "#cli/render/plan.ts";
+import { trackRun } from "#cli/telemetry/events.ts";
 import { type RunResult, runPipeline } from "#engine/install/pipeline.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
@@ -44,6 +45,7 @@ export const { run } = defineCommand({
       cancel(step);
       return STREAMED;
     }
+    trackRun("install", result, "install");
     exitOnClash(context, result.plan);
     return {
       data: { ...outcome(result, common.dryRun), unchanged: result.plan.unchanged },

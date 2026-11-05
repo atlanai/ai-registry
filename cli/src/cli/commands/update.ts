@@ -7,6 +7,7 @@ import { confirmIfDestructive } from "#cli/prompt/confirm-plan.ts";
 import { cancel, interaction } from "#cli/prompt/interaction.ts";
 import { exitOnClash, reportCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
+import { trackUpdate } from "#cli/telemetry/events.ts";
 import { asksFor } from "#core/manifest/match.ts";
 import { lockView } from "#core/plan/acquire/lock-view.ts";
 import { formatRef, refName } from "#core/ref.ts";
@@ -114,6 +115,7 @@ async function update(
     cancel(step);
     return STREAMED;
   }
+  trackUpdate(result);
   exitOnClash(context, result.plan);
   return { data: outcome(result, common.dryRun), ran: result };
 }

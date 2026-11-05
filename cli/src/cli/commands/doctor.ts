@@ -14,6 +14,7 @@ import {
 } from "#cli/onboarding/own-skills.ts";
 import { noArguments, parse } from "#cli/options/parse.ts";
 import { underHome } from "#cli/render/home.ts";
+import { savedTelemetryState, type TelemetryState } from "#cli/telemetry/state.ts";
 import { loadAdapters } from "#core/adapter/load.ts";
 import { fileExposure } from "#core/credentials/store.ts";
 import { ExitCode } from "#core/errors.ts";
@@ -103,7 +104,7 @@ async function checksFor(
       name: "telemetry",
       ok: true,
       info: true,
-      detail: "none",
+      detail: telemetryDetail(await savedTelemetryState()),
     },
     updates(releaseStamp(), cached),
   ];
@@ -237,6 +238,13 @@ async function ownSkills(cwd: string): Promise<Check> {
     detail: "not installed",
     fix: ownSkillsCommand(),
   };
+}
+
+function telemetryDetail(state: TelemetryState): string {
+  if (state.on) return "usage events on; turn them off with `aireg config set telemetry false`";
+  if (state.why === "opted-out") return `off, because ${state.switch} is set`;
+  if (state.why === "config") return "off, because `aireg config` has telemetry false";
+  return "off: a build from source sends none";
 }
 
 function updates(stamp: ReleaseStamp | undefined, cached: UpdateCache | undefined): Check {

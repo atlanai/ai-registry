@@ -26,7 +26,7 @@ Node.js requires 22.23.4+ on major 22, 24.22.1+ on major 24, or 26.12.1 and late
 | `credentials` | Whether aireg stores any sign-in, and that only you can read the file. |
 | `user scope` | Where your user scope is. |
 | `aireg skills` | Whether the skills that teach your coding agent to use aireg are installed, and the commands to install them if not. If the skills installed come from another release's tag, such as after aireg updated itself, it shows `!` and the commands that pin them to this release, at the address your user scope declares them from. |
-| `telemetry` | aireg sends no usage analytics. An installed aireg checks its release server for updates at most every 15 minutes and installs them, unless `CI` is set or `AIREG_DISABLE_UPDATE_CHECK=1`; a build from source never does. See [Network and privacy](environment.md#network-and-privacy). |
+| `telemetry` | Whether aireg sends usage events. An installed aireg checks its release server for updates at most every 15 minutes and installs them, unless `CI` is set or `AIREG_DISABLE_UPDATE_CHECK=1`; a build from source never does. See [Network and privacy](environment.md#network-and-privacy). |
 | `updates` | The release channel this aireg updates from and whether a newer one is available, or that it is a build that doesn't update itself. |
 
 It ends with `This machine is ready.`, or the number of problems to fix, and how many suggestions it made.
