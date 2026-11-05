@@ -11,7 +11,6 @@ const OFFER: OfferedVersion = {
   description: "mine",
 };
 
-/** Serves one in-memory root, so the writer's output is read back by the real reader. */
 function rootOf(documents: Readonly<Record<string, unknown>>) {
   return (path: string) => {
     const found = documents[path];
@@ -43,7 +42,6 @@ describe("mergedVersions", () => {
     const versions = document.versions as Record<string, unknown>[];
 
     expect(versions.map((row) => row.version)).toEqual(["0.2.0", "0.1.0"]);
-    // The old row survives untouched, `published_at` and `released_by` included.
     expect(versions[1]).toEqual(existing.versions[0]);
     expect(document.latest).toBe("0.2.0");
   });

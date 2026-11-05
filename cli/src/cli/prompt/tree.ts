@@ -131,7 +131,8 @@ export class Selection<T> {
     if (this.whole(node)) return "all";
     if (node.kind === "leaf") return this.picked.has(node.choice.value) ? "all" : "none";
     const taken = node.leaves.filter((choice) => this.picked.has(choice.value)).length;
-    return taken === 0 ? "none" : taken === node.leaves.length ? "all" : "some";
+    if (taken === 0) return "none";
+    return taken === node.leaves.length ? "all" : "some";
   }
 
   /** Leaves picked on their own or through their group. */

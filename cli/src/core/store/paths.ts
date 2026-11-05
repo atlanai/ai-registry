@@ -11,7 +11,6 @@ import { canonical } from "#core/fs/realpath.ts";
 import { kindDir, stagedLeaf } from "#core/kinds.ts";
 import { HOME_DIR, LEGACY_TARGETS_DIR, TARGETS_DIR } from "#core/product.ts";
 
-/** Where a command installs: this project, or `-g` for the user. */
 export const SCOPES = ["user", "project"] as const;
 export type Scope = (typeof SCOPES)[number];
 
@@ -22,34 +21,30 @@ export interface Where {
   env: NodeJS.ProcessEnv;
 }
 
-/** The one folder each scope keeps its manifest, lock and installed copies in. */
 export const SCOPE_DIR = ".registry";
 export const MANIFEST_FILE = "manifest.yml";
 const LOCK_FILE = "manifest.lock.yml";
 
 export interface Roots {
   scope: Scope;
-  /** Project directory; also what relative link paths in the lock resolve against. */
+  /** Relative link paths in the lock resolve against this. */
   cwd: string;
-  /** Paths recorded in the lock are relative to this, so the file stays portable. */
+  /** Lock paths are relative to this, so the file stays portable. */
   base: string;
   manifest: string;
   lock: string;
-  /**
-   * This scope's only content tree. Use `namespaceDir`, `artifactPath` and
-   * `projectionDir` rather than joining onto it.
-   */
+  /** Use `namespaceDir`, `artifactPath` and `projectionDir` rather than joining onto it. */
   artifacts: string;
-  /** Apply journal, deleted once the lock is written. */
+  /** Deleted once the lock is written. */
   applyJournal: string;
 }
 
-/** The tool's own files: `AIREG_HOME`, else `~/.aireg`. Nothing you install lives here. */
+/** `AIREG_HOME`, else `~/.aireg`. Nothing installed lives here. */
 export function toolHome(env: NodeJS.ProcessEnv = process.env): string {
   return canonical(toolHomeRoot(env));
 }
 
-/** Caller-selected location before filesystem aliases are resolved. */
+/** Like `toolHome`, but before symlinks are resolved. */
 export function toolHomeRoot(env: NodeJS.ProcessEnv = process.env): string {
   return setting("HOME", env) ?? join(homeDir(env), HOME_DIR);
 }
@@ -62,8 +57,8 @@ export function stateDir(env: NodeJS.ProcessEnv = process.env): string {
 export const LEASES_DIR = "leases";
 
 /**
- * Creates the home owner-only before anything goes in it, whatever the umask: stored
- * credentials are refused under a home other users can write to. An existing one keeps its mode.
+ * Owner-only whatever the umask: credentials are refused under a home others can write to.
+ * An existing home keeps its mode.
  */
 export function ensureHome(env: NodeJS.ProcessEnv = process.env): string {
   const home = toolHome(env);
@@ -71,10 +66,7 @@ export function ensureHome(env: NodeJS.ProcessEnv = process.env): string {
   return home;
 }
 
-/**
- * The user scope's folder, where `-g` installs: `AIREG_USER_SCOPE`, else
- * `~/.registry`. Set on its own, never worked out from `AIREG_HOME`.
- */
+/** `AIREG_USER_SCOPE`, else `~/.registry`; never derived from `AIREG_HOME`. */
 export function userScopeDir(env: NodeJS.ProcessEnv = process.env): string {
   return canonical(setting("USER_SCOPE", env) ?? join(homeDir(env), SCOPE_DIR));
 }
@@ -84,25 +76,20 @@ export function credentialsPath(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), "credentials.json");
 }
 
-/** Signed adapter modules, one directory per id and version. */
 export function adaptersDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), "adapters");
 }
 
-/** Target definitions of your own, one JSON file each. */
 export function targetsDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), TARGETS_DIR);
 }
 
-/** The folder aireg 0.1 keeps target definitions in, still read beside `targetsDir`. */
+/** Where aireg 0.1 kept target definitions; still read beside `targetsDir`. */
 export function legacyTargetsDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), LEGACY_TARGETS_DIR);
 }
 
-/**
- * Sibling of `adapters/<id>/<version>/`, never inside it: unpin deletes the
- * version directories only, and these files must survive a version swap.
- */
+/** Beside the version directories: unpin deletes those, and this must survive a swap. */
 export function adapterDataDir(id: string, env: NodeJS.ProcessEnv = process.env): string {
   return join(adaptersDir(env), id);
 }
@@ -116,7 +103,7 @@ export function adapterModulePath(
   return join(adapterDataDir(id, env), version, filename);
 }
 
-/** The user scope's leases, outside its tree so they survive that tree being replaced. */
+/** Outside the user scope's tree so leases survive that tree being replaced. */
 export function leasesDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), LEASES_DIR);
 }
@@ -143,34 +130,24 @@ function journalPath(dir: string, env: NodeJS.ProcessEnv): string {
   return join(toolHome(env), "journals", `${key}.json`);
 }
 
-/** Scope is positional rather than declared: the user scope's folder, else a project. */
+/** Positional, not declared: the user scope's folder, else a project. */
 export function scopeFor(root: string, env: NodeJS.ProcessEnv = process.env): Scope {
   return resolve(canonical(root)) === userScopeDir(env) ? "user" : "project";
 }
 
-/**
- * The fetch cache: one clone per repository, kept between runs so the next fetch
- * is incremental. Deleting it costs a refetch and nothing else.
- */
+/** One clone per repository so fetches are incremental. Deleting it only costs a refetch. */
 export function cacheDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), "cache");
 }
 
-/**
- * Reserved directory at the artifacts root. Dot-prefixed so it cannot collide
- * with a registry alias, which `sanitizeName` never leaves dotted.
- */
+/** Dot-prefixed so it cannot collide with a registry alias, which `sanitizeName` never dots. */
 export const PROJECTIONS_DIR = ".projections";
 
-/** Everything one registry put in this scope. Its children are namespaces. */
 export function registryDir(roots: Pick<Roots, "artifacts">, source: string): string {
   return join(roots.artifacts, sanitizeName(source));
 }
 
-/**
- * One namespace of one registry: content and nothing else. No manifests, no
- * generated files, no packaging - those live in the projection beside it.
- */
+/** Content only: manifests, generated files and packaging live in the projection beside it. */
 export function namespaceDir(
   roots: Pick<Roots, "artifacts">,
   source: string,
@@ -180,8 +157,8 @@ export function namespaceDir(
 }
 
 /**
- * Separate from the content so that "if it is in the writable copy it is
- * pushable" stays true, and under `roots.artifacts` so a link into it is ours.
+ * Apart from content so everything in the writable copy stays pushable, and under
+ * `roots.artifacts` so a link into it is ours.
  */
 export function projectionDir(
   roots: Pick<Roots, "artifacts">,
@@ -196,10 +173,7 @@ export function projectionDir(
   );
 }
 
-/**
- * Keyed by what you called it rather than by version, so it is inspectable
- * without the lock and a rename shows up where you read it.
- */
+/** Keyed by local name, not version, so it is inspectable without the lock. */
 export function artifactPath(
   roots: Pick<Roots, "artifacts">,
   source: string,
@@ -225,20 +199,16 @@ export function stagingDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(cacheDir(env), ".staging");
 }
 
-/**
- * Where an adapter that cannot be read in place materializes bytes before they are
- * copied into a scope, keyed by the content digest they are checked against on reuse.
- */
+/** For adapters that cannot be read in place; keyed by the digest rechecked on reuse. */
 export function stagingPath(
   content: string | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
   const hex = digestHex(content ?? "");
-  // A lockfile names this digest, and a repository writes lockfiles: anything else is hashed, never spelled.
+  // Lockfiles come from repositories: anything but a real digest is hashed, never used as a path.
   return join(stagingDir(env), "sha256", isSha256Hex(hex) ? hex : sha256Hex(content ?? ""));
 }
 
-/** Where a command acts, in a person's words. */
 export function scopeName(scope: Scope): string {
   return scope === "user" ? "your user scope" : "this project";
 }

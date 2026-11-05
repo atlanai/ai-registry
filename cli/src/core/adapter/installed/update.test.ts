@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { readConfig, writeConfig } from "#core/config/repository.ts";
@@ -6,7 +6,6 @@ import { test } from "#test/kit/fixtures.ts";
 import type { AdapterRelease } from "./fetch.ts";
 import { originVersion, updateAdapters } from "./update.ts";
 
-/** This test's folder, which the kit removes after it. */
 let scratch: string;
 test.beforeEach(({ tmp }) => {
   scratch = tmp;
@@ -18,7 +17,8 @@ const stamp = () => ({
 });
 
 async function homeWith(adapters: Record<string, string>): Promise<NodeJS.ProcessEnv> {
-  const home = await mkdtemp(join(scratch, "aireg-adapter-update-"));
+  const home = join(scratch, "home");
+  await mkdir(home);
   const env = { AIREG_HOME: home };
   const current = await readConfig(env);
   await writeConfig({ ...current, adapters }, current.revision, env);

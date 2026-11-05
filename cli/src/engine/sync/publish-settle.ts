@@ -1,5 +1,5 @@
 import { isAdapterError } from "#adapter/index.ts";
-import { failureCode, RunErrorCode } from "#core/run/model.ts";
+import { failureCode, type ItemOutcome, RunErrorCode } from "#core/run/model.ts";
 import type { SyncExecutionHooks, SyncOutcome } from "./decide.ts";
 
 export interface PublishTally {
@@ -42,16 +42,14 @@ export function settlePublished(
       tally.published.has(item.artifact) || tally.archived?.has(item.artifact) === true;
     const error = tally.refusals.has(item.artifact)
       ? tally.refusals.get(item.artifact)
-      : tally.attempted.has(item.artifact)
-        ? batchError
-        : undefined;
+      : attemptedError(tally, item.artifact, batchError);
     const failed = !landed && error !== undefined;
     // A code alone cannot say why the registry refused this one; the adapter's message can.
     hooks.item(
       item.artifact,
       item.operation === "archive" ? "archiving" : "publishing",
       {
-        outcome: landed ? "changed" : failed ? "failed" : "attention",
+        outcome: settledOutcome(landed, failed),
         kind: item.kind,
         disposition: item.disposition,
         operation: item.operation,
@@ -60,4 +58,13 @@ export function settlePublished(
       failed && isAdapterError(error) ? { detail: error.message } : undefined,
     );
   }
+}
+
+function attemptedError(tally: PublishTally, artifact: string, batchError: unknown): unknown {
+  return tally.attempted.has(artifact) ? batchError : undefined;
+}
+
+function settledOutcome(landed: boolean, failed: boolean): ItemOutcome {
+  if (landed) return "changed";
+  return failed ? "failed" : "attention";
 }

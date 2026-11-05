@@ -119,7 +119,6 @@ function sameDeclaration(declared: RegistrySource | undefined, locked: LockRegis
   );
 }
 
-/** A locked row asked for again: at its version and commit, unless it is free to move. */
 function lockedWant(row: LockArtifact, free: boolean): Want {
   return {
     name: row.name,

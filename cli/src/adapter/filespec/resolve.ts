@@ -27,35 +27,30 @@ import {
 } from "./documents.ts";
 import { ENVELOPE, INDEX_DOCUMENT, isArtifactName, isNamespace, versionDir } from "./names.ts";
 
-/** A url with a scheme is on another host; any other resolves inside the root (section 11). */
+/** Section 11: a url with a scheme is on another host; any other resolves inside the root. */
 export function isRemote(url: string): boolean {
   return url.includes("://");
 }
 
-/** Where one described file is read from, relative to the root. */
 export function locatorOf(descriptor: FileDescriptor, dir: string, blobUrl: string): string {
   const relative = descriptor.urls?.find((url) => !isRemote(url));
   if (relative !== undefined) return `${dir}/${relative}`;
-  // Section 3.6: no relative url means the blob store, addressed by digest.
+  // Section 3.6: no relative url means the blob store.
   return blobUrl.replace("{digest}", digestHex(descriptor.digest));
 }
 
-/** Whether every file sits in the version directory, so it can be read where it lies. */
+/** Whether every file can be read where it lies, in the version directory. */
 export function besideEnvelope(artifact: Artifact): boolean {
   return artifact.files.every((file) => file.locator === `${artifact.id}/${file.path}`);
 }
 
-/**
- * Two round trips resolve a ref to bytes: the versions document, then the envelope and
- * the files it names. A name the caller did not ask for is never read.
- */
+/** A name the caller did not ask for is never read. */
 export async function resolveFromRoot(
   read: ReadPath,
   options: RootResolveOptions,
 ): Promise<Resolution> {
   const index = await readIndex(read);
-  // A want this index does not list is left to the caller: refusing it here
-  // would break the very push that is waiting to be indexed.
+  // A want the index does not list is left to the caller, or a push awaiting indexing breaks.
   const chosen = index.flatMap((entry) => {
     const reaching = options.wanted.filter((want) => covers(want, entry));
     const asked = reaching.length > 0;
@@ -64,8 +59,7 @@ export async function resolveFromRoot(
   });
 
   const rows = await inOrder(chosen, async ({ entry, asked, pinned }) => {
-    // A malformed path segment is the indexer's mistake, and installing from
-    // it would write that mistake into somebody's tree.
+    // A malformed segment is the indexer's mistake; installing it would write that into a tree.
     if (!usable(entry)) {
       throw new SpecError(
         `index.json lists ${quoted(`${entry.namespace}/${entry.kind}/${entry.name}@${entry.latest}`)}, which is not a valid path.`,
@@ -99,20 +93,16 @@ export async function resolveFromRoot(
 const narrowness = (want: Want) =>
   Number(want.namespace !== undefined) + Number(want.kind !== undefined);
 
-/** Where two wants reach one artifact, the one that names it more narrowly sets its version. */
+/** Where two wants reach one artifact, the narrower one sets its version. */
 function pinOf(reaching: readonly Want[]): string | undefined {
   return [...reaching]
     .filter((want) => want.version !== undefined)
     .sort((a, b) => narrowness(b) - narrowness(a))[0]?.version;
 }
 
-/** Entries read at once, up to this many: a registry of thousands is not read one by one. */
 const READS_AT_ONCE = 16;
 
-/**
- * `work` over every item, a few at a time, with results in the items' order. A failure
- * is the first item's that failed, as a one-by-one pass would have reported it.
- */
+/** Throws the first item's failure, as a one-by-one pass would. */
 async function inOrder<T, R>(items: readonly T[], work: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
   const failures = new Map<number, unknown>();
@@ -132,13 +122,12 @@ async function inOrder<T, R>(items: readonly T[], work: (item: T) => Promise<R>)
   return results;
 }
 
-/** What `resolveFromRoot` reads and how. */
 export interface RootResolveOptions {
   /** `blob_url` from `registry.json`, already defaulted. */
   blobUrl: string;
-  /** What the caller asked for. Empty means everything the index lists, at latest. */
+  /** Empty means everything the index lists, at latest. */
   wanted: readonly Want[];
-  /** Everything the index lists, with `wanted` applying only as pins. */
+  /** Everything the index lists, with `wanted` only as pins. */
   all?: boolean | undefined;
 }
 
@@ -148,7 +137,7 @@ function usable(entry: IndexRow): boolean {
 
 const UNRELEASED = new Set(["draft", "pending_review"]);
 
-/** Statuses that install, but with a warning the client gives from `Artifact.status`. */
+/** These install, with a warning from `Artifact.status`. */
 const CAUTIONED = new Set([...UNRELEASED, "deprecated", "archived"]);
 
 async function serve(
@@ -162,8 +151,7 @@ async function serve(
   withheld: Withheld[],
   blobUrl: string,
 ): Promise<Artifact | undefined> {
-  // Section 5 rule 7: a yanked version stays resolvable by name, because a
-  // lockfile pinning one must keep resolving, but `latest` must not hand it out.
+  // Section 5 rule 7: a lockfile may pin a yanked version, but `latest` never hands it out.
   if (version.yanked && pinned === undefined) return undefined;
 
   const status = version.status ?? "";
@@ -179,8 +167,7 @@ async function serve(
     });
     return undefined;
   }
-  // An archived artifact is retired: named, it still installs, but taking a
-  // whole namespace does not bring it along.
+  // Archived installs only when named, not with a whole namespace.
   if (version.status === "archived" && !asked) return undefined;
 
   const dir = versionDir(entry.namespace, entry.kind, entry.name, version.version);
@@ -208,10 +195,7 @@ function heldBack(version: VersionRow, pinned: string | undefined): boolean {
   return status === "blocked" || (pinned === undefined && UNRELEASED.has(status));
 }
 
-/**
- * The envelope as the root wrote it, never rebuilt: its digest is what a version
- * is pinned by, so recomputing it from parts would let a rewrite pass unnoticed.
- */
+/** Never rebuilt from parts, since that would let a rewrite pass the pinned digest. */
 async function readEnvelope(
   read: ReadPath,
   namespace: string,
@@ -227,8 +211,7 @@ async function readEnvelope(
   const raw = object(parsed, path);
   const metadata = object(raw.metadata, `${path} metadata`);
 
-  // Section 3.4: the envelope's own idea of where it lives must equal where it
-  // was found, or one of the two is lying about what was pinned.
+  // Section 3.4: the envelope must agree with where it was found, or one of the two lies about the pin.
   if (raw.kind !== kind) {
     throw new SpecError(
       `${path} says kind ${quoted(String(raw.kind))}, but it is under ${quoted(kind)}.`,
@@ -253,11 +236,10 @@ async function readEnvelope(
   if (raw.relationships !== undefined && !Array.isArray(raw.relationships)) {
     throw new SpecError(`${path} needs \`relationships\` to be a list.`, { path });
   }
-  // Unknown fields stay, since rule 4 says a reader ignores them and the digest covers them.
+  // Unknown fields stay: rule 4 says ignore them, and the digest covers them.
   const envelope = raw as unknown as Envelope;
 
-  // Section 6: verify the content digest equals the one the versions document
-  // named. Every mirror, CDN and host is untrusted; the client checks.
+  // Section 6: every mirror, CDN and host is untrusted, so the client checks the digest.
   const actual = contentDigest(envelope);
   if (actual !== expected) {
     throw new SpecError(
@@ -268,7 +250,7 @@ async function readEnvelope(
   return envelope;
 }
 
-/** Each descriptor is checked and kept as written, since the content digest covers all of it. */
+/** Descriptors are kept as written, since the content digest covers all of them. */
 function checkFiles(value: unknown, path: string): void {
   if (!Array.isArray(value)) throw new SpecError(`${path} has no \`files\` list.`, { path });
   const files = value.map((item, at) => {

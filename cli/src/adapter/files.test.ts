@@ -35,7 +35,7 @@ describe("readRegular", () => {
 });
 
 describe("copyRegular", () => {
-  test("copies a file larger than one read, digested on the way, with its executable bit", async () => {
+  test("copies a file larger than one read, digested on the way", async () => {
     await mkdir(join(root, "v"), { recursive: true });
     // Several stream chunks, so the digest has to be taken across all of them.
     const bytes = Buffer.alloc(300 * 1024, "ab");
@@ -51,9 +51,15 @@ describe("copyRegular", () => {
       executable: process.platform !== "win32",
     });
     expect((await readFile(join(root, "out"))).equals(bytes)).toBe(true);
-    if (process.platform !== "win32") {
-      expect((await stat(join(root, "out"))).mode & 0o111).not.toBe(0);
-    }
+  });
+
+  test.skipIf(process.platform === "win32")("keeps the executable bit on the copy", async () => {
+    await mkdir(join(root, "v"), { recursive: true });
+    await writeFile(join(root, "v", "run.sh"), "echo hi");
+    await chmod(join(root, "v", "run.sh"), 0o755);
+
+    await copyRegular(join(root, "v"), "run.sh", join(root, "out"));
+    expect((await stat(join(root, "out"))).mode & 0o111).not.toBe(0);
   });
 
   test("refuses a link, and never writes over a file already there", async () => {

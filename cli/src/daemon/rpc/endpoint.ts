@@ -10,10 +10,9 @@ import { isMissing } from "#core/fs/path.ts";
 import { NAME } from "#core/product.ts";
 import { ensureHome, stateDir, toolHome } from "#core/store/paths.ts";
 
-/** `sun_path` holds 104 bytes on macOS and 108 on Linux, its terminating NUL included. */
+/** `sun_path` holds 104 bytes on macOS and 108 on Linux, including the NUL. */
 const SOCKET_PATH_BYTES = process.platform === "darwin" ? 103 : 107;
 
-/** Keeps two aireg homes' sockets and services apart. */
 export function homeIdentity(home: string): string {
   return shortHash(home);
 }
@@ -22,10 +21,7 @@ export function daemonChallenge(): string {
   return randomBytes(32).toString("hex");
 }
 
-/**
- * Signed with a key only this user's home holds, so a process of another user
- * that took the endpoint first cannot answer it.
- */
+/** Keyed by this home, so another user's process that took the endpoint first cannot answer. */
 export function daemonProof(challenge: unknown): string | undefined {
   if (typeof challenge !== "string" || !CHALLENGE.test(challenge)) return undefined;
   const key = homeSecret(process.env, "daemon-key");
@@ -80,7 +76,7 @@ export function rpcEndpoint(
   platform: NodeJS.Platform = process.platform,
 ): string {
   if (platform === "win32") return pipeName(env);
-  // A folder another user made first is passed over; the last one, in aireg's home, they cannot make.
+  // A folder another user made first is passed over; they cannot make the last one, in aireg's home.
   const dirs = [
     ...[runtimeDir(env), tmpdir(), "/tmp"].map((base) =>
       privateAlready(base) ? base : join(base, `${NAME}-${user()}`),
@@ -96,8 +92,8 @@ export function rpcEndpoint(
 
 const SECRET = /^[0-9a-f]{32}$/;
 
-// Pipe names are machine-wide: a guessable one could be taken first. Node cannot check a pipe
-// server's owner, and a name listed while the daemon runs can be taken once it stops: hence the proof.
+// Pipe names are machine-wide and Node cannot check a pipe server's owner, so the name is secret
+// and the daemon still proves itself: a listed name can be taken once the daemon stops.
 function pipeName(env: NodeJS.ProcessEnv): string {
   return `\\\\.\\pipe\\${NAME}-${homeIdentity(toolHome(env))}-${homeSecret(env, "pipe-name")}`;
 }
@@ -141,7 +137,6 @@ function socketName(env: NodeJS.ProcessEnv): string {
   return `${NAME}-${user()}-${homeIdentity(toolHome(env))}.sock`;
 }
 
-/** Refuses an existing directory anybody else can enter. */
 export async function privateDirectory(dir: string): Promise<void> {
   if (process.platform === "win32") return;
   await mkdir(dir, { mode: PRIVATE_DIR }).catch((error: NodeJS.ErrnoException) => {
@@ -154,10 +149,7 @@ export async function privateDirectory(dir: string): Promise<void> {
   }
 }
 
-/**
- * A socket is trusted only when this user owns it. Another user could otherwise
- * bind the address first and read every token sent to it.
- */
+/** Another user could otherwise bind the address first and read every token sent to it. */
 export async function assertOwnSocket(endpoint: string): Promise<void> {
   if (process.platform === "win32") return;
   let info: Awaited<ReturnType<typeof lstat>>;
@@ -181,7 +173,7 @@ export function listening(endpoint: string): Promise<boolean> {
     });
     probe.once("error", (error: NodeJS.ErrnoException) => {
       if (error.code === "ECONNREFUSED" || error.code === "ENOENT") resolve(false);
-      // Reset on connect: something listens, but is serving as many clients as it allows.
+      // Something listens but is serving as many clients as it allows.
       else if (error.code === "ECONNRESET") resolve(true);
       else reject(error);
     });

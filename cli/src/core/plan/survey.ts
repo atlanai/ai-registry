@@ -8,10 +8,7 @@ import type { LinkMode, Lock, LockArtifact } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
 
-/**
- * The only reader of installed state. Keeping it in one place is what lets
- * `build` and `status` stay pure functions of values.
- */
+/** The only reader of installed state, so `build` and `status` stay pure. */
 export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
   const artifacts: Survey["artifacts"] = dict();
   // Each artifact walks and hashes its copies; hundreds at once would hold a
@@ -64,7 +61,6 @@ export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
 export interface ArtifactSurvey {
   /** Present in this scope's writable copy. */
   staged: boolean;
-  /** Undefined when nothing is staged. */
   digest: string | undefined;
   links: Record<
     string,
@@ -97,7 +93,7 @@ export function copyEdited(
   );
 }
 
-/** The copy here no longer matches what the lock says was installed. */
+/** This scope's copy no longer matches what the lock says was installed. */
 export function editedHere(
   entry: LockArtifact | undefined,
   state: ArtifactSurvey | undefined,

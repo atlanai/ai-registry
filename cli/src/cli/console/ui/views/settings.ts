@@ -22,7 +22,7 @@ export const SETTINGS_VIEW = defineView<readonly PolicyAxis[]>("settings", {
   keys: {},
 });
 
-/** What each of `STEP_POLICIES` means on an axis, in that order. */
+/** In `STEP_POLICIES` order. */
 const MEANING: Record<PolicyAxis, readonly string[]> = {
   pull: ["take what changed in the registry", "say it changed, take nothing", "do not look"],
   publish: ["send your edits up", "say you edited it, send nothing", "do not look"],
@@ -36,7 +36,6 @@ export function settingsView(props: {
   width: number;
   state: ConsoleState;
   cursor: number;
-  /** A section per contributed panel, for a setting aireg does not name. */
   extra: ReactNode[];
 }): ReactElement {
   const policy = props.state.policy;
@@ -120,7 +119,7 @@ function axisRow(
   );
 }
 
-/** An absent adopt follows publish and an absent claim never takes a folder, as a sync reads them. */
+/** An absent adopt follows publish and an absent claim never takes a folder, as sync does. */
 function effective(policy: SyncPolicy, axis: PolicyAxis): string {
   if (axis === "adopt") return policy.adopt ?? policy.publish;
   if (axis === "claim") return policy.claim ?? "off";

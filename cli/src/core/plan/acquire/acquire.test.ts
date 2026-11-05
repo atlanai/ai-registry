@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, vi } from "vitest";
 import { type Artifact, buildEnvelope } from "#adapter/index.ts";
-import { emptyLock, type Lock } from "#core/lock.ts";
+import type { Lock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { parseManifest } from "#core/manifest/parse.ts";
+import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { type AcquireOptions, acquire } from "./acquire.ts";
 import { answers, lockView } from "./lock-view.ts";
@@ -66,31 +67,19 @@ const manifest = (artifacts: string[]) =>
 
 /** One locked skill per name, each in the `platform` namespace. */
 function locked(versions: Record<string, string>): Lock {
-  const lock = emptyLock();
-  lock.registries.acme = {
-    location: "github.com/acme/registry",
-    adapter: "git",
-    key: "sha256:acme",
-    config: {},
-    revision: undefined,
-  };
+  const built = lockOf().registry("acme", { location: "github.com/acme/registry" });
   for (const [name, version] of Object.entries(versions)) {
-    lock.artifacts[`platform/${name}`] = {
-      registry: "acme",
+    built.artifact(`platform/${name}`, {
       id: `artifacts/platform/skill/${name}/${version}`,
-      name,
-      kind: "skill",
       namespace: "platform",
       address: `artifacts/platform/skill/${name}`,
       content: `sha256:${name}`,
       version,
       path: "",
       digest: "",
-      origin: undefined,
-      links: [],
-    };
+    });
   }
-  return lock;
+  return built.build();
 }
 
 describe("wanted", () => {

@@ -31,24 +31,23 @@ interface CreateSyncJob {
   expectedRevision: number;
   root: string;
   scope?: Scope;
-  /** The registry's name in the root's manifest. The account is bound through it. */
+  /** Name in the root's manifest; the account is bound through it. */
   registry: string;
   /** Declares the registry at this address when the root does not name it yet. */
   address?: string;
   adapter?: string;
-  /** The registry's adapter config, which only its adapter reads. */
   config?: SourceConfig;
   /** Refs to declare in the manifest. Absent takes the whole registry, unless `declaredOnly`. */
   refs?: string[];
   /** Keep current only what the manifest declares; never subscribe to the whole registry. */
   declaredOnly?: boolean;
-  /** Folders of your own artifacts to publish to `<registry>/<namespace>`, added to any already watched. */
+  /** Own-artifact folders to publish to `<registry>/<namespace>`, added to those already watched. */
   origins?: { to: string; from: string[] };
   name?: string;
   intervalSeconds?: number;
   /** Fields left out fall back to the adapter's default policy. */
   policy?: Partial<SyncPolicy>;
-  /** Defaults to true; a disabled job is created intact but never scheduled. */
+  /** Defaults to true; a disabled job is stored but never scheduled. */
   enabled?: boolean;
 }
 
@@ -85,37 +84,27 @@ export interface DaemonMethods {
     Record<string, never>,
     { config: RegistryConfig; activeRuns: RunRecord[]; daemon: DaemonInfo }
   >;
-  /**
-   * `created` is false when an existing row kept its id, which is what lets
-   * every job that named it keep working across a re-login.
-   */
+  /** `created` is false when an existing row kept its id, so its jobs survive a re-login. */
   "account.login": RpcMethod<
     {
       registry: string;
-      /**
-       * Declares the registry when the manifest does not name it yet:
-       * every other route into `manifest.yml` creates a job as a side effect.
-       */
+      /** Declares the registry when the manifest lacks it; every other route also creates a job. */
       address?: string;
       adapter?: string;
       config?: SourceConfig;
       defaultNamespace?: string;
       /** Handed to the adapter's sign-in and stored; never logged or sent back. */
       token?: string;
-      /** What `auth login` got from an OAuth sign-in, in place of a token; never logged or sent back. */
+      /** From an OAuth sign-in, in place of a token; never logged or sent back. */
       oauth?: { accessToken: string; refreshToken?: string; expiresAtMs?: number };
     },
-    /** `identity` is who the registry says signed in, when it says. */
     { account: Account; created: boolean; identity?: Identity }
   >;
   /** Deletes the sign-in and keeps the row, so jobs keep their reference. */
   "account.logout": RpcMethod<{ accountId: string }, { accountId: string }>;
   /** Deletes the row. Refused while a job references it. */
   "account.remove": RpcMethod<{ accountId: string }, { accountId: string }>;
-  /**
-   * Every edit with no other side effect, as one revision. Not a whole-document
-   * PUT: accounts change only through sign-in.
-   */
+  /** Edits with no side effect, as one revision; accounts change only through sign-in. */
   "settings.patch": RpcMethod<
     {
       expectedRevision: number;
@@ -126,15 +115,12 @@ export interface DaemonMethods {
   >;
   /** Separate because it also declares the registry in `manifest.yml`. */
   "job.create": RpcMethod<CreateJob, { config: RegistryConfig; job: Job }>;
-  /** Settles one artifact that needs a person, as an ordinary run the UI already follows. */
+  /** Settles one artifact that needs a person, as an ordinary run. */
   "conflict.resolve": RpcMethod<
     { jobId: string; name: string; resolution: ConflictResolution },
     { run: RunRecord }
   >;
-  /**
-   * The job is built from these params and never persisted, so the run carries
-   * no job id - which is what `runs.job_id` being nullable is for.
-   */
+  /** The job is never persisted, so the run has no job id (`runs.job_id` is nullable). */
   "sync.start": RpcMethod<
     {
       root: string;
@@ -142,15 +128,12 @@ export interface DaemonMethods {
       registry: string;
       policy: SyncPolicy;
       refs?: string[];
-      /** The command's `AIREG_TOKEN_<NAME>` for `registry`: this run's alone, never stored or logged. */
+      /** This run's `AIREG_TOKEN_<NAME>` for `registry`; never stored or logged. */
       token?: string;
     },
     { run: RunRecord }
   >;
-  /**
-   * The job is rebuilt from these params exactly as `sync.start` builds it,
-   * because an ephemeral job is never stored to look up again.
-   */
+  /** Rebuilds the job exactly as `sync.start` does, since an ephemeral job is never stored. */
   "sync.resolve": RpcMethod<
     {
       root: string;

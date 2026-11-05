@@ -2,11 +2,13 @@ import { homedir } from "node:os";
 import { PassThrough } from "node:stream";
 import { describe, expect, test } from "vitest";
 import { unhandled } from "#cli/render/tools.ts";
-import { emptyLock, type LockArtifact } from "#core/lock.ts";
+import { emptyLock } from "#core/lock.ts";
 import type { Plan, Selected } from "#core/plan/model.ts";
 import { roots, type Scope } from "#core/store/paths.ts";
+import { names } from "#core/target/ids.ts";
 import { resolveTargets } from "#core/target/table.ts";
 import { Printer } from "#core/term/printer.ts";
+import { lock } from "#test/kit/builders/lock.ts";
 import { emptyPlan } from "#test/kit/builders/plan.ts";
 import { KEY, terminal } from "#test/kit/fake-terminal.ts";
 import { withoutKind } from "#test/kit/target.ts";
@@ -21,7 +23,6 @@ import {
 import { equivalent } from "./equivalent.ts";
 
 const targetTable = resolveTargets({ HOME: "/home/dev" });
-/** A table where Codex has nowhere to put an agent, for what is said about a kind left out. */
 const noCodexAgents = withoutKind(targetTable, "codex", "agent");
 
 describe("methodIsMeaningful", () => {
@@ -85,8 +86,7 @@ describe("unreached", () => {
 
 describe("linkedTargets", () => {
   test("names each target once, however many members point into it", () => {
-    // A plugin is one entry in the plan but one link per member per target,
-    // so the line otherwise repeats each target for every member.
+    // One plan entry per plugin but one link per member per target, so targets would repeat.
     const plan: Plan = {
       ...emptyPlan(),
       actions: [
@@ -202,8 +202,6 @@ describe("confirmPlan", () => {
   }
 
   test("names the tools each artifact reaches, and what a tool skips", async () => {
-    const row = (kind: "skill" | "agent") =>
-      ({ kind, version: "0.1.0", links: [] }) as unknown as LockArtifact;
     const plan: Plan = {
       ...emptyPlan(),
       actions: [
@@ -235,10 +233,10 @@ describe("confirmPlan", () => {
         },
         {
           kind: "record",
-          lock: {
-            ...emptyLock(),
-            artifacts: { "pr-review": row("skill"), reviewer: row("agent") },
-          },
+          lock: lock()
+            .artifact("pr-review", { registry: "acme", version: "0.1.0" })
+            .artifact("reviewer", { registry: "acme", kind: "agent", version: "0.1.0" })
+            .build(),
         },
       ],
     };
@@ -256,12 +254,8 @@ describe("confirmPlan", () => {
   });
 
   test("places a plugin's members where the lock records them", async () => {
-    const row = (kind: "skill" | "agent", targets: string[]) =>
-      ({
-        kind,
-        version: "0.1.0",
-        links: targets.map((target) => ({ target, path: "p", mode: "symlink" })),
-      }) as unknown as LockArtifact;
+    const linked = (targets: string[]) =>
+      targets.map((target) => ({ target, path: "p", mode: "symlink" as const }));
     // One link per plugin, named for its first member.
     const plan: Plan = {
       ...emptyPlan(),
@@ -279,13 +273,19 @@ describe("confirmPlan", () => {
         { kind: "link", name: "pr-review", target: "codex", from: "/f", to: "/t2", copy: false },
         {
           kind: "record",
-          lock: {
-            ...emptyLock(),
-            artifacts: {
-              "pr-review": row("skill", ["claude-code", "codex"]),
-              reviewer: row("agent", ["claude-code"]),
-            },
-          },
+          lock: lock()
+            .artifact("pr-review", {
+              registry: "acme",
+              version: "0.1.0",
+              links: linked(["claude-code", "codex"]),
+            })
+            .artifact("reviewer", {
+              registry: "acme",
+              kind: "agent",
+              version: "0.1.0",
+              links: linked(["claude-code"]),
+            })
+            .build(),
         },
       ],
     };
@@ -331,8 +331,8 @@ describe("chooseTargets", () => {
     group: "engineering",
   });
   const BOTH = [item("skill", "pr-review"), item("agent", "reviewer")];
-  // Google Antigravity sorts first.
-  const TO_CLAUDE = [KEY.down];
+  const offered = names(targetTable).filter((name) => targetTable[name]?.shared === false);
+  const to = (name: string) => offered.slice(0, offered.indexOf(name)).map(() => KEY.down);
 
   async function pick(
     preselected: string[],
@@ -366,44 +366,38 @@ describe("chooseTargets", () => {
   });
 
   test("shows where the highlighted tool loads what was picked, and nothing on other rows", async () => {
-    const { shown } = await pick([], TO_CLAUDE);
+    const { shown } = await pick([], to("claude-code"));
     expect(shown).toMatch(/Claude Code\s+\.claude[\\/]skills, \.claude[\\/]agents/);
     expect(shown).not.toMatch(/Codex\s+\.agents/);
     expect(shown).not.toContain("Found");
   });
 
   test("follows the cursor: Codex reads skills from .agents, Cursor from .agents and .claude", async () => {
-    expect((await pick([], [...TO_CLAUDE, KEY.down])).shown).toMatch(
+    expect((await pick([], to("codex"))).shown).toMatch(
       /Codex\s+\.agents[\\/]skills, \.codex[\\/]agents$/m,
     );
-    expect((await pick([], [...TO_CLAUDE, KEY.down, KEY.down])).shown).toMatch(
+    expect((await pick([], to("cursor"))).shown).toMatch(
       /Cursor\s+\.agents[\\/]skills, \.claude[\\/]agents$/m,
     );
   });
 
   test("leaves a tool that loads none of it unpicked, with a dash", async () => {
     const agent = [item("agent", "reviewer")];
-    const { picked, shown } = await pick(
-      [],
-      [...TO_CLAUDE, KEY.down],
-      agent,
-      "project",
-      noCodexAgents,
-    );
+    const { picked, shown } = await pick([], to("codex"), agent, "project", noCodexAgents);
     expect(shown).toMatch(/Codex\s+-$/m);
     expect(picked).toEqual(["claude-code"]);
   });
 
   test("shows a user scope's folders under ~, never as absolute paths", async () => {
     const tools = resolveTargets({ HOME: homedir() });
-    const { shown } = await pick([], TO_CLAUDE, BOTH, "user", tools);
+    const { shown } = await pick([], to("claude-code"), BOTH, "user", tools);
     expect(shown).toContain("~/.claude/skills, ~/.claude/agents");
     expect(shown).not.toContain(homedir());
   });
 
   test("shows the plugin folder for a source that installs its namespaces as plugins", async () => {
     const tools = resolveTargets({ HOME: homedir() });
-    const { shown } = await pick([], TO_CLAUDE, BOTH, "user", tools, true);
+    const { shown } = await pick([], to("claude-code"), BOTH, "user", tools, true);
     expect(shown).toContain("~/.claude/skills/engineering");
   });
 

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, vi } from "vitest";
 import { cliClient } from "#daemon/rpc/client.ts";
 import { listening, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
+import { runDaemon } from "#daemon/runtime.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { runDaemon } from "./runtime.ts";
 
 describe("daemon runtime", () => {
   afterEach(() => vi.unstubAllEnvs());

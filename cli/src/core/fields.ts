@@ -8,10 +8,7 @@ export const RESERVED_KEYS: ReadonlySet<string> = new Set([
   "prototype",
 ]);
 
-/**
- * A map keyed by names a registry or a file chose, with no prototype: `constructor` or
- * `__proto__` is then only ever a key, never a property every object inherits.
- */
+/** No prototype, so a key a registry chose, such as `__proto__`, is only ever a key. */
 export function dict<T>(entries: Iterable<readonly [string, T]> = []): Record<string, T> {
   const out = Object.create(null) as Record<string, T>;
   for (const [key, value] of entries) out[key] = value;
@@ -34,7 +31,7 @@ export function textMapOf(value: unknown): Record<string, string> | undefined {
   return Object.fromEntries(entries) as Record<string, string>;
 }
 
-/** The keys `entry` has beyond `known`, sorted so a message reads the same each time. */
+/** Sorted so a message reads the same each time. */
 export function unknownKeys(entry: Fields, known: readonly string[]): string[] {
   return Object.keys(entry)
     .filter((key) => !known.includes(key))
@@ -51,7 +48,6 @@ export function unknownKeysProblem(
   return `${owner} does not take ${list(extra.map(quoted))}; it takes ${list([...known].sort())}.`;
 }
 
-/** The record without its undefined fields, as a file writes it. */
 export function withoutUndefined(record: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined));
 }

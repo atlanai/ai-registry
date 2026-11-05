@@ -71,10 +71,7 @@ export async function downloadArtifact(
   return bytes;
 }
 
-/**
- * A redirect is refused rather than followed: following one is exactly how a
- * derived URL turns back into an arbitrary-URL fetch.
- */
+/** Refuses redirects: following one turns a derived URL back into an arbitrary-URL fetch. */
 export async function fetchOriginBytes(
   url: string,
   limit: number,
@@ -107,8 +104,7 @@ export async function fetchOriginBytes(
     void reader.cancel(signal?.reason).catch(() => {});
   };
   signal?.addEventListener("abort", abort, { once: true });
-  // One buffer sized by the declared length when there is one, so a release binary
-  // is held once rather than as chunks and then again joined.
+  // Sized by the declared length so a release binary is not held twice, as chunks and joined.
   let bytes = new Uint8Array(Number.isFinite(declared) && declared >= 0 ? declared : 64 * 1024);
   let size = 0;
   try {

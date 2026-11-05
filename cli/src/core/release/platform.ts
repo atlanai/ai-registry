@@ -1,9 +1,6 @@
 import { AiregError, ErrorCode } from "#core/errors.ts";
 
-/**
- * A closed set, because the artifact filename is a path segment on the release
- * origin: an unrecognized platform has no name rather than an unvetted one.
- */
+/** Closed set: the name is a path segment on the release origin, so it must be vetted. */
 export const RELEASE_PLATFORMS = [
   "darwin-amd64",
   "darwin-arm64",
@@ -14,10 +11,7 @@ export const RELEASE_PLATFORMS = [
 ] as const;
 export type ReleasePlatform = (typeof RELEASE_PLATFORMS)[number];
 
-/**
- * Maps rather than object literals, so a lookup of `constructor` or `toString`
- * misses instead of returning something off Object.prototype.
- */
+/** Maps, so a lookup of `constructor` misses instead of hitting Object.prototype. */
 const OS = new Map<string, string>([
   ["darwin", "darwin"],
   ["linux", "linux"],
@@ -41,7 +35,6 @@ export function releasePlatform(
     : undefined;
 }
 
-/** The same lookup where having no build is fatal rather than a value to carry. */
 export function requireReleasePlatform(
   platform: string = process.platform,
   arch: string = process.arch,

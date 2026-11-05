@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -6,13 +6,12 @@ import { type SpecArtifact, skillBody, writeSpecRoot } from "#test/kit/spec-root
 import { canonicalize, contentDigest, sha256 } from "../spec/canonical.ts";
 import { resolveFromRoot } from "./resolve.ts";
 
-/** This test's folder, which the kit removes after it. */
 let scratch: string;
 test.beforeEach(({ tmp }) => {
   scratch = tmp;
 });
 
-/** Shares a name with `aireg/add`, and yanked its newest version. */
+// Shares a name with `aireg/add`.
 const OPS_ADD: SpecArtifact = {
   namespace: "ops",
   kind: "skill",
@@ -28,7 +27,6 @@ const OPS_ADD: SpecArtifact = {
   ],
 };
 
-/** Blocked at its newest version, with nothing active to stand in as latest. */
 const OPS_GATE: SpecArtifact = {
   namespace: "ops",
   kind: "skill",
@@ -45,7 +43,6 @@ const OPS_GATE: SpecArtifact = {
   ],
 };
 
-/** Waiting on review, so it has no release yet. */
 const OPS_DRAFT: SpecArtifact = {
   namespace: "ops",
   kind: "skill",
@@ -55,9 +52,8 @@ const OPS_DRAFT: SpecArtifact = {
 
 async function root(
   extra: readonly SpecArtifact[] = [],
-  dir?: string,
 ): Promise<(path: string) => Promise<Uint8Array | undefined>> {
-  const at = dir ?? (await mkdtemp(join(scratch, "aireg-spec-read-")));
+  const at = join(scratch, "registry");
   await writeSpecRoot(at, [
     {
       namespace: "aireg",
@@ -129,7 +125,7 @@ describe("resolveFromRoot", () => {
   test("names the newest version it holds where it served another, a yanked one included", async () => {
     const read = await root([OPS_ADD, OPS_GATE]);
     const listed = await resolveFromRoot(read, { blobUrl: "blobs", wanted: [], all: true });
-    // The blocked gate is withheld at its newest version, which says it already.
+    // The withheld gate already reports its newest version.
     expect(
       [...(listed.newest ?? [])].sort((a, b) => a.namespace?.localeCompare(b.namespace ?? "") ?? 0),
     ).toEqual([
@@ -196,8 +192,8 @@ describe("resolveFromRoot", () => {
   });
 
   test("verifies the envelope as written, fields it does not know included", async () => {
-    const dir = await mkdtemp(join(scratch, "aireg-spec-read-"));
-    const read = await root([], dir);
+    const read = await root();
+    const dir = join(scratch, "registry");
     const at = join(dir, "artifacts/aireg/skill/add/0.1.0/artifact.json");
     const raw = JSON.parse(await readFile(at, "utf8"));
     raw.x_future = { since: 2 };

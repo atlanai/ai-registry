@@ -20,7 +20,6 @@ import type { load } from "#engine/scope/load.ts";
 
 type Loaded = Awaited<ReturnType<typeof load>>;
 
-/** How to settle the first conflict, with the short name when it is unambiguous. */
 export async function conflictHint(
   loaded: Loaded,
   names: readonly string[],
@@ -55,15 +54,12 @@ export const PUBLISH_HINT = "Run `aireg publish` to publish what was edited here
 export interface Followed {
   attention: boolean;
   failed: boolean;
-  /** Why the run stopped before its work was done, in words, when it did. */
   stopped: string | undefined;
   run: RunRecord;
   artifacts: SettledArtifact[];
-  /** What the run did to your own files, or left undone. */
   warnings: string[];
 }
 
-/** One run's result, in the words `--dry-run` uses when there is nothing to do. */
 export function runSummary(
   counts: RunRecord["counts"],
   prefix: string,
@@ -83,14 +79,13 @@ export function runSummary(
   return `${prefix}Checked ${plural(examined, "artifact")}: ${list(parts)}.`;
 }
 
-/** Renders one run's item events in the vocabulary `--dry-run` already uses. */
 export async function follow(
   context: CommandContext,
   client: RpcClient,
   runId: string,
-  /** The registry, named on its summary line when the scope declares more than one. */
+  /** Named on the summary line only when the scope declares several registries. */
   label: string | undefined,
-  /** The registry the run was asked to cover, when one was named. */
+  /** The registry the run was limited to, if one was named. */
   named: string | undefined,
 ): Promise<Followed> {
   let attention = false;
@@ -117,7 +112,7 @@ export async function follow(
 
   const { run } = await client.request("run.get", { runId });
   const prefix = label === undefined ? "" : `${label}: `;
-  // It checked only part of the scope, so its counts must not read as being in sync.
+  // It checked only part of the scope, so its counts must not read as in sync.
   const stopped = isInterrupted(run.state)
     ? failureWords(run.errorCode ?? RunErrorCode.Canceled)
     : undefined;
@@ -141,13 +136,11 @@ function settledOf(name: string, event: RunEvent): SettledArtifact {
   };
 }
 
-/** A run that stopped before its work was done, under the name its command gave it. */
 export interface StoppedRun {
   name: string;
   reason: string;
 }
 
-/** What a command ends with when its runs stopped before their work was done. */
 export function stoppedError(
   what: string,
   stopped: readonly StoppedRun[],
@@ -164,7 +157,6 @@ export function stoppedError(
   });
 }
 
-/** What to run for what a sync left for you, as `--dry-run` would say it. */
 export async function attentionHints(
   context: CommandContext,
   loaded: Loaded,

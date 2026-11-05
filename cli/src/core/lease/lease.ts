@@ -68,14 +68,14 @@ export function releaseLeasesOnInterrupt(alsoStop: () => void): void {
       }
     }
     held.clear();
-    // Die of the signal, unless the command handles it itself.
+    // Die of the signal unless the command handles it itself.
     if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
   };
   process.once("SIGINT", interrupted);
   process.once("SIGTERM", interrupted);
 }
 
-/** Leases this process holds, by directory, so an interrupt can hand them back. */
+/** By directory, so an interrupt can hand them back. */
 const held = new Map<string, string>();
 
 /** A holder that lost its lease must not write its stale snapshot over the new holder's work. */

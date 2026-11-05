@@ -1,7 +1,6 @@
 import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 
-/** A skill's front matter and body, as a folder of skills writes it. */
 export function skillFile(name: string, description = `${name}.`, body = `Use ${name}.\n`): string {
   return `---\nname: ${name}\ndescription: ${description}\n---\n${body}`;
 }
@@ -16,7 +15,7 @@ class FolderBuilder {
     this.#root = root;
   }
 
-  /** A skill folder at `at`, such as `skills/pdf`, named after its last segment. */
+  /** Named after the last segment of `at`. */
   skill(at: string, options: { description?: string; body?: string; name?: string } = {}): this {
     const name = options.name ?? posix.basename(at);
     return this.file(
@@ -25,12 +24,10 @@ class FolderBuilder {
     );
   }
 
-  /** An agent file at `at`, such as `agents/reviewer.md`. */
   agent(at: string, options: { description?: string; body?: string } = {}): this {
     return this.file(at, skillFile(posix.basename(at, ".md"), options.description, options.body));
   }
 
-  /** A JSON document at `at`, such as a marketplace or a plugin manifest. */
   json(at: string, value: unknown): this {
     return this.file(at, `${JSON.stringify(value, null, 2)}\n`);
   }
@@ -66,10 +63,7 @@ export function skillsFolder(root: string): FolderBuilder {
   return new FolderBuilder(root);
 }
 
-/**
- * A marketplace of two plugins: `docs-kit`, with its own manifest, two skills and a command, and
- * `deploy-kit`, which carries hooks and an MCP server and has only its entry for a manifest.
- */
+/** Two plugins: `docs-kit` has a manifest; `deploy-kit` has hooks, an MCP server and none. */
 export function marketplace(root: string): FolderBuilder {
   return skillsFolder(root)
     .json(".claude-plugin/marketplace.json", {

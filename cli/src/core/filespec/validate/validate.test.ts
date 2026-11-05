@@ -24,14 +24,12 @@ function clean(root: string): Builder {
 
 const test = base.extend("root", ({ tmp }) => join(tmp, "registry"));
 
-/** A file under the root, made with its folders. */
 async function put(root: string, path: string, body: string): Promise<void> {
   await mkdir(join(root, path, ".."), { recursive: true });
   await writeFile(join(root, path), body);
 }
 
 interface Case {
-  /** What a pull request got wrong. */
   name: string;
   build?: (registry: Builder) => Builder;
   edit?: (root: string) => Promise<unknown>;

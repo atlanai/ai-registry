@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import type { Entry } from "#core/catalog/catalog.ts";
@@ -13,7 +13,6 @@ import {
   throughManifest,
 } from "./probe.ts";
 
-/** This test's folder, which the kit removes after it. */
 let scratch: string;
 test.beforeEach(({ tmp }) => {
   scratch = tmp;
@@ -172,7 +171,8 @@ describe("atAddress", () => {
 
 describe("insideRegistry", () => {
   async function registryAt(): Promise<string> {
-    const root = await mkdtemp(join(scratch, "aireg-inside-"));
+    const root = join(scratch, "registry");
+    await mkdir(root);
     await writeFile(join(root, "registry.json"), "{}");
     await mkdir(join(root, "artifacts/engineering/skill/pr-review/1.2.0"), { recursive: true });
     return root;

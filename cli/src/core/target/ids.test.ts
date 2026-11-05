@@ -1,8 +1,17 @@
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { BUILTIN_TARGETS } from "#targets/index.ts";
 import type { Target } from "./contract.ts";
 import { canonicalId, canonicalIds, categoryOfEarlier, earlierId, earlierTable } from "./ids.ts";
 import { resolveTargets } from "./table.ts";
+
+/** The built-ins aireg 0.1 knew by another id; every other built-in kept its id. */
+const EARLIER: Record<string, string> = {
+  "claude-code": "claude",
+  "github-copilot": "copilot",
+  "gemini-cli": "gemini",
+  universal: "agents",
+};
 
 describe("resolveTargets", () => {
   test("expands each user root against HOME", () => {
@@ -34,18 +43,11 @@ describe("resolveTargets", () => {
     const table = resolveTargets(process.env);
     expect(
       Object.fromEntries(Object.values(table).map((each) => [each.name, each.aliases])),
-    ).toEqual({
-      antigravity: [],
-      "claude-code": ["claude"],
-      codex: [],
-      cursor: [],
-      "github-copilot": ["copilot"],
-      "gemini-cli": ["gemini"],
-      grok: [],
-      opencode: [],
-      pi: [],
-      universal: ["agents"],
-    });
+    ).toEqual(
+      Object.fromEntries(
+        BUILTIN_TARGETS.map(({ id }) => [id, EARLIER[id] === undefined ? [] : [EARLIER[id]]]),
+      ),
+    );
   });
 });
 
@@ -81,18 +83,7 @@ describe("earlierTable", () => {
     const claude = Object.values(table).find((target) => target.name === "claude");
     expect(claude?.displayName).toBe("Claude Code");
     expect(Object.keys(table).sort()).toEqual(
-      [
-        "agents",
-        "antigravity",
-        "claude",
-        "codex",
-        "copilot",
-        "cursor",
-        "gemini",
-        "grok",
-        "opencode",
-        "pi",
-      ].sort(),
+      BUILTIN_TARGETS.map(({ id }) => EARLIER[id] ?? id).sort(),
     );
     expect(table.agents?.kind).toBe("shared");
     expect(table.codex?.reads).toEqual({ skill: ["agents"] });

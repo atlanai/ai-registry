@@ -14,7 +14,6 @@ export function shownAddress(address: string): string {
 export const NAME_COLLISION_HINT =
   "To change the default, run `aireg config set defaults.name-collision <rename|report|fail>`.";
 
-/** The name a target folder shows: the last segment of an installed name. */
 export function leafOf(name: string): string {
   return name.split("/").at(-1) ?? name;
 }

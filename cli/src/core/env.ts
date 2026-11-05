@@ -79,7 +79,7 @@ export function tokenVariable(alias: string): string {
   return `${TOKEN_PREFIX}${alias.toUpperCase().replaceAll(/[^A-Z0-9]/g, "_")}`;
 }
 
-/** `env` with no `AIREG_TOKEN_<NAME>` in it. */
+/** A copy of `env` with no `AIREG_TOKEN_<NAME>` in it. */
 export function withoutTokens(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([name]) => !isTokenVariable(name)));
 }

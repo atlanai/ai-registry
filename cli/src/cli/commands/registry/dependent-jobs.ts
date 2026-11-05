@@ -12,8 +12,8 @@ import { withFreshConfig } from "#daemon/rpc/client.ts";
 const jobName = (job: Job) => job.name ?? job.id;
 
 /**
- * The jobs in this scope that go with the registry, which cannot outlive it. A job set up for
- * more than syncing, such as one that publishes your folders, is refused rather than removed.
+ * Jobs that go with the registry and cannot outlive it. One set up for more than syncing,
+ * such as one that publishes your folders, is refused rather than removed.
  */
 export function registryJobs(config: RegistryConfig, alias: string, scope: Roots): Job[] {
   const accounts = new Set(
@@ -42,7 +42,7 @@ function uses(job: Job, alias: string, accounts: ReadonlySet<string>): boolean {
   return accounts.has(job.account) || job.steps.some((step) => step.to?.split("/")[0] === alias);
 }
 
-/** What `add` creates to keep a scope in sync: aireg's own steps, none of them your folders. */
+/** What `add` creates: aireg's own sync steps, none of them your folders. */
 function syncsOnly(job: Job): boolean {
   return job.steps.every((step) => isScopeStep(step) && step.kind !== "origins");
 }

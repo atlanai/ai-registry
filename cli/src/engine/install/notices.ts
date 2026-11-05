@@ -6,7 +6,7 @@ import { displayPath } from "#core/sync/adopt.ts";
 import type { Targets } from "#core/target/contract.ts";
 import type { Printer } from "#core/term/printer.ts";
 
-/** Something an apply did to a person's files, or left undone, worded once for every caller. */
+/** Worded once for every caller. */
 export interface ApplyNotice {
   message: string;
   hint?: string;
@@ -55,7 +55,6 @@ function keptNotice(roots: Roots, kept: ApplyResult["kept"][number]): string {
   return `Did not install ${name} at ${shown}: ${sanitizeText(reason)}.`;
 }
 
-/** A tool by its name, and a shared folder by its path, as the summary names them. */
 function displayName(targetTable: Targets, name: string): string {
   const target = targetTable[name];
   if (target === undefined) return name;

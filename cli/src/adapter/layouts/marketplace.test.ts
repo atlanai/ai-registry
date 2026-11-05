@@ -208,7 +208,6 @@ describe("the marketplace layout", () => {
   test("fetches remote plugins side by side, eight at most, and one repository's in turn", async ({
     tmp,
   }) => {
-    // Twenty plugins in ten repositories, two to each.
     const names = Array.from({ length: 20 }, (_, at) => `p${at}`);
     const repository = (name: string) => `acme/r${Number(name.slice(1)) % 10}`;
     const root = await skillsFolder(join(tmp, "mkt"))

@@ -9,15 +9,12 @@ import type { Scope } from "#core/store/paths.ts";
 import { GLYPH } from "#core/term/theme.ts";
 import { probe } from "#engine/address/probe.ts";
 export interface OnboardingFlow {
-  /** Where artifacts come from. Declared, signed in to, and pulled whole. */
   registry: string;
   alias: string | undefined;
-  /** Named when the address alone does not say which adapter reads it. */
   adapter: string | undefined;
-  /** `<registry>/<namespace>`: where work authored here is published. */
+  /** `<registry>/<namespace>`. */
   namespace: string | undefined;
   tokenStdin: boolean;
-  /** Whether to add a background job that keeps the project in sync. */
   watch: boolean;
 }
 
@@ -26,10 +23,6 @@ export interface Step {
   detail: string;
 }
 
-/**
- * The one order that works: pull first, so a skill the registry already
- * publishes is recognized as theirs rather than imported as your own.
- */
 export async function onboard(
   context: CommandContext,
   flow: OnboardingFlow,
@@ -40,8 +33,7 @@ export async function onboard(
   const alias = flow.alias ?? (await registryName(flow, context.cwd));
   const at = scopeArgv(scope);
 
-  // Signing in declares the registry: a private one cannot be read without a
-  // credential, and there is nowhere to hang one until it is declared.
+  // Signing in also declares the registry, which a private one needs before it can be read.
   if (flow.tokenStdin) {
     const adapter = flow.adapter === undefined ? [] : ["--adapter", flow.adapter];
     await delegate("auth", context, [
@@ -65,8 +57,7 @@ export async function onboard(
     done.push({ name: "namespace", detail: flow.namespace });
   }
 
-  // Whole registry: a namespace added to it or removed must show up on the next
-  // sync. A named-ref list goes stale.
+  // The whole registry, so a namespace added or removed shows up on the next sync.
   const added = (await delegate("add", context, [alias, "--all", "--yes", ...at])) as
     | { installed?: unknown[] }
     | undefined;
@@ -74,12 +65,10 @@ export async function onboard(
   done.push({ name: "pulled", detail: `${plural(installed, "artifact")} from ${alias}` });
 
   if (imports.length > 0) {
-    // Runs after the pull on purpose: anything the registry already
-    // publishes is claimed by the lock by now and is not imported again.
+    // After the pull on purpose: what the registry already publishes is claimed by the lock.
     const { applyImport, planImport } = await import("./import.ts");
     const planned = await planImport(context.cwd, imports, scope);
-    // `<registry>/<namespace>`; with no namespace declared the registry
-    // itself is the one it publishes under.
+    // With no namespace declared, the registry itself is the one it publishes under.
     const namespace = flow.namespace?.split("/").slice(1).join("/");
     const imported = await applyImport(planned, {
       registry: alias,
@@ -109,10 +98,6 @@ export async function onboard(
   return done;
 }
 
-/**
- * The name `aireg registry add` gives it: the one in its registry.json. One that cannot be
- * read before you sign in is named after its address instead.
- */
 async function registryName(flow: OnboardingFlow, cwd: string): Promise<string> {
   const fallback = sanitizeName(lastSegment(flow.registry));
   if (flow.tokenStdin) return fallback;
@@ -142,10 +127,7 @@ function scopeArgv(scope: Scope): string[] {
   return scope === "user" ? ["-g"] : [];
 }
 
-/**
- * Static imports, because a template literal here makes the bundler pull in
- * every file in the commands directory, test files included.
- */
+// Static imports: a template literal makes the bundler pull in every command file, tests included.
 const DELEGATES = {
   add: () => import("#cli/commands/add.ts"),
   auth: () => import("#cli/commands/auth.ts"),
@@ -154,7 +136,6 @@ const DELEGATES = {
   registry: () => import("#cli/commands/registry.ts"),
 } as const;
 
-/** Runs one step's command, whose result `init` reports in its own summary: the step's data. */
 async function delegate(
   command: keyof typeof DELEGATES,
   context: CommandContext,
@@ -173,7 +154,7 @@ async function delegate(
     : (JSON.parse(last) as { data?: unknown }).data;
 }
 
-/** `init` checked it before writing anything. */
+/** `init` validated it before writing anything. */
 async function setNamespace(namespace: string): Promise<void> {
   const config = await readConfig();
   await writeConfig({ ...config, defaults: { ...config.defaults, namespace } }, config.revision);
@@ -195,7 +176,6 @@ async function publishes(flow: OnboardingFlow, cwd: string): Promise<boolean> {
   return adapter.capabilities.publish !== false;
 }
 
-/** Offers what was edited here, and is a step only when something was sent. */
 async function publishLocal(
   context: CommandContext,
   alias: string,

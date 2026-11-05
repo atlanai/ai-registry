@@ -12,7 +12,6 @@ import type { Loaded } from "#engine/scope/load.ts";
 
 export interface Scan {
   items: SyncItem[];
-  /** Where this scope's own copies live, which is what a publish sends. */
   roots: Roots;
   local: Candidate[];
   undeclared: Candidate[];
@@ -22,7 +21,7 @@ export interface Scan {
 }
 
 export interface ScanOptions {
-  /** Registries to open; absent means every one the manifest asks for. */
+  /** Absent means every one the manifest asks for. */
   aliases?: readonly string[];
   credentials?: Readonly<Record<string, Credential>>;
   signal?: AbortSignal;
@@ -85,10 +84,7 @@ export async function scan(
   return { items, roots: loaded.roots, local, undeclared, publisher, pinned, acquired };
 }
 
-/**
- * Closes the sources a scan opened. The daemon scans again and again, so a
- * source holding a connection or a timer would otherwise keep it for good.
- */
+/** The daemon scans repeatedly, so an open connection or timer would otherwise leak. */
 export async function closeScan(found: Pick<Scan, "acquired">): Promise<void> {
   await Promise.allSettled(found.acquired.map((source) => source.close()));
 }

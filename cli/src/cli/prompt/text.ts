@@ -10,7 +10,6 @@ export interface TextOptions {
   style: Styler;
   /** Taken when the answer is left empty, and shown until something is typed. */
   initial?: string | undefined;
-  /** How to answer, shown under the question while it waits. */
   hint?: string | undefined;
 }
 

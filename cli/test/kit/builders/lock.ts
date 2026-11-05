@@ -26,11 +26,12 @@ class LockBuilder {
     return this;
   }
 
-  /** Recorded against the registry declared last, unless the row names one. */
-  artifact(name: string, row: Partial<LockArtifact> = {}): this {
+  /** Named for the last segment of `key`, in the registry declared last unless the row says. */
+  artifact(key: string, row: Partial<LockArtifact> = {}): this {
     const registry = row.registry ?? this.#last;
-    if (registry === undefined) throw new Error(`Declare a registry before ${name}.`);
-    this.#lock.artifacts[name] = {
+    if (registry === undefined) throw new Error(`Declare a registry before ${key}.`);
+    const name = key.slice(key.lastIndexOf("/") + 1);
+    this.#lock.artifacts[key] = {
       registry,
       id: undefined,
       name,

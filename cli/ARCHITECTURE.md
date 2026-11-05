@@ -95,13 +95,19 @@ Vitest runs five projects. `pnpm test` runs them all, and `pnpm run test:unit`, 
 | contract | `test/contract/` | The JSON Schemas against the spec, the generated schemas against their definitions, and, in `test/contract/output/<command>.test.ts`, each command's real `--json` data against its published schema. |
 | conformance | `test/conformance/` | Each target against its evidence: what aireg places, and, with `AIREG_CONFORMANCE=1` and the target installed, what the target itself loads. |
 
+A test that starts a daemon runtime, opens a socket or drives a client against a server is an integration test even when it covers one module, under `test/integration/<area>/`; the module's own test file keeps its in-process tests.
+
 A command is tested in two tiers: its `parse`, from argv to options with no I/O, and its `run`, against a test printer or through the built CLI, where the contract test checks the `--json` data and the scenarios check the text.
 
 `test/kit/` holds what tests share: fixtures that give each test its own home, project, daemon and git identity and clean them up, builders for registries, manifests, locks and plans, and one redaction for paths, digests, times and versions. `test/fixtures/` holds static files only.
 
 A scenario in `test/scenarios/*.md` is a CLI session: `$ aireg ...` lines with the output expected, `? <code>` for an exit status, and `file` blocks for what should be on disk. `UPDATE_SCENARIOS=1` rewrites the expected output after a deliberate change.
 
-`pnpm run verify` runs the typecheck, lint, dead-code check, third-party notices check, build, package check and tests. Lint warns about a function over 100 lines or a file over 1000, blank lines aside and outside tests, a function whose cognitive complexity is over 25, and a reassigned parameter. Existing code may carry these warnings, but a pull request must leave every file it adds or edits free of them: CI runs `pnpm run lint:changed --since=<base>`, which fails on any warning in those files. Run it before you push, with `--since=origin/main`.
+`pnpm run verify` runs the typecheck, lint, dead-code check, third-party notices check, build, package check and tests.
+
+Lint fails on a function whose cognitive complexity is over 25, a function with more than six parameters, an import cycle, a barrel or `export *` module, an import below other code, a nested ternary, a switch over a union that misses a case, a file name that is not kebab-case, and a test that asserts nothing, asserts conditionally or is named `it`. `biome.json` lists no exceptions per file: fix the code instead.
+
+Lint also warns about a function over 100 lines or a file over 1000, blank lines aside and outside tests, and a reassigned parameter. These prompt a look, not a split: split a file when it holds more than one concern. Existing code may carry these warnings, but a pull request must leave every file it adds or edits free of them: CI runs `pnpm run lint:changed --since=<base>`, which fails on any warning in those files. Run it before you push, with `--since=origin/main`.
 
 ## Code layout
 

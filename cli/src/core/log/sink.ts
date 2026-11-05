@@ -26,10 +26,7 @@ interface FileSinkOptions {
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_KEEP = 4;
 
-/**
- * Writes are synchronous: a process that hands its tail to an async transport
- * loses the lines explaining why it exited.
- */
+/** Synchronous: a process that hands its tail to an async transport loses why it exited. */
 export function fileSink(options: FileSinkOptions): Sink {
   const { path, maxBytes = DEFAULT_MAX_BYTES, keep = DEFAULT_KEEP } = options;
   mkdirSync(dirname(path), { recursive: true });
@@ -67,8 +64,8 @@ export function fileSink(options: FileSinkOptions): Sink {
   }
 
   /**
-   * Before the write, not after: rolling afterwards leaves the newest line in
-   * the rolled file. A rotation another process holds the lock for is left to it.
+   * Before the write, since rolling after leaves the newest line in the rolled file.
+   * A rotation another process holds the lock for is left to it.
    */
   function rollIfFull(incoming: number): void {
     if (written === 0 || written + incoming <= maxBytes) return;
@@ -135,10 +132,10 @@ function withRotateLock(path: string, rotate: () => void): boolean {
   }
 }
 
-/** Far longer than a rotation takes, so a lock this old was left by a process that died in one. */
+/** Far longer than a rotation takes, so a lock this old was left by a crash. */
 const ROTATE_STALE_MS = 60_000;
 
-/** Takes over a lock left by a crash, which would otherwise stop rotation for good. */
+/** A lock left by a crash would otherwise stop rotation for good. */
 function reclaim(lock: string): boolean {
   try {
     if (Math.abs(Date.now() - statSync(lock).mtimeMs) <= ROTATE_STALE_MS) return false;

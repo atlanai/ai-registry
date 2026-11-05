@@ -20,7 +20,7 @@ interface AiregOptions {
   env?: NodeJS.ProcessEnv;
   /** Flags for node itself, ahead of the entry point. */
   node?: string[];
-  /** Written to standard input, which is then closed. */
+  /** Written to stdin, then closed. */
   input?: string;
 }
 
@@ -172,14 +172,15 @@ export const test = base
   .extend("git", ({ home }) => makeGit(home));
 
 /** `test`, with every test in its own home and aireg folder: for code that reads HOME or AIREG_* itself. */
+// biome-ignore lint/suspicious/useExpect: this defines a fixture; it is not a test.
 export const homeTest = test.extend("inHome", { auto: true }, async ({ home }) => {
   await mkdir(home.aireg, { recursive: true, mode: 0o700 });
   return home;
 });
 
 /**
- * One folder, home, project and git identity per file, for e2e suites whose tests build on
- * the ones before; the spawned CLI gets the home's variables, as nothing is stubbed in process.
+ * One home and project per file, for e2e suites whose tests build on the ones before. Nothing
+ * is stubbed in process: only the spawned CLI gets the home's variables.
  */
 export const fileTest = base
   .extend("tmp", { scope: "file" }, makeTmp)

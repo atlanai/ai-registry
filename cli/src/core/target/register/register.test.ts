@@ -52,7 +52,6 @@ const user = (): Where => ({ scope: "user", cwd: dir, env: {} });
 /** The project in `dir`, whose `.tool` folder is the same root. */
 const project = (): Where => ({ scope: "project", cwd: dir, env: {} });
 
-/** A placement of ours: a link into the scope's folder. */
 async function place(source: string, name: string): Promise<string> {
   const at = placement(source, name);
   await mkdir(join(at, ".."), { recursive: true });
@@ -90,7 +89,7 @@ async function writeConfig(text: string): Promise<void> {
   await writeFile(config(), text);
 }
 
-/** A copy of ours, a real folder the lockfile records. */
+/** A real folder the lockfile records. */
 async function copy(name: string): Promise<string> {
   const path = placement("acme", name);
   await mkdir(path, { recursive: true });

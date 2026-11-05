@@ -11,10 +11,7 @@ import type { Lock } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import type { Plan } from "./model.ts";
 
-/**
- * What a target starts on its own from a plugin it loads: commands that run as you, not
- * instructions an agent reads. Named by the plugin manifest key that declares each.
- */
+/** What a loaded plugin starts on its own (commands that run as you), by manifest key. */
 export type Carried = "hooks" | "mcpServers" | "lspServers" | "monitors" | "bin";
 
 const ORDER: readonly Carried[] = ["hooks", "mcpServers", "lspServers", "monitors", "bin"];
@@ -72,10 +69,7 @@ function declared(manifest: Record<string, unknown>): Carried[] {
   );
 }
 
-/**
- * What a plugin would have a target start, read from its envelope and the manifest it is
- * placed by, before any of it is fetched; and a digest of those parts, which moves when they do.
- */
+/** What a plugin would have a target start, read before fetching, and a digest of those parts. */
 export function carriedIn(
   envelope: Envelope,
   manifest: Record<string, unknown> | undefined,

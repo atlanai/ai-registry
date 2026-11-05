@@ -2,10 +2,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import type { Lock, LockArtifact } from "#core/lock.ts";
-import { emptyLock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import type { Acquired, Action } from "#core/plan/model.ts";
 import { roots } from "#core/store/paths.ts";
+import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import {
   acquired,
   entry,
@@ -30,29 +30,18 @@ describe("a sync that reads one registry and names none", () => {
     return { ...base, alias };
   }
   function farRow(): Lock {
-    const lock = emptyLock();
-    lock.registries.far = {
-      location: "https://github.com/acme/far.git",
-      adapter: "git",
-      key: "sha256:far",
-      config: {},
-      revision: "c1",
-    };
-    lock.artifacts.fmt = {
-      registry: "far",
-      id: "engineering/skills/fmt",
-      name: "fmt",
-      kind: "skill",
-      namespace: "engineering",
-      address: "engineering/skills/fmt",
-      path: ".registry/artifacts/far/engineering/skills/fmt",
-      origin: undefined,
-      content: "sha256:t1",
-      version: undefined,
-      digest: "sha256:3",
-      links: [{ target: "claude-code", path: ".claude/skills/engineering", mode: "symlink" }],
-    };
-    return lock;
+    return lockOf()
+      .registry("far", { location: "https://github.com/acme/far.git", revision: "c1" })
+      .artifact("fmt", {
+        id: "engineering/skills/fmt",
+        namespace: "engineering",
+        address: "engineering/skills/fmt",
+        path: ".registry/artifacts/far/engineering/skills/fmt",
+        content: "sha256:t1",
+        digest: "sha256:3",
+        links: [{ target: "claude-code", path: ".claude/skills/engineering", mode: "symlink" }],
+      })
+      .build();
   }
   function declaringFar(refs: string[]): Manifest {
     const declared = kitManifest(refs);

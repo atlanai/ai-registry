@@ -1,4 +1,4 @@
-/** What a prompt answers when the person backs out: escape, ctrl+c, or nothing to choose. */
+/** Answered on escape, ctrl+c, or when there is nothing to choose. */
 export const CANCEL = Symbol("prompt.cancel");
 export type Canceled = typeof CANCEL;
 
@@ -15,10 +15,7 @@ export interface PromptWriter {
 
 export interface PromptIo {
   input: NodeJS.ReadStream;
-  /**
-   * Prompts go to stderr. Interaction is not output: it must not land in
-   * `aireg list --json | jq` or in a file the user redirected stdout to.
-   */
+  /** Stderr, so prompts never land in `aireg list --json | jq` or a redirected stdout. */
   output: PromptWriter;
 }
 
@@ -29,7 +26,7 @@ export interface Size {
 }
 
 export interface Keypress {
-  /** The character typed, empty for a named key. */
+  /** Empty for a named key. */
   text: string;
   up: boolean;
   down: boolean;
@@ -44,7 +41,6 @@ export interface Keypress {
   modified: boolean;
 }
 
-/** A prompt's state: keys in, the frame to draw out, and an answer once it has one. */
 export interface Machine<T> {
   press(key: Keypress): { answer: T | Canceled } | undefined;
   lines(size: Size): string[];

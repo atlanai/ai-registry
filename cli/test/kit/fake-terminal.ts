@@ -127,8 +127,7 @@ export interface Terminal {
 }
 
 export function terminal(rows = 40, columns = 80): Terminal {
-  // Ink throttles frames on a timer, so the clock is faked: a press then flushes the
-  // trailing frame at once instead of sleeping past the interval and hoping it landed.
+  // Ink throttles frames on a timer; faking it lets a press flush the trailing frame at once.
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   onTestFinished(() => {
     vi.useRealTimers();

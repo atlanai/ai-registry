@@ -259,7 +259,6 @@ function warnLeftOut(item: Selected, previous: LockArtifact | undefined, build: 
   });
 }
 
-/** Two artifacts that would take one installed name, or one path in a target folder. */
 export function clashMessage({ name, kept, dropped, at }: Clash): string {
   return at === undefined
     ? `${dropped} and ${kept} would both install as "${name}"`

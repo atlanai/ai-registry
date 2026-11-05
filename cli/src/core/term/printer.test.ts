@@ -1,15 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { type ColorWhen, Printer, type PrinterOptions, Styler, sentence } from "./printer.ts";
+import { type CaptureOptions, capturedPrinter } from "#test/kit/printer.ts";
+import { type ColorWhen, Styler, sentence } from "./printer.ts";
 
-function capture(options: PrinterOptions) {
-  const out: string[] = [];
-  const err: string[] = [];
-  const printer = new Printer({
-    ...options,
-    out: { write: (chunk: string) => out.push(chunk), isTTY: false },
-    err: { write: (chunk: string) => err.push(chunk), isTTY: false },
-  });
-  return { printer, out: () => out.join(""), err: () => err.join("") };
+function capture(options: CaptureOptions) {
+  const { printer, printed, errors } = capturedPrinter(options);
+  return { printer, out: () => printed.join(""), err: () => errors.join("") };
 }
 
 describe("Printer", () => {

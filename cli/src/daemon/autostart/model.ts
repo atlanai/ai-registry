@@ -1,10 +1,10 @@
 import { envName } from "#core/env.ts";
 import type { ExecResult } from "#core/process.ts";
 
-/** Set in a service definition, so the daemon knows a supervisor will start it again. */
+/** Tells the daemon a supervisor will start it again. */
 export const SUPERVISOR_ENV = envName("DAEMON_SUPERVISOR");
 
-/** EX_TEMPFAIL: a supervised daemon exits with it to be started again, on the updated binary. */
+/** EX_TEMPFAIL: a supervised daemon exits with it to restart on the updated binary. */
 export const RESTART_EXIT_CODE = 75;
 
 type Mechanism = "launchd" | "systemd" | "run-key";
@@ -28,7 +28,6 @@ export interface ServiceSpec {
 
 export interface AutostartState {
   mechanism: Mechanism;
-  /** The file or registry value holding the definition. */
   location: string;
   registered: boolean;
   /** The service manager knows the definition; a login-only hook is loaded when registered. */
@@ -50,6 +49,6 @@ export interface AutostartBackend {
   start(): Promise<boolean>;
   /** The definition on disk runs `program`. */
   starts(program: string): Promise<boolean>;
-  /** Writes the definition without reloading it, so the manager runs it from its next start. */
+  /** Without reloading, so the manager runs it from its next start. */
   rewrite(): Promise<void>;
 }

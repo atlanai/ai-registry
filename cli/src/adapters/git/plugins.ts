@@ -8,8 +8,8 @@ import { parseSource, type SourceSpec } from "./url.ts";
 import { GitVersions } from "./versions.ts";
 
 /**
- * Fetches each plugin a marketplace lists by repository, at its own commit: the entry's sha,
- * else the commit the lockfile holds for it, else its ref now. Nothing a source names is run.
+ * Each plugin at its own commit: the entry's sha, else the lockfile's, else its ref now.
+ * Nothing a source names is run.
  */
 export function pluginFetcher(
   context: Pick<SourceContext, "cacheDir" | "exclusive">,

@@ -1,13 +1,12 @@
-/** What a search reads of an artifact: the fields the file spec's index carries. */
 export interface Searchable {
   name: string;
   namespace: string | undefined;
   description: string | undefined;
-  /** The spec's indexable string pairs, which serve as tags. */
+  /** The spec's indexable string pairs, used as tags. */
   labels: Readonly<Record<string, string>> | undefined;
 }
 
-/** The items every word of the query matches, case-insensitively, best first. */
+/** Items every query word matches, case-insensitively, best first. */
 export function search<T extends Searchable>(items: readonly T[], query: string): T[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];

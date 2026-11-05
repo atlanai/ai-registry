@@ -10,14 +10,14 @@ import type { FetchedPlugin, Found, Layout, LayoutContext, RemotePlugin } from "
 import { pluginManifest, readObject, readPlugin } from "./plugin.ts";
 import { openTree, type Tree } from "./tree.ts";
 
-/** Claude Code's marketplace, then Codex's, which aireg reads when the first is not there. */
+/** Claude Code's, then Codex's when the first is not there. */
 const MARKETPLACES = [".claude-plugin/marketplace.json", ".agents/plugins/marketplace.json"];
 
 interface Marketplace {
   path: string;
   name: string;
   entries: Fields[];
-  /** Where a bare plugin source resolves, from `metadata.pluginRoot`. */
+  /** From `metadata.pluginRoot`: where a bare plugin source resolves. */
   pluginRoot: string | undefined;
 }
 
@@ -40,13 +40,12 @@ async function marketplaces(tree: Tree): Promise<Marketplace[]> {
   return found;
 }
 
-/** Sources aireg fetches with git, which take a `ref` and a `sha`. */
 const FETCHED = new Set(["github", "url", "git-subdir"]);
 
-/** A commit, as Claude Code takes one: forty lowercase hex characters. */
+// A full commit, as Claude Code takes one.
 const SHA = /^[0-9a-f]{40}$/;
 
-/** A marketplace as its format requires it: Claude Code's needs an owner, Codex's does not. */
+/** Claude Code's format needs an owner; Codex's does not. */
 async function readMarketplace(tree: Tree, path: string): Promise<Marketplace | undefined> {
   const document = await readObject(tree, path);
   if (document === undefined) return undefined;
@@ -115,7 +114,7 @@ function sourceOf(entry: Fields, name: string, marketplace: Marketplace): Locate
   return { skip: `its ${type === undefined ? "" : `${type} `}source is not one aireg reads` };
 }
 
-/** Where the ids of fetched plugins begin, which no folder in a marketplace can be named. */
+/** Prefixes fetched plugin ids; no folder in a marketplace can have this name. */
 const REMOTE = "@remote";
 
 const names = (marketplace: Marketplace) =>
@@ -123,7 +122,7 @@ const names = (marketplace: Marketplace) =>
     marketplace.entries.map((entry) => trimmedText(entry.name)).filter((n) => n !== undefined),
   );
 
-/** A relative path inside the marketplace, `./x` from its root; undefined for one that leaves it. */
+/** Undefined for a path that leaves the marketplace. */
 function relative(path: string): string | undefined {
   if (path === "." || path === "./") return "";
   if (!path.startsWith("./") || path.includes("\\")) return undefined;
@@ -155,19 +154,19 @@ function remoteOf(name: string, source: Fields, path: string): RemotePlugin | un
   };
 }
 
-/** Remote plugins fetched at once. One repository's take turns, since they share its cache. */
+/** One repository's plugins take turns, since they share its cache. */
 const FETCHES_AT_ONCE = 8;
 
 type Fetched = { plugin: Awaited<ReturnType<typeof fetchedPlugin>>; warnings: string[] };
 
-/** A repository however a source writes it: `acme/x`, or its github.com URL. */
+/** `acme/x` and its github.com URL are the same repository. */
 const repositoryOf = (remote: RemotePlugin) =>
   remote.location
     .toLowerCase()
     .replace(/^https:\/\/github\.com\//, "")
     .replace(/\.git$/, "");
 
-/** A plugin from elsewhere, read from its own folder, with ids kept apart from the marketplace's. */
+/** Ids are kept apart from the marketplace's own. */
 async function fetchedPlugin(
   remote: RemotePlugin,
   entry: Fields,
@@ -210,7 +209,6 @@ async function fetchedPlugin(
   };
 }
 
-/** One entry's plugin and its parts, read where its source says, or undefined when skipped. */
 async function entryPlugin(
   tree: Tree,
   marketplace: Marketplace,
@@ -240,10 +238,7 @@ async function entryPlugin(
   return readPlugin(tree, { dir: at.dir, entry, name, rootSource: at.dir === "" }, warnings);
 }
 
-/**
- * A plugin marketplace, Claude Code's or Codex's, or a lone plugin manifest, which is a
- * marketplace of one. Each plugin installs whole, as a `plugin` artifact.
- */
+/** A lone plugin manifest reads as a marketplace of one. */
 export const marketplaceLayout: Layout = {
   id: "marketplace",
   looksFor: ["marketplace.json", "plugin.json"],

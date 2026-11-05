@@ -22,10 +22,7 @@ const RESOLUTION_OPERATION: Record<ConflictResolution, SyncOperation> = {
 
 const RESOLUTIONS = Object.keys(RESOLUTION_OPERATION) as ConflictResolution[];
 
-/**
- * One named artifact the person has already looked at: `theirs` replaces
- * whatever differs here, `mine` needs an edit here to publish.
- */
+/** `theirs` replaces whatever differs here; `mine` needs an edit here to publish. */
 export function resolvable(
   artifact: { operation: string; disposition: Disposition } | undefined,
   wanted: ConflictResolution,
@@ -39,10 +36,7 @@ export function resolvable(
 
 const TAKEABLE: readonly Disposition[] = ["publish", "conflict", "archive", "pull", "pull-delete"];
 
-/**
- * Settles one artifact as the person chose, with an ordinary run over that artifact
- * alone, so a client follows it exactly as it follows a sync. `place` ends the messages.
- */
+/** An ordinary run over one artifact, so a client follows it as it follows a sync. */
 export async function startResolution(
   runner: SyncRunner,
   params: Record<string, unknown>,
@@ -70,7 +64,7 @@ export async function startResolution(
     );
   }
 
-  // A skill and an agent may share the name; only the kind waiting on the choice is settled.
+  // A skill and an agent may share the name; settle only the kind waiting on the choice.
   const overrides = new Map([[artifactKey(artifact.kind, name), RESOLUTION_OPERATION[wanted]]]);
   return {
     run: await runner.start(work.id, "sync", "manual", {

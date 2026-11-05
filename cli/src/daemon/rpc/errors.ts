@@ -1,5 +1,5 @@
 import { adapterProblem, messageOf } from "#adapter/errors.ts";
-import { isAdapterError } from "#adapter/index.ts";
+import { type AdapterError, isAdapterError } from "#adapter/index.ts";
 import { quoted } from "#adapter/text.ts";
 import { ConfigConflictError } from "#core/config/errors.ts";
 import { CredentialStoreError } from "#core/credentials/store.ts";
@@ -71,11 +71,7 @@ export function rpcError(error: unknown): ProtocolError {
   if (error instanceof RequestRefused) {
     return new ProtocolError(REFUSAL_CODES[error.refusal], error.message, error.data);
   }
-  const adapter = isAdapterError(error)
-    ? error
-    : error instanceof Error && isAdapterError(error.cause)
-      ? error.cause
-      : undefined;
+  const adapter = adapterErrorIn(error);
   if (adapter !== undefined) {
     return new ProtocolError(RpcErrorCode.Server, messageOf(error), adapterProblem(adapter));
   }
@@ -114,6 +110,11 @@ function diskFull(error: unknown): boolean {
   return (
     code === "ERR_SQLITE_ERROR" && typeof errcode === "number" && (errcode & 0xff) === SQLITE_FULL
   );
+}
+
+function adapterErrorIn(error: unknown): AdapterError | undefined {
+  if (isAdapterError(error)) return error;
+  return error instanceof Error && isAdapterError(error.cause) ? error.cause : undefined;
 }
 
 function reason(error: Error): string | undefined {

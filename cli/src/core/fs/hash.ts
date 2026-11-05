@@ -5,7 +5,6 @@ export function sha256Hex(data: string | Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
-/** Whether `value` is a SHA-256 digest in the lowercase hex `sha256Hex` writes. */
 export function isSha256Hex(value: string): boolean {
   return /^[0-9a-f]{64}$/.test(value);
 }

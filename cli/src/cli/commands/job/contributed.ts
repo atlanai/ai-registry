@@ -5,7 +5,7 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { StepContribution } from "#core/host/extend.ts";
 import { type RpcClient, withFreshConfig } from "#daemon/rpc/client.ts";
 
-/** `job add --<flag>`: an adapter-contributed type owns no project tree. */
+/** An adapter-contributed job type owns no project tree. */
 export async function addContributedJob(
   client: RpcClient,
   contribution: StepContribution,

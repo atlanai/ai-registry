@@ -8,7 +8,7 @@ import { describeSkip, type Sending } from "./review.ts";
 
 interface Outcome {
   dryRun: boolean;
-  /** Where exports go, from `--to` or `publish.to`; absent when each artifact goes where it came from. */
+  /** Absent when each artifact goes where it came from. */
   to: Destination | undefined;
   skipped: readonly Skipped[];
 }

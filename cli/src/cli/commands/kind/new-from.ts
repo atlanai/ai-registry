@@ -30,7 +30,6 @@ import { nameOf } from "./fields.ts";
 import { FRESH } from "./files.ts";
 import { namespaceFor } from "./place.ts";
 
-/** One existing folder, read and checked before anything is copied. */
 interface Incoming {
   input: string;
   dir: string;
@@ -65,7 +64,7 @@ export async function newFrom(
     });
   }
   const root = requireRegistry(context.cwd);
-  // Every folder is checked first, so a bad one in a batch leaves nothing half copied.
+  // Check every folder first, so a bad one in a batch leaves nothing half copied.
   const found: Incoming[] = [];
   for (const input of paths)
     found.push(await incoming(kind, manifest, context.cwd, input, own.name));
@@ -98,7 +97,7 @@ export async function newFrom(
       await cp(join(item.dir, path), join(at, path), FRESH);
     }
     await rm(join(at, ENVELOPE), { force: true });
-    // `--name` renames the copy, and index checks the folder against its front matter.
+    // Rename in the front matter too, since index checks the folder against it.
     if (item.front !== undefined && item.front.name !== item.name) {
       const file = join(at, item.front.file);
       await writeFile(file, withName(await readFile(file, "utf8"), item.name), "utf8");

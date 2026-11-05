@@ -89,12 +89,9 @@ export type Mark = "active" | "submit" | "cancel";
 
 /** The question line every prompt opens with, and collapses to once answered. */
 export function titleLine(style: Styler, mark: Mark, message: string, aside?: string): string {
-  const glyph =
-    mark === "active"
-      ? style.green(GLYPH.active)
-      : mark === "submit"
-        ? style.green(GLYPH.submit)
-        : style.red(GLYPH.cancel);
+  let glyph = style.red(GLYPH.cancel);
+  if (mark === "active") glyph = style.green(GLYPH.active);
+  else if (mark === "submit") glyph = style.green(GLYPH.submit);
   return `${glyph}  ${style.bold(message)}${aside === undefined ? "" : `  ${aside}`}`;
 }
 

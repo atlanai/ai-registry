@@ -6,7 +6,7 @@ import { NAME, PUBLISHER } from "#core/product.ts";
 import { defines } from "./defines.ts";
 import { BUN_VERSION, hostTarget, type Target } from "./targets.ts";
 
-/** Bundled by Bun, not by tsup: the compiled binary has no `dist/` to load. Bun reads `/` on Windows too. */
+/** Bundled by Bun, not tsup: the binary has no `dist/`. Bun reads `/` on Windows too. */
 const ENTRY = "src/main.ts";
 
 export interface CompileOptions {
@@ -16,7 +16,6 @@ export interface CompileOptions {
   readonly origin: string;
   /** Encoded trusted Ed25519 keyring, stamped in. Empty fails signing closed. */
   readonly keyring: string;
-  /** The source commit, reported by `--version --json`. */
   readonly commit?: string;
   readonly outFile: string;
 }

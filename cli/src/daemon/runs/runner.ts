@@ -49,10 +49,9 @@ const RUN_TIMEOUT_MS = 30 * 60 * 1_000;
  * its signal would otherwise hold the run, and its job, for good.
  */
 const ABORT_GRACE_MS = 30 * 1_000;
-/** How long stopping waits for runs to wind down before the daemon goes anyway. */
 const STOP_GRACE_MS = 15 * 1_000;
 
-/** A failed run still reports what got through, so the counters outlive the hooks. */
+/** Outlives the hooks, so a failed run still reports what got through. */
 interface Tally {
   step: string;
   changed: number;
@@ -68,10 +67,7 @@ interface RunOptions {
   refs?: RunScope;
   /** Forces one artifact's operation, so a resolved conflict is an ordinary run. */
   overrides?: ReadonlyMap<string, SyncOperation>;
-  /**
-   * A job built for this run alone. It is never persisted, so the run records
-   * no job id and the one-live-run-per-job index leaves it alone.
-   */
+  /** Never persisted, so the run records no job id and the one-run-per-job index skips it. */
   ephemeral?: Target;
 }
 
@@ -95,7 +91,7 @@ interface RunEnd {
 export class SyncRunner {
   readonly #controllers = new Map<string, AbortController>();
   readonly #workers = new Map<string, Promise<void>>();
-  /** The live run behind each one-off request, which has no job to hold it to one. */
+  /** A one-off request has no job to hold it to one live run. */
   readonly #oneOff = new Map<string, string>();
   readonly #store: RunStore;
   readonly #emit: (event: RunEvent) => void;
@@ -121,15 +117,13 @@ export class SyncRunner {
   ): Promise<RunRecord> {
     const config = await readConfig();
     const { job, account } = ephemeral ?? resolveTarget(config, jobId);
-    // One live run per job is a unique index, so a repeated request joins the
-    // run already in flight rather than needing an idempotency key of its own.
+    // One live run per job is a unique index, so a repeated request joins the run in flight.
     const existing = ephemeral === undefined ? this.#store.activeJob(jobId) : undefined;
     if (existing !== undefined && existing.mode === mode) return existing;
     if (existing !== undefined) {
       throw runningAlready(jobId, existing.mode);
     }
-    // A one-off run gets a fresh job id the index never sees, so a repeated `aireg sync` joins
-    // the run doing it rather than queuing another full scan behind the same lease.
+    // The index never sees a one-off run's fresh job id, so join a repeated `aireg sync` here.
     const asked = ephemeral === undefined ? undefined : oneOffKey(ephemeral, mode, refs, overrides);
     const joined = asked === undefined ? undefined : this.#store.get(this.#oneOff.get(asked) ?? "");
     if (joined !== undefined && isActive(joined.state)) return joined;
@@ -189,7 +183,7 @@ export class SyncRunner {
             error: TIMED_OUT,
             counts: { ...EMPTY_RUN_COUNTS, changed: tally.changed, failed: 1 },
           });
-          // Forgotten, not awaited: whatever ignored the abort may never return.
+          // Not awaited: whatever ignored the abort may never return.
           this.#controllers.delete(run.id);
           this.#workers.delete(run.id);
         }, ABORT_GRACE_MS);
@@ -313,8 +307,6 @@ export class SyncRunner {
     return {
       event: (type, nextPhase, artifact, data) => {
         tally.step = nextPhase;
-        // The run store keeps these as rows; at debug they also narrate the
-        // run in the log, beside the failure that ended it.
         this.#log.debug("sync event", { runId, type, phase: nextPhase, artifact });
         this.#record(runId, {
           occurredAtMs: Date.now(),
@@ -358,8 +350,7 @@ export class SyncRunner {
   #finishFailure({ run, job }: RunRequest, { signal, error, counts }: RunEnd): void {
     if (!this.#running(run.id)) return;
     const failure = classifyFailure(error, signal.reason, counts.changed);
-    // The store keeps `errorCode` and nothing else, so unless the cause is
-    // written here it is gone the moment this returns.
+    // The store keeps only `errorCode`, so this is the only record of the cause.
     this.#log[failure.interrupted ? "warn" : "error"]("run failed", {
       runId: run.id,
       jobId: job.id,
@@ -380,10 +371,7 @@ export class SyncRunner {
   }
 }
 
-/**
- * What a one-off run was asked to do, without the id made up for it, so the
- * same request made twice is recognized as one.
- */
+/** Leaves out the made-up id, so the same request made twice is recognized as one. */
 function oneOffKey(
   { job, account }: Target,
   mode: RunMode,

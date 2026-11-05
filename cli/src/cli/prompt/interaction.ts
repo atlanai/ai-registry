@@ -3,7 +3,6 @@ import { prepare } from "./ask.ts";
 import { blocker, explain } from "./caller.ts";
 import type { PromptIo } from "./model.ts";
 
-/** Shared prompt state for commands that gather missing choices. */
 export interface Interaction {
   io: PromptIo;
   printer: Printer;
@@ -27,7 +26,6 @@ export function interactive(step: Interaction): boolean {
   return step.blocked === undefined;
 }
 
-/** Loads the prompts' renderer behind the slow work that comes before a step's first question. */
 export function preparing(step: Interaction): void {
   if (interactive(step)) void prepare();
 }

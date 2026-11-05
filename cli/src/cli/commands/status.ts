@@ -145,8 +145,8 @@ export const { run } = defineCommand({
 });
 
 /**
- * Installed at both scopes, so the target loads it twice or picks by its own order:
- * reported, never resolved. Matched by kind and upstream name, as the user scope names it.
+ * Installed at both scopes, so the target loads it twice or picks by its own order.
+ * Reported, never resolved; matched by kind and upstream name, as the user scope names it.
  */
 async function shadowed(scope: string, cwd: string, lock: Lock): Promise<string[]> {
   if (scope === "user") return [];
@@ -212,7 +212,6 @@ function shown(roots: { scope: string; base: string }, path: string): string {
     : underHome(path);
 }
 
-/** A link of yours that points at nothing, so no target can load it. */
 function printDangling(
   printer: Printer,
   roots: { scope: string; base: string },

@@ -1,25 +1,18 @@
-// A reader for the front matter of a SKILL.md or an agent file: the YAML subset those files use,
-// read as text and never evaluated. Anything outside the subset is left out rather than guessed.
+// The YAML subset skill and agent files use, never evaluated. Anything else is left out.
 
-/** A value as front matter gives it: text, a list of text, or one level of text by key. */
 type FrontmatterValue = string | string[] | Record<string, string>;
 
 export interface Frontmatter {
-  /** Each top-level key the reader understood. */
   data: Record<string, FrontmatterValue>;
-  /** What follows the closing `---`. */
   body: string;
 }
 
-/** Front matter that is not a few kilobytes of fields is not front matter. */
+/** Front matter longer than this is not front matter, so the text reads as having none. */
 const MAX_LINES = 1_000;
 
 const KEY = /^([A-Za-z0-9_][A-Za-z0-9_.-]*)\s*:(?:\s+(.*))?$/;
 
-/**
- * The fields between a leading `---` line and the next `---`, or undefined when the text has
- * none. A line the subset does not cover is skipped, along with anything indented under it.
- */
+/** A line outside the subset is skipped, along with anything indented under it. */
 export function readFrontmatter(text: string): Frontmatter | undefined {
   const source = text.startsWith("\uFEFF") ? text.slice(1) : text;
   const lines = source.split(/\r?\n/);
@@ -45,7 +38,6 @@ function indentOf(line: string): number {
   return line.length - line.trimStart().length;
 }
 
-/** The lines indented under the key at `at`, which belong to it. */
 function indentedAfter(lines: readonly string[], at: number): string[] {
   const taken: string[] = [];
   for (let next = at + 1; next < lines.length; next += 1) {
@@ -56,14 +48,12 @@ function indentedAfter(lines: readonly string[], at: number): string[] {
   return taken;
 }
 
-/** One key's value, from what follows its colon and the lines indented under it. */
 function readValue(value: string, under: readonly string[]): FrontmatterValue | undefined {
   if (value === "" || value.startsWith("#")) return nestedValue(under);
   if (/^[|>][+-]?$/.test(value)) return block(value, under);
   return scalar(value);
 }
 
-/** The text items of a `- item` list, or one level of `key: value` pairs. */
 function nestedValue(under: readonly string[]): FrontmatterValue {
   const items = under.filter((item) => item.trim() !== "");
   if (items.length === 0) return "";
@@ -83,7 +73,6 @@ function nestedValue(under: readonly string[]): FrontmatterValue {
   return map;
 }
 
-/** One inline value: quoted, a flow list of plain items, or plain text. */
 function scalar(text: string): string | string[] | undefined {
   if (text.startsWith('"')) return doubleQuoted(text);
   if (text.startsWith("'")) return singleQuoted(text);
@@ -142,7 +131,6 @@ function block(header: string, lines: readonly string[]): string {
   return header.includes("-") ? text : `${text}\n`;
 }
 
-/** A text field, when the front matter has one that is not empty. */
 export function textField(front: Frontmatter | undefined, key: string): string | undefined {
   const value = front?.data[key];
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;

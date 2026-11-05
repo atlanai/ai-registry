@@ -1,9 +1,8 @@
 import { LEVEL_WEIGHT, type LogRecord, type Sink } from "./model.ts";
 
 interface ThrottleOptions {
-  /** How long identical records are collapsed for. */
   windowMs?: number;
-  /** Distinct messages tracked at once, so a varying key cannot grow the map. */
+  /** So a varying key cannot grow the map. */
   maxKeys?: number;
 }
 
@@ -13,7 +12,7 @@ const DEFAULT_MAX_KEYS = 256;
 interface Seen {
   suppressed: number;
   openedAtMs: number;
-  /** The newest record swallowed, which a count left at the end is reported on. */
+  /** A count left at the end is reported on the newest record swallowed. */
   last: LogRecord;
 }
 
@@ -35,8 +34,8 @@ export function throttleSink(inner: Sink, options: ThrottleOptions = {}): Sink {
 
   return {
     write(record: LogRecord): void {
-      // Only a failure repeats itself: each info line is its own event, such as one
-      // run starting, and debug and trace are written only when someone asked for them.
+      // Only a failure repeats itself: each info line is its own event, and debug and
+      // trace are written only when asked for.
       if (LEVEL_WEIGHT[record.severity_text] < LEVEL_WEIGHT.warn) {
         inner.write(record);
         return;

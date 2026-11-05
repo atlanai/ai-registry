@@ -17,7 +17,7 @@ export function decodeBase64(value: string, bytes: number): Uint8Array | undefin
 }
 
 /**
- * Base64 of a JSON object mapping key id to a base64 raw Ed25519 public key.
+ * Base64 JSON of key id to base64 raw Ed25519 public key.
  * A malformed keyring yields nothing, so a build trusts no one, not everyone.
  */
 export function decodeTrustedKeys(encoded: string): TrustedKeys | undefined {
@@ -47,7 +47,7 @@ function decodeJsonObject(encoded: string): Record<string, unknown> | undefined 
   return isRecord(parsed) ? parsed : undefined;
 }
 
-/** A raw key imported as a JWK: no dependency and no DER assembled by hand. */
+/** Imported as a JWK: no dependency and no hand-built DER. */
 function publicKeyFrom(raw: Uint8Array): KeyObject | undefined {
   try {
     return createPublicKey({

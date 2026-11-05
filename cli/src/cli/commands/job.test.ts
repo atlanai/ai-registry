@@ -4,9 +4,8 @@ import { afterEach, describe, expect, vi } from "vitest";
 import { emptyRegistryConfig, type Job, type StepPolicy } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { AiregError } from "#core/errors.ts";
-import { Printer } from "#core/term/printer.ts";
+import { commandContext } from "#test/kit/command.ts";
 import { test } from "#test/kit/fixtures.ts";
-import type { CommandContext } from "./command.ts";
 import { run } from "./job.ts";
 
 const daemon = vi.hoisted(() => ({ withDaemon: vi.fn() }));
@@ -14,25 +13,8 @@ vi.mock("#daemon/process/lifecycle.ts", () => daemon);
 
 let home: string;
 
-function context(argv: string[], out: string[] = [], err: string[] = []): CommandContext {
-  return {
-    argv,
-    cwd: home,
-    printer: new Printer({
-      format: "json",
-      out: { write: (text: string) => out.push(text), isTTY: false },
-      err: { write: (text: string) => err.push(text), isTTY: false },
-    }),
-    host: {
-      version: "test",
-      connectAccount: async () => {
-        throw new Error("no host");
-      },
-      openRunStore: async () => {
-        throw new Error("no host");
-      },
-    },
-  };
+function context(argv: string[], printed: string[] = [], errors: string[] = []) {
+  return commandContext(argv, { cwd: home, printed, errors });
 }
 
 test.beforeEach(async ({ tmp }) => {

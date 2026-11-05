@@ -17,7 +17,7 @@ import {
 
 const DEFAULT_COLUMNS = 80;
 
-/** Draws the machine inline until it answers, leaving its last frame in the scrollback. */
+/** Draws inline until it answers, leaving its last frame in the scrollback. */
 export async function mount<T>(io: PromptIo, machine: Machine<T>): Promise<T | Canceled> {
   let answer: T | Canceled = CANCEL;
   const output = new Output(io.output);
@@ -41,8 +41,8 @@ export async function mount<T>(io: PromptIo, machine: Machine<T>): Promise<T | C
 }
 
 /**
- * The machine holds the state, so keys read in one burst all see the latest
- * of it. Ink unmounts on the commit after the answer, leaving that frame behind.
+ * The machine holds the state, so every key read in one burst sees the latest of it.
+ * Ink unmounts on the commit after the answer, leaving that frame behind.
  */
 function Prompt<T>(props: PromptProps<T>): ReactElement {
   const { exit } = useApp();
@@ -102,10 +102,7 @@ function keypress(text: string, key: Key): Keypress {
   };
 }
 
-/**
- * Ink's view of the prompt stream. It has no height on purpose: frames are
- * fitted before they reach Ink, which clears the whole terminal once one fills it.
- */
+/** No height on purpose: frames are fitted first, as Ink clears the terminal once one fills it. */
 class Output extends Writable {
   readonly target: PromptWriter;
 
@@ -141,8 +138,8 @@ class Output extends Writable {
 const FORWARD_DELETE = `${ESC}[3~`;
 
 /**
- * Lines measured here, one Text per terminal row: a long line breaks where the
- * terminal would, and Ink erases every row it drew on the next frame.
+ * One Text per terminal row: a long line breaks where the terminal would, and Ink
+ * erases every row it drew on the next frame.
  */
 function Frame(props: { lines: readonly string[]; columns: number }): ReactElement {
   // Options carry registry text, and Ink passes hyperlinks and styling through.
@@ -157,10 +154,7 @@ function Frame(props: { lines: readonly string[]; columns: number }): ReactEleme
 
 type Handle = Partial<{ ref(): unknown; unref(): unknown }>;
 
-/**
- * Ink reads keys only in raw mode, so it is told the input is a terminal; raw
- * mode itself is switched only on a real one.
- */
+/** Ink reads keys only in raw mode, so we claim a TTY; raw mode is set only on a real one. */
 function keyed(input: NodeJS.ReadStream): NodeJS.ReadStream {
   const queue: string[] = [];
   const handle = input as Handle;

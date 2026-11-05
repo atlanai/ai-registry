@@ -59,7 +59,7 @@ function scrub(error: SerializedError): SerializedError {
   return scrubbed;
 }
 
-/** Discards everything, so a caller never branches on whether logging is on. */
+/** So a caller never branches on whether logging is on. */
 export function nullLogger(): Logger {
   return createLogger({ sink: NULL_SINK, level: "fatal" });
 }

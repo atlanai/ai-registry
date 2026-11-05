@@ -83,7 +83,7 @@ export function launchdBackend(spec: ServiceSpec, exec: Exec): AutostartBackend 
   const wanted = renderPlist(spec);
   const loaded = async () => (await exec("launchctl", ["print", service])).code === 0;
 
-  /** A bootout returns before launchd has let go of the label, so the first bootstrap can fail. */
+  /** A bootout returns before launchd lets go of the label, so the first bootstrap can fail. */
   async function bootstrap(): Promise<void> {
     let last = "";
     for (let attempt = 1; attempt <= BOOTSTRAP_ATTEMPTS; attempt++) {

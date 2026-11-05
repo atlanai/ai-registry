@@ -6,10 +6,9 @@ import { ensureHome } from "#core/store/paths.ts";
 import { downloadSize, type ResolvedRelease } from "./release.ts";
 
 export interface UpdateCache {
-  /** When the channel was last asked, answered or not, so a dead origin costs one try per interval. */
+  /** Set whether or not the channel answered, so a dead origin costs one try per interval. */
   checkedAt: number;
   latest?: string | undefined;
-  /** The signed artifact size, so the hint can say what the update costs. */
   sizeBytes?: number | undefined;
   minimumVersion?: string | undefined;
 }

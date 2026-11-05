@@ -18,7 +18,7 @@ function escapeLength(text: string): number {
   return 1;
 }
 
-/** One grapheme or one escape sequence, and the terminal cells it takes. */
+/** One grapheme or one escape sequence. */
 export interface Cell {
   text: string;
   width: number;
@@ -44,7 +44,7 @@ export function cells(text: string): Cell[] {
   return out;
 }
 
-/** Terminal cells a string occupies, ignoring any styling it carries. */
+/** In terminal cells, ignoring styling. */
 export function displayWidth(text: string): number {
   return stringWidth(text);
 }
@@ -74,15 +74,14 @@ export function ago(atMs: number | undefined, nowMs = Date.now()): string {
   const delta = nowMs - atMs;
   const abs = Math.abs(delta);
   if (abs < 45_000) return delta < 0 ? "in a moment" : "just now";
-  const minutes = abs / 60_000;
-  const hours = minutes / 60;
-  const text =
-    minutes < 60
-      ? `${Math.round(minutes)}m`
-      : hours < 48
-        ? `${Math.round(hours)}h`
-        : `${Math.round(hours / 24)}d`;
+  const text = coarse(abs / 60_000);
   return delta < 0 ? `in ${text}` : `${text} ago`;
+}
+
+function coarse(minutes: number): string {
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  const hours = minutes / 60;
+  return hours < 48 ? `${Math.round(hours)}h` : `${Math.round(hours / 24)}d`;
 }
 
 export function shortDuration(seconds: number): string {
@@ -95,7 +94,6 @@ export function interval(seconds: number): string {
   return `every ${shortDuration(seconds)}`;
 }
 
-/** The longest prefix that fits in `width` cells. */
 export function cut(text: string, width: number): string {
   let out = "";
   let used = 0;
@@ -107,7 +105,7 @@ export function cut(text: string, width: number): string {
   return out;
 }
 
-/** Cut to fit, marking the cut. Measured in cells, so CJK and emoji fit too. */
+/** Measured in cells, so CJK and emoji fit too. */
 export function truncate(value: string, width: number): string {
   if (width <= 1) return cut(value, Math.max(0, width));
   return displayWidth(value) <= width ? value : `${cut(value, width - 1)}…`;
@@ -131,7 +129,6 @@ export function pad(value: string, width: number): string {
   return fitted + " ".repeat(Math.max(0, width - displayWidth(fitted)));
 }
 
-/** A digest as the CLI prints one, or `-` for none. */
 export function shortDigest(digest: string | undefined): string {
   return digest === undefined || digest === "" ? "-" : abbreviate(digest);
 }
@@ -139,8 +136,7 @@ export function shortDigest(digest: string | undefined): string {
 export function bar(done: number, total: number, width: number): string {
   if (total <= 0) return "\u2591".repeat(width);
   const exact = (done / total) * width;
-  // Never draw a full bar while work is outstanding: rounding up would make
-  // something still behind look finished.
+  // Never full while work is outstanding, or rounding up would make it look finished.
   const filled =
     done >= total ? width : Math.min(width - 1, Math.max(done > 0 ? 1 : 0, Math.round(exact)));
   return `${"\u2593".repeat(filled)}${"\u2591".repeat(width - filled)}`;
@@ -159,7 +155,7 @@ export function duration(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-/** A word a shell reads back unchanged: as it is when it can be, else single-quoted. */
+/** Single-quoted only when the shell would not read it back unchanged. */
 export function shellWord(value: string): string {
   return /^[\w@%+=:,./~-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 }

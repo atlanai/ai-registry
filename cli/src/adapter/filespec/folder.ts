@@ -7,7 +7,7 @@ import { isSafePath } from "../paths.ts";
 import { identityOf, type ReadPath, readRegistry, SpecError } from "./documents.ts";
 import { besideEnvelope, resolveFromRoot } from "./resolve.ts";
 
-/** A folder inside the registry, with every component from the root down checked for links. */
+/** Every component from the root down is checked for links. */
 export async function registryPath(root: string, path: string, allowRoot = false): Promise<string> {
   if (!(allowRoot && path === "")) refuseUnsafe(path);
   const target = join(root, ...path.split(posix.sep));
@@ -26,8 +26,8 @@ function refuseUnsafe(path: string): void {
 }
 
 /**
- * The one reader of a registry on disk: only a regular file reached without a link from
- * the root. With `verified`, folders checked once in this pass are not walked again.
+ * Reads only a regular file reached without a link from the root.
+ * With `verified`, folders checked once in this pass are not walked again.
  */
 export function rootReader(root: string, verified?: Set<string>): ReadPath {
   return async (path) => {
@@ -45,9 +45,8 @@ export function rootReader(root: string, verified?: Set<string>): ReadPath {
   };
 }
 
-/** A file spec registry in a folder on disk: what it resolved, and reading only that. */
 export interface FolderRegistry {
-  /** Reads the root at `root` and remembers what it listed, for `fetch` and `localRoot`. */
+  /** `fetch` and `localRoot` read only what the last resolve listed. */
   resolve(root: string, wanted: readonly Want[], all?: boolean): Promise<Resolution>;
   localRoot(artifact: Artifact): Promise<string | undefined>;
   fetch(artifact: Artifact, file: FileRef): Promise<Uint8Array>;
@@ -59,13 +58,10 @@ export interface FolderRegistry {
 const SETTLED = new Map<string, Resolution>();
 const SETTLED_LIMIT = 32;
 
-/**
- * For any adapter whose registry ends up as a folder on disk, such as a checkout
- * or a mounted bucket. Failures are `SpecError`s the adapter reports as its own.
- */
+/** For a registry that ends up as a folder on disk. Failures are `SpecError`s. */
 export function openFolderRegistry(
   options: {
-    /** The folder's content never changes once written, such as a checkout of one commit. */
+    /** The content never changes once written, such as a checkout of one commit. */
     immutable?: boolean;
   } = {},
 ): FolderRegistry {
@@ -92,7 +88,6 @@ export function openFolderRegistry(
       if (kept !== undefined) {
         resolution = structuredClone(kept);
       } else {
-        // One pass reads every document once, so each folder on the way is checked once.
         const read = rootReader(at, new Set());
         const registry = await readRegistry(read);
         const found = await resolveFromRoot(read, { blobUrl: registry.blobUrl, wanted, all });

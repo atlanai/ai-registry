@@ -88,7 +88,7 @@ describe("openLayoutRoot", () => {
       "@remote/wide/skills/tip",
     ]);
     expect(fetched).toEqual(["wide"]);
-    // A name no entry has, such as one a plugin goes by elsewhere, reads them all to find it.
+    // A name no entry has reads them all to find it.
     expect(await read([{ name: "tip", kind: "skill" }])).toHaveLength(3);
     expect(fetched).toEqual(names);
     await read([], true);

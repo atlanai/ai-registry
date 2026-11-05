@@ -16,7 +16,6 @@ export interface InstallerConfig {
   readonly version: string;
   /** The https release origin, such as https://aireg.sh. */
   readonly origin: string;
-  /** Directory holding the compiled `aireg-<os>-<arch>[.exe]` assets. */
   readonly binaryDir: string;
 }
 
@@ -53,7 +52,7 @@ function digestOf(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
-/** The values both installers share, and the digests of the platforms `windows` selects. */
+/** `windows` selects which platforms' digests go in. */
 function installerValues(config: InstallerConfig, windows: boolean): Record<string, string> {
   const origin = installerOrigin(config.origin);
   const artifactBase = artifactBaseUrl(config.origin, config.version);
@@ -78,12 +77,10 @@ function installerValues(config: InstallerConfig, windows: boolean): Record<stri
   return values;
 }
 
-/** `install.sh`, for macOS and Linux. */
 export function renderInstaller(config: InstallerConfig): string {
   return renderTemplate(readFileSync(SH_TEMPLATE, "utf8"), installerValues(config, false));
 }
 
-/** `install.ps1`, for Windows. */
 export function renderWindowsInstaller(config: InstallerConfig): string {
   return renderTemplate(readFileSync(POWERSHELL_TEMPLATE, "utf8"), installerValues(config, true));
 }

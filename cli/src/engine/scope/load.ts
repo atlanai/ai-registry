@@ -21,7 +21,7 @@ export interface Loaded {
   lock: Lock;
   /** Nothing in a project changes it. */
   targetTable: Targets;
-  /** The manifest as loaded, so a run that did not edit it leaves the file alone. */
+  /** So a run that did not edit it leaves the file alone. */
   manifestAsRead: string;
 }
 
@@ -34,8 +34,8 @@ export async function load(
 }
 
 /**
- * Holds the scope's lease and reads it under the lease, so a change another process
- * wrote meanwhile is kept, not overwritten. One writer per scope, across processes.
+ * Reads under the lease, so another process's change is kept, not overwritten. One writer
+ * per scope, across processes.
  */
 export async function withScope<T>(
   roots: Roots,

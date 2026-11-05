@@ -102,10 +102,7 @@ async function refuseIrregular(roots: Roots, from: string, found?: Irregular): P
   });
 }
 
-/**
- * Copies each artifact into the registry and records it in the lockfile. The original
- * stays where it was written: not moved, not linked over, not deleted.
- */
+/** The original is never moved, linked over or deleted. */
 export async function applyImport(
   plan: ImportPlan,
   into: { registry: string; namespace: string },
@@ -132,7 +129,7 @@ async function copyIn(
     }
   }
   const lock = loaded.lock;
-  // What this run copied, so a refusal part way leaves nothing behind, as its hint says.
+  // What this run copied, so a refusal part way leaves nothing behind.
   const made: string[] = [];
   try {
     await copyAll(plan, into, loaded, lock, made);

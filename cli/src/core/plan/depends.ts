@@ -8,10 +8,7 @@ import type { Ref } from "#core/ref.ts";
 import type { Acquired, Selected } from "./model.ts";
 import { addressOf } from "./select.ts";
 
-/**
- * One `depends_on` edge. The file spec makes `to` a fully qualified ref resolved
- * within the same root, so it names one version and never another registry.
- */
+/** One `depends_on` edge; the file spec makes `to` an exact version in the same registry. */
 export interface Need {
   namespace: string;
   kind: ArtifactKind;
@@ -190,7 +187,6 @@ function betweenTwo(
   };
 }
 
-/** Where the source publishes a need at exactly the version asked for. */
 function publishedAt(source: Acquired | undefined, need: Need): string | undefined {
   if (source === undefined) return undefined;
   const entry = entryFor(source.catalog.entries, need.namespace, need.kind, need.name);
@@ -243,7 +239,6 @@ function descendants(start: string, forward: ReadonlyMap<string, readonly string
   return seen;
 }
 
-/** By installed name, what needs each artifact, read from the closure's ids. */
 export function dependentsByName(
   needs: Closure,
   selected: readonly Selected[],

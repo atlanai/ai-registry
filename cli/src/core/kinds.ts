@@ -3,16 +3,15 @@ import { type ArtifactKind, KINDS } from "#adapter/index.ts";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { AGENT_CARD_ENTRY } from "./product.ts";
 
-/** How a kind appears in a registry, and what it is called there. */
 export interface KindSpec {
   /** Plural; used in this scope's own copies and in every target. */
   dir: string;
   shape: "directory" | "file";
-  /** Extensions a file-shaped kind may use. Empty for directory-shaped kinds. */
+  /** Empty for directory-shaped kinds. */
   extensions: readonly string[];
   /**
-   * The file that makes a directory one of these, and holds its front matter.
-   * A directory without it is not this kind; absent, any directory is.
+   * The file that makes a directory this kind and holds its front matter. A directory without
+   * it is not this kind; absent, any directory is.
    */
   entry?: string;
   /** Entry filenames a file-shaped kind can install; companion files stay in the registry. */
@@ -36,7 +35,6 @@ export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
 /** Kinds the registry scanner walks; `plugin` is found by its manifest. */
 export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter((kind) => kind !== "plugin");
 
-/** Target-shaped and plural: what the writable copy and every target use. */
 export function kindDir(kind: ArtifactKind): string {
   return KIND_SPECS[kind].dir;
 }
@@ -44,10 +42,7 @@ export function kindDir(kind: ArtifactKind): string {
 /** Anything stranger than a short alphanumeric suffix is not an extension. */
 const EXTENSION = /^\.[A-Za-z0-9]{1,16}$/;
 
-/**
- * A version directory always holds files, so a file-shaped kind is one file
- * inside it rather than the directory itself.
- */
+/** A version directory always holds files, so a file-shaped kind is one file inside it. */
 export function nativePath(versionDir: string, kind: ArtifactKind, sourcePath: string): string {
   if (KIND_SPECS[kind].shape === "directory") return versionDir;
   return join(versionDir, basename(sourcePath));

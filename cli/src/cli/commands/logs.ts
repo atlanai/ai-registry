@@ -44,7 +44,8 @@ export const { run } = defineCommand({
       .sort((a, b) => {
         const at = isRaw(a.entry) ? "" : a.entry.timestamp;
         const bt = isRaw(b.entry) ? "" : b.entry.timestamp;
-        return at < bt ? -1 : at > bt ? 1 : 0;
+        if (at < bt) return -1;
+        return at > bt ? 1 : 0;
       });
     const entries = limit === 0 ? [] : history.slice(-limit);
     if (options.follow !== true) return { entries };

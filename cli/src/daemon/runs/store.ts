@@ -46,10 +46,7 @@ const EVENT_COLUMNS = `
   id, run_id, seq, occurred_at_ms, event_type, step, artifact, kind,
   disposition, operation, outcome, error_code, retryable, data_json`;
 
-/**
- * Counts are an aggregate over the events, so what a run reports and what it
- * recorded cannot drift apart.
- */
+/** Aggregated from the events, so what a run reports and what it recorded cannot drift. */
 const COUNTS_SELECT = `
   SELECT run_id,
     COUNT(*) AS examined,
@@ -81,9 +78,7 @@ function unreadable(error: unknown): boolean {
 
 export class SqliteRunStore implements RunStore {
   readonly #database: DatabaseSync;
-  /** Each statement compiled once; a run of thousands of events reuses them. */
   readonly #statements = new Map<string, StatementSync>();
-  /** The next sequence number of each run written to since this store opened. */
   readonly #sequences = new Map<string, number>();
 
   private constructor(database: DatabaseSync) {
@@ -134,7 +129,7 @@ export class SqliteRunStore implements RunStore {
     });
   }
 
-  /** A deleted job leaves its run history behind, which nothing else reclaims. */
+  /** A deleted job leaves its run history behind, and nothing else reclaims it. */
   forgetJobs(live: ReadonlySet<string>): number {
     const rows = this.#prepare(
       "SELECT DISTINCT job_id FROM runs WHERE job_id IS NOT NULL",
@@ -147,7 +142,6 @@ export class SqliteRunStore implements RunStore {
   }
 
   finish(id: string, result: FinishRun): RunRecord {
-    // A finished run takes no more events, so its counter is not kept.
     this.#sequences.delete(id);
     return this.#transaction(() => {
       const changed = this.#prepare(
@@ -264,10 +258,7 @@ export class SqliteRunStore implements RunStore {
     });
   }
 
-  /**
-   * History is a cache, so a database SQLite cannot read is moved aside and a
-   * new one started, rather than keeping the daemon from ever starting.
-   */
+  /** History is a cache, so an unreadable database is moved aside rather than block startup. */
   static async open(
     path: string,
     movedAside: (to: string) => void = () => {},
@@ -333,12 +324,12 @@ export class SqliteRunStore implements RunStore {
       this.#database.exec("COMMIT");
       return result;
     } catch (error) {
-      // SQLite already rolled back after SQLITE_FULL, and a second error must not hide the first.
+      // SQLite already rolled back after SQLITE_FULL; a second error must not hide the first.
       if (this.#database.isTransaction) {
         try {
           this.#database.exec("ROLLBACK");
         } catch {
-          // The original error says what went wrong.
+          // Keep the original error.
         }
       }
       throw error;
@@ -407,7 +398,7 @@ export class SqliteRunStore implements RunStore {
       ).run(run.accountId, run.accountId, RUN_HISTORY_PER_ACCOUNT);
       return;
     }
-    // The newest runs, up to the run cap and the event budget; the newest is always kept.
+    // Up to the run cap and the event budget; the newest is always kept.
     this.#prepare(
       `DELETE FROM runs WHERE job_id = ? AND id NOT IN (
            SELECT id FROM (
@@ -423,10 +414,8 @@ export class SqliteRunStore implements RunStore {
   }
 }
 
-/** Sets the journal and the schema, rebuilding history whose layout is not this one. */
 async function prepare(database: DatabaseSync, path: string, onDisk: boolean): Promise<void> {
-  // NORMAL under WAL never corrupts the database; a power cut may lose the newest
-  // events, which is acceptable for history and spares an fsync per event.
+  // NORMAL under WAL never corrupts; a power cut may lose the newest events, fine for history.
   database.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA trusted_schema=OFF;");
   // SQLite gives a later -wal or -shm the database's own mode.
   if (onDisk) {

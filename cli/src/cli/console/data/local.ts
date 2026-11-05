@@ -10,13 +10,9 @@ import type { Roots } from "#core/store/paths.ts";
 import { candidates } from "#core/sync/adopt.ts";
 import type { Targets } from "#core/target/contract.ts";
 
-/** Folders an adapter job already carries, by path, from its newest finished run. */
 export type Carried = ReadonlyMap<string, Carrier>;
 
-/**
- * Work in no lock and no registry, found the way `aireg status` finds it. A name a
- * registry already publishes cannot be offered as new work, but is still shown.
- */
+/** A name a registry already publishes is shown but cannot be offered as new work. */
 export async function localWork(
   roots: Roots,
   targetTable: Targets,
@@ -68,12 +64,10 @@ function addressOf(entry: Lock["artifacts"][string]): string {
   return `${entry.registry}/${within}${entry.kind}/${entry.name}`;
 }
 
-/** An installed artifact a local folder shares its name with, as a person would address it. */
 interface Tracked {
   from: string;
 }
 
-/** When a carried folder last changed, and whether that was after its job last ran. */
 async function editsOf(
   carrier: Carrier | undefined,
   path: string,
@@ -88,7 +82,7 @@ async function editsOf(
   };
 }
 
-/** The newest mtime under a skill folder, bounded: an edit to any file counts. */
+/** The newest mtime under a skill folder, bounded: an edit to any file counts, not just the folder's. */
 async function newestChange(dir: string, depth = 4): Promise<number> {
   let newest = (await ifPresent(stat(dir)))?.mtimeMs ?? 0;
   if (depth === 0) return newest;
@@ -111,8 +105,7 @@ function classify(
   carrier: Carrier | undefined,
   edited: boolean,
 ): { state: ArtifactRow["state"]; detail: string } {
-  // The lock wins: this directory is a second copy of something installed, not
-  // work of its own, and publishing it would collide with that name.
+  // The lock wins: publishing this second copy would collide with the installed name.
   if (tracked !== undefined) {
     return {
       state: "duplicate",
@@ -133,8 +126,7 @@ function classify(
       detail: `carried by job ${carrier.job}${held ? `; needs attention: ${carrier.detail ?? "see the run"}` : ""}`,
     };
   }
-  // What a push leaves behind: the registry has it, nothing has resolved
-  // its id back yet.
+  // What a push leaves behind: the registry has it, but its id is not resolved yet.
   if (declared) {
     return { state: "pending", detail: "published; run `aireg install` to track it" };
   }

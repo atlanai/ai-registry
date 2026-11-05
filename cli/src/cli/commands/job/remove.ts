@@ -34,7 +34,6 @@ export const remove = action({
   text: (job, printer) => printer.success(`Removed job ${job.name ?? job.id}.`),
 });
 
-/** After a job is removed, says when nothing keeps what it kept up to date any more. */
 async function warnUnkept(context: CommandContext, job: Job, after: RegistryConfig): Promise<void> {
   const registry = after.accounts.find((account) => account.id === job.account)?.registry;
   const root = pulledInto(job);
@@ -66,7 +65,6 @@ async function warnUnkept(context: CommandContext, job: Job, after: RegistryConf
   }
 }
 
-/** The folder a job keeps up to date from its registry: enabled, and pulling there. */
 function pulledInto(job: Job): string | undefined {
   if (!job.schedule.enabled) return undefined;
   return job.steps.find(

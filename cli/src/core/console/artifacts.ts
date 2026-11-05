@@ -21,10 +21,6 @@ export interface UpstreamFacts {
   pending: ReadonlySet<string>;
 }
 
-/**
- * The lock, the disk and what the registry refused, folded into one row per
- * artifact and one group per namespace.
- */
 export async function groupArtifacts(input: GroupInput): Promise<ArtifactGroup[]> {
   const byKey = new Map(input.statuses.map((item) => [item.name, item]));
   const rows = await Promise.all(
@@ -132,10 +128,7 @@ async function changedAt(path: string): Promise<number | undefined> {
   return (await ifPresent(stat(path)))?.mtimeMs;
 }
 
-/**
- * Artifacts the registry listed and then refused. They are in no lock and on
- * no disk, so nothing else in the read path would mention them at all.
- */
+/** In no lock and on no disk, so nothing else in the read path would mention them. */
 function refused(lock: Lock, upstream: UpstreamFacts): ArtifactRow[] {
   const rows: ArtifactRow[] = [];
   for (const [key, detail] of upstream.failed) {
@@ -168,7 +161,6 @@ export interface GroupInput {
   statuses: readonly ArtifactStatus[];
   roots: Roots;
   upstream: UpstreamFacts;
-  /** The namespace an unqualified publish lands in, marked in the tree. */
   defaultNamespace: string | undefined;
   /** Skills written on this machine that no registry knows about. */
   local: readonly ArtifactRow[];
@@ -223,7 +215,6 @@ export function summarize(groups: readonly ArtifactGroup[], examined: number): L
   };
 }
 
-/** What a namespace row reports: how many rows are where they belong, and what is not. */
 export function health(group: ArtifactGroup): { settled: number; trouble: string[] } {
   // Local work a job already carries is where it belongs, like an artifact that matches its lock.
   const settled = group.counts.ok + group.counts.imported;
@@ -233,7 +224,6 @@ export function health(group: ArtifactGroup): { settled: number; trouble: string
   return { settled, trouble };
 }
 
-/** The publishable members of a group: your edits, and anything never sent. */
 export function publishable(group: ArtifactGroup): ArtifactRow[] {
   // A folder a job carries goes back through that job, not a publish.
   return group.rows.filter(

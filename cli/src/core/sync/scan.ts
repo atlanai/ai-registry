@@ -30,25 +30,31 @@ export async function entriesIn(
   for (const item of items.sort((a, b) => a.name.localeCompare(b.name))) {
     if (item.name.startsWith(".")) continue;
     const full = join(dir, item.name);
-    // A link is an entry only to a caller that follows links, such as a report. Whoever made
-    // it, a dotfiles checkout for one, owns what it points at, so nothing adopts it.
-    const type = item.isSymbolicLink() ? (followLinks ? await linked(full) : undefined) : item;
+    // Whoever made a link (a dotfiles checkout, say) owns its target, so only reports follow it.
+    if (item.isSymbolicLink() && !followLinks) continue;
+    const type = item.isSymbolicLink() ? await linked(full) : item;
     if (type === undefined) continue;
-    const entry =
-      spec.shape === "directory"
-        ? type.isDirectory()
-          ? await directoryEntry(root, full, item.name, spec, group)
-          : undefined
-        : type.isFile()
-          ? await fileEntry(root, full, item.name, spec, group)
-          : undefined;
+    const entry = await entryOf(root, full, item.name, spec, group, type);
     if (entry !== undefined) entries.push(entry);
   }
 
   return entries;
 }
 
-/** What a link points at, or undefined when its target is gone. */
+async function entryOf(
+  root: string,
+  full: string,
+  name: string,
+  spec: Omit<KindDir, "dir">,
+  group: string | undefined,
+  type: Pick<Stats, "isDirectory" | "isFile">,
+): Promise<Entry | undefined> {
+  if (spec.shape === "directory") {
+    return type.isDirectory() ? directoryEntry(root, full, name, spec, group) : undefined;
+  }
+  return type.isFile() ? fileEntry(root, full, name, spec, group) : undefined;
+}
+
 async function linked(path: string): Promise<Stats | undefined> {
   try {
     return await stat(path);
@@ -65,8 +71,7 @@ async function directoryEntry(
   spec: Omit<KindDir, "dir">,
   group: string | undefined,
 ): Promise<Entry | undefined> {
-  // Targets keep folders of their own beside artifacts; one without the
-  // entry file its kind declares is not that kind, and a publish is refused.
+  // Targets keep their own folders beside artifacts; one without the kind's entry file is not one.
   const marker = spec.entry === undefined ? undefined : join(full, spec.entry);
   if (marker !== undefined && !(await isFile(marker))) return undefined;
   const { name, description, engine } =
@@ -114,12 +119,7 @@ async function fileEntry(
   const extension = spec.extensions.find((ext) => file.endsWith(ext));
   if (extension === undefined) return undefined;
   const stem = file.slice(0, -extension.length);
-  const { name, description, engine } =
-    extension === ".json"
-      ? { name: sanitizeName(stem), description: undefined, engine: undefined }
-      : extension === ".toml"
-        ? await describeToml(full, stem)
-        : await describe(full, stem);
+  const { name, description, engine } = await describeFile(full, stem, extension);
   return {
     name,
     kind: spec.kind,
@@ -131,7 +131,19 @@ async function fileEntry(
   };
 }
 
-/** A target's own TOML, such as a Codex agent: its name and description are top-level keys. */
+function describeFile(
+  full: string,
+  stem: string,
+  extension: string,
+): Promise<{ name: string; description: string | undefined; engine: string | undefined }> {
+  if (extension === ".json") {
+    return Promise.resolve({ name: sanitizeName(stem), description: undefined, engine: undefined });
+  }
+  if (extension === ".toml") return describeToml(full, stem);
+  return describe(full, stem);
+}
+
+/** A target's own TOML, such as a Codex agent, keeps name and description at the top level. */
 async function describeToml(
   file: string,
   fallback: string,

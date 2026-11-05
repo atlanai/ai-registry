@@ -6,7 +6,6 @@ import { BUN_COMMIT, BUN_VERSION } from "#packaging/targets.ts";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 
-/** Checked in and shipped beside every release. */
 const NOTICES_FILE = join(ROOT, "THIRD_PARTY_NOTICES.txt");
 
 const BUN_LICENSE = join(ROOT, "packaging", "licenses", "bun.md");
@@ -63,7 +62,8 @@ function normalize(text: string): string {
 }
 
 function byte(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
 }
 
 function readPackage(dir: string): Package {

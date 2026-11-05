@@ -1,31 +1,26 @@
 import { describe, expect, test } from "vitest";
-import { emptyLock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
 import { resolveTargets } from "#core/target/table.ts";
+import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { movedPluginLinks } from "./projection.ts";
 
 describe("movedPluginLinks", () => {
   const USER = roots("user", "/work");
   const scope = { roots: USER, env: process.env, targetTable: resolveTargets(process.env) };
   function lockWith(rows: Record<string, { registry: string; link: string; target?: string }>) {
-    const lock = emptyLock();
+    const built = lockOf();
     for (const [name, row] of Object.entries(rows)) {
-      lock.artifacts[name] = {
+      built.artifact(name, {
         registry: row.registry,
         id: name,
-        name,
-        kind: "skill",
         namespace: "engineering",
         address: name,
         path: `.registry/artifacts/${row.registry}/engineering/skills/${name}`,
-        origin: undefined,
-        content: undefined,
-        version: undefined,
         digest: "",
         links: [{ target: row.target ?? "claude-code", path: row.link, mode: "symlink" }],
-      };
+      });
     }
-    return lock;
+    return built.build();
   }
 
   test("names the row still at the bare name once another registry shares it", () => {

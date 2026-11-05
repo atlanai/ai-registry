@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { describe, expect } from "vitest";
+import { test } from "#test/kit/fixtures.ts";
 import { skillBody, writeSpecRoot } from "#test/kit/spec-root.ts";
 import { contentDigest } from "../spec/canonical.ts";
 import type { Envelope } from "../spec/types.ts";
@@ -28,8 +28,8 @@ async function locator(url: string): Promise<void> {
 
 const refused = expect.objectContaining({ name: "SpecError", missing: false });
 
-beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "aireg-source-containment-"));
+test.beforeEach(async ({ tmp }) => {
+  home = tmp;
   root = join(home, "registry");
   await writeSpecRoot(root, [
     {
@@ -41,11 +41,7 @@ beforeEach(async () => {
   ]);
   await writeFile(join(home, "sentinel"), body);
 });
-afterEach(async () => {
-  await rm(home, { recursive: true, force: true });
-});
 
-// Both built-in adapters read through this, so one table holds them to the same rules.
 describe("file spec containment", () => {
   test("refuses an envelope locator that climbs out of the source", async () => {
     await locator("../../../../../../sentinel");

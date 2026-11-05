@@ -75,7 +75,6 @@ describe("systemdBackend", () => {
     expect(await backend.starts("/home/u/.aireg/bin")).toBe(false);
   });
 
-  // A reload makes the new unit the one the next start runs; nothing is restarted now.
   test("rewrites the unit and reloads without restarting it", async () => {
     const fake = fakeExec();
     await systemdBackend(spec(home), fake.exec).rewrite();

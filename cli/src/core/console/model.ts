@@ -10,27 +10,26 @@ export const LOCAL_SOURCE = "local";
 export type ArtifactState = State | "failed" | "pending" | "imported" | "unpublished" | "duplicate";
 
 export interface ArtifactRow {
-  /** Lock key. Namespaced (`engineering/lint`) where the registry namespaces. */
+  /** Namespaced (`engineering/lint`) where the registry namespaces. */
   key: string;
   /** What the registry calls it, which a local rename does not change. */
   name: string;
   kind: ArtifactKind;
-  /** The registry this came from; `local` for work authored here. */
+  /** `local` for work authored here. */
   registry: string;
   /** Absent for locally authored work. */
   namespace: string | undefined;
   id: string;
   version: string | undefined;
-  /** Digest the lock recorded at install. */
   lockDigest: string;
-  /** Digest of this scope's own copy right now. Differs once you edit it. */
+  /** This scope's own copy now; differs from `lockDigest` once edited. */
   diskDigest: string | undefined;
   state: ArtifactState;
   detail: string | undefined;
   targets: string[];
   /** Absolute path of the writable copy a target is served. */
   copy: string;
-  /** mtime of that copy, which is when you last changed it. */
+  /** mtime of that copy, which is when it was last changed. */
   changedAtMs: number | undefined;
   /** The job that imports this local folder, which `p` runs instead of a publish. */
   carriedBy?: string | undefined;
@@ -58,7 +57,6 @@ export interface JobRow {
   accountId: string;
   enabled: boolean;
   intervalSeconds: number;
-  /** The steps, on one line. */
   summary: string;
   lastRunAtMs: number | undefined;
   nextRunAtMs: number | undefined;
@@ -82,18 +80,16 @@ export interface AccountRow {
   id: string;
   /** The registry's name, which also names its account on the CLI. */
   registry: string;
-  /** The registry's address, as the manifest declares it. */
   address: string;
   /** The registry's adapter config, which only its adapter reads. */
   config: Readonly<Record<string, string>>;
   /** Where the stored token is kept when signed in, which `auth list` does not say. */
   credentialsFile: string | undefined;
   signedIn: boolean;
-  /** The registry's adapter has a sign-in at all; a git or folder registry has none. */
+  /** A git or folder registry has no sign-in. */
   signIn: boolean;
   /** The registry takes published work; aireg never publishes to a git one. */
   publishes: boolean;
-  /** Where an unqualified publish lands. */
   defaultNamespace: string | undefined;
   artifactCount: number;
   namespaceCount: number;
@@ -133,7 +129,6 @@ export interface ConsoleState {
   scope: Scope;
   /** The folder that tree belongs to, where every action runs. */
   root: string;
-  /** When this snapshot was taken, so the header can age it. */
   readAtMs: number;
   /** Anything the read could not answer, shown rather than swallowed. */
   problems: string[];

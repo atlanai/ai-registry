@@ -9,7 +9,7 @@ describe("releasePlatform", () => {
     expect(releasePlatform("win32", "x64")).toBe("windows-amd64");
     expect(releasePlatform("win32", "ia32")).toBeUndefined();
     expect(releasePlatform("linux", "ppc64")).toBeUndefined();
-    // Nothing is composed from an unvetted string: the filename is a path segment.
+    // The filename is a path segment.
     expect(releasePlatform("../..", "x64")).toBeUndefined();
     expect(releasePlatform("linux", "../..")).toBeUndefined();
     // A Map lookup, so these miss rather than returning off Object.prototype.

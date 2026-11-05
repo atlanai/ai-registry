@@ -28,8 +28,8 @@ interface Updated {
 }
 
 /**
- * The one command that moves locked versions: the rows it names, or every row,
- * resolve again. A version the manifest pinned survives, so it is reported.
+ * The one command that moves locked versions. A version the manifest pinned survives
+ * the re-resolve, so it is reported.
  */
 export const { run } = defineCommand({
   spec: UPDATE_COMMAND,
@@ -53,15 +53,13 @@ async function update(
   const loaded = await load(common, context.cwd);
 
   const lock = loaded.lock;
-  // A registry's name, or any name `aireg list` accepts for an installed artifact.
   const named = new Set(
     positionals.flatMap((name) =>
       lock.registries[name] !== undefined ? [name] : rowsNamed(name, lock),
     ),
   );
 
-  // Named explicitly and held at a version: the command cannot do what it looks
-  // like it did, so it says which reference is holding it and how to move it.
+  // Named but held at a version: say which reference holds it and how to move it.
   const view = lockView(lock);
   const held = loaded.manifest.artifacts.filter(
     (ref) =>

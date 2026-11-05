@@ -25,7 +25,6 @@ describe("tabsWith", () => {
   });
 });
 
-/** What Ink draws for an element at this width, as plain lines. */
 function draw(element: ReactElement, columns: number): string[] {
   const writes: string[] = [];
   const stdout = {

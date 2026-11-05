@@ -72,7 +72,6 @@ export function panelBlocks(
   });
 }
 
-/** A panel gets the toolkit and its own slice of the state, nothing else. */
 // biome-ignore lint/suspicious/noExplicitAny: each panel names its own state.
 function panelViewAt(frame: ViewFrame, id: string, cursor: number): PanelView<any> {
   return {
@@ -98,10 +97,7 @@ function counted(panel: AnyPanel, view: PanelView): number {
   }
 }
 
-/**
- * A panel is third-party code inside our render tree, and Ink has no error boundary:
- * an exception in one takes the whole console with it.
- */
+/** Ink has no error boundary, so a panel that throws would take the whole console down. */
 function attempt(label: string, draw: () => PanelNode): ReactNode {
   try {
     return draw() as ReactNode;
@@ -110,7 +106,6 @@ function attempt(label: string, draw: () => PanelNode): ReactNode {
   }
 }
 
-/** A tab whose adapter could not answer, or threw while drawing. */
 function unreadable(label: string, why: string | undefined): ReactNode {
   return box(
     { flexDirection: "column", marginTop: 1 },

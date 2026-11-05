@@ -51,14 +51,9 @@ async function describe(
 }
 
 export interface AccountCounts {
-  /** Installed artifacts and distinct namespaces, by registry alias. */
   byAlias: Readonly<Record<string, { artifacts: number; namespaces: number }>>;
 }
 
-/**
- * One with no sign-in has no account state to show, and one that takes no publishes
- * has nothing to publish to. An adapter that cannot be told apart is shown as able to.
- */
 async function abilities(
   manifest: Manifest,
   alias: string,

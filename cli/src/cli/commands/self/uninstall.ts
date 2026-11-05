@@ -18,7 +18,6 @@ import { probeDaemon, stopDaemon } from "#daemon/process/lifecycle.ts";
 import { removeFromPath } from "#self/shell-path.ts";
 import { deleteFolders, type Footprint, footprint, unlinkUserScope } from "#self/uninstall.ts";
 
-/** Everything aireg put on this machine outside projects. */
 interface Found extends Footprint {
   daemon: boolean;
   autostart: boolean;
@@ -32,7 +31,7 @@ export async function survey(env: NodeJS.ProcessEnv = process.env): Promise<Foun
   };
 }
 
-/** Turns autostart off, which stops a managed daemon, then stops one started by hand. */
+/** Turning autostart off stops a managed daemon; one started by hand is stopped after. */
 export async function stopEverything(): Promise<{ autostart: boolean }> {
   const change = await disableAutostart();
   await stopDaemon();

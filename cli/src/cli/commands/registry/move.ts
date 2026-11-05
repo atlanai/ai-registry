@@ -12,7 +12,6 @@ import { formatRef } from "#core/ref.ts";
 import type { Roots } from "#core/store/paths.ts";
 import type { Probed } from "#engine/address/probe.ts";
 
-/** A declared name taking a new address, with what was checked against it. */
 export interface Move {
   from: string;
   /** Installed artifacts the new address serves unchanged. */
@@ -22,8 +21,8 @@ export interface Move {
 }
 
 /**
- * A name declared elsewhere moves only when the new address serves every artifact installed
- * from it, at its version and with the same content, so nothing installed changes underneath.
+ * A declared name moves only when the new address serves every artifact installed from it,
+ * at its version and with the same content, so nothing installed changes underneath.
  */
 export async function moveOf(
   roots: Roots,

@@ -1,25 +1,19 @@
 import { isVersion } from "../spec/ref.ts";
 
-// The file spec's paths and names, shared by the reader, the writer and every
-// command that names a registry document.
-
-/** A root's discovery document. */
 export const REGISTRY_DOCUMENT = "registry.json";
-/** A root's list of every artifact at its latest version. */
 export const INDEX_DOCUMENT = "index.json";
-/** An artifact's list of its versions, beside its version folders. */
 export const VERSIONS_DOCUMENT = "versions.json";
 export const ARTIFACTS_DIR = "artifacts";
 /** Reserved in a version folder: never authored content, digested or copied to a target. */
 export const ENVELOPE = "artifact.json";
 
-/** The longest namespace or name segment section 2.1 allows. */
+/** File spec section 2.1. */
 export const MAX_SEGMENT = 64;
 
 const SEGMENT = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/;
 const KIND_SEGMENT = /^[a-z][a-z0-9_]{0,31}$/;
 
-/** Windows opens a device, not a folder, at these names, in any case and with any extension. */
+// Windows opens a device at these names, in any case and with any extension.
 const DEVICE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
 
 /** Section 2.1: no path segment may be one, or the registry cannot be checked out on Windows. */
@@ -37,7 +31,7 @@ export function isArtifactName(value: string): boolean {
   return SEGMENT.test(value);
 }
 
-/** A kind as a path segment: a lowercase letter, then letters, digits or underscores. */
+/** A lowercase letter, then lowercase letters, digits or underscores, at most 32 characters. */
 export function isKindSegment(value: string): boolean {
   return KIND_SEGMENT.test(value);
 }
@@ -47,19 +41,16 @@ export function artifactDir(namespace: string, kind: string, name: string): stri
   return `${ARTIFACTS_DIR}/${namespace}/${kind}/${name}`;
 }
 
-/** Where an artifact's `versions.json` is, relative to the root. */
 export function versionsPath(namespace: string, kind: string, name: string): string {
   return `${artifactDir(namespace, kind, name)}/${VERSIONS_DOCUMENT}`;
 }
 
-/** Where one version's folder is, relative to the root. */
 export function versionDir(namespace: string, kind: string, name: string, version: string): string {
   return `${artifactDir(namespace, kind, name)}/${version}`;
 }
 
-/** Where a path inside a registry points: an artifact folder, a version in it, or a file in that. */
 export interface ArtifactPlace {
-  /** The registry's folder, as the part of the path above `artifacts`; empty at its root. */
+  /** The path above `artifacts`; empty at the registry root. */
   root: string;
   namespace: string;
   kind: string;

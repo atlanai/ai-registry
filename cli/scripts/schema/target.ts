@@ -6,7 +6,6 @@ const VARIABLE = "^[A-Za-z_][A-Za-z0-9_]*$";
 
 const ref = (name: string) => Type.Unsafe({ $ref: `#/$defs/${name}` });
 
-/** One of a few words, which an editor offers and an error lists. */
 const choice = (...values: string[]) => Type.Unsafe<string>({ type: "string", enum: values });
 
 /** Objects told apart by `tag`, so only the one it names is checked. */

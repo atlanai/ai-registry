@@ -4,6 +4,7 @@ import { describe, expect } from "vitest";
 import { exists } from "#core/fs/tree.ts";
 import { emptyLock, type Lock } from "#core/lock.ts";
 import { roots as makeRoots, type Roots, stagingDir } from "#core/store/paths.ts";
+import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { recover } from "./journal.ts";
 
@@ -12,29 +13,21 @@ let roots: Roots;
 let env: NodeJS.ProcessEnv;
 
 function locked(): Lock {
-  const lock = emptyLock();
-  lock.registries.mkt = {
-    location: "https://example.test/mkt.git",
-    adapter: "git",
-    key: "sha256:test",
-    config: {},
-    revision: "a".repeat(40),
-  };
-  lock.artifacts.lint = {
-    registry: "mkt",
-    id: "skills/lint",
-    name: "lint",
-    kind: "skill",
-    namespace: undefined,
-    address: "skills/lint",
-    path: "artifacts/copy",
-    origin: undefined,
-    content: "sha256:upstream",
-    version: undefined,
-    digest: "sha256:1",
-    links: [{ target: "claude-code", path: ".claude/skills/lint", mode: "symlink" }],
-  };
-  return lock;
+  return lockOf()
+    .registry("mkt", {
+      location: "https://example.test/mkt.git",
+      key: "sha256:test",
+      revision: "a".repeat(40),
+    })
+    .artifact("lint", {
+      id: "skills/lint",
+      address: "skills/lint",
+      path: "artifacts/copy",
+      content: "sha256:upstream",
+      digest: "sha256:1",
+      links: [{ target: "claude-code", path: ".claude/skills/lint", mode: "symlink" }],
+    })
+    .build();
 }
 
 test.beforeEach(async ({ tmp }) => {

@@ -7,25 +7,21 @@ import { SUPPORTED_FORMAT } from "../spec/types.ts";
 import { list, quoted } from "../text.ts";
 import { INDEX_DOCUMENT, REGISTRY_DOCUMENT, versionsPath } from "./names.ts";
 
-// The same paths work for every kind of root, so this is the only reader there is
-// and a transport is one function.
-
-/** Reads one path under the root. Absent is `undefined`, unreadable throws. */
+/** Absent is `undefined`; unreadable throws. */
 export type ReadPath = (path: string) => Promise<Uint8Array | undefined>;
 
 interface SpecErrorOptions {
   path?: string | undefined;
   hint?: string | undefined;
-  /** What was asked for is not there, as opposed to there and wrong. */
+  /** Not there, as opposed to there and wrong. */
   missing?: boolean | undefined;
-  /** The artifact this concerns, when it concerns one. */
   artifact?: string | undefined;
   cause?: unknown;
 }
 
 /** A registry that breaks the file spec. Each adapter reports it as its own failure. */
 export class SpecError extends Error {
-  /** The failure in aireg's words: `not_found` when `missing`, else `invalid`. */
+  /** `not_found` when `missing`, else `invalid`. */
   readonly code: "not_found" | "invalid";
   readonly path: string | undefined;
   readonly hint: string | undefined;
@@ -43,14 +39,13 @@ export class SpecError extends Error {
   }
 }
 
-/** The JSON document at `path`, or undefined when there is none. */
 export async function readJson(read: ReadPath, path: string): Promise<unknown | undefined> {
   const bytes = await read(path);
   if (bytes === undefined) return undefined;
   try {
     return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
   } catch (cause) {
-    // The parser's message quotes the bytes it stopped at, which are the registry's to choose.
+    // The parser's message quotes registry-chosen bytes, so it stays out of ours.
     throw new SpecError(`${path} is not valid JSON.`, { path, cause });
   }
 }
@@ -60,7 +55,6 @@ export function object(value: unknown, path: string): Fields {
   return value;
 }
 
-/** A root's `registry.json`, read and checked. */
 export interface RegistryDocument {
   formatVersion: number;
   name: string;
@@ -73,7 +67,6 @@ export interface RegistryDocument {
   kinds: readonly string[];
 }
 
-/** One entry of a root's `index.json`. */
 export interface IndexRow {
   namespace: string;
   kind: ArtifactKind;
@@ -84,7 +77,6 @@ export interface IndexRow {
   description: string | undefined;
 }
 
-/** One version in an artifact's `versions.json`. */
 export interface VersionRow {
   version: string;
   digest: string;
@@ -93,7 +85,6 @@ export interface VersionRow {
   reason: string | undefined;
 }
 
-/** An artifact's `versions.json`, read and checked. */
 export interface VersionsDocument {
   namespace: string;
   kind: ArtifactKind;
@@ -112,10 +103,7 @@ export function identityOf(registry: RegistryDocument): RegistryIdentity {
   };
 }
 
-/**
- * The discovery document. Its absence is what makes something not a registry,
- * which is the one check `aireg registry add` makes before anything else.
- */
+/** Its absence is what makes something not a registry. */
 export async function readRegistry(read: ReadPath): Promise<RegistryDocument> {
   const raw = await readJson(read, REGISTRY_DOCUMENT);
   if (raw === undefined) {
@@ -126,8 +114,7 @@ export async function readRegistry(read: ReadPath): Promise<RegistryDocument> {
   }
   const entry = object(raw, REGISTRY_DOCUMENT);
 
-  // Section 8: a host document is a different thing that lives at the same
-  // place, so saying which is the first thing a reader does.
+  // Section 8: a host document may live at the same place, so check which this is first.
   const kind = textOf(entry.kind);
   if (kind !== undefined && kind !== "registry") {
     throw new SpecError(`registry.json is a ${quoted(kind)} document, not a registry.`, {
@@ -188,8 +175,7 @@ export async function readIndex(read: ReadPath): Promise<IndexRow[]> {
   for (const [at, item] of entry.entries.entries()) {
     const parsed = entryOf(item, `index.json entries[${at}]`);
     if (parsed === undefined) continue;
-    // Section 3.2: entries are unique on (namespace, kind, name), so a repeat
-    // is a broken index rather than something to merge.
+    // Section 3.2: entries are unique, so a repeat is a broken index, not something to merge.
     const key = `${parsed.namespace}/${parsed.kind}/${parsed.name}`;
     if (seen.has(key))
       throw new SpecError(`index.json lists ${key} twice.`, { path: INDEX_DOCUMENT });
@@ -202,8 +188,7 @@ export async function readIndex(read: ReadPath): Promise<IndexRow[]> {
 function entryOf(raw: unknown, at: string): IndexRow | undefined {
   const item = object(raw, at);
   const kind = text(item, "kind", at);
-  // A root may hold kinds this client has no reader for. Section 5 rule 4:
-  // unknown is not an error, so it is skipped rather than refused.
+  // Section 5 rule 4: an unknown kind is skipped, not refused.
   if (!isKind(kind)) return undefined;
   return {
     namespace: text(item, "namespace", at),
@@ -216,7 +201,6 @@ function entryOf(raw: unknown, at: string): IndexRow | undefined {
   };
 }
 
-/** An artifact's versions, from its `versions.json` under the root `read` serves. */
 export async function readVersions(
   read: ReadPath,
   namespace: string,
@@ -273,7 +257,7 @@ export function resolveVersion(document: VersionsDocument, wanted: string | unde
   });
 }
 
-/** Return the newest held version, including yanked releases, to avoid republishing it. */
+/** Includes yanked releases, so a publish never reuses one. */
 export function newestListed(document: VersionsDocument): string {
   let best: { version: string; parsed: Version } | undefined;
   for (const { version } of document.versions) {

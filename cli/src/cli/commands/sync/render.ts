@@ -20,25 +20,24 @@ const MARK: Record<Disposition, (printer: Printer) => string> = {
   unavailable: (p) => p.style.red("unavailable"),
 };
 
-export function renderSync(
-  printer: Printer,
-  items: readonly SyncItem[],
-  found: readonly Candidate[],
-  undeclared: readonly Candidate[],
-  roots: Roots,
+interface SyncView {
+  items: readonly SyncItem[];
+  found: readonly Candidate[];
+  undeclared: readonly Candidate[];
+  roots: Roots;
   /** Undeclared copies holding the registry's bytes, and ones someone changed. */
   claims: {
     linkable: readonly Candidate[];
     changed: readonly Candidate[];
     /** Folders of yours the registry also serves, kept in place with its copy left out. */
     kept?: readonly Candidate[];
-  } = {
-    linkable: [],
-    changed: [],
-  },
+  };
   /** The one registry the run covers, when it was named. */
-  registry?: string,
-): void {
+  registry?: string | undefined;
+}
+
+export function renderSync(printer: Printer, view: SyncView): void {
+  const { items, found, undeclared, roots, claims, registry } = view;
   const shown = items.filter((item) => item.disposition !== "synced");
 
   if (
@@ -92,7 +91,6 @@ export function renderSync(
   }
 }
 
-/** Written or published elsewhere: what it is, and the folder it is in. */
 function candidates(
   printer: Printer,
   title: string,

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, open, readdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import {
@@ -13,13 +13,11 @@ import {
 import { test } from "#test/kit/fixtures.ts";
 import { copyDescribed, materialize } from "./materialize.ts";
 
-/** This test's folder, which the kit removes after it. */
 let scratch: string;
 test.beforeEach(({ tmp }) => {
   scratch = tmp;
 });
 
-/** A cache folder keyed by content digest, the way the client lays one out. */
 function keyed(dir: string): (contentId: string) => string {
   return (contentId) => join(dir, contentId.replace(/^sha256:/, ""));
 }
@@ -48,7 +46,6 @@ function artifact(id: string, kind: ArtifactKind, name: string, paths: string[])
   };
 }
 
-/** A plugin laid out the way the client addresses a plugin's contents. */
 function plugin(...members: string[]): Artifact {
   return artifact("workspace:team", "plugin", "team", [
     ".claude-plugin/plugin.json",
@@ -62,8 +59,7 @@ function serving(withheld: ReadonlySet<string>, tampered: ReadonlySet<string> = 
       if (withheld.has(ref.path)) {
         throw new AdapterError("test", "not_found", `${ref.path} is gone`);
       }
-      // What a CDN injecting a script into an HTML response looks like from
-      // here: the right file, more bytes than were described.
+      // A CDN injecting a script: the right file, more bytes than were described.
       if (tampered.has(ref.path)) {
         return new TextEncoder().encode(`${new TextDecoder().decode(bytesOf(ref.path))} <script/>`);
       }
@@ -78,7 +74,8 @@ describe("materialize", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   async function into(work: (home: string) => Promise<void>): Promise<void> {
-    const home = await mkdtemp(join(scratch, "aireg-content-test-"));
+    const home = join(scratch, "home");
+    await mkdir(home);
     vi.stubEnv("AIREG_HOME", home);
     await work(home);
   }
@@ -187,7 +184,8 @@ describe("materialize", () => {
 
 describe("materialize, when a member arrives as something else", () => {
   async function into(work: (home: string) => Promise<void>): Promise<void> {
-    const home = await mkdtemp(join(scratch, "aireg-content-tamper-"));
+    const home = join(scratch, "home");
+    await mkdir(home);
     vi.stubEnv("AIREG_HOME", home);
     try {
       await work(home);
@@ -196,8 +194,6 @@ describe("materialize, when a member arrives as something else", () => {
     }
   }
 
-  // Dropping the member is the safe half of the choice: the bytes never land
-  // either way, and the rest of the namespace still installs.
   test("drops the member and keeps the others", async () => {
     await into(async (home) => {
       const session = serving(new Set(), new Set(["skills/bad/SKILL.md"]));
@@ -226,7 +222,8 @@ describe("a version read where its source keeps it", () => {
   async function inPlace(
     work: (version: string, home: string, handle: SourceHandle) => Promise<void>,
   ): Promise<void> {
-    const home = await mkdtemp(join(scratch, "aireg-content-local-"));
+    const home = join(scratch, "home");
+    await mkdir(home);
     vi.stubEnv("AIREG_HOME", home);
     const version = join(home, "registry", "lint", "1.0.0");
     await mkdir(version, { recursive: true });
@@ -258,8 +255,7 @@ describe("a version read where its source keeps it", () => {
       const one = artifact("skills/lint", "skill", "lint", ["SKILL.md"]);
       const staged = await materialize("test", handle, one, { into: keyed(join(home, "mirror")) });
 
-      // Every whole-file read goes through a FileHandle, so counting those is
-      // what tells a streamed copy from a buffered one.
+      // Every whole-file read goes through a FileHandle, so counting them shows a buffered copy.
       const probe = await open(join(version, "SKILL.md"));
       const fileHandle = Object.getPrototypeOf(probe) as {
         readFile: (...args: never[]) => unknown;

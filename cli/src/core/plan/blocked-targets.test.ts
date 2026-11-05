@@ -1,10 +1,10 @@
-import { accessSync, chmodSync, constants, mkdtempSync, rmSync } from "node:fs";
-import { chmod, mkdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { constants } from "node:fs";
+import { access, chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { emptyPlan } from "#test/kit/builders/plan.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { tempDir } from "#test/kit/temp.ts";
 import { blockedTargets } from "./blocked-targets.ts";
 import type { Plan } from "./model.ts";
 
@@ -28,20 +28,17 @@ function planning(links: readonly { target: string; to: string }[]): Plan {
   };
 }
 
-/**
- * Root, or a capability such as CAP_DAC_OVERRIDE, ignores mode bits, so a write test
- * would pass for the wrong reason. Probed rather than read from the uid, which misses the latter.
- */
-const modesIgnored = (() => {
-  const probe = mkdtempSync(join(tmpdir(), "aireg-modes-"));
+/** Root or CAP_DAC_OVERRIDE ignores mode bits; probed, since the uid misses the capability. */
+const modesIgnored = await (async () => {
+  const probe = await tempDir("modes-");
   try {
-    chmodSync(probe, 0o555);
-    accessSync(probe, constants.W_OK);
+    await chmod(probe, 0o555);
+    await access(probe, constants.W_OK);
     return true;
   } catch {
     return false;
   } finally {
-    rmSync(probe, { recursive: true, force: true });
+    await rm(probe, { recursive: true, force: true });
   }
 })();
 

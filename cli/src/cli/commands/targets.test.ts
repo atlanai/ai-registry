@@ -1,39 +1,28 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
-import { Printer } from "#core/term/printer.ts";
+import { BUILTIN_TARGETS } from "#targets/index.ts";
+import { commandContext } from "#test/kit/command.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { RESERVED } from "./builtins.ts";
-import type { CommandContext } from "./command.ts";
 import { allCommands, lookup } from "./index.ts";
 import { foundSummary, run } from "./targets.ts";
 
 function context(
   cwd: string,
-  writes: string[],
+  printed: string[],
   format: "json" | "text" = "json",
   argv: string[] = [],
-): CommandContext {
-  return {
-    argv,
-    cwd,
-    printer: new Printer({
-      format,
-      color: "never",
-      out: { write: (chunk: string) => writes.push(chunk), isTTY: false },
-      err: { write: (chunk: string) => writes.push(chunk), isTTY: false },
-    }),
-    host: {
-      version: "test",
-      connectAccount: async () => {
-        throw new Error("no host");
-      },
-      openRunStore: async () => {
-        throw new Error("no host");
-      },
-    },
-  };
+) {
+  return commandContext(argv, { cwd, format, printed, errors: printed });
 }
+
+type BuiltIn = (typeof BUILTIN_TARGETS)[number];
+const shared = (target: BuiltIn) => target.category === "shared-folder";
+/** Sorted as `aireg targets` lists them: shared folders last. */
+const LISTED = [...BUILTIN_TARGETS]
+  .sort((a, b) => (a.id < b.id ? -1 : 1))
+  .sort((a, b) => Number(shared(a)) - Number(shared(b)));
 
 const TOOL = {
   id: "tool",
@@ -51,13 +40,13 @@ describe("targets", () => {
     vi.stubEnv("USERPROFILE", cwd);
     vi.stubEnv("AIREG_HOME", join(cwd, ".aireg"));
     vi.stubEnv("PATH", "");
+    // This machine's own variables would detect its targets; only Claude Code's is set.
+    for (const target of BUILTIN_TARGETS) {
+      for (const name of target.detect === "never" ? [] : (target.detect?.env ?? [])) {
+        vi.stubEnv(name, "");
+      }
+    }
     vi.stubEnv("CLAUDE_CONFIG_DIR", join(cwd, ".claude"));
-    vi.stubEnv("CODEX_HOME", "");
-    vi.stubEnv("COPILOT_HOME", "");
-    vi.stubEnv("GEMINI_CLI_HOME", "");
-    vi.stubEnv("GROK_HOME", "");
-    vi.stubEnv("OPENCODE_CONFIG_DIR", "");
-    vi.stubEnv("PI_CODING_AGENT_DIR", "");
   });
 
   afterEach(async () => {
@@ -78,52 +67,16 @@ describe("targets", () => {
     const payload = JSON.parse(writes.join("")) as {
       data: { targets: Record<string, unknown>[] };
     };
-    // In the order the text lists them, with the shared folder last.
-    const builtIn = { shared: false, origin: "built-in" };
-    expect(payload.data.targets).toEqual([
-      {
-        name: "antigravity",
-        aliases: [],
-        displayName: "Google Antigravity",
-        ...builtIn,
-        detected: false,
-      },
-      {
-        name: "claude-code",
-        aliases: ["claude"],
-        displayName: "Claude Code",
-        ...builtIn,
-        detected: true,
-        by: "env",
-      },
-      { name: "codex", aliases: [], displayName: "Codex", ...builtIn, detected: false },
-      { name: "cursor", aliases: [], displayName: "Cursor", ...builtIn, detected: false },
-      {
-        name: "gemini-cli",
-        aliases: ["gemini"],
-        displayName: "Gemini CLI",
-        ...builtIn,
-        detected: false,
-      },
-      {
-        name: "github-copilot",
-        aliases: ["copilot"],
-        displayName: "GitHub Copilot",
-        ...builtIn,
-        detected: false,
-      },
-      { name: "grok", aliases: [], displayName: "Grok Build", ...builtIn, detected: false },
-      { name: "opencode", aliases: [], displayName: "OpenCode", ...builtIn, detected: false },
-      { name: "pi", aliases: [], displayName: "Pi", ...builtIn, detected: false },
-      {
-        name: "universal",
-        aliases: ["agents"],
-        displayName: "Shared .agents folder",
-        shared: true,
-        detected: false,
+    expect(payload.data.targets).toEqual(
+      LISTED.map((target) => ({
+        name: target.id,
+        aliases: target.aliases ?? [],
+        displayName: target.displayName,
+        shared: shared(target),
         origin: "built-in",
-      },
-    ]);
+        ...(target.id === "claude-code" ? { detected: true, by: "env" } : { detected: false }),
+      })),
+    );
   });
 
   test("lists the coding agents this machine has, and every one with --all, but no folder row", async () => {
@@ -135,7 +88,8 @@ describe("targets", () => {
       "  Claude Code  claude-code  claude   found   from its environment variables",
     );
     expect(lines.some((line) => /^ +(Codex|Cursor|agents|Shared)/.test(line))).toBe(false);
-    expect(lines).toContain("Found 1 of 9 supported targets on this machine.");
+    const tools = LISTED.filter((target) => !shared(target)).length;
+    expect(lines).toContain(`Found 1 of ${tools} supported targets on this machine.`);
     expect(lines).toContain("hint: Run `aireg targets --all` to see every one.");
     expect(lines).toContain(
       "hint: Use `--for universal`, or `agents`, for the shared .agents folder.",

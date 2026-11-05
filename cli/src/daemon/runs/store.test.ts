@@ -48,8 +48,7 @@ describe("SQLite run store", () => {
       }),
     ).toThrow();
 
-    // Counts are derived from item events, so recording these is what makes
-    // the finished run's counts non-empty.
+    // Counts derive from item events.
     store.progress("run_1", "pull", {
       occurredAtMs: 111,
       eventType: RunEventType.ItemSettled,

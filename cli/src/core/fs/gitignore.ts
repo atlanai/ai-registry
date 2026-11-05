@@ -1,5 +1,4 @@
 interface Rule {
-  /** The pattern as written, which a caller reports by. */
   pattern: string;
   negated: boolean;
   /** It ends in `/`, so only a folder matches it. */
@@ -85,7 +84,6 @@ function doubleStar(body: string, at: number): { source: string; end: number } |
 }
 
 export interface Ignore {
-  /** Whether git would leave this file out. */
   ignores(path: string): boolean;
   /** The patterns that matched no file or folder of those asked about so far. */
   unmatched(): string[];

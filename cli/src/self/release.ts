@@ -14,10 +14,7 @@ export interface ResolvedRelease {
   readonly plan: ManifestPlan;
 }
 
-/**
- * The signed channel manifest on the release server, and nothing else. A build
- * that cannot name its keyring has no signature to check, so it refuses.
- */
+/** Only the signed channel manifest; a build with no keyring refuses. */
 export async function resolveRelease(
   env: NodeJS.ProcessEnv = process.env,
   $fetch: typeof fetch = fetch,

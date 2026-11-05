@@ -27,7 +27,6 @@ export function earlierIds(targetTable: Targets, ids: readonly string[]): string
   return ids.map((id) => earlierId(targetTable, id));
 }
 
-/** One job, held to every rule config.yml is; `where` names it in a message. */
 export function parseJob(value: unknown, where: string, read: Readers): Job {
   const entry = read.record(value, where);
   read.onlyKnown(entry, ["id", "name", "account", "schedule", "steps"], where);

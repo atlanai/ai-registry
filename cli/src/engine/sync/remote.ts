@@ -18,18 +18,13 @@ import type { SyncOperation } from "#core/sync/policy.ts";
 import { artifactKey } from "./decide.ts";
 import type { Scan } from "./scan.ts";
 
-/**
- * What a mutation had already completed when it threw. A caller that writes to
- * disk needs this: an archive can land before the publish that follows it fails.
- */
+/** What landed before the throw: an archive can land before the publish after it fails. */
 export function partialMutation(error: unknown): RemoteMutationResult | undefined {
   return typeof error === "object" && error !== null ? partials.get(error) : undefined;
 }
 
-/**
- * Records what landed and reports each refusal on its artifact, then rethrows the first.
- * An adapter that ignores `partial` throws instead, and the batch fails as a whole.
- */
+// Records what landed and reports each refusal on its artifact, then rethrows the first.
+// An adapter that ignores `partial` throws instead, failing the whole batch.
 export async function publishPartial(
   publish: NonNullable<SourceHandle["publish"]>,
   inputs: readonly PublishInput[],
@@ -78,7 +73,6 @@ export interface RemoteMutationResult {
 
 const partials = new WeakMap<object, RemoteMutationResult>();
 
-/** A registry whose adapter reads but never publishes. */
 export function readOnly(alias: string, displayName: string): AiregError {
   return new AiregError(`${alias} does not accept published artifacts.`, {
     code: ErrorCode.Usage,
@@ -86,16 +80,19 @@ export function readOnly(alias: string, displayName: string): AiregError {
   });
 }
 
-export async function mutateRemote(
-  scan: Scan,
+export interface RemoteMutation {
+  scan: Scan;
   /** The run's own scope, whose manifest declares the registry it sends to. */
-  roots: Pick<Roots, "scope" | "cwd">,
-  source: RegistrySource,
-  account: Account,
-  operations: ReadonlyMap<string, SyncOperation>,
-  signal: AbortSignal,
-  hooks: RemoteMutationHooks,
-): Promise<RemoteMutationResult> {
+  roots: Pick<Roots, "scope" | "cwd">;
+  source: RegistrySource;
+  account: Account;
+  operations: ReadonlyMap<string, SyncOperation>;
+  signal: AbortSignal;
+  hooks: RemoteMutationHooks;
+}
+
+export async function mutateRemote(mutation: RemoteMutation): Promise<RemoteMutationResult> {
+  const { scan, roots, source, account, operations, signal, hooks } = mutation;
   const result: RemoteMutationResult = { published: new Map(), archived: new Set() };
   if (![...operations.values()].some((item) => item === "publish" || item === "archive")) {
     return result;
@@ -206,7 +203,6 @@ async function stageMutations(
   /** Keyed by `artifactKey`, so a choice for one kind never sends another of the same name. */
   operations: ReadonlyMap<string, SyncOperation>,
   hooks: RemoteMutationHooks,
-  /** Where the account publishes new work. */
   namespace: string | undefined,
 ): Promise<StagedMutations> {
   const staged: StagedMutations = {

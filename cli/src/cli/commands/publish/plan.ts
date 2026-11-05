@@ -10,7 +10,6 @@ import type { Work } from "#engine/publish/work.ts";
 import type { Loaded } from "#engine/scope/load.ts";
 import type { Sending } from "./review.ts";
 
-/** The edges an export carries into one target, given what this run plans for the others. */
 type EdgesFor = (
   work: Work,
   target: { registry: string; namespace: string },

@@ -228,11 +228,9 @@ class Picking<T> implements Machine<T[]> {
 
   private allBody(on: boolean): string {
     const fills = this.top.map((node) => this.selection.fill(node));
-    const fill: Fill = fills.every((each) => each === "all")
-      ? "all"
-      : fills.some((each) => each !== "none")
-        ? "some"
-        : "none";
+    let fill: Fill = "none";
+    if (fills.every((each) => each === "all")) fill = "all";
+    else if (fills.some((each) => each !== "none")) fill = "some";
     // The title already counts what is selected, in the same units the tree picks.
     const label = "Select all";
     return `${this.radio(fill)} ${on ? this.options.style.cyan(label) : label}`;
@@ -273,12 +271,9 @@ class Picking<T> implements Machine<T[]> {
 
   private detailRows(columns: number): string[] {
     const { style } = this.options;
-    const text =
-      this.at === undefined
-        ? undefined
-        : this.at === ALL
-          ? `Select or clear every row below: ${this.top.length} in all.`
-          : this.describe(this.at);
+    let text: string | undefined;
+    if (this.at === ALL) text = `Select or clear every row below: ${this.top.length} in all.`;
+    else if (this.at !== undefined) text = this.describe(this.at);
     const lines = fitLines(text, columns - DETAIL_INSET, this.options.detailLines ?? DETAIL_LINES);
     return lines.map((line, index) =>
       line === ""

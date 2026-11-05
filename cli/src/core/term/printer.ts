@@ -80,31 +80,25 @@ const ESC = "\u001B";
 /** Exactly what `Styler` writes, so any other escape in a line can be told apart and dropped. */
 const OWN_STYLE = new RegExp(`(${ESC}\\[(?:0|1|2|31|32|33|36)m)`);
 
-/** `text` less every escape but those `Styler` writes, for a line styled before it is written. */
+/** For a line styled before it is written. */
 export function ownStyleOnly(text: string): string {
   const parts = text.split(OWN_STYLE);
   return parts.map((part, at) => (at % 2 === 1 ? part : sanitizeBlock(part))).join("");
 }
 
-/**
- * A revision is opaque: a commit, a snapshot id, an ordinal. Only something
- * that is plainly a digest is shortened, so `r3` and `v2.1.0` survive intact.
- */
+/** A revision is opaque; only a plain digest is shortened, so `r3` and `v2.1.0` survive. */
 export function abbreviate(revision: string): string {
   if (!DIGEST.test(revision)) return revision;
   return revision.replace(/^sha256:/i, "").slice(0, 7);
 }
 
-/** A fragment, or another program's own message, ended once as a sentence. */
 export function sentence(text: string): string {
   const trimmed = text.trim();
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
-/**
- * Primary output is never gated by `--verbose` or `--quiet`, and diagnostics never touch stdout.
- * Both carry manifest, registry and adapter text, so each is stripped of terminal escapes here, once.
- */
+/** Primary output ignores `--verbose` and `--quiet`; diagnostics never touch stdout. Both strip
+ * escapes here, since they carry manifest, registry and adapter text. */
 export class Printer {
   readonly format: OutputFormat;
   readonly verbose: boolean;
@@ -129,15 +123,12 @@ export class Printer {
     this.errStyle = new Styler(this.err, env, color);
   }
 
-  /**
-   * For a command run on this one's behalf: its one JSON result goes to `out` for the caller
-   * to read, and its warnings and hints reach this printer's stderr as they are.
-   */
+  /** For a command run on this one's behalf: its JSON goes to `out`, its warnings to this stderr. */
   delegate(out: Writer): Printer {
     return new Printer({ ...this.options, err: this.err, out, format: "json" });
   }
 
-  /** Whether stderr is a terminal, for notices a script reading stderr must not see. */
+  /** For notices a script reading stderr must not see. */
   get errIsTerminal(): boolean {
     return this.err.isTTY === true;
   }
@@ -147,7 +138,6 @@ export class Printer {
     this.out.write(this.style.inert(line));
   }
 
-  /** Primary output. Never suppressed. */
   info(message = ""): void {
     this.followsProblem = false;
     if (this.format === "json") return;
@@ -165,21 +155,20 @@ export class Printer {
     this.info(this.style.dim("Dry run. Nothing was changed."));
   }
 
-  /** A step in a longer operation. Verbose only. */
+  /** Verbose only. */
   step(message: string): void {
     this.followsProblem = false;
     if (this.format === "json" || !this.verbose) return;
     this.err.write(`${this.errStyle.dim("·")} ${sanitizeBlock(message)}\n`);
   }
 
-  /** Secondary information about the step just printed. Verbose only. */
+  /** About the step just printed. Verbose only. */
   detail(message: string): void {
     this.followsProblem = false;
     if (this.format === "json" || !this.verbose) return;
     this.err.write(`  ${this.errStyle.dim(sanitizeBlock(message))}\n`);
   }
 
-  /** A labeled follow-up, such as the next command to run. */
   note(label: string, message: string): void {
     this.followsProblem = false;
     if (this.format === "json" || this.quiet) return;
@@ -196,7 +185,6 @@ export class Printer {
     this.followsProblem = true;
   }
 
-  /** What to do about the error or warning just printed. */
   hint(message: string): void {
     if (this.quiet && !this.followsProblem) return;
     this.err.write(`${this.errStyle.cyan("hint:")} ${sanitizeBlock(message)}\n`);
@@ -211,7 +199,6 @@ export class Printer {
     this.out.write(`${JSON.stringify(payload)}\n`);
   }
 
-  /** A labeled diagnostic on stderr (problem code, trace). */
   field(label: string, value: string): void {
     this.err.write(`  ${this.errStyle.dim(`${label}:`)} ${sanitizeBlock(value)}\n`);
   }

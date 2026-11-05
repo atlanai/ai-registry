@@ -117,7 +117,6 @@ async function resolve(
   });
 }
 
-/** The row a name means in a job's scope, read as `sync resolve` reads it without `--job`. */
 async function jobKey(job: Job | undefined, name: string): Promise<string> {
   const root = job?.steps.find((step) => step.root !== undefined)?.root;
   if (root === undefined) return name;
@@ -127,7 +126,6 @@ async function jobKey(job: Job | undefined, name: string): Promise<string> {
   return rowsNamed(name, lock)[0] as string;
 }
 
-/** Waits for the run, printing how the artifact settled, as `aireg sync` does. */
 async function settled(
   context: CommandContext,
   client: RpcClient,

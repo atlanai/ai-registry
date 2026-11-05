@@ -1,17 +1,17 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
 import { requireRegistry } from "./init.ts";
 
-/** This test's folder, which the kit removes after it. */
 let scratch: string;
 test.beforeEach(({ tmp }) => {
   scratch = tmp;
 });
 
 async function folder(files: string[]): Promise<string> {
-  const dir = await mkdtemp(join(scratch, "aireg-root-"));
+  const dir = join(scratch, "root");
+  await mkdir(dir);
   for (const file of files) await writeFile(join(dir, file), "");
   return dir;
 }

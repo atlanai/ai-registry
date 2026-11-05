@@ -145,10 +145,7 @@ export const add = action({
   },
 });
 
-/**
- * Decided and written under the scope's lease, against the manifest and lock as they are then,
- * so a command that writes the scope meanwhile is kept, not overwritten.
- */
+/** Decided under the scope's lease against the current state, so a concurrent write is kept. */
 async function settle(
   context: CommandContext,
   loaded: Loaded,

@@ -47,7 +47,7 @@ export function skipMinimumUpdate(
   return !isInstalledCli(entry, env);
 }
 
-/** Moves a running daemon onto the CLI at `entry`; passed in, since the daemon sits above self. */
+/** Passed in, since the daemon layer sits above self. */
 export type RecycleDaemon = (entry: string, version: string) => Promise<void>;
 
 /** Every answer is recorded, so the next run's floor check reads it instead of asking. */
@@ -102,8 +102,7 @@ export async function applyMinimumUpdate(
     return { kind: "skip" };
   }
 
-  // Said before the download, not after: this is unattended, and a silent multi-minute stall
-  // reads as a hang.
+  // Said before the download: a silent multi-minute stall reads as a hang.
   printer.hint(
     `aireg ${VERSION} is older than the oldest supported version, ${floor}. Updating to ${found.version}${describeSize(downloadSize(found))}.`,
   );
@@ -112,10 +111,7 @@ export async function applyMinimumUpdate(
   return { kind: "reexec", code: await reexec(found.version, argv, env) };
 }
 
-/**
- * The new version is a different executable at a different path, so this is an
- * ordinary spawn of it - the process that just wrote it is still the old one.
- */
+/** A plain spawn: the new version is another executable, and this process is the old one. */
 function reexec(version: string, argv: string[], env: NodeJS.ProcessEnv): Promise<number> {
   return handOff(versionBin(version, env), argv, { ...env, [envName("SKIP_MIN_UPDATE")]: "1" });
 }

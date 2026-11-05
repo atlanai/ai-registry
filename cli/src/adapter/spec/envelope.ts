@@ -1,5 +1,6 @@
 import { extname, posix } from "node:path";
 import { isSafePath } from "../paths.ts";
+import { byCodeUnit } from "../text.ts";
 import { contentDigest } from "./canonical.ts";
 import { isDigest } from "./ref.ts";
 import {
@@ -9,7 +10,6 @@ import {
   type FileDescriptor,
 } from "./types.ts";
 
-/** What `buildEnvelope` needs: the kind, the metadata and each file's descriptor. */
 export interface EnvelopeInput {
   kind: string;
   metadata: Omit<EnvelopeMetadata, "digest">;
@@ -18,14 +18,9 @@ export interface EnvelopeInput {
   relationships?: Envelope["relationships"] | undefined;
 }
 
-/**
- * Adapters build envelopes here rather than by hand, so a digest cannot differ
- * by spelling: file order, absent fields and apiVersion are fixed in one place.
- */
+/** Build envelopes here, not by hand, so file order and absent fields cannot change the digest. */
 export function buildEnvelope(input: EnvelopeInput): Envelope {
-  const files = [...input.files]
-    .map(descriptor)
-    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  const files = [...input.files].map(descriptor).sort((a, b) => byCodeUnit(a.path, b.path));
   if (files.length === 0) throw new Error(`${input.metadata.name} describes no files.`);
 
   const seen = new Set<string>();
@@ -44,7 +39,7 @@ export function buildEnvelope(input: EnvelopeInput): Envelope {
   if (input.relationships !== undefined && input.relationships.length > 0) {
     envelope.relationships = input.relationships;
   }
-  // Recorded after the rest, because it covers the rest.
+  // Last, since it covers everything else.
   envelope.metadata.digest = contentDigest(envelope);
   return envelope;
 }
@@ -91,10 +86,7 @@ const MEDIA_TYPES: Readonly<Record<string, string>> = {
   ".svg": "image/svg+xml",
 };
 
-/**
- * One file as an envelope describes it when it sits beside the envelope, so every
- * writer and reader builds the same descriptor, and the same digest, from the same bytes.
- */
+/** A file beside its envelope, described alike by every writer and reader so digests match. */
 export function describeFile(path: string, digest: string, size: number): FileDescriptor {
   const described: FileDescriptor = { path, digest, size, urls: [path] };
   const mediaType = MEDIA_TYPES[extname(path).toLowerCase()];

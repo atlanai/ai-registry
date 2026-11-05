@@ -22,8 +22,8 @@ export function frontmatterStrict(
 }
 
 /**
- * Keys the coding agents' own docs name as limiting what an agent may use, which no codec drops
- * or changes; a definition's `restrictions` add to them.
+ * Keys the agents' own docs name as limiting an agent, which no codec drops or changes; a
+ * definition's `restrictions` add more.
  */
 const RESTRICTIONS = ["tools", "allowed-tools", "disallowedTools", "permissionMode", "permission"];
 

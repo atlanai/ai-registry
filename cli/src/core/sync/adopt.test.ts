@@ -34,7 +34,6 @@ test.beforeEach(async ({ tmp }) => {
 describe("registryPath", () => {
   test("files each kind where the scanner would look for it", () => {
     expect(registryPath("skill", "review", "/x/review")).toBe("skills/review");
-    // The extension comes from the file, not from the kind.
     expect(registryPath("agent", "adr", "/x/adr.md")).toBe("agents/adr.md");
     expect(registryPath("agent", "adr", "/x/adr")).toBe("agents/adr.md");
   });
@@ -49,8 +48,7 @@ describe("candidates", () => {
     expect(found.local[0]?.suggestedPath).toBe("skills/mine");
   });
 
-  // A target can keep its own folders beside skills, such as one it syncs
-  // into; publishing one as a skill is refused upstream on every run.
+  // A target can keep its own folders beside skills; publishing one would be refused upstream.
   test("skips a directory with no SKILL.md, whatever sits deeper in it", async () => {
     await write(join(root, ".claude", "skills", "mine", "SKILL.md"), skill("mine"));
     await write(
@@ -75,8 +73,7 @@ describe("candidates", () => {
     expect(found.local.map((item) => item.name)).toEqual(["real-name"]);
   });
 
-  // Anything we placed is a link into the staged tree, whether or not this
-  // lock still remembers it.
+  // Anything we placed is a link into the staged tree, whether or not this lock still remembers it.
   test("ignores a link into the staged tree", async () => {
     const staged = join(roots.artifacts, "kit", "eng", "skills", "installed");
     await write(join(staged, "SKILL.md"), skill("installed"));
@@ -98,7 +95,6 @@ describe("candidates", () => {
     expect(found.local).toEqual([]);
   });
 
-  // A person's link, such as one into a dotfiles checkout, belongs to whoever made it.
   test("ignores a person's link to a folder outside the store", async () => {
     const elsewhere = join(root, "dotfiles", "skills", "mine");
     await write(join(elsewhere, "SKILL.md"), skill("mine"));
@@ -129,8 +125,6 @@ describe("candidates", () => {
     expect(found.local).toEqual([]);
   });
 
-  // A name the registry publishes is not local work: it is an artifact this
-  // project has not declared, which is a different sentence.
   test("separates a name the registry already publishes", async () => {
     await write(join(root, ".claude", "skills", "lint", "SKILL.md"), skill("lint"));
     const found = await candidates(

@@ -13,19 +13,17 @@ type Table = Record<string, unknown>;
 const MARK = NAME;
 
 export interface ConfigDocument {
-  /** The table at `at`, or undefined when there is none. */
   table(at: readonly string[]): Table | undefined;
   set(at: readonly string[], values: Readonly<Record<string, ConfigValue>>): void;
   unset(at: readonly string[], keys: readonly string[]): void;
   drop(at: readonly string[]): void;
   list(at: readonly string[]): unknown[] | undefined;
   setList(at: readonly string[], items: unknown[]): void;
-  /** Adds `value` to the list at `at`, marked as aireg's, unless the list holds it already. */
+  /** Marked as aireg's; a no-op when the list holds it already. */
   addMarked(at: readonly string[], value: string): void;
-  /** Removes `value` from the list at `at` only when aireg marked it; true when it did. */
+  /** Only when aireg marked it; true when it did. */
   dropMarked(at: readonly string[], value: string): boolean;
   render(): string;
-  /** The parsed document, for comparing with what a file started as. */
   value(): unknown;
 }
 

@@ -28,12 +28,8 @@ import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
 import { defineCommand } from "./define.ts";
 
-/** What one source publishes right now, or why it could not be asked. */
 interface Head {
-  /**
-   * Keyed by the address: an artifact's id carries its version, so it never
-   * matches across the very bump this command exists to report.
-   */
+  /** By address: an id carries its version, so it never matches across a bump. */
   byAddress: Map<string, Upstream>;
   entries: readonly Entry[];
   why: string | undefined;
@@ -99,7 +95,7 @@ export const { run } = defineCommand({
     }
     const { style } = printer;
     const shown = shownNames(lock);
-    // Not installed yet, so named like the rest: by its own name unless another row has it.
+    // Named like installed rows: by leaf name unless another row has it.
     const leaf = (name: string) => name.split("/").at(-1) ?? name;
     const taken = new Map<string, number>();
     for (const entry of rows) {
@@ -196,8 +192,8 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
 }
 
 /**
- * Include locked names the manifest does not ask for, so a withdrawal stays
- * visible. Pins are dropped: asking at the pinned version would only echo it back.
+ * Includes locked names the manifest does not ask for, so a withdrawal stays visible.
+ * Drops pins, since asking at the pinned version would only echo it back.
  */
 function asked(request: Request | undefined, lock: Lock, alias: string): [Want[], ResolveOptions] {
   if (request === undefined || request.all || request.want.length === 0) return [[], {}];
@@ -249,7 +245,7 @@ function row(
 
   const latest =
     upstream.version ?? (upstream.contentId === undefined ? "?" : abbreviate(upstream.contentId));
-  // A row of yours whose publish the lock has not recorded yet; the next sync records it.
+  // A row of yours whose publish the lock has not recorded yet.
   if (entry.address === undefined) {
     return {
       ...base,
@@ -323,14 +319,13 @@ function additions(manifest: Manifest, lock: Lock, heads: Map<string, Head>): Ou
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** The manifest's whole-registry and whole-namespace entries for one registry. */
 function wholes(manifest: Manifest, alias: string): Ref[] {
   return manifest.artifacts.filter((ref) => ref.registry === alias && ref.name === undefined);
 }
 
 function next(printer: Printer, moved: readonly OutdatedArtifact[], scope: Scope): void {
   const flag = scopeFlag(scope);
-  // A pin that is holding is not something to act on, and `update` never moves a watched row.
+  // A holding pin is not actionable, and `update` never moves a watched row.
   if (moved.some((entry) => entry.pinned === undefined && entry.watched === undefined)) {
     printer.note("next", `aireg update${flag}`);
   }

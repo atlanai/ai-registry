@@ -26,13 +26,11 @@ export interface Tag {
 interface Tagged {
   tag: Tag;
   version: Version;
-  /** The artifact it versions alone, when it is one artifact's tag. */
   artifact: string | undefined;
 }
 
 const SHA12 = /^[0-9a-f]{12}$/;
 
-/** Every tag of the repository, with the commit each one names. */
 async function listTags(spec: SourceSpec, limits: GitLimits): Promise<Tag[]> {
   const refs = await lsRemote(spec, ["refs/tags/*"], limits);
   const names = new Set(
@@ -76,8 +74,8 @@ function newest(found: readonly Tagged[]): Tagged | undefined {
 }
 
 /**
- * A commit no tag names. Without the leading `v`, so it is SemVer, and a prerelease, so it sorts
- * after the tag it descends from and before the next release.
+ * A commit no tag names: no leading `v`, so it is SemVer, and a prerelease, so it sorts after
+ * the tag it descends from and before the next release.
  */
 export function pseudoVersion(base: Version | undefined, time: Date, commit: string): string {
   const suffix = `${stamp(time)}-${commit.slice(0, 12)}`;
@@ -91,7 +89,6 @@ function stamp(time: Date): string {
   return time.toISOString().replace(/[-:T]/g, "").slice(0, 14);
 }
 
-/** The time and commit a pseudo-version names, when it is one. */
 export function readPseudo(version: string): { stamp: string; sha: string } | undefined {
   const match = /(?:^0\.0\.0-|-0\.|\.0\.)(\d{14})-([0-9a-f]{12})$/.exec(version);
   if (match === null || parseVersion(version) === undefined) return undefined;
@@ -105,7 +102,6 @@ function releasesFor(tagged: readonly Tagged[], name: string): string[] {
     .map((item) => formatVersion(item.version));
 }
 
-/** What `GitVersions` reads with: the source, its limits, and where the host lets it keep a clone. */
 export interface VersionContext {
   spec: SourceSpec;
   limits: GitLimits;
@@ -114,8 +110,8 @@ export interface VersionContext {
 }
 
 /**
- * A non-registry git source's versions: its tags, and a pseudo-version for a commit no tag names,
- * so every commit has exactly one. Tags and history are read once per connection.
+ * A non-registry source has no versions.json: tags, plus a pseudo-version for each untagged commit,
+ * so every commit has exactly one. Both are read once per connection.
  */
 export class GitVersions {
   readonly #context: VersionContext;
@@ -158,7 +154,6 @@ export class GitVersions {
     return found.tag.commit;
   }
 
-  /** The version each artifact is served at from `commit`, by name. */
   async versionsAt(
     commit: string,
     names: readonly string[],
@@ -284,7 +279,6 @@ function historyKey(spec: SourceSpec): string {
   return `${sanitizeName(label)}-${sha256(spec.location).slice(7, 19)}`;
 }
 
-/** When a commit was made, from a repository that holds it. */
 async function commitTime(
   dir: string,
   limits: GitLimits,

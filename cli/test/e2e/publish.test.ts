@@ -136,11 +136,10 @@ describe("creating a registry and publishing into it", () => {
     );
 
     const reported: string[] = [];
+    const refused: string[] = [];
     for (const [at, run] of sent.entries()) {
       if (run.code !== 0) {
-        expect(run.stderr).toMatch(
-          /platform\/skill\/racer@[\d.]+ is already published with other content\./,
-        );
+        refused.push(run.stderr);
         continue;
       }
       const version = /racer {2}(?:[\d.]+ → )?([\d.]+)/.exec(run.stdout)?.[1] ?? "";
@@ -151,6 +150,11 @@ describe("creating a registry and publishing into it", () => {
           "utf8",
         ),
       ).toContain(`Run ${racers[at]}.`);
+    }
+    for (const stderr of refused) {
+      expect(stderr).toMatch(
+        /platform\/skill\/racer@[\d.]+ is already published with other content\./,
+      );
     }
     expect(reported.length).toBeGreaterThan(0);
     const listed = JSON.parse(await versions("platform", "skill", "racer")).versions.map(

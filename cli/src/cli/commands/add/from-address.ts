@@ -36,16 +36,16 @@ export async function addAddress(
   const { declared, input, within, resolved, asked, partial, asking, source, alias } = opened;
   const { catalogAlias, entries } = opened;
 
-  const gathered = await gather(
-    asking,
-    asked,
-    context.cwd,
-    showable(resolved),
-    entries,
+  const gathered = await gather({
+    step: asking,
+    common: asked,
+    cwd: context.cwd,
+    shown: showable(resolved),
+    all: entries,
     partial,
-    catalogAlias,
-    source.namespacePlugins,
-  );
+    alias: catalogAlias,
+    wrapped: source.namespacePlugins,
+  });
   if (gathered === undefined) {
     cancel(step);
     return undefined;
@@ -157,8 +157,8 @@ export async function addAddress(
 }
 
 /**
- * Plugins this add may install although a target that loads them runs what they carry as you:
- * named with `--trust`, trusted by the manifest already, or agreed to here on a terminal.
+ * Plugins this add may install, though a target runs what they carry as you: named with
+ * `--trust`, already trusted by the manifest, or agreed to here on a terminal.
  */
 async function trustFor(
   step: Interaction,
@@ -178,10 +178,7 @@ async function trustFor(
   return trust;
 }
 
-/**
- * Taking everything an address names is the address itself, not the whole
- * registry: `add acme/my-team --all` must not drag in every other team.
- */
+// `add acme/my-team --all` takes everything in that address, not every other team.
 function requestedRefs(
   resolved: Resolved,
   input: string,

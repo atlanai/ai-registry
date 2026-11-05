@@ -1,7 +1,6 @@
 import { readFileSync, realpathSync } from "node:fs";
 import type { SnapshotSerializer } from "vitest";
 
-/** The folders a test made, each replaced by its placeholder wherever output names it. */
 export interface Places {
   home?: string;
   project?: string;
@@ -23,10 +22,7 @@ const TIME =
 // Bounded so a registry's own `1.0.0` stays, and only the CLI's version is named.
 const VERSION_PATTERN = new RegExp(`(?<![\\w.-])${literal(VERSION)}(?![\\w.-])`, "g");
 
-/**
- * A path as written and as resolved: macOS reports `/var/...` as `/private/var/...`. A
- * Windows path also appears JSON-escaped, with each backslash doubled.
- */
+/** macOS reports `/var` as `/private/var`, and Windows paths also appear JSON-escaped. */
 function spellings(path: string): string[] {
   let real = path;
   try {
@@ -67,12 +63,10 @@ export function redact(text: string, places: Places = {}): string {
 
 let current: Places = {};
 
-/** The places the snapshot serializer redacts, until the next test sets its own. */
 export function redactPlaces(places: Places): void {
   current = places;
 }
 
-/** Redacts every string a snapshot holds against the current test's places. */
 export const serializer: SnapshotSerializer = {
   test: (value) => typeof value === "string" && redact(value, current) !== value,
   serialize: (value, config, indentation, depth, refs, printer) =>

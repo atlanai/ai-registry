@@ -22,10 +22,7 @@ interface Bindings {
   declared: Readonly<Record<string, RegistrySource>>;
 }
 
-/**
- * Undefined for most registries. `declared` is every alias the scope declares, since two can
- * read one token variable.
- */
+/** Undefined for most registries. `declared` lists every alias, since two can read one token variable. */
 export async function credentialFor(
   alias: string,
   source: Source,

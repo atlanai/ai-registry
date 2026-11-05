@@ -8,7 +8,6 @@ import { CANCEL, type Canceled, type Keypress, type Machine, type PromptIo } fro
 interface Option<T> {
   value: T;
   label: string;
-  /** Why someone would pick this one. Shown beside the label. */
   hint?: string | undefined;
   /** Shown as the answer once chosen, when the label carries more, such as "(recommended)". */
   answer?: string | undefined;
@@ -78,7 +77,6 @@ class Choosing<T> implements Machine<T> {
       letters.length > 0
         ? [letters.join("/"), `${GLYPH.upDown} choose`, "enter confirm", "esc cancel"]
         : [`${GLYPH.upDown} move`, "enter confirm", "esc cancel"];
-    // Hints line up in one column, after the longest label.
     const widest = Math.max(...options.map((option) => displayWidth(option.label)));
     return [
       titleLine(style, "active", message),
@@ -112,7 +110,6 @@ export interface ConfirmOptions {
   body?: readonly string[] | undefined;
 }
 
-/** Yes/no as a two-option select, so it looks and steers like every other prompt. */
 export async function confirm(options: ConfirmOptions, io: PromptIo): Promise<boolean | Canceled> {
   return await select<boolean>(
     {

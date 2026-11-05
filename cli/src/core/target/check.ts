@@ -5,7 +5,6 @@ import { KIND_SPECS } from "#core/kinds.ts";
 import type { ConfigValue, KindMapping, RegisterEntry, TargetDefinition } from "./contract.ts";
 import { templateVars } from "./template.ts";
 
-/** Every `{var}` a definition may use, by where it is used. */
 const TEMPLATE_VARS = {
   placement: ["name", "source"],
   manifest: ["name", "description"],
@@ -15,8 +14,8 @@ const TEMPLATE_VARS = {
 type Report = (problem: string) => void;
 
 /**
- * What types cannot say: ids that resolve, templates that use only the variables their
- * place fills, and paths that stay inside their root. `known` are ids defined elsewhere.
+ * What types cannot say: ids that resolve, templates using only the variables their place fills,
+ * and paths that stay inside their root. `known` are definitions ids may name from elsewhere.
  */
 export function targetProblems(
   definitions: readonly TargetDefinition[],
@@ -57,7 +56,6 @@ export function targetProblems(
 
 const ID = /^[a-z][a-z0-9-]{0,63}$/;
 
-/** Every id and alias, with each definition that answers to it. */
 function ownersOf(definitions: readonly TargetDefinition[]): Map<string, TargetDefinition[]> {
   const owners = new Map<string, TargetDefinition[]>();
   for (const definition of definitions) {
@@ -149,15 +147,15 @@ function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Repor
     report(`kinds.${kind}: render is the earlier name of a codec, so set codec alone.`);
   }
   // Written unquoted, so each key must be a bare one.
-  const toml =
-    mapping.codec?.id === "frontmatter-toml"
-      ? mapping.codec
-      : mapping.shape === "file"
-        ? mapping.render
-        : undefined;
+  const toml = tomlCodec(mapping);
   for (const key of [...(toml?.fields ?? []), toml?.body ?? "body"]) {
     if (!/^[A-Za-z0-9_-]+$/.test(key)) report(`${kind} renders ${key}, which is not a bare key.`);
   }
+}
+
+function tomlCodec(mapping: KindMapping) {
+  if (mapping.codec?.id === "frontmatter-toml") return mapping.codec;
+  return mapping.shape === "file" ? mapping.render : undefined;
 }
 
 function valueProblems(value: ConfigValue, vars: readonly string[], report: Report) {

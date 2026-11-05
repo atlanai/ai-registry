@@ -147,7 +147,6 @@ async function showFolder(cwd: string, input: string): Promise<Shown> {
   return { data: { path: file, body, carries: await carries(path) }, name: basename(path) };
 }
 
-/** A folder's own Markdown: its SKILL.md, AGENT.md or README.md, else its first Markdown file. */
 async function markdownIn(dir: string): Promise<string | undefined> {
   const names = (await readdir(dir)).sort();
   const own =

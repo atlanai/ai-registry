@@ -22,36 +22,27 @@ import { moveAside } from "./claim.ts";
 import type { Scan } from "./scan.ts";
 
 /**
- * A folder step never moves, links over or deletes what it found: the copy under
- * `artifacts/` is what a publish sends, and `origin` says the row is yours.
+ * A folder step never moves, links over or deletes what it found: the copy under `artifacts/`
+ * is what a publish sends, and `origin` says the row is yours.
  */
 interface Origin {
   name: string;
   kind: ArtifactKind;
   namespace: string;
   registry: string;
-  /** Absolute path of the file or directory a person wrote. */
   from: string;
-  /** Which target's folder conventions it was found under. */
   target: string;
-  /** The step that claimed it. */
   step: string;
 }
 
 export interface OriginOutcome {
   origin: Origin;
-  /**
-   * `refreshed` when the folder moved since the last run; `refused` when it holds
-   * what a publish refuses, such as a symlink, which is never followed into the copy.
-   */
+  /** `refused`: it holds what a publish refuses, such as a symlink, never followed into the copy. */
   state: "unchanged" | "refreshed" | "missing" | "refused";
-  /** What the folder holds now, which becomes the row's digest once copied. */
   digest: string | undefined;
-  /** Why it was refused, naming the entry. */
   reason?: string;
 }
 
-/** The lock key a folder artifact takes, which is what a publish then names. */
 export function originKey(origin: Origin): string {
   return `${origin.namespace}/${origin.name}`;
 }
@@ -74,7 +65,6 @@ export async function surveyOrigins(
       ),
     ),
   );
-  // Inside a placed folder means the folder or one of its ancestors is placed.
   const underPlaced = (where: string): boolean => {
     for (let at = where; ; at = dirname(at)) {
       if (placed.has(at)) return true;
@@ -86,8 +76,7 @@ export async function surveyOrigins(
     if (step.kind !== "origins") continue;
     for (const selector of step.select) {
       for (const origin of await found(step, selector)) {
-        // Anything that resolves into this scope's own tree is something we
-        // placed: a folder step offers your work upstream, never ours back.
+        // A folder step offers your work upstream, never what this scope placed.
         const where = canonical(origin.from);
         if (isWithin(ours, where) || underPlaced(where)) continue;
         // One origin may serve two namespaces, but not one namespace twice.
@@ -100,7 +89,6 @@ export async function surveyOrigins(
   return outcomes;
 }
 
-/** Every artifact one selector names, without reading a byte of it. */
 async function found(step: Step, selector: Selector): Promise<Origin[]> {
   const { registry, namespace } = destination(step);
   const kind = kindOfDir(selector.from);
@@ -118,8 +106,7 @@ async function found(step: Step, selector: Selector): Promise<Origin[]> {
   const origins: Origin[] = [];
   for (const entry of entries) {
     if (entry.startsWith(".")) continue;
-    // A file-shaped kind is one file per artifact; a directory-shaped one is a
-    // directory, and the extension a file kind carries is not part of the name.
+    // A file kind's extension is not part of the name.
     const name = shape === "file" ? entry.replace(/\.[^.]+$/, "") : entry;
     if (sanitizeName(name) !== name) continue;
     if (!matches(selector.match, name)) continue;
@@ -136,13 +123,11 @@ async function found(step: Step, selector: Selector): Promise<Origin[]> {
   return origins;
 }
 
-/** `<registry>/<namespace>` as a step declares it. */
 function destination(step: Step): { registry: string; namespace: string } {
   const [registry = "", namespace = ""] = (step.to ?? "").split("/");
   return { registry, namespace };
 }
 
-/** The kind a directory of artifacts holds, read off its own name. */
 function kindOfDir(dir: string): ArtifactKind | undefined {
   const leaf = basename(dir);
   for (const [kind, spec] of Object.entries(KIND_SPECS)) {
@@ -151,7 +136,7 @@ function kindOfDir(dir: string): ArtifactKind | undefined {
   return undefined;
 }
 
-/** The target whose tree a path sits in, for the record rather than for behavior. */
+/** For the record only, not for behavior. */
 function targetOf(from: string): string {
   const marker = /[\\/]\.([a-z0-9-]+)[\\/]/.exec(from);
   return marker?.[1] ?? "local";
@@ -188,16 +173,13 @@ async function settle(origin: Origin, lock: Lock): Promise<OriginOutcome> {
   return { origin, state: unchanged ? "unchanged" : "refreshed", digest: now };
 }
 
-/** Said the way publish says it, naming the entry from the folder it sits in. */
+/** Worded the way publish words it. */
 function refusedAt(origin: Origin, entry: Irregular): string {
   const at = entry.path === "" ? basename(origin.from) : `${basename(origin.from)}/${entry.path}`;
   return `${at} ${refusal(entry)}`;
 }
 
-/**
- * The digest moves here rather than after a publish: the copy is what a publish
- * reads, so a publish that fails re-sends the same bytes.
- */
+/** The digest moves here, not after a publish: a failed publish then re-sends the same copy. */
 export async function applyOrigins(
   outcomes: readonly OriginOutcome[],
   lock: Lock,
@@ -237,8 +219,7 @@ export async function applyOrigins(
         ? previous
         : undefined,
     );
-    // The key, not the name: what the caller adds to the set the plan records,
-    // so the row lands in the same write as the registry it belongs to.
+    // The key, so the row lands in the same write as its registry.
     refreshed.push(originKey(outcome.origin));
   }
   return { refreshed, refused };
@@ -277,7 +258,7 @@ function portable(roots: Roots, path: string): string {
   return posixRelative(canonical(roots.base), canonical(path));
 }
 
-/** A publish has landed once the registry serves exactly this copy, so the row takes its identity. */
+/** A publish has landed once the registry serves exactly this copy. */
 export function recordServed(
   lock: Lock,
   scan: Pick<Scan, "items" | "acquired">,
@@ -326,7 +307,6 @@ export async function forgetOrigins(
   return forgotten;
 }
 
-/** Your folder after `--theirs`: written, with where the old one went, or left as it was. */
 export interface Taken {
   name: string;
   folder: string;
@@ -335,8 +315,8 @@ export interface Taken {
 }
 
 /**
- * `sync resolve --theirs` on a row of yours: the registry's copy replaces your folder, kept in
- * backups first, or the next run would read the old folder as an edit and send it back up.
+ * The registry's copy replaces your folder, backed up first, or the next run would read the old
+ * folder as an edit and send it back up.
  */
 export async function takeIntoOrigins(
   roots: Roots,

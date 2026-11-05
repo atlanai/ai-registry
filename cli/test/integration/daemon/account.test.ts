@@ -5,18 +5,9 @@ import { registerBuiltinAdapters } from "#adapters/index.ts";
 import { emptyRegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
-import { ADAPTER, ENDPOINT, NAMESPACE, testClient } from "#test/kit/daemon.ts";
+import { ADAPTER, declareUserRegistry, ENDPOINT, NAMESPACE, testClient } from "#test/kit/daemon.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { expectMode } from "#test/kit/mode.ts";
-
-/** So `account.login` can resolve the alias against the user's own manifest. */
-async function declareUserRegistry(scope: string): Promise<void> {
-  await mkdir(scope, { recursive: true });
-  await writeFile(
-    join(scope, "manifest.yml"),
-    ["registries:", "  personal:", `    source: ${ENDPOINT}`, "    adapter: dev", ""].join("\n"),
-  );
-}
 
 describe("account.login", () => {
   test("declares the registry when the caller names its address", async ({ tmp, home, daemon }) => {
@@ -127,8 +118,7 @@ describe("account.login", () => {
     const snap = await client.request("state.snapshot", {});
     expect(snap.config.accounts[0]).not.toHaveProperty("credential");
 
-    // Upserts by registry: a re-login keeps the same id so every job
-    // that named it keeps working.
+    // Upserts by registry: a re-login keeps the id every job names.
     const again = await client.request("account.login", { registry: "personal" });
     expect(again.created).toBe(false);
     expect(again.account.id).toBe(logged.account.id);

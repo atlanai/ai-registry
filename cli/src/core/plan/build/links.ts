@@ -25,15 +25,15 @@ interface Claimed {
 
 const partName = (path: string) => (path.split(/[\\/]/).at(-1) ?? path).replace(/\.(md|toml)$/, "");
 
-/** Where `item` would link this run, before any other artifact claims a path. */
+/** Before any other artifact claims a path. */
 export function wantedLinks(item: Selected, build: BuildState): PlannedLink[] {
   const wrapped = build.wrapping.has(item.source);
   return linksFor(item, "", build.options, wrapped, build.crowded);
 }
 
 /**
- * The links this item gets, and what blocks the rest. In a project a link is written only where
- * it could also be removed: a committed symlink on the way would carry the write outside it.
+ * In a project a link is written only where it could also be removed: a committed symlink on
+ * the way would carry the write outside it.
  */
 export function placeLinks(
   item: Selected,
@@ -85,7 +85,7 @@ export function placeLinks(
   return { links, blocked: claimed.blocked };
 }
 
-/** The links this item may take, first come first served, recording what another holds. */
+/** First come, first served; records what another artifact holds. */
 function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
   const skipped = new Set<string>();
   const elsewhere = new Set<string>();
@@ -140,7 +140,7 @@ interface LinkUpdate {
   restage: boolean;
 }
 
-/** Plans the links that are not already in place and takes back the ones the item left; true if any. */
+/** Plans missing links and takes back ones the item left; true if it planned any. */
 export function updateLinks(
   { item, links, previous, state, restage }: LinkUpdate,
   build: BuildState,

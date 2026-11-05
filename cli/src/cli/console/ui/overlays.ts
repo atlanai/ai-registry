@@ -11,14 +11,12 @@ export function artifactDetail(props: {
   width: number;
   row: ArtifactRow;
   url: string | undefined;
-  /** The app the link belongs to, named by whichever adapter served the row. */
   app: string;
 }): ReactElement {
   const row = props.row;
   const style = stateStyle(row.state);
   const width = props.width;
-  // Nothing was fetched, so there is no id, digest, copy or link: the panel says why
-  // rather than printing a column of blanks.
+  // Nothing was fetched: say why rather than print a column of blanks.
   const bodiless = row.state === "failed" && row.id === "";
   const rows: (ReactElement | undefined)[] = [
     known("id", row.id),
@@ -107,7 +105,6 @@ export function artifactDetail(props: {
   );
 }
 
-/** Only the fields the artifact actually has: an empty row says nothing. */
 function known(
   label: string,
   value: string | undefined,
@@ -141,15 +138,12 @@ function panel(title: string, width: number, ...children: ReactNode[]): ReactEle
 
 export interface PublishPlan {
   title: string;
-  /** The registry the publish is addressed to. */
   alias: string | undefined;
-  /** Namespace it will land in, which is what a person recognizes. */
   namespace: string | undefined;
   send: ArtifactRow[];
   skip: { row: ArtifactRow; why: string }[];
-  /** Set for the local group, whose members publish together or not at all. */
+  /** The local group publishes together or not at all. */
   wholeGroupOnly: boolean;
-  /** Something the registry will refuse, said before the key is pressed. */
   caution: string | undefined;
   command: string;
 }
@@ -229,13 +223,9 @@ export function publishConfirm(props: { width: number; plan: PublishPlan }): Rea
   );
 }
 
-/** The most of a command's output the activity panel ever shows. */
 const ACTIVITY_LINES = 16;
 
-/**
- * A command's output with one more line, kept to what the panel can show: a
- * verbose child would otherwise grow it, and copy it, for every line it writes.
- */
+/** Capped, or a verbose child would grow and copy it for every line it writes. */
 export function withLine(lines: readonly string[], line: string): string[] {
   return [...lines.slice(-(ACTIVITY_LINES - 1)), line];
 }
@@ -247,14 +237,10 @@ export function activityPanel(props: {
   lines: readonly string[];
   done: boolean;
   code: number | undefined;
-  /** What the run's own counts say it has got through, while it is going. */
   progress: string | undefined;
   /** Shown from 2 s on: a publish uploads one artifact at a time. */
   elapsedMs: number;
-  /**
-   * What the state actually says now that it has finished, read back rather
-   * than inferred from the exit code. A command can exit 0 and change nothing.
-   */
+  /** Read back, not inferred from the exit code: a command can exit 0 and change nothing. */
   changed: readonly string[] | undefined;
 }): ReactElement {
   const width = props.width;

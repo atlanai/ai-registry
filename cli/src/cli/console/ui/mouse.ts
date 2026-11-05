@@ -20,8 +20,7 @@ export interface MouseEvent {
 export function useMouse(onEvent: (event: MouseEvent) => void): void {
   const { stdin, setRawMode, isRawModeSupported } = useStdin();
   const { stdout } = useStdout();
-  // Held in a ref so the handler can close over this render's state without
-  // the subscription tearing down and re-arming the terminal on every one.
+  // A ref, so a new handler does not re-arm the terminal on every render.
   const handler = useRef(onEvent);
   handler.current = onEvent;
 
@@ -44,8 +43,7 @@ export function useMouse(onEvent: (event: MouseEvent) => void): void {
     return () => {
       stdin.off("data", onData);
       stdout.write(DISABLE);
-      // Ink counts raw-mode requests, so one never handed back keeps the
-      // terminal raw after everything else reading keys has let go.
+      // Ink counts raw-mode requests, so one never handed back keeps the terminal raw.
       setRawMode(false);
     };
   }, [stdin, stdout, setRawMode, isRawModeSupported]);
@@ -74,7 +72,6 @@ export function listRowAt(
   return index >= window.from && index < window.to ? index : undefined;
 }
 
-/** Which tab a click at this column belongs to, given each label's width. */
 export function tabAt(column: number, widths: readonly number[], gap: number): number | undefined {
   let start = 0;
   for (const [index, width] of widths.entries()) {

@@ -33,10 +33,7 @@ import {
   ownSkillsRef,
 } from "./own-skills.ts";
 
-/**
- * `aireg --setup`: places this binary, puts it on PATH and offers the default registries,
- * then says how to start using aireg. The installer runs it on the binary it downloaded.
- */
+/** `aireg --setup`, which the installer runs on the binary it downloaded. */
 export async function install(
   context: CommandContext,
   yes: boolean,
@@ -51,8 +48,7 @@ export async function install(
     });
   }
   const bin = await installBinaryFrom(VERSION, process.execPath, env);
-  // The rest runs from the installed binary, so what it starts, such as the daemon,
-  // does not point at the download that was just moved.
+  // The rest runs from the installed binary, so a daemon it starts does not use the download.
   if (canonical(process.execPath) !== canonical(bin)) {
     return handOff(bin, ["--setup", ...(yes ? ["--yes"] : [])], env);
   }
@@ -85,10 +81,7 @@ export async function install(
   return 0;
 }
 
-/**
- * A daemon still on the version just replaced refuses new jobs; move it to this one, as
- * self-update does. A sync in progress can outlast one stop, so it gets a few tries.
- */
+/** A daemon on the replaced version refuses new jobs; a sync in progress can outlast one stop. */
 async function followDaemon(bin: string, printer: Printer): Promise<void> {
   const spin = canAnimate(process.stderr) ? spinner(defaultIo(), printer.errStyle) : undefined;
   try {
@@ -110,10 +103,7 @@ async function followDaemon(bin: string, printer: Printer): Promise<void> {
   }
 }
 
-/**
- * Edits the startup files even when this shell already finds aireg: that PATH may be
- * left over from files since edited.
- */
+/** Edits startup files even when this shell finds aireg, as that PATH may be stale. */
 async function putOnPath(
   printer: Printer,
   env: NodeJS.ProcessEnv,
@@ -142,8 +132,8 @@ async function putOnPath(
 }
 
 /**
- * Runs the two documented commands at this release's tag, so the skills are an ordinary registry
- * and match this aireg. A user scope that already declares the registry is left as its owner set it.
+ * Runs the documented commands at this release's tag, so the skills are an ordinary registry
+ * that matches this aireg. A user scope that already declares it is left as its owner set it.
  */
 async function offerSkills(
   context: CommandContext,
@@ -206,8 +196,7 @@ async function offerSkills(
   };
   const spin = canAnimate(process.stderr) ? spinner(defaultIo(), printer.errStyle) : undefined;
   spin?.update(`Installing the aireg skills for ${names}`);
-  // A user scope with no targets yet takes the ones found here, so later -g installs reach
-  // them too; one someone already set is left, and only this entry names the targets.
+  // Only a user scope with no targets yet takes these, so later -g installs reach them too.
   const wanted = found.map((item) => item.target.name);
   const scopeTargets = await withScope(user, async ({ manifest: now }) => {
     if (now.targets.length > 0) return now.targets;
@@ -278,10 +267,7 @@ function ask(question: string): boolean {
   return ["", "y", "yes"].includes(answer.trim().toLowerCase());
 }
 
-/**
- * One line from the terminal, read with blocking reads: macOS cannot watch a reopened
- * /dev/tty for input, which is what the installer hands over. Undefined when it closes.
- */
+/** Blocking reads: macOS cannot watch a reopened /dev/tty, which the installer hands over. */
 function readLine(): string | undefined {
   const byte = Buffer.alloc(1);
   let line = "";
@@ -301,7 +287,6 @@ function readLine(): string | undefined {
   }
 }
 
-/** The last line: how to reach aireg from the shell that ran the installer. */
 function sayNextStep(printer: Printer, env: NodeJS.ProcessEnv): void {
   // A Windows terminal reads the user PATH only when it starts.
   if (process.platform === "win32") {

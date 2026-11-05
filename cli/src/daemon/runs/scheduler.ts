@@ -25,7 +25,6 @@ export class JobScheduler {
   readonly #runner: SyncRunner;
   readonly #log: Logger;
   readonly #steadyKinds: () => Promise<ReadonlySet<string>>;
-  /** The config as last read, and the file stamp it was read at: most ticks find it unchanged. */
   #config: { stamp: string; value: RegistryConfig } | undefined;
 
   constructor(
@@ -51,13 +50,12 @@ export class JobScheduler {
     this.#timer = undefined;
   }
 
-  private async tick(): Promise<void> {
+  async tick(): Promise<void> {
     if (this.#ticking) return;
     this.#ticking = true;
     try {
       const { config, changed } = await this.#readConfig();
-      // Reclaiming a removed job's state is bookkeeping, not scheduling, so
-      // it happens whether or not the scheduler is allowed to start anything.
+      // Bookkeeping, so it runs whether or not the scheduler may start anything.
       if (changed) {
         const live = new Set(config.jobs.map(({ id }) => id));
         for (const id of this.#deferred.keys()) if (!live.has(id)) this.#deferred.delete(id);
@@ -67,9 +65,9 @@ export class JobScheduler {
       const steady = await this.#steadyKinds();
       for (const job of config.jobs) {
         if (!job.schedule.enabled) continue;
-        // Resuming leaves every held-back job overdue at once, so a started run
-        // ends the tick. A failed start does not, or one broken job spends it.
-        if (await this.consider(job, steady)) break;
+        // Resuming leaves every held-back job overdue, so a started run ends the tick;
+        // a failed start does not, or one broken job spends it.
+        if (await this.#consider(job, steady)) break;
       }
     } catch (error) {
       this.#log.error("scheduler tick failed", { error });
@@ -78,7 +76,6 @@ export class JobScheduler {
     }
   }
 
-  /** Read again only when the file changed, by modification time, size and inode. */
   async #readConfig(): Promise<{ config: RegistryConfig; changed: boolean }> {
     const stamp = await stat(configPath()).then(
       (info) => `${info.mtimeMs}:${info.size}:${info.ino}`,
@@ -90,8 +87,7 @@ export class JobScheduler {
     return { config: value, changed: true };
   }
 
-  /** True when a run actually started, which is what ends the tick. */
-  private async consider(job: Job, steady: ReadonlySet<string>): Promise<boolean> {
+  async #consider(job: Job, steady: ReadonlySet<string>): Promise<boolean> {
     const jobId = job.id;
     const now = Date.now();
     if ((this.#deferred.get(jobId)?.nextAttemptAtMs ?? 0) > now) return false;
@@ -105,20 +101,19 @@ export class JobScheduler {
       this.#deferred.delete(jobId);
       return true;
     } catch (error) {
-      // No run row is written for a start that throws, so without this the
-      // job simply stops running and nothing anywhere says why.
+      // No run row is written for a start that throws, so this is the only record of why.
       this.#log.warn("job could not be started", {
         jobId,
         mode: "sync",
         attempts: (this.#deferred.get(jobId)?.attempts ?? 0) + 1,
         error,
       });
-      this.defer(jobId, now);
+      this.#defer(jobId, now);
       return false;
     }
   }
 
-  private defer(jobId: string, now: number): void {
+  #defer(jobId: string, now: number): void {
     const attempts = (this.#deferred.get(jobId)?.attempts ?? 0) + 1;
     this.#deferred.set(jobId, { attempts, nextAttemptAtMs: now + retryBackoff(attempts) });
   }

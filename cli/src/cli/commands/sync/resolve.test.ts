@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, vi } from "vitest";
-import type { CommandContext } from "#cli/commands/command.ts";
 import { emptyRegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { RunEventType } from "#core/run/model.ts";
-import { Printer } from "#core/term/printer.ts";
+import { commandContext } from "#test/kit/command.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { run } from "./resolve.ts";
 
@@ -63,21 +62,13 @@ describe("aireg sync resolve --job", () => {
       }),
     );
     const out: string[] = [];
-    const context = {
-      argv: ["pr-review", "--theirs", "--job", "nightly"],
-      cwd: tmp,
-      printer: new Printer({
-        format: "json",
-        out: { write: (text: string) => out.push(text), isTTY: false },
-      }),
-    } as unknown as CommandContext;
-
-    await run(context);
+    await run(
+      commandContext(["pr-review", "--theirs", "--job", "nightly"], { cwd: tmp, printed: out }),
+    );
 
     expect(asked).toEqual([
       expect.objectContaining({ jobId: "job_1", name: "pr-review", resolution: "theirs" }),
     ]);
-    // The run is waited for, so the answer is how it ended.
     expect(JSON.parse(out.join(""))).toEqual({ ok: true, data: { run: finished, artifacts: [] } });
   });
 });

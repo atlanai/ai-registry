@@ -30,7 +30,6 @@ export function resolveTargets(env: NodeJS.ProcessEnv): Targets {
   return out;
 }
 
-/** A definition as data that crosses the daemon RPC, with every default filled in. */
 function toTarget(
   definition: TargetDefinition,
   env: NodeJS.ProcessEnv,
@@ -66,7 +65,7 @@ function toTarget(
   };
 }
 
-/** Every mapping as the rest of aireg reads it: a `render` becomes the codec it names. */
+/** A `render` becomes the codec it names. */
 function kindsOf(definition: TargetDefinition): Target["kinds"] {
   const kinds: Target["kinds"] = {};
   for (const [kind, mapping] of Object.entries(definition.kinds) as [ArtifactKind, KindMapping][]) {
@@ -83,7 +82,6 @@ function kindsOf(definition: TargetDefinition): Target["kinds"] {
 /** A profile name as both its folder and a target id can carry it. */
 const PROFILE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
-/** Each profile folder its `profiles` root finds, as a target of its own. */
 function profilesOf(definition: TargetDefinition, env: NodeJS.ProcessEnv, origin: string) {
   const root = definition.profiles?.root;
   if (root === undefined) return [];

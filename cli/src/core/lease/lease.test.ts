@@ -33,7 +33,6 @@ function leaseMeta(lock: string): string {
   return join(home, "leases", `${leaseKey({ lock })}.lease`, "meta.json");
 }
 
-/** Ages a lease past the 30s staleness window without waiting for it. */
 async function age(lock: string, ms: number): Promise<void> {
   const when = new Date(Date.now() - ms);
   await utimes(leaseMeta(lock), when, when);
@@ -209,7 +208,7 @@ describe("waiting for a held lease", () => {
         await vi.waitFor(() => expect(vi.getTimerCount()).toBeGreaterThan(0));
         await vi.advanceTimersToNextTimerAsync();
       }
-      // Released only while it sleeps; a poll still in flight could take the lease and never sleep again.
+      // Released only while it sleeps: a poll in flight could take the lease and never sleep again.
       await vi.waitFor(() => expect(vi.getTimerCount()).toBeGreaterThan(0));
       await held.release();
       await vi.advanceTimersToNextTimerAsync();

@@ -1,6 +1,6 @@
 import type { SerializedError } from "./model.ts";
 
-/** A cause chain can be cyclic, and nothing in the language stops it. */
+/** A cause chain can be cyclic. */
 const MAX_DEPTH = 5;
 
 export function serializeError(error: unknown, depth = MAX_DEPTH): SerializedError {
@@ -28,8 +28,8 @@ function codeOf(error: Error): string | undefined {
 }
 
 /**
- * A stack on every expected failure buries the one unexpected throw that is the bug. An
- * error that names its own code is expected; Node's system errors name only the call.
+ * A stack on every expected failure buries the unexpected throw that is the bug. An error
+ * that names its own code is expected; Node's system errors name only the call.
  */
 function classified(error: Error, code: string | undefined): boolean {
   if (code === undefined) return false;

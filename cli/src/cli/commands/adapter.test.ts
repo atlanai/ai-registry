@@ -4,49 +4,27 @@ import { beforeAll, describe, expect } from "vitest";
 import { registerBuiltinAdapters } from "#adapters/index.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { PACKAGE } from "#core/product.ts";
-import { Printer } from "#core/term/printer.ts";
+import { commandContext } from "#test/kit/command.ts";
 import { homeTest as test } from "#test/kit/fixtures.ts";
-import { tempDir } from "#test/kit/temp.ts";
 import { run } from "./adapter.ts";
-import type { CommandContext } from "./command.ts";
 
 // Never the checkout: an init that is not refused would write its package here.
 let cwd: string;
 
-beforeAll(async () => {
-  registerBuiltinAdapters();
-  cwd = await tempDir("adapter-command");
+beforeAll(() => registerBuiltinAdapters());
+
+test.beforeEach(({ tmp }) => {
+  cwd = tmp;
 });
 
-function context(argv: string[]): CommandContext {
-  return {
-    argv,
-    cwd,
-    printer: new Printer({ format: "json", out: { write() {}, isTTY: false } }),
-    host: {
-      version: "test",
-      connectAccount: async () => {
-        throw new Error("no host");
-      },
-      openRunStore: async () => {
-        throw new Error("no host");
-      },
-    },
-  };
+function context(argv: string[]) {
+  return commandContext(argv, { cwd });
 }
 
 async function runJson(argv: string[], at = cwd): Promise<{ data: unknown }> {
-  const writes: string[] = [];
-  await run({
-    argv,
-    cwd: at,
-    printer: new Printer({
-      format: "json",
-      out: { write: (chunk: string) => writes.push(chunk), isTTY: false },
-    }),
-    host: context(argv).host,
-  });
-  return JSON.parse(writes.join("")) as { data: unknown };
+  const printed: string[] = [];
+  await run(commandContext(argv, { cwd: at, printed }));
+  return JSON.parse(printed.join("")) as { data: unknown };
 }
 
 describe("adapter command", () => {
@@ -69,18 +47,7 @@ describe("adapter command", () => {
   });
 
   test("lists nothing until an origin install lands", async () => {
-    const writes: string[] = [];
-    const ctx: CommandContext = {
-      argv: ["list"],
-      cwd,
-      printer: new Printer({
-        format: "json",
-        out: { write: (chunk: string) => writes.push(chunk), isTTY: false },
-      }),
-      host: context(["list"]).host,
-    };
-    await run(ctx);
-    expect(JSON.parse(writes.join(""))).toEqual({ ok: true, data: { adapters: [] } });
+    expect(await runJson(["list"])).toEqual({ ok: true, data: { adapters: [] } });
   });
 
   test("refuses an unknown action", async () => {
@@ -127,7 +94,6 @@ describe("adapter command", () => {
 });
 
 describe("adapter init writes only inside its folder", () => {
-  /** An empty folder outside the one being scaffolded, and where the package goes. */
   async function folders(tmp: string): Promise<{ dir: string; outside: string }> {
     const outside = join(tmp, "outside");
     await mkdir(outside);

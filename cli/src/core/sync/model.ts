@@ -1,9 +1,6 @@
 import type { ArtifactKind } from "#adapter/kinds.ts";
 
-/**
- * Derived from three digests, never from a flag anyone stored: a disposition
- * that could be written down could also disagree with the bytes on disk.
- */
+/** Derived from three digests, never stored, so it cannot disagree with the bytes on disk. */
 export const DISPOSITIONS = [
   "synced",
   "pull",
@@ -11,8 +8,11 @@ export const DISPOSITIONS = [
   "pull-delete",
   "publish",
   "conflict",
+  // Here and publishable, but no registry publishes it.
   "adopt",
+  // Deleted here while the registry still holds the base.
   "archive",
+  // Both sides deleted the content represented by the base.
   "removed",
   // No base, so neither side can be shown to have moved.
   "unknown",
@@ -22,7 +22,6 @@ export const DISPOSITIONS = [
 
 export type Disposition = (typeof DISPOSITIONS)[number];
 
-/** Every disposition that leaves the project and the registry disagreeing. */
 export const UNSETTLED: readonly Disposition[] = DISPOSITIONS.filter(
   (disposition) => disposition !== "synced",
 );
@@ -40,8 +39,8 @@ export const PUBLISH_DISPOSITIONS: readonly Disposition[] = [
 
 export interface Digests {
   /**
-   * What the registry published at the revision the lock pins - not what we
-   * placed, which after a settled conflict reads as unchanged against itself.
+   * What the registry published at the locked revision, not what we placed:
+   * after a settled conflict that reads as unchanged against itself.
    */
   base: string | undefined;
   local: string | undefined;
@@ -53,11 +52,11 @@ export interface SyncItem {
   kind: ArtifactKind;
   /** Key into the lock's `registries`. */
   source: string;
-  /** The artifact's file spec address in the registry, POSIX separators. */
+  /** File spec address, POSIX separators. */
   path: string;
   disposition: Disposition;
   digests: Digests;
   detail: string | undefined;
-  /** Why this one item could not be read. Present only when unavailable. */
+  /** Present only when unavailable. */
   failure?: { code: string; retryable: boolean };
 }

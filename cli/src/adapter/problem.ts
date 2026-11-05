@@ -33,8 +33,8 @@ export function problemFromFailure(failure: Failure, message: string, status?: n
 }
 
 /**
- * Parse a problem+json body (or an SDK error that already is one). A server's
- * own `code` is kept; a missing title is minted so the client always has one.
+ * A problem+json body, or an SDK error that already is one. A server's own `code` is kept; a
+ * missing title is minted so the client always has one.
  */
 export function readProblem(status: number | undefined, body: unknown): Problem | undefined {
   const record = asRecord(body);

@@ -27,12 +27,10 @@ export async function gather(
     since === undefined ? works : changedSince(works, since, cwd);
 
   const exported = found === undefined ? undefined : await exportWork(found, loaded.roots.base);
-  const works =
-    paths.length > 0
-      ? await keep(await fromArgs(paths, loaded, cwd))
-      : exported !== undefined
-        ? await keep(exported)
-        : await chooseWork(step, loaded, common, cwd, keep);
+  let works: Work[] | undefined;
+  if (paths.length > 0) works = await keep(await fromArgs(paths, loaded, cwd));
+  else if (exported !== undefined) works = await keep(exported);
+  else works = await chooseWork(step, loaded, common, cwd, keep);
   for (const work of works ?? []) work.exported = found?.get(work.path);
   return works;
 }

@@ -94,13 +94,12 @@ export async function destinationFrom(
   known[folder.destination.registry] = folder.declared;
   const inGit = await gitIn(folder.declared.location, ["rev-parse", "--is-inside-work-tree"]);
   if (inGit.code !== 0) return { to: folder.destination, checkout: undefined };
-  // Nothing in a git checkout reaches anyone until git pushes it. The `cd` there stays
-  // short, from real paths on both sides, however --to was typed.
+  // Nothing in a git checkout reaches anyone until git pushes it.
+  // Real paths on both sides keep the `cd` short however --to was typed.
   const at = relative(canonical(cwd), canonical(folder.declared.location)) || ".";
   return { to: folder.destination, checkout: { registry: folder.destination.registry, at } };
 }
 
-/** A registry folder inside a git checkout, and where to `cd` to commit in it. */
 interface Checkout {
   registry: string;
   at: string;
@@ -125,13 +124,11 @@ export function nameOne(works: Work[], to: Destination | undefined, explicit: bo
   (works[0] as Work).name = to.name;
 }
 
-/** Where this run sends work, and what of it the manifest's exports keep from going there. */
 interface Bound {
   works: Work[];
   skipped: Skipped[];
   to: Destination | undefined;
   checkout: Checkout | undefined;
-  /** The `publish.to` target, as the manifest writes it. */
   target: string | undefined;
 }
 

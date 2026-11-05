@@ -33,7 +33,7 @@ export interface OfferTarget {
   description?: string | undefined;
   /** Send an agent file as the `AGENT.md` a registry folder holds, rather than as `<name>.md`. */
   asAgentDocument?: boolean | undefined;
-  /** The edges the version carries, such as its `depends_on`. Absent, it carries none. */
+  /** Such as `depends_on`; absent, it carries none. */
   relationships?: readonly PublishRelationship[] | undefined;
   /** Selected files in publication order, mapped to destination paths. Absent, every file is sent. */
   files?: readonly { from: string; as: string }[] | undefined;
@@ -161,8 +161,7 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
           const entry = byPath.get(from);
           return entry === undefined ? [] : [{ entry, as }];
         });
-  // Bounded, so a tree of thousands of files neither runs out of descriptors nor
-  // has every read in flight at once.
+  // Bounded, so thousands of files neither exhaust descriptors nor all read at once.
   return Promise.all(
     files.map(({ entry, as }) =>
       reading(async () => ({

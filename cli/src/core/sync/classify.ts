@@ -5,10 +5,7 @@ export interface Classified {
   detail: string | undefined;
 }
 
-/**
- * Content, never history: two people who made the same edit, and one who made
- * an edit and undid it, both land on `synced` without a special case.
- */
+/** Content, never history: the same edit on both sides, or an undone edit, is `synced`. */
 export function classify(digests: Digests): Classified {
   const { base, local, upstream } = digests;
 
@@ -46,16 +43,14 @@ export function classify(digests: Digests): Classified {
   const editedHere = local !== base;
   const movedUpstream = upstream !== base;
 
-  // Never reconciled: guessing a combination corrupts an artifact in a way
-  // that still looks like a successful update.
+  // Never merged: a guessed combination corrupts an artifact yet looks like a successful update.
   if (editedHere && movedUpstream) {
     return { disposition: "conflict", detail: "edited here and changed in the registry" };
   }
   if (editedHere) return { disposition: "publish", detail: "edited here" };
   if (movedUpstream) return { disposition: "pull", detail: "changed in the registry" };
 
-  // Unreachable unless the three digests contradict each other, which means
-  // the lock disagrees with the disk it describes.
+  // Only reached when the lock disagrees with the disk it describes.
   return {
     disposition: "unknown",
     detail: "the lockfile digest matches neither this project nor the registry",

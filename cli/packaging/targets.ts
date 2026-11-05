@@ -45,7 +45,6 @@ export function findTarget(os: string, arch: string): Target | undefined {
   return TARGETS.find((entry) => entry.os === os && entry.arch === arch);
 }
 
-/** The pair this host runs, which `release:compile` builds when no target is named. */
 export function hostTarget(
   platform: string = process.platform,
   arch: string = process.arch,

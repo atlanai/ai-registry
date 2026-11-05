@@ -177,8 +177,7 @@ describe("the command surface", () => {
       kit,
     }) => {
       await aireg(["add", "kit", "--all", "-y"]);
-      // A version directory is written once, so upstream moving is a new
-      // version rather than an edit to the one already published.
+      // A version directory is written once, so upstream moving is a new version.
       await registry(kit)
         .skill("kit/lint@1.0.0", { description: "Lint it." })
         .skill("kit/deploy@1.1.0", {

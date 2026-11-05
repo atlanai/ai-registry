@@ -73,7 +73,9 @@ export async function prepareManifest(
       throw new Error(`referenced schema ${quoted(uri)} uses unsupported asynchronous validation`);
     }
     // Ajv's asynchronous loader accepts objects; these are equivalent boolean schemas.
-    return document === true ? {} : document === false ? { not: {} } : document;
+    if (document === true) return {};
+    if (document === false) return { not: {} };
+    return document;
   };
   const validate = await ajv.compileAsync(schema);
   compiled.set(schema, validate);

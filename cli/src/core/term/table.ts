@@ -10,7 +10,7 @@ export interface Column<R> {
   optional?: boolean;
 }
 
-/** The aligned lines, for a caller that places them itself, such as a prompt frame. */
+/** For a caller that places the lines itself, such as a prompt frame. */
 export function tableLines<R>(
   style: Styler,
   columns: readonly Column<R>[],
@@ -49,7 +49,6 @@ function padCell(text: string, width: number, align: "left" | "right" = "left"):
   return align === "right" ? gap + text : text + gap;
 }
 
-/** Every listing prints through here, so columns line up the same way everywhere. */
 export function table<R>(
   printer: Printer,
   columns: readonly Column<R>[],
@@ -59,7 +58,6 @@ export function table<R>(
   for (const line of tableLines(printer.style, columns, rows, options)) printer.info(line);
 }
 
-/** A label and value per line, for one thing described in detail. */
 export function fields(printer: Printer, rows: readonly (readonly [string, string])[]): void {
   table(
     printer,

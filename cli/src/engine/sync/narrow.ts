@@ -8,7 +8,6 @@ import type { SyncItem } from "#core/sync/model.ts";
 import { artifactKey } from "./decide.ts";
 import type { Scan } from "./scan.ts";
 
-/** Narrows one run to chosen refs without touching what the job covers. */
 export type RunScope = readonly string[] | undefined;
 
 /** Typed so a caller can tell a mistyped address from a run with no work. */
@@ -16,7 +15,7 @@ export class RunScopeError extends AiregError {
   readonly refs: readonly string[];
 
   constructor(refs: readonly string[]) {
-    // A run records only its message, so the way out is part of it.
+    // A run records only its message, so the hint is part of it.
     super(
       `${list(refs)} ${refs.length === 1 ? "matches" : "match"} nothing this job covers. ` +
         "Name an artifact as `<registry>/<namespace>/<kind>/<name>`, or by the name its runs show.",
@@ -33,7 +32,6 @@ export function kindAddress(registry: string, kind: ArtifactKind, name: string):
   return formatAddress({ registry, namespace, kind, name: leaf });
 }
 
-/** `<namespace>/<name>`, or a bare name when the registry groups it under none. */
 function split(name: string): { namespace: string | undefined; leaf: string } {
   const cut = name.lastIndexOf("/");
   if (cut < 0) return { namespace: undefined, leaf: name };
@@ -41,8 +39,8 @@ function split(name: string): { namespace: string | undefined; leaf: string } {
 }
 
 /**
- * `undefined` covers everything the job does. Throws when any ref reached
- * nothing, so a run cannot report success for work it never looked at.
+ * `undefined` covers everything the job does. Throws when any ref reached nothing, so a run
+ * cannot report success for work it never looked at.
  */
 export function scopedKeys(
   refs: RunScope,
@@ -64,10 +62,7 @@ export function scopedKeys(
   return keys;
 }
 
-/**
- * Artifacts this one ref reaches, in the keys `classify` keys outcomes by: a ref
- * that names a kind reaches only that kind, and one that names none, every kind.
- */
+/** In the keys `classify` keys outcomes by. */
 function reached(raw: string, registry: string, scan: Scan): Set<string> {
   const keys = new Set<string>();
   // The catalog name is what a run's events name, so it is accepted alongside the address grammar.
@@ -97,8 +92,7 @@ function reached(raw: string, registry: string, scan: Scan): Set<string> {
 }
 
 function matchesItem(ref: Ref, registry: string, item: SyncItem, scan: Scan): boolean {
-  // Both sides: the ref has to name this job's registry, and the item has
-  // to come from it. Another account's catalog is not this run's to narrow.
+  // Another account's catalog is not this run's to narrow.
   if (ref.registry !== registry || item.source !== registry) return false;
   const { namespace: named, leaf } = split(item.name);
   // An installed artifact's lock key is usually its bare name; its row records the namespace.
@@ -106,15 +100,11 @@ function matchesItem(ref: Ref, registry: string, item: SyncItem, scan: Scan): bo
   if (isWholeRegistry(ref)) return true;
   if (isWholeNamespace(ref)) return ref.namespace === namespace;
   if (ref.kind !== item.kind || ref.name !== leaf) return false;
-  // An address that names no namespace means "wherever it is", the same
-  // reading `plan/select.ts` gives it.
+  // No namespace means "wherever it is", as `plan/select.ts` reads it.
   return ref.namespace === undefined || ref.namespace === namespace;
 }
 
-/**
- * A local artifact has no namespace to match on, so a whole registry or
- * namespace never adopts one by implication.
- */
+/** A local artifact has no namespace, so a whole registry or namespace never adopts one. */
 function matchesCandidate(ref: Ref, registry: string, candidate: Candidate): boolean {
   if (ref.registry !== registry || ref.name !== candidate.name) return false;
   return ref.kind === undefined || ref.kind === candidate.kind;

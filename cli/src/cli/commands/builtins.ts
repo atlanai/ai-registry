@@ -56,13 +56,12 @@ export const BUILTIN_SPECS: readonly CommandSpec[] = [
   SELF_COMMAND,
 ];
 
-/** Names aireg's own commands answer to, so a kind or an adapter's command cannot have them. */
+/** A kind or an adapter's command cannot take these names. */
 export const RESERVED: ReadonlySet<string> = new Set([
   "help",
   ...BUILTIN_SPECS.flatMap((c) => [c.name, ...(c.aliases ?? []), ...(c.formerly ?? [])]),
 ]);
 
-/** A kind or an adapter's command that a command with the same name hides. */
 export interface Hidden {
   readonly name: string;
   readonly message: string;

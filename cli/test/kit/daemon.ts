@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { vi } from "vitest";
@@ -17,6 +18,29 @@ export const NAMESPACE = "personal";
 
 export function testClient(instanceId: string): ClientInfo {
   return { kind: "cli", name: "aireg-test", version: "test", instanceId };
+}
+
+/** So `account.login` can resolve the alias against the user's own manifest. */
+export async function declareUserRegistry(scope: string, alias = "personal"): Promise<void> {
+  await mkdir(scope, { recursive: true });
+  await writeFile(
+    join(scope, "manifest.yml"),
+    ["registries:", `  ${alias}:`, `    source: ${ENDPOINT}`, "    adapter: dev", ""].join("\n"),
+  );
+}
+
+/** Publishes a skill into the dev adapter's remote folder, as another machine would. */
+export async function publishUpstream(remote: string, name: string, body: string): Promise<void> {
+  const path = join(remote, NAMESPACE, "skill", name);
+  await mkdir(path, { recursive: true });
+  await writeFile(
+    join(path, "SKILL.md"),
+    `---\nname: ${name}\ndescription: Reviews a change.\n---\n\n${body}\n`,
+  );
+  await writeFile(
+    join(path, "meta.json"),
+    `${JSON.stringify({ id: `skill_${name}`, description: "Reviews a change." })}\n`,
+  );
 }
 
 /** What a job's next sync would do, read in process the way its runner reads it. */

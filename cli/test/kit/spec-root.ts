@@ -10,9 +10,8 @@ export interface SpecVersion {
   files: Record<string, string>;
   /** Published then withdrawn: skipped for `latest`, still resolvable by pin. */
   yanked?: boolean;
-  /** Why it was yanked, as `versions.json` records it. */
   reason?: string;
-  /** `active` unless set, as `versions.json` records it. */
+  /** `active` unless set. */
   status?: string;
   /** Fully qualified refs this version's `depends_on` edges name. */
   dependsOn?: readonly string[];
@@ -65,15 +64,11 @@ async function writeJson(root: string, path: string, value: unknown): Promise<vo
   await write(root, path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-/** The default skill body, so a fixture only says what it cares about. */
 export function skillBody(name: string, description = name, extra = ""): string {
   return `---\nname: ${name}\ndescription: ${description}\n---\n${extra}`;
 }
 
-/**
- * One version is latest for both documents: the client resolves through
- * versions.json, so an index that disagreed would name an unreachable root.
- */
+/** The client resolves through versions.json, so the index must name the same latest. */
 function latestOf(artifact: SpecArtifact): SpecVersion {
   const versions = artifact.versions;
   const last = versions.at(-1);
@@ -134,7 +129,7 @@ async function writeArtifact(root: string, artifact: SpecArtifact): Promise<unkn
   };
 }
 
-/** A file spec root, as the client reads a registry, rather than a folder of loose skills. */
+/** A file spec root, rather than a folder of loose skills. */
 export async function writeSpecRoot(
   root: string,
   artifacts: readonly SpecArtifact[],

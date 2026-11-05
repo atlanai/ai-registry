@@ -14,10 +14,7 @@ export function toolName(targetTable: Targets | undefined, name: string): string
   return target.shared ? target.projectRoot : target.displayName;
 }
 
-/**
- * The targets that load an artifact placed in these folders: the chosen ones
- * that read them, then any tool whose own folder holds it though it was not chosen.
- */
+/** The chosen targets that read these folders, then any unchosen tool whose own folder holds it. */
 export function loadedBy(
   targetTable: Targets,
   chosen: readonly string[],
@@ -37,7 +34,6 @@ export function loadedBy(
   return [...picked, ...others, ...unread];
 }
 
-/** Whether a target loads an artifact placed in these folders, its own or one it reads the kind from. */
 function loads(
   targetTable: Targets,
   tool: string,
@@ -63,10 +59,7 @@ export function chosenFor(manifest: Manifest, scope: readonly string[], row: Pin
   return [...new Set(asking.flatMap((ref) => ref.targets ?? scope))];
 }
 
-/**
- * How a target has an artifact, from the state of each folder it was linked in:
- * the target's own folder first, then the first folder it reads this kind from.
- */
+/** The target's own folder first, then the first folder it reads this kind from. */
 export function stateFor(
   targetTable: Targets,
   tool: string,
@@ -82,7 +75,6 @@ export function stateFor(
   return read === undefined ? undefined : states[read];
 }
 
-/** The targets that load what one link places, by name, for a table cell or a step line. */
 export function linkLoadedBy(
   targetTable: Targets,
   chosen: readonly string[],
@@ -94,7 +86,6 @@ export function linkLoadedBy(
     .join(", ");
 }
 
-/** The kinds a target cannot load, which explain why it was left out. */
 export function unhandled(
   targetTable: Targets,
   name: string,

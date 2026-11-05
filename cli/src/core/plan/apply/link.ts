@@ -80,12 +80,11 @@ async function rendering(action: ActionOf<"link">): Promise<Rendered | undefined
   return applyCodec(action.codec, source);
 }
 
-/** Whether aireg writes this placement's file itself, rather than linking or copying a tree. */
+/** Whether aireg writes the file itself rather than linking or copying a tree. */
 function writes(action: ActionOf<"link">): boolean {
   return action.codec !== undefined || action.entry !== undefined;
 }
 
-/** Where a written placement's file sits: inside its folder, for an `entry`. */
 function writtenFile(action: ActionOf<"link">): string {
   return action.entry === undefined ? action.to : join(action.to, action.entry);
 }

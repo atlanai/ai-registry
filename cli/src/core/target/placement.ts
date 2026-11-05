@@ -7,7 +7,7 @@ import { userTargetRoot } from "./roots.ts";
 /** Placement compares a project's target roots as relative paths, so it needs no folder. */
 export type PlacementWhere = Pick<Where, "scope" | "env">;
 
-/** The folders a target reads a kind from, most preferred first. */
+/** Most preferred first. */
 export function readsFor(
   targetTable: Targets,
   name: string,
@@ -24,7 +24,6 @@ export function readsFor(
     : [...new Set(reads.map((read) => (read === name ? shared : read)))];
 }
 
-/** The shared folder that is this target's own folder for a kind in this scope, by its target. */
 function sharedOwnFolder(
   targetTable: Targets,
   target: Target,
@@ -56,7 +55,7 @@ function placeable(target: Target | undefined, kind: ArtifactKind, scope: Scope)
 }
 
 export interface KindTargets {
-  /** Folders to write, each named by the target that lays it out. */
+  /** Each named by the target that lays it out. */
   targets: string[];
   /** Selected targets that read this kind from nowhere at this scope. */
   unreadable: string[];
@@ -136,7 +135,6 @@ function* combinations(items: readonly string[], size: number, start = 0): Gener
   }
 }
 
-/** Every folder the selected targets read, for finding what already sits in them. */
 export function readTargets(selected: readonly string[], targetTable: Targets): string[] {
   const out = new Set<string>();
   for (const name of selected) {
@@ -149,13 +147,11 @@ export function readTargets(selected: readonly string[], targetTable: Targets): 
   return [...out];
 }
 
-/** The command a person runs before this target loads a kind placed at `scope`, if any. */
 export function trustFor(target: Target, kind: ArtifactKind, scope: Scope): string | undefined {
   const trust = target.trust[kind];
   return trust === undefined || (trust.scope ?? scope) !== scope ? undefined : trust.run;
 }
 
-/** True when this target loads a directory of artifacts as one plugin. */
 export function takesPlugin(target: Target, scope: Scope = "user"): boolean {
   const mapping = target.kinds.plugin;
   if (mapping === undefined || mapping.shape !== "directory" || mapping.subdir === undefined) {

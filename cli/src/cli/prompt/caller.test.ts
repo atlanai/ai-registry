@@ -1,11 +1,18 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { CALLER_SIGNALS } from "#core/target/detect.ts";
+import { BUILTIN_TARGETS } from "#targets/index.ts";
 import { blocker, callingAgent, explain, SIGNALS } from "./caller.ts";
 
 const DOCS = readFileSync(
   new URL("../../../../docs/reference/environment.md", import.meta.url),
   "utf8",
+);
+
+const CALLERS = BUILTIN_TARGETS.flatMap((target) =>
+  target.detect === "never" || target.detect?.caller === undefined
+    ? []
+    : [[target.id, target.detect.caller] as const],
 );
 
 const human = { json: false, yes: false, isTTY: true, env: {} as NodeJS.ProcessEnv };
@@ -36,14 +43,10 @@ describe("callingAgent", () => {
     expect(callingAgent({ COPILOT_MODEL: "auto", COPILOT_ALLOW_ALL: "true" })).toBeUndefined();
   });
 
-  test.each([
-    ["gemini-cli", "GEMINI_CLI"],
-    ["opencode", "OPENCODE"],
-    ["pi", "PI_CODING_AGENT"],
-  ])("takes %s's variable from its target definition alone", (agent, variable) => {
-    expect(CALLER_SIGNALS).toContainEqual({ agent, env: [variable] });
+  test.each(CALLERS)("takes %s's variables from its target definition alone", (agent, env) => {
+    expect(CALLER_SIGNALS).toContainEqual({ agent, env });
     expect(SIGNALS.filter((signal) => signal.agent === agent)).toHaveLength(1);
-    expect(callingAgent({ [variable]: "1" })).toBe(agent);
+    for (const variable of env) expect(callingAgent({ [variable]: "1" })).toBe(agent);
   });
 
   test("ignores a variable that is set but empty", () => {

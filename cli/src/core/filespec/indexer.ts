@@ -58,7 +58,7 @@ export interface Indexed {
   added: OfferedVersion[];
   /** Artifacts whose `latest` moved without a new version, such as after a yank. */
   moved: OfferedVersion[];
-  /** Root-relative paths written. */
+  /** Root-relative. */
   paths: string[];
 }
 
@@ -130,18 +130,12 @@ export function inBlobStore(file: unknown): file is FileDescriptor {
   return Array.isArray(urls) && urls.every((url) => typeof url === "string" && isRemote(url));
 }
 
-/**
- * Every version folder `versions.json` does not list yet gets an `artifact.json`, a row there and
- * an `index.json` entry. Listed versions are released and never touched.
- */
+/** Listed versions are released and never touched. */
 export function indexRoot(root: string, at: string): Promise<Indexed> {
   return withRegistryLease(root, () => indexRootNow(root, at));
 }
 
-/**
- * One writer at a time per registry folder, the same key a local publish takes.
- * The lease lives in aireg's home, keeping the registry clean.
- */
+/** The same key a local publish takes; the lease lives in aireg's home, not the registry. */
 function withRegistryLease<T>(root: string, run: () => Promise<T>): Promise<T> {
   return withLease({ scope: "user", lock: join(root, REGISTRY_DOCUMENT) }, { wait: true }, run);
 }
@@ -195,8 +189,7 @@ async function indexRootNow(root: string, at: string): Promise<Indexed> {
     await writeAtomic(join(root, ...versionsAt.split(posix.sep)), specJson(document));
     paths.push(versionsAt);
   }
-  // A yank or a hand edit leaves `latest` behind without adding a version, so
-  // every artifact's is recomputed, not only those just indexed.
+  // A yank or hand edit can leave `latest` behind, so every artifact's is recomputed.
   const moved: OfferedVersion[] = [];
   for (const versionsAt of documents) {
     if (latest.has(versionsAt)) continue;
@@ -218,8 +211,8 @@ async function indexRootNow(root: string, at: string): Promise<Indexed> {
 }
 
 /**
- * Section 9: a status change moves its row's `catalog_digest` too (section 4.3). Only a row
- * whose envelope still has its content digest is recomputed, so changed content stays an error.
+ * Section 9: a status change moves its row's `catalog_digest` (section 4.3). Only a row whose
+ * envelope still has its content digest is recomputed, so changed content stays an error.
  */
 async function recatalog(root: string, versionsAt: string): Promise<boolean> {
   // Only a document that reads is recomputed; `registry validate` reports one that does not.
@@ -308,10 +301,7 @@ async function envelopeOf(
   });
 }
 
-/**
- * Only a Markdown or JSON file can hold the spec or a description, so only those
- * are held; any other file is digested as it streams past, however large.
- */
+/** Only Markdown or JSON can hold a spec or description; others are hashed as they stream. */
 async function digested(dir: string, path: string) {
   if (!/\.(md|json)$/.test(path)) {
     const read = await hashRegular(dir, path);
@@ -327,10 +317,7 @@ async function digested(dir: string, path: string) {
   };
 }
 
-/**
- * Files an existing `artifact.json` keeps in the blob store, which no folder holds:
- * carried into the new envelope once the blob is there with the bytes they name.
- */
+/** Blob store files an existing `artifact.json` keeps, carried once the blob has the bytes. */
 async function blobFiles(
   root: string,
   folder: VersionFolder,
@@ -355,7 +342,6 @@ async function blobFiles(
   return kept;
 }
 
-/** Why the blob store does not hold the bytes `file` names at `locator`, if it does not. */
 async function blobProblem(
   root: string,
   file: FileDescriptor,
@@ -369,10 +355,7 @@ async function blobProblem(
   return read.digest === file.digest && read.size === file.size ? undefined : "holds other bytes";
 }
 
-/**
- * One artifact's newest active release, with its `versions.json` set to name it. With none
- * active, `latest` stays where it is and its row's status still reaches the index.
- */
+/** With no active release, `latest` stays put and its row's status still reaches the index. */
 async function currentLatest(
   root: string,
   versionsAt: string,
@@ -411,7 +394,6 @@ async function currentLatest(
   };
 }
 
-/** An artifact whose `versions.json` is gone has nothing left to list. */
 async function withoutDeleted(
   root: string,
   index: Record<string, unknown>,

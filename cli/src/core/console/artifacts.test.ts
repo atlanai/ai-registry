@@ -1,10 +1,11 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
-import { emptyLock, type Lock } from "#core/lock.ts";
+import type { Lock } from "#core/lock.ts";
 import type { ArtifactStatus } from "#core/plan/status.ts";
 import type { Survey } from "#core/plan/survey.ts";
 import { roots as makeRoots } from "#core/store/paths.ts";
+import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { groupArtifacts, health, publishable, selector, summarize } from "./artifacts.ts";
 import { flatten } from "./flatten.ts";
@@ -18,35 +19,27 @@ test.beforeAll(async ({ fileTmp }) => {
 });
 
 function lockWith(): Lock {
-  const lock = emptyLock();
-  lock.registries.market = {
+  const built = lockOf().registry("market", {
     location: "https://api.acme.example",
     adapter: "acme",
     key: "sha256:k",
-    config: {},
-    revision: undefined,
-  };
+  });
   for (const [key, namespace, version] of [
     ["eng/lint", "eng", "0.1.0"],
     ["eng/format", "eng", "0.1.0"],
     ["mine/audit", "mine", "1"],
   ] as const) {
-    lock.artifacts[key] = {
-      registry: "market",
+    built.artifact(key, {
       id: `skill_${key}`,
-      name: key.split("/")[1] as string,
-      kind: "skill",
       namespace,
-      address: undefined,
-      origin: undefined,
       path: `${key}/SKILL.md`,
       content: "sha256:c",
       version,
       digest: "sha256:lock",
       links: [{ target: "claude-code", path: `.claude/skills/${namespace}`, mode: "symlink" }],
-    };
+    });
   }
-  return lock;
+  return built.build();
 }
 
 function surveyWith(digests: Record<string, string>): Survey {

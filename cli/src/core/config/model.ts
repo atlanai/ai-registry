@@ -15,10 +15,7 @@ export interface Account {
   defaultNamespace?: string;
 }
 
-/**
- * One folder a step reads. The same shape serves every step that looks at local
- * files, so scoping is one concept rather than one per step kind.
- */
+/** One shape for every step that reads local files, so scoping is one concept. */
 export interface Selector {
   /** A directory, or a glob when the step kind accepts one. */
   from: string;
@@ -98,14 +95,10 @@ export const STEP_FIELDS = [
   "policy",
 ] as const satisfies readonly (keyof Step)[];
 
-/**
- * One node of a job's graph. A step names what it touches, not the job, so one
- * job can span two scopes.
- */
+/** A step names what it touches, not the job, so one job can span two scopes. */
 export interface Step {
   name: string;
   kind: string;
-  /** Names of steps that must finish first. */
   needs: readonly string[];
   /** Scope root, for the kinds that reconcile a scope. */
   root?: string;
@@ -124,10 +117,7 @@ export interface Schedule {
   enabled: boolean;
 }
 
-/**
- * A template. A run is one execution of it, and the schema bounds a job to one
- * live run, so concurrency is not a field here.
- */
+/** The schema bounds a job to one live run, so concurrency is not a field here. */
 export interface Job {
   id: string;
   /** Optional label; what `aireg job start <name>` and a report show. */
@@ -183,7 +173,6 @@ export interface RegistryConfig {
 
 export const DEFAULT_INTERVAL_SECONDS = 900;
 
-/** The default interval as a message says it. */
 export const DEFAULT_INTERVAL_WORDS = `${DEFAULT_INTERVAL_SECONDS / 60} minutes`;
 
 export function emptyRegistryConfig(): RegistryConfig {

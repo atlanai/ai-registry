@@ -52,13 +52,10 @@ export const index = action({
       printer.info(`  latest  ${item.namespace}/${item.kind}/${item.name}  ${item.version}`);
     }
     if (added.length === 0) {
-      printer.success(
-        moved.length > 0
-          ? "Updated latest and index.json. No new versions."
-          : paths.includes(INDEX_DOCUMENT)
-            ? "Updated index.json. No new versions."
-            : "Nothing new to index. Every version folder is listed.",
-      );
+      let message = "Nothing new to index. Every version folder is listed.";
+      if (moved.length > 0) message = "Updated latest and index.json. No new versions.";
+      else if (paths.includes(INDEX_DOCUMENT)) message = "Updated index.json. No new versions.";
+      printer.success(message);
       return;
     }
     for (const item of added) {

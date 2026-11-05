@@ -6,10 +6,7 @@ import { describe, expect, test } from "vitest";
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src");
 const PACKAGE = resolve(SRC, "..");
 
-/**
- * Each folder under `src/` by rank: a folder imports its own files and those
- * of lower ranks. Folders that share a rank do not import each other.
- */
+/** A folder imports its own files and lower ranks; equal ranks never import each other. */
 const RANKS: Record<string, number> = {
   "main.ts": 7,
   cli: 6,
@@ -43,7 +40,6 @@ const IMPORTS = (
   }
 ).imports;
 
-/** Where `#name` or `#name/rest` points, by the package's own imports map. */
 function aliased(specifier: string): string {
   const exact = IMPORTS[specifier];
   if (exact !== undefined) return resolve(PACKAGE, exact);
@@ -56,7 +52,6 @@ function aliased(specifier: string): string {
   throw new Error(`${specifier} is not in package.json imports`);
 }
 
-/** Every import in `src`, as paths relative to the package with forward slashes. */
 function edges(): { from: string; to: string }[] {
   const posix = (path: string) => path.split(sep).join("/");
   return sources(SRC).flatMap((file) =>
@@ -71,19 +66,12 @@ function edges(): { from: string; to: string }[] {
 }
 
 const under = (path: string, folder: string) => path === folder || path.startsWith(`${folder}/`);
-/** The folder under `src/` a path sits in, such as `core` for `src/core/errors.ts`. */
 const layer = (path: string) => path.split("/")[1] ?? "";
-/** The folder one level below `parent`, such as `git` for `adapters/git/api.ts`. */
 const child = (path: string, parent: string) =>
   under(path, parent) && path.split("/").length > 2 ? path.split("/")[1] : undefined;
-/** A built-in adapter's entry points: its api module, and the registration of every one. */
 const adapterEntry = (path: string) =>
   path === "adapters/index.ts" || /^adapters\/[^/]+\/api\.ts$/.test(path);
 
-/**
- * Test files keep the rules of the folder they sit in, and may also use the shared
- * kit in `test/`. Paths here are relative to `src/`.
- */
 function refusal(from: string, to: string, test: boolean): string | undefined {
   if (!under(to, "src")) {
     const outside = to === "package.json" || under(to, "schema") || (test && under(to, "test"));

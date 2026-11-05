@@ -12,13 +12,12 @@ import type { Tree } from "./tree.ts";
 /** A root `plugin.json` is an Agent Plugins manifest only under this schema. */
 const AGENT_PLUGINS_SCHEMA = /^https:\/\/agent-plugins\.org\/schemas\/[^/]+\/plugin\.schema\.json$/;
 
-/** Manifests are a few kilobytes; anything larger is not one. */
 const MAX_MANIFEST = 1024 * 1024;
 
 /** What an entry may add to a plugin's own manifest, as Claude Code's strict mode names them. */
 const COMPONENTS = ["commands", "agents", "skills", "hooks", "outputStyles", "themes"];
 
-/** Marketplace bookkeeping, which is not part of the plugin it lists. */
+/** Marketplace bookkeeping, not part of the plugin it lists. */
 const ENTRY_ONLY = new Set([
   "source",
   "strict",
@@ -50,7 +49,6 @@ export async function readObject(tree: Tree, path: string): Promise<Fields | und
 
 const under = (dir: string, path: string) => (dir === "" ? path : `${dir}/${path}`);
 
-/** The manifest a plugin folder holds, by precedence, and where it was found. */
 export async function pluginManifest(
   tree: Tree,
   dir: string,
@@ -62,7 +60,7 @@ export async function pluginManifest(
       if (manifest !== undefined) return { path, manifest };
       continue;
     }
-    // Any project may have a plugin.json; only one under the Agent Plugins schema is a plugin's.
+    // Any project may have a plugin.json, so a broken one is not a plugin's and never throws.
     const manifest = await readObject(tree, path).catch(() => undefined);
     if (manifest !== undefined && AGENT_PLUGINS_SCHEMA.test(String(manifest.$schema))) {
       return { path, manifest };
@@ -72,8 +70,8 @@ export async function pluginManifest(
 }
 
 /**
- * One plugin, whole, as a `plugin` artifact, followed by its skills and agents on their own, so
- * a target without plugins gets its parts and `-s` can take one. Undefined when it is skipped.
+ * The `plugin` artifact, then its skills and agents on their own, so a target without plugins
+ * gets its parts and `-s` can take one.
  */
 export async function readPlugin(
   tree: Tree,
@@ -159,10 +157,7 @@ export async function readPlugin(
   return [plugin, ...members];
 }
 
-/**
- * The manifest a target loads: the entry alone when the plugin has none, else the plugin's own
- * with the entry's components appended, which `strict: false` refuses.
- */
+/** The plugin's manifest with the entry's components appended, which `strict: false` refuses. */
 function effectiveManifest(
   own: Fields | undefined,
   entry: Fields | undefined,
@@ -199,7 +194,7 @@ function namesOf(manifest: Fields, input: PluginInput): { name: string; manifest
   return manifestName === undefined ? { name } : { name, manifestName };
 }
 
-/** A manifest path, `./x` relative to the plugin, as a path in the tree; undefined if it leaves. */
+/** Undefined for a path that leaves the plugin. */
 function inside(dir: string, path: unknown): string | undefined {
   if (typeof path !== "string") return undefined;
   if (path === "." || path === "./") return dir;
@@ -210,7 +205,7 @@ function inside(dir: string, path: unknown): string | undefined {
   return under(dir, rest);
 }
 
-/** Skill folders under each place a manifest names: one holding SKILL.md, or a folder of them. */
+/** A place a manifest names is a skill folder or a folder of them. */
 async function skillDirs(tree: Tree, places: readonly string[]): Promise<string[]> {
   const found = new Set<string>();
   for (const place of places) {
@@ -227,18 +222,17 @@ async function skillDirs(tree: Tree, places: readonly string[]): Promise<string[
   return [...found].sort();
 }
 
-/** What a plugin listing names it, how it was found, and where it lives. */
 export interface PluginInput {
-  /** The plugin's folder in the tree, `""` for the root. */
+  /** `""` for the root. */
   dir: string;
   entry?: Fields | undefined;
   /** Installs under it; for a lone plugin, the name when its manifest has none. */
   name: string;
-  /** Listed by a marketplace whose source is its own root, so only the skills it names count. */
+  /** Its source is the marketplace root, so only what it names counts. */
   rootSource: boolean;
 }
 
-/** `*.md` files: those a manifest names, or each one directly in the default folder. */
+/** Those a manifest names, or each one directly in the default folder. */
 async function markdownFiles(tree: Tree, dir: string, named: unknown, folder: string) {
   const places =
     named === undefined ? [under(dir, folder)] : listOf(named).map((p) => inside(dir, p));
@@ -256,7 +250,7 @@ async function markdownFiles(tree: Tree, dir: string, named: unknown, folder: st
   return [...new Set(files)].sort();
 }
 
-/** A command as a person runs it, `/plugin:name`, and the file it is written in. */
+/** `name` as a person runs it: `/plugin:name`. */
 interface Command {
   name: string;
   path: string;
@@ -278,7 +272,7 @@ async function commandsOf(tree: Tree, dir: string, manifest: Fields): Promise<Co
   }));
 }
 
-/** Files of a plugin whose folder is the whole source: only what it names, never its neighbors. */
+/** For a plugin whose folder is the whole source: only these and what it names, never neighbors. */
 const ROOT_FILES = [
   "hooks",
   "bin",

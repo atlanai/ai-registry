@@ -11,7 +11,6 @@ import type { HostCommandContext } from "./extend.ts";
 /** Opaque on purpose: only the toolkit can make one. */
 export type PanelNode = unknown;
 
-/** The subset of the renderer's layout a panel may set. */
 export interface PanelBoxProps {
   key?: string;
   flexDirection?: "row" | "column";
@@ -45,10 +44,7 @@ export interface ListWindow {
   below: number;
 }
 
-/**
- * Lent by the host for one render. A panel is handed a toolkit rather than
- * importing one: a second copy of the renderer would reconcile against a different tree.
- */
+/** Handed in, not imported: a second copy of the renderer would reconcile against another tree. */
 export interface PanelToolkit {
   box(props: PanelBoxProps | null, ...children: PanelNode[]): PanelNode;
   text(props: PanelTextProps | null, ...children: PanelNode[]): PanelNode;
@@ -59,7 +55,6 @@ export interface PanelToolkit {
   heading(label: string): PanelNode;
   /** `[k] label`, the shape every action in the console is announced in. */
   action(key: string, label: string, active?: boolean): PanelNode;
-  /** The two-line strip under a list. */
   summaryStrip(props: {
     width: number;
     title: PanelNode;
@@ -83,9 +78,7 @@ export interface PanelToolkit {
   window(total: number, cursor: number, height: number): ListWindow;
 }
 
-/** What the console knows about the selected registry; the routes themselves are the adapter's. */
 export interface LinkFacts {
-  /** The registry's address, as the manifest declares it. */
   location: string;
   /** The registry's adapter config, which only its adapter reads. */
   config: Readonly<Record<string, string>>;
@@ -93,17 +86,16 @@ export interface LinkFacts {
   viewer: string | undefined;
 }
 
-/** The host has already opened these, so a panel is handed them. */
 interface PanelCollectInput {
   context: HostCommandContext;
   config: RegistryConfig;
   manifest: Manifest;
   targetTable: Targets;
-  /** @deprecated `targetTable` by the ids aireg 0.1 knew, which adapters built against it read. */
+  /** @deprecated `targetTable` keyed by aireg 0.1 ids, for adapters built against it. */
   harnesses: Readonly<Record<string, EarlierTarget>>;
-  /** The account whose tab is selected. Every view is scoped to it. */
+  /** The selected tab's account; every view is scoped to it. */
   account: AccountRow | undefined;
-  /** That account's jobs and runs, already narrowed. */
+  /** Already narrowed to that account. */
   jobs: readonly Job[];
   runs: readonly RunRecord[];
   store: RunStore;
@@ -111,14 +103,14 @@ interface PanelCollectInput {
 
 export interface PanelView<S = unknown> {
   width: number;
-  /** Rows the list may draw, after the chrome has taken its share. */
+  /** Rows left for the list after the chrome. */
   height: number;
   cursor: number;
   nowMs: number;
   state: ConsoleState;
-  /** Always what this panel's own `collect` returned: a panel whose collect threw is not called. */
+  /** A panel whose `collect` threw is not called. */
   data: S;
-  /** The panel's own toggles, held by the host so a reload does not lose them. */
+  /** Held by the host so a reload does not lose them. */
   flags: Readonly<Record<string, boolean>>;
   facts: LinkFacts;
   ui: PanelToolkit;
@@ -128,20 +120,17 @@ export interface PanelView<S = unknown> {
 interface PanelKeyContext<S = unknown> {
   view: PanelView<S>;
   setFlag(name: string, value: boolean): void;
-  /**
-   * Spawns the command straight away; a panel binding this to a bare keypress
-   * decides for itself whether that key deserves a confirmation first.
-   */
+  /** Spawns at once; a panel decides whether a bare keypress needs a confirmation first. */
   run(label: string, command: Command): void;
   open(url: string): void;
   reload(): void;
 }
 
 export interface PanelContribution<S = unknown> {
-  /** Tab id, and the key the host files its cursor and flags under. */
+  /** Also the key the host files its cursor and flags under. */
   id: string;
   label: string;
-  /** Tab to sit after. Unknown or absent puts it before Settings. */
+  /** Tab to sit after; unknown or absent puts it before Settings. */
   after?: string;
   collect(input: PanelCollectInput): Promise<S>;
   length(view: PanelView<S>): number;
@@ -155,18 +144,15 @@ export interface PanelContribution<S = unknown> {
   link?(view: PanelView<S>): string | undefined;
   /** Reads only the visible window; true redraws. */
   prefetch?(view: PanelView<S>): Promise<boolean>;
-  /** First rendered row of this list. Ink reports no geometry to measure. */
+  /** First rendered row of the list, since Ink reports no geometry. */
   listTop?: number;
 }
 
-/**
- * What the console shows about the registry behind these artifacts. It knows
- * an artifact has a page somewhere; only the adapter that served it has the route.
- */
+/** The console knows an artifact has a page; only the adapter that served it has the route. */
 export interface UpstreamContribution {
   /** Shown as `open in <app>`. */
   app: string;
-  /** The registry's own page, where `o` goes when nothing narrower is selected. */
+  /** Where `o` goes when nothing narrower is selected. */
   registry?(facts: LinkFacts): string | undefined;
   artifact?(facts: LinkFacts, row: ArtifactRow): string | undefined;
   namespace?(facts: LinkFacts, namespace: string): string | undefined;

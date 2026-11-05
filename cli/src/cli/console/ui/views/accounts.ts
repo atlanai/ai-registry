@@ -65,7 +65,6 @@ function accountBlock(account: AccountRow, selected: boolean, active: boolean): 
   );
 }
 
-/** Where the sign-in is kept, which `auth list` does not say. */
 function credentialLine(account: AccountRow): ReactElement {
   return box(
     null,

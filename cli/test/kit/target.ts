@@ -18,10 +18,7 @@ export function withoutKind(targetTable: Targets, name: string, kind: ArtifactKi
   return { ...targetTable, [name]: { ...target, kinds } };
 }
 
-/**
- * Where a skill is projected under `root`: inside the plugin its namespace
- * becomes, or directly when the target has no plugin container.
- */
+/** Inside the plugin its namespace becomes, or directly when the target has no plugins. */
 export function projected(root: string, name: string): string {
   const entry = KIND_SPECS.skill.entry as string;
   for (const target of TARGET_ROOTS) {

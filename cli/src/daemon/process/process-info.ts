@@ -26,7 +26,7 @@ async function commandLine(pid: number): Promise<string | undefined> {
   return code !== 0 || line === "" ? undefined : line;
 }
 
-/** Windows has no `ps` or `/proc`; CIM is what still reports another process's command line. */
+/** Windows has no `ps` or `/proc`; CIM still reports another process's command line. */
 async function windowsCommandLine(pid: number): Promise<string | undefined> {
   // Interpolated into a PowerShell filter, so only a plain positive integer gets there.
   if (!Number.isSafeInteger(pid) || pid <= 0) return undefined;
@@ -48,10 +48,10 @@ function isDaemonCommand(command: string): boolean {
   return command.includes(DAEMON_FLAG);
 }
 
-/** Pids that have this unix socket open. Empty when lsof is missing or the path is idle. */
+/** Empty when lsof is missing or the path is idle. */
 export async function socketPids(endpoint: string): Promise<number[]> {
   if (process.platform === "win32") return [];
-  // lsof ORs its selections unless -a joins them: alone, -U names every process with any unix socket.
+  // lsof ORs its selections unless -a joins them; alone, -U matches every unix socket.
   const { code, stdout } = await exec("lsof", ["-a", "-t", "-U", "--", endpoint], {
     timeoutMs: EXEC_MS,
   });

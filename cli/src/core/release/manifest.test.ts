@@ -1,7 +1,6 @@
-import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, test } from "vitest";
 import { ErrorCode } from "#core/errors.ts";
-import { decodeTrustedKeys, type TrustedKeys } from "./keyring.ts";
+import { type ReleaseSigner, releaseSigner } from "#test/kit/release.ts";
 import {
   artifactNamed,
   canonicalPayload,
@@ -21,16 +20,6 @@ const manifest: ReleaseManifest = {
   artifacts: [{ name: NAME, sha256: SHA, size: 4096 }],
 };
 
-function signer(): { keys: TrustedKeys; sign: (payload: Uint8Array) => string } {
-  const pair = generateKeyPairSync("ed25519");
-  const jwk = pair.publicKey.export({ format: "jwk" });
-  const encoded = Buffer.from(String(jwk.x), "base64url").toString("base64");
-  const keyring = Buffer.from(JSON.stringify({ release: encoded }), "utf8").toString("base64");
-  const keys = decodeTrustedKeys(keyring);
-  if (keys === undefined) throw new Error("keyring did not decode");
-  return { keys, sign: (payload) => sign(null, payload, pair.privateKey).toString("base64") };
-}
-
 function document(
   over: Record<string, unknown> = {},
   signature = "",
@@ -48,9 +37,9 @@ function document(
   };
 }
 
-/** Signed over the canonical payload of `manifest`, whatever `over` then says. */
+/** Signs `manifest`'s canonical payload, whatever `over` then says. */
 function signed(
-  keyring: ReturnType<typeof signer>,
+  keyring: ReleaseSigner,
   over: Record<string, unknown> = {},
   keyId = "release",
 ): string {
@@ -68,7 +57,7 @@ function failure(run: () => unknown): unknown {
 
 describe("verifyManifest", () => {
   test("accepts a manifest signed by a trusted key", () => {
-    const keyring = signer();
+    const keyring = releaseSigner();
     const parsed = verifyManifest(signed(keyring), keyring.keys, "stable");
     expect(parsed).toEqual(manifest);
     expect(artifactNamed(parsed, NAME)?.sha256).toBe(SHA);
@@ -76,7 +65,7 @@ describe("verifyManifest", () => {
   });
 
   test("rejects a tampered manifest", () => {
-    const keyring = signer();
+    const keyring = releaseSigner();
     const raw = signed(keyring, { version: "9.9.9" });
     expect(failure(() => verifyManifest(raw, keyring.keys, "stable"))).toMatchObject({
       code: ErrorCode.Integrity,
@@ -93,14 +82,15 @@ describe("verifyManifest", () => {
   });
 
   test("separates a substituted publisher from an unknown one", () => {
-    const keyring = signer();
-    // Same key id, a different key: the publisher this build trusts is broken
-    // or substituted, so the manifest is refused rather than merely ignored.
-    expect(failure(() => verifyManifest(signed(signer()), keyring.keys, "stable"))).toMatchObject({
+    const keyring = releaseSigner();
+    // Same key id, different key: a broken or substituted publisher is refused, not ignored.
+    expect(
+      failure(() => verifyManifest(signed(releaseSigner()), keyring.keys, "stable")),
+    ).toMatchObject({
       code: ErrorCode.Integrity,
       message: expect.stringMatching(/verification failed/),
     });
-    // An id the keyring does not carry: nothing here is trusted at all.
+    // An id the keyring does not carry.
     expect(
       failure(() => verifyManifest(signed(keyring, {}, "rotated-out"), keyring.keys, "stable")),
     ).toMatchObject({
@@ -110,7 +100,7 @@ describe("verifyManifest", () => {
   });
 
   test("rejects an unsigned, misencoded or over-long manifest", () => {
-    const keyring = signer();
+    const keyring = releaseSigner();
     expect(
       failure(() => verifyManifest(signed(keyring, { signatures: [] }), keyring.keys, "stable")),
     ).toMatchObject({
@@ -135,7 +125,7 @@ describe("verifyManifest", () => {
   });
 
   test("refuses a manifest served for another channel, and unknown fields", () => {
-    const keyring = signer();
+    const keyring = releaseSigner();
     expect(failure(() => verifyManifest(signed(keyring), keyring.keys, "canary"))).toMatchObject({
       code: ErrorCode.Integrity,
       message: expect.stringMatching(/is for stable, not canary/),
@@ -149,12 +139,12 @@ describe("verifyManifest", () => {
   });
 
   test("accepts a pin whose signed channel is not the one this build asked for", () => {
-    const keyring = signer();
+    const keyring = releaseSigner();
     expect(verifyManifest(signed(keyring), keyring.keys).channel).toBe("stable");
   });
 
   test("refuses a floor newer than the release, and a non-exact version", () => {
-    const keyring = signer();
+    const keyring = releaseSigner();
     const ahead = signed(keyring, { minimum_version: "0.9.0" });
     expect(failure(() => verifyManifest(ahead, keyring.keys, "stable"))).toMatchObject({
       code: ErrorCode.Invalid,
@@ -171,7 +161,7 @@ describe("verifyManifest", () => {
 
 describe("a release that names its adapter", () => {
   test("signs the name, so it cannot be changed to another adapter", () => {
-    const keyring = signer();
+    const keyring = releaseSigner();
     const raw = JSON.stringify(
       document(
         { adapter: "acme" },

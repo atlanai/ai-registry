@@ -1,6 +1,5 @@
 import { isActive, isFailed, type RunState } from "#core/run/model.ts";
 
-/** One palette, so a state reads the same color in every view. */
 export const COLOR = {
   white: "#f4f4f6",
   ink: "#d7d7dd",

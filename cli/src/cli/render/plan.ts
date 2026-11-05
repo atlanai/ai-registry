@@ -248,7 +248,6 @@ function followUps(
 /** The targets some artifacts went to, named as chosen; `folders` narrows where each went. */
 type Tools = (names: readonly string[], folders?: (name: string) => string[]) => string;
 
-/** An applied run: the plan, what apply did, and the lockfile it started from. */
 export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "targetTable" | "scope"> & {
   applied: ApplyResult;
 };
@@ -263,9 +262,8 @@ function placedKind(
   action: Shown,
   kindOf: (name: string) => ArtifactKind | undefined,
 ): ArtifactKind | undefined {
-  const placed =
-    action.kind !== "link" ? undefined : action.plugin === true ? "plugin" : action.part;
-  return placed ?? kindOf(action.name);
+  if (action.kind !== "link") return kindOf(action.name);
+  return (action.plugin === true ? "plugin" : action.part) ?? kindOf(action.name);
 }
 
 export function outcome({ plan, applied }: RunResult, dryRun: boolean): Outcome {

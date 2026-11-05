@@ -23,18 +23,12 @@ const GLOBAL_FLAGS = new Set([
 
 const GLOBAL_VALUE_FLAGS = new Set(["--color", "--log-level"]);
 
-/**
- * Globals whose value is optional: bare means a default, and a following
- * word is the value only when it is one - see `mapTakesValue`.
- */
+/** Bare means a default; a following word is the value only when `mapTakesValue` says so. */
 const GLOBAL_OPTIONAL_VALUE_FLAGS = new Set(["--map"]);
 
 export const GLOBALS_HINT = "Run `aireg --help` for the global options.";
 
-/**
- * The command is the first bare word that is not a global flag's value, or
- * `aireg --log-level debug add x` resolves the command as `debug`.
- */
+/** Skips global flag values, or `aireg --log-level debug add x` would resolve to `debug`. */
 export function findCommand(argv: readonly string[]): number {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i] as string;
@@ -52,10 +46,7 @@ function consumesNext(arg: string, next: string | undefined): boolean {
   return GLOBAL_OPTIONAL_VALUE_FLAGS.has(arg) && mapTakesValue(next);
 }
 
-/**
- * Before the command, only globals can appear; after it, the command's own
- * options decide which words are values, so `-m "-v"` is not --version.
- */
+/** After the command its own options decide which words are values, so `-m "-v"` is not -v. */
 export function readGlobals(
   argv: readonly string[],
   commandIndex: number,

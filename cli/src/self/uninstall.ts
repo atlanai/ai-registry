@@ -23,9 +23,8 @@ import { resolveTargets } from "#core/target/table.ts";
 import { removeTree } from "./remove-after-exit.ts";
 import { onPathIn } from "./shell-path.ts";
 
-/** The files aireg put on this machine outside projects, as `aireg self uninstall` finds them. */
+/** The files aireg put on this machine outside projects. */
 export interface Footprint {
-  /** What your user scope placed in target folders. */
   links: string[];
   startupFiles: string[];
   folders: string[];
@@ -130,8 +129,8 @@ function helperPath(suffix: string): string {
 }
 
 /**
- * A copy in the temp folder, which a copy can reach on any drive, deletes the folder once this
- * process exits; Windows cleans the copy with the rest of TEMP.
+ * A copy in TEMP, reachable from any drive, deletes the folder once this process exits.
+ * Windows cleans the copy with the rest of TEMP.
  */
 async function deleteAfterExit(dir: string, executable: string): Promise<void> {
   const helper = helperPath("uninstall");

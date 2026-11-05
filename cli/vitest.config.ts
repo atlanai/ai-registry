@@ -3,8 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    // The e2e suites spawn the built binary, so they are slow by construction.
-    // A ceiling here stops a loaded machine reading as a test failure.
+    // The e2e suites spawn the built binary, so a loaded machine needs a high ceiling.
     testTimeout: 60_000,
     hookTimeout: 60_000,
     projects: [
@@ -46,7 +45,8 @@ export default defineConfig({
       reporter: ["text-summary", "lcov"],
       reportsDirectory: "coverage",
       // `test:coverage` runs only the in-process projects: V8 cannot see the CLI the e2e suites spawn.
-      thresholds: { lines: 45, functions: 45, branches: 42, statements: 44 },
+      // Two points under what the suite covers, for platform skips; raise them as coverage grows.
+      thresholds: { lines: 71, functions: 70, branches: 61, statements: 69 },
     },
   },
 });

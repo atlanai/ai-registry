@@ -26,8 +26,8 @@ export function earlierDigest(framed: string): string | undefined {
 }
 
 /**
- * Digests already taken, by path, with a stamp of each file's size, modification time
- * and inode: a long-running daemon surveys the same copies every tick, as git's index does.
+ * Digests already taken, by path, stamped with size, mtime and inode: a long-running daemon
+ * surveys the same copies every tick, as git's index does.
  */
 const KNOWN = new Map<string, { stamp: string } & Partial<Record<Encoding, string>>>();
 const KNOWN_LIMIT = 20_000;
@@ -37,12 +37,17 @@ const RACY_MS = 2_000;
 /** Each file's path, mode, size and content digest as one JSON list, so no two trees share it. */
 async function framed(tree: Tree): Promise<string> {
   const entries: [string, boolean, number, string][] = [];
-  const ordered = [...tree.files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  const ordered = [...tree.files].sort(byPath);
   for (const file of ordered) {
     const read = await hashStream(createReadStream(join(tree.root, file.path)));
     entries.push([file.path, file.executable, read.size, read.digest]);
   }
   return sha256(JSON.stringify(entries));
+}
+
+function byPath(a: { path: string }, b: { path: string }): number {
+  if (a.path === b.path) return 0;
+  return a.path < b.path ? -1 : 1;
 }
 
 /** A lock row's two digests, read together so writing the row again keeps both. */
@@ -54,10 +59,7 @@ function remember(framed: string, earlier: string): void {
   setRecent(EARLIER, framed, earlier, KNOWN_LIMIT);
 }
 
-/**
- * Has the copy on disk been edited since we placed it? Given the digest a lock records
- * for it, that digest is returned when the copy still matches it.
- */
+/** Whether a placed copy was edited: returns `recorded` while the copy still matches it. */
 export async function digest(path: string, recorded?: string): Promise<string> {
   const tree = (await isDirectory(path)) ? folder(path, path, await walk(path)) : await lone(path);
   return settle(tree, recorded);
@@ -129,10 +131,7 @@ async function hashFile(hash: Hash, path: string): Promise<void> {
   });
 }
 
-/**
- * What a person's own folder holds as a copy of it holds it (`copyAuthored`), so the
- * two digest alike: litter and anything refused are left out.
- */
+/** Reads a person's own folder as `copyAuthored` copies it, so the two digest alike. */
 export async function authoredDigest(path: string, recorded?: string): Promise<string> {
   if (!(await isDirectory(path))) return settle(await lone(path), recorded);
   return settle(folder(path, `${path}\0authored`, (await authored(path)).files), recorded);

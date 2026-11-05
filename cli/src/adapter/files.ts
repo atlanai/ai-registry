@@ -7,17 +7,12 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { assertWithin } from "./paths.ts";
 import { hashStream } from "./spec/canonical.ts";
 
-// Reading and writing files under a root without being redirected by a link,
-// for any adapter whose store is a folder on disk.
-
-/** Modes a copied file is written with, and the mask that says it was executable. */
 export const PUBLIC_FILE = 0o644;
 
 export const EXECUTABLE = 0o755;
 
 export const EXECUTE_BITS = 0o111;
 
-/** Why a path under a root was not read. */
 export type RefusedReason = "is a symlink" | "is not a regular file";
 
 export type Regular =
@@ -25,10 +20,7 @@ export type Regular =
   | { kind: "missing" }
   | { kind: "refused"; reason: RefusedReason };
 
-/**
- * A file under `root` read without following a link at any step, so the bytes
- * can only ever come from inside it. `path` is POSIX and relative.
- */
+/** Follows no link at any step, so the bytes can only come from inside `root`. `path` is POSIX. */
 export async function readRegular(
   root: string,
   path: string,
@@ -43,10 +35,7 @@ export async function readRegular(
   }
 }
 
-/**
- * A file under `root` opened without following a link at any step. `verified` holds
- * folders already checked in this pass, which are not checked again.
- */
+/** `verified` holds folders already checked in this pass, which are not checked again. */
 async function openRegular(
   root: string,
   path: string,
@@ -88,7 +77,7 @@ async function openRegular(
   return { kind: "open", handle, executable: (info.mode & EXECUTE_BITS) !== 0 };
 }
 
-/** Like `readRegular`, but streamed into a digest, so a large file is never held whole. */
+/** Streamed into a digest, so a large file is never held whole. */
 export async function hashRegular(
   root: string,
   path: string,
@@ -107,10 +96,7 @@ export async function hashRegular(
   }
 }
 
-/**
- * Like `hashRegular`, but also streamed to `dest`, which must not exist yet: a caller
- * lands it under its own name once the digest is checked.
- */
+/** `dest` must not exist yet: a caller lands it under its own name once the digest is checked. */
 export async function copyRegular(
   root: string,
   path: string,
@@ -147,7 +133,6 @@ export async function copyRegular(
   };
 }
 
-/** The first component below a boundary that is a link, or not a directory where one must be. */
 interface Redirection {
   at: string;
   problem: "symlink" | "not-directory";
@@ -183,8 +168,8 @@ export function redirection(
 }
 
 /**
- * Refuses links below the caller-selected `root`: lexical containment alone lets a checked-in
- * directory link redirect a copy, rename or recursive removal. Not a guard against concurrent swaps.
+ * Lexical containment alone lets a checked-in directory link redirect a copy, rename or
+ * recursive removal. Not a guard against concurrent swaps.
  */
 export async function assertUnredirected(
   root: string,

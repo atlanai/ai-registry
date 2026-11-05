@@ -67,8 +67,7 @@ describe("publishing from a project", () => {
     await exec("sh", ["-c", commit], { cwd: scratch, env: { ...process.env, ...home.env } });
     expect(await git(clone, "status", "--porcelain")).toBe("");
     expect(published.stdout).not.toContain("your user scope");
-    // A registry stores a version directory with the envelope beside the
-    // native file, so that is what a publish adds - not a loose `agents/` path.
+    // A publish adds a version directory with the envelope beside the native file.
     const at = (path: string) => readFile(join(clone, path), "utf8");
     // An agent goes in as AGENT.md, named and otherwise as written.
     const agent = await at("artifacts/mine/agent/hotfix/0.1.0/AGENT.md");

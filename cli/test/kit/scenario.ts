@@ -154,16 +154,35 @@ async function runCommands(
       body.push(...step.source);
       continue;
     }
-    if (!update) {
-      expect({ code: ran.code, output: actual.join("\n") }, `$ ${step.command}`).toEqual({
-        code: step.code,
-        output: step.expected.join("\n"),
-      });
-    }
     changed = true;
     body.push(`$ ${step.command}`, ...(ran.code === 0 ? [] : [`? ${ran.code}`]), ...actual);
+    if (update) continue;
+    expect({ code: ran.code, output: actual.join("\n") }, `$ ${step.command}`).toEqual({
+      code: step.code,
+      output: step.expected.join("\n"),
+    });
   }
   return changed ? body : undefined;
+}
+
+function checkAbsent(path: string, shown: string): void {
+  expect(existsSync(path), `!file ${shown}`).toBe(false);
+}
+
+/** The file's lines when they differ from the block and `update` is on. */
+async function checkFile(
+  block: Extract<Block, { kind: "file" }>,
+  path: string,
+  normalize: (text: string) => string[],
+  update: boolean,
+): Promise<string[] | undefined> {
+  const text = await readFile(path, "utf8").catch(() => undefined);
+  expect(text, `file ${block.path} is missing`).toBeDefined();
+  const actual = normalize(text ?? "");
+  if (matches(block.expected, actual)) return undefined;
+  if (update) return actual;
+  expect(actual.join("\n"), `file ${block.path}`).toBe(block.expected.join("\n"));
+  return actual;
 }
 
 /** Runs one Markdown scenario; the format is in test/scenarios/README.md. */
@@ -193,18 +212,14 @@ export async function runScenario(path: string, sandbox: Sandbox): Promise<void>
   const rewrites: { start: number; end: number; body: string[] }[] = [];
   for (const block of blocks) {
     if (block.kind === "absent") {
-      expect(existsSync(resolve(block.path)), `!file ${block.path}`).toBe(false);
-    } else if (block.kind === "file") {
-      const text = await readFile(resolve(block.path), "utf8").catch(() => undefined);
-      expect(text, `file ${block.path} is missing`).toBeDefined();
-      const actual = normalize(text ?? "");
-      if (matches(block.expected, actual)) continue;
-      if (!update) expect(actual.join("\n"), `file ${block.path}`).toBe(block.expected.join("\n"));
-      rewrites.push({ start: block.start, end: block.end, body: actual });
-    } else {
-      const body = await runCommands(block.steps, sandbox, expand, normalize, update);
-      if (body !== undefined) rewrites.push({ start: block.start, end: block.end, body });
+      checkAbsent(resolve(block.path), block.path);
+      continue;
     }
+    const body =
+      block.kind === "file"
+        ? await checkFile(block, resolve(block.path), normalize, update)
+        : await runCommands(block.steps, sandbox, expand, normalize, update);
+    if (body !== undefined) rewrites.push({ start: block.start, end: block.end, body });
   }
   if (rewrites.length === 0) return;
   for (const { start, end, body } of rewrites.reverse()) lines.splice(start, end - start, ...body);

@@ -123,7 +123,7 @@ export const { run } = defineCommand<Options>({
   },
 });
 
-/** The rows as aireg 0.1 printed them, under `harnesses`, for scripts written against it. */
+/** Rows as aireg 0.1 printed them under `harnesses`, for scripts written against it. */
 function earlierRows(targetTable: Targets, rows: readonly Detection[]) {
   const earlier = earlierTable(targetTable);
   return rows.map((item) => {
@@ -192,7 +192,6 @@ function origin(path: string): string {
   return path === BUILT_IN ? "built in" : underHome(path);
 }
 
-/** A shared folder has no row, so its ids are said once below the table. */
 function sharedHint(target: Target): string {
   const aliases = target.aliases.map((alias) => `\`${alias}\``);
   const also = aliases.length === 0 ? "" : `, or ${listed(aliases, "or")},`;
@@ -204,7 +203,6 @@ const lowered = (sentences: readonly string[]) => {
   return `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
 };
 
-/** Files in your user scope aireg could not use, or uses but would have you change. */
 function warnFiles(
   printer: Printer,
   files: readonly TargetFile[],
@@ -232,7 +230,7 @@ function show(id: string): TargetShown {
       hint: "Run `aireg targets` to see every target and its id.",
     });
   }
-  // `category` is internal; `shared` already says what a person needs of it.
+  // `category` is internal; `shared` says what a person needs of it.
   const { category: _, ...shown } = target;
   const earlier = earlierTable(targetTable)[earlierId(targetTable, target.name)];
   const { category: _category, aliases: _aliases, ...harness } = earlier as EarlierTarget;

@@ -14,7 +14,6 @@ interface Fault {
 
 const faults = vi.hoisted(() => ({ list: [] as Fault[] }));
 
-/** Throws the first fault still armed for `path`, as the call named `call` would. */
 function fault(call: string, path: unknown): void {
   const found = faults.list.find((f) => f.times > 0 && String(path).endsWith(f.suffix));
   if (found === undefined) return;
@@ -22,8 +21,8 @@ function fault(call: string, path: unknown): void {
   throw Object.assign(new Error(`${found.code}: ${call} '${String(path)}'`), { code: found.code });
 }
 
-// Mocked for this file alone, so a test can make removing a folder fail. Moving one aside fails
-// alike, as a handle that blocks a delete on Windows blocks a rename too.
+// So a test can make removing a folder fail. Moving one aside fails alike, as a handle
+// that blocks a delete on Windows blocks a rename too.
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
@@ -39,7 +38,6 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   };
 });
 
-/** Makes removing a path ending in `suffix` fail with `code`, `times` times. */
 function failRm(suffix: string, code: string, times = Number.POSITIVE_INFINITY): void {
   faults.list.push({ suffix, code, times });
 }
@@ -56,7 +54,7 @@ async function acquire(...args: Parameters<typeof acquireLease>): Promise<Lease>
 
 const scope = (lock: string) => ({ scope: "project" as const, lock });
 
-/** Ages a lease past the 30s staleness window without waiting for it. */
+/** Past the 30s staleness window. */
 async function ageLease(lock: string): Promise<void> {
   const meta = join(home, "leases", `${leaseKey({ lock })}.lease`, "meta.json");
   const past = new Date(Date.now() - 60_000);

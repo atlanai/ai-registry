@@ -41,7 +41,6 @@ export interface Inspected {
   found: Scan;
 }
 
-/** The first half of `executeSync`, stopped before anything is written. */
 export async function inspect(
   job: ScopeWork,
   account: Account,

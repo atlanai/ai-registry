@@ -2,7 +2,6 @@ import { gunzipSync, inflateRawSync } from "node:zlib";
 import { isSafePath, plural } from "#adapter/index.ts";
 import { fail } from "./errors.ts";
 
-/** One file an archive holds. */
 export interface Unpacked {
   /** POSIX, relative to the archive's root. */
   path: string;
@@ -164,7 +163,6 @@ function unzip(zip: Uint8Array, into: Collector): void {
   }
 }
 
-/** One central directory record, and where the next one starts. */
 function centralEntry(
   zip: Uint8Array,
   view: DataView,

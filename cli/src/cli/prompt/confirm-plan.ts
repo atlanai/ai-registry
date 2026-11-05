@@ -27,7 +27,6 @@ export async function confirmIfDestructive(
 export interface PlanContext {
   /** What confirming does, which titles the question. */
   verb?: "Install" | "Remove" | "Update" | undefined;
-  /** Targets this run was asked to write to. */
   targets?: readonly string[] | undefined;
   /** Kinds being installed, used to explain a target that gets nothing. */
   kinds?: readonly ArtifactKind[] | undefined;
@@ -83,13 +82,10 @@ function planQuestion(plan: Plan, verb: "Install" | "Remove" | "Update"): string
     else if (action.kind === "unlink") removed.add(action.name);
   }
   // A plan that only removes says so, whatever the command; an update counts both.
-  const [said, count] =
-    verb === "Update"
-      ? [verb, new Set([...placed, ...removed]).size]
-      : verb === "Remove" || placed.size === 0
-        ? (["Remove", removed.size] as const)
-        : ([verb, placed.size] as const);
-  return `${said} ${plural(count, "artifact")}?`;
+  if (verb === "Update")
+    return `${verb} ${plural(new Set([...placed, ...removed]).size, "artifact")}?`;
+  if (verb === "Remove" || placed.size === 0) return `Remove ${plural(removed.size, "artifact")}?`;
+  return `${verb} ${plural(placed.size, "artifact")}?`;
 }
 
 function planLines(step: Interaction, plan: Plan, context: PlanContext): string[] {
@@ -165,11 +161,9 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
           { indent: 0 },
         );
   for (const name of [...removed].sort()) {
-    const marked = edited.has(name)
-      ? `  ${style.red("has local edits")}`
-      : plan.pruned.includes(name)
-        ? `  ${style.dim("no longer needed")}`
-        : "";
+    let marked = "";
+    if (edited.has(name)) marked = `  ${style.red("has local edits")}`;
+    else if (plan.pruned.includes(name)) marked = `  ${style.dim("no longer needed")}`;
     lines.push(`${style.yellow("remove")} ${name}${marked}`);
   }
   if (plan.unchanged.length > 0) {
@@ -187,7 +181,6 @@ function planLines(step: Interaction, plan: Plan, context: PlanContext): string[
   return lines.length === 0 ? [style.dim("Nothing to do.")] : lines;
 }
 
-/** Group unreached targets by unsupported kinds for concise reporting. */
 function explainMissed(missed: readonly string[], context: PlanContext): string[] {
   if (missed.length === 0) return [];
   const { targetTable, kinds } = context;
@@ -214,7 +207,6 @@ function explainMissed(missed: readonly string[], context: PlanContext): string[
   );
 }
 
-/** One line per tool: what it skips, and the kind it cannot load when that is why. */
 function explainSkipped(
   skips: ReadonlyMap<string, string[]>,
   recorded: Lock | undefined,

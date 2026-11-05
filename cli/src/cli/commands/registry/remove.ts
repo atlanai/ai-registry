@@ -100,7 +100,7 @@ function stillDeclared(alias: string, dependents: readonly Ref[], lock: Lock): A
   );
 }
 
-/** Jobs live in config.yml; one this aireg cannot read leaves them as they are, and says so. */
+/** One unreadable config.yml leaves the jobs as they are, and says so. */
 async function jobsConfig(context: CommandContext, alias: string): Promise<RegistryConfig> {
   try {
     return await readConfig();

@@ -83,7 +83,6 @@ export function publishInstead(
   return adapter.readOnly?.instead.replace("{how}", how);
 }
 
-/** A publish refused because the registry's adapter does not publish. */
 export function cannotPublish(adapter: SourceAdapter, alias: string, how?: string): AiregError {
   const instead = publishInstead(adapter, how);
   if (adapter.readOnly === undefined || instead === undefined) {
@@ -99,10 +98,7 @@ function sentence(clause: string): string {
   return `${clause.charAt(0).toUpperCase()}${clause.slice(1)}.`;
 }
 
-/**
- * The declared registries a publish can write to. When there are none, it refuses before
- * anything is asked, rather than after the work and a registry are picked.
- */
+/** Refuses before anything is asked when no declared registry takes publishes. */
 export async function writableRegistries(
   known: Readonly<Record<string, RegistrySource>>,
   cwd: string,
@@ -151,10 +147,7 @@ const holdsRegistry = (folder: string) =>
     () => false,
   );
 
-/**
- * `--to ../acme-registry/engineering`: the nearest folder holding `registry.json`
- * is the registry, such as a clone of a git one, and the rest names the namespace.
- */
+/** `--to <path>/<namespace>`: the nearest folder holding `registry.json` is the registry. */
 export async function folderTo(
   to: string,
   cwd: string,
@@ -191,15 +184,14 @@ export async function folderTo(
   };
 }
 
-/** What a registry holds of one artifact now: its latest version, its files and its edges. */
 interface Current {
   id: string | undefined;
   version: string | undefined;
   digests: string[];
-  /** Each file by the path it is stored at; absent when the registry gives none, as for one held back. */
+  /** Absent when the registry gives none, as for one held back. */
   files?: readonly StoredFile[] | undefined;
   relationships?: readonly Relationship[] | undefined;
-  /** Published, but held back by its status, such as blocked: the registry gives no files for it. */
+  /** Held back by its status, such as blocked, so the registry gives no files. */
   withheld?: Withheld | undefined;
 }
 
@@ -326,7 +318,6 @@ function heldBack(withheld: Withheld): Current {
   return { id: undefined, version: withheld.version, digests: [], withheld };
 }
 
-/** One artifact's outcome: a first version, the next one, or already there. */
 export interface Planned {
   work: Work;
   namespace: string;
@@ -412,12 +403,13 @@ export async function plan({
     sameFiles(held, probe) &&
     (relationships === undefined || sameEdges(held.relationships, probe.input.relationships));
 
-  const held =
-    asked === undefined
-      ? undefined
-      : asked === current?.version && current.withheld === undefined
+  let held: Current | undefined;
+  if (asked !== undefined) {
+    held =
+      asked === current?.version && current.withheld === undefined
         ? current
         : await heldAt(published, namespace, work, asked);
+  }
 
   const same =
     held !== undefined
@@ -573,10 +565,8 @@ function alreadyPublished(
   );
 }
 
-/**
- * Refused before anything is sent. Only a registry folder lays an agent out as the
- * spec's agent kind does; another source takes it as one `<name>.md`.
- */
+// Only a registry folder lays an agent out as the spec's agent kind does; another source
+// takes it as one `<name>.md`.
 async function refuseInvalid(
   work: Work,
   namespace: string,

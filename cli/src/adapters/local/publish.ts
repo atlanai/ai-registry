@@ -35,7 +35,7 @@ import { fail, translated } from "./errors.ts";
 export interface WrittenOffer {
   /** Every version offered already sat in the root with this exact digest. */
   unchanged: boolean;
-  /** Only when asked for `partial`: the changes not written, by position. */
+  /** Only under `partial`, by position. */
   refused: PublishRefusal[];
 }
 

@@ -2,7 +2,6 @@ import type { Codec, Render } from "#core/target/contract.ts";
 import { frontmatterSet, frontmatterStrict } from "./frontmatter.ts";
 import { frontmatterToml } from "./frontmatter-toml.ts";
 
-/** The bytes a codec writes, or why it writes none. */
 export type Rendered = { text: string } | { problem: string };
 
 export function applyCodec(codec: Codec, source: string): Rendered {
@@ -16,7 +15,7 @@ export function applyCodec(codec: Codec, source: string): Rendered {
   }
 }
 
-/** A mapping's codec, reading the earlier `render` as the codec it became. */
+/** Reads the earlier `render` as the codec it became. */
 export function codecOf(mapping: {
   codec?: Codec | undefined;
   render?: Render | undefined;

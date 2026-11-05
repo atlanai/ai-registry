@@ -17,13 +17,9 @@ const CONTROL_SEQUENCES = new RegExp(
   "g",
 );
 
-/**
- * Reduce arbitrary text to one path segment the file spec accepts. The store
- * tree and the artifacts tree are keyed by this, so there is exactly one.
- */
+/** One path segment the file spec accepts. The store and artifacts trees are keyed by it. */
 export function sanitizeName(name: string): string {
-  // Trimmed after truncating, so a cut landing on a separator still settles:
-  // addresses are matched by comparing sanitized names, so this must be stable.
+  // Trimmed after truncating, so a cut on a separator settles: addresses compare sanitized names.
   const sanitized = name
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, "-")
@@ -116,14 +112,18 @@ export function stripTrailing(text: string, chars: string): string {
   return text.slice(0, end);
 }
 
-/** `text` less any leading run of `chars`. */
 export function stripLeading(text: string, chars: string): string {
   let start = 0;
   while (start < text.length && chars.includes(text.charAt(start))) start += 1;
   return text.slice(start);
 }
 
-/** A count with its noun, singular only for 1. */
+/** Code-unit order, which unlike `localeCompare` is the same on every machine. */
+export function byCodeUnit(left: string, right: string): number {
+  if (left < right) return -1;
+  return left > right ? 1 : 0;
+}
+
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }

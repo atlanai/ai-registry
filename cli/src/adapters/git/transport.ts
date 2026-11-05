@@ -9,20 +9,13 @@ export interface Attempt {
   config: readonly string[];
 }
 
-/**
- * No other helper, then gh's, as `gh auth setup-git` writes it: the gh found the way aireg finds
- * any program, quoted for the shell git runs it in.
- */
+/** No other helper, then gh's as `gh auth setup-git` writes it, quoted for the shell git runs it in. */
 function ghCredentials(env: NodeJS.ProcessEnv): readonly string[] {
   const gh = programPath("gh", withAbsolutePath(env)) ?? "gh";
   const quoted = `'${gh.replaceAll("'", "'\\''")}'`;
   return ["-c", "credential.helper=", "-c", `credential.helper=!${quoted} auth git-credential`];
 }
 
-/**
- * The ladder as an ordered list rather than nested try/catch: adding a
- * transport is appending a row, and the code that walks it never changes.
- */
 export function attempts(spec: SourceSpec, env: NodeJS.ProcessEnv = process.env): Attempt[] {
   if (spec.kind === "path") return [{ label: "direct", url: spec.location, config: [] }];
 
@@ -55,10 +48,7 @@ export function attempts(spec: SourceSpec, env: NodeJS.ProcessEnv = process.env)
   return ladder;
 }
 
-/**
- * Every network operation walks the ladder here, so ls-remote, fetch and clone
- * cannot drift to different rungs. A failure retrying cannot fix ends the walk.
- */
+/** One ladder for ls-remote, fetch and clone, so they cannot drift. A failure retrying cannot fix ends the walk. */
 export async function overLadder<T>(
   spec: SourceSpec,
   limits: GitLimits,
@@ -78,10 +68,7 @@ export async function overLadder<T>(
   throw describeFailure(last, spec, ladder);
 }
 
-/**
- * Git's own wording names neither the source nor the fix. Enriching here rather
- * than in clone makes resolving a private repository fail the way cloning does.
- */
+/** Git's own wording names neither the source nor the fix; resolving then fails the way cloning does. */
 function describeFailure(error: unknown, spec: SourceSpec, ladder: readonly Attempt[]): Error {
   if (!(error instanceof GitError)) {
     return error instanceof Error ? error : new Error(String(error));

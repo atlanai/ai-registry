@@ -6,10 +6,7 @@ import { registry } from "#test/kit/builders/registry.ts";
 import { type Aireg, test as base } from "#test/kit/fixtures.ts";
 import { lockPath, writeManifestIn } from "#test/kit/scope.ts";
 
-/**
- * One namespace per status: each holds an artifact whose newest version has that status beside
- * an active one, and `only`, whose one version has it.
- */
+/** A namespace per status: newest version in that status beside an active one, plus `only`. */
 async function publish(root: string): Promise<void> {
   const built = registry(root, { name: "acme", slug: "acme" });
   built

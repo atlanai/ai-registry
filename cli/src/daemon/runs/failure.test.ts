@@ -28,7 +28,6 @@ function run(over: Partial<RunRecord> = {}): RunRecord {
   };
 }
 
-/** `count` earlier runs beside the latest, all reaching the same conclusion. */
 function repeatedHistory(count: number): RunRecord[] {
   return Array.from({ length: count + 1 }, (_, index) => run({ id: `run_${index}` }));
 }
@@ -78,8 +77,7 @@ describe("dueAt", () => {
       run({ id: "run_1", state: "canceled" }),
       run({ id: "run_0", state: "failed" }),
     ];
-    // A streak of two: the canceled run in between is skipped, not counted,
-    // and does not reset the streak either.
+    // The canceled run in between neither counts nor resets the streak.
     expect(dueAt(WATCH, recent)).toBe(300 + 60_000 * 2);
   });
 
@@ -132,7 +130,6 @@ describe("failure classification", () => {
   });
 
   test("names a ref that reached nothing, and does not offer to retry it", () => {
-    // Generic `sync_failed` would read as an outage; the address was just wrong.
     expect(classifyFailure(new RunScopeError(["shop/sales/skill/absent"]), undefined, 0)).toEqual({
       state: "failed",
       errorCode: "run_scope_unmatched",

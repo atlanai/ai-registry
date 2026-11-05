@@ -168,14 +168,10 @@ function integerOf(
     (min === undefined || number >= min) &&
     (max === undefined || number <= max);
   if (inRange) return number;
-  const bounds =
-    min !== undefined && max !== undefined
-      ? ` from ${min} to ${max}`
-      : min !== undefined
-        ? ` of at least ${min}`
-        : max !== undefined
-          ? ` of at most ${max}`
-          : "";
+  let bounds = "";
+  if (min !== undefined && max !== undefined) bounds = ` from ${min} to ${max}`;
+  else if (min !== undefined) bounds = ` of at least ${min}`;
+  else if (max !== undefined) bounds = ` of at most ${max}`;
   throw valueError(option, `a whole number${bounds}`, value, path);
 }
 
@@ -235,12 +231,12 @@ function optionError(
         },
       );
     }
-    const problem =
-      option.type === "string" && token.value === undefined
-        ? `${token.rawName} needs a value.`
-        : option.type === "boolean" && token.inlineValue === true
-          ? `${token.rawName} takes no value.`
-          : undefined;
+    let problem: string | undefined;
+    if (option.type === "string" && token.value === undefined) {
+      problem = `${token.rawName} needs a value.`;
+    } else if (option.type === "boolean" && token.inlineValue === true) {
+      problem = `${token.rawName} takes no value.`;
+    }
     if (problem !== undefined) return new AiregError(problem, { code: ErrorCode.Usage, hint });
   }
   const message = messageOf(cause);

@@ -1,31 +1,16 @@
 import { spawn } from "node:child_process";
-import { tmpdir } from "node:os";
 import { createInterface } from "node:readline";
 import { afterEach, describe, expect, vi } from "vitest";
-import { type OutputFormat, Printer } from "#core/term/printer.ts";
+import type { OutputFormat } from "#core/term/printer.ts";
 import { writeDaemonPid } from "#daemon/process/pid-file.ts";
 import { rpcEndpoint } from "#daemon/rpc/endpoint.ts";
 import { PROTOCOL_VERSION } from "#daemon/rpc/methods.ts";
+import { commandContext } from "#test/kit/command.ts";
 import { test } from "#test/kit/fixtures.ts";
-import type { CommandContext } from "./command.ts";
 import { daemonAction, run } from "./daemon.ts";
 
-function context(argv: string[], writes: string[], format: OutputFormat = "json"): CommandContext {
-  const writer = { write: (chunk: string) => writes.push(chunk), isTTY: false };
-  return {
-    argv,
-    cwd: tmpdir(),
-    printer: new Printer({ format, out: writer, err: writer }),
-    host: {
-      version: "test",
-      connectAccount: async () => {
-        throw new Error("no host");
-      },
-      openRunStore: async () => {
-        throw new Error("no host");
-      },
-    },
-  };
+function context(argv: string[], printed: string[], format: OutputFormat = "json") {
+  return commandContext(argv, { format, printed, errors: printed });
 }
 
 describe("daemonAction", () => {
@@ -37,7 +22,7 @@ describe("daemonAction", () => {
   });
 });
 
-/** Answers initialize as aireg 0.1.7 did, from before the daemon had to prove it holds the key. */
+/** Answers initialize as aireg 0.1.7 did, before the daemon had to prove it holds the key. */
 const OLDER_DAEMON = `
 const [path, protocolVersion] = process.argv.slice(1);
 require("node:net").createServer((socket) => {
@@ -130,17 +115,24 @@ describe("daemon stop", () => {
 describe("daemon autostart", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  test("reports off for a home that never registered", async ({ tmp }) => {
-    const home = tmp;
-    vi.stubEnv("AIREG_HOME", home);
+  const supported = ["darwin", "linux", "win32"].includes(process.platform);
+
+  test.runIf(supported)("reports off for a home that never registered", async ({ tmp }) => {
+    vi.stubEnv("AIREG_HOME", tmp);
     const writes: string[] = [];
     await run(context(["autostart"], writes));
-    const data = JSON.parse(writes.join("")).data;
-    if (["darwin", "linux", "win32"].includes(process.platform)) {
-      expect(data).toMatchObject({ supported: true, registered: false, loaded: false });
-    } else {
-      expect(data).toEqual({ supported: false });
-    }
+    expect(JSON.parse(writes.join("")).data).toMatchObject({
+      supported: true,
+      registered: false,
+      loaded: false,
+    });
+  });
+
+  test.skipIf(supported)("reports unsupported on other platforms", async ({ tmp }) => {
+    vi.stubEnv("AIREG_HOME", tmp);
+    const writes: string[] = [];
+    await run(context(["autostart"], writes));
+    expect(JSON.parse(writes.join("")).data).toEqual({ supported: false });
   });
 
   test("rejects an unknown action as a usage error", async () => {

@@ -23,11 +23,11 @@ import {
 } from "#core/target/template.ts";
 import { type ConfigDocument, jsonDocument, tomlDocument, yamlDocument } from "./document.ts";
 
-/** A path an apply linked or unlinked. A link names its target; a removal does not know it. */
+/** A path an apply linked or unlinked; a removal does not know its target. */
 export interface Touched {
   path: string;
   target: string | undefined;
-  /** For a removal, the target the lockfile recorded the link for, when it recorded one. */
+  /** For a removal, the target the lockfile recorded, if any. */
   recorded?: string | undefined;
 }
 
@@ -35,7 +35,7 @@ export interface Touched {
 export interface Kept {
   name: string;
   path: string;
-  /** Why it was not edited, when not because a person set it. */
+  /** Set when the cause is not that a person set it. */
   reason?: string;
   /** A target config file left unedited, for an install or a removal alike. */
   config?: true;
@@ -43,17 +43,16 @@ export interface Kept {
 
 interface OpenFile {
   doc: ConfigDocument;
-  /** What the file held before, undefined when it did not exist. */
   before: string | undefined;
-  /** What it renders as unedited, so a file nothing changed is not written. */
+  /** Rendered unedited, so a file nothing changed is not written. */
   baseline: string;
-  /** What it started as when missing; a document back to this is deleted. */
+  /** A document back to its init is deleted. */
   init: Record<string, ConfigValue> | undefined;
   /** The highest folder deleting it may prune. */
   stop: string;
 }
 
-/** Every config file this run edits, held open so each is read and written once. */
+/** Held open so each config file is read and written once per run. */
 class Files {
   readonly #open = new Map<string, OpenFile>();
 
@@ -62,12 +61,7 @@ class Files {
     if (held !== undefined) return held.doc;
     const before = await readTextIfPresent(path);
     const init = entry.init === undefined ? undefined : expandValue(entry.init, vars);
-    const doc =
-      entry.format === "toml"
-        ? tomlDocument(before ?? "", path)
-        : entry.format === "yaml"
-          ? yamlDocument(before, init ?? {}, path)
-          : jsonDocument(before, init ?? {}, path);
+    const doc = openDocument(entry.format, before, init ?? {}, path);
     this.#open.set(path, { doc, before, baseline: doc.render(), init, stop });
     return doc;
   }
@@ -87,6 +81,17 @@ class Files {
   }
 }
 
+function openDocument(
+  format: RegisterEntry["format"],
+  before: string | undefined,
+  init: Record<string, ConfigValue>,
+  path: string,
+): ConfigDocument {
+  if (format === "toml") return tomlDocument(before ?? "", path);
+  if (format === "yaml") return yamlDocument(before, init, path);
+  return jsonDocument(before, init, path);
+}
+
 /** Placements whose expansion of one entry is the same edit, split by whether they still exist. */
 interface Group {
   present: Map<string, Vars>;
@@ -101,7 +106,7 @@ export interface RegisterOptions {
 }
 
 /**
- * Writes a target's config entry while a placement of ours needs it, removing it with the last.
+ * Keeps a target's config entry while a placement of ours needs it, removing it with the last.
  * Ours is a link into `scopeDir` (the scope's `.registry`) or one of the lockfile's `copies`.
  */
 export async function applyRegister(
@@ -114,8 +119,7 @@ export async function applyRegister(
   const owned = { scopeDir, copies };
   for (const target of Object.values(targetTable)) {
     const root = targetRoot(target, where);
-    // A project's own folders hold its target roots, and a link among them may lead out of
-    // it; a person's target root is theirs to keep wherever they like, dotfiles included.
+    // A project's links may not lead out of it; a person's root may live anywhere, like dotfiles.
     const anchor = where.scope === "project" ? where.cwd : root;
     for (const mapping of Object.values(target.kinds)) {
       if (mapping === undefined) continue;
@@ -143,8 +147,7 @@ async function registerMapping(
   const pattern = placementPattern(template);
   const kept: Kept[] = [];
   for (const [root, paths] of touchedByRoot(touched, target, pattern)) {
-    // Only the target's own root for this scope: a path elsewhere that merely ends the
-    // way a placement does names no config of this target's.
+    // A path elsewhere that merely ends like a placement names no config of this target.
     if (!isRoot(root, at.root)) continue;
     // Only a kind placed as copies by design: a `--copy` install is not registered.
     const copies = mapping.place === "copy" ? owned.copies : new Set<string>();
@@ -156,12 +159,11 @@ async function registerMapping(
     if (paths.size === 0) continue;
     // Folders below the kind's fixed prefix are ours to tidy; the target's own are not.
     const stop = join(root, ...fixedPrefix(template));
-    kept.push(...(await reconcile(entries, root, paths, members, files, stop, at)));
+    kept.push(...(await reconcile({ entries, root, touched: paths, members, files, stop, at })));
   }
   return kept;
 }
 
-/** This target's touched paths that match the placement, keyed by the root they sit under. */
 function touchedByRoot(
   touched: readonly Touched[],
   target: string,
@@ -202,19 +204,26 @@ async function ours(
   return out;
 }
 
-/**
- * Applies every target's register entries for the placements an apply touched.
- * Entries run in order, and one left to a person stops the rest for its placements.
- */
-async function reconcile(
-  entries: readonly RegisterEntry[],
-  root: string,
-  touched: ReadonlyMap<string, Vars>,
-  members: ReadonlyMap<string, Vars>,
-  files: Files,
-  stop: string,
-  at: Anchor,
-): Promise<Kept[]> {
+interface Reconcile {
+  entries: readonly RegisterEntry[];
+  root: string;
+  touched: ReadonlyMap<string, Vars>;
+  members: ReadonlyMap<string, Vars>;
+  files: Files;
+  stop: string;
+  at: Anchor;
+}
+
+/** Entries run in order, and one left to a person stops the rest for its placements. */
+async function reconcile({
+  entries,
+  root,
+  touched,
+  members,
+  files,
+  stop,
+  at,
+}: Reconcile): Promise<Kept[]> {
   const kept: Kept[] = [];
   const blocked = new Set<string>();
   for (const entry of entries) {
@@ -242,7 +251,6 @@ async function reconcile(
   return kept;
 }
 
-/** Touched placements grouped by the config entry they share, split by whether they remain. */
 function groupsFor(
   entry: RegisterEntry,
   touched: ReadonlyMap<string, Vars>,
@@ -301,8 +309,8 @@ function first(group: Group): Vars {
 }
 
 /**
- * Why a config file under the touched `root` is not edited, if it is not: it must be reached
- * through real folders from the anchor. The file itself may be a link, as a person's dotfiles are.
+ * Why a config file is not edited: it must be reached through real folders from the anchor.
+ * The file itself may be a link, as a person's dotfiles are.
  */
 function outside(file: string, root: string, at: Anchor): string | undefined {
   if (!isWithin(root, file)) return "it is not inside the target folder";
@@ -350,10 +358,7 @@ function edit(entry: RegisterEntry, doc: ConfigDocument, group: Group): boolean 
   return false;
 }
 
-/**
- * One shared list item, marked as aireg's: there while any placement needs it, and gone with
- * the last. An item a person wrote is theirs, and stays.
- */
+/** A shared list item marked as aireg's, removed with the last placement; a person's items stay. */
 function append(
   entry: RegisterEntry & { append: string },
   doc: ConfigDocument,

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { expect, vi } from "vitest";
 import type { SourceContext } from "#adapter/index.ts";
 import { test } from "#test/kit/fixtures.ts";
+import { sourceContext } from "#test/kit/source-context.ts";
 import { skillBody, writeSpecRoot } from "#test/kit/spec-root.ts";
 import { connect } from "./connect.ts";
 
@@ -19,20 +20,12 @@ let home: string;
 let root: string;
 const body = skillBody("sample");
 function context(folder = ""): SourceContext {
-  return {
-    source: {
-      registry: "demo",
-      location: "https://example.test/demo.git",
-      config: folder === "" ? {} : { path: folder },
-      key: "sha256:synthetic",
-    },
-    credential: undefined,
-    signal: new AbortController().signal,
-    limits: { timeoutMs: 1000, retries: 0 },
-    onBytes: () => {},
-    cacheDir: () => "",
-    exclusive: (_key, run) => run(),
-  };
+  return sourceContext({
+    registry: "demo",
+    location: "https://example.test/demo.git",
+    config: folder === "" ? {} : { path: folder },
+    key: "sha256:synthetic",
+  });
 }
 
 test.beforeEach(async ({ tmp }) => {

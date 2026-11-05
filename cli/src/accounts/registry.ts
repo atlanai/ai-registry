@@ -70,8 +70,8 @@ export function heldAt(
 }
 
 /**
- * Declares `alias` in the user scope for a sign-in that names its address. A name declared at
- * another address is refused, so a sign-in never reaches the one not named.
+ * Every other route into `manifest.yml` creates a job as a side effect. A name declared at another
+ * address is refused, so a sign-in never reaches the one not named.
  */
 export async function declareRegistryFor(alias: string, source: RegistrySource): Promise<void> {
   const cwd = process.cwd();

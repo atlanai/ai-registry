@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-/** A project scope's manifest, where aireg reads and writes it. */
 export function manifestPath(dir: string): string {
   return join(dir, ".registry", "manifest.yml");
 }

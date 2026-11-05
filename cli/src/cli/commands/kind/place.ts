@@ -64,16 +64,26 @@ function namespaceHere(root: string, cwd: string): string | undefined {
   return inside !== undefined && isNamespace(inside) ? inside : undefined;
 }
 
+interface RegistryPlace {
+  kind: string;
+  root: string;
+  context: CommandContext;
+  own: Own;
+  yes: boolean;
+  given: string | undefined;
+  step: Interaction;
+}
+
 /** `artifacts/<namespace>/<kind>/<name>/0.1.0`, with the namespace and name asked for when missing. */
-export async function registryPlace(
-  kind: string,
-  root: string,
-  context: CommandContext,
-  own: Own,
-  yes: boolean,
-  given: string | undefined,
-  step: Interaction,
-): Promise<{ name: string; at: string } | undefined> {
+export async function registryPlace({
+  kind,
+  root,
+  context,
+  own,
+  yes,
+  given,
+  step,
+}: RegistryPlace): Promise<{ name: string; at: string } | undefined> {
   const namespace = await namespaceFor(root, context.cwd, own, context, yes);
   if (namespace === undefined) return undefined;
   const name = given ?? (await askName(kind, step));
@@ -129,12 +139,9 @@ export async function locate(
   if (candidates.length === 1) return candidates[0] as string;
   if (candidates.length === 0) {
     // `new` infers only the namespace you are in, so any other has to be named.
-    const flag =
-      namespace !== undefined
-        ? ` --namespace ${namespace}`
-        : wanted === undefined
-          ? " --namespace <namespace>"
-          : "";
+    let flag = "";
+    if (namespace !== undefined) flag = ` --namespace ${namespace}`;
+    else if (wanted === undefined) flag = " --namespace <namespace>";
     throw new AiregError(
       `No ${kind} named ${quoted(name)}${wanted === undefined ? "" : ` in ${wanted}`}.`,
       {

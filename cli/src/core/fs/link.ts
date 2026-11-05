@@ -34,10 +34,7 @@ export async function link(source: string, linkPath: string, copyOnly = false): 
   }
 }
 
-/**
- * Junctions need neither Developer Mode nor elevation, which plain symlinks do
- * on a default Windows install. They only work for directories.
- */
+/** Junctions need no Developer Mode or elevation, unlike Windows symlinks; folders only. */
 async function windowsLink(source: string, linkPath: string): Promise<LinkMode> {
   if (await isDirectory(source)) {
     await symlink(resolve(source), linkPath, "junction");
@@ -56,8 +53,8 @@ async function relativeTarget(source: string, linkPath: string): Promise<string>
 }
 
 /**
- * A real directory mirroring `source`'s top level: a link per content directory and a copy
- * of each manifest. A refresh replaces what changed and drops entries the source lacks.
+ * A link per content directory and a copy of each manifest. A refresh replaces what changed
+ * and drops entries the source lacks.
  */
 export async function fanOut(source: string, dir: string): Promise<LinkMode> {
   const info = await ifPresent(lstat(dir));
@@ -148,10 +145,7 @@ export interface LinkState {
   target: string | undefined;
 }
 
-/**
- * The source a fan-out directory mirrors: every link points at the same-named
- * entry of one directory, and every copied manifest is an entry of it too.
- */
+/** Every link points at the same-named entry of one directory, as every copied manifest is. */
 async function fanOutSource(dir: string): Promise<string | undefined> {
   const entries = await ifPresent(readdir(dir));
   if (entries === undefined) return undefined;

@@ -11,7 +11,6 @@ export interface Side {
   relationships?: readonly (Relationship | PublishRelationship)[] | undefined;
 }
 
-/** Sorted file changes and exact dependency edges added or removed by a publish. */
 export interface Changes {
   files: { added: string[]; changed: string[]; removed: string[] };
   dependsOn: { added: string[]; removed: string[] };
@@ -19,12 +18,12 @@ export interface Changes {
 
 const sorted = (items: Iterable<string>) => [...items].sort();
 
-/** What `sent` changes against `held`; with no version held, everything it sends is added. */
+/** With no version held, everything sent is added. */
 export function changesFrom(held: Side | undefined, sent: Side): Changes {
   const heldFiles = held?.files ?? [];
   const [entry] = heldFiles;
   const [sole] = sent.files;
-  // A sole file on each side is the entry, which a target may name <name>.md and a registry AGENT.md.
+  // A sole file on each side is the entry, named <name>.md by a target and AGENT.md by a registry.
   const compared =
     heldFiles.length === 1 && sent.files.length === 1 && entry && sole
       ? [{ path: sole.path, digest: entry.digest }]
@@ -57,7 +56,7 @@ function dependsOn(side: Side | undefined): Set<string> {
 
 const SHOWN = 10;
 
-/** Format bounded change details, sanitizing paths and edges supplied by the registry. */
+/** Sanitizes paths and edges, which the registry supplies. */
 export function changeLines(changes: Changes): string[] {
   const { files, dependsOn: edges } = changes;
   const line = (label: string, what: string) => `    ${label.padEnd(9)}${sanitizeText(what)}`;
@@ -73,7 +72,7 @@ export function changeLines(changes: Changes): string[] {
   return [...kept, `    and ${all.length - kept.length} more`];
 }
 
-/** `filesChanged` and `dependsOnChanged` under `--json`, each left out when it has nothing. */
+/** Each field is left out when it has nothing. */
 export function changesJson(changes: Changes | undefined): {
   filesChanged?: Changes["files"];
   dependsOnChanged?: Changes["dependsOn"];

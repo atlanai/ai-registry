@@ -5,7 +5,7 @@ import { isAbsent } from "#adapter/files.ts";
 
 export interface TailOptions {
   path: string;
-  /** Start here rather than at the end, for the lines already on disk. */
+  /** Start here rather than at the end, for lines already on disk. */
   fromByte?: number;
   signal?: AbortSignal;
 }

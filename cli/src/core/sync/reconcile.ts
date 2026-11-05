@@ -17,10 +17,7 @@ import { classify } from "./classify.ts";
 import type { Digests, SyncItem } from "./model.ts";
 import { unlockedCopies } from "./unlocked.ts";
 
-/**
- * Read, never acted on. Every sync starts here and then decides what it is
- * willing to do, which is why `--dry-run` and a real run agree.
- */
+/** Read only: every sync starts here, which is why `--dry-run` and a real run agree. */
 export async function reconcile(
   manifest: Manifest,
   lock: Lock,
@@ -36,8 +33,7 @@ export async function reconcile(
   });
   const content = fetchFrom(acquired);
   const byName = new Map(selected.map((item) => [item.name, item]));
-  // Content in the writable copy that neither the lock nor the catalog claims
-  // is discovered by nothing else.
+  // Nothing else finds content in the writable copy that neither the lock nor the catalog claims.
   const unlocked = new Map(
     (await unlockedCopies(manifest, lock, roots))
       .filter((copy) => !byName.has(copy.name) && lock.artifacts[copy.name] === undefined)
@@ -56,8 +52,7 @@ export async function reconcile(
     if (kind === undefined || source === undefined) continue;
 
     const path = item?.path ?? previous?.path ?? found?.path ?? "";
-    // This scope's own copy, not the shared mirror: the mirror is never edited,
-    // so reading it would report every local edit as synced.
+    // The scope's copy, not the shared mirror, which is never edited and would hide local edits.
     const staged = artifactPath(
       roots,
       source,
@@ -85,8 +80,7 @@ export async function reconcile(
       continue;
     }
 
-    // One artifact the registry will not serve is reported as that one
-    // artifact, rather than ending the run without naming any.
+    // One artifact the registry will not serve is reported, rather than ending the run.
     let digests: Digests;
     try {
       digests =
@@ -120,10 +114,7 @@ export async function reconcile(
   return items;
 }
 
-/**
- * The import already moved the lock digest to the folder's edit, so a row of yours is never
- * compared three ways: it is yours, or the registry has published past what it last sent.
- */
+/** Import already moved the lock digest to your edit, so a row of yours is never a three-way compare. */
 function watchOf(
   previous: LockArtifact | undefined,
   item: Selected | undefined,
@@ -132,10 +123,7 @@ function watchOf(
   return item !== undefined && item.contentId !== previous.content ? "moved" : "yours";
 }
 
-/**
- * Why the registry will not hand an installed row over, which leaves it for a person to settle:
- * it withholds the version, or no longer lists the artifact. Neither is a deletion.
- */
+/** A withheld or unlisted row is left for a person to settle; neither is a deletion. */
 function heldBack(
   name: string,
   previous: LockArtifact | undefined,
@@ -152,16 +140,18 @@ function heldBack(
   }
   const withheld = withheldRow(previous, acquired);
   const gone = unlisted.get(name);
-  const why =
-    withheld !== undefined
-      ? withheldMessage(withheld)
-      : gone === undefined
-        ? undefined
-        : unlistedReason(gone);
+  const why = withheldReason(withheld, gone);
   return why === undefined ? undefined : `${why}; run \`aireg remove ${name}\` to take it out`;
 }
 
-/** What the registry withholds of an installed row, which is not the same as no longer publishing it. */
+function withheldReason(
+  withheld: Withheld | undefined,
+  gone: Unlisted | undefined,
+): string | undefined {
+  if (withheld !== undefined) return withheldMessage(withheld);
+  return gone === undefined ? undefined : unlistedReason(gone);
+}
+
 function withheldRow(
   previous: LockArtifact | undefined,
   acquired: readonly Acquired[],
@@ -172,10 +162,7 @@ function withheldRow(
   return withheldAt(source?.catalog.withheld, at);
 }
 
-/**
- * A plugin whose new version adds or changes what a target runs as you waits for a person,
- * even trusted: a sync, and a background job above all, never applies that on its own.
- */
+/** A plugin version that changes what runs as you waits for a person, even when trusted. */
 function carriesMoved(item: Selected, previous: LockArtifact | undefined): string | undefined {
   const fingerprint = item.plugin?.fingerprint;
   if (previous === undefined || fingerprint === undefined || fingerprint === previous.carried) {
@@ -185,10 +172,7 @@ function carriesMoved(item: Selected, previous: LockArtifact | undefined): strin
   return `its new version adds or changes the ${carries} it runs; run \`aireg update ${item.name}\` to take it`;
 }
 
-/**
- * A row from your own folder is declared by no manifest, so its published copy is
- * found by address in the catalog of the registry it went to.
- */
+/** No manifest declares a row from your folder, so its published copy is found by address. */
 async function compareOrigin(
   previous: LockArtifact,
   staged: string,
@@ -206,10 +190,7 @@ async function compareOrigin(
   return { base, local, upstream: await digest((await content(source.alias, at)).path) };
 }
 
-/**
- * The three digests a disposition is derived from. When the registry still
- * publishes the content the lock pins, only an artifact that moved is fetched.
- */
+/** Only an artifact whose content moved from the lock's pin is fetched. */
 async function compare(
   item: Selected | undefined,
   previous: LockArtifact | undefined,
@@ -245,10 +226,7 @@ function classifyRow(
   return classify(digests);
 }
 
-/**
- * Your own folder is the source of truth for its rows, so a difference is always sent up;
- * one never published has no upstream to compare with, which differs from one that vanished.
- */
+/** Your folder is the source of truth for its rows, so any difference is sent up. */
 function classifyOrigin(digests: Digests): ReturnType<typeof classify> {
   if (digests.upstream === undefined)
     return { disposition: "publish", detail: "not published yet" };
@@ -256,7 +234,7 @@ function classifyOrigin(digests: Digests): ReturnType<typeof classify> {
   return { disposition: "publish", detail: "changed in your folder" };
 }
 
-/** Only a person knows if your folder is behind or edited too, so `sync resolve` settles it. */
+/** Only a person knows whether your folder is behind or edited too, so `sync resolve` settles it. */
 function classifyMoved(digests: Digests, registry: string): ReturnType<typeof classify> {
   if (digests.local !== undefined && digests.local === digests.upstream) {
     return { disposition: "synced", detail: undefined };
@@ -269,7 +247,5 @@ function missingBase(lock: Lock, artifact: LockArtifact): string {
   if (revision !== undefined) {
     return `the version in the lockfile (${abbreviate(revision)}) is no longer in the registry, so there is nothing to compare against`;
   }
-  // Adopted content: the lock never recorded the bytes this was installed as,
-  // so there is no third side to compare the other two against.
   return "the lockfile does not record what this was installed as, so there is nothing to compare against";
 }

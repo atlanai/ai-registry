@@ -7,7 +7,7 @@ import type { HookEvent, HookStage, PipelineHook } from "#core/config/hook-stage
 import { readConfig } from "#core/config/repository.ts";
 import { toolHome } from "#core/store/paths.ts";
 
-/** User hooks from `~/.aireg/config.yml` only. Never from a project manifest. */
+/** From the user config only, never from a project manifest. */
 export async function configuredHooks(): Promise<readonly PipelineHook[]> {
   return (await readConfig()).hooks;
 }

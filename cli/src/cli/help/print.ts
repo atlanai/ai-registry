@@ -27,7 +27,7 @@ const EXAMPLES: readonly Example[] = [
   { command: "aireg daemon status", what: "check background sync" },
 ];
 
-/** Named in a command's help; --help, --version and --map run instead of the command. */
+/** --help, --version and --map run instead of a command, so its help leaves them out. */
 const INLINE_GLOBALS = GLOBAL_OPTIONS.filter(
   (option) => !["--help", "--version", "--map"].includes(option.flag),
 )

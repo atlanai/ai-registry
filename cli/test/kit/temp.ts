@@ -8,19 +8,13 @@ import { NAME } from "#core/product.ts";
 
 const CHECKOUT = fileURLToPath(new URL("../..", import.meta.url));
 
-/**
- * Every test's temp folder sits under one root per checkout, so the e2e teardown
- * can find what this run left behind without touching another checkout's tests.
- */
+/** One root per checkout, so e2e teardown finds this run's leftovers and no one else's. */
 export const TEST_ROOT = join(
   tmpdir(),
   `${NAME}-test-${createHash("sha256").update(CHECKOUT).digest("hex").slice(0, 8)}`,
 );
 
-/**
- * Resolved, so paths compare equal to what a spawned process reports: `/private/var` on
- * macOS, and the long name of a Windows short one such as `RUNNER~1`.
- */
+/** Resolved, to match what a spawned process reports: `/private/var`, or a long Windows name. */
 export function testRoot(): string {
   mkdirSync(TEST_ROOT, { recursive: true });
   return realpathSync.native(TEST_ROOT);

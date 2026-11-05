@@ -6,12 +6,11 @@ import {
   type Targets,
 } from "./contract.ts";
 
-/** The tools a manifest installs into when it names none, in the order they are listed. */
+/** Used when a manifest names none. */
 export const DEFAULT_TARGETS: readonly string[] = BUILTIN_TARGETS.filter(
   (target) => target.default === true,
 ).map((target) => target.id);
 
-/** The targets whose folders hold artifacts worth importing, by name. */
 export const IMPORTABLE_TARGETS: readonly string[] = BUILTIN_TARGETS.filter(
   (target) => target.importable === true,
 )
@@ -19,8 +18,8 @@ export const IMPORTABLE_TARGETS: readonly string[] = BUILTIN_TARGETS.filter(
   .sort();
 
 /**
- * The id aireg 0.1 knew a built-in by (its first alias, profile kept), else `id` as given; never
- * an alias the table no longer reads as this target, which the next command could not resolve.
+ * The id aireg 0.1 knew a built-in by (its first alias, profile kept); never an alias the table
+ * no longer resolves here, so a writer never records an id the next command cannot resolve.
  */
 export function earlierId(targetTable: Targets, id: string): string {
   const at = id.indexOf(":");
@@ -41,14 +40,13 @@ export function categoryOfEarlier(kind: string): TargetCategory | undefined {
   return TARGET_CATEGORIES.find((category) => EARLIER_KINDS[category] === kind);
 }
 
-/** A record keyed by target id, keyed instead by `earlierId`. */
 export function byEarlierIds<T>(targetTable: Targets, byId: Record<string, T>): Record<string, T> {
   return Object.fromEntries(
     Object.entries(byId).map(([id, value]) => [earlierId(targetTable, id), value]),
   );
 }
 
-/** The table keyed and named by `earlierId`, for adapters built against aireg 0.1. */
+/** For adapters built against aireg 0.1. */
 export function earlierTable(targetTable: Targets): Record<string, EarlierTarget> {
   const out: Record<string, EarlierTarget> = {};
   for (const target of Object.values(targetTable)) {
@@ -64,7 +62,7 @@ export function earlierTable(targetTable: Targets): Record<string, EarlierTarget
   return out;
 }
 
-/** The id an id or one of its aliases names, `<alias>:<profile>` included; any other as given. */
+/** Resolves aliases, `<alias>:<profile>` included; an unknown id is returned as given. */
 export function canonicalId(targetTable: Targets, id: string): string {
   if (Object.hasOwn(targetTable, id)) return id;
   const at = id.indexOf(":");
@@ -74,7 +72,6 @@ export function canonicalId(targetTable: Targets, id: string): string {
   return at === -1 ? owner.name : `${owner.name}${id.slice(at)}`;
 }
 
-/** Each as its canonical id, once, in the order given. */
 export function canonicalIds(targetTable: Targets, ids: readonly string[]): string[] {
   return [...new Set(ids.map((id) => canonicalId(targetTable, id)))];
 }

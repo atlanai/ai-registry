@@ -50,7 +50,7 @@ export function classifyFailure(error: unknown, reason: unknown, changed: number
       interrupted: false,
     };
   }
-  // An interruption, not a failure, so the failure streak is left alone.
+  // An interruption, so the failure streak is left alone.
   if (error instanceof LeaseBusyError) {
     return {
       state: "canceled",
@@ -68,7 +68,7 @@ export function classifyFailure(error: unknown, reason: unknown, changed: number
       interrupted: false,
     };
   }
-  // A ref that reaches nothing is the caller's, so retrying it changes nothing.
+  // The caller's mistake, so retrying changes nothing.
   if (error instanceof RunScopeError) {
     return {
       state: "failed",
@@ -80,20 +80,15 @@ export function classifyFailure(error: unknown, reason: unknown, changed: number
   return { state: changed > 0 ? "partial" : "failed", ...failureCode(error), interrupted: false };
 }
 
-/** The longest a job is ever left alone, however settled it looks. */
 const QUIET_CEILING_MS = 30 * 60_000;
 const RETRY_FLOOR_MS = 60_000;
 const RETRY_CEILING_MS = 30 * 60_000;
 
-/** Doubles from a minute per consecutive failure, to half an hour. */
 export function retryBackoff(failures: number): number {
   return Math.min(RETRY_CEILING_MS, RETRY_FLOOR_MS * 2 ** (failures - 1));
 }
 
-/**
- * Derived from the job's own history rather than a stored schedule: a column
- * beside the runs is a second answer that can disagree. Newest first.
- */
+/** From the run history (newest first), since a stored schedule is a second answer that can disagree. */
 export function dueAt(
   job: Job,
   recent: readonly RunRecord[],
@@ -113,17 +108,15 @@ export function dueAt(
   if (streak > 0) {
     return settled + Math.max(interval, retryBackoff(streak));
   }
-  // A steady job is cheap and watches edits a person expects picked up soon.
+  // A steady job watches edits a person expects picked up soon.
   if (steady) return settled + interval;
-  // The ceiling caps the growth, never the interval: a daily job must not be
-  // pulled up to every half hour by its own backoff.
+  // The ceiling caps the growth, never the interval, or a daily job would run half-hourly.
   return (
     settled +
     Math.max(interval, Math.min(interval * 2 ** repeats(recent, latest), QUIET_CEILING_MS))
   );
 }
 
-/** Consecutive newest runs that failed outright, ignoring interruptions. */
 function failureStreak(recent: readonly RunRecord[]): number {
   let streak = 0;
   for (const run of recent) {
@@ -136,7 +129,6 @@ function failureStreak(recent: readonly RunRecord[]): number {
   return streak;
 }
 
-/** Consecutive earlier runs that reached the same conclusion, unedited. */
 function repeats(recent: readonly RunRecord[], latest: RunRecord): number {
   const key = outcomeKey(latest.state as TerminalRunState, latest.counts);
   let count = 0;

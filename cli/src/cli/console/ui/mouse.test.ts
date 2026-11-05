@@ -4,7 +4,6 @@ import { createElement } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { useMouse } from "./mouse.ts";
 
-/** A terminal Ink can drive: raw mode recorded, output discarded. */
 function terminal() {
   const stdin = Object.assign(new EventEmitter(), {
     isTTY: true,
@@ -30,7 +29,6 @@ function Mouse(): null {
   return null;
 }
 
-/** Keys while `typing`, and the mouse while `pointing`, as a view might switch them. */
 function Probe(props: { typing: boolean; pointing: boolean }) {
   useInput(() => {}, { isActive: props.typing });
   return props.pointing ? createElement(Mouse) : null;

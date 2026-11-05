@@ -15,11 +15,10 @@ const WINDOWS = process.platform === "win32";
 export interface PathChange {
   /** Startup files that now source the env file, or the Windows user environment. */
   added: string[];
-  /** Startup files that could not be written. */
   failed: string[];
 }
 
-/** `$HOME`-relative where possible, so the line survives a renamed home; aireg's home is a real path. */
+/** `$HOME`-relative where possible, so the line survives a renamed home. */
 function spelled(path: string, env: NodeJS.ProcessEnv): string {
   for (const root of new Set([userHome(env), canonical(userHome(env))])) {
     if (path.startsWith(`${root}${sep}`)) return `$HOME${path.slice(root.length)}`;
@@ -30,7 +29,6 @@ function spelled(path: string, env: NodeJS.ProcessEnv): string {
 /** Characters a quoted startup-file line would expand or end on. */
 const UNSAFE = /["'`$\\\n]/;
 
-/** What `aireg` resolves to on this PATH, as `command -v` would find it. */
 export function resolvedOnPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
   for (const dir of (env.PATH ?? "").split(delimiter)) {
     if (!isAbsolute(dir)) continue;
@@ -161,7 +159,7 @@ export async function addToPath(env: NodeJS.ProcessEnv = process.env): Promise<P
   return change;
 }
 
-/** Startup files `addToPath` may have written, which hold its line or its fish file now. */
+/** Startup files that hold `addToPath`'s line, plus its fish file. */
 export async function onPathIn(env: NodeJS.ProcessEnv = process.env): Promise<string[]> {
   if (WINDOWS) return (await userPathHas(binDir(env), env)) ? [USER_PATH] : [];
   const line = sourceLine(env);
@@ -180,9 +178,7 @@ export async function onPathIn(env: NodeJS.ProcessEnv = process.env): Promise<st
 }
 
 export interface PathRemoval {
-  /** Startup files that no longer put aireg on PATH. */
   removed: string[];
-  /** Startup files that could not be written. */
   failed: string[];
 }
 

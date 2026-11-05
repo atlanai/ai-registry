@@ -32,7 +32,6 @@ import { contributedJobId, skillsJobId } from "./job-id.ts";
 import * as inputs from "./params.ts";
 import { committed } from "./settings-write.ts";
 
-/** Every job names an account; the credential on it is what may be absent. */
 export function accountOf(config: RegistryConfig, job: Job): Account {
   return accountFor(config, job.account);
 }
@@ -45,7 +44,6 @@ function accountFor(config: RegistryConfig, accountId: string): Account {
   return account;
 }
 
-/** For methods that sync artifacts: a job with no rooted step syncs none. */
 export function artifactsJobFor(config: RegistryConfig, jobId: string): Job {
   const job = jobFor(config, jobId);
   if (!job.steps.some((step) => step.root !== undefined)) {
@@ -64,7 +62,7 @@ function jobFor(config: RegistryConfig, jobId: string): Job {
 
 export async function createJob(
   raw: unknown,
-  /** The caller's connection: a client that goes away stops waiting for the lease. */
+  /** A client that goes away stops waiting for the lease. */
   signal?: AbortSignal,
 ): Promise<{ config: RegistryConfig; job: Job }> {
   const params = inputs.object(raw);
@@ -98,12 +96,10 @@ export async function createJob(
     scopeRoots.base,
   );
   const account = await bindAccount(config, alias);
-  // adopt() writes the account first; saving the job against the caller's
-  // snapshot then fails as stale. Use the revision that write left.
+  // adopt() wrote the account, so the caller's snapshot is stale now.
   const latest = await readConfig();
   const id = skillsJobId(latest, params, account, alias, root, scope);
-  // A manifest that already names some of this registry's artifacts is not widened to all of
-  // them: that would subscribe the job to the whole catalog behind the caller's back.
+  // Widening a manifest that names some artifacts would subscribe the job to the whole catalog.
   const already = (await readManifest(scopeRoots.manifest)).artifacts.some(
     (ref) => ref.registry === alias,
   );
@@ -111,8 +107,7 @@ export async function createJob(
     already || params.declaredOnly === true ? [] : [{ registry: alias, path: [] as string[] }];
   const wanted = refs.length > 0 ? refs : whole;
 
-  // `writeManifest` has no revision of its own; the CLI edits it under this
-  // same lease, which is what stops the two losing each other's edit.
+  // `writeManifest` has no revision; the CLI edits under this same lease, so neither loses an edit.
   await withLease(scopeRoots, { wait: true, ...(signal === undefined ? {} : { signal }) }, () =>
     declareRegistry(scopeRoots, alias, location, adapter, sourceConfig, wanted),
   );
@@ -121,7 +116,7 @@ export async function createJob(
     latest.jobs.find((item) => item.id === id),
     scope,
   );
-  // A new job starts from what a sync run by hand does; folders it watches are there to publish.
+  // A new job starts from what a sync by hand does; folders it watches are there to publish.
   const policy = inputs.syncPolicy(
     params,
     "policy",
@@ -168,8 +163,7 @@ async function createAdapterJob(
       `No installed adapter runs ${quoted(type)} jobs. Install one with \`aireg adapter install\`.`,
     );
   }
-  // An adapter contributes a step kind, so a job for it is one step with the
-  // fields that kind names; aireg stores them without reading them.
+  // One step with the fields the adapter's kind names; aireg stores them unread.
   const {
     id: _id,
     account: _account,
@@ -235,7 +229,6 @@ async function forgetUnwatched(before: readonly Job[], after: readonly Job[]): P
   }
 }
 
-/** The folders each job's folder step publishes from, with the scope it keeps them in. */
 function watches(jobs: readonly Job[]): Watch[] {
   return jobs.flatMap((job) => {
     const root = job.steps.find((step) => step.root !== undefined)?.root;
@@ -252,10 +245,7 @@ function watches(jobs: readonly Job[]): Watch[] {
   });
 }
 
-/**
- * An account resolves through the user-scope manifest, so a project's own alias
- * has to reach it too, at the folder the project's relative location names.
- */
+/** An account resolves through the user-scope manifest, so a project alias must reach it too. */
 async function declareForAccounts(
   alias: string,
   source: RegistrySource | undefined,
@@ -268,10 +258,7 @@ async function declareForAccounts(
   await writeManifest(user, manifest);
 }
 
-/**
- * The account is the job's handle on its registry, so one needing no
- * credential still gets a bare row for the job to name.
- */
+/** A registry needing no credential still gets a bare account row for the job to name. */
 async function bindAccount(config: RegistryConfig, alias: string): Promise<Account> {
   const existing = config.accounts.find((account) => account.registry === alias);
   if (existing !== undefined) return existing;
@@ -339,7 +326,6 @@ function sameConfig(left: SourceConfig, right: SourceConfig): boolean {
   return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
 }
 
-/** The folders asked for, joined to those the job already watches for the same destination. */
 function originsStep(
   params: Record<string, unknown>,
   existing: Job | undefined,
@@ -354,7 +340,7 @@ function originsStep(
     throw invalidParams(`The destination must be <registry>/<namespace>, not ${quoted(to)}.`);
   }
   const kept = before?.select.map((selector) => selector.from) ?? [];
-  // One job publishes to one place, so moving its folders elsewhere is asked for, never done in passing.
+  // One job publishes to one place; moving its folders elsewhere is never done in passing.
   if (before !== undefined && before.to !== to && kept.length > 0) {
     throw invalidParams(`This scope already publishes ${list(kept)} to ${before.to}.`, {
       code: ErrorCode.Usage,

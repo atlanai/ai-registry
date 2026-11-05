@@ -21,8 +21,8 @@ export function launchArgv(
 }
 
 /**
- * A standalone build is its own interpreter, so `execPath` is the CLI; under Node
- * the CLI is `argv[1]`. A wrong answer silently turns the version floor off.
+ * A standalone build is its own interpreter, so `execPath` is the CLI; under Node it is `argv[1]`.
+ * A wrong answer silently turns the version floor off.
  */
 export function runningEntry(
   argv: readonly string[] = process.argv,

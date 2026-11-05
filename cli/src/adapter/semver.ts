@@ -1,4 +1,4 @@
-/** SemVer as the file spec orders versions: what is newest, and what comes next. */
+import { byCodeUnit } from "./text.ts";
 
 /** A parsed SemVer version. Build metadata is dropped, since it never orders. */
 export interface Version {
@@ -38,14 +38,12 @@ export function parseVersion(input: string): Version | undefined {
   };
 }
 
-/** The version written back as `major.minor.patch[-prerelease]`. */
 export function formatVersion(version: Version): string {
   const core = `${version.major}.${version.minor}.${version.patch}`;
   return version.prerelease.length === 0 ? core : `${core}-${version.prerelease.join(".")}`;
 }
 
 export const BUMPS = ["patch", "minor", "major"] as const;
-/** Which part of the version a release moves. */
 export type Bump = (typeof BUMPS)[number];
 
 /** The next release after `current`; nothing published yet is `0.1.0`. */
@@ -80,7 +78,7 @@ function cmpIdent(left: string, right: string): number {
   if (leftNum && rightNum) return Number(left) - Number(right);
   if (leftNum) return -1;
   if (rightNum) return 1;
-  return left < right ? -1 : left > right ? 1 : 0;
+  return byCodeUnit(left, right);
 }
 
 export function gte(current: string, min: string): boolean {

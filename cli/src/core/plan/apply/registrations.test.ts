@@ -1,9 +1,9 @@
 import { lstat, mkdir, readFile, realpath, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { describe, expect } from "vitest";
-import { emptyLock, type Lock } from "#core/lock.ts";
 import type { Action, Plan } from "#core/plan/model.ts";
 import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
+import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { emptyPlan } from "#test/kit/builders/plan.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { apply } from "./apply.ts";
@@ -145,23 +145,17 @@ describe("codex plugins as a local marketplace", () => {
   test("records the new mode for every artifact that shares the plugin it relinked", async () => {
     const sales = await projected("acme-prod", "sales");
     const local = join(cache("acme-prod"), "sales", "local");
-    const row = (name: string): Lock["artifacts"][string] => ({
+    const row = (name: string) => ({
       registry: "acme-prod",
-      id: undefined,
-      name,
-      kind: "skill",
       namespace: "sales",
-      address: undefined,
-      content: undefined,
-      version: undefined,
       path: `artifacts/acme-prod/sales/skills/${name}`,
       digest: "",
-      origin: undefined,
-      links: [{ target: "codex", path: relative(roots.base, local), mode: "copy" }],
+      links: [{ target: "codex", path: relative(roots.base, local), mode: "copy" as const }],
     });
-    const lock: Lock = emptyLock();
-    lock.artifacts["acme-prod/sales/skill/hello"] = row("hello");
-    lock.artifacts["acme-prod/sales/skill/pitch"] = row("pitch");
+    const lock = lockOf()
+      .artifact("acme-prod/sales/skill/hello", row("hello"))
+      .artifact("acme-prod/sales/skill/pitch", row("pitch"))
+      .build();
 
     // One plugin directory, so the planner relinks it once, for the first artifact.
     await apply({
