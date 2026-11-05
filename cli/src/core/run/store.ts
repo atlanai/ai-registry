@@ -4,7 +4,6 @@ import type { SyncOperation } from "#core/sync/policy.ts";
 import type {
   ItemOutcome,
   RunEvent,
-  RunEventType,
   RunMode,
   RunRecord,
   RunState,
