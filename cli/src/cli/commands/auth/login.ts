@@ -21,6 +21,7 @@ import { open } from "#core/console/actions.ts";
 import { type SignInPrompt, signInWithOAuth } from "#core/credentials/oauth.ts";
 import { isCI, registryToken, tokenVariable } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { readStdin } from "#core/process.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { withDaemon } from "#daemon/process/lifecycle.ts";
 import { type Declared, declared, heldFor } from "./list.ts";
@@ -198,7 +199,7 @@ async function resolveToken(registry: string, flags: LoginFlags): Promise<string
         hint: `Pipe the token in: \`… | aireg auth login ${registry} --token-stdin\`.`,
       });
     }
-    const piped = await readStdin();
+    const piped = (await readStdin()).trim();
     if (piped === "") {
       throw new AiregError("No token arrived on standard input.", {
         code: ErrorCode.Usage,
@@ -208,12 +209,6 @@ async function resolveToken(registry: string, flags: LoginFlags): Promise<string
     return piped;
   }
   return undefined;
-}
-
-async function readStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-  return Buffer.concat(chunks).toString("utf8").trim();
 }
 
 async function oauthClientFor(

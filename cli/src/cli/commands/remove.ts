@@ -10,6 +10,7 @@ import { canceled } from "#cli/prompt/model.ts";
 import { exitOnClash, reportCollisions } from "#cli/render/collisions.ts";
 import { planReport, type Ran, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { loadedBy, toolName } from "#cli/render/tools.ts";
+import { trackRun } from "#cli/telemetry/events.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import type { Lock } from "#core/lock.ts";
@@ -142,6 +143,7 @@ async function remove(
     cancel(step);
     return STREAMED;
   }
+  trackRun("remove", result);
 
   // An artifact something else depends on leaves the manifest but stays installed while needed.
   const record = result.plan.actions.find((action) => action.kind === "record");

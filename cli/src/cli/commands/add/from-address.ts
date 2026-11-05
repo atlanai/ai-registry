@@ -6,6 +6,7 @@ import { equivalent } from "#cli/prompt/equivalent.ts";
 import { cancel, type Interaction, interaction, interactive } from "#cli/prompt/interaction.ts";
 import { exitOnClash } from "#cli/render/collisions.ts";
 import { planReport } from "#cli/render/plan.ts";
+import { trackRun } from "#cli/telemetry/events.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
 import { coveredByWhole } from "#core/manifest/match.ts";
 import type { RegistrySource } from "#core/manifest/model.ts";
@@ -118,6 +119,7 @@ export async function addAddress(
     cancel(step);
     return undefined;
   }
+  trackRun("install", result, "add");
   exitOnClash(context, result.plan);
 
   // `--json` changes only what is printed, so the background job is still added.

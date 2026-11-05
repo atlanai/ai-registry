@@ -9,6 +9,11 @@ declare const __RELEASE_KEYRING__: string;
 const ORIGIN = typeof __RELEASE_ORIGIN__ === "string" ? __RELEASE_ORIGIN__ : "";
 const KEYRING = typeof __RELEASE_KEYRING__ === "string" ? __RELEASE_KEYRING__ : "";
 
+/** The release server this build was stamped with; undefined for a build from source. */
+export function stampedOrigin(): string | undefined {
+  return normalizeOrigin(ORIGIN);
+}
+
 export interface ReleaseStamp {
   readonly origin: string;
   readonly channel: Channel;

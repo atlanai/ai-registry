@@ -4,6 +4,7 @@ import type { CommandContext } from "#cli/commands/command.ts";
 import type { Interaction } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
 import { text } from "#cli/prompt/text.ts";
+import { trackPublish } from "#cli/telemetry/events.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
 import {
   commitAndPush,
@@ -52,6 +53,10 @@ export async function sendTo(
     .catch((error: unknown) => {
       throw heldUnlisted(error, alias, items);
     });
+  trackPublish(
+    { location: opened.location, adapter: adapter.id },
+    items.map((item) => item.work),
+  );
   const what = items.length === 1 ? items[0]?.work.name : plural(items.length, "artifact");
   printer.success(published?.summary ?? `Published ${what} to ${alias}.`);
   for (const note of published?.notes ?? []) printer.info(`  ${note}`);
