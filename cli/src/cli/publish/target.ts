@@ -32,6 +32,7 @@ import { kindsOf } from "#core/filespec/write/kinds.ts";
 import { type OfferTarget, offerFrom } from "#core/filespec/write/offer.ts";
 import { versionProblems } from "#core/filespec/write/validate.ts";
 import { posixRelative } from "#core/fs/path.ts";
+import { knowledgeProblems } from "#core/knowledge.ts";
 import type { RegistrySource } from "#core/manifest.ts";
 import { parseRef, type Ref, RefParseError } from "#core/ref.ts";
 import { readOnly } from "#engine/remote.ts";
@@ -369,6 +370,7 @@ async function refuseInvalid(
   input: PublishInput,
   folder: boolean,
 ): Promise<void> {
+  if (work.kind === "knowledge") return refuseBundle(work, namespace, input);
   if (work.kind !== "skill" && !(work.kind === "agent" && folder)) return;
   const manifest = (await kindsOf(undefined))[work.kind];
   if (manifest === undefined) return;
@@ -384,6 +386,16 @@ async function refuseInvalid(
   if (problems.length === 0) return;
   throw new AiregError(
     `${namespace}/${work.kind}/${work.name} would not pass \`aireg registry validate\`: ${problems.join("; ")}.`,
+    { code: ErrorCode.Invalid, hint: `Fix it in ${work.path}, then publish again.` },
+  );
+}
+
+/** Every path an Open Knowledge Format registry would refuse, named before anything is sent. */
+function refuseBundle(work: Work, namespace: string, input: PublishInput): void {
+  const problems = knowledgeProblems(input.files);
+  if (problems.length === 0) return;
+  throw new AiregError(
+    `${namespace}/knowledge/${work.name} is not an Open Knowledge Format bundle: ${problems.join("; ")}.`,
     { code: ErrorCode.Invalid, hint: `Fix it in ${work.path}, then publish again.` },
   );
 }

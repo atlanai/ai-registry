@@ -206,6 +206,7 @@ async function openAddress(
   const address = await commandLineAddress(own, positionals, typed, known, common, context.cwd);
   const { input, inside: within, exact, picks } = address;
   let { resolved } = address;
+  if (resolved.kind === "knowledge") throw notInstalled(input);
   if (!resolved.declared) {
     const unknown = await undeclaredRegistry(input, known, common, context.cwd);
     if (unknown !== undefined) throw unknown;
@@ -312,6 +313,7 @@ async function addAddress(
   );
 
   const refs = requestedRefs(resolved, input, alias, within, choices.select);
+  refuseBundles(refs);
 
   let approved = true;
   let introduced = false;
@@ -1132,4 +1134,21 @@ function shortened(addresses: string[] | undefined, all: readonly Entry[]): stri
     const same = all.filter((entry) => entry.group === namespace && entry.name === name);
     return same.length === 1 ? `${namespace}/${name}` : address;
   });
+}
+
+/** A short form or a selection can still land on a knowledge bundle once the catalog is read. */
+function refuseBundles(refs: readonly string[]): void {
+  const bundle = refs.find((text) => parseRef(text).kind === "knowledge");
+  if (bundle !== undefined) throw notInstalled(bundle);
+}
+
+/** A knowledge bundle is published, never installed: no target has a place for one. */
+function notInstalled(address: string): AiregError {
+  return new AiregError(
+    `${address} is a knowledge bundle, which aireg publishes but does not install.`,
+    {
+      code: ErrorCode.Usage,
+      hint: "Read it from its registry instead, or add the skills and agents that use it.",
+    },
+  );
 }

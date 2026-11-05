@@ -40,10 +40,15 @@ export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
     extensions: [".md"],
     served: [AGENT_ENTRY, AGENT_CARD_ENTRY],
   },
+  // A folder of Open Knowledge Format documents and the files they describe. It has no entry
+  // file, so only an export that says `kind: knowledge` names one, and no target places it.
+  knowledge: { dir: "knowledge", shape: "directory", extensions: [] },
 };
 
 /** Kinds the registry scanner walks; `plugin` is found by its manifest. */
-export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter((kind) => kind !== "plugin");
+export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter(
+  (kind) => kind !== "plugin" && kind !== "knowledge",
+);
 
 /** Target-shaped and plural: what the writable copy and every target use. */
 export function kindDir(kind: ArtifactKind): string {

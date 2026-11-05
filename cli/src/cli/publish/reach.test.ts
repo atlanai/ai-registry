@@ -277,6 +277,65 @@ describe("exportsOn, for a folder of artifacts", () => {
   });
 });
 
+describe("exportsOn, a knowledge bundle", () => {
+  const bundle = async (name: string) => {
+    await mkdir(join(base, "knowledge", name, "contracts"), { recursive: true });
+    await writeFile(join(base, "knowledge", name, "contracts", "routing.json"), "{}\n");
+    await writeFile(join(base, "knowledge", name, "index.md"), "# Contents\n");
+    // An entry file inside does not make the bundle a skill: `kind` says what it is.
+    await writeFile(join(base, "knowledge", name, "SKILL.md"), "---\ntype: Guide\n---\n");
+  };
+
+  test("is the folder `kind: knowledge` names, with every file it holds and no entry file", async () => {
+    await bundle("accounts");
+    const { found } = await exportsOn(
+      manifestWith("  - path: knowledge/accounts\n    kind: knowledge\n"),
+      base,
+    );
+    const at = join(base, "knowledge", "accounts");
+    expect([...found.keys()]).toEqual([at]);
+    expect(found.get(at)?.kind).toBe("knowledge");
+    expect(found.get(at)?.files?.map((file) => file.as)).toEqual([
+      "SKILL.md",
+      "contracts/routing.json",
+      "index.md",
+    ]);
+  });
+
+  test("refuses a file named as a bundle, and `exclude`, since a bundle is one artifact", async () => {
+    await bundle("accounts");
+    await expect(
+      exportsOn(manifestWith("  - path: knowledge/accounts/index.md\n    kind: knowledge\n"), base),
+    ).rejects.toMatchObject({
+      message:
+        'Export "knowledge/accounts/index.md" is a file, and a knowledge bundle is a folder.',
+      code: "invalid",
+    });
+    await expect(
+      exportsOn(
+        manifestWith(
+          "  - path: knowledge/accounts\n    kind: knowledge\n    exclude: [contracts]\n",
+        ),
+        base,
+      ),
+    ).rejects.toThrow("sets `exclude`, but it is one artifact, not a folder of them.");
+  });
+
+  test("leaves out what `ignore` matches", async () => {
+    await bundle("accounts");
+    await writeFile(join(base, "knowledge", "accounts", "draft.md"), "---\ntype: Draft\n---\n");
+    const { found } = await exportsOn(
+      manifestWith("  - path: knowledge/accounts\n    kind: knowledge\n    ignore: [draft.md]\n"),
+      base,
+    );
+    expect(found.get(join(base, "knowledge", "accounts"))?.files?.map((file) => file.as)).toEqual([
+      "SKILL.md",
+      "contracts/routing.json",
+      "index.md",
+    ]);
+  });
+});
+
 describe("exportsOn, choosing an artifact's files", () => {
   beforeEachFiles();
 

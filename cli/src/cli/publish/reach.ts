@@ -185,6 +185,17 @@ async function heldAt(path: string, base: string): Promise<Held> {
   return { root: path, kind: "agent" };
 }
 
+/**
+ * A knowledge bundle has no entry file to find it by, so only an entry that says
+ * `kind: knowledge` names one, and the folder it names is the bundle. Such an entry
+ * is a mapping, and a mapping is never a glob, so one entry names one bundle.
+ */
+async function bundleAt(path: string): Promise<Held> {
+  return (await isDirectory(path))
+    ? { root: path, kind: "knowledge" }
+    : { stray: "is a file, and a knowledge bundle is a folder" };
+}
+
 /** What every entry is read against, and the notes on what an entry skipped. */
 interface Reading {
   base: string;
@@ -321,8 +332,15 @@ async function namedBy(entry: Export, reading: Reading): Promise<Reaching> {
       hint: "Check its path under `exports:`, or remove the entry.",
     });
   }
-  await refuseOutside(entry, artifactRoot(path), reading.base);
-  const held = await heldAt(path, reading.base);
+  const bundle = entry.kind === "knowledge";
+  await refuseOutside(entry, bundle ? path : artifactRoot(path), reading.base);
+  const held = bundle ? await bundleAt(path) : await heldAt(path, reading.base);
+  if (bundle && !("root" in held)) {
+    throw new AiregError(`Export ${quoted(entry.path)} ${held.stray}.`, {
+      code: ErrorCode.Invalid,
+      hint: "Name the folder that holds the bundle, or remove `kind: knowledge`.",
+    });
+  }
   if ("root" in held) {
     if (entry.exclude !== undefined) {
       throw new AiregError(

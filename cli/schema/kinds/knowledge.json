@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kinds/knowledge.json",
+  "title": "knowledge",
+  "description": "Draft. A knowledge bundle: a folder tree in the Open Knowledge Format v0.2, published byte for byte. Every Markdown file except index.md and log.md is a concept whose YAML front matter carries a non-empty type; other files, such as JSON or SQL, ride with the bundle as written. The bundle has no entry file, so spec names it and nothing more.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "MUST equal metadata.name in the envelope.",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "additionalProperties": true,
+  "x-registry-schema-version": 1,
+  "x-registry-searchable": [
+    "/name",
+    "/description"
+  ],
+  "x-registry-files": {
+    "optional": [
+      {
+        "glob": "**/*.md",
+        "media_type": "text/markdown"
+      },
+      {
+        "glob": "**"
+      }
+    ]
+  },
+  "x-registry-attachment": false,
+  "x-registry-gated": false
+}

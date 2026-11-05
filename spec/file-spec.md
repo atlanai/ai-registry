@@ -190,6 +190,14 @@ own `name` remains its human-readable name and need not equal the slug. An agent
 exactly one of these native entry files. Other supporting files are permitted; the optional
 file patterns in a kind manifest are non-exhaustive conventions.
 
+*Draft.* A knowledge bundle (kind `knowledge`) is a folder tree in the Open Knowledge Format
+v0.2, carried byte for byte. It has no entry file, so its `spec` holds only `name` and,
+optionally, `description`. Every Markdown file whose name is not `index.md` or `log.md` MUST
+open with a YAML front matter block whose `type` is a non-empty string; other files, such as
+JSON or SQL, are carried as written. Paths MUST be safe relative paths of at most 1024 bytes
+and 16 segments, and a bundle MUST NOT hold `bundle.zip` or `bundle.tar.gz` at its root. A
+writer MAY refuse a bundle over 10,000 files or 64 MiB.
+
 ### 3.5 Native files
 
 Every file named in `files[]` whose `urls` entry is a relative reference is stored at that path under the version directory, byte-identical to what the author wrote. The envelope wraps a kind's existing format; it never rewrites it.

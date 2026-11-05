@@ -68,16 +68,19 @@ function planWith(
   const top = select(manifest, lock, acquired, [], options.cliVersion, [], [], renames);
   const needs = closure(top, acquired);
   const untrusted: Untrusted[] = [];
-  const selected = select(
-    { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
-    lock,
-    acquired,
+  const selected = installable(
+    select(
+      { ...manifest, artifacts: [...manifest.artifacts, ...needs.refs] },
+      lock,
+      acquired,
+      warnings,
+      options.cliVersion,
+      incompatible,
+      clashes,
+      renames,
+      untrusted,
+    ),
     warnings,
-    options.cliVersion,
-    incompatible,
-    clashes,
-    renames,
-    untrusted,
   );
   const next = emptyLock();
   for (const source of acquired) {
@@ -166,6 +169,21 @@ function planWith(
     untrusted,
   };
   return { plan, selected };
+}
+
+/**
+ * A knowledge bundle is published, never installed: no target takes one, so a registry that
+ * serves one alongside its skills leaves it out with a note rather than failing the run.
+ */
+function installable(selected: Selected[], warnings: Warning[]): Selected[] {
+  return selected.filter((item) => {
+    if (item.kind !== "knowledge") return true;
+    warnings.push({
+      name: item.name,
+      message: `${addressOf({ ...item, name: item.upstreamName }, item.source)} is a knowledge bundle, which aireg publishes but installs into no target, so it is left out.`,
+    });
+    return false;
+  });
 }
 
 function planItem(item: Selected, build: BuildState): void {
