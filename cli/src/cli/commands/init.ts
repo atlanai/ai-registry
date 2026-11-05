@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname, relative } from "node:path";
 import { isAdapterError } from "#adapter/index.ts";
 import { KINDS } from "#adapter/kinds.ts";
@@ -13,6 +13,7 @@ import { USER } from "#cli/options/flags.ts";
 import { noArguments, parse } from "#cli/options/parse.ts";
 import { isNamespaceAddress } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { writeAtomic } from "#core/fs/atomic.ts";
 import { canonical } from "#core/fs/realpath.ts";
 import { formatManifest } from "#core/manifest/format.ts";
 import { emptyManifest } from "#core/manifest/model.ts";
@@ -124,7 +125,7 @@ export const { run } = defineCommand({
         registries: existing.registries,
       });
       await mkdir(dirname(roots.manifest), { recursive: true });
-      await writeFile(roots.manifest, contents, "utf8");
+      await writeAtomic(roots.manifest, contents);
     }
 
     await ensureScopeIgnore(roots);

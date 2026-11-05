@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { mkdir, readdir, symlink } from "node:fs/promises";
+import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { describe, expect } from "vitest";
 import { emptyLock } from "#core/lock.ts";
@@ -50,5 +50,44 @@ describe("a plugin placed as a copy", () => {
       },
     });
     expect((await readdir(join(to, "skills"))).sort()).toEqual(["lint", "ship"]);
+  });
+});
+
+describe("a copy installed under another name", () => {
+  test("carries that name in a skill folder and in a single file", async ({ home }) => {
+    const skill = join(roots.artifacts, "acme", "pr-review");
+    await mkdir(skill, { recursive: true });
+    await writeFile(join(skill, "SKILL.md"), "---\nname: pr-review\n---\nBody.\n");
+    const agent = join(roots.artifacts, "acme", "reviewer.md");
+    await writeFile(agent, "---\nname: reviewer\n---\nBody.\n");
+    const skillTo = join(home.dir, ".claude", "skills", "eng-pr-review");
+    const agentTo = join(home.dir, ".claude", "agents", "eng-reviewer.md");
+    const copied = (name: string, from: string, to: string, rename: string): Action => ({
+      kind: "link",
+      name,
+      target: "claude-code",
+      from,
+      to,
+      copy: true,
+      rename,
+    });
+    const plan = {
+      ...emptyPlan(),
+      actions: [
+        copied("pr-review", skill, skillTo, "eng-pr-review"),
+        copied("reviewer", agent, agentTo, "eng-reviewer"),
+        { kind: "record" as const, lock: emptyLock() },
+      ],
+    };
+
+    await apply({
+      plan,
+      roots,
+      fetch: () => Promise.reject(new Error("nothing is staged")),
+      env: process.env,
+    });
+
+    expect(await readFile(join(skillTo, "SKILL.md"), "utf8")).toContain("name: eng-pr-review");
+    expect(await readFile(agentTo, "utf8")).toContain("name: eng-reviewer");
   });
 });
