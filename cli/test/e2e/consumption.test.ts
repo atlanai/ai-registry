@@ -32,10 +32,10 @@ test.beforeAll(async ({ aireg: run, git: gitIn, tmp, project: dir, home: { dir: 
   outside = join(root, "outside");
   await Promise.all([mkdir(join(project, "src"), { recursive: true }), mkdir(outside)]);
   await git.init(project);
+  // More reports than the cap of 10, so a namespace address has to count only its own.
   await publish({
     "platform/lint": ["1.0.0", "1.1.0"],
     "data/profile": ["0.4.0"],
-    // More than the cap of 10, so a namespace address has to count only its own.
     ...Object.fromEntries(Array.from({ length: 11 }, (_, at) => [`data/report-${at}`, ["0.1.0"]])),
   });
 });
@@ -174,7 +174,7 @@ describe("consuming a registry like a package manager", () => {
     const listed = (await aireg(["list"])).stdout;
     expect(listed).not.toContain("lint");
     expect(listed).toContain("changelog");
-    // A newer lint is published, but the namespace leaves it out, so it isn't an update.
+    // A newer lint is published, but the namespace leaves it out, so it is not an update.
     expect((await aireg(["outdated"])).stdout).not.toMatch(/ lint\s/);
   });
 

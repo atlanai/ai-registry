@@ -1,8 +1,8 @@
 import type { SourceAdapter, SourceContext } from "#adapter/index.ts";
 import type { Account, Step } from "#core/config/model.ts";
-import type { Printer } from "#core/output.ts";
 import type { ItemSettled, RunCounts, TerminalRunState } from "#core/run/model.ts";
 import type { RunStore } from "#core/run/store.ts";
+import type { Printer } from "#core/term/printer.ts";
 import type { PanelContribution, UpstreamContribution } from "./panel.ts";
 
 export interface ExtensionHost {

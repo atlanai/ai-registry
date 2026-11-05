@@ -3,10 +3,10 @@ import { link, lstat, rm, writeFile } from "node:fs/promises";
 import { connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { RunEvent } from "#core/run/model.ts";
 import { RpcErrorCode } from "./codes.ts";
-import { PROTOCOL_VERSION } from "./protocol.ts";
+import { PROTOCOL_VERSION } from "./methods.ts";
 import { DaemonAlreadyRunningError, RpcServer } from "./server.ts";
 
 const paths: string[] = [];
@@ -34,19 +34,19 @@ describe.skipIf(process.platform === "win32")("rpc server endpoints", () => {
     for (const path of paths.splice(0)) await rm(path, { force: true });
   });
 
-  it("replaces a socket left behind by a daemon that is gone", async () => {
+  test("replaces a socket left behind by a daemon that is gone", async () => {
     const server = new RpcServer();
-    await server.listen(await orphaned());
+    await expect(server.listen(await orphaned())).resolves.toBeUndefined();
     await server.close();
   });
 
-  it("refuses a path that is not a socket", async () => {
+  test("refuses a path that is not a socket", async () => {
     const path = endpoint();
     await writeFile(path, "not a socket");
     await expect(new RpcServer().listen(path)).rejects.toThrow("will not replace");
   });
 
-  it("names the live-socket case apart from every other listen failure", async () => {
+  test("names the live-socket case apart from every other listen failure", async () => {
     const path = endpoint();
     const first = new RpcServer();
     await first.listen(path);
@@ -57,7 +57,7 @@ describe.skipIf(process.platform === "win32")("rpc server endpoints", () => {
     }
   });
 
-  it("keeps the bind while draining so a replacement cannot steal the socket", async () => {
+  test("keeps the bind while draining so a replacement cannot steal the socket", async () => {
     const path = endpoint();
     const first = new RpcServer();
     await first.listen(path);
@@ -72,7 +72,7 @@ describe.skipIf(process.platform === "win32")("rpc server endpoints", () => {
     await next.close();
   });
 
-  it("leaves a replacement's socket in place when the old daemon closes", async () => {
+  test("leaves a replacement's socket in place when the old daemon closes", async () => {
     const path = endpoint();
     const old = new RpcServer();
     await old.listen(path);
@@ -141,7 +141,7 @@ describe.skipIf(process.platform === "win32")("rpc server limits", () => {
     for (const path of paths.splice(0)) await rm(path, { force: true });
   });
 
-  it("refuses a request past the per-client limit on unanswered ones", async () => {
+  test("refuses a request past the per-client limit on unanswered ones", async () => {
     const path = endpoint();
     const server = new RpcServer();
     let release: () => void = () => {};
@@ -177,7 +177,7 @@ describe.skipIf(process.platform === "win32")("rpc server limits", () => {
     }
   });
 
-  it("closes even when a handler never returns", async () => {
+  test("closes even when a handler never returns", async () => {
     const path = endpoint();
     const server = new RpcServer();
     server.method("initialize", async () => ({}));
@@ -205,7 +205,7 @@ describe.skipIf(process.platform === "win32")("rpc server limits", () => {
     expect(closed).toBe(true);
   });
 
-  it("answers a reply too large to frame with an error, and keeps the client", async () => {
+  test("answers a reply too large to frame with an error, and keeps the client", async () => {
     const path = endpoint();
     const server = new RpcServer();
     server.method("initialize", async () => ({}));
@@ -235,7 +235,7 @@ describe.skipIf(process.platform === "win32")("rpc server limits", () => {
     }
   });
 
-  it("drops a client that never initializes", async () => {
+  test("drops a client that never initializes", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const path = endpoint();
     const server = new RpcServer();
@@ -252,7 +252,7 @@ describe.skipIf(process.platform === "win32")("rpc server limits", () => {
     }
   });
 
-  it("drops a client that stopped reading before it queues much", async () => {
+  test("drops a client that stopped reading before it queues much", async () => {
     const path = endpoint();
     const server = new RpcServer();
     server.method("initialize", async () => ({}));

@@ -1,8 +1,8 @@
 import { list, plural, quoted } from "#adapter/text.ts";
-import type { CommandContext } from "#cli/commands/index.ts";
+import type { CommandContext } from "#cli/commands/command.ts";
 import { underHome } from "#cli/render/home.ts";
 import { eventLine, failureWords } from "#cli/render/run.ts";
-import { findJob } from "#core/config/model.ts";
+import { findJob } from "#core/config/jobs.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { failureReasons } from "#core/console/runs.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -17,10 +17,10 @@ import {
 import { scopeFor } from "#core/store/paths.ts";
 import { ago, duration } from "#core/term/format.ts";
 import { table } from "#core/term/table.ts";
+import { withDaemon } from "#daemon/process/lifecycle.ts";
 import { followRun, type RpcClient, runEvents } from "#daemon/rpc/client.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
-import { MAX_PAGE_SIZE } from "#daemon/rpc/protocol.ts";
-import { withDaemon } from "#daemon/service.ts";
+import { MAX_PAGE_SIZE } from "#daemon/rpc/methods.ts";
 
 /** `run_` plus a v4 uuid, as `runner.ts` mints them. */
 const RUN_ID = /^run_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,70 +30,6 @@ export interface RunsOptions {
   state?: string | undefined;
   limit?: string | undefined;
   follow?: boolean | undefined;
-}
-
-function printEvent(context: CommandContext, event: RunEvent, reason?: string): void {
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { event } });
-    return;
-  }
-  const line = eventLine(context.printer, event, reason);
-  if (line !== undefined) context.printer.info(line);
-}
-
-/** A failed run's last line says why, which only the daemon's log kept. */
-async function printEnd(context: CommandContext, event: RunEvent): Promise<void> {
-  const failed = context.printer.format !== "json" && event.errorCode !== undefined;
-  const reasons = failed ? await failureReasons(new Set([event.runId])) : undefined;
-  printEvent(context, event, reasons?.get(event.runId));
-}
-
-/** Why it ended, or what it did: without one of the two a state is unreadable. */
-function outcome(run: RunRecord, reasons: ReadonlyMap<string, string>): string {
-  if (run.errorCode !== undefined) return reasons.get(run.id) ?? failureWords(run.errorCode);
-  const { examined, changed, attention } = run.counts;
-  if (examined === 0) return "";
-  const parts = [`${examined} checked`];
-  if (changed > 0) parts.push(`${changed} changed`);
-  if (attention > 0) parts.push(`${attention} need attention`);
-  return parts.join(", ");
-}
-
-function took(run: RunRecord): string {
-  if (run.startedAtMs === undefined || run.finishedAtMs === undefined) return "";
-  return duration(run.finishedAtMs - run.startedAtMs);
-}
-
-function tone(context: CommandContext, state: RunState): string {
-  const { style } = context.printer;
-  if (state === "succeeded") return style.green(state);
-  if (state === "failed") return style.red(state);
-  return isActive(state) ? style.dim(state) : style.yellow(state);
-}
-
-async function printRuns(context: CommandContext, runs: readonly RunRecord[]): Promise<void> {
-  const { style } = context.printer;
-  const failed = runs.flatMap((run) => (run.errorCode === undefined ? [] : [run.id]));
-  const reasons = await failureReasons(new Set(failed));
-  table(
-    context.printer,
-    [
-      { header: "run", value: (run: RunRecord) => run.id },
-      { header: "state", value: (run: RunRecord) => tone(context, run.state) },
-      { header: "mode", value: (run: RunRecord) => run.mode },
-      // A run started by `aireg sync` belongs to no job; the trigger says who started it.
-      { header: "job", value: (run: RunRecord) => run.jobId ?? style.dim("-") },
-      { header: "trigger", value: (run: RunRecord) => style.dim(run.trigger) },
-      { header: "started", value: (run: RunRecord) => ago(run.startedAtMs ?? run.requestedAtMs) },
-      { header: "took", value: took, align: "right", optional: true },
-      {
-        header: "outcome",
-        value: (run: RunRecord) => style.dim(outcome(run, reasons)),
-        optional: true,
-      },
-    ],
-    runs,
-  );
 }
 
 /** `aireg job runs [<run>]`: recent runs, or one run's events. */
@@ -134,29 +70,11 @@ export async function runs(
   });
 }
 
-/** `aireg job retry <run>`: run an earlier run's job again. */
-export async function retry(context: CommandContext, runId: string | undefined): Promise<void> {
-  const id = needsRun("retry", runId);
-  await withDaemon(async (client) => {
-    const { run } = await existing(id, () => client.request("run.retry", { runId: id }));
-    context.printer.format === "json"
-      ? context.printer.json({ ok: true, data: { run } })
-      : context.printer.success(`Started run ${run.id} to retry ${id}.`);
-  });
-}
-
-/** `aireg job cancel <run>`: stop a queued or running run. */
-export async function cancel(context: CommandContext, runId: string | undefined): Promise<void> {
-  const id = needsRun("cancel", runId);
-  await withDaemon(async (client) => {
-    const { run } = await existing(id, () => client.request("run.cancel", { runId: id }));
-    context.printer.format === "json"
-      ? context.printer.json({ ok: true, data: { run } })
-      : context.printer.success(
-          isTerminal(run.state)
-            ? `Run ${run.id} has already finished: ${run.state}.`
-            : `Asked run ${run.id} to stop.`,
-        );
+function checkRunId(word: string): void {
+  if (RUN_ID.test(word)) return;
+  throw new AiregError(`${quoted(word)} is not a run id.`, {
+    code: ErrorCode.Usage,
+    hint: "Use `aireg job runs [<run>]`, `aireg job retry <run>` or `aireg job cancel <run>`.",
   });
 }
 
@@ -190,19 +108,6 @@ async function detail(
   else await nextStep(context, run);
 }
 
-/** A run that left artifacts for a person names the dry run that says what each one needs. */
-async function nextStep(context: CommandContext, run: RunRecord): Promise<void> {
-  if (context.printer.format === "json" || run.counts.attention === 0) return;
-  const job = run.jobId === undefined ? undefined : findJob(await readConfig(), run.jobId);
-  const root = job?.steps.find((step) => step.root !== undefined)?.root;
-  if (root === undefined) return;
-  context.printer.hint(
-    scopeFor(root) === "user"
-      ? "Run `aireg sync -g --dry-run` to see what each one needs."
-      : `Run \`aireg sync --dry-run\` in ${underHome(root)} to see what each one needs.`,
-  );
-}
-
 /** The daemon's bare "run not found", as an error that names the run and where to look. */
 async function existing<T>(runId: string, request: () => Promise<T>): Promise<T> {
   try {
@@ -214,6 +119,83 @@ async function existing<T>(runId: string, request: () => Promise<T>): Promise<T>
       hint: "Run `aireg job runs` to see recent runs.",
     });
   }
+}
+
+async function printRuns(context: CommandContext, runs: readonly RunRecord[]): Promise<void> {
+  const { style } = context.printer;
+  const failed = runs.flatMap((run) => (run.errorCode === undefined ? [] : [run.id]));
+  const reasons = await failureReasons(new Set(failed));
+  // A run started by `aireg sync` belongs to no job; the trigger says who started it.
+  table(
+    context.printer,
+    [
+      { header: "run", value: (run: RunRecord) => run.id },
+      { header: "state", value: (run: RunRecord) => tone(context, run.state) },
+      { header: "mode", value: (run: RunRecord) => run.mode },
+      { header: "job", value: (run: RunRecord) => run.jobId ?? style.dim("-") },
+      { header: "trigger", value: (run: RunRecord) => style.dim(run.trigger) },
+      { header: "started", value: (run: RunRecord) => ago(run.startedAtMs ?? run.requestedAtMs) },
+      { header: "took", value: took, align: "right", optional: true },
+      {
+        header: "outcome",
+        value: (run: RunRecord) => style.dim(outcome(run, reasons)),
+        optional: true,
+      },
+    ],
+    runs,
+  );
+}
+
+function tone(context: CommandContext, state: RunState): string {
+  const { style } = context.printer;
+  if (state === "succeeded") return style.green(state);
+  if (state === "failed") return style.red(state);
+  return isActive(state) ? style.dim(state) : style.yellow(state);
+}
+
+function took(run: RunRecord): string {
+  if (run.startedAtMs === undefined || run.finishedAtMs === undefined) return "";
+  return duration(run.finishedAtMs - run.startedAtMs);
+}
+
+/** Why it ended, or what it did: without one of the two a state is unreadable. */
+function outcome(run: RunRecord, reasons: ReadonlyMap<string, string>): string {
+  if (run.errorCode !== undefined) return reasons.get(run.id) ?? failureWords(run.errorCode);
+  const { examined, changed, attention } = run.counts;
+  if (examined === 0) return "";
+  const parts = [`${examined} checked`];
+  if (changed > 0) parts.push(`${changed} changed`);
+  if (attention > 0) parts.push(`${attention} need attention`);
+  return parts.join(", ");
+}
+
+function printEvent(context: CommandContext, event: RunEvent, reason?: string): void {
+  if (context.printer.format === "json") {
+    context.printer.json({ ok: true, data: { event } });
+    return;
+  }
+  const line = eventLine(context.printer, event, reason);
+  if (line !== undefined) context.printer.info(line);
+}
+
+/** A failed run's last line says why, which only the daemon's log kept. */
+async function printEnd(context: CommandContext, event: RunEvent): Promise<void> {
+  const failed = context.printer.format !== "json" && event.errorCode !== undefined;
+  const reasons = failed ? await failureReasons(new Set([event.runId])) : undefined;
+  printEvent(context, event, reasons?.get(event.runId));
+}
+
+/** A run that left artifacts for a person names the dry run that says what each one needs. */
+async function nextStep(context: CommandContext, run: RunRecord): Promise<void> {
+  if (context.printer.format === "json" || run.counts.attention === 0) return;
+  const job = run.jobId === undefined ? undefined : findJob(await readConfig(), run.jobId);
+  const root = job?.steps.find((step) => step.root !== undefined)?.root;
+  if (root === undefined) return;
+  context.printer.hint(
+    scopeFor(root) === "user"
+      ? "Run `aireg sync -g --dry-run` to see what each one needs."
+      : `Run \`aireg sync --dry-run\` in ${underHome(root)} to see what each one needs.`,
+  );
 }
 
 async function listRuns(
@@ -232,11 +214,14 @@ async function listRuns(
   }
 }
 
-function checkRunId(word: string): void {
-  if (RUN_ID.test(word)) return;
-  throw new AiregError(`${quoted(word)} is not a run id.`, {
-    code: ErrorCode.Usage,
-    hint: "Use `aireg job runs [<run>]`, `aireg job retry <run>` or `aireg job cancel <run>`.",
+/** `aireg job retry <run>`: run an earlier run's job again. */
+export async function retry(context: CommandContext, runId: string | undefined): Promise<void> {
+  const id = needsRun("retry", runId);
+  await withDaemon(async (client) => {
+    const { run } = await existing(id, () => client.request("run.retry", { runId: id }));
+    context.printer.format === "json"
+      ? context.printer.json({ ok: true, data: { run } })
+      : context.printer.success(`Started run ${run.id} to retry ${id}.`);
   });
 }
 
@@ -250,4 +235,19 @@ function needsRun(action: string, runId: string | undefined): string {
   }
   checkRunId(runId);
   return runId;
+}
+
+/** `aireg job cancel <run>`: stop a queued or running run. */
+export async function cancel(context: CommandContext, runId: string | undefined): Promise<void> {
+  const id = needsRun("cancel", runId);
+  await withDaemon(async (client) => {
+    const { run } = await existing(id, () => client.request("run.cancel", { runId: id }));
+    context.printer.format === "json"
+      ? context.printer.json({ ok: true, data: { run } })
+      : context.printer.success(
+          isTerminal(run.state)
+            ? `Run ${run.id} has already finished: ${run.state}.`
+            : `Asked run ${run.id} to stop.`,
+        );
+  });
 }

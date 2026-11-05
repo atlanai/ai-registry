@@ -35,14 +35,6 @@ export function decodeTrustedKeys(encoded: string): TrustedKeys | undefined {
   return keys.size === 0 || keys.size > MAX_KEYS ? undefined : keys;
 }
 
-export function verifyEd25519(key: KeyObject, payload: Uint8Array, signature: Uint8Array): boolean {
-  try {
-    return verify(null, payload, key, signature);
-  } catch {
-    return false;
-  }
-}
-
 function decodeJsonObject(encoded: string): Record<string, unknown> | undefined {
   const decoded = Buffer.from(encoded, "base64");
   if (decoded.byteLength === 0 || decoded.toString("base64") !== encoded) return undefined;
@@ -64,5 +56,13 @@ function publicKeyFrom(raw: Uint8Array): KeyObject | undefined {
     });
   } catch {
     return undefined;
+  }
+}
+
+export function verifyEd25519(key: KeyObject, payload: Uint8Array, signature: Uint8Array): boolean {
+  try {
+    return verify(null, payload, key, signature);
+  } catch {
+    return false;
   }
 }

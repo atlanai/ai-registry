@@ -1,7 +1,4 @@
-/**
- * Waits for the work to settle, or for the grace period, whichever is first.
- * What is still running after it is left to finish, or never, on its own.
- */
+/** Waits for the work to settle or `ms` to pass, whichever is first; nothing is canceled. */
 export async function settledWithin(work: Iterable<Promise<unknown>>, ms: number): Promise<void> {
   let timer: NodeJS.Timeout | undefined;
   await Promise.race([

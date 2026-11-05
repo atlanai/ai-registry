@@ -110,7 +110,7 @@ describe("a target's earlier id", () => {
 });
 
 describe("a project an earlier aireg wrote", () => {
-  /** A project as aireg 0.1 leaves it: `harnesses:`, `harness:` and the earlier ids. */
+  // A project as aireg 0.1 leaves it: `harnesses:`, `harness:` and the earlier ids.
   async function earlierProject(
     aireg: (argv: string[]) => Promise<{ code: number; stderr: string }>,
     kit: string,

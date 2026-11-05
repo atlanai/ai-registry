@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { withheldAt } from "#core/catalog/withheld.ts";
 import type { LockArtifact } from "#core/lock.ts";
-import type { Manifest } from "#core/manifest.ts";
+import type { Manifest } from "#core/manifest/model.ts";
 import type { Closure } from "#core/plan/depends.ts";
 import type { Acquired, Kept, Selected } from "#core/plan/model.ts";
 import { type NamespaceWant, namespaceOf, pluginLinkAt, rowPlugin } from "#core/plan/projection.ts";

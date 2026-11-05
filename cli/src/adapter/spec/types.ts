@@ -31,10 +31,7 @@ export interface Relationship {
 export interface EnvelopeMetadata {
   /** The artifact's name. */
   name: string;
-  /**
-   * The namespace, where the source has one. A working tree or a bare clone is
-   * not a registry and has no namespace, so it reports none.
-   */
+  /** Absent for a working tree or a bare clone. */
   namespace?: string;
   /** Absent where the source publishes no versions: the content digest is then the identity. */
   version?: string;
@@ -52,7 +49,7 @@ export interface EnvelopeMetadata {
   uid?: string;
 }
 
-/** An artifact's `artifact.json`: its metadata and the files it is made of. Its digest is its content identity. */
+/** An artifact's `artifact.json`. Its digest is its content identity. */
 export interface Envelope {
   /** The format's version, `aireg.sh/v1`. */
   apiVersion: string;
@@ -67,10 +64,7 @@ export interface Envelope {
   relationships?: Relationship[];
 }
 
-/**
- * An RFC 9457 problem document. `code` is what a client branches on; a server's
- * own code passes through.
- */
+/** An RFC 9457 problem document. Clients branch on `code`; a server's own code passes through. */
 export interface Problem {
   type?: string;
   /** Required on the client; minted from status or code when the server omitted it. */

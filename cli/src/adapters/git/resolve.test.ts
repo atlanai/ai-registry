@@ -1,14 +1,13 @@
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
 import { lsRemote, peel, type RemoteRef, resolveRef } from "./resolve.ts";
 import { parseSource, type SourceSpec } from "./url.ts";
 
 const PEELED = "a496748000000000000000000000000000000bbb";
 
-/** What `git ls-remote` prints for an annotated tag: the tag object, then the
- * commit it points at under the same name with `^{}` appended. */
+/** `git ls-remote` for an annotated tag: the tag object, then its commit under the name plus `^{}`. */
 const annotated: RemoteRef[] = [
   { commit: "21cea2a0000000000000000000000000000000aa", name: "refs/tags/v1.0.0" },
   { commit: PEELED, name: "refs/tags/v1.0.0^{}" },
@@ -17,7 +16,7 @@ const annotated: RemoteRef[] = [
 const lightweight: RemoteRef[] = [{ commit: PEELED, name: "refs/tags/v1.1.0" }];
 
 describe("peel", () => {
-  it.each([
+  test.each([
     [
       "takes the commit an annotated tag points at, not the tag object",
       annotated,

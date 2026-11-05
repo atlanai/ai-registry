@@ -1,22 +1,11 @@
 import { adapterProblem } from "#adapter/errors.ts";
 import { isAdapterError } from "#adapter/index.ts";
-import { ConfigConflictError } from "#core/config/parse-errors.ts";
+import { ConfigConflictError } from "#core/config/errors.ts";
 import { CredentialStoreError } from "#core/credentials/store.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { staleSettings } from "#daemon/config-write.ts";
+import { staleSettings } from "#daemon/handlers/settings-write.ts";
 import { RpcErrorCode } from "./codes.ts";
 import { ProtocolError } from "./protocol.ts";
-
-/** SQLite's primary result code for a full disk, in the low byte of an extended code. */
-const SQLITE_FULL = 13;
-
-function diskFull(error: unknown): boolean {
-  const { code, errcode } = (error ?? {}) as { code?: unknown; errcode?: unknown };
-  if (code === "ENOSPC") return true;
-  return (
-    code === "ERR_SQLITE_ERROR" && typeof errcode === "number" && (errcode & 0xff) === SQLITE_FULL
-  );
-}
 
 /** Classified failures stay named on the socket, with their code; a raw throw is internal. */
 export function rpcError(error: unknown): ProtocolError {
@@ -59,13 +48,24 @@ export function rpcError(error: unknown): ProtocolError {
   );
 }
 
-function rpcCodeFor(code: ErrorCode): RpcErrorCode {
-  if (code === ErrorCode.NotFound) return RpcErrorCode.NotFound;
-  if (code === ErrorCode.Usage || code === ErrorCode.Invalid) return RpcErrorCode.InvalidParams;
-  return RpcErrorCode.Server;
+/** SQLite's primary result code for a full disk, in the low byte of an extended code. */
+const SQLITE_FULL = 13;
+
+function diskFull(error: unknown): boolean {
+  const { code, errcode } = (error ?? {}) as { code?: unknown; errcode?: unknown };
+  if (code === "ENOSPC") return true;
+  return (
+    code === "ERR_SQLITE_ERROR" && typeof errcode === "number" && (errcode & 0xff) === SQLITE_FULL
+  );
 }
 
 function reason(error: Error): string | undefined {
   const cause = error.cause;
   return cause instanceof Error ? (cause.message.split("\n")[0] ?? cause.message) : undefined;
+}
+
+function rpcCodeFor(code: ErrorCode): RpcErrorCode {
+  if (code === ErrorCode.NotFound) return RpcErrorCode.NotFound;
+  if (code === ErrorCode.Usage || code === ErrorCode.Invalid) return RpcErrorCode.InvalidParams;
+  return RpcErrorCode.Server;
 }

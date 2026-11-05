@@ -1,10 +1,11 @@
 import { resolve } from "node:path";
 import { list, quoted } from "#adapter/text.ts";
 import type { LinkMode, LockArtifact } from "#core/lock.ts";
-import { type Action, type ArtifactSurvey, copyEdited, type Selected } from "#core/plan/model.ts";
+import type { Action, Selected } from "#core/plan/model.ts";
 import { claim, linksFor, type PlannedLink } from "#core/plan/projection.ts";
 import { removal } from "#core/plan/removable.ts";
 import { addressOf } from "#core/plan/select.ts";
+import { type ArtifactSurvey, copyEdited } from "#core/plan/survey.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { renamedTo } from "./rename.ts";
 import type { BuildState } from "./state.ts";
@@ -22,60 +23,12 @@ interface Claimed {
   blocked: Blocked[];
 }
 
-/** `.agents/skills/pdf` or `.claude/agents/review.md`: the name a part is installed under. */
 const partName = (path: string) => (path.split(/[\\/]/).at(-1) ?? path).replace(/\.(md|toml)$/, "");
 
 /** Where `item` would link this run, before any other artifact claims a path. */
 export function wantedLinks(item: Selected, build: BuildState): PlannedLink[] {
   const wrapped = build.wrapping.has(item.source);
   return linksFor(item, "", build.options, wrapped, build.crowded);
-}
-
-/** The links this item may take, first come first served, recording what another holds. */
-function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
-  const skipped = new Set<string>();
-  const elsewhere = new Set<string>();
-  const blocked: Blocked[] = [];
-  const address = addressOf({ ...item, name: item.upstreamName }, item.source);
-  build.addresses.set(item.name, address);
-  const wrapped = build.wrapping.has(item.source);
-  const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (target, kind) => {
-    const tool = build.options.targetTable[target];
-    (tool?.kinds[kind]?.scope === undefined ? skipped : elsewhere).add(tool?.displayName ?? target);
-  });
-  const collided = (owner: string, link: PlannedLink) => {
-    const kept = build.addresses.get(owner) ?? owner;
-    blocked.push({ target: link.target, path: link.relative, by: kept });
-    if (!build.clashes.some((clash) => clash.dropped === address && clash.kept === kept)) {
-      // A plugin's parts each land under a name of their own, which is the one that collided.
-      const name = item.kind === "plugin" ? partName(link.relative) : item.name;
-      const container = link.shared === true ? { container: true as const } : {};
-      build.clashes.push({ name, kept, dropped: address, at: link.relative, ...container });
-    }
-  };
-  // A path the lockfile gives another artifact stays its own, though this one comes first, as a
-  // plugin linked beside it may.
-  const open = planned.filter((link) => {
-    if (build.claimed.has(link.absolute)) return true;
-    const holder = build.recorded.get(link.absolute);
-    if (holder === undefined || holder === item.name || !holds(holder, link, build)) return true;
-    collided(holder, link);
-    return false;
-  });
-  const links = claim(open, item.name, build.claimed, build.plugins, collided);
-  return { links, skipped, elsewhere, blocked };
-}
-
-/**
- * Whether the lockfile row recorded at this path still keeps it from `link`: only while that row
- * links there this run, and a plugin directory never from its own namespace's artifacts.
- */
-function holds(holder: string, link: PlannedLink, build: BuildState): boolean {
-  const wants = build.wants.get(holder);
-  if (wants === undefined) return true;
-  const wanted = wants.find((each) => each.absolute === link.absolute);
-  if (wanted === undefined) return false;
-  return link.shared !== true || wanted.content !== link.content;
 }
 
 /**
@@ -132,6 +85,53 @@ export function placeLinks(
   return { links, blocked: claimed.blocked };
 }
 
+/** The links this item may take, first come first served, recording what another holds. */
+function claimLinks(item: Selected, copy: string, build: BuildState): Claimed {
+  const skipped = new Set<string>();
+  const elsewhere = new Set<string>();
+  const blocked: Blocked[] = [];
+  const address = addressOf({ ...item, name: item.upstreamName }, item.source);
+  build.addresses.set(item.name, address);
+  const wrapped = build.wrapping.has(item.source);
+  const planned = linksFor(item, copy, build.options, wrapped, build.crowded, (target, kind) => {
+    const tool = build.options.targetTable[target];
+    (tool?.kinds[kind]?.scope === undefined ? skipped : elsewhere).add(tool?.displayName ?? target);
+  });
+  const collided = (owner: string, link: PlannedLink) => {
+    const kept = build.addresses.get(owner) ?? owner;
+    blocked.push({ target: link.target, path: link.relative, by: kept });
+    if (!build.clashes.some((clash) => clash.dropped === address && clash.kept === kept)) {
+      // A plugin's parts each land under a name of their own, which is the one that collided.
+      const name = item.kind === "plugin" ? partName(link.relative) : item.name;
+      const container = link.shared === true ? { container: true as const } : {};
+      build.clashes.push({ name, kept, dropped: address, at: link.relative, ...container });
+    }
+  };
+  // A path the lockfile gives another artifact stays its own, though this one comes first, as a
+  // plugin linked beside it may.
+  const open = planned.filter((link) => {
+    if (build.claimed.has(link.absolute)) return true;
+    const holder = build.recorded.get(link.absolute);
+    if (holder === undefined || holder === item.name || !holds(holder, link, build)) return true;
+    collided(holder, link);
+    return false;
+  });
+  const links = claim(open, item.name, build.claimed, build.plugins, collided);
+  return { links, skipped, elsewhere, blocked };
+}
+
+/**
+ * Whether the lockfile row recorded at this path still keeps it from `link`: only while that row
+ * links there this run, and a plugin directory never from its own namespace's artifacts.
+ */
+function holds(holder: string, link: PlannedLink, build: BuildState): boolean {
+  const wants = build.wants.get(holder);
+  if (wants === undefined) return true;
+  const wanted = wants.find((each) => each.absolute === link.absolute);
+  if (wanted === undefined) return false;
+  return link.shared !== true || wanted.content !== link.content;
+}
+
 interface LinkUpdate {
   item: Selected;
   links: readonly PlannedLink[];
@@ -178,6 +178,28 @@ export function updateLinks(
   return touched;
 }
 
+/** A copy is a real folder; anywhere else one means the link was replaced by content we do not own. */
+function inPlace(
+  observed: ArtifactSurvey["links"][string] | undefined,
+  copying: boolean,
+  from: string,
+): boolean {
+  return (
+    observed?.present === true &&
+    (copying ? !observed.isLink : observed.isLink) &&
+    (observed.target === undefined || resolve(observed.target) === resolve(from))
+  );
+}
+
+/** A target's own copy that was edited stays as it is unless forced; planning has said so. */
+function keepsEditedCopy(
+  prior: LockArtifact["links"][number] | undefined,
+  state: ArtifactSurvey | undefined,
+  build: BuildState,
+): boolean {
+  return prior !== undefined && !build.options.force && copyEdited(prior, state);
+}
+
 function linkAction(
   item: Selected,
   link: PlannedLink,
@@ -210,28 +232,6 @@ function linkAction(
       ? { adopt: true }
       : {}),
   };
-}
-
-/** A copy is a real folder; anywhere else one means the link was replaced by content we do not own. */
-function inPlace(
-  observed: ArtifactSurvey["links"][string] | undefined,
-  copying: boolean,
-  from: string,
-): boolean {
-  return (
-    observed?.present === true &&
-    (copying ? !observed.isLink : observed.isLink) &&
-    (observed.target === undefined || resolve(observed.target) === resolve(from))
-  );
-}
-
-/** A target's own copy that was edited stays as it is unless forced; planning has said so. */
-function keepsEditedCopy(
-  prior: LockArtifact["links"][number] | undefined,
-  state: ArtifactSurvey | undefined,
-  build: BuildState,
-): boolean {
-  return prior !== undefined && !build.options.force && copyEdited(prior, state);
 }
 
 /** Said once, when the renamed plugin first appears, rather than on every sync. */

@@ -3,12 +3,12 @@ import { join } from "node:path";
 import { beforeAll, describe, expect } from "vitest";
 import { registerBuiltinAdapters } from "#adapters/index.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { Printer } from "#core/output.ts";
 import { PACKAGE } from "#core/product.ts";
+import { Printer } from "#core/term/printer.ts";
 import { homeTest as test } from "#test/kit/fixtures.ts";
 import { tempDir } from "#test/kit/temp.ts";
 import { run } from "./adapter.ts";
-import type { CommandContext } from "./index.ts";
+import type { CommandContext } from "./command.ts";
 
 // Never the checkout: an init that is not refused would write its package here.
 let cwd: string;

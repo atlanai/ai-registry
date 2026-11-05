@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { releaseStamp } from "./stamp.ts";
 
 function keyring(): string {
@@ -9,7 +9,7 @@ function keyring(): string {
 }
 
 describe("releaseStamp", () => {
-  it("has nothing to read in a source or unstamped build", () => {
+  test("has nothing to read in a source or unstamped build", () => {
     expect(releaseStamp({})).toBeUndefined();
     expect(releaseStamp({}, "prod", "")).toBeUndefined();
     expect(releaseStamp({}, "", keyring())).toBeUndefined();
@@ -18,7 +18,7 @@ describe("releaseStamp", () => {
     ).toBeUndefined();
   });
 
-  it("takes a channel out of the closed set, and nothing else", () => {
+  test("takes a channel out of the closed set, and nothing else", () => {
     const keys = keyring();
     expect(
       releaseStamp({ AIREG_RELEASE_CHANNEL: "canary" }, "https://releases.example.com/aireg", keys)

@@ -23,6 +23,24 @@ export type Regular =
   | { kind: "refused"; reason: RefusedReason };
 
 /**
+ * A file under `root` read without following a link at any step, so the bytes
+ * can only ever come from inside it. `path` is POSIX and relative.
+ */
+export async function readRegular(
+  root: string,
+  path: string,
+  verified?: Set<string>,
+): Promise<Regular> {
+  const opened = await openRegular(root, path, verified);
+  if (opened.kind !== "open") return opened;
+  try {
+    return { kind: "file", bytes: await opened.handle.readFile(), executable: opened.executable };
+  } finally {
+    await opened.handle.close();
+  }
+}
+
+/**
  * A file under `root` opened without following a link at any step. `verified` holds
  * folders already checked in this pass, which are not checked again.
  */
@@ -71,24 +89,6 @@ async function openRegular(
     return { kind: "refused", reason: "is not a regular file" };
   }
   return { kind: "open", handle, executable: (info.mode & EXECUTE_BITS) !== 0 };
-}
-
-/**
- * A file under `root` read without following a link at any step, so the bytes
- * can only ever come from inside it. `path` is POSIX and relative.
- */
-export async function readRegular(
-  root: string,
-  path: string,
-  verified?: Set<string>,
-): Promise<Regular> {
-  const opened = await openRegular(root, path, verified);
-  if (opened.kind !== "open") return opened;
-  try {
-    return { kind: "file", bytes: await opened.handle.readFile(), executable: opened.executable };
-  } finally {
-    await opened.handle.close();
-  }
 }
 
 /** Like `readRegular`, but streamed into a digest, so a large file is never held whole. */
@@ -161,7 +161,6 @@ export function redirection(
   root: string,
   path: string,
   includeLeaf = true,
-  /** Folders already found to be real ones in this pass, which are not checked again. */
   verified?: Set<string>,
 ): Redirection | undefined {
   const base = resolve(root);
@@ -201,26 +200,6 @@ export async function assertUnredirected(
   if (found !== undefined) throw new Error(`${found.at} is not a directory.`);
 }
 
-function scratch(target: string): string {
-  return join(dirname(target), `.${process.pid}-${randomUUID()}.tmp`);
-}
-
-async function syncDirectory(path: string): Promise<void> {
-  try {
-    const directory = await open(path, "r");
-    try {
-      await directory.sync();
-    } finally {
-      await directory.close();
-    }
-  } catch (error) {
-    const unsupported = new Set(["EACCES", "EINVAL", "EISDIR", "ENOTSUP", "EPERM"]);
-    if (!unsupported.has((error as NodeJS.ErrnoException).code ?? "")) throw error;
-  }
-}
-
-/** Long enough for a reader or a virus scan to let go; a held lease is refused well before. */
-const REPLACE_RETRY_MS = 5_000;
 const HELD = new Set(["EPERM", "EACCES", "EBUSY"]);
 
 /**
@@ -287,5 +266,25 @@ export async function writeAtomic(
   } catch (error) {
     await rm(temp, { force: true }).catch(() => {});
     throw error;
+  }
+}
+
+/** Long enough for a reader or a virus scan to let go; a held lease is refused well before. */
+const REPLACE_RETRY_MS = 5_000;
+function scratch(target: string): string {
+  return join(dirname(target), `.${process.pid}-${randomUUID()}.tmp`);
+}
+
+async function syncDirectory(path: string): Promise<void> {
+  try {
+    const directory = await open(path, "r");
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
+  } catch (error) {
+    const unsupported = new Set(["EACCES", "EINVAL", "EISDIR", "ENOTSUP", "EPERM"]);
+    if (!unsupported.has((error as NodeJS.ErrnoException).code ?? "")) throw error;
   }
 }

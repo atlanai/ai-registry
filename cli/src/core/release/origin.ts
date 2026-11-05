@@ -45,7 +45,7 @@ export function artifactsUrl(origin: string): string | undefined {
   return base === undefined ? undefined : `${base}/artifacts`;
 }
 
-/** The directory one release's artifacts are stored under, named as published. */
+/** Undefined unless `version` is canonical, since it becomes a path segment. */
 export function artifactBaseUrl(origin: string, version: string): string | undefined {
   const root = artifactsUrl(origin);
   const parsed = parseVersion(version);
@@ -69,13 +69,6 @@ export function isAdapterId(value: string): boolean {
   return ADAPTER_ID.test(value);
 }
 
-/** `{origin}/adapters/{id}`: one host and keyring, independent adapter versions. */
-function adapterOrigin(origin: string, id: string): string | undefined {
-  const base = normalizeOrigin(origin);
-  if (base === undefined || !isAdapterId(id)) return undefined;
-  return `${base}/adapters/${id}`;
-}
-
 export function adapterManifestUrl(
   origin: string,
   id: string,
@@ -83,6 +76,13 @@ export function adapterManifestUrl(
 ): string | undefined {
   const base = adapterOrigin(origin, id);
   return base === undefined ? undefined : manifestUrl(base, channel);
+}
+
+/** `{origin}/adapters/{id}`: one host and keyring, independent adapter versions. */
+function adapterOrigin(origin: string, id: string): string | undefined {
+  const base = normalizeOrigin(origin);
+  if (base === undefined || !isAdapterId(id)) return undefined;
+  return `${base}/adapters/${id}`;
 }
 
 /**

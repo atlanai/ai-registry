@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { tarGz, zip } from "#test/kit/site.ts";
 import { unpack } from "./archive.ts";
 
 const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
 describe("unpack", () => {
-  it("reads a .tar.gz, keeping which files are executable", () => {
+  test("reads a .tar.gz, keeping which files are executable", () => {
     const files = unpack(
       "fill",
       tarGz([
@@ -19,25 +19,25 @@ describe("unpack", () => {
     ]);
   });
 
-  it("reads a .zip", () => {
+  test("reads a .zip", () => {
     const files = unpack("fill", zip({ "SKILL.md": "Fill.\n", "references/a.md": "A.\n" }));
     expect(files.map((file) => file.path)).toEqual(["SKILL.md", "references/a.md"]);
   });
 
-  it("refuses a path that leaves the archive, and an absolute one", () => {
+  test("refuses a path that leaves the archive, and an absolute one", () => {
     expect(() => unpack("fill", tarGz([{ path: "../escape", body: "x" }]))).toThrow(
       `fill's archive holds "../escape", which is not a path inside it.`,
     );
     expect(() => unpack("fill", zip({ "/etc/passwd": "x" }))).toThrow(/not a path inside it/);
   });
 
-  it("refuses a link", () => {
+  test("refuses a link", () => {
     expect(() => unpack("fill", tarGz([{ path: "outside", link: "/etc/passwd" }]))).toThrow(
       `fill's archive holds "outside", which is a link.`,
     );
   });
 
-  it("stops at its file and byte limits", () => {
+  test("stops at its file and byte limits", () => {
     const many = tarGz([
       { path: "a", body: "1" },
       { path: "b", body: "2" },
@@ -49,7 +49,7 @@ describe("unpack", () => {
     expect(() => unpack("fill", big, { bytes: 1024, files: 10 })).toThrow(/unpacks to more than/);
   });
 
-  it("refuses what is neither a .tar.gz nor a .zip", () => {
+  test("refuses what is neither a .tar.gz nor a .zip", () => {
     expect(() => unpack("fill", new TextEncoder().encode("plain"))).toThrow(
       "fill's archive is neither a .tar.gz nor a .zip file.",
     );

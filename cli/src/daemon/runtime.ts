@@ -9,7 +9,8 @@ import { readConfig } from "#core/config/repository.ts";
 import { removeTokens, tokenVariable, withRegistryTokens } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { Fields } from "#core/fields.ts";
-import { type Logger, nullLogger } from "#core/log/index.ts";
+import { nullLogger } from "#core/log/logger.ts";
+import type { Logger } from "#core/log/model.ts";
 import { installCrashHandlers, openDaemonLog } from "#core/log/open.ts";
 import { NAME } from "#core/product.ts";
 import {
@@ -22,33 +23,30 @@ import {
   type RunRecord,
 } from "#core/run/model.ts";
 import { type Scope, toolHome, userScopeDir } from "#core/store/paths.ts";
-import { RESTART_EXIT_CODE, refreshAutostart, supervised } from "#daemon/autostart/index.ts";
+import { refreshAutostart, supervised } from "#daemon/autostart/index.ts";
+import { RESTART_EXIT_CODE } from "#daemon/autostart/model.ts";
+import { loginAccount, logoutAccount, removeAccount } from "#daemon/handlers/account.ts";
+import { resolveConflict, startResolution } from "#daemon/handlers/conflict.ts";
+import { createJob, patchSettings } from "#daemon/handlers/job.ts";
+import * as inputs from "#daemon/handlers/params.ts";
+import { startDaemon } from "#daemon/process/lifecycle.ts";
+import { liveDaemonPid, releaseDaemonPid, writeDaemonPid } from "#daemon/process/pid-file.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { privateDirectory, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
-import {
-  type DaemonInfo,
-  MAX_PAGE_SIZE,
-  PROTOCOL_VERSION,
-  ProtocolError,
-} from "#daemon/rpc/protocol.ts";
+import { type DaemonInfo, MAX_PAGE_SIZE, PROTOCOL_VERSION } from "#daemon/rpc/methods.ts";
+import { ProtocolError } from "#daemon/rpc/protocol.ts";
 import { DaemonAlreadyRunningError, type RpcContext, RpcServer } from "#daemon/rpc/server.ts";
-import { jobOfWork, type ScopeWork } from "#engine/work.ts";
-import { loginAccount, logoutAccount, removeAccount } from "./account-methods.ts";
-import { applyDaemonAdapterUpdate } from "./adapter-update.ts";
-import { resolveConflict, startResolution } from "./conflict-methods.ts";
-import * as inputs from "./inputs.ts";
-import { createJob, patchSettings } from "./job-methods.ts";
+import { SyncRunner } from "#daemon/runs/runner.ts";
+import { JobScheduler } from "#daemon/runs/scheduler.ts";
+import { runDatabasePath, SqliteRunStore } from "#daemon/runs/store.ts";
+import { applyDaemonAdapterUpdate } from "#daemon/updates/adapter-update.ts";
 import {
   applyDaemonCliUpdate,
   applyDaemonFollowInstalled,
   DaemonMinUpdate,
   FOLLOW_INTERVAL_MS,
-} from "./min-update.ts";
-import { liveDaemonPid, releaseDaemonPid, writeDaemonPid } from "./pidfile.ts";
-import { runDatabasePath, SqliteRunStore } from "./run-store.ts";
-import { SyncRunner } from "./runner.ts";
-import { JobScheduler } from "./scheduler.ts";
-import { startDaemon } from "./service.ts";
+} from "#daemon/updates/cli-update.ts";
+import { jobOfWork, type ScopeWork } from "#engine/sync/work.ts";
 
 const EVENT_PAGE_SIZE = 200;
 

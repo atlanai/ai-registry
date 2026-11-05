@@ -1,12 +1,14 @@
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
-import { pluginProjection, resolveTargets, takesPlugin, trustFor } from "./index.ts";
+import { takesPlugin, trustFor } from "./placement.ts";
+import { pluginProjection } from "./roots.ts";
+import { resolveTargets } from "./table.ts";
 
 const BUILTIN = Object.fromEntries(BUILTIN_TARGETS.map((target) => [target.id, target]));
 
 describe("built-in targets", () => {
-  it("places or reads something for every target", () => {
+  test("places or reads something for every target", () => {
     // An entry with neither could never be installed into.
     for (const [id, target] of Object.entries(BUILTIN)) {
       const reads = Object.values(target.reads ?? {}).flat();
@@ -16,7 +18,7 @@ describe("built-in targets", () => {
 });
 
 describe("claude-code", () => {
-  it("asks a person to trust a project before it loads the plugins placed there", () => {
+  test("asks a person to trust a project before it loads the plugins placed there", () => {
     const claude = resolveTargets({ HOME: "/tmp/home" })["claude-code"]!;
     expect(trustFor(claude, "plugin", "project")).toBe("claude");
     expect(trustFor(claude, "plugin", "user")).toBeUndefined();
@@ -25,7 +27,7 @@ describe("claude-code", () => {
 });
 
 describe("codex", () => {
-  it("links a whole plugin into its cache, keyed by source, not exploded skills", () => {
+  test("links a whole plugin into its cache, keyed by source, not exploded skills", () => {
     const env = { HOME: "/tmp/home", CODEX_HOME: "/tmp/home/.codex" };
     const codex = resolveTargets(env).codex!;
     expect(takesPlugin(codex)).toBe(true);
@@ -37,7 +39,7 @@ describe("codex", () => {
     expect(takesPlugin(codex, "project")).toBe(false);
   });
 
-  it("asks a person to trust a project before it loads the agents placed there", () => {
+  test("asks a person to trust a project before it loads the agents placed there", () => {
     const codex = resolveTargets({ HOME: "/tmp/home" }).codex!;
     expect(trustFor(codex, "agent", "project")).toBe("codex");
     expect(trustFor(codex, "agent", "user")).toBeUndefined();

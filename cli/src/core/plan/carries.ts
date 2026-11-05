@@ -39,13 +39,6 @@ const FILES: readonly [string, Carried][] = [
 
 const MANIFESTS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "plugin.json"];
 
-function declared(manifest: Record<string, unknown>): Carried[] {
-  const experimental = isRecord(manifest.experimental) ? manifest.experimental : {};
-  return ORDER.filter(
-    (key) => (manifest[key] ?? (key === "monitors" ? experimental.monitors : undefined)) != null,
-  );
-}
-
 /** What the plugin at `root` would have a target start; empty for anything that is not a folder. */
 export async function carries(root: string): Promise<Carried[]> {
   const dir = await realpath(root).catch(() => undefined);
@@ -73,14 +66,11 @@ export async function carries(root: string): Promise<Carried[]> {
   return ORDER.filter((what) => found.has(what));
 }
 
-/** Whether a plugin file is one a target starts or puts on the PATH, which a fingerprint covers. */
-function carrying(path: string): Carried | undefined {
-  const named = FILES.find(([file]) => file === path)?.[1];
-  if (named !== undefined) return named;
-  if (path.startsWith(`${BIN}/`)) return "bin";
-  if (path.startsWith("hooks/")) return "hooks";
-  if (path.startsWith("monitors/")) return "monitors";
-  return undefined;
+function declared(manifest: Record<string, unknown>): Carried[] {
+  const experimental = isRecord(manifest.experimental) ? manifest.experimental : {};
+  return ORDER.filter(
+    (key) => (manifest[key] ?? (key === "monitors" ? experimental.monitors : undefined)) != null,
+  );
 }
 
 /**
@@ -108,7 +98,16 @@ export function carriedIn(
   return { carries, fingerprint: sha256(JSON.stringify(parts)) };
 }
 
-/** `hooks and MCP servers`. */
+/** Whether a plugin file is one a target starts or puts on the PATH, which a fingerprint covers. */
+function carrying(path: string): Carried | undefined {
+  const named = FILES.find(([file]) => file === path)?.[1];
+  if (named !== undefined) return named;
+  if (path.startsWith(`${BIN}/`)) return "bin";
+  if (path.startsWith("hooks/")) return "hooks";
+  if (path.startsWith("monitors/")) return "monitors";
+  return undefined;
+}
+
 export function describeCarried(carried: readonly Carried[]): string {
   return list(carried.map((what) => WORDS[what]));
 }

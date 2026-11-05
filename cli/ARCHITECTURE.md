@@ -19,7 +19,7 @@ targets/            one typed definition per target; imports only core/target/co
 adapter/            the public adapter contract; imports nothing else
 ```
 
-`self/` never reaches the daemon. The update code takes the daemon restart from its caller (`RecycleDaemon` in `self/minimum.ts`), and `aireg self uninstall` stops the daemon in its command module. `targets/` sits below `core/`, which loads the built-in list; the contract a target is written against is the one file of `core/` it imports.
+`self/` never reaches the daemon. The update code takes the daemon restart from its caller (`RecycleDaemon` in `self/minimum-update.ts`), and `aireg self uninstall` stops the daemon in its command module. `targets/` sits below `core/`, which loads the built-in list; the contract a target is written against is the one file of `core/` it imports.
 
 Three folders carry the word adapter. `adapter/` is the contract an adapter is written against, which the npm package exports; `adapters/` holds the adapters built into aireg; and `core/adapter/` is the host side, which finds the adapter for an address, loads it and talks to it.
 
@@ -43,33 +43,34 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | What an adapter adds beside the contract: commands, job steps and console tabs | `core/host/` |
 | Reading a file spec registry from any `read(path)`, its name rules and document names | `adapter/filespec/` |
 | How a source on disk lays out what it holds, and reading one that is not a registry, such as a folder of skills | `adapter/layouts/` |
-| The merges a publish writes into `versions.json` and `index.json` | `adapter/filespec/write.ts` |
-| Registry authoring: init, index, validate, kinds and offers | `core/filespec/write/` |
+| The merges a publish writes into `versions.json` and `index.json` | `adapter/filespec/merge.ts` |
+| Registry authoring: init, index, validate, kinds and offers | `core/filespec/` |
 | SemVer ordering, digests, safe file reads and writes, and message text helpers | `adapter/semver.ts`, `adapter/spec/canonical.ts`, `adapter/files.ts`, `adapter/text.ts` |
 | Paths, the home folder, hashing, file modes and processes | `adapter/paths.ts`, `core/fs/path.ts`, `core/fs/hash.ts`, `core/fs/mode.ts`, `core/process.ts` |
 | The lockfile, `.registry/manifest.lock.yml` | `core/lock.ts` |
 | Running git | `adapters/git/exec.ts`, reached through `adapters/git/api.ts` |
 | The scope a command installs into, and where it places artifacts | `core/store/paths.ts` |
 | Edits to a target's own config file, such as registering a plugin | `core/target/register/` |
-| The command table: names, options, help and docs links | `cli/commands/index.ts` |
+| A command's name, options, help and docs link | `cli/commands/<command>/spec.ts` |
+| The command types; the built-in specs in help order and the names they reserve; each built-in's lazy module | `cli/commands/command.ts`, `cli/commands/builtins.ts`, `cli/commands/index.ts` |
 | The values a release build stamps in, for tsup and `bun build --compile` | `packaging/defines.ts` |
 
 ## How a command runs
 
 1. `main.ts` finds the command in `cli/commands/index.ts` and loads its module.
-2. The command parses its options with `cli/options.ts` and reads the scope once: the project's or your user scope's `.registry/manifest.yml` and `manifest.lock.yml`.
-3. Installing commands call `engine/pipeline.ts`, which acquires each registry through its adapter (`core/adapter/`), builds a plan (`core/plan/build.ts`) and, through one guarded commit, applies it (`core/plan/apply.ts`) under the scope's lease (`core/lease.ts`). How the run is shown is the command's, through `cli/render/plan.ts`.
+2. The command parses its options with `cli/options/parse.ts` and reads the scope once: the project's or your user scope's `.registry/manifest.yml` and `manifest.lock.yml`.
+3. Installing commands call `engine/install/pipeline.ts`, which acquires each registry through its adapter (`core/adapter/`), builds a plan (`core/plan/build/build.ts`) and, through one guarded commit, applies it (`core/plan/apply/apply.ts`) under the scope's lease (`core/lease/lease.ts`). How the run is shown is the command's, through `cli/render/plan.ts`.
 4. Placement in each target folder follows the target's definition (`src/targets/`, applied by `core/target/`), including any config file the target needs edited, such as Codex's `config.toml`.
-5. A failure is an `AiregError`; `cli/report.ts` prints it, or its `--json` form, and returns its exit status.
+5. A failure is an `AiregError`; `cli/render/error.ts` prints it, or its `--json` form, and returns its exit status.
 
-Background jobs run the same engine from the daemon (`daemon/runner.ts`), so a sync started by hand and one started by the scheduler behave the same: both write through the pipeline's `commit`, after the same recovery, refusals and hooks.
+Background jobs run the same engine from the daemon (`daemon/runs/runner.ts`), so a sync started by hand and one started by the scheduler behave the same: both write through the pipeline's `commit`, after the same recovery, refusals and hooks.
 
 ## Extending aireg
 
-- **A target:** copy the closest module in `src/targets/` to `<id>.ts` and edit it with `defineTarget`, typed by `core/target/contract.ts`: its `roots`, the `detect` signals that it is installed, and under `kinds` where each kind goes. Use `reads` when it already loads another target's folder, and `register` and `manifest` entries only when it needs a config edit to load a plugin. Its `id` is the name the tool goes by in the industry, such as `claude-code`; `aliases` keeps an earlier id working, and `canonicalId` in `core/target/index.ts` is where every id read from a flag or a file is resolved. List it in `src/targets/index.ts`; a test checks every target's ids, templates and paths. No code branches on a target's name: extend the contract instead. Record what each mapping rests on in `test/conformance/<id>/EVIDENCE.md` and prove it with a conformance test. A person can also define one as a JSON file, which `core/target/load.ts` reads and checks.
+- **A target:** copy the closest module in `src/targets/` to `<id>.ts` and edit it with `defineTarget`, typed by `core/target/contract.ts`: its `roots`, the `detect` signals that it is installed, and under `kinds` where each kind goes. Use `reads` when it already loads another target's folder, and `register` and `manifest` entries only when it needs a config edit to load a plugin. Its `id` is the name the tool goes by in the industry, such as `claude-code`; `aliases` keeps an earlier id working, and `canonicalId` in `core/target/ids.ts` is where every id read from a flag or a file is resolved. List it in `src/targets/index.ts`; a test checks every target's ids, templates and paths. No code branches on a target's name: extend the contract instead. Record what each mapping rests on in `test/conformance/<id>/EVIDENCE.md` and prove it with a conformance test. A person can also define one as a JSON file, which `core/target/load.ts` reads and checks.
 - **A codec:** a pure function in `core/target/codecs/`, listed in the `Codec` type, `applyCodec` and `scripts/schema/target.ts`. A definition only names a codec, so a target file never carries code.
 - **An adapter:** implement the contract in `src/adapter/` with `defineAdapter`, and check it with `assertAdapterCompliance`. `aireg adapter init <id>` scaffolds one as a standalone package that imports the contract from `@atlanai/aireg`. Any other adapter installs from the release server with `aireg adapter install`. A store laid out as the file spec reads through `resolveFromRoot` and, on disk, `openFolderRegistry`; a built-in adapter whose source is a folder reads it through `openLayoutRoot` in `adapter/layouts/`, which tells a registry from a folder of skills and reads either. Built-in adapters live in `src/adapters/<id>/` with the same layout, and say through the contract what the CLI needs, such as `credentialsHint`, `readOnly` and the `fileSpec` capability, so no command branches on an adapter's id.
-- **A command:** add its entry to `cli/commands/index.ts`, with its options, examples and docs page, and its module at `cli/commands/<command>.ts`. A command with actions keeps each action's module beside it, in `cli/commands/<command>/<action>.ts`, such as `cli/commands/self/update.ts`. Help and the command map (`aireg --map`) read the table.
+- **A command:** write its spec, with its options, examples and docs page, in `cli/commands/<command>/spec.ts`, its module at `cli/commands/<command>.ts`, then list the spec in `cli/commands/builtins.ts` and the module in `cli/commands/index.ts`. A command with actions keeps each action's module beside the spec, in `cli/commands/<command>/<action>.ts`, such as `cli/commands/self/update.ts`. A command module imports its own spec and `command.ts`, never `index.ts`, so loading the table never loads a command. Help and the command map (`aireg --map`) read the table.
 - **An environment setting:** add it to `SETTINGS` in `core/env.ts`. A test fails until `docs/reference/environment.md` documents it.
 - **An error:** throw `AiregError` with an `ErrorCode`, or extend it for a domain error. A new code needs an exit status in `core/errors.ts` and a row in `docs/reference/output.md`.
 
@@ -81,7 +82,7 @@ Vitest runs five projects. `pnpm test` runs them all, and `pnpm run test:unit`, 
 |---|---|---|
 | unit | `src/**/*.test.ts` beside the code, the tests in `scripts/` and `packaging/`, and `test/architecture.test.ts` | One module at a time, in process, and the import directions between layers. |
 | integration | `test/integration/` | Several modules together, in process, such as a client driving the daemon. |
-| e2e | `test/e2e/`, `test/scenarios/` | The built CLI in an isolated home. Each built-in command's `--help` is snapshotted. |
+| e2e | `test/e2e/`, `test/scenarios/` | The built CLI in an isolated home, including the root `--help` page; each command's own page is snapshotted by `cli/help/print.test.ts`. |
 | contract | `test/contract/` | The JSON Schemas against the spec, and the generated schemas against their definitions. |
 | conformance | `test/conformance/` | Each target against its evidence: what aireg places, and, with `AIREG_CONFORMANCE=1` and the target installed, what the target itself loads. |
 
@@ -90,6 +91,19 @@ Vitest runs five projects. `pnpm test` runs them all, and `pnpm run test:unit`, 
 A scenario in `test/scenarios/*.md` is a CLI session: `$ aireg ...` lines with the output expected, `? <code>` for an exit status, and `file` blocks for what should be on disk. `UPDATE_SCENARIOS=1` rewrites the expected output after a deliberate change.
 
 `pnpm run verify` runs the typecheck, lint, dead-code check, third-party notices check, build, package check and tests. Lint warns about a function over 100 lines or a file over 1000, blank lines aside and outside tests, a function whose cognitive complexity is over 25, and a reassigned parameter. Existing code may carry these warnings, but a pull request must leave every file it adds or edits free of them: CI runs `pnpm run lint:changed --since=<base>`, which fails on any warning in those files. Run it before you push, with `--since=origin/main`.
+
+## Code layout
+
+- **File names** are kebab-case and name one concern; the folder gives the context, so `manifest/parse.ts`, not `manifest-parser.ts`. There is no `utils.ts`: a helper one folder uses stays in that folder, one a command group shares goes in `commands/<command>/shared.ts`, and one several layers share is a named module in `core/` or `adapter/`.
+- **`model.ts`** holds a feature's types, constants and small type guards; **`errors.ts`** holds its error classes and the functions that build them; **`index.ts`** is only an entry point, such as `adapter/index.ts`, never an implementation.
+- **Import a name from the module that defines it.** Nothing in `src/` re-exports another module except the published entry `adapter/index.ts` and each built-in adapter's `api.ts`.
+- **A large module splits by concern, not by length.** Split when its parts change for different reasons, its importers use separate groups of its exports, or it cannot be named without "and". A long module that is one concern, such as a target definition or the adapter contract, stays whole.
+- **Inside a file**, imports come first, then types and constants, then the exported entry points, each followed by the private helpers it calls in the order it calls them. A constant one function uses sits directly above it.
+
+## Comments
+
+A comment says why: a constraint, an invariant, an ordering, a platform quirk, a compatibility reason or a link. What the code does, the name and the type already say; when they do not, rename. JSDoc is for the published contract in `adapter/`, `core/target/contract.ts`, `core/product.ts`, the settings in `core/env.ts` and the command specs, one line where it fits. Elsewhere a doc comment on a declaration or field is at most two lines, and only for what its name and type cannot say, such as what an absent value means. A `//` above a statement is at most two lines.
+
 
 ## Messages
 

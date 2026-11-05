@@ -1,7 +1,7 @@
 import { access, chmod, copyFile, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
 import { GitError, git, gitTry, stopGit } from "./exec.ts";
 
@@ -83,7 +83,7 @@ unix("git", () => {
     await expect.poll(() => alive(helper), { timeout: 5_000 }).toBe(false);
   });
 
-  it("returns a non-zero exit as data", async () => {
+  test("returns a non-zero exit as data", async () => {
     const attempt = await gitTry(["rev-parse", "--verify", "--quiet", "no-such-ref"], {
       cwd: tmpdir(),
       timeoutMs: 60_000,

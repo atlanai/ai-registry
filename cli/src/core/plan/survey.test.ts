@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { LOCK_VERSION, type Lock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
 import { survey } from "./survey.ts";
@@ -42,7 +42,7 @@ function lockOf(count: number): Lock {
 }
 
 describe("survey", () => {
-  it("hashes a bounded number of installed copies at a time", async () => {
+  test("hashes a bounded number of installed copies at a time", async () => {
     const found = await survey(lockOf(100), roots("project", "/work"));
 
     expect(Object.keys(found.artifacts)).toHaveLength(100);

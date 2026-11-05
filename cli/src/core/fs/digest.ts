@@ -2,10 +2,10 @@ import { createHash, type Hash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
+import { EXECUTE_BITS } from "#adapter/files.ts";
 import { ENVELOPE } from "#adapter/filespec/names.ts";
 import { hashStream, sha256 } from "#adapter/spec/canonical.ts";
 import { authored, type FileRecord, isDirectory, walk } from "#core/fs/tree.ts";
-import { EXECUTE_BITS } from "./mode.ts";
 
 type Listed = Pick<FileRecord, "path" | "size" | "mtimeMs" | "ino" | "executable">;
 
@@ -19,13 +19,9 @@ interface Tree {
 
 type Encoding = "framed" | "unframed";
 
-async function hashFile(hash: Hash, path: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    createReadStream(path)
-      .on("data", (chunk) => hash.update(chunk))
-      .on("end", () => resolve())
-      .on("error", reject);
-  });
+/** What aireg 0.1 records for the files a framed digest describes, when this process knows it. */
+export function earlierDigest(framed: string): string | undefined {
+  return EARLIER.get(framed);
 }
 
 /**
@@ -36,14 +32,6 @@ const KNOWN = new Map<string, { stamp: string } & Partial<Record<Encoding, strin
 const KNOWN_LIMIT = 20_000;
 /** A write this close to the hash may share its modification time with what was read. */
 const RACY_MS = 2_000;
-
-function stampOf(files: readonly Listed[]) {
-  return sha256(
-    files
-      .map((file) => `${file.path}\0${file.size}\0${file.mtimeMs}\0${file.ino}\0${file.executable}`)
-      .join("\n"),
-  );
-}
 
 /** Each file's path, mode, size and content digest as one JSON list, so no two trees share it. */
 async function framed(tree: Tree): Promise<string> {
@@ -56,15 +44,51 @@ async function framed(tree: Tree): Promise<string> {
   return sha256(JSON.stringify(entries));
 }
 
-/** What older locks record, one file run into the next; written only as aireg 0.1's `digest`. */
-async function unframed(tree: Tree): Promise<string> {
-  const hash = createHash("sha256");
-  for (const file of tree.files) {
-    if (tree.folder) hash.update(`${file.path} ${file.executable ? "1" : "0"} `);
-    await hashFile(hash, join(tree.root, file.path));
-    if (tree.folder) hash.update(" ");
-  }
-  return `sha256:${hash.digest("hex")}`;
+/** A lock row's two digests, read together so writing the row again keeps both. */
+export function rememberEarlier(framed: string, earlier: string): void {
+  if (framed !== earlier) remember(framed, earlier);
+}
+
+function remember(framed: string, earlier: string): void {
+  EARLIER.delete(framed);
+  EARLIER.set(framed, earlier);
+  const [oldest] = EARLIER.keys();
+  if (EARLIER.size > KNOWN_LIMIT && oldest !== undefined) EARLIER.delete(oldest);
+}
+
+/**
+ * Has the copy on disk been edited since we placed it? Given the digest a lock records
+ * for it, that digest is returned when the copy still matches it.
+ */
+export async function digest(path: string, recorded?: string): Promise<string> {
+  const tree = (await isDirectory(path)) ? folder(path, path, await walk(path)) : await lone(path);
+  return settle(tree, recorded);
+}
+
+/**
+ * The unframed digest of each framed one taken or read. A lock writes it as `digest`, the
+ * one aireg 0.1 checks, so a copy this version placed does not read there as edited.
+ */
+const EARLIER = new Map<string, string>();
+
+function folder(path: string, key: string, files: readonly FileRecord[]): Tree {
+  return { root: path, key, files: files.filter((file) => file.path !== ENVELOPE), folder: true };
+}
+
+async function lone(path: string): Promise<Tree> {
+  const info = await stat(path);
+  const executable = (info.mode & EXECUTE_BITS) !== 0;
+  const file = { path: "", size: info.size, mtimeMs: info.mtimeMs, ino: info.ino, executable };
+  return { root: path, key: path, files: [file], folder: false };
+}
+
+/** Keeps `recorded` when it is these files' unframed digest, so older locks read as untouched. */
+async function settle(tree: Tree, recorded: string | undefined): Promise<string> {
+  const now = await taken(tree, "framed");
+  const earlier = await taken(tree, "unframed");
+  remember(now, earlier);
+  if (recorded === undefined || recorded === "" || recorded === now) return now;
+  return earlier === recorded ? recorded : now;
 }
 
 async function taken(tree: Tree, encoding: Encoding): Promise<string> {
@@ -82,56 +106,32 @@ async function taken(tree: Tree, encoding: Encoding): Promise<string> {
   return value;
 }
 
-/**
- * The unframed digest of each framed one taken or read. A lock writes it as `digest`, the
- * one aireg 0.1 checks, so a copy this version placed doesn't read there as edited.
- */
-const EARLIER = new Map<string, string>();
-
-function remember(framed: string, earlier: string): void {
-  EARLIER.delete(framed);
-  EARLIER.set(framed, earlier);
-  const [oldest] = EARLIER.keys();
-  if (EARLIER.size > KNOWN_LIMIT && oldest !== undefined) EARLIER.delete(oldest);
+function stampOf(files: readonly Listed[]) {
+  return sha256(
+    files
+      .map((file) => `${file.path}\0${file.size}\0${file.mtimeMs}\0${file.ino}\0${file.executable}`)
+      .join("\n"),
+  );
 }
 
-/** What aireg 0.1 records for the files a framed digest describes, when this process knows it. */
-export function earlierDigest(framed: string): string | undefined {
-  return EARLIER.get(framed);
+/** What older locks record, one file run into the next; written only as aireg 0.1's `digest`. */
+async function unframed(tree: Tree): Promise<string> {
+  const hash = createHash("sha256");
+  for (const file of tree.files) {
+    if (tree.folder) hash.update(`${file.path} ${file.executable ? "1" : "0"} `);
+    await hashFile(hash, join(tree.root, file.path));
+    if (tree.folder) hash.update(" ");
+  }
+  return `sha256:${hash.digest("hex")}`;
 }
 
-/** A lock row's two digests, read together so writing the row again keeps both. */
-export function rememberEarlier(framed: string, earlier: string): void {
-  if (framed !== earlier) remember(framed, earlier);
-}
-
-/** `recorded` stands when it is the unframed digest of these files, so older locks read as untouched. */
-async function settle(tree: Tree, recorded: string | undefined): Promise<string> {
-  const now = await taken(tree, "framed");
-  const earlier = await taken(tree, "unframed");
-  remember(now, earlier);
-  if (recorded === undefined || recorded === "" || recorded === now) return now;
-  return earlier === recorded ? recorded : now;
-}
-
-async function lone(path: string): Promise<Tree> {
-  const info = await stat(path);
-  const executable = (info.mode & EXECUTE_BITS) !== 0;
-  const file = { path: "", size: info.size, mtimeMs: info.mtimeMs, ino: info.ino, executable };
-  return { root: path, key: path, files: [file], folder: false };
-}
-
-function folder(path: string, key: string, files: readonly FileRecord[]): Tree {
-  return { root: path, key, files: files.filter((file) => file.path !== ENVELOPE), folder: true };
-}
-
-/**
- * Has the copy on disk been edited since we placed it? Given the digest a lock records
- * for it, that digest is returned when the copy still matches it.
- */
-export async function digest(path: string, recorded?: string): Promise<string> {
-  const tree = (await isDirectory(path)) ? folder(path, path, await walk(path)) : await lone(path);
-  return settle(tree, recorded);
+async function hashFile(hash: Hash, path: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    createReadStream(path)
+      .on("data", (chunk) => hash.update(chunk))
+      .on("end", () => resolve())
+      .on("error", reject);
+  });
 }
 
 /**

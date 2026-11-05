@@ -1,5 +1,5 @@
+import { fields } from "./errors.ts";
 import type { Account } from "./model.ts";
-import { fields } from "./parse-errors.ts";
 
 const { onlyKnown, record, text } = fields;
 

@@ -5,31 +5,108 @@ import { join } from "node:path";
 import { advertisedCapabilities } from "#adapter/contract.ts";
 import { gte } from "#adapter/semver.ts";
 import { plural, sanitizeText } from "#adapter/text.ts";
-import { noArguments, parse } from "#cli/options.ts";
+import { DOCTOR_COMMAND } from "#cli/commands/doctor/spec.ts";
+import {
+  ownSkillsCommand,
+  ownSkillsInstalled,
+  staleOwnSkillsPin,
+} from "#cli/onboarding/own-skills.ts";
+import { noArguments, parse } from "#cli/options/parse.ts";
 import { underHome } from "#cli/render/home.ts";
-import { loadAdapters } from "#core/adapter/registry.ts";
+import { loadAdapters } from "#core/adapter/load.ts";
 import { fileExposure } from "#core/credentials/store.ts";
 import { ExitCode } from "#core/errors.ts";
 import { WRITABLE_BY_OTHERS } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
-import { ownSkillsCommand, ownSkillsInstalled, staleOwnSkillsPin } from "#core/own-skills.ts";
 import { NAME } from "#core/product.ts";
 import { type ReleaseStamp, releaseStamp } from "#core/release/stamp.ts";
 import { cacheDir, credentialsPath, toolHome, userScopeDir } from "#core/store/paths.ts";
 import { displayWidth, pad } from "#core/term/format.ts";
 import { nodeTooOld, VERSION } from "#core/version.ts";
 import { autostartState } from "#daemon/autostart/index.ts";
-import { readUpdateCache, type UpdateCache } from "#self/check.ts";
-import { builtin, type CommandContext } from "./index.ts";
+import { readUpdateCache, type UpdateCache } from "#self/update-cache.ts";
+import type { CommandContext } from "./command.ts";
 
 interface Check {
   name: string;
   ok: boolean;
   detail: string;
-  /** The one command that fixes or improves it. */
+  /** What fixes or improves it; commands joined with ` && ` print one per line. */
   fix?: string;
   /** Worth knowing, with nothing to do. */
   info?: boolean;
+}
+
+export async function run(context: CommandContext): Promise<void> {
+  const { positionals } = parse(context.argv, DOCTOR_COMMAND);
+  noArguments(
+    positionals,
+    "doctor",
+    "It only reads. To clear a stuck write lock, run `aireg unlock`.",
+  );
+
+  const found = await loadAdapters();
+  const checks = await checksFor(context.cwd, found);
+  const adapters = found.loaded.map((adapter) => ({
+    id: adapter.id,
+    displayName: adapter.displayName,
+    capabilities: advertisedCapabilities(adapter.capabilities),
+  }));
+  const fatal = checks.some(
+    (check) => (check.name === "git" || check.name === "node") && !check.ok,
+  );
+  if (fatal) context.exit = ExitCode.Error;
+  if (context.printer.format === "json") {
+    const problems = checks.filter((check) => !check.ok).length;
+    context.printer.json({ ok: !fatal, data: { problems, checks, adapters } });
+    return;
+  }
+  render(context, checks);
+}
+
+async function checksFor(
+  cwd: string,
+  adapters: Awaited<ReturnType<typeof loadAdapters>>,
+): Promise<Check[]> {
+  const prerequisites: Check[] = [];
+  for (const adapter of adapters.loaded) {
+    for (const item of (await adapter.ready?.()) ?? []) prerequisites.push(item);
+  }
+  // One broken module is reported where it stands; every other check still runs.
+  for (const { id, error } of adapters.broken) {
+    const why = error instanceof Error ? sanitizeText(error.message) : "it did not load";
+    prerequisites.push({ name: `adapter ${id}`, ok: false, detail: why });
+  }
+  const cached = await readUpdateCache();
+  const tooOld = nodeTooOld();
+  // aireg sends no telemetry; an adapter reports its own through `ready()`.
+  return [
+    { name: "cli", ok: true, detail: VERSION },
+    {
+      name: "node",
+      ok: tooOld === undefined,
+      detail: tooOld ?? process.versions.node,
+    },
+    ...prerequisites,
+    await canLink(),
+    {
+      name: "store",
+      ok: true,
+      detail: underHome(cacheDir()),
+    },
+    await autostart(),
+    await home(),
+    await credentials(),
+    userScope(),
+    await ownSkills(cwd),
+    {
+      name: "telemetry",
+      ok: true,
+      info: true,
+      detail: "none",
+    },
+    updates(releaseStamp(), cached),
+  ];
 }
 
 /** Can this machine make the links projection depends on? */
@@ -103,7 +180,7 @@ async function home(): Promise<Check> {
   return { name: "home", ok: true, detail: shown };
 }
 
-/** What every command would refuse about the file, by the store's own rule; its contents are never read. */
+/** What every command would refuse about the file; never reads its contents. */
 async function credentials(): Promise<Check> {
   const path = credentialsPath();
   const shown = underHome(path);
@@ -190,79 +267,6 @@ function updates(stamp: ReleaseStamp | undefined, cached: UpdateCache | undefine
       };
 }
 
-async function checksFor(
-  cwd: string,
-  adapters: Awaited<ReturnType<typeof loadAdapters>>,
-): Promise<Check[]> {
-  const prerequisites: Check[] = [];
-  for (const adapter of adapters.loaded) {
-    for (const item of (await adapter.ready?.()) ?? []) prerequisites.push(item);
-  }
-  // One broken module is reported where it stands; every other check still runs.
-  for (const { id, error } of adapters.broken) {
-    const why = error instanceof Error ? sanitizeText(error.message) : "it did not load";
-    prerequisites.push({ name: `adapter ${id}`, ok: false, detail: why });
-  }
-  const cached = await readUpdateCache();
-  const tooOld = nodeTooOld();
-  return [
-    { name: "cli", ok: true, detail: VERSION },
-    {
-      name: "node",
-      ok: tooOld === undefined,
-      detail: tooOld ?? process.versions.node,
-    },
-    ...prerequisites,
-    await canLink(),
-    {
-      name: "store",
-      ok: true,
-      detail: underHome(cacheDir()),
-    },
-    await autostart(),
-    await home(),
-    await credentials(),
-    userScope(),
-    await ownSkills(cwd),
-    // aireg itself sends none; an installed adapter reports its own through `ready()`.
-    {
-      name: "telemetry",
-      ok: true,
-      info: true,
-      detail: "none",
-    },
-    updates(releaseStamp(), cached),
-  ];
-}
-
-export async function run(context: CommandContext): Promise<void> {
-  const { positionals } = parse(context.argv, builtin("doctor"));
-  noArguments(
-    positionals,
-    "doctor",
-    "It only reads. To clear a stuck write lock, run `aireg unlock`.",
-  );
-
-  const found = await loadAdapters();
-  const checks = await checksFor(context.cwd, found);
-  const adapters = found.loaded.map((adapter) => ({
-    id: adapter.id,
-    displayName: adapter.displayName,
-    capabilities: advertisedCapabilities(adapter.capabilities),
-  }));
-  const fatal = checks.some(
-    (check) => (check.name === "git" || check.name === "node") && !check.ok,
-  );
-  if (fatal) context.exit = ExitCode.Error;
-  if (context.printer.format === "json") {
-    const problems = checks.filter((check) => !check.ok).length;
-    context.printer.json({ ok: !fatal, data: { problems, checks, adapters } });
-    return;
-  }
-  render(context, checks);
-}
-
-/** One line of versions, then a checklist: what passed, what to improve, what blocks installs. */
 function render(context: CommandContext, checks: readonly Check[]): void {
   const { style } = context.printer;
   const version = (name: string) => checks.find((check) => check.name === name);

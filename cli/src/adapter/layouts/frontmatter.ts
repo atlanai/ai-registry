@@ -16,107 +16,6 @@ const MAX_LINES = 1_000;
 
 const KEY = /^([A-Za-z0-9_][A-Za-z0-9_.-]*)\s*:(?:\s+(.*))?$/;
 
-function indentOf(line: string): number {
-  return line.length - line.trimStart().length;
-}
-
-/** A trailing ` # comment` ends a plain scalar; a `#` inside one does not. */
-function plain(text: string): string {
-  const comment = text.search(/\s#/);
-  return (comment === -1 ? text : text.slice(0, comment)).trim();
-}
-
-function doubleQuoted(text: string): string | undefined {
-  const match = /^"((?:[^"\\]|\\.)*)"\s*(?:#.*)?$/.exec(text);
-  if (match === null) return undefined;
-  const escapes: Record<string, string> = {
-    n: "\n",
-    t: "\t",
-    r: "\r",
-    '"': '"',
-    "\\": "\\",
-    "/": "/",
-  };
-  return (match[1] as string).replace(/\\(.)/g, (whole, char: string) => escapes[char] ?? whole);
-}
-
-function singleQuoted(text: string): string | undefined {
-  const match = /^'((?:[^']|'')*)'\s*(?:#.*)?$/.exec(text);
-  return match === null ? undefined : (match[1] as string).replace(/''/g, "'");
-}
-
-/** One inline value: quoted, a flow list of plain items, or plain text. */
-function scalar(text: string): string | string[] | undefined {
-  if (text.startsWith('"')) return doubleQuoted(text);
-  if (text.startsWith("'")) return singleQuoted(text);
-  if (text.startsWith("[")) {
-    const match = /^\[(.*)\]\s*(?:#.*)?$/.exec(text);
-    if (match === null) return undefined;
-    const inner = (match[1] as string).trim();
-    if (inner === "") return [];
-    return inner.split(",").map((item) => {
-      const value = item.trim();
-      return singleQuoted(value) ?? doubleQuoted(value) ?? value;
-    });
-  }
-  // A flow map or an anchor is outside the subset.
-  if (/^[{&*!|>]/.test(text)) return undefined;
-  return plain(text);
-}
-
-/** `|` keeps line breaks, `>` folds them into spaces; `-` drops the final one. */
-function block(header: string, lines: readonly string[]): string {
-  const indent = Math.min(...lines.filter((line) => line.trim() !== "").map(indentOf));
-  const body = lines.map((line) => line.slice(Number.isFinite(indent) ? indent : 0));
-  while (body.length > 0 && body.at(-1)?.trim() === "") body.pop();
-  const text = header.startsWith(">")
-    ? body.reduce((joined, line, index) => {
-        if (index === 0) return line;
-        if (line === "") return `${joined}\n`;
-        return joined.endsWith("\n") ? `${joined}${line}` : `${joined} ${line}`;
-      }, "")
-    : body.join("\n");
-  return header.includes("-") ? text : `${text}\n`;
-}
-
-/** The text items of a `- item` list, or one level of `key: value` pairs. */
-function nestedValue(under: readonly string[]): FrontmatterValue {
-  const items = under.filter((item) => item.trim() !== "");
-  if (items.length === 0) return "";
-  if (items.every((item) => item.trimStart().startsWith("- "))) {
-    return items.map((item) => {
-      const listed = item.trimStart().slice(2).trim();
-      const read = scalar(listed);
-      return typeof read === "string" ? read : listed;
-    });
-  }
-  const map: Record<string, string> = {};
-  for (const item of items) {
-    const pair = KEY.exec(item.trim());
-    const read = pair === null ? undefined : scalar((pair[2] ?? "").trim());
-    if (pair !== null && typeof read === "string") map[pair[1] as string] = read;
-  }
-  return map;
-}
-
-/** One key's value, from what follows its colon and the lines indented under it. */
-function readValue(value: string, under: readonly string[]): FrontmatterValue | undefined {
-  if (value === "" || value.startsWith("#")) return nestedValue(under);
-  if (/^[|>][+-]?$/.test(value)) return block(value, under);
-  return scalar(value);
-}
-
-/** The lines indented under the key at `at`, which belong to it. */
-function indentedAfter(lines: readonly string[], at: number): string[] {
-  const taken: string[] = [];
-  for (let next = at + 1; next < lines.length; next += 1) {
-    const line = lines[next] as string;
-    if (line.trim() !== "" && indentOf(line) === 0) break;
-    taken.push(line);
-  }
-  return taken;
-}
-
 /**
  * The fields between a leading `---` line and the next `---`, or undefined when the text has
  * none. A line the subset does not cover is skipped, along with anything indented under it.
@@ -140,6 +39,107 @@ export function readFrontmatter(text: string): Frontmatter | undefined {
     if (value !== undefined) data[match[1] as string] = value;
   }
   return { data, body: lines.slice(end + 1).join("\n") };
+}
+
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length;
+}
+
+/** The lines indented under the key at `at`, which belong to it. */
+function indentedAfter(lines: readonly string[], at: number): string[] {
+  const taken: string[] = [];
+  for (let next = at + 1; next < lines.length; next += 1) {
+    const line = lines[next] as string;
+    if (line.trim() !== "" && indentOf(line) === 0) break;
+    taken.push(line);
+  }
+  return taken;
+}
+
+/** One key's value, from what follows its colon and the lines indented under it. */
+function readValue(value: string, under: readonly string[]): FrontmatterValue | undefined {
+  if (value === "" || value.startsWith("#")) return nestedValue(under);
+  if (/^[|>][+-]?$/.test(value)) return block(value, under);
+  return scalar(value);
+}
+
+/** The text items of a `- item` list, or one level of `key: value` pairs. */
+function nestedValue(under: readonly string[]): FrontmatterValue {
+  const items = under.filter((item) => item.trim() !== "");
+  if (items.length === 0) return "";
+  if (items.every((item) => item.trimStart().startsWith("- "))) {
+    return items.map((item) => {
+      const listed = item.trimStart().slice(2).trim();
+      const read = scalar(listed);
+      return typeof read === "string" ? read : listed;
+    });
+  }
+  const map: Record<string, string> = {};
+  for (const item of items) {
+    const pair = KEY.exec(item.trim());
+    const read = pair === null ? undefined : scalar((pair[2] ?? "").trim());
+    if (pair !== null && typeof read === "string") map[pair[1] as string] = read;
+  }
+  return map;
+}
+
+/** One inline value: quoted, a flow list of plain items, or plain text. */
+function scalar(text: string): string | string[] | undefined {
+  if (text.startsWith('"')) return doubleQuoted(text);
+  if (text.startsWith("'")) return singleQuoted(text);
+  if (text.startsWith("[")) {
+    const match = /^\[(.*)\]\s*(?:#.*)?$/.exec(text);
+    if (match === null) return undefined;
+    const inner = (match[1] as string).trim();
+    if (inner === "") return [];
+    return inner.split(",").map((item) => {
+      const value = item.trim();
+      return singleQuoted(value) ?? doubleQuoted(value) ?? value;
+    });
+  }
+  // A flow map or an anchor is outside the subset.
+  if (/^[{&*!|>]/.test(text)) return undefined;
+  return plain(text);
+}
+
+function doubleQuoted(text: string): string | undefined {
+  const match = /^"((?:[^"\\]|\\.)*)"\s*(?:#.*)?$/.exec(text);
+  if (match === null) return undefined;
+  const escapes: Record<string, string> = {
+    n: "\n",
+    t: "\t",
+    r: "\r",
+    '"': '"',
+    "\\": "\\",
+    "/": "/",
+  };
+  return (match[1] as string).replace(/\\(.)/g, (whole, char: string) => escapes[char] ?? whole);
+}
+
+function singleQuoted(text: string): string | undefined {
+  const match = /^'((?:[^']|'')*)'\s*(?:#.*)?$/.exec(text);
+  return match === null ? undefined : (match[1] as string).replace(/''/g, "'");
+}
+
+/** A trailing ` # comment` ends a plain scalar; a `#` inside one does not. */
+function plain(text: string): string {
+  const comment = text.search(/\s#/);
+  return (comment === -1 ? text : text.slice(0, comment)).trim();
+}
+
+/** `|` keeps line breaks, `>` folds them into spaces; `-` drops the final one. */
+function block(header: string, lines: readonly string[]): string {
+  const indent = Math.min(...lines.filter((line) => line.trim() !== "").map(indentOf));
+  const body = lines.map((line) => line.slice(Number.isFinite(indent) ? indent : 0));
+  while (body.length > 0 && body.at(-1)?.trim() === "") body.pop();
+  const text = header.startsWith(">")
+    ? body.reduce((joined, line, index) => {
+        if (index === 0) return line;
+        if (line === "") return `${joined}\n`;
+        return joined.endsWith("\n") ? `${joined}${line}` : `${joined} ${line}`;
+      }, "")
+    : body.join("\n");
+  return header.includes("-") ? text : `${text}\n`;
 }
 
 /** A text field, when the front matter has one that is not empty. */

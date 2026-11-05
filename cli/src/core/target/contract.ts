@@ -1,4 +1,4 @@
-import type { ArtifactKind } from "#core/kinds.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 
 /** Places nothing of its own: a container's members land where their own kinds go. */
 interface ContentsMapping {

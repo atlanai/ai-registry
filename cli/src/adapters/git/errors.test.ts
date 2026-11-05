@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { SpecError } from "#adapter/index.ts";
 import { translating } from "./errors.ts";
 import { git } from "./exec.ts";
 
 describe("translating", () => {
-  it("passes a git failure through as the adapter's own", async () => {
+  test("passes a git failure through as the adapter's own", async () => {
     const error = await git(["no-such-command"], { timeoutMs: 60_000 }).catch(
       (reason: unknown) => reason,
     );
@@ -15,7 +15,7 @@ describe("translating", () => {
     expect(translated).toMatchObject({ adapter: "git" });
   });
 
-  it("reports a missing registry document as not found, with its hint", async () => {
+  test("reports a missing registry document as not found, with its hint", async () => {
     const missing = new SpecError("versions.json is missing.", { missing: true, hint: "Fix it." });
     await expect(translating(() => Promise.reject(missing))).rejects.toMatchObject({
       adapter: "git",

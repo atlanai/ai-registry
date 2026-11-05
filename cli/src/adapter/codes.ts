@@ -1,6 +1,6 @@
-/** Codes this client mints. A server's own codes are free-form and pass through. */
 import type { Failure } from "./errors.ts";
 
+/** Codes this client mints. A server's own codes are free-form and pass through. */
 export const CLI_CODES = [
   "UNAUTHORIZED",
   "DENIED",
@@ -17,7 +17,7 @@ export const CLI_CODES = [
 
 export type CliCode = (typeof CLI_CODES)[number];
 
-/** The code each failure is reported under when the server sent none. Forbidden is `DENIED`. */
+/** The code each failure is reported under when the server sent none. */
 export const FAILURE_CODES = {
   unauthorized: "UNAUTHORIZED",
   forbidden: "DENIED",

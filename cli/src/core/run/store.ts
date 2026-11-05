@@ -1,4 +1,4 @@
-import type { ArtifactKind } from "#core/kinds.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import type { Disposition } from "#core/sync/model.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
 import type {
@@ -53,7 +53,7 @@ export interface RunQuery {
 export interface RunStore {
   create(input: CreateRun): RunRecord;
   start(id: string, step: string, atMs: number): RunRecord;
-  /** Moves a running run's step pointer and records the event, in one write; undefined once it stopped running. */
+  /** One write for the step and the event; undefined once the run stopped. */
   progress(id: string, step: string, event: AppendRunEvent): RunEvent | undefined;
   forgetJobs(live: ReadonlySet<string>): number;
   finish(id: string, result: FinishRun): RunRecord;

@@ -10,10 +10,7 @@ export const ADAPTER_PROTOCOL = 1;
 /** Adapter ids are path segments under `/adapters/`: lowercase, no dots. */
 export const ADAPTER_ID = /^[a-z][a-z0-9-]{0,63}$/;
 
-/**
- * How to read one file the envelope describes. The descriptor in `files[]` names
- * the bytes; this names where to get them, which is the adapter's own business.
- */
+/** Where to read one file the envelope describes. */
 export interface FileRef {
   /** POSIX, relative, matching a `files[].path` in the envelope. */
   path: string;
@@ -31,21 +28,15 @@ export interface Artifact {
   kind: ArtifactKind;
   /** The file spec envelope. Name, version, description and files all live here. */
   envelope: Envelope;
-  /**
-   * The plugin this belongs to, when the source groups its artifacts. A client
-   * projection of a namespace, never a kind on the wire.
-   */
+  /** A client view of a namespace, never a kind on the wire. */
   group?: string | undefined;
   /** npm `engines`. Oldest aireg CLI that can install this artifact. */
   engines?: { aireg?: string } | undefined;
   /** One per `envelope.files` entry, by path. */
   files: readonly FileRef[];
-  /**
-   * The version the source serves this at, where the envelope cannot say it: a git source's
-   * tag or pseudo-version. Outside the envelope, so it never changes the content digest.
-   */
+  /** The served version where the envelope cannot say it, such as a git tag; not in the digest. */
   version?: string | undefined;
-  /** The commit this one artifact was read at, where it is not the source's own, as for a plugin a marketplace fetches. */
+  /** The commit this was read at, where not the source's own, as for a marketplace plugin. */
   revision?: string | undefined;
   /** Set when the version was withdrawn, which only a pin still resolves. */
   yanked?: { reason: string | undefined } | undefined;
@@ -113,7 +104,7 @@ export interface Want {
   name: string;
   /** An exact version, which pins it. */
   version?: string | undefined;
-  /** Each narrows the want, so a pin reaches only the artifact it was written on. */
+  /** Narrows the want, so a pin reaches only the artifact it was written on. */
   namespace?: string | undefined;
   /** Narrows the want to one kind, as `namespace` narrows it to one namespace. */
   kind?: ArtifactKind | undefined;
@@ -242,9 +233,9 @@ export interface SourceContext {
   limits: SourceLimits;
   /** Keeps run counters honest whatever transport the adapter uses. */
   onBytes: (count: number) => void;
-  /** A folder of this adapter's own, kept between runs and created on first ask; deleting it costs a refetch. */
+  /** This adapter's own folder, kept between runs and made on first ask; deleting it costs a refetch. */
   cacheDir(): string;
-  /** Runs `run` while no other aireg process holds `key`, waiting its turn, such as one writer per folder. */
+  /** Waits until no other aireg process holds `key`, then runs `run`: one writer per folder, say. */
   exclusive<T>(key: string, run: () => Promise<T>): Promise<T>;
 }
 
@@ -287,19 +278,13 @@ export interface PublishInput {
   relationships?: readonly PublishRelationship[] | undefined;
 }
 
-/**
- * How to offer a change, not what to change. Every field is a hint a source may
- * have no notion of, and ignoring one is never an error.
- */
+/** Hints on how to offer a change; a source may ignore any of them without error. */
 export interface PublishOptions {
   /** Why the change was made, where the source records that. */
   message?: string | undefined;
   /** A person is publishing by hand: leave the change for review, where the source has a way to. */
   review?: boolean | undefined;
-  /**
-   * The host records each change on its own: report a refused one in
-   * `refused` and carry on, rather than throwing away the ones that landed.
-   */
+  /** Report each refused change in `refused` and carry on, keeping the ones that landed. */
   partial?: boolean | undefined;
 }
 
@@ -377,16 +362,13 @@ export interface OAuthClient {
 
 /** How an adapter signs in. aireg stores the credential and hands it back on connect. */
 export interface SourceAuth {
-  /**
-   * Exchanges a token, or the adapter's own flow, for a credential. The identity
-   * is absent when the registry does not say who the credential belongs to.
-   */
+  /** Exchanges a token, or runs its own flow, for a credential; identity is absent if unknown. */
   login(
     context: LoginContext,
   ): Promise<{ credential: Credential; identity?: Identity | undefined }>;
   /** Only for a credential that expires. A token an operator issued does not. */
   refresh?(endpoint: string, credential: Credential, signal: AbortSignal): Promise<Credential>;
-  /** Tells the registry a credential is no longer used: on sign-out, and for a session a new sign-in replaced. */
+  /** On sign-out, or when a new sign-in replaces the credential. */
   revoke?(endpoint: string, credential: Credential, signal: AbortSignal): Promise<void>;
   /** Where `auth login` signs in through the browser when no token is given; undefined when nowhere. */
   oauth?(endpoint: string, config: Readonly<Record<string, string>>): OAuthClient | undefined;
@@ -401,7 +383,7 @@ export interface SourceHandle {
   resolve(want: readonly Want[], options?: ResolveOptions): Promise<Resolution>;
   /** One file's bytes. aireg checks them against the digest the envelope gives. */
   fetch(artifact: Artifact, file: FileRef): Promise<Uint8Array>;
-  /** A source that is already a content store says where, and is read in place; undefined fetches instead. */
+  /** Where a source that is already a content store is read in place; undefined fetches instead. */
   localRoot?(artifact: Artifact): Promise<string | undefined>;
   /**
    * Offers a set, not one artifact: a source that records changes together can

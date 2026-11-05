@@ -2,8 +2,8 @@ import type { EventEmitter } from "node:events";
 import { Writable } from "node:stream";
 import { Box, type Key, render, Text, useApp, useInput } from "ink";
 import { createElement, type ReactElement, useEffect, useReducer, useState } from "react";
-import { ownStyleOnly } from "#core/output.ts";
 import { CSI_BODY, cells, ESC } from "#core/term/format.ts";
+import { ownStyleOnly } from "#core/term/printer.ts";
 import { wrapRows } from "./layout.ts";
 import {
   CANCEL,
@@ -13,63 +13,31 @@ import {
   type PromptIo,
   type PromptWriter,
   type Size,
-} from "./prompt.ts";
+} from "./model.ts";
 
 const DEFAULT_COLUMNS = 80;
 
-function sizeOf(output: PromptWriter): Size {
-  const columns = output.columns !== undefined && output.columns > 0 ? output.columns : undefined;
-  const rows = output.rows !== undefined && output.rows > 0 ? output.rows : undefined;
-  return { columns: columns ?? DEFAULT_COLUMNS, rows };
-}
-
-function useSize(output: PromptWriter): Size {
-  const [size, setSize] = useState(() => sizeOf(output));
-  useEffect(() => {
-    const source = output as Partial<Pick<EventEmitter, "on" | "off">>;
-    if (typeof source.on !== "function") return;
-    const resized = (): void => setSize(sizeOf(output));
-    source.on.call(output, "resize", resized);
-    return () => {
-      source.off?.call(output, "resize", resized);
-    };
-  }, [output]);
-  return size;
-}
-
-function keypress(text: string, key: Key): Keypress {
-  return {
-    text,
-    up: key.upArrow,
-    down: key.downArrow,
-    left: key.leftArrow,
-    right: key.rightArrow,
-    enter: key.return,
-    cancel: key.escape || (key.ctrl && text === "c"),
-    erase: key.backspace || key.delete,
-    modified: key.ctrl || (key.meta && !key.escape),
+/** Draws the machine inline until it answers, leaving its last frame in the scrollback. */
+export async function mount<T>(io: PromptIo, machine: Machine<T>): Promise<T | Canceled> {
+  let answer: T | Canceled = CANCEL;
+  const output = new Output(io.output);
+  const prompt = Prompt as (props: PromptProps<T>) => ReactElement;
+  const props: PromptProps<T> = {
+    machine,
+    output: io.output,
+    settle: (value) => {
+      answer = value;
+    },
   };
-}
-
-/**
- * Lines measured here, one Text per terminal row: a long line breaks where the
- * terminal would, and Ink erases every row it drew on the next frame.
- */
-function Frame(props: { lines: readonly string[]; columns: number }): ReactElement {
-  // Options carry registry text, and Ink passes hyperlinks and styling through.
-  const rows = props.lines.flatMap((line) => wrapRows(ownStyleOnly(line), props.columns));
-  return createElement(
-    Box,
-    { flexDirection: "column" },
-    // An empty Text takes no height, so a blank row keeps one cell.
-    ...rows.map((row, index) => createElement(Text, { key: index }, row === "" ? " " : row)),
-  );
-}
-
-interface PromptProps<T> {
-  machine: Machine<T>;
-  output: PromptWriter;
-  settle(answer: T | Canceled): void;
+  const app = render(createElement(prompt, props), {
+    stdin: keyed(io.input),
+    stdout: output,
+    stderr: output,
+    exitOnCtrlC: false,
+    patchConsole: false,
+  });
+  await app.waitUntilExit();
+  return answer;
 }
 
 /**
@@ -92,6 +60,46 @@ function Prompt<T>(props: PromptProps<T>): ReactElement {
     if (done) exit();
   }, [done, exit]);
   return createElement(Frame, { lines: props.machine.lines(size), columns: size.columns });
+}
+
+function useSize(output: PromptWriter): Size {
+  const [size, setSize] = useState(() => sizeOf(output));
+  useEffect(() => {
+    const source = output as Partial<Pick<EventEmitter, "on" | "off">>;
+    if (typeof source.on !== "function") return;
+    const resized = (): void => setSize(sizeOf(output));
+    source.on.call(output, "resize", resized);
+    return () => {
+      source.off?.call(output, "resize", resized);
+    };
+  }, [output]);
+  return size;
+}
+
+function sizeOf(output: PromptWriter): Size {
+  const columns = output.columns !== undefined && output.columns > 0 ? output.columns : undefined;
+  const rows = output.rows !== undefined && output.rows > 0 ? output.rows : undefined;
+  return { columns: columns ?? DEFAULT_COLUMNS, rows };
+}
+
+interface PromptProps<T> {
+  machine: Machine<T>;
+  output: PromptWriter;
+  settle(answer: T | Canceled): void;
+}
+
+function keypress(text: string, key: Key): Keypress {
+  return {
+    text,
+    up: key.upArrow,
+    down: key.downArrow,
+    left: key.leftArrow,
+    right: key.rightArrow,
+    enter: key.return,
+    cancel: key.escape || (key.ctrl && text === "c"),
+    erase: key.backspace || key.delete,
+    modified: key.ctrl || (key.meta && !key.escape),
+  };
 }
 
 /**
@@ -132,30 +140,19 @@ class Output extends Writable {
 /** Ink names forward delete as it names backspace, and no prompt has a cursor to delete forward from. */
 const FORWARD_DELETE = `${ESC}[3~`;
 
-/** The key `rest` opens with: an escape sequence whole, with or without alt, else one character. */
-function firstKey(rest: string): string {
-  if (!rest.startsWith(ESC)) return cells(rest)[0]?.text ?? rest;
-  const lead = rest.startsWith(ESC + ESC) ? 2 : 1;
-  const body = rest.slice(lead);
-  if (body.startsWith("[")) {
-    const params = CSI_BODY.exec(body.slice(1))?.[0];
-    if (params !== undefined) return rest.slice(0, lead + 1 + params.length);
-  }
-  const next = [...body.slice(body.startsWith("O") ? 1 : 0)][0];
-  if (next === undefined || next === ESC) return rest.slice(0, lead);
-  return rest.slice(0, lead + (body.startsWith("O") ? 1 : 0) + next.length);
-}
-
-/** A read can hold several keys, and Ink takes each read as one, so they are handed over singly. */
-function split(chunk: string): string[] {
-  const out: string[] = [];
-  let rest = chunk;
-  while (rest !== "") {
-    const key = firstKey(rest);
-    if (key !== FORWARD_DELETE) out.push(key);
-    rest = rest.slice(key.length);
-  }
-  return out;
+/**
+ * Lines measured here, one Text per terminal row: a long line breaks where the
+ * terminal would, and Ink erases every row it drew on the next frame.
+ */
+function Frame(props: { lines: readonly string[]; columns: number }): ReactElement {
+  // Options carry registry text, and Ink passes hyperlinks and styling through.
+  const rows = props.lines.flatMap((line) => wrapRows(ownStyleOnly(line), props.columns));
+  // An empty Text takes no height, so a blank row keeps one cell.
+  return createElement(
+    Box,
+    { flexDirection: "column" },
+    ...rows.map((row, index) => createElement(Text, { key: index }, row === "" ? " " : row)),
+  );
 }
 
 type Handle = Partial<{ ref(): unknown; unref(): unknown }>;
@@ -204,25 +201,28 @@ function keyed(input: NodeJS.ReadStream): NodeJS.ReadStream {
   return adapter as unknown as NodeJS.ReadStream;
 }
 
-/** Draws the machine inline until it answers, leaving its last frame in the scrollback. */
-export async function mount<T>(io: PromptIo, machine: Machine<T>): Promise<T | Canceled> {
-  let answer: T | Canceled = CANCEL;
-  const output = new Output(io.output);
-  const prompt = Prompt as (props: PromptProps<T>) => ReactElement;
-  const props: PromptProps<T> = {
-    machine,
-    output: io.output,
-    settle: (value) => {
-      answer = value;
-    },
-  };
-  const app = render(createElement(prompt, props), {
-    stdin: keyed(io.input),
-    stdout: output,
-    stderr: output,
-    exitOnCtrlC: false,
-    patchConsole: false,
-  });
-  await app.waitUntilExit();
-  return answer;
+/** A read can hold several keys, and Ink takes each read as one, so they are handed over singly. */
+function split(chunk: string): string[] {
+  const out: string[] = [];
+  let rest = chunk;
+  while (rest !== "") {
+    const key = firstKey(rest);
+    if (key !== FORWARD_DELETE) out.push(key);
+    rest = rest.slice(key.length);
+  }
+  return out;
+}
+
+/** The key `rest` opens with: an escape sequence whole, with or without alt, else one character. */
+function firstKey(rest: string): string {
+  if (!rest.startsWith(ESC)) return cells(rest)[0]?.text ?? rest;
+  const lead = rest.startsWith(ESC + ESC) ? 2 : 1;
+  const body = rest.slice(lead);
+  if (body.startsWith("[")) {
+    const params = CSI_BODY.exec(body.slice(1))?.[0];
+    if (params !== undefined) return rest.slice(0, lead + 1 + params.length);
+  }
+  const next = [...body.slice(body.startsWith("O") ? 1 : 0)][0];
+  if (next === undefined || next === ESC) return rest.slice(0, lead);
+  return rest.slice(0, lead + (body.startsWith("O") ? 1 : 0) + next.length);
 }

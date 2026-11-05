@@ -18,43 +18,19 @@ export function homeIdentity(home: string): string {
   return shortHash(home);
 }
 
-function user(): string {
-  return typeof process.getuid === "function" ? String(process.getuid()) : "user";
+export function daemonChallenge(): string {
+  return randomBytes(32).toString("hex");
 }
 
-function isPrivate(info: { isDirectory(): boolean; uid: number; mode: number }): boolean {
-  return (
-    info.isDirectory() && info.uid === process.getuid?.() && (info.mode & OPEN_TO_OTHERS) === 0
-  );
+/**
+ * Signed with a key only this user's home holds, so a process of another user
+ * that took the endpoint first cannot answer it.
+ */
+export function daemonProof(challenge: unknown): string | undefined {
+  if (typeof challenge !== "string" || !CHALLENGE.test(challenge)) return undefined;
+  const key = homeSecret(process.env, "daemon-key");
+  return createHmac("sha256", key).update(challenge).digest("hex");
 }
-
-function privateAlready(dir: string): boolean {
-  try {
-    return isPrivate(lstatSync(dir));
-  } catch {
-    return false;
-  }
-}
-
-/** Missing, so `privateDirectory` makes it this user's, or already theirs alone. */
-function usable(dir: string): boolean {
-  try {
-    return isPrivate(lstatSync(dir));
-  } catch (error) {
-    return isMissing(error);
-  }
-}
-
-function runtimeDir(env: NodeJS.ProcessEnv): string {
-  const runtime = env.XDG_RUNTIME_DIR;
-  return runtime !== undefined && isAbsolute(runtime) ? runtime : tmpdir();
-}
-
-function socketName(env: NodeJS.ProcessEnv): string {
-  return `${NAME}-${user()}-${homeIdentity(toolHome(env))}.sock`;
-}
-
-const SECRET = /^[0-9a-f]{32}$/;
 
 /** A random value kept in this home, written whole and then linked into place. */
 function homeSecret(env: NodeJS.ProcessEnv, file: string): string {
@@ -88,33 +64,11 @@ function readSecret(path: string): string {
   return secret;
 }
 
-const CHALLENGE = /^[0-9a-f]{64}$/;
-
-export function daemonChallenge(): string {
-  return randomBytes(32).toString("hex");
-}
-
-/**
- * Signed with a key only this user's home holds, so a process of another user
- * that took the endpoint first cannot answer it.
- */
-export function daemonProof(challenge: unknown): string | undefined {
-  if (typeof challenge !== "string" || !CHALLENGE.test(challenge)) return undefined;
-  const key = homeSecret(process.env, "daemon-key");
-  return createHmac("sha256", key).update(challenge).digest("hex");
-}
-
 export function provesDaemon(challenge: string, proof: unknown): boolean {
   const expected = daemonProof(challenge);
   if (expected === undefined || typeof proof !== "string") return false;
   const given = Buffer.from(proof);
   return given.length === expected.length && timingSafeEqual(given, Buffer.from(expected));
-}
-
-// Pipe names are machine-wide: a guessable one could be taken first. Node cannot check a pipe
-// server's owner, and a name listed while the daemon runs can be taken once it stops: hence the proof.
-function pipeName(env: NodeJS.ProcessEnv): string {
-  return `\\\\.\\pipe\\${NAME}-${homeIdentity(toolHome(env))}-${homeSecret(env, "pipe-name")}`;
 }
 
 /**
@@ -138,6 +92,52 @@ export function rpcEndpoint(
     candidates.find((path) => Buffer.byteLength(path) <= SOCKET_PATH_BYTES) ??
     join(dirs.at(-1) as string, socketName(env))
   );
+}
+
+const SECRET = /^[0-9a-f]{32}$/;
+
+// Pipe names are machine-wide: a guessable one could be taken first. Node cannot check a pipe
+// server's owner, and a name listed while the daemon runs can be taken once it stops: hence the proof.
+function pipeName(env: NodeJS.ProcessEnv): string {
+  return `\\\\.\\pipe\\${NAME}-${homeIdentity(toolHome(env))}-${homeSecret(env, "pipe-name")}`;
+}
+
+function runtimeDir(env: NodeJS.ProcessEnv): string {
+  const runtime = env.XDG_RUNTIME_DIR;
+  return runtime !== undefined && isAbsolute(runtime) ? runtime : tmpdir();
+}
+
+const CHALLENGE = /^[0-9a-f]{64}$/;
+
+function privateAlready(dir: string): boolean {
+  try {
+    return isPrivate(lstatSync(dir));
+  } catch {
+    return false;
+  }
+}
+
+function isPrivate(info: { isDirectory(): boolean; uid: number; mode: number }): boolean {
+  return (
+    info.isDirectory() && info.uid === process.getuid?.() && (info.mode & OPEN_TO_OTHERS) === 0
+  );
+}
+
+function user(): string {
+  return typeof process.getuid === "function" ? String(process.getuid()) : "user";
+}
+
+/** A missing one is usable, since `privateDirectory` then makes it this user's. */
+function usable(dir: string): boolean {
+  try {
+    return isPrivate(lstatSync(dir));
+  } catch (error) {
+    return isMissing(error);
+  }
+}
+
+function socketName(env: NodeJS.ProcessEnv): string {
+  return `${NAME}-${user()}-${homeIdentity(toolHome(env))}.sock`;
 }
 
 /** Refuses an existing directory anybody else can enter. */
@@ -171,7 +171,6 @@ export async function assertOwnSocket(endpoint: string): Promise<void> {
   }
 }
 
-/** True when something accepts connections on this endpoint. */
 export function listening(endpoint: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const probe = createConnection(endpoint);

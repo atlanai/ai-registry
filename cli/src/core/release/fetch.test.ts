@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { ErrorCode } from "#core/errors.ts";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { downloadArtifact, fetchOriginBytes } from "./fetch.ts";
@@ -23,7 +23,7 @@ function streaming(headers?: Record<string, string>) {
 }
 
 describe("bounded release downloads", () => {
-  it.each([undefined, "1", "invalid"])(
+  test.each([undefined, "1", "invalid"])(
     "cancels an oversized body with content length %s",
     async (declared) => {
       const stream = streaming(declared === undefined ? undefined : { "content-length": declared });
@@ -35,7 +35,7 @@ describe("bounded release downloads", () => {
       expect(stream.response.body?.locked).toBe(false);
     },
   );
-  it("cancels a declared oversized body without reading it", async () => {
+  test("cancels a declared oversized body without reading it", async () => {
     const stream = streaming({ "content-length": "30" });
     await expect(
       fetchOriginBytes(url, 3, async () => stream.response, undefined),
@@ -45,7 +45,7 @@ describe("bounded release downloads", () => {
     expect(stream.pulls()).toBe(0);
     expect(stream.cancel).toHaveBeenCalledOnce();
   });
-  it("accepts a body exactly at the limit, refusing redirects and passing the signal", async () => {
+  test("accepts a body exactly at the limit, refusing redirects and passing the signal", async () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(new Uint8Array([1, 2, 3])));
     const signal = new AbortController().signal;
     expect(await fetchOriginBytes(url, 3, fetcher, signal)).toEqual(new Uint8Array([1, 2, 3]));
@@ -54,7 +54,7 @@ describe("bounded release downloads", () => {
       expect.objectContaining({ redirect: "error", signal }),
     );
   });
-  it.each([
+  test.each([
     ["no length", undefined],
     ["its exact length", "20"],
     ["a length shorter than the body, as a compressed one is", "4"],
@@ -64,7 +64,7 @@ describe("bounded release downloads", () => {
     expect(bytes).toEqual(new Uint8Array(20).map((_, index) => (index % 2 === 0 ? 1 : 2)));
     expect(bytes.buffer.byteLength).toBe(20);
   });
-  it("cancels and unlocks a response aborted during a pending read", async () => {
+  test("cancels and unlocks a response aborted during a pending read", async () => {
     const controller = new AbortController();
     const cancel = vi.fn();
     let started!: () => void;
@@ -90,7 +90,7 @@ describe("bounded release downloads", () => {
     expect(cancel).toHaveBeenCalledOnce();
     expect(response.body?.locked).toBe(false);
   });
-  it("refuses a download of the wrong size or checksum", async () => {
+  test("refuses a download of the wrong size or checksum", async () => {
     const bytes = new Uint8Array([1, 2, 3]);
     const plan = {
       kind: "manifest" as const,

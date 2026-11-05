@@ -1,4 +1,4 @@
-import { frontmatterRecord, markdownBody } from "#core/catalog/frontmatter.ts";
+import { frontmatterRecord, markdownBody } from "#core/frontmatter.ts";
 import { multilineQuote, quote } from "#core/target/register/toml.ts";
 import type { Rendered } from "./index.ts";
 

@@ -1,17 +1,18 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { authoredDigest } from "#core/fs/digest.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { authoredArtifact, copyAuthored, exists, type Irregular, refusal } from "#core/fs/tree.ts";
-import type { ArtifactKind } from "#core/kinds.ts";
 import { emptyLock, type Lock, writeLock } from "#core/lock.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import { artifactPath, type Roots, type Scope } from "#core/store/paths.ts";
 import { type Candidate, candidates, displayPath } from "#core/sync/adopt.ts";
 import type { CommonOptions } from "#engine/options.ts";
-import { type Loaded, load, scopeRoots, withScope } from "#engine/pipeline.ts";
+import { type Loaded, load, withScope } from "#engine/scope/load.ts";
+import { scopeRoots } from "#engine/scope/locate.ts";
 
 interface Found {
   name: string;
@@ -26,31 +27,6 @@ export interface ImportPlan {
   root: string;
   scope: Scope;
   artifacts: readonly Found[];
-}
-
-/** Said before anything is copied, the way a publish would say it, so nothing is half imported. */
-async function refuseIrregular(roots: Roots, from: string, found?: Irregular): Promise<void> {
-  const refused = found ?? (await authoredArtifact(from)).irregular[0];
-  if (refused === undefined) return;
-  const at = displayPath(roots, refused.path === "" ? from : join(from, refused.path));
-  throw new AiregError(`Did not import ${at}: it ${refusal(refused)}.`, {
-    code: ErrorCode.Invalid,
-    hint: "Nothing was imported. Fix that entry and run the import again.",
-  });
-}
-
-function common(scope: Scope): CommonOptions {
-  return {
-    scope,
-    targets: undefined,
-    select: undefined,
-    yes: true,
-    all: true,
-    dryRun: false,
-    frozen: false,
-    force: false,
-    copy: false,
-  };
 }
 
 export async function planImport(
@@ -102,6 +78,30 @@ export async function planImport(
   return { root, scope, artifacts };
 }
 
+function common(scope: Scope): CommonOptions {
+  return {
+    scope,
+    targets: undefined,
+    select: undefined,
+    yes: true,
+    all: true,
+    dryRun: false,
+    frozen: false,
+    force: false,
+    copy: false,
+  };
+}
+
+async function refuseIrregular(roots: Roots, from: string, found?: Irregular): Promise<void> {
+  const refused = found ?? (await authoredArtifact(from)).irregular[0];
+  if (refused === undefined) return;
+  const at = displayPath(roots, refused.path === "" ? from : join(from, refused.path));
+  throw new AiregError(`Did not import ${at}: it ${refusal(refused)}.`, {
+    code: ErrorCode.Invalid,
+    hint: "Nothing was imported. Fix that entry and run the import again.",
+  });
+}
+
 /**
  * Copies each artifact into the registry and records it in the lockfile. The original
  * stays where it was written: not moved, not linked over, not deleted.
@@ -131,7 +131,6 @@ async function copyIn(
       }
     }
   }
-  // A later `origins` step keeps this row up to date from the folder it came from.
   const lock = loaded.lock;
   // What this run copied, so a refusal part way leaves nothing behind, as its hint says.
   const made: string[] = [];
@@ -165,6 +164,7 @@ async function copyAll(
     await guardManagedPath(copy, loaded.roots);
     if (!(await exists(copy))) made.push(copy);
     await refuseIrregular(loaded.roots, source.from, await copyAuthored(source.from, copy));
+    // A later `origins` step keeps this row up to date from the folder it came from.
     lock.artifacts[`${into.namespace}/${artifact.name}`] = {
       registry: into.registry,
       id: undefined,

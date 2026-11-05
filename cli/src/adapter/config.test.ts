@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { type AdapterConfigSchema, assertAdapterConfig } from "./config.ts";
 
 describe("assertAdapterConfig", () => {
-  it("allows anything when the adapter names no schema", () => {
+  test("allows anything when the adapter names no schema", () => {
     expect(() => assertAdapterConfig("probe", undefined, { extra: "1" })).not.toThrow();
   });
 
-  it("mints CONFIG_INVALID for missing required keys and unknown properties", () => {
+  test("mints CONFIG_INVALID for missing required keys and unknown properties", () => {
     const schema = {
       required: ["endpoint"],
       properties: { endpoint: { type: "string" as const } },
@@ -20,7 +20,7 @@ describe("assertAdapterConfig", () => {
     expect(() => assertAdapterConfig("probe", schema, { endpoint: "https://x" })).not.toThrow();
   });
 
-  it("names the keys an adapter does take, or that it takes none", () => {
+  test("names the keys an adapter does take, or that it takes none", () => {
     const refused = (schema: AdapterConfigSchema) => {
       try {
         assertAdapterConfig("probe", schema, { extra: "1" });

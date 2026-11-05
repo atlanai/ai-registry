@@ -1,8 +1,5 @@
 import type { Choice } from "./multiselect.ts";
 
-// The picker's outline: groups hold sections or leaves, sections hold leaves.
-// A run of choices sharing a group (or a section within it) becomes one heading.
-
 interface Leaf<T> {
   kind: "leaf";
   choice: Choice<T>;
@@ -28,23 +25,10 @@ export type Node<T> = Leaf<T> | Heading<T>;
 
 export type Fill = "none" | "some" | "all";
 
-function heading<T>(
-  kind: Heading<T>["kind"],
-  key: string,
-  label: string,
-  parent: Heading<T> | undefined,
-  value?: T,
-): Heading<T> {
-  const group = parent?.label ?? label;
-  return { kind, key, label, group, value, leaves: [], children: [], parent };
-}
-
-function adopt<T>(parent: Heading<T> | undefined, choice: Choice<T>, depth: number): Leaf<T> {
-  const leaf: Leaf<T> = { kind: "leaf", choice, depth, last: false, parent };
-  parent?.children.push(leaf);
-  return leaf;
-}
-
+/**
+ * The picker's outline: groups hold sections or leaves, sections hold leaves.
+ * A run of choices sharing a group, or a section within it, becomes one heading.
+ */
 export function plant<T>(
   choices: readonly Choice<T>[],
   grouped: boolean,
@@ -85,6 +69,23 @@ export function plant<T>(
     if (last?.kind === "leaf") last.last = true;
   }
   return top;
+}
+
+function adopt<T>(parent: Heading<T> | undefined, choice: Choice<T>, depth: number): Leaf<T> {
+  const leaf: Leaf<T> = { kind: "leaf", choice, depth, last: false, parent };
+  parent?.children.push(leaf);
+  return leaf;
+}
+
+function heading<T>(
+  kind: Heading<T>["kind"],
+  key: string,
+  label: string,
+  parent: Heading<T> | undefined,
+  value?: T,
+): Heading<T> {
+  const group = parent?.label ?? label;
+  return { kind, key, label, group, value, leaves: [], children: [], parent };
 }
 
 /** Every node in display order; headings in `folded` hide what they hold. */

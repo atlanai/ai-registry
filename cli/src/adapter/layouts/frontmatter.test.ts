@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { readFrontmatter, textField } from "./frontmatter.ts";
 
 describe("readFrontmatter", () => {
-  it("reads top-level text, quoted or not, and keeps the body", () => {
+  test("reads top-level text, quoted or not, and keeps the body", () => {
     const read = readFrontmatter(
       [
         "---",
@@ -26,7 +26,7 @@ describe("readFrontmatter", () => {
     expect(read?.body).toBe("# Body\n");
   });
 
-  it("reads block scalars, lists and one level of keys", () => {
+  test("reads block scalars, lists and one level of keys", () => {
     const read = readFrontmatter(
       [
         "---",
@@ -55,7 +55,7 @@ describe("readFrontmatter", () => {
     });
   });
 
-  it("is undefined without a front matter block, and skips what it does not cover", () => {
+  test("is undefined without a front matter block, and skips what it does not cover", () => {
     expect(readFrontmatter("# Just a body\n")).toBeUndefined();
     expect(readFrontmatter("---\nname: open\n")).toBeUndefined();
     const read = readFrontmatter("﻿---\r\nname: x\r\nanchor: &a value\r\n  - stray\r\n---\r\n");
@@ -64,7 +64,7 @@ describe("readFrontmatter", () => {
     expect(textField(read, "missing")).toBeUndefined();
   });
 
-  it("never evaluates what it reads", () => {
+  test("never evaluates what it reads", () => {
     const read = readFrontmatter("---\nname: !!js/function 'function () {}'\nother: {a: 1}\n---\n");
     expect(read?.data).toEqual({});
   });

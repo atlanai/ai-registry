@@ -1,5 +1,6 @@
 import type { SourceConfig } from "#core/adapter/identity.ts";
-import { emptyManifest, formatManifest, type Manifest } from "#core/manifest.ts";
+import { formatManifest } from "#core/manifest/format.ts";
+import { emptyManifest, type Manifest } from "#core/manifest/model.ts";
 import { parseRef } from "#core/ref.ts";
 import { manifestPath, writeManifestIn } from "#test/kit/scope.ts";
 

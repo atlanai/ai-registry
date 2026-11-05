@@ -7,21 +7,15 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isRecord } from "#core/fields.ts";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
-import { type Logger, nullLogger } from "#core/log/index.ts";
+import { nullLogger } from "#core/log/logger.ts";
+import type { Logger } from "#core/log/model.ts";
 import { settledWithin } from "#daemon/settled.ts";
 import { RpcErrorCode } from "./codes.ts";
 import { daemonProof, listening } from "./endpoint.ts";
 import { rpcError } from "./errors.ts";
 import { FrameDecoder, MAX_RPC_FRAME_BYTES, MAX_RPC_FRAME_SHOWN } from "./frames.ts";
-import {
-  type DaemonNotification,
-  type DaemonNotifications,
-  encodeMessage,
-  PROTOCOL_VERSION,
-  type RpcFailure,
-  type RpcId,
-  type RpcIncoming,
-} from "./protocol.ts";
+import { type DaemonNotification, type DaemonNotifications, PROTOCOL_VERSION } from "./methods.ts";
+import { encodeMessage, type RpcFailure, type RpcId, type RpcIncoming } from "./protocol.ts";
 
 export interface RpcContext {
   signal: AbortSignal;

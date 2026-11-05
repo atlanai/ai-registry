@@ -1,11 +1,11 @@
 import { stripVTControlCharacters } from "node:util";
 import { renderToString } from "ink";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { ArtifactRow } from "#core/console/model.ts";
 import { artifactDetail, withLine } from "./overlays.ts";
 
 describe("withLine", () => {
-  it("keeps only what the activity panel can show, newest last", () => {
+  test("keeps only what the activity panel can show, newest last", () => {
     let lines: string[] = [];
     for (let index = 0; index < 1_000; index += 1) lines = withLine(lines, `line ${index}`);
     expect(lines).toHaveLength(16);
@@ -15,7 +15,7 @@ describe("withLine", () => {
 });
 
 describe("artifactDetail", () => {
-  it("draws lockfile text as inert text", () => {
+  test("draws lockfile text as inert text", () => {
     const link = (text: string) => `\u001B]8;;https://example.test/\u0007${text}\u001B]8;;\u0007`;
     const row: ArtifactRow = {
       key: "team/lint",

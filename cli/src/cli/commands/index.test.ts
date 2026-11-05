@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
-import { GLOBAL_OPTIONS } from "#cli/options.ts";
+import { describe, expect, test } from "vitest";
+import { GLOBAL_OPTIONS } from "#cli/options/flags.ts";
 import type { OptionSpec } from "#core/host/extend.ts";
-import type { CommandSpec } from "./index.ts";
-import { COMMANDS } from "./table.ts";
+import type { CommandSpec } from "./command.ts";
+import { COMMANDS } from "./index.ts";
 
 const REFERENCE = new URL("../../../../docs/reference/", import.meta.url);
 
@@ -30,7 +30,7 @@ function named(text: string, option: OptionSpec): boolean {
 }
 
 describe("the reference docs", () => {
-  it.each(shown.map((command) => [command.name, command] as const))(
+  test.each(shown.map((command) => [command.name, command] as const))(
     "has a page for %s",
     (_, command) => {
       expect(command.docs, "a docs page").toBeDefined();
@@ -38,7 +38,7 @@ describe("the reference docs", () => {
     },
   );
 
-  it.each(shown.map((command) => [command.name, command] as const))(
+  test.each(shown.map((command) => [command.name, command] as const))(
     "lists %s in the index with its summary",
     (_, command) => {
       const row = INDEX.split("\n").find((line) => line.includes(`](${command.docs}.md)`));
@@ -47,7 +47,7 @@ describe("the reference docs", () => {
     },
   );
 
-  it.each(shown.map((command) => [command.name, command] as const))(
+  test.each(shown.map((command) => [command.name, command] as const))(
     "documents every option of %s on its page",
     (_, command) => {
       const text = page(command.docs as string);

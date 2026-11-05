@@ -1,5 +1,5 @@
 import { quoted } from "#adapter/text.ts";
-import type { CommandContext } from "#cli/commands/index.ts";
+import type { CommandContext } from "#cli/commands/command.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { StepContribution } from "#core/host/extend.ts";
 import { type RpcClient, withFreshConfig } from "#daemon/rpc/client.ts";

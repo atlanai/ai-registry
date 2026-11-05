@@ -65,6 +65,15 @@ function descriptor(file: FileDescriptor): FileDescriptor {
   return normalized;
 }
 
+/** An absent field and a field set to undefined must hash alike. */
+function prune(metadata: Omit<EnvelopeMetadata, "digest">): EnvelopeMetadata {
+  const kept: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    if (value !== undefined) kept[key] = value;
+  }
+  return kept as unknown as EnvelopeMetadata;
+}
+
 const MEDIA_TYPES: Readonly<Record<string, string>> = {
   ".md": "text/markdown",
   ".markdown": "text/markdown",
@@ -91,13 +100,4 @@ export function describeFile(path: string, digest: string, size: number): FileDe
   const mediaType = MEDIA_TYPES[extname(path).toLowerCase()];
   if (mediaType !== undefined) described.media_type = mediaType;
   return described;
-}
-
-/** An absent field and a field set to undefined must hash alike. */
-function prune(metadata: Omit<EnvelopeMetadata, "digest">): EnvelopeMetadata {
-  const kept: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(metadata)) {
-    if (value !== undefined) kept[key] = value;
-  }
-  return kept as unknown as EnvelopeMetadata;
 }

@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
 import * as actions from "./actions.ts";
 
@@ -23,7 +23,7 @@ describe("a console action", () => {
 });
 
 describe("opening a link", () => {
-  it("hands the browser an http(s) URL as one argument, on every platform", () => {
+  test("hands the browser an http(s) URL as one argument, on every platform", () => {
     const url = "https://example.com/a?b=1&calc";
     expect(actions.browserCommand(url, "darwin", {})).toEqual(["open", [url]]);
     expect(actions.browserCommand(url, "linux", {})).toEqual(["xdg-open", [url]]);
@@ -33,13 +33,13 @@ describe("opening a link", () => {
     ]);
   });
 
-  it("uses the first browser $BROWSER lists", () => {
+  test("uses the first browser $BROWSER lists", () => {
     const url = "https://example.com/";
     const env = { BROWSER: "/usr/bin/firefox:chromium" };
     expect(actions.browserCommand(url, "linux", env)).toEqual(["/usr/bin/firefox", [url]]);
   });
 
-  it("opens nothing that is not a web page, such as a file, an app or a flag", () => {
+  test("opens nothing that is not a web page, such as a file, an app or a flag", () => {
     for (const link of [
       "file:///etc/passwd",
       "/Applications/Calculator.app",
@@ -54,7 +54,7 @@ describe("opening a link", () => {
 });
 
 describe("the command a console action shows", () => {
-  it("quotes an argument a shell would split or expand, so it can be pasted as shown", () => {
+  test("quotes an argument a shell would split or expand, so it can be pasted as shown", () => {
     expect(actions.publish(["pr-review"], "acme/engineering", "user").display).toBe(
       "aireg publish -g --to acme/engineering --yes -- pr-review",
     );

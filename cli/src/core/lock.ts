@@ -9,7 +9,9 @@ import { earlierDigest, rememberEarlier } from "#core/fs/digest.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { guardManagedPath } from "#core/store/managed-paths.ts";
 import type { Roots, Scope } from "#core/store/paths.ts";
-import { canonicalId, earlierId, resolveTargets, type Targets } from "#core/target/index.ts";
+import type { Targets } from "#core/target/contract.ts";
+import { canonicalId, earlierId } from "#core/target/ids.ts";
+import { resolveTargets } from "#core/target/table.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import { dict, isRecord, textMapOf, textOf, withoutUndefined } from "./fields.ts";
 import { parseYaml } from "./yaml.ts";
@@ -20,22 +22,70 @@ export const LOCK_VERSION = 1;
 const LINK_MODES = ["symlink", "junction", "copy", "fanout"] as const;
 export type LinkMode = (typeof LINK_MODES)[number];
 
-function isLinkMode(value: string): value is LinkMode {
-  return (LINK_MODES as readonly string[]).includes(value);
+export function emptyLock(): Lock {
+  return { version: LOCK_VERSION, registries: dict(), artifacts: dict() };
+}
+
+/** A copy to edit, keyed as safely as the original. */
+export function cloneLock(lock: Lock): Lock {
+  const copy = structuredClone(lock);
+  return {
+    ...copy,
+    registries: dict(Object.entries(copy.registries)),
+    artifacts: dict(Object.entries(copy.artifacts)),
+  };
 }
 
 /**
- * A project's lockfile is committed, so a clone chooses it: its paths stay relative and below
- * the scope. The user's own lock may name a scope or target home outside HOME.
+ * Only an empty file reads as empty. Anything else unreadable is refused: read
+ * as empty, the next install would overwrite every edit the lock protects.
  */
-function scopePathOf(value: unknown, scope: Scope): string | undefined {
-  const path = textOf(value);
-  return path !== undefined && (scope === "user" || isSafePath(path)) ? path : undefined;
-}
+export function parseLock(text: string, path = "The lockfile", scope: Scope = "project"): Lock {
+  if (CONFLICT_MARKER.test(text)) {
+    throw new LockError(
+      `${path} has unresolved merge conflict markers.`,
+      "Resolve the conflict, then run `aireg install`.",
+    );
+  }
+  let doc: unknown;
+  try {
+    doc = parseYaml(text);
+  } catch (error) {
+    const first = (error as Error).message.split("\n")[0]?.replace(/:$/, "");
+    throw unreadable(path, `is not valid YAML: ${first}`);
+  }
+  if (doc === null || doc === undefined) return emptyLock();
+  if (typeof doc !== "object" || Array.isArray(doc)) throw unreadable(path, "is not a lockfile");
 
-/** A name becomes one folder under the scope's artifacts. */
-function isLeafName(name: string): boolean {
-  return isSafePath(name) && !name.includes("/");
+  const root = doc as Record<string, unknown>;
+  if (typeof root.version === "number" && root.version > LOCK_VERSION) {
+    throw new LockError(
+      `${path} is lockfile version ${root.version}; this aireg reads version ${LOCK_VERSION}.`,
+      "Run `aireg self update`.",
+    );
+  }
+  if (root.version !== LOCK_VERSION) throw unreadable(path, "has no lockfile version aireg reads");
+
+  const lock = emptyLock();
+  const registries = section(root.registries, path, "registries");
+  const artifacts = section(root.artifacts, path, "artifacts");
+  for (const [name, raw] of registries) {
+    const registry = parseRegistry(raw);
+    if (registry === undefined)
+      throw unreadable(path, `has a registry ${quoted(name)} it cannot read`);
+    lock.registries[name] = registry;
+  }
+  for (const [name, raw] of artifacts) {
+    const artifact = isSafePath(name) ? parseArtifact(raw, scope) : undefined;
+    if (artifact === undefined)
+      throw unreadable(path, `has an artifact ${quoted(name)} it cannot read`);
+    // An artifact whose registry vanished is unusable; drop it and rebuild.
+    // A row from your own folder is yours whether or not anything was installed.
+    if (lock.registries[artifact.registry] !== undefined || artifact.origin !== undefined) {
+      lock.artifacts[name] = artifact;
+    }
+  }
+  return lock;
 }
 
 /**
@@ -119,18 +169,18 @@ export interface Lock {
   artifacts: Record<string, LockArtifact>;
 }
 
-export function emptyLock(): Lock {
-  return { version: LOCK_VERSION, registries: dict(), artifacts: dict() };
+function unreadable(path: string, why: string): LockError {
+  return new LockError(
+    `${path} ${why}.`,
+    "Restore it from version control, or delete it and run `aireg install` to write it again.",
+  );
 }
 
-/** A copy to edit, keyed as safely as the original. */
-export function cloneLock(lock: Lock): Lock {
-  const copy = structuredClone(lock);
-  return {
-    ...copy,
-    registries: dict(Object.entries(copy.registries)),
-    artifacts: dict(Object.entries(copy.artifacts)),
-  };
+/** A section left out is empty; one that is there but not a mapping is refused. */
+function section(value: unknown, path: string, name: string): [string, unknown][] {
+  if (value === undefined || value === null) return [];
+  if (!isRecord(value)) throw unreadable(path, `has a \`${name}:\` that is not a mapping`);
+  return Object.entries(value);
 }
 
 function parseRegistry(entry: unknown): LockRegistry | undefined {
@@ -146,76 +196,6 @@ function parseRegistry(entry: unknown): LockRegistry | undefined {
     config: canonicalConfig(textMapOf(entry.config) ?? {}),
     revision: textOf(entry.revision),
   };
-}
-
-/** A field only when it has a value, so a row without it reads back as it was written. */
-function optional<K extends string>(key: K, value: string | undefined): { [P in K]?: string } {
-  return (value === undefined ? {} : { [key]: value }) as { [P in K]?: string };
-}
-
-/** aireg 0.1 reads only `harness`, so rows are written with both, and `target` wins. */
-function targetOf(entry: Record<string, unknown>): string | undefined {
-  return textOf(entry.target) ?? textOf(entry.harness);
-}
-
-function parseBlocked(raw: unknown, scope: Scope): LockArtifact["blocked"] {
-  const held = (Array.isArray(raw) ? raw : []).flatMap((item) => {
-    const entry = (item ?? {}) as Record<string, unknown>;
-    const target = targetOf(entry);
-    const path = scopePathOf(entry.path, scope);
-    if (target === undefined || path === undefined) return [];
-    const by = textOf(entry.by);
-    return [{ target, path, ...(by === undefined ? {} : { by }) }];
-  });
-  return held.length === 0 ? undefined : held;
-}
-
-/** A row's framed digest when it carries one; `digest` alone is what aireg 0.1 wrote. */
-function digestOf(row: Record<string, unknown>): string | undefined {
-  const earlier = textOf(row.digest);
-  const framed = textOf(row.framed);
-  if (framed === undefined || earlier === undefined) return earlier ?? framed;
-  rememberEarlier(framed, earlier);
-  return framed;
-}
-
-/** `digest` as aireg 0.1 checks it, and `framed` beside it for this version to check. */
-function digestDoc(digest: string | undefined): { digest?: string; framed?: string } {
-  if (digest === undefined) return {};
-  const earlier = earlierDigest(digest);
-  return earlier === undefined ? { digest } : { digest: earlier, framed: digest };
-}
-
-/** Undefined when any link is unreadable: prune reads only these, so none may be guessed at. */
-function parseLinks(raw: unknown, scope: Scope): LockLink[] | undefined {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw)) return undefined;
-  const links: LockLink[] = [];
-  for (const item of raw) {
-    if (!isRecord(item)) return undefined;
-    const target = targetOf(item);
-    const path = scopePathOf(item.path, scope);
-    const mode = textOf(item.mode);
-    const digest = digestOf(item);
-    if (target === undefined || path === undefined) return undefined;
-    if (mode === undefined || !isLinkMode(mode)) return undefined;
-    links.push({ target, path, mode, ...(digest === undefined ? {} : { digest }) });
-  }
-  return links;
-}
-
-function parseNames(raw: unknown): string[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
-  const names = raw.flatMap((item) => textOf(item) ?? []);
-  return names.length === 0 ? undefined : [...new Set(names)].sort();
-}
-
-function parseOrigin(entry: unknown, scope: Scope): LockOrigin | undefined {
-  if (!isRecord(entry)) return undefined;
-  const target = targetOf(entry);
-  const path = scopePathOf(entry.path, scope);
-  if (target === undefined || path === undefined) return undefined;
-  return { target, path, step: textOf(entry.step) ?? "" };
 }
 
 function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
@@ -251,6 +231,69 @@ function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
   };
 }
 
+/** A name becomes one folder under the scope's artifacts. */
+function isLeafName(name: string): boolean {
+  return isSafePath(name) && !name.includes("/");
+}
+
+/**
+ * A project's lockfile is committed, so a clone chooses it: its paths stay relative and below
+ * the scope. The user's own lock may name a scope or target home outside HOME.
+ */
+function scopePathOf(value: unknown, scope: Scope): string | undefined {
+  const path = textOf(value);
+  return path !== undefined && (scope === "user" || isSafePath(path)) ? path : undefined;
+}
+
+/** Undefined when any link is unreadable: prune reads only these, so none may be guessed at. */
+function parseLinks(raw: unknown, scope: Scope): LockLink[] | undefined {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) return undefined;
+  const links: LockLink[] = [];
+  for (const item of raw) {
+    if (!isRecord(item)) return undefined;
+    const target = targetOf(item);
+    const path = scopePathOf(item.path, scope);
+    const mode = textOf(item.mode);
+    const digest = digestOf(item);
+    if (target === undefined || path === undefined) return undefined;
+    if (mode === undefined || !isLinkMode(mode)) return undefined;
+    links.push({ target, path, mode, ...(digest === undefined ? {} : { digest }) });
+  }
+  return links;
+}
+
+/** aireg 0.1 reads only `harness`, so rows are written with both, and `target` wins. */
+function targetOf(entry: Record<string, unknown>): string | undefined {
+  return textOf(entry.target) ?? textOf(entry.harness);
+}
+
+/** A row's framed digest when it carries one; `digest` alone is what aireg 0.1 wrote. */
+function digestOf(row: Record<string, unknown>): string | undefined {
+  const earlier = textOf(row.digest);
+  const framed = textOf(row.framed);
+  if (framed === undefined || earlier === undefined) return earlier ?? framed;
+  rememberEarlier(framed, earlier);
+  return framed;
+}
+
+function isLinkMode(value: string): value is LinkMode {
+  return (LINK_MODES as readonly string[]).includes(value);
+}
+
+function parseOrigin(entry: unknown, scope: Scope): LockOrigin | undefined {
+  if (!isRecord(entry)) return undefined;
+  const target = targetOf(entry);
+  const path = scopePathOf(entry.path, scope);
+  if (target === undefined || path === undefined) return undefined;
+  return { target, path, step: textOf(entry.step) ?? "" };
+}
+
+/** A field only when it has a value, so a row without it reads back as it was written. */
+function optional<K extends string>(key: K, value: string | undefined): { [P in K]?: string } {
+  return (value === undefined ? {} : { [key]: value }) as { [P in K]?: string };
+}
+
 /** A lockfile that is there but cannot be read. */
 export class LockError extends AiregError {
   constructor(message: string, hint: string) {
@@ -261,70 +304,50 @@ export class LockError extends AiregError {
 
 const CONFLICT_MARKER = /^(<{7}|={7}|>{7})(\s|$)/m;
 
-function unreadable(path: string, why: string): LockError {
-  return new LockError(
-    `${path} ${why}.`,
-    "Restore it from version control, or delete it and run `aireg install` to write it again.",
-  );
+function parseNames(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const names = raw.flatMap((item) => textOf(item) ?? []);
+  return names.length === 0 ? undefined : [...new Set(names)].sort();
+}
+
+function parseBlocked(raw: unknown, scope: Scope): LockArtifact["blocked"] {
+  const held = (Array.isArray(raw) ? raw : []).flatMap((item) => {
+    const entry = (item ?? {}) as Record<string, unknown>;
+    const target = targetOf(entry);
+    const path = scopePathOf(entry.path, scope);
+    if (target === undefined || path === undefined) return [];
+    const by = textOf(entry.by);
+    return [{ target, path, ...(by === undefined ? {} : { by }) }];
+  });
+  return held.length === 0 ? undefined : held;
 }
 
 /**
- * Only an empty file reads as empty. Anything else unreadable is refused: read
- * as empty, the next install would overwrite every edit the lock protects.
+ * The registries and rows `after` would write differently from `before`. A row
+ * about to be restaged has no digest until its copy lands, so that is no change.
  */
-export function parseLock(text: string, path = "The lockfile", scope: Scope = "project"): Lock {
-  if (CONFLICT_MARKER.test(text)) {
-    throw new LockError(
-      `${path} has unresolved merge conflict markers.`,
-      "Resolve the conflict, then run `aireg install`.",
-    );
+export function lockChanges(before: Lock, after: Lock): string[] {
+  const table = resolveTargets();
+  const changed = new Set<string>();
+  const differ = (a: object | undefined, b: object | undefined) =>
+    JSON.stringify(a) !== JSON.stringify(b);
+  for (const name of new Set([
+    ...Object.keys(before.registries),
+    ...Object.keys(after.registries),
+  ])) {
+    const was = before.registries[name];
+    const now = after.registries[name];
+    if (differ(was && registryDoc(was), now && registryDoc(now))) changed.add(name);
   }
-  let doc: unknown;
-  try {
-    doc = parseYaml(text);
-  } catch (error) {
-    const first = (error as Error).message.split("\n")[0]?.replace(/:$/, "");
-    throw unreadable(path, `is not valid YAML: ${first}`);
-  }
-  if (doc === null || doc === undefined) return emptyLock();
-  if (typeof doc !== "object" || Array.isArray(doc)) throw unreadable(path, "is not a lockfile");
-
-  const root = doc as Record<string, unknown>;
-  if (typeof root.version === "number" && root.version > LOCK_VERSION) {
-    throw new LockError(
-      `${path} is lockfile version ${root.version}; this aireg reads version ${LOCK_VERSION}.`,
-      "Run `aireg self update`.",
-    );
-  }
-  if (root.version !== LOCK_VERSION) throw unreadable(path, "has no lockfile version aireg reads");
-
-  const lock = emptyLock();
-  const registries = section(root.registries, path, "registries");
-  const artifacts = section(root.artifacts, path, "artifacts");
-  for (const [name, raw] of registries) {
-    const registry = parseRegistry(raw);
-    if (registry === undefined)
-      throw unreadable(path, `has a registry ${quoted(name)} it cannot read`);
-    lock.registries[name] = registry;
-  }
-  for (const [name, raw] of artifacts) {
-    const artifact = isSafePath(name) ? parseArtifact(raw, scope) : undefined;
-    if (artifact === undefined)
-      throw unreadable(path, `has an artifact ${quoted(name)} it cannot read`);
-    // An artifact whose registry vanished is unusable; drop it and rebuild.
-    // A row from your own folder is yours whether or not anything was installed.
-    if (lock.registries[artifact.registry] !== undefined || artifact.origin !== undefined) {
-      lock.artifacts[name] = artifact;
+  for (const name of new Set([...Object.keys(before.artifacts), ...Object.keys(after.artifacts)])) {
+    const was = before.artifacts[name];
+    const now = after.artifacts[name];
+    const landed = now?.digest === "" && was !== undefined ? { ...now, digest: was.digest } : now;
+    if (differ(was && artifactDoc(was, table), landed && artifactDoc(landed, table))) {
+      changed.add(name);
     }
   }
-  return lock;
-}
-
-/** A section left out is empty; one that is there but not a mapping is refused. */
-function section(value: unknown, path: string, name: string): [string, unknown][] {
-  if (value === undefined || value === null) return [];
-  if (!isRecord(value)) throw unreadable(path, `has a \`${name}:\` that is not a mapping`);
-  return Object.entries(value);
+  return [...changed].sort();
 }
 
 function registryDoc(source: LockRegistry): Record<string, unknown> {
@@ -334,18 +357,6 @@ function registryDoc(source: LockRegistry): Record<string, unknown> {
     key: source.key,
     config: Object.keys(source.config).length === 0 ? undefined : source.config,
     revision: source.revision,
-  });
-}
-
-function blockedDoc(
-  item: NonNullable<LockArtifact["blocked"]>[number],
-  table: Targets,
-): Record<string, unknown> {
-  return withoutUndefined({
-    target: item.target,
-    harness: earlierId(table, item.target),
-    path: item.path,
-    by: item.by,
   });
 }
 
@@ -390,32 +401,23 @@ function artifactDoc(artifact: LockArtifact, table: Targets): Record<string, unk
   });
 }
 
-/**
- * The registries and rows `after` would write differently from `before`. A row
- * about to be restaged has no digest until its copy lands, so that is no change.
- */
-export function lockChanges(before: Lock, after: Lock): string[] {
-  const table = resolveTargets();
-  const changed = new Set<string>();
-  const differ = (a: object | undefined, b: object | undefined) =>
-    JSON.stringify(a) !== JSON.stringify(b);
-  for (const name of new Set([
-    ...Object.keys(before.registries),
-    ...Object.keys(after.registries),
-  ])) {
-    const was = before.registries[name];
-    const now = after.registries[name];
-    if (differ(was && registryDoc(was), now && registryDoc(now))) changed.add(name);
-  }
-  for (const name of new Set([...Object.keys(before.artifacts), ...Object.keys(after.artifacts)])) {
-    const was = before.artifacts[name];
-    const now = after.artifacts[name];
-    const landed = now?.digest === "" && was !== undefined ? { ...now, digest: was.digest } : now;
-    if (differ(was && artifactDoc(was, table), landed && artifactDoc(landed, table))) {
-      changed.add(name);
-    }
-  }
-  return [...changed].sort();
+/** `digest` as aireg 0.1 checks it, and `framed` beside it for this version to check. */
+function digestDoc(digest: string | undefined): { digest?: string; framed?: string } {
+  if (digest === undefined) return {};
+  const earlier = earlierDigest(digest);
+  return earlier === undefined ? { digest } : { digest: earlier, framed: digest };
+}
+
+function blockedDoc(
+  item: NonNullable<LockArtifact["blocked"]>[number],
+  table: Targets,
+): Record<string, unknown> {
+  return withoutUndefined({
+    target: item.target,
+    harness: earlierId(table, item.target),
+    path: item.path,
+    by: item.by,
+  });
 }
 
 export function formatLock(lock: Lock): string {

@@ -1,8 +1,8 @@
 import { stat } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import type { Lock, LockArtifact } from "#core/lock.ts";
-import type { Survey } from "#core/plan/model.ts";
 import type { ArtifactStatus } from "#core/plan/status.ts";
+import type { Survey } from "#core/plan/survey.ts";
 import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
 import {
   type ArtifactGroup,
@@ -20,24 +20,51 @@ export interface UpstreamFacts {
   pending: ReadonlySet<string>;
 }
 
-async function changedAt(path: string): Promise<number | undefined> {
-  try {
-    return (await stat(path)).mtimeMs;
-  } catch {
-    return undefined;
-  }
-}
+/**
+ * The lock, the disk and what the registry refused, folded into one row per
+ * artifact and one group per namespace.
+ */
+export async function groupArtifacts(input: GroupInput): Promise<ArtifactGroup[]> {
+  const byKey = new Map(input.statuses.map((item) => [item.name, item]));
+  const rows = await Promise.all(
+    Object.entries(input.lock.artifacts).map(([key, entry]) =>
+      row(key, entry, input.roots, input.survey, byKey.get(key), input.upstream),
+    ),
+  );
 
-function stateOf(
-  key: string,
-  status: ArtifactStatus | undefined,
-  upstream: UpstreamFacts,
-): ArtifactState {
-  // What the registry says outranks what the disk says: a failed fetch and a
-  // pending review both explain the local state rather than competing with it.
-  if (upstream.failed.has(key)) return "failed";
-  if (upstream.pending.has(key)) return "pending";
-  return status?.state ?? "ok";
+  const all = [...rows, ...refused(input.lock, input.upstream), ...input.local];
+  const groups = new Map<string, ArtifactRow[]>();
+  for (const item of all) {
+    const key = item.namespace ?? LOCAL_GROUP;
+    const bucket = groups.get(key);
+    if (bucket === undefined) groups.set(key, [item]);
+    else bucket.push(item);
+  }
+
+  return [...groups.entries()]
+    .map(([key, members]) => {
+      const counts = emptyCounts();
+      for (const item of members) counts[item.state] += 1;
+      const local = key === LOCAL_GROUP;
+      // Rows sort trouble first: the ones you can act on should not need scrolling to.
+      return {
+        key,
+        label: local ? "THIS MACHINE" : key,
+        isDefault: !local && key === input.defaultNamespace,
+        authoredHere: local,
+        rows: members.sort(
+          (left, right) =>
+            RANK[left.state] - RANK[right.state] || left.name.localeCompare(right.name),
+        ),
+        counts,
+        versions: versionSpread(members),
+      };
+    })
+    .sort((left, right) => {
+      // This machine sits at the bottom: it is the only group you author into.
+      if (left.authoredHere !== right.authoredHere) return left.authoredHere ? 1 : -1;
+      return right.rows.length - left.rows.length || left.label.localeCompare(right.label);
+    });
 }
 
 async function row(
@@ -88,6 +115,26 @@ async function row(
   };
 }
 
+function stateOf(
+  key: string,
+  status: ArtifactStatus | undefined,
+  upstream: UpstreamFacts,
+): ArtifactState {
+  // What the registry says outranks what the disk says: a failed fetch and a
+  // pending review both explain the local state rather than competing with it.
+  if (upstream.failed.has(key)) return "failed";
+  if (upstream.pending.has(key)) return "pending";
+  return status?.state ?? "ok";
+}
+
+async function changedAt(path: string): Promise<number | undefined> {
+  try {
+    return (await stat(path)).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Artifacts the registry listed and then refused. They are in no lock and on
  * no disk, so nothing else in the read path would mention them at all.
@@ -118,18 +165,6 @@ function refused(lock: Lock, upstream: UpstreamFacts): ArtifactRow[] {
   return rows;
 }
 
-/** Commonest first, so `0.1.0 x349` leads and the outliers follow it. */
-function versionSpread(rows: readonly ArtifactRow[]): string[] {
-  const tally = new Map<string, number>();
-  for (const item of rows) {
-    const version = item.version ?? "-";
-    tally.set(version, (tally.get(version) ?? 0) + 1);
-  }
-  return [...tally.entries()]
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-    .map(([version, count]) => (count === 1 ? version : `${version} x${count}`));
-}
-
 export interface GroupInput {
   lock: Lock;
   survey: Survey;
@@ -142,51 +177,15 @@ export interface GroupInput {
   local: readonly ArtifactRow[];
 }
 
-/**
- * The lock, the disk and what the registry refused, folded into one row per
- * artifact and one group per namespace.
- */
-export async function groupArtifacts(input: GroupInput): Promise<ArtifactGroup[]> {
-  const byKey = new Map(input.statuses.map((item) => [item.name, item]));
-  const rows = await Promise.all(
-    Object.entries(input.lock.artifacts).map(([key, entry]) =>
-      row(key, entry, input.roots, input.survey, byKey.get(key), input.upstream),
-    ),
-  );
-
-  const all = [...rows, ...refused(input.lock, input.upstream), ...input.local];
-  const groups = new Map<string, ArtifactRow[]>();
-  for (const item of all) {
-    const key = item.namespace ?? LOCAL_GROUP;
-    const bucket = groups.get(key);
-    if (bucket === undefined) groups.set(key, [item]);
-    else bucket.push(item);
+function versionSpread(rows: readonly ArtifactRow[]): string[] {
+  const tally = new Map<string, number>();
+  for (const item of rows) {
+    const version = item.version ?? "-";
+    tally.set(version, (tally.get(version) ?? 0) + 1);
   }
-
-  return [...groups.entries()]
-    .map(([key, members]) => {
-      const counts = emptyCounts();
-      for (const item of members) counts[item.state] += 1;
-      const local = key === LOCAL_GROUP;
-      return {
-        key,
-        label: local ? "THIS MACHINE" : key,
-        isDefault: !local && key === input.defaultNamespace,
-        authoredHere: local,
-        // Trouble first: the rows you can act on should not be scrolled to.
-        rows: members.sort(
-          (left, right) =>
-            RANK[left.state] - RANK[right.state] || left.name.localeCompare(right.name),
-        ),
-        counts,
-        versions: versionSpread(members),
-      };
-    })
-    .sort((left, right) => {
-      // This machine sits at the bottom: it is the only group you author into.
-      if (left.authoredHere !== right.authoredHere) return left.authoredHere ? 1 : -1;
-      return right.rows.length - left.rows.length || left.label.localeCompare(right.label);
-    });
+  return [...tally.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([version, count]) => (count === 1 ? version : `${version} x${count}`));
 }
 
 const RANK: Record<ArtifactState, number> = {

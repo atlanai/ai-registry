@@ -30,7 +30,7 @@ export const SEVERITY_NUMBER: Record<Level, number> = Object.freeze({
 export interface SerializedError {
   name: string;
   message: string;
-  /** The stable classification, when the error carries one. */
+  /** The error's own `failure` or `code`. */
   code?: string;
   /** Present only for errors the codebase did not classify: see `error.ts`. */
   stack?: string;

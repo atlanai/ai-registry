@@ -1,15 +1,9 @@
-import type { Styler } from "#core/output.ts";
 import { cells } from "#core/term/format.ts";
+import type { Styler } from "#core/term/printer.ts";
 import { GLYPH } from "#core/term/theme.ts";
+import { ask } from "./ask.ts";
 import { type Mark, railLine, titleLine } from "./layout.ts";
-import {
-  ask,
-  CANCEL,
-  type Canceled,
-  type Keypress,
-  type Machine,
-  type PromptIo,
-} from "./prompt.ts";
+import { CANCEL, type Canceled, type Keypress, type Machine, type PromptIo } from "./model.ts";
 
 export interface TextOptions {
   message: string;
@@ -57,8 +51,8 @@ class Typing implements Machine<string> {
     if (this.ended === "submit") {
       return [titleLine(style, "submit", message, style.dim(this.value || initial))];
     }
+    // Ink hides the terminal's cursor, so the prompt draws one where typing goes.
     return [
-      // Ink hides the terminal's cursor, so the prompt draws one where typing goes.
       titleLine(
         style,
         "active",

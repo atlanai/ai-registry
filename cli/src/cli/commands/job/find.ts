@@ -1,11 +1,12 @@
 import { isAbsolute, resolve } from "node:path";
 import { quoted } from "#adapter/text.ts";
 import { underHome } from "#cli/render/home.ts";
-import { findJob, type Job, jobRoot, type RegistryConfig } from "#core/config/model.ts";
+import { findJob, jobRoot } from "#core/config/jobs.ts";
+import type { Job, RegistryConfig } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { canonical } from "#core/fs/canonical.ts";
 import { expandUserPath } from "#core/fs/path.ts";
+import { canonical } from "#core/fs/realpath.ts";
 import { roots, scopeFor, scopeName, userScopeDir } from "#core/store/paths.ts";
 
 export function noJob(wanted: string, hint = "Run `aireg job list` to see the jobs."): AiregError {

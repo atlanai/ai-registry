@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { BINARY_NAME } from "./urls.ts";
+import { BINARY_NAME } from "./platform.ts";
 
 export interface Launch {
   readonly command: string;

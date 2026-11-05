@@ -1,5 +1,5 @@
-import type { CommandContext } from "#cli/commands/index.ts";
-import { type OutputFormat, Printer } from "#core/output.ts";
+import type { CommandContext } from "#cli/commands/command.ts";
+import { type OutputFormat, Printer } from "#core/term/printer.ts";
 
 export interface CommandContextOptions {
   cwd?: string;

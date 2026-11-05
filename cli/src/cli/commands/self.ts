@@ -1,5 +1,6 @@
+import { SELF_COMMAND } from "#cli/commands/self/spec.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { builtin, type CommandContext, runAction } from "./index.ts";
+import { type CommandContext, runAction } from "./command.ts";
 
 export async function run(context: CommandContext): Promise<void> {
   const at = context.argv.findIndex((arg) => !arg.startsWith("-"));
@@ -12,7 +13,7 @@ export async function run(context: CommandContext): Promise<void> {
   }
   const argv = context.argv.filter((_, index) => index !== at);
   const handed = { ...context, argv };
-  return runAction(builtin("self"), action, {
+  return runAction(SELF_COMMAND, action, {
     update: async () => (await import("#cli/commands/self/update.ts")).run(handed),
     uninstall: async () => (await import("#cli/commands/self/uninstall.ts")).run(handed),
   });

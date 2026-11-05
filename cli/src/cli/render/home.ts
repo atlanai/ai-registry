@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { resolve, sep } from "node:path";
-import { canonical } from "#core/fs/canonical.ts";
 import { posixRelative } from "#core/fs/path.ts";
+import { canonical } from "#core/fs/realpath.ts";
 
 /**
  * Under the home directory as `~/…`, so a path reads the same from any folder.

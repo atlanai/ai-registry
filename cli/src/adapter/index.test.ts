@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import * as sdk from "./index.ts";
 
 describe("the published adapter contract", () => {
   // Every name here is public API an adapter may depend on, so a change to it is deliberate.
-  it("exports exactly these values", () => {
+  test("exports exactly these values", () => {
     expect(Object.keys(sdk).sort()).toEqual([
       "ADAPTER_ID",
       "ADAPTER_PROTOCOL",

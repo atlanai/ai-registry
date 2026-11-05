@@ -1,7 +1,7 @@
 import type { Job, RegistryConfig } from "#core/config/model.ts";
 import type { Command } from "#core/console/actions.ts";
 import type { AccountRow, ArtifactRow, ConsoleState } from "#core/console/model.ts";
-import type { Manifest } from "#core/manifest.ts";
+import type { Manifest } from "#core/manifest/model.ts";
 import type { RunRecord } from "#core/run/model.ts";
 import type { RunStore } from "#core/run/store.ts";
 import type { EarlierTarget, Targets } from "#core/target/contract.ts";
@@ -153,7 +153,7 @@ export interface PanelContribution<S = unknown> {
   onKey?(input: string, context: PanelKeyContext<S>): void;
   /** Where `o` goes with this row selected. */
   link?(view: PanelView<S>): string | undefined;
-  /** A lazy read for the visible window, so a long list never reads every file to draw a screen; resolving true redraws. */
+  /** Reads only the visible window; true redraws. */
   prefetch?(view: PanelView<S>): Promise<boolean>;
   /** First rendered row of this list. Ink reports no geometry to measure. */
   listTop?: number;

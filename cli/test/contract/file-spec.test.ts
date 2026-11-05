@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Ajv2020, type SchemaObject } from "ajv/dist/2020.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { buildEnvelope } from "#adapter/index.ts";
 
 // The schemas live in the sibling `spec/` component, not in this package.
@@ -30,22 +30,20 @@ function check(compiler: Ajv2020, schema: string, document: unknown): string[] {
 
 const read = (name: string): unknown => JSON.parse(readFileSync(join(FIXTURE, name), "utf8"));
 
-/** Read in place from the spec, so they stay honest about the registries this client reads. */
+// Read in place from the spec, so they stay honest about the registries this client reads.
 describe("the file spec schemas", () => {
   const compiler = ajv();
 
-  it("accept a registry laid out by the current file spec", () => {
+  test("accept a registry laid out by the current file spec", () => {
     expect(check(compiler, "registry.schema.json", read("registry.json"))).toEqual([]);
     expect(check(compiler, "index.schema.json", read("index.json"))).toEqual([]);
     expect(check(compiler, "versions.schema.json", read("versions.json"))).toEqual([]);
     expect(check(compiler, "artifact.schema.json", read("artifact.json"))).toEqual([]);
   });
 
-  /**
-   * The client normalizes what it reads and publishes nothing, so these are the
-   * deliberate differences, asserted so none of them changes by accident.
-   */
-  it("records where an envelope read from a working tree differs", () => {
+  // The client normalizes what it reads and publishes nothing, so these are the
+  // deliberate differences, asserted so none of them changes by accident.
+  test("records where an envelope read from a working tree differs", () => {
     // A working tree sits in no namespace, publishes no version, and has no
     // kind document to carry, so a reader's envelope is not a publishable one.
     const readFromATree = buildEnvelope({

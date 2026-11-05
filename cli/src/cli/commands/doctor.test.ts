@@ -2,13 +2,13 @@ import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import { registerBuiltinAdapters } from "#adapters/index.ts";
-import { Printer } from "#core/output.ts";
 import type { TrustedKeys } from "#core/release/keyring.ts";
 import type { ReleaseStamp } from "#core/release/stamp.ts";
-import { resolveTargets } from "#core/target/index.ts";
+import { resolveTargets } from "#core/target/table.ts";
+import { Printer } from "#core/term/printer.ts";
 import { test } from "#test/kit/fixtures.ts";
+import type { CommandContext } from "./command.ts";
 import { run } from "./doctor.ts";
-import type { CommandContext } from "./index.ts";
 
 // The stamp is build-time only, so a test substitutes one rather than reading env.
 const stub = vi.hoisted(() => ({ stamp: undefined as ReleaseStamp | undefined }));

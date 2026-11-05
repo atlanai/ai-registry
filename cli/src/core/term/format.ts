@@ -1,12 +1,12 @@
 import stringWidth from "string-width";
-import { abbreviate } from "#core/output.ts";
+import { abbreviate } from "./printer.ts";
 
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 export const ESC = "\u001B";
 /** What follows `ESC [` in a control sequence: parameters, then one final byte. */
 export const CSI_BODY = /^[0-?]*[ -/]*[@-~]/;
 
-/** Length of the escape sequence `text` opens with: a control sequence, or a titled one ended by BEL or ST. */
+/** A CSI, or an OSC ended by BEL or ST. */
 function escapeLength(text: string): number {
   if (text[1] === "[") return 2 + (CSI_BODY.exec(text.slice(2))?.[0].length ?? 0);
   if (text[1] === "]") {
@@ -68,7 +68,7 @@ export function clock(atMs: number | undefined): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-/** "4m ago", "2d ago", or "in 4m" for an instant still to come. */
+/** Coarse relative time, past or future; `-` when undefined. */
 export function ago(atMs: number | undefined, nowMs = Date.now()): string {
   if (atMs === undefined) return "-";
   const delta = nowMs - atMs;
@@ -146,7 +146,7 @@ export function bar(done: number, total: number, width: number): string {
   return `${"\u2593".repeat(filled)}${"\u2591".repeat(width - filled)}`;
 }
 
-/** Day heading for a dated list: "Today", "Yesterday", then a date. */
+/** Day heading for a dated list, relative for today and yesterday. */
 export function day(atMs: number, nowMs = Date.now()): string {
   const start = (ms: number) => new Date(new Date(ms).setHours(0, 0, 0, 0)).getTime();
   const days = Math.round((start(nowMs) - start(atMs)) / 86_400_000);
@@ -155,7 +155,6 @@ export function day(atMs: number, nowMs = Date.now()): string {
   return new Date(atMs).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-/** How long something took: `850ms`, `2.4s`. */
 export function duration(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }

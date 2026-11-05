@@ -1,13 +1,13 @@
 import { plural, sanitizeName, stripTrailing } from "#adapter/text.ts";
-import type { CommandContext } from "#cli/commands/index.ts";
-import { probe } from "#cli/source.ts";
+import type { CommandContext } from "#cli/commands/command.ts";
+import { adapterFor } from "#core/adapter/load.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { adapterFor } from "#core/adapter/registry.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
 import { readConfig, writeConfig } from "#core/config/repository.ts";
 import { contributedStepFlags } from "#core/host/load.ts";
 import type { Scope } from "#core/store/paths.ts";
 import { GLYPH } from "#core/term/theme.ts";
+import { probe } from "#engine/address/probe.ts";
 export interface OnboardingFlow {
   /** Where artifacts come from. Declared, signed in to, and pulled whole. */
   registry: string;
@@ -109,28 +109,32 @@ export async function onboard(
   return done;
 }
 
-/** Offers what was edited here, and is a step only when something was sent. */
-async function publishLocal(
-  context: CommandContext,
-  alias: string,
-  at: readonly string[],
-): Promise<Step[]> {
-  const sent = (await delegate("publish", context, ["--yes", ...at])) as
-    | { artifacts?: { published?: boolean }[] }
-    | undefined;
-  const published = sent?.artifacts?.filter((item) => item.published === true).length ?? 0;
-  return published === 0
-    ? []
-    : [{ name: "published", detail: `${plural(published, "artifact")} to ${alias}` }];
+/**
+ * The name `aireg registry add` gives it: the one in its registry.json. One that cannot be
+ * read before you sign in is named after its address instead.
+ */
+async function registryName(flow: OnboardingFlow, cwd: string): Promise<string> {
+  const fallback = sanitizeName(lastSegment(flow.registry));
+  if (flow.tokenStdin) return fallback;
+  const source = await probe(flow.registry, { adapter: flow.adapter }, cwd).catch(() => undefined);
+  if (source === undefined) return fallback;
+  await source.close();
+  return source.alias;
 }
 
-/** A git registry takes work through git, so there is nothing for aireg to offer it. */
-async function publishes(flow: OnboardingFlow, cwd: string): Promise<boolean> {
-  const adapter = await adapterFor(expandLocation(flow.registry, cwd), flow.adapter);
-  return adapter.capabilities.publish !== false;
+function lastSegment(location: string): string {
+  let path = location;
+  try {
+    path = new URL(location).pathname;
+  } catch {
+    // Not a URL, so the whole address is the path.
+  }
+  const last = stripTrailing(path.replace(/\.git$/, ""), "/")
+    .split(/[/:]/)
+    .at(-1);
+  return last === undefined || last === "" ? "registry" : last;
 }
 
-/** The scope `init` settled on, said the way each delegated command reads it. */
 function scopeArgv(scope: Scope): string[] {
   return scope === "user" ? ["-g"] : [];
 }
@@ -166,6 +170,12 @@ async function delegate(
     : (JSON.parse(last) as { data?: unknown }).data;
 }
 
+/** `init` checked it before writing anything. */
+async function setNamespace(namespace: string): Promise<void> {
+  const config = await readConfig();
+  await writeConfig({ ...config, defaults: { ...config.defaults, namespace } }, config.revision);
+}
+
 async function setAccountNamespace(alias: string, namespace: string): Promise<void> {
   const [, own] = namespace.split("/");
   if (own === undefined) return;
@@ -176,34 +186,23 @@ async function setAccountNamespace(alias: string, namespace: string): Promise<vo
   await writeConfig({ ...config, accounts }, config.revision);
 }
 
-/** `init` checked it before writing anything. */
-async function setNamespace(namespace: string): Promise<void> {
-  const config = await readConfig();
-  await writeConfig({ ...config, defaults: { ...config.defaults, namespace } }, config.revision);
+/** A git registry takes work through git, so there is nothing for aireg to offer it. */
+async function publishes(flow: OnboardingFlow, cwd: string): Promise<boolean> {
+  const adapter = await adapterFor(expandLocation(flow.registry, cwd), flow.adapter);
+  return adapter.capabilities.publish !== false;
 }
 
-/**
- * The name `aireg registry add` gives it: the one in its registry.json. One that cannot be
- * read before you sign in is named after its address instead.
- */
-async function registryName(flow: OnboardingFlow, cwd: string): Promise<string> {
-  const fallback = sanitizeName(lastSegment(flow.registry));
-  if (flow.tokenStdin) return fallback;
-  const source = await probe(flow.registry, { adapter: flow.adapter }, cwd).catch(() => undefined);
-  if (source === undefined) return fallback;
-  await source.close();
-  return source.alias;
-}
-
-function lastSegment(location: string): string {
-  let path = location;
-  try {
-    path = new URL(location).pathname;
-  } catch {
-    // Not a URL, so the whole address is the path.
-  }
-  const last = stripTrailing(path.replace(/\.git$/, ""), "/")
-    .split(/[/:]/)
-    .at(-1);
-  return last === undefined || last === "" ? "registry" : last;
+/** Offers what was edited here, and is a step only when something was sent. */
+async function publishLocal(
+  context: CommandContext,
+  alias: string,
+  at: readonly string[],
+): Promise<Step[]> {
+  const sent = (await delegate("publish", context, ["--yes", ...at])) as
+    | { artifacts?: { published?: boolean }[] }
+    | undefined;
+  const published = sent?.artifacts?.filter((item) => item.published === true).length ?? 0;
+  return published === 0
+    ? []
+    : [{ name: "published", detail: `${plural(published, "artifact")} to ${alias}` }];
 }

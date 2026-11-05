@@ -6,25 +6,10 @@ export type Line =
 
 export interface FlattenOptions {
   folded: ReadonlySet<string>;
-  /** Substring match on the name, the namespace and the state. */
+  /** Case-insensitive substring of the key, state, group label, namespace or version. */
   filter: string;
   /** When set, only rows in this state survive. */
   only: ArtifactState | undefined;
-}
-
-function keep(row: ArtifactRow, group: ArtifactGroup, options: FlattenOptions): boolean {
-  if (options.only !== undefined && row.state !== options.only) return false;
-  const needle = options.filter.trim().toLowerCase();
-  if (needle === "") return true;
-  // The group's label too: work authored here has no namespace, and "this
-  // machine" is the only name a person has for it.
-  return (
-    row.key.toLowerCase().includes(needle) ||
-    row.state.includes(needle) ||
-    group.label.toLowerCase().includes(needle) ||
-    (row.namespace ?? "").toLowerCase().includes(needle) ||
-    (row.version ?? "").includes(needle)
-  );
 }
 
 /**
@@ -49,6 +34,21 @@ export function flatten(
     for (const row of members) lines.push({ kind: "artifact", group, row });
   }
   return { lines, shown };
+}
+
+function keep(row: ArtifactRow, group: ArtifactGroup, options: FlattenOptions): boolean {
+  if (options.only !== undefined && row.state !== options.only) return false;
+  const needle = options.filter.trim().toLowerCase();
+  if (needle === "") return true;
+  // The group's label too: work authored here has no namespace, and "this
+  // machine" is the only name a person has for it.
+  return (
+    row.key.toLowerCase().includes(needle) ||
+    row.state.includes(needle) ||
+    group.label.toLowerCase().includes(needle) ||
+    (row.namespace ?? "").toLowerCase().includes(needle) ||
+    (row.version ?? "").includes(needle)
+  );
 }
 
 export function lineKey(line: Line): string {

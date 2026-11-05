@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { emptyRegistryConfig } from "#core/config/model.ts";
 import { EMPTY_RUN_COUNTS, ITEM_EVENT, type RunEvent, type RunRecord } from "#core/run/model.ts";
 import { carriedPaths, jobRows, newestFinished, upstreamFacts } from "./runs.ts";
@@ -45,7 +45,7 @@ function run(over: Partial<RunRecord>): RunRecord {
 }
 
 describe("newestFinished", () => {
-  it("skips a run still going, which reports nothing examined", () => {
+  test("skips a run still going, which reports nothing examined", () => {
     const chosen = newestFinished(
       [
         run({ id: "old", requestedAtMs: 1, counts: { ...EMPTY_RUN_COUNTS, examined: 695 } }),
@@ -56,18 +56,18 @@ describe("newestFinished", () => {
     expect(chosen?.id).toBe("old");
   });
 
-  it("counts a run the daemon abandoned as finished", () => {
+  test("counts a run the daemon abandoned as finished", () => {
     const chosen = newestFinished([run({ id: "gone", state: "abandoned" })], "sync");
     expect(chosen?.id).toBe("gone");
   });
 
-  it("ignores another mode's runs", () => {
+  test("ignores another mode's runs", () => {
     expect(newestFinished([run({ mode: "pull" })], "sync")).toBeUndefined();
   });
 });
 
 describe("upstreamFacts", () => {
-  it("reads the adapter's own reason, not only the code", () => {
+  test("reads the adapter's own reason, not only the code", () => {
     const facts = upstreamFacts([
       event({
         artifact: "eng/explain",
@@ -80,7 +80,7 @@ describe("upstreamFacts", () => {
     expect(facts.failed.get("eng/flow")).toBe("adapter_not_found");
   });
 
-  it("strips terminal escapes from the adapter's reason", () => {
+  test("strips terminal escapes from the adapter's reason", () => {
     const facts = upstreamFacts([
       event({
         artifact: "eng/explain",
@@ -91,7 +91,7 @@ describe("upstreamFacts", () => {
     expect(facts.failed.get("eng/explain")).toBe("badname");
   });
 
-  it("treats a publish that settled for review as pending, not as changed", () => {
+  test("treats a publish that settled for review as pending, not as changed", () => {
     const facts = upstreamFacts([
       event({
         artifact: "mine/demo",
@@ -105,7 +105,6 @@ describe("upstreamFacts", () => {
         operation: "publish",
         outcome: "changed",
       }),
-      // Reported, never sent: nothing upstream is waiting on it.
       event({
         artifact: "mine/edited",
         disposition: "publish",
@@ -113,12 +112,13 @@ describe("upstreamFacts", () => {
         outcome: "attention",
       }),
     ]);
+    // `mine/edited` was only reported, never sent, so nothing upstream waits on it.
     expect([...facts.pending]).toEqual(["mine/demo"]);
   });
 });
 
 describe("carriedPaths", () => {
-  it("maps each folder a job settled to that job, with the held reason", () => {
+  test("maps each folder a job settled to that job, with the held reason", () => {
     const carried = carriedPaths([
       {
         job: "import-local",
@@ -148,7 +148,7 @@ describe("carriedPaths", () => {
     });
   });
 
-  it("ignores data it cannot read, and items the job refused", () => {
+  test("ignores data it cannot read, and items the job refused", () => {
     const carried = carriedPaths([
       {
         job: "import-local",
@@ -173,7 +173,7 @@ describe("carriedPaths", () => {
 });
 
 describe("jobRows", () => {
-  it("describes a job by the steps it runs, in order", () => {
+  test("describes a job by the steps it runs, in order", () => {
     const step = (name: string, kind: string, needs: string[] = []) => ({
       name,
       kind,

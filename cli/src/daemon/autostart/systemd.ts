@@ -1,32 +1,11 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
+import { PUBLIC_FILE } from "#adapter/files.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
-import { PUBLIC_FILE } from "#core/fs/mode.ts";
 import { readTextIfPresent } from "#core/fs/path.ts";
 import { SERVICE } from "#core/product.ts";
 import { type AutostartBackend, type Exec, type ServiceSpec, SUPERVISOR_ENV } from "./model.ts";
-
-function systemdUnit(suffix: string): string {
-  return suffix === "" ? `${SERVICE.systemd}.service` : `${SERVICE.systemd}-${suffix}.service`;
-}
-
-function line(value: string): string {
-  if (/[\r\n]/.test(value))
-    throw new AiregError("The daemon's service file cannot hold a value with a line break.", {
-      code: ErrorCode.Invalid,
-    });
-  return value.replace(/%/g, "%%");
-}
-
-/** Quoted so spaces survive; `$` is doubled because ExecStart expands variables. */
-function execArg(value: string): string {
-  return `"${line(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "$$$$")}"`;
-}
-
-function environment(key: string, value: string): string {
-  return `Environment="${line(`${key}=${value}`).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
 
 /** Restart=on-failure leaves a clean `daemon stop` down and brings a crash or an update restart back. */
 export function renderUnit(spec: ServiceSpec): string {
@@ -47,6 +26,23 @@ export function renderUnit(spec: ServiceSpec): string {
     "WantedBy=default.target",
     "",
   ].join("\n");
+}
+
+/** Quoted so spaces survive; `$` is doubled because ExecStart expands variables. */
+function execArg(value: string): string {
+  return `"${line(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "$$$$")}"`;
+}
+
+function line(value: string): string {
+  if (/[\r\n]/.test(value))
+    throw new AiregError("The daemon's service file cannot hold a value with a line break.", {
+      code: ErrorCode.Invalid,
+    });
+  return value.replace(/%/g, "%%");
+}
+
+function environment(key: string, value: string): string {
+  return `Environment="${line(`${key}=${value}`).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 export function systemdBackend(spec: ServiceSpec, exec: Exec): AutostartBackend {
@@ -111,4 +107,8 @@ export function systemdBackend(spec: ServiceSpec, exec: Exec): AutostartBackend 
       return found?.split("\n").some((row) => row === head || row.startsWith(`${head} `)) === true;
     },
   };
+}
+
+function systemdUnit(suffix: string): string {
+  return suffix === "" ? `${SERVICE.systemd}.service` : `${SERVICE.systemd}-${suffix}.service`;
 }

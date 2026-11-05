@@ -2,14 +2,14 @@ import { canSignIn } from "#adapter/contract.ts";
 import type { Credential } from "#adapter/index.ts";
 import { withoutCredentials } from "#adapter/text.ts";
 import { comparableLocation } from "#core/adapter/identity.ts";
+import { adapterFor, declaredLayout } from "#core/adapter/load.ts";
 import { expandLocation } from "#core/adapter/location.ts";
-import { adapterFor, declaredLayout } from "#core/adapter/registry.ts";
 import type { Account } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { CredentialStoreError } from "#core/credentials/store.ts";
 import { registryToken, tokenVariable } from "#core/env.ts";
 import { ErrorCode } from "#core/errors.ts";
-import type { RegistrySource } from "#core/manifest.ts";
+import type { RegistrySource } from "#core/manifest/model.ts";
 import { readRootManifest } from "./registry.ts";
 import { AccountService } from "./service.ts";
 
@@ -22,14 +22,38 @@ interface Bindings {
   declared: Readonly<Record<string, RegistrySource>>;
 }
 
-async function bindings(): Promise<Bindings> {
-  const [{ accounts }, user] = await Promise.all([readConfig(), readRootManifest("user")]);
-  return { accounts, declared: user.registries };
+/**
+ * Undefined for most registries. `declared` is every alias the scope declares, since two can
+ * read one token variable.
+ */
+export async function credentialFor(
+  alias: string,
+  source: Source,
+  location: string,
+  declared: readonly string[],
+  signal: AbortSignal = new AbortController().signal,
+): Promise<Credential | undefined> {
+  return release(alias, source, location, true, await lookup(signal, [alias, ...declared]));
 }
 
-function declaredAt(found: Bindings, alias: string): string | undefined {
-  const declared = found.declared[alias];
-  return declared === undefined ? undefined : expandLocation(declared.location, process.cwd());
+/**
+ * `AIREG_TOKEN_<NAME>` wins over a stored sign-in, which goes only to the origin it was issued
+ * for; an undeclared address, which only a probe asks about, gets none from another origin.
+ */
+async function release(
+  alias: string,
+  source: Source,
+  location: string,
+  declared: boolean,
+  { found, aliases, service, signal }: Lookup,
+): Promise<Credential | undefined> {
+  const account = found.accounts.find(({ registry }) => registry === alias);
+  if (account === undefined && registryToken(alias) === undefined) return undefined;
+  if (!(await signsIn(source, location))) return undefined;
+  const fromEnv = fromEnvironment(alias, location, declared, aliases);
+  if (fromEnv !== undefined || account === undefined) return fromEnv;
+  if (!declared && !(await service.issuedFor(account, location))) return undefined;
+  return service.signedInCredential(account, location, signal);
 }
 
 type Source = Pick<RegistrySource, "adapter"> & Partial<Pick<RegistrySource, "config">>;
@@ -41,7 +65,6 @@ async function signsIn(source: Source, location: string) {
   return adapter !== undefined && canSignIn(adapter);
 }
 
-/** What one lookup shares across the registries it resolves. */
 interface Lookup {
   found: Bindings;
   aliases: readonly string[];
@@ -49,20 +72,7 @@ interface Lookup {
   signal: AbortSignal;
 }
 
-async function lookup(signal: AbortSignal, aliases: readonly string[] = []): Promise<Lookup> {
-  const found = await bindings();
-  return {
-    found,
-    aliases: [...aliases, ...Object.keys(found.declared)],
-    service: new AccountService(),
-    signal,
-  };
-}
-
-/**
- * Sent to the registry the current scope declares under `alias`, the one the
- * command works on; an address nothing declares under that name gets none.
- */
+/** Sent only to the registry the scope declares under `alias`; a set token for any other is refused. */
 function fromEnvironment(
   alias: string,
   location: string,
@@ -94,39 +104,19 @@ function fromEnvironment(
   return { type: "bearer", accessToken: token };
 }
 
-/**
- * `AIREG_TOKEN_<NAME>` wins over a stored sign-in. A stored one goes only to the
- * origin it was issued for, whatever address a project declares for its name; an
- * address nothing declares, which only a probe asks about, gets none from another origin.
- */
-async function release(
-  alias: string,
-  source: Source,
-  location: string,
-  declared: boolean,
-  { found, aliases, service, signal }: Lookup,
-): Promise<Credential | undefined> {
-  const account = found.accounts.find(({ registry }) => registry === alias);
-  if (account === undefined && registryToken(alias) === undefined) return undefined;
-  if (!(await signsIn(source, location))) return undefined;
-  const fromEnv = fromEnvironment(alias, location, declared, aliases);
-  if (fromEnv !== undefined || account === undefined) return fromEnv;
-  if (!declared && !(await service.issuedFor(account, location))) return undefined;
-  return service.signedInCredential(account, location, signal);
+async function lookup(signal: AbortSignal, aliases: readonly string[] = []): Promise<Lookup> {
+  const found = await bindings();
+  return {
+    found,
+    aliases: [...aliases, ...Object.keys(found.declared)],
+    service: new AccountService(),
+    signal,
+  };
 }
 
-/**
- * Undefined for most registries. `declared` is every alias the scope declares, since two can
- * read one token variable.
- */
-export async function credentialFor(
-  alias: string,
-  source: Source,
-  location: string,
-  declared: readonly string[],
-  signal: AbortSignal = new AbortController().signal,
-): Promise<Credential | undefined> {
-  return release(alias, source, location, true, await lookup(signal, [alias, ...declared]));
+async function bindings(): Promise<Bindings> {
+  const [{ accounts }, user] = await Promise.all([readConfig(), readRootManifest("user")]);
+  return { accounts, declared: user.registries };
 }
 
 /**
@@ -178,4 +168,9 @@ export async function credentialForLocation(
     if (credential !== undefined) return credential;
   }
   return release(alias, source, location, false, shared);
+}
+
+function declaredAt(found: Bindings, alias: string): string | undefined {
+  const declared = found.declared[alias];
+  return declared === undefined ? undefined : expandLocation(declared.location, process.cwd());
 }

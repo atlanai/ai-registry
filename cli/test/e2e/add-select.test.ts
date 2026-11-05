@@ -41,7 +41,7 @@ const test = base
       [".claude"],
     ),
   )
-  /** Each case starts from a project of its own, so one install cannot satisfy the next. */
+  // `newProject` gives each case a project of its own, so one install cannot satisfy the next.
   .extend("newProject", ({ initialised, tmp }) => {
     let projects = 0;
     return async (from: CopyProject = initialised) => {
@@ -179,7 +179,7 @@ describe("an address", () => {
     newProject: project,
     tmp,
   }) => {
-    // Its own registry, so a later release doesn't reach the shared one.
+    // Its own registry, so a later release does not reach the shared one.
     const teams = join(tmp, "teams");
     const publish = (versions: string[]) => {
       const built = registry(teams, { name: "teams", slug: "teams" });

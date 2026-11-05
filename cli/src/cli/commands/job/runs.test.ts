@@ -1,20 +1,20 @@
 import { dirname } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
-import type { CommandContext } from "#cli/commands/index.ts";
+import type { CommandContext } from "#cli/commands/command.ts";
 import { emptyRegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
-import { Printer } from "#core/output.ts";
 import { NAME } from "#core/product.ts";
 import { EMPTY_RUN_COUNTS, type RunEvent, type RunRecord } from "#core/run/model.ts";
+import { Printer } from "#core/term/printer.ts";
 import type { RpcClient } from "#daemon/rpc/client.ts";
 import { privateDirectory, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
-import { PROTOCOL_VERSION } from "#daemon/rpc/protocol.ts";
+import { PROTOCOL_VERSION } from "#daemon/rpc/methods.ts";
 import { RpcServer } from "#daemon/rpc/server.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { runs } from "./runs.ts";
 
 // The test serves the socket itself, so no daemon is started or stopped.
-vi.mock("#daemon/service.ts", async () => {
+vi.mock("#daemon/process/lifecycle.ts", async () => {
   const { cliClient, RpcClient } = await import("#daemon/rpc/client.ts");
   return {
     withDaemon: async <T>(work: (client: RpcClient) => Promise<T>) => {

@@ -1,127 +1,30 @@
 import { list, sanitizeName } from "#adapter/text.ts";
-import { matchInstalled, rowsNamed, shownNames } from "#cli/names.ts";
-import { parse } from "#cli/options.ts";
-import {
-  cancel,
-  chooseRemovals,
-  confirmPlan,
-  interaction,
-  interactive,
-  preparing,
-  silence,
-} from "#cli/prompt/flow.ts";
-import { canceled, defaultIo } from "#cli/prompt/index.ts";
+import { REMOVE_COMMAND } from "#cli/commands/remove/spec.ts";
+import { parse } from "#cli/options/parse.ts";
+import { defaultIo } from "#cli/prompt/ask.ts";
+import { chooseRemovals } from "#cli/prompt/choose.ts";
+import { confirmPlan } from "#cli/prompt/confirm-plan.ts";
+import { cancel, interaction, interactive, preparing, silence } from "#cli/prompt/interaction.ts";
+import { canceled } from "#cli/prompt/model.ts";
 import { settleCollisions } from "#cli/render/collisions.ts";
 import { planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { loadedBy, toolName } from "#cli/render/tools.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
 import type { Lock } from "#core/lock.ts";
-import { reaches } from "#core/manifest.ts";
-import { editedAnywhere } from "#core/plan/model.ts";
-import { survey } from "#core/plan/survey.ts";
+import { reaches } from "#core/manifest/match.ts";
+import { editedAnywhere, survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
+import { run as runPipeline } from "#engine/install/pipeline.ts";
+import { selectTargets } from "#engine/install/targets.ts";
+import { matchInstalled, rowsNamed, shownNames } from "#engine/installed-names.ts";
 import type { CommonOptions } from "#engine/options.ts";
-import { type Loaded, load, run as runPipeline, selectTargets } from "#engine/pipeline.ts";
-import { builtin, type CommandContext } from "./index.ts";
-
-/**
- * A ref naming a dropped artifact goes, as does a whole ref removed by its own address;
- * any other keeps taking the rest minus what was dropped, so later members still arrive.
- */
-function without(ref: Ref, drop: ReadonlySet<string>, lock: Lock, whole: boolean): Ref[] {
-  const covered = Object.entries(lock.artifacts).filter(([, entry]) => reaches(ref, entry));
-  const dropped = covered.filter(([key]) => drop.has(key));
-  // Checked first: a namespace whose every member was already removed covers nothing.
-  if (whole && dropped.length === covered.length) return [];
-  if (dropped.length === 0) return [ref];
-  if (ref.name !== undefined) return [];
-  const exclusions = dropped.map(([, entry]) =>
-    relativeTo(ref, {
-      namespace: entry.namespace,
-      kind: entry.kind,
-      name: sanitizeName(entry.name),
-    }),
-  );
-  return [withExclusions(ref, [...(ref.exclude ?? []), ...exclusions])];
-}
-
-/** A name written as a whole registry or namespace's address, such as `acme/frontend`. */
-function wholeAddress(name: string): string[] {
-  try {
-    const ref = parseRef(name);
-    return ref.name === undefined ? [formatAddress(ref)] : [];
-  } catch {
-    return [];
-  }
-}
-
-async function editedAmong(lock: Lock, names: readonly string[], roots: Roots): Promise<string[]> {
-  const wanted = new Set(names);
-  const going = Object.entries(lock.artifacts).filter(([name]) => wanted.has(name));
-  const found = await survey({ ...lock, artifacts: dict(going) }, roots);
-  return names.filter((name) => editedAnywhere(lock.artifacts[name], found.artifacts[name]));
-}
-
-/** Said whenever a removal leaves a row a job publishes, so it is never kept silently. */
-function keptWatched(context: CommandContext, lock: Lock, watched: readonly string[]): void {
-  if (watched.length === 0) return;
-  const shown = shownNames(lock);
-  context.printer.warning(
-    `Kept ${list(watched.map((name) => shown.get(name) ?? name))}, which a job publishes from your own ${watched.length === 1 ? "folder" : "folders"}.`,
-  );
-  context.printer.hint(
-    "Run `aireg watch list` to see the folder, and `aireg watch remove <folder>` to stop publishing it.",
-  );
-}
-
-/** Asks which installed artifacts to remove; undefined when the person cancels. */
-async function pickRemovals(
-  step: ReturnType<typeof interaction>,
-  loaded: Loaded,
-  common: CommonOptions,
-): Promise<string[] | undefined> {
-  const installed = new Set(Object.keys(loaded.lock.artifacts));
-  if (installed.size === 0) {
-    throw new AiregError(`Nothing is installed in ${scopeName(loaded.roots.scope)}.`, {
-      code: ErrorCode.NotFound,
-      hint:
-        loaded.roots.scope === "user"
-          ? "Run `aireg list` in a project to see what it installs."
-          : "Run `aireg list -g` to see your user scope.",
-    });
-  }
-  if (!interactive(step)) {
-    // Name the reason: on a terminal this command would have offered a list,
-    // and "nothing to remove" alone reads as though nothing is installed.
-    throw new AiregError("`aireg remove` needs an artifact name.", {
-      code: ErrorCode.Usage,
-      hint: `Name one: \`aireg remove <name>\`, or pass \`--all\`. No list was offered because ${silence(step)}.`,
-    });
-  }
-  const picked = await chooseRemovals(
-    step,
-    [...installed].sort().map((name) => {
-      const entry = loaded.lock.artifacts[name];
-      return {
-        name,
-        kind: entry?.kind ?? "",
-        source: entry?.registry ?? "",
-        targets: loadedBy(
-          loaded.targetTable,
-          selectTargets(loaded.manifest, loaded.targetTable, common),
-          entry?.kind,
-          (entry?.links ?? []).map((linked) => linked.target),
-        ).map((name) => toolName(loaded.targetTable, name)),
-      };
-    }),
-  );
-  return canceled(picked) ? undefined : picked;
-}
+import { type Loaded, load } from "#engine/scope/load.ts";
+import type { CommandContext } from "./command.ts";
 
 export async function run(context: CommandContext): Promise<void> {
-  const { positionals, common } = parse(context.argv, builtin("remove"));
+  const { positionals, common } = parse(context.argv, REMOVE_COMMAND);
   const named = [...positionals, ...(common.select ?? [])].filter((name) => name !== "*");
   const removeAll = common.all || common.select?.includes("*") === true;
 
@@ -241,4 +144,98 @@ export async function run(context: CommandContext): Promise<void> {
   if (result.applied)
     summarize(context.printer, { ...result, targets, plan, applied: result.applied }, told);
   settleCollisions(context, plan);
+}
+
+/** Asks which installed artifacts to remove; undefined when the person cancels. */
+async function pickRemovals(
+  step: ReturnType<typeof interaction>,
+  loaded: Loaded,
+  common: CommonOptions,
+): Promise<string[] | undefined> {
+  const installed = new Set(Object.keys(loaded.lock.artifacts));
+  if (installed.size === 0) {
+    throw new AiregError(`Nothing is installed in ${scopeName(loaded.roots.scope)}.`, {
+      code: ErrorCode.NotFound,
+      hint:
+        loaded.roots.scope === "user"
+          ? "Run `aireg list` in a project to see what it installs."
+          : "Run `aireg list -g` to see your user scope.",
+    });
+  }
+  if (!interactive(step)) {
+    // Name the reason: on a terminal this command would have offered a list,
+    // and "nothing to remove" alone reads as though nothing is installed.
+    throw new AiregError("`aireg remove` needs an artifact name.", {
+      code: ErrorCode.Usage,
+      hint: `Name one: \`aireg remove <name>\`, or pass \`--all\`. No list was offered because ${silence(step)}.`,
+    });
+  }
+  const picked = await chooseRemovals(
+    step,
+    [...installed].sort().map((name) => {
+      const entry = loaded.lock.artifacts[name];
+      return {
+        name,
+        kind: entry?.kind ?? "",
+        source: entry?.registry ?? "",
+        targets: loadedBy(
+          loaded.targetTable,
+          selectTargets(loaded.manifest, loaded.targetTable, common),
+          entry?.kind,
+          (entry?.links ?? []).map((linked) => linked.target),
+        ).map((name) => toolName(loaded.targetTable, name)),
+      };
+    }),
+  );
+  return canceled(picked) ? undefined : picked;
+}
+
+/** A name written as a whole registry or namespace's address, such as `acme/frontend`. */
+function wholeAddress(name: string): string[] {
+  try {
+    const ref = parseRef(name);
+    return ref.name === undefined ? [formatAddress(ref)] : [];
+  } catch {
+    return [];
+  }
+}
+
+async function editedAmong(lock: Lock, names: readonly string[], roots: Roots): Promise<string[]> {
+  const wanted = new Set(names);
+  const going = Object.entries(lock.artifacts).filter(([name]) => wanted.has(name));
+  const found = await survey({ ...lock, artifacts: dict(going) }, roots);
+  return names.filter((name) => editedAnywhere(lock.artifacts[name], found.artifacts[name]));
+}
+
+/**
+ * A ref naming a dropped artifact goes, as does a whole ref removed by its own address;
+ * any other keeps taking the rest minus what was dropped, so later members still arrive.
+ */
+function without(ref: Ref, drop: ReadonlySet<string>, lock: Lock, whole: boolean): Ref[] {
+  const covered = Object.entries(lock.artifacts).filter(([, entry]) => reaches(ref, entry));
+  const dropped = covered.filter(([key]) => drop.has(key));
+  // Checked first: a namespace whose every member was already removed covers nothing.
+  if (whole && dropped.length === covered.length) return [];
+  if (dropped.length === 0) return [ref];
+  if (ref.name !== undefined) return [];
+  const exclusions = dropped.map(([, entry]) =>
+    relativeTo(ref, {
+      namespace: entry.namespace,
+      kind: entry.kind,
+      name: sanitizeName(entry.name),
+    }),
+  );
+  return [withExclusions(ref, [...(ref.exclude ?? []), ...exclusions])];
+}
+
+/** Said whenever a removal leaves a row a job publishes, so it is never kept silently. */
+function keptWatched(context: CommandContext, lock: Lock, watched: readonly string[]): void {
+  if (watched.length === 0) return;
+  const shown = shownNames(lock);
+  context.printer.warning(
+    `Kept ${list(watched.map((name) => shown.get(name) ?? name))}, which a job publishes from your own ${watched.length === 1 ? "folder" : "folders"}.`,
+  );
+  context.printer.hint(
+    "Run `aireg watch list` to see the folder, and `aireg watch remove <folder>` to stop publishing it.",
+  );
 }

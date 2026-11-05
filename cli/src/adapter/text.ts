@@ -4,7 +4,7 @@ const FALLBACK_NAME = "unnamed";
 
 /**
  * Registry text is attacker-controlled: escapes can retitle the terminal, write the clipboard or fake
- * table rows. Whole sequences go first, payload and all, then any control but tab, newline and CR.
+ * rows. Whole sequences go first, then controls but tab, newline and CR, then bidi (Trojan Source).
  */
 const CONTROL_SEQUENCES = new RegExp(
   [
@@ -12,7 +12,6 @@ const CONTROL_SEQUENCES = new RegExp(
     "(?:\\u001B\\[|\\u009B)[0-?]*[ -/]*[@-~]",
     "\\u001B[ -~]?",
     "[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F-\\u009F]",
-    // Bidi controls reorder what is shown without changing what is there (Trojan Source).
     "[\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]",
   ].join("|"),
   "g",
@@ -45,14 +44,14 @@ export function quoted(value: string): string {
   );
 }
 
-function stripControl(text: string): string {
-  return text.replace(CONTROL_SEQUENCES, "");
-}
-
-/** Escapes, controls and bidi controls removed, whitespace folded, truncated: safe to print on one line. */
+/** Escapes, controls and bidi controls removed, whitespace folded, truncated: safe on one line. */
 export function sanitizeText(text: string, maxLength = 200): string {
   const flat = stripControl(text).replace(/\s+/g, " ").trim();
   return flat.length > maxLength ? `${flat.slice(0, maxLength - 1)}…` : flat;
+}
+
+function stripControl(text: string): string {
+  return text.replace(CONTROL_SEQUENCES, "");
 }
 
 /**
@@ -63,10 +62,7 @@ export function sanitizeBlock(text: string): string {
   return stripControl(text).replace(/\r(?!\n)/g, "");
 }
 
-/**
- * A mistyped source can carry a token in its userinfo, and everything here is
- * echoed to a terminal and CI output; call sites cannot be trusted to remember.
- */
+/** `location` with its userinfo redacted, since a mistyped source can carry a token into logs. */
 export function withoutCredentials(location: string): string {
   return replaceUserinfo(location, () => "<redacted>");
 }
@@ -83,8 +79,8 @@ const endsUserinfo = (char: string | undefined) =>
   char === undefined || char === "/" || char === "@" || /\s/.test(char);
 
 /**
- * Every `scheme://userinfo@` in `text` with its userinfo replaced, in one linear pass so hostile
- * input cannot stall the CLI or the daemon. `replace` returns the new userinfo, or undefined to keep it.
+ * Every `scheme://userinfo@` in `text` with `replace`'s userinfo, undefined keeping it. One linear
+ * pass, so hostile input cannot stall the CLI or the daemon.
  */
 export function replaceUserinfo(
   text: string,
@@ -127,12 +123,11 @@ export function stripLeading(text: string, chars: string): string {
   return text.slice(start);
 }
 
-/** `1 skill`, `2 skills`: a count with its noun, for messages. */
+/** A count with its noun, singular only for 1. */
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** `a`, `a and b`, `a, b and c`. */
 export function list(items: readonly string[], conjunction = "and"): string {
   if (items.length <= 1) return items[0] ?? "";
   return `${items.slice(0, -1).join(", ")} ${conjunction} ${items.at(-1)}`;

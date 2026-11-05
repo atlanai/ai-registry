@@ -1,20 +1,16 @@
-import { collect } from "#cli/console/model/state.ts";
-import { noArguments, parse } from "#cli/options.ts";
+import { CONSOLE_COMMAND } from "#cli/commands/console/spec.ts";
+import { collect } from "#cli/console/data/state.ts";
+import { noArguments, parse } from "#cli/options/parse.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { contributedPanels, contributedUpstream } from "#core/host/load.ts";
-import { builtin, type CommandContext } from "./index.ts";
-
-/** Ink owns the screen and reads raw keys; neither works through a pipe. */
-function interactive(): boolean {
-  return process.stdin.isTTY === true && process.stdout.isTTY === true;
-}
+import type { CommandContext } from "./command.ts";
 
 /**
  * The renderer sits behind a dynamic import, so nothing that only syncs pays for
  * it. Contributed tabs load first: the render is synchronous.
  */
 export async function run(context: CommandContext): Promise<void> {
-  const { positionals, own } = parse<{ account?: string }>(context.argv, builtin("console"));
+  const { positionals, own } = parse<{ account?: string }>(context.argv, CONSOLE_COMMAND);
   noArguments(positionals, "console");
 
   if (context.printer.format !== "json" && !interactive()) {
@@ -42,4 +38,9 @@ export async function run(context: CommandContext): Promise<void> {
   const viewer = state.account === undefined ? undefined : await upstream?.viewer?.(state.account);
 
   await runApp({ context, initial: state, panels, upstream, viewer });
+}
+
+/** Ink owns the screen and reads raw keys; neither works through a pipe. */
+function interactive(): boolean {
+  return process.stdin.isTTY === true && process.stdout.isTTY === true;
 }

@@ -13,13 +13,13 @@ import {
   symlink,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { EXECUTABLE } from "#adapter/files.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { gte, parseVersion } from "#adapter/semver.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
-import { canonical } from "#core/fs/canonical.ts";
-import { EXECUTABLE } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
+import { canonical } from "#core/fs/realpath.ts";
 import {
   binDir,
   cliRoot,
@@ -69,59 +69,6 @@ export async function installBinary(
 }
 
 /**
- * Places an executable already on disk. The installer's staged copy, inside aireg's
- * home, is renamed into place; any other file is copied beside the target and renamed.
- */
-export async function installBinaryFrom(
-  version: string,
-  path: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<string> {
-  const bin = versionBin(version, env);
-  ensureHome(env);
-  if (canonical(path) !== canonical(bin)) {
-    await mkdir(versionDir(version, env), { recursive: true });
-    if (isWithin(canonical(cliRoot(env)), canonical(path))) {
-      await chmod(path, EXECUTABLE);
-      await swapIn(path, bin);
-    } else {
-      const staged = `${bin}.${process.pid}.tmp`;
-      try {
-        await copyFile(path, staged);
-        await chmod(staged, EXECUTABLE);
-        await swapIn(staged, bin);
-      } finally {
-        await rm(staged, { force: true });
-      }
-    }
-  }
-  return await goLive(version, bin, env);
-}
-
-export async function versionOnDisk(
-  version: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<boolean> {
-  try {
-    await access(versionBin(version, env), constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function goLive(version: string, bin: string, env: NodeJS.ProcessEnv): Promise<string> {
-  try {
-    await access(bin, constants.X_OK);
-  } catch {
-    throw new Error(`Installed aireg ${version}, but ${bin} is not executable.`);
-  }
-  await activate(version, env);
-  await sweepReplaced(dirname(bin));
-  return bin;
-}
-
-/**
  * Renames `staged` over `target`. Windows refuses that while `target` runs, but lets the
  * running file be renamed, so it moves aside until nothing runs it.
  */
@@ -136,12 +83,15 @@ async function swapIn(staged: string, target: string): Promise<void> {
   await rename(staged, target);
 }
 
-/** Deletes what `swapIn` moved aside; one a process still runs stays until a later install. */
-async function sweepReplaced(dir: string): Promise<void> {
-  if (!WINDOWS) return;
-  for (const entry of await readdir(dir).catch(() => [])) {
-    if (entry.endsWith(".old")) await rm(join(dir, entry), { force: true }).catch(() => undefined);
+async function goLive(version: string, bin: string, env: NodeJS.ProcessEnv): Promise<string> {
+  try {
+    await access(bin, constants.X_OK);
+  } catch {
+    throw new Error(`Installed aireg ${version}, but ${bin} is not executable.`);
   }
+  await activate(version, env);
+  await sweepReplaced(dirname(bin));
+  return bin;
 }
 
 async function activate(version: string, env: NodeJS.ProcessEnv): Promise<void> {
@@ -183,18 +133,54 @@ async function writeShims(version: string, env: NodeJS.ProcessEnv): Promise<void
   await sweepReplaced(binDir(env));
 }
 
-async function listedVersions(env: NodeJS.ProcessEnv): Promise<string[]> {
-  let entries: Dirent[];
-  try {
-    entries = await readdir(cliRoot(env), { withFileTypes: true });
-  } catch (error) {
-    if (isMissing(error)) return [];
-    throw error;
+/** Deletes what `swapIn` moved aside; one a process still runs stays until a later install. */
+async function sweepReplaced(dir: string): Promise<void> {
+  if (!WINDOWS) return;
+  for (const entry of await readdir(dir).catch(() => [])) {
+    if (entry.endsWith(".old")) await rm(join(dir, entry), { force: true }).catch(() => undefined);
   }
-  return entries
-    .filter((entry) => entry.isDirectory() && parseVersion(entry.name) !== undefined)
-    .map((entry) => entry.name)
-    .sort((a, b) => (gte(a, b) ? -1 : 1));
+}
+
+/**
+ * Places an executable already on disk. The installer's staged copy, inside aireg's
+ * home, is renamed into place; any other file is copied beside the target and renamed.
+ */
+export async function installBinaryFrom(
+  version: string,
+  path: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
+  const bin = versionBin(version, env);
+  ensureHome(env);
+  if (canonical(path) !== canonical(bin)) {
+    await mkdir(versionDir(version, env), { recursive: true });
+    if (isWithin(canonical(cliRoot(env)), canonical(path))) {
+      await chmod(path, EXECUTABLE);
+      await swapIn(path, bin);
+    } else {
+      const staged = `${bin}.${process.pid}.tmp`;
+      try {
+        await copyFile(path, staged);
+        await chmod(staged, EXECUTABLE);
+        await swapIn(staged, bin);
+      } finally {
+        await rm(staged, { force: true });
+      }
+    }
+  }
+  return await goLive(version, bin, env);
+}
+
+export async function versionOnDisk(
+  version: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<boolean> {
+  try {
+    await access(versionBin(version, env), constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function previousInstalled(env: NodeJS.ProcessEnv = process.env): Promise<string> {
@@ -209,13 +195,26 @@ export async function previousInstalled(env: NodeJS.ProcessEnv = process.env): P
   return previous;
 }
 
+async function listedVersions(env: NodeJS.ProcessEnv): Promise<string[]> {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(cliRoot(env), { withFileTypes: true });
+  } catch (error) {
+    if (isMissing(error)) return [];
+    throw error;
+  }
+  return entries
+    .filter((entry) => entry.isDirectory() && parseVersion(entry.name) !== undefined)
+    .map((entry) => entry.name)
+    .sort((a, b) => (gte(a, b) ? -1 : 1));
+}
+
 export async function rollback(env: NodeJS.ProcessEnv = process.env): Promise<string> {
   const previous = await previousInstalled(env);
   await activate(previous, env);
   return previous;
 }
 
-/** Oldest versions beyond `keep` newest, newest-first input not required. */
 export function versionsToPrune(versions: readonly string[], keep = 2): string[] {
   return [...versions].sort((a, b) => (gte(a, b) ? -1 : 1)).slice(keep);
 }

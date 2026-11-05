@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { resolveVersion, SpecError, type VersionsDocument } from "./documents.ts";
 
 const row = (version: string, yanked = false) => ({
@@ -18,11 +18,11 @@ const lint: VersionsDocument = {
 };
 
 describe("resolveVersion", () => {
-  it("takes latest when no version is asked for", () => {
+  test("takes latest when no version is asked for", () => {
     expect(resolveVersion(lint, undefined).version).toBe("0.3.0");
   });
 
-  it("calls a version that was never released missing, and names the ones there are", () => {
+  test("calls a version that was never released missing, and names the ones there are", () => {
     let thrown: unknown;
     try {
       resolveVersion(lint, "9.9.9");
@@ -38,7 +38,7 @@ describe("resolveVersion", () => {
     });
   });
 
-  it("counts the versions it does not name", () => {
+  test("counts the versions it does not name", () => {
     const many = { ...lint, versions: ["7", "6", "5", "4", "3", "2"].map((v) => row(`0.${v}.0`)) };
     expect(() => resolveVersion(many, "9.9.9")).toThrow(
       expect.objectContaining({

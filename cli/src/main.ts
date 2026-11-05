@@ -2,6 +2,10 @@ import { homedir } from "node:os";
 import { list, quoted, sanitizeBlock } from "#adapter/text.ts";
 import { stopGit } from "#adapters/git/api.ts";
 import { registerBuiltinAdapters } from "#adapters/index.ts";
+import type { Command, CommandContext } from "#cli/commands/command.ts";
+import { lookup, warnHidden } from "#cli/commands/index.ts";
+import { findMapFormat, runMap } from "#cli/help/map.ts";
+import { printHelp, printShortHelp, unknownCommand } from "#cli/help/print.ts";
 import {
   colorWhen,
   findCommand,
@@ -10,23 +14,25 @@ import {
   misplacedOption,
   misusedGlobal,
   readGlobals,
-} from "#cli/argv.ts";
-import { type CommandContext, type CommandSpec, lookup, warnHidden } from "#cli/commands/index.ts";
-import { printHelp, printShortHelp, unknownCommand } from "#cli/help.ts";
-import { findMapFormat, runMap } from "#cli/map.ts";
-import { reportError } from "#cli/report.ts";
-import { closest, didYouMean } from "#cli/suggest.ts";
+} from "#cli/options/globals.ts";
+import { closest, didYouMean } from "#cli/options/suggest.ts";
+import { reportError } from "#cli/render/error.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
-import { releaseLeasesOnInterrupt } from "#core/lease.ts";
-import { LogLevelError } from "#core/log/index.ts";
+import { releaseLeasesOnInterrupt } from "#core/lease/lease.ts";
+import { LogLevelError } from "#core/log/level.ts";
 import { type LogBootstrap, openCliLog } from "#core/log/open.ts";
-import { Printer } from "#core/output.ts";
+import { Printer } from "#core/term/printer.ts";
 import { NODE_REQUIREMENT, nodeTooOld, VERSION, versionInfo } from "#core/version.ts";
 import { extensionHost } from "#daemon/extension-host.ts";
-import { recycleDaemon } from "#daemon/service.ts";
-import { hintUpdate, refreshUpdates, scheduleUpdateCheck, UPDATE_CHECK_FLAG } from "#self/check.ts";
-import { applyMinimumUpdate } from "#self/minimum.ts";
-import { REMOVE_AFTER_FLAG, removeAfterExit } from "#self/remove-after.ts";
+import { recycleDaemon } from "#daemon/process/lifecycle.ts";
+import { applyMinimumUpdate } from "#self/minimum-update.ts";
+import { REMOVE_AFTER_FLAG, removeAfterExit } from "#self/remove-after-exit.ts";
+import {
+  hintUpdate,
+  refreshUpdates,
+  scheduleUpdateCheck,
+  UPDATE_CHECK_FLAG,
+} from "#self/update-check.ts";
 
 registerBuiltinAdapters();
 
@@ -69,8 +75,8 @@ async function mapIfRequested(printer: Printer, argv: string[]): Promise<ExitCod
 }
 
 async function unknownKind(name: string, action: string): Promise<AiregError> {
-  const { findRegistry } = await import("#core/filespec/write/init.ts");
-  const { kindsOf, leftOutKind } = await import("#core/filespec/write/kinds.ts");
+  const { findRegistry } = await import("#core/filespec/init.ts");
+  const { kindsOf, leftOutKind } = await import("#core/filespec/kind-manifests.ts");
   const root = findRegistry(process.cwd());
   const left = root === undefined ? undefined : await leftOutKind(root, name);
   if (left !== undefined) {
@@ -186,7 +192,7 @@ async function dispatch(
   if (answered !== undefined) return answered;
   if (name === undefined) return ExitCode.Usage;
 
-  const spec: CommandSpec | undefined = await lookup(name);
+  const spec: Command | undefined = await lookup(name);
   const action = rest[0];
   const kindAction = action === "new" || action === "bump";
   if (spec === undefined && kindAction) {
@@ -251,7 +257,7 @@ async function runCommand(
   printer: Printer,
   argv: string[],
   name: string,
-  spec: CommandSpec,
+  spec: Command,
   rest: string[],
   values: GlobalValues,
 ): Promise<ExitCode> {

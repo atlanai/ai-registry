@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import type { ArtifactKind } from "#core/kinds.ts";
+import { describe, expect, test } from "vitest";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { acquired, entry } from "#test/kit/builders/plan.ts";
 import { closure, idOf, type Need } from "./depends.ts";
 import type { Acquired, Selected } from "./model.ts";
@@ -61,7 +61,7 @@ const refs = (result: ReturnType<typeof closure>) =>
   result.refs.map((ref) => `${ref.kind}/${ref.name}@${ref.version}`).sort();
 
 describe("closure", () => {
-  it("follows edges transitively, at the version each one names", () => {
+  test("follows edges transitively, at the version each one names", () => {
     const result = closure(
       [selected("agent", "reviewer", "0.3.0")],
       registry(
@@ -78,7 +78,7 @@ describe("closure", () => {
     expect(result.conflicts).toEqual([]);
   });
 
-  it("reports a version the registry does not hold, and who needed it", () => {
+  test("reports a version the registry does not hold, and who needed it", () => {
     const result = closure(
       [selected("agent", "reviewer", "0.3.0")],
       registry(["agent", "reviewer", "0.3.0", "eng/skill/lint@9.9.9"], ["skill", "lint", "1.0.0"]),
@@ -89,7 +89,7 @@ describe("closure", () => {
     ]);
   });
 
-  it("refuses two dependents that need one artifact at two versions", () => {
+  test("refuses two dependents that need one artifact at two versions", () => {
     const result = closure(
       [selected("agent", "reviewer", "0.3.0"), selected("agent", "helper", "1.0.0")],
       registry(
@@ -103,7 +103,7 @@ describe("closure", () => {
     expect(result.conflicts[0]?.message).toContain("eng/skill/lint is needed at two versions");
   });
 
-  it("holds a version the manifest names against a dependent, but not one a namespace brought", () => {
+  test("holds a version the manifest names against a dependent, but not one a namespace brought", () => {
     const published = registry(
       ["agent", "reviewer", "0.3.0", "eng/skill/lint@1.0.0"],
       ["skill", "lint", "1.0.0"],
@@ -125,7 +125,7 @@ describe("closure", () => {
     expect(refs(brought)).toEqual(["skill/lint@1.0.0"]);
   });
 
-  it("ends a cycle where it began", () => {
+  test("ends a cycle where it began", () => {
     const result = closure(
       [selected("skill", "ping", "1.0.0")],
       registry(
@@ -138,7 +138,7 @@ describe("closure", () => {
     expect(result.neededBy.get(id("skill", "ping"))).toEqual(new Set([id("skill", "pong")]));
   });
 
-  it("puts a dependency in the targets its dependents were narrowed to", () => {
+  test("puts a dependency in the targets its dependents were narrowed to", () => {
     const published = registry(
       ["agent", "reviewer", "0.3.0", "eng/skill/lint@1.0.0"],
       ["agent", "helper", "1.0.0", "eng/skill/lint@1.0.0"],

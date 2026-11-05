@@ -77,13 +77,26 @@ const text = (bytes: Uint8Array, start: number, length: number) => {
 const octal = (bytes: Uint8Array, start: number, length: number) =>
   Number.parseInt(text(bytes, start, length).trim() || "0", 8);
 
-/** `path=` from a pax extended header, which names the next entry when its own name is too long. */
-function paxPath(bytes: Uint8Array): string | undefined {
-  for (const record of new TextDecoder().decode(bytes).split("\n")) {
-    const match = /^\d+ path=(.*)$/.exec(record);
-    if (match !== null) return match[1];
+/** A .tar.gz or a .zip, told apart by its first bytes, unpacked in memory within the limits. */
+export function unpack(name: string, archive: Uint8Array, limits = ARCHIVE_LIMITS): Unpacked[] {
+  const into = new Collector(name, limits);
+  if (archive[0] === 0x1f && archive[1] === 0x8b) {
+    let tar: Uint8Array;
+    try {
+      tar = gunzipSync(archive, { maxOutputLength: limits.bytes + 1024 * 1024 });
+    } catch {
+      throw fail(
+        "invalid",
+        `${name}'s archive is not a gzip file it can unpack within ${Math.round(limits.bytes / 1024 / 1024)} MB.`,
+      );
+    }
+    untar(tar, into);
+  } else if (archive[0] === 0x50 && archive[1] === 0x4b) {
+    unzip(archive, into);
+  } else {
+    throw fail("invalid", `${name}'s archive is neither a .tar.gz nor a .zip file.`);
   }
-  return undefined;
+  return into.files;
 }
 
 function untar(tar: Uint8Array, into: Collector): void {
@@ -119,6 +132,36 @@ interface ZipEntry {
   size: number;
   mode: number;
   local: number;
+}
+
+/** `path=` from a pax extended header, which names the next entry when its own name is too long. */
+function paxPath(bytes: Uint8Array): string | undefined {
+  for (const record of new TextDecoder().decode(bytes).split("\n")) {
+    const match = /^\d+ path=(.*)$/.exec(record);
+    if (match !== null) return match[1];
+  }
+  return undefined;
+}
+
+/** The central directory says what a zip holds; each local header says where its bytes start. */
+function unzip(zip: Uint8Array, into: Collector): void {
+  const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+  let end = -1;
+  for (let at = zip.byteLength - 22; at >= Math.max(0, zip.byteLength - 65_557); at -= 1) {
+    if (view.getUint32(at, true) === 0x06054b50) {
+      end = at;
+      break;
+    }
+  }
+  if (end === -1) throw fail("invalid", `${into.name}'s archive is not a zip file.`);
+  let at = view.getUint32(end + 16, true);
+  for (let count = view.getUint16(end + 10, true); count > 0; count -= 1) {
+    const [entry, next] = centralEntry(zip, view, at, into.name);
+    at = next;
+    if (entry.name.endsWith("/")) continue;
+    if ((entry.mode & 0o170000) === 0o120000) into.refuse(entry.name, "a link");
+    into.add(entry.name, zipBytes(zip, view, entry, into), (entry.mode & EXECUTE_BITS) !== 0);
+  }
 }
 
 /** One central directory record, and where the next one starts. */
@@ -167,47 +210,4 @@ function zipBytes(zip: Uint8Array, view: DataView, entry: ZipEntry, into: Collec
     throw fail("invalid", `${into.name}'s archive holds ${entry.name} at the wrong size.`);
   }
   return bytes;
-}
-
-/** The central directory says what a zip holds; each local header says where its bytes start. */
-function unzip(zip: Uint8Array, into: Collector): void {
-  const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
-  let end = -1;
-  for (let at = zip.byteLength - 22; at >= Math.max(0, zip.byteLength - 65_557); at -= 1) {
-    if (view.getUint32(at, true) === 0x06054b50) {
-      end = at;
-      break;
-    }
-  }
-  if (end === -1) throw fail("invalid", `${into.name}'s archive is not a zip file.`);
-  let at = view.getUint32(end + 16, true);
-  for (let count = view.getUint16(end + 10, true); count > 0; count -= 1) {
-    const [entry, next] = centralEntry(zip, view, at, into.name);
-    at = next;
-    if (entry.name.endsWith("/")) continue;
-    if ((entry.mode & 0o170000) === 0o120000) into.refuse(entry.name, "a link");
-    into.add(entry.name, zipBytes(zip, view, entry, into), (entry.mode & EXECUTE_BITS) !== 0);
-  }
-}
-
-/** A gzip-compressed tar or a zip, told apart by its first bytes, unpacked in memory within the limits. */
-export function unpack(name: string, archive: Uint8Array, limits = ARCHIVE_LIMITS): Unpacked[] {
-  const into = new Collector(name, limits);
-  if (archive[0] === 0x1f && archive[1] === 0x8b) {
-    let tar: Uint8Array;
-    try {
-      tar = gunzipSync(archive, { maxOutputLength: limits.bytes + 1024 * 1024 });
-    } catch {
-      throw fail(
-        "invalid",
-        `${name}'s archive is not a gzip file it can unpack within ${Math.round(limits.bytes / 1024 / 1024)} MB.`,
-      );
-    }
-    untar(tar, into);
-  } else if (archive[0] === 0x50 && archive[1] === 0x4b) {
-    unzip(archive, into);
-  } else {
-    throw fail("invalid", `${name}'s archive is neither a .tar.gz nor a .zip file.`);
-  }
-  return into.files;
 }

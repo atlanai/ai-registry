@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { actionOf, builtin } from "#cli/commands/index.ts";
-import { parse, takeGlobals } from "#cli/options.ts";
+import { describe, expect, test } from "vitest";
+import { actionOf } from "#cli/commands/command.ts";
+import { builtin } from "#cli/commands/index.ts";
+import { parse, takeGlobals } from "#cli/options/parse.ts";
 import { isStepPolicy } from "#core/config/model.ts";
 import * as actions from "#core/console/actions.ts";
 
@@ -35,12 +36,12 @@ describe("console actions", () => {
     actions.retryRun("run_1"),
   ];
 
-  it.each(commands)("$display is a command aireg takes", (command) => {
+  test.each(commands)("$display is a command aireg takes", (command) => {
     expect(command.display).toBe(`aireg ${command.argv.join(" ")}`);
     accepted(command.argv);
   });
 
-  it("passes a name spelled like an option as data", () => {
+  test("passes a name spelled like an option as data", () => {
     for (const [built, words] of [
       [actions.publish(["-g"], undefined, "project"), ["-g"]],
       [actions.pullLatest("-g", "project"), ["-g"]],

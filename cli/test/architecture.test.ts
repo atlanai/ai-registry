@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src");
 const PACKAGE = resolve(SRC, "..");
@@ -130,12 +130,12 @@ function layerRefusal(from: string, to: string): string | undefined {
 }
 
 describe("architecture", () => {
-  it("ranks every folder under src", () => {
+  test("ranks every folder under src", () => {
     const unranked = readdirSync(SRC).filter((name) => RANKS[name] === undefined);
     expect(unranked).toEqual([]);
   });
 
-  it("keeps every import inside the layering rules", () => {
+  test("keeps every import inside the layering rules", () => {
     const broken = edges()
       .filter(
         ({ from, to }) => !ALLOWED.some((edge) => edge.from === from && to.startsWith(edge.to)),
@@ -147,7 +147,7 @@ describe("architecture", () => {
     expect(broken).toEqual([]);
   });
 
-  it("keeps every allowance in use", () => {
+  test("keeps every allowance in use", () => {
     const found = edges();
     const stale = ALLOWED.filter(
       (edge) => !found.some(({ from, to }) => from === edge.from && to.startsWith(edge.to)),
@@ -155,7 +155,7 @@ describe("architecture", () => {
     expect(stale).toEqual([]);
   });
 
-  it("gives every built-in adapter the scaffold's layout and an api module", () => {
+  test("gives every built-in adapter the scaffold's layout and an api module", () => {
     const root = join(SRC, "adapters");
     const missing = readdirSync(root, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -167,11 +167,11 @@ describe("architecture", () => {
     expect(missing).toEqual([]);
   });
 
-  it("climbs with ../ only inside the published contract", () => {
+  test("climbs with ../ only inside the published contract", () => {
     // tsconfig.types.json builds the contract's declarations alone, where `#adapter/` does not resolve.
     const contract = join(SRC, "adapter");
     // Its template text holds the import lines of the package it writes.
-    const scaffold = join(SRC, "cli", "commands", "adapter", "scaffold.ts");
+    const scaffold = join(SRC, "cli", "commands", "adapter", "init.ts");
     const allowed = (file: string, specifier: string) =>
       file === scaffold ||
       (file.startsWith(contract) && resolve(dirname(file), specifier).startsWith(contract));
@@ -187,7 +187,7 @@ describe("architecture", () => {
     expect(climbing).toEqual([]);
   });
 
-  it("imports with ./ only from the importing file's own folder", () => {
+  test("imports with ./ only from the importing file's own folder", () => {
     const contract = join(SRC, "adapter");
     const descending = ["src", "test", "scripts", "packaging"]
       .map((name) => join(PACKAGE, name))
@@ -201,4 +201,14 @@ describe("architecture", () => {
       );
     expect(descending).toEqual([]);
   });
+});
+
+// The CLI writes escape sequences, so a literal control byte can hide in a template literal.
+test("no source file holds a literal control byte", () => {
+  const found = sources(SRC).filter((file) =>
+    [...readFileSync(file, "utf8")].some(
+      (char) => char.charCodeAt(0) < 32 && char !== "\n" && char !== "\t",
+    ),
+  );
+  expect(found.map((file) => relative(PACKAGE, file))).toEqual([]);
 });

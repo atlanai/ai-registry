@@ -53,10 +53,6 @@ const NOT_SECRETS: readonly string[] = [
   "prompttokens",
 ];
 
-function normalizeKey(key: string): string {
-  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
 export function isSecretKey(key: string): boolean {
   const normalized = normalizeKey(key);
   if (normalized === "") return false;
@@ -64,7 +60,11 @@ export function isSecretKey(key: string): boolean {
   return KEYED_SUFFIXES.some((suffix) => normalized.endsWith(suffix));
 }
 
-/** `--password=x`, `--token x`, `-p x` for the tools that take one. */
+function normalizeKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** `--password=x`, `--token x` or `-pass x`; a value starting with `-` is the next flag. */
 const FLAG_FORM =
   /(--?(?:password|passwd|pass|token|api-?key|secret|access-?key)(?:=|\s+))(?!-)([^\s"']+)/gi;
 
@@ -129,6 +129,11 @@ export function redactKeyedText(text: string): { text: string; count: number } {
   return { text: out, count };
 }
 
+/** A value that is already a marker is never redacted again. */
+function isMarker(value: string): boolean {
+  return value.startsWith("[REDACTED:") || value.startsWith("[WITHHELD:");
+}
+
 /**
  * `scheme://user:password@host`: as OpenTelemetry's url.full rule asks, the whole
  * userinfo goes, since a token is often sent as the user name.
@@ -144,9 +149,13 @@ export function redactText(text: string): string {
   return maskUserinfo(redactKeyedText(text).text);
 }
 
-/** A value that is already a marker is never redacted again. */
-function isMarker(value: string): boolean {
-  return value.startsWith("[REDACTED:") || value.startsWith("[WITHHELD:");
+/** A throwing getter withholds the value: a log line must not be what takes a run down. */
+export function redactKeyedValue(value: unknown): unknown {
+  try {
+    return walk(value, 0);
+  } catch {
+    return "[WITHHELD:scrubber-error]";
+  }
 }
 
 const MAX_DEPTH = 16;
@@ -164,16 +173,4 @@ function walk(value: unknown, depth: number): unknown {
     return out;
   }
   return value;
-}
-
-/**
- * Walks a value with keyed semantics. A throwing getter withholds rather than
- * propagating: a log line must not be what takes a run down.
- */
-export function redactKeyedValue(value: unknown): unknown {
-  try {
-    return walk(value, 0);
-  } catch {
-    return "[WITHHELD:scrubber-error]";
-  }
 }

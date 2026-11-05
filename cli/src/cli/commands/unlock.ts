@@ -1,15 +1,17 @@
 import { quoted } from "#adapter/text.ts";
-import { parse } from "#cli/options.ts";
+import { UNLOCK_COMMAND } from "#cli/commands/unlock/spec.ts";
+import { parse } from "#cli/options/parse.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { breakLease, LeaseError, readLease } from "#core/lease.ts";
+import { LeaseError } from "#core/lease/errors.ts";
+import { breakLease, readLease } from "#core/lease/lease.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { ago } from "#core/term/format.ts";
-import { scopeRoots } from "#engine/pipeline.ts";
-import { builtin, type CommandContext } from "./index.ts";
+import { scopeRoots } from "#engine/scope/locate.ts";
+import type { CommandContext } from "./command.ts";
 
 /** Breaking a lease while its holder still writes corrupts the scope. */
 export async function run(context: CommandContext): Promise<void> {
-  const { common, positionals } = parse(context.argv, builtin("unlock"));
+  const { common, positionals } = parse(context.argv, UNLOCK_COMMAND);
   const roots = scopeRoots(common, context.cwd);
   const holder = await readLease(roots);
   const where = scopeName(roots.scope);

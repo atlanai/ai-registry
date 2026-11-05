@@ -55,6 +55,7 @@ export {
   registryPath,
   rootReader,
 } from "./filespec/folder.ts";
+export { mergedIndex, mergedVersions, type OfferedVersion, specJson } from "./filespec/merge.ts";
 export {
   ENVELOPE,
   INDEX_DOCUMENT,
@@ -62,14 +63,12 @@ export {
   isDeviceName,
   isKindSegment,
   isNamespace,
-  isVersion,
   REGISTRY_DOCUMENT,
   VERSIONS_DOCUMENT,
   versionDir,
   versionsPath,
 } from "./filespec/names.ts";
 export { type RootResolveOptions, resolveFromRoot } from "./filespec/resolve.ts";
-export { mergedIndex, mergedVersions, type OfferedVersion, specJson } from "./filespec/write.ts";
 export { type ArtifactKind, isKind, KINDS } from "./kinds.ts";
 export type { LayoutId } from "./layouts/ids.ts";
 export { namesHost, registryNameFromLocation, SCP_LOCATION } from "./location.ts";
@@ -98,6 +97,7 @@ export {
 } from "./semver.ts";
 export { contentDigest, sha256 } from "./spec/canonical.ts";
 export { buildEnvelope, describeFile, type EnvelopeInput } from "./spec/envelope.ts";
+export { isVersion } from "./spec/ref.ts";
 export type {
   Envelope,
   EnvelopeMetadata,

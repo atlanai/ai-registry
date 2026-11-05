@@ -6,7 +6,10 @@ import { NAME } from "#core/product.ts";
 
 export type SourceConfig = Readonly<Record<string, string>>;
 
-/** Canonicalize adapter-defined scope selection before hashing or persistence. */
+/**
+ * Trimmed and sorted by key, so one selection hashes and saves the same way everywhere. A blank,
+ * reserved or repeated key throws.
+ */
 export function canonicalConfig(config: SourceConfig): Record<string, string> {
   const entries = Object.entries(config)
     .map(([key, value]) => [key.trim(), value.trim()] as const)
@@ -26,6 +29,15 @@ export function canonicalConfig(config: SourceConfig): Record<string, string> {
     canonical[key] = value;
   }
   return canonical;
+}
+
+/** For comparing two addresses: one `canonicalLocation` refuses is compared as written. */
+export function comparableLocation(location: string): string {
+  try {
+    return canonicalLocation(location);
+  } catch {
+    return location;
+  }
 }
 
 /**
@@ -53,15 +65,6 @@ function canonicalLocation(location: string): string {
   }
   url.pathname = stripTrailing(url.pathname, "/");
   return url.href;
-}
-
-/** For comparing two addresses: one `canonicalLocation` refuses is compared as written. */
-export function comparableLocation(location: string): string {
-  try {
-    return canonicalLocation(location);
-  } catch {
-    return location;
-  }
 }
 
 /**

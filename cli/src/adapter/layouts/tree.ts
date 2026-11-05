@@ -65,52 +65,13 @@ export interface Tree {
   isFile(path: string): Promise<boolean>;
 }
 
-function typeOf(entry: Dirent): TreeEntry["type"] {
-  if (entry.isSymbolicLink()) return "link";
-  if (entry.isDirectory()) return "folder";
-  if (entry.isFile()) return "file";
-  return "other";
-}
-
-const at = (dir: string, name: string) => (dir === "" ? name : `${dir}/${name}`);
-
 /** Whether a walk descends into a folder of this name. */
 export function walksInto(name: string): boolean {
   if (SKIPPED_FOLDERS.has(name)) return false;
   return !name.startsWith(".") || READ_HIDDEN.has(name);
 }
 
-type Step =
-  | { kind: "descend" }
-  | { kind: "skip"; skip: Skip }
-  | { kind: "file"; file: TreeFile }
-  | { kind: "none" };
-
-/** What a walk does with one entry: descend into it, keep it, or say why it was left out. */
-async function stepOf(
-  entry: TreeEntry,
-  depth: number,
-  limits: TreeLimits,
-  fileAt: (path: string) => Promise<TreeFile | Skip>,
-): Promise<Step> {
-  if (entry.type === "link")
-    return { kind: "skip", skip: { path: entry.path, reason: "is a symlink" } };
-  if (entry.type === "other") {
-    return { kind: "skip", skip: { path: entry.path, reason: "is not a regular file" } };
-  }
-  if (entry.type === "folder") {
-    if (!walksInto(entry.name)) return { kind: "none" };
-    if (depth >= limits.depth) {
-      throw new SpecError(`${entry.path} is nested more than ${limits.depth} folders deep.`, {
-        path: entry.path,
-      });
-    }
-    return { kind: "descend" };
-  }
-  if (OS_FILES.has(entry.name)) return { kind: "none" };
-  const file = await fileAt(entry.path);
-  return "reason" in file ? { kind: "skip", skip: file } : { kind: "file", file };
-}
+const at = (dir: string, name: string) => (dir === "" ? name : `${dir}/${name}`);
 
 /** Opens `root` for bounded reading. The root itself must not be a link. */
 export async function openTree(root: string, limits: TreeLimits = TREE_LIMITS): Promise<Tree> {
@@ -152,7 +113,7 @@ export async function openTree(root: string, limits: TreeLimits = TREE_LIMITS): 
     }
   };
 
-  /** A listed file as it is now: changed into something else since, it is left out, never followed. */
+  // A file that changed into something else since it was listed is left out, not followed.
   const fileAt = async (path: string): Promise<TreeFile | Skip> => {
     const info = await lstat(join(root, ...path.split(posix.sep)));
     if (!info.isFile()) return { path, reason: "is not a regular file" };
@@ -188,4 +149,43 @@ export async function openTree(root: string, limits: TreeLimits = TREE_LIMITS): 
       return entries.some((entry) => entry.name === name && entry.type === "file");
     },
   };
+}
+
+function typeOf(entry: Dirent): TreeEntry["type"] {
+  if (entry.isSymbolicLink()) return "link";
+  if (entry.isDirectory()) return "folder";
+  if (entry.isFile()) return "file";
+  return "other";
+}
+
+type Step =
+  | { kind: "descend" }
+  | { kind: "skip"; skip: Skip }
+  | { kind: "file"; file: TreeFile }
+  | { kind: "none" };
+
+/** What a walk does with one entry: descend into it, keep it, or say why it was left out. */
+async function stepOf(
+  entry: TreeEntry,
+  depth: number,
+  limits: TreeLimits,
+  fileAt: (path: string) => Promise<TreeFile | Skip>,
+): Promise<Step> {
+  if (entry.type === "link")
+    return { kind: "skip", skip: { path: entry.path, reason: "is a symlink" } };
+  if (entry.type === "other") {
+    return { kind: "skip", skip: { path: entry.path, reason: "is not a regular file" } };
+  }
+  if (entry.type === "folder") {
+    if (!walksInto(entry.name)) return { kind: "none" };
+    if (depth >= limits.depth) {
+      throw new SpecError(`${entry.path} is nested more than ${limits.depth} folders deep.`, {
+        path: entry.path,
+      });
+    }
+    return { kind: "descend" };
+  }
+  if (OS_FILES.has(entry.name)) return { kind: "none" };
+  const file = await fileAt(entry.path);
+  return "reason" in file ? { kind: "skip", skip: file } : { kind: "file", file };
 }

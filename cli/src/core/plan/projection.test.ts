@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { emptyLock } from "#core/lock.ts";
 import { roots } from "#core/store/paths.ts";
-import { resolveTargets } from "#core/target/index.ts";
+import { resolveTargets } from "#core/target/table.ts";
 import { movedPluginLinks } from "./projection.ts";
 
 describe("movedPluginLinks", () => {
@@ -28,7 +28,7 @@ describe("movedPluginLinks", () => {
     return lock;
   }
 
-  it("names the row still at the bare name once another registry shares it", () => {
+  test("names the row still at the bare name once another registry shares it", () => {
     const lock = lockWith({
       fmt: { registry: "far", link: ".claude/skills/engineering" },
       lint: { registry: "kit", link: ".claude/skills/kit-engineering" },
@@ -36,12 +36,12 @@ describe("movedPluginLinks", () => {
     expect([...movedPluginLinks(lock, scope)]).toEqual(["fmt"]);
   });
 
-  it("names the row still qualified once it has the namespace to itself", () => {
+  test("names the row still qualified once it has the namespace to itself", () => {
     const lock = lockWith({ lint: { registry: "kit", link: ".claude/skills/kit-engineering" } });
     expect([...movedPluginLinks(lock, scope)]).toEqual(["lint"]);
   });
 
-  it("looks only at the registries the run opened", () => {
+  test("looks only at the registries the run opened", () => {
     const lock = lockWith({
       fmt: { registry: "far", link: ".claude/skills/engineering" },
       lint: { registry: "kit", link: ".claude/skills/engineering" },
@@ -49,7 +49,7 @@ describe("movedPluginLinks", () => {
     expect([...movedPluginLinks(lock, scope, new Set(["kit"]))]).toEqual(["lint"]);
   });
 
-  it("leaves a target that already keys plugins by registry alone", () => {
+  test("leaves a target that already keys plugins by registry alone", () => {
     const lock = lockWith({
       fmt: {
         registry: "far",
