@@ -53,6 +53,17 @@ describe("fan-out links", () => {
     expect(await readFile(join(to, "plugin.json"), "utf8")).toBe('{"version":"2"}');
   });
 
+  test("copies a manifest again where a link to the same bytes replaced the copy", async () => {
+    const source = await projection();
+    const to = join(root, "cache", "acme", "sales", "local");
+    await fanOut(source, to);
+    await rm(join(to, "plugin.json"));
+    await symlink(join(source, "plugin.json"), join(to, "plugin.json"));
+    await fanOut(source, to);
+    expect((await lstat(join(to, "plugin.json"))).isSymbolicLink()).toBe(false);
+    expect(await readFile(join(to, "plugin.json"), "utf8")).toBe("{}");
+  });
+
   // A target reading the plugin during a refresh must not find an entry missing.
   test("leaves an entry that is already right in place", async () => {
     const source = await projection();
