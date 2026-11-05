@@ -48,7 +48,7 @@ export async function collect(
   if (manifest === undefined) problems.push(`Cannot read ${roots.manifest}.`);
   const resolved: Manifest = manifest ?? emptyManifest();
 
-  const targetTable = resolveTargets();
+  const targetTable = resolveTargets(process.env);
   const lock = await readLock(roots).catch((error: Error) => {
     problems.push(error.message);
     return emptyLock();

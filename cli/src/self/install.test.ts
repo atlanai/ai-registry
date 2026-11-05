@@ -2,6 +2,7 @@ import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { executableFile } from "#core/product.ts";
+import { VERSION } from "#core/version.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { installedVersion, previousInstalled, rollback, versionsToPrune } from "./install.ts";
 
@@ -34,4 +35,14 @@ describe("rollback", () => {
       message: "No earlier version of aireg is installed to roll back to.",
     });
   });
+});
+
+describe("installedVersion", () => {
+  test.skipIf(process.platform === "win32")(
+    "reads a current that is a folder as this build's own, not as a failure",
+    async ({ tmp }) => {
+      await mkdir(join(tmp, "cli", "current"), { recursive: true });
+      expect(await installedVersion({ AIREG_HOME: tmp })).toBe(VERSION);
+    },
+  );
 });

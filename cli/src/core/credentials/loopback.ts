@@ -99,6 +99,7 @@ export async function listenForCode(
       if (redeemed) await Promise.race([arrival, limit.done]);
       const told = [...waiting].map((response) => {
         tell(response, signedIn);
+        // A tab closed before its page arrived does not undo the sign-in.
         return finished(response).catch(() => undefined);
       });
       await Promise.race([Promise.all(told), limit.done]);

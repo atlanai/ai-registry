@@ -26,6 +26,15 @@ describe("parseLine", () => {
     expect(entry !== undefined && isRaw(entry)).toBe(true);
   });
 
+  test.each([
+    ["no attributes", { ...record, attributes: undefined }],
+    ["no timestamp", { ...record, timestamp: undefined }],
+    ["an error that is not an object", { ...record, error: "boom" }],
+  ])("treats a record with %s as raw, so no reader trips on it", (_case, partial) => {
+    const entry = parseLine(JSON.stringify(partial));
+    expect(entry !== undefined && isRaw(entry)).toBe(true);
+  });
+
   test("skips a blank line", () => {
     expect(parseLine("   ")).toBeUndefined();
   });

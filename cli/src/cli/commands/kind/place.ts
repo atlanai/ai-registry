@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { basename, join, relative, sep } from "node:path";
+import { ifPresent } from "#adapter/files.ts";
 import { ARTIFACTS_DIR, isNamespace } from "#adapter/filespec/names.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
@@ -25,7 +26,7 @@ export async function namespaceFor(
   const inside = namespaceHere(root, cwd);
   if (inside !== undefined) return inside;
   const existing = (
-    await readdir(join(root, ARTIFACTS_DIR), { withFileTypes: true }).catch(() => [])
+    (await ifPresent(readdir(join(root, ARTIFACTS_DIR), { withFileTypes: true }))) ?? []
   )
     .filter((item) => item.isDirectory() && isNamespace(item.name))
     .map((item) => item.name)
@@ -120,7 +121,7 @@ export async function locate(
 ): Promise<string> {
   const wanted = namespace ?? namespaceHere(root, cwd);
   const candidates = (
-    await readdir(join(root, ARTIFACTS_DIR), { withFileTypes: true }).catch(() => [])
+    (await ifPresent(readdir(join(root, ARTIFACTS_DIR), { withFileTypes: true }))) ?? []
   )
     .filter((item) => item.isDirectory() && (wanted === undefined || item.name === wanted))
     .map((item) => join(root, ARTIFACTS_DIR, item.name, kind, name))

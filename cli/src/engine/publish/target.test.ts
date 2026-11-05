@@ -41,7 +41,7 @@ describe("plan", () => {
       withheld: new Map(),
     } as unknown as Published;
 
-    const planned = await plan(work, published, "eng", "minor", undefined, false);
+    const planned = await plan({ work, published, namespace: "eng", bump: "minor" });
     expect(planned.version).toBe("1.3.0");
     expect(planned.input.version).toBe("1.3.0");
     expect(planned.input.files.map((file) => file.path).sort()).toEqual(["SKILL.md", "model.bin"]);
@@ -82,12 +82,24 @@ describe("plan's changes", () => {
       relationships: [{ ...edge, to: "eng/skill/style@1.2.0" }],
     };
 
-    const update = await plan(work, holding(latest), "eng", "patch", undefined, false, [edge]);
+    const update = await plan({
+      work,
+      published: holding(latest),
+      namespace: "eng",
+      bump: "patch",
+      relationships: [edge],
+    });
     expect(update.changes).toEqual({
       files: { added: ["rules.md"], changed: [], removed: ["old.md"] },
       dependsOn: { added: ["eng/skill/style@1.3.0"], removed: ["eng/skill/style@1.2.0"] },
     });
-    const add = await plan(work, holding(undefined), "eng", "patch", undefined, false, [edge]);
+    const add = await plan({
+      work,
+      published: holding(undefined),
+      namespace: "eng",
+      bump: "patch",
+      relationships: [edge],
+    });
     expect(add.changes).toEqual({
       files: { added: ["SKILL.md", "rules.md"], changed: [], removed: [] },
       dependsOn: { added: ["eng/skill/style@1.3.0"], removed: [] },
@@ -95,18 +107,24 @@ describe("plan's changes", () => {
 
     const blocked = { id: undefined, version: "1.0.0", digests: [], withheld: {} };
     expect(
-      (await plan(work, holding(blocked, true), "eng", "patch", undefined, false)).changes,
+      (await plan({ work, published: holding(blocked, true), namespace: "eng", bump: "patch" }))
+        .changes,
     ).toBeUndefined();
 
     const yanked = {
       ...holding(undefined),
       newest: [{ name: "lint", group: "eng", kind: "skill", version: "1.0.0" }],
     } as Published;
-    const past = await plan(work, yanked, "eng", "patch", undefined, false);
+    const past = await plan({ work, published: yanked, namespace: "eng", bump: "patch" });
     expect(past).toMatchObject({ from: "1.0.0", version: "1.0.1" });
     expect(past.changes).toBeUndefined();
     const same = { ...latest, digests: files.map((file) => file.digest).sort(), files };
-    const unchanged = await plan(work, holding(same), "eng", "patch", undefined, false);
+    const unchanged = await plan({
+      work,
+      published: holding(same),
+      namespace: "eng",
+      bump: "patch",
+    });
     expect(unchanged).toMatchObject({ same: true });
     expect(unchanged.changes).toBeUndefined();
   });
@@ -134,11 +152,18 @@ describe("plan for a folder agent", () => {
         latest: new Map(),
         withheld: new Map(),
       }) as unknown as Published;
-    await expect(plan(work, at({}), "eng", "patch", undefined, false)).rejects.toMatchObject({
+    await expect(
+      plan({ work, published: at({}), namespace: "eng", bump: "patch" }),
+    ).rejects.toMatchObject({
       message: "helper has files beyond its AGENT.md, but acme keeps only an agent's AGENT.md.",
       code: "usage",
     });
-    const planned = await plan(work, at({ agentFolders: true }), "eng", "patch", undefined, false);
+    const planned = await plan({
+      work,
+      published: at({ agentFolders: true }),
+      namespace: "eng",
+      bump: "patch",
+    });
     expect(planned.input.files.map((file) => file.path)).toEqual([
       "AGENT.md",
       "workspace/AGENTS.md",
@@ -185,9 +210,13 @@ describe("plan with relationships", () => {
 
   test("refuses an adapter that does not store them, before reading the files", async () => {
     const { work } = await lint();
-    const refused = plan(work, publishedAt({ fileSpec: true }), "eng", "patch", undefined, false, [
-      edge,
-    ]);
+    const refused = plan({
+      work,
+      published: publishedAt({ fileSpec: true }),
+      namespace: "eng",
+      bump: "patch",
+      relationships: [edge],
+    });
     await expect(refused).rejects.toMatchObject({
       message: "lint has dependencies, but acme does not store them with a published version.",
       code: "usage",
@@ -195,7 +224,13 @@ describe("plan with relationships", () => {
     expect(offerFrom).not.toHaveBeenCalled();
     // Without any, the same adapter still takes the work.
     await expect(
-      plan(work, publishedAt({ fileSpec: true }), "eng", "patch", undefined, false, []),
+      plan({
+        work,
+        published: publishedAt({ fileSpec: true }),
+        namespace: "eng",
+        bump: "patch",
+        relationships: [],
+      }),
     ).resolves.toMatchObject({ version: "0.1.0" });
   });
 
@@ -203,15 +238,33 @@ describe("plan with relationships", () => {
     const { work, digests } = await lint();
     const stored = publishedAt({ relationships: true }, { digests, relationships: [edge] });
 
-    const same = await plan(work, stored, "eng", "patch", undefined, false, [edge]);
+    const same = await plan({
+      work,
+      published: stored,
+      namespace: "eng",
+      bump: "patch",
+      relationships: [edge],
+    });
     expect(same.same).toBe(true);
 
     const moved = { ...edge, to: "eng/skill/style@1.3.0" };
-    const next = await plan(work, stored, "eng", "patch", undefined, false, [moved]);
+    const next = await plan({
+      work,
+      published: stored,
+      namespace: "eng",
+      bump: "patch",
+      relationships: [moved],
+    });
     expect(next).toMatchObject({ same: false, version: "1.0.1" });
     expect(next.input.relationships).toEqual([moved]);
 
-    const dropped = await plan(work, stored, "eng", "patch", undefined, false, []);
+    const dropped = await plan({
+      work,
+      published: stored,
+      namespace: "eng",
+      bump: "patch",
+      relationships: [],
+    });
     expect(dropped.same).toBe(false);
     expect(dropped.input).not.toHaveProperty("relationships");
   });
@@ -219,7 +272,9 @@ describe("plan with relationships", () => {
   test("leaves sameness to the files when the publish names no relationships", async () => {
     const { work, digests } = await lint();
     const stored = publishedAt({ relationships: true }, { digests, relationships: [edge] });
-    expect((await plan(work, stored, "eng", "patch", undefined, false)).same).toBe(true);
+    expect((await plan({ work, published: stored, namespace: "eng", bump: "patch" })).same).toBe(
+      true,
+    );
   });
 });
 
@@ -282,18 +337,30 @@ describe("plan with an export's version", () => {
 
   test("publishes that version, past the newest, rather than the next patch", async () => {
     const { work } = await exported("2.0.0");
-    const planned = await plan(work, holding(["sha256:older"]), "eng", "patch", undefined, false);
+    const planned = await plan({
+      work,
+      published: holding(["sha256:older"]),
+      namespace: "eng",
+      bump: "patch",
+    });
     expect(planned).toMatchObject({ same: false, from: "1.0.0", version: "2.0.0" });
   });
 
   test("is the same when the registry holds that version with these files", async () => {
     const newest = await exported("1.0.0");
-    const same = await plan(newest.work, holding(newest.digests), "eng", "patch", undefined, false);
+    const same = await plan({
+      work: newest.work,
+      published: holding(newest.digests),
+      namespace: "eng",
+      bump: "patch",
+    });
     expect(same).toMatchObject({ same: true, version: "1.0.0" });
 
     const older = await exported("0.9.0");
     const held = holding(["sha256:newer"], older.digests);
-    expect(await plan(older.work, held, "eng", "patch", undefined, false)).toMatchObject({
+    expect(
+      await plan({ work: older.work, published: held, namespace: "eng", bump: "patch" }),
+    ).toMatchObject({
       same: true,
       version: "0.9.0",
     });
@@ -302,14 +369,14 @@ describe("plan with an export's version", () => {
   test("refuses that version when the registry holds it with other files", async () => {
     const { work } = await exported("0.9.0");
     await expect(
-      plan(work, holding(["sha256:newer"]), "eng", "patch", undefined, false),
+      plan({ work, published: holding(["sha256:newer"]), namespace: "eng", bump: "patch" }),
     ).rejects.toMatchObject({ message: "eng/lint@0.9.0 is already published.", code: "conflict" });
   });
 
   test("refuses that version when the registry holds it back, though a resolve does not return it", async () => {
     const { work } = await exported("0.8.0");
     await expect(
-      plan(work, holding(["sha256:newer"]), "eng", "patch", undefined, false),
+      plan({ work, published: holding(["sha256:newer"]), namespace: "eng", bump: "patch" }),
     ).rejects.toMatchObject({
       message: "eng/lint@0.8.0 is already published, and is blocked (leaks tokens).",
       code: "conflict",
@@ -317,7 +384,13 @@ describe("plan with an export's version", () => {
 
     const named = { ...work, exported: undefined };
     await expect(
-      plan(named, holding(["sha256:newer"]), "eng", "patch", "0.8.0", false),
+      plan({
+        work: named,
+        published: holding(["sha256:newer"]),
+        namespace: "eng",
+        bump: "patch",
+        exact: "0.8.0",
+      }),
     ).rejects.toMatchObject({ code: "conflict" });
   });
 
@@ -333,7 +406,7 @@ describe("plan with an export's version", () => {
       withheld: new Map(),
     } as unknown as Published;
     const at = (relationships: { rel_type: string; to: string }[]) =>
-      plan(work, stored, "eng", "patch", undefined, false, relationships);
+      plan({ work, published: stored, namespace: "eng", bump: "patch", relationships });
 
     expect(await at([edge])).toMatchObject({ same: true, version: "1.0.0" });
 
@@ -349,12 +422,23 @@ describe("plan with an export's version", () => {
 
   test("says when that version is below the newest", async () => {
     const { work } = await exported("0.9.5");
-    const planned = await plan(work, holding(["sha256:newer"]), "eng", "patch", undefined, false);
+    const planned = await plan({
+      work,
+      published: holding(["sha256:newer"]),
+      namespace: "eng",
+      bump: "patch",
+    });
     expect(planned).toMatchObject({ from: "1.0.0", version: "0.9.5", belowLatest: true });
     const past = await exported("2.0.0");
     expect(
-      (await plan(past.work, holding(["sha256:newer"]), "eng", "patch", undefined, false))
-        .belowLatest,
+      (
+        await plan({
+          work: past.work,
+          published: holding(["sha256:newer"]),
+          namespace: "eng",
+          bump: "patch",
+        })
+      ).belowLatest,
     ).toBe(false);
   });
 
@@ -379,7 +463,7 @@ describe("plan with an export's version", () => {
         ["eng/skill/lint", { id: undefined, version: "1.4.0", digests: [], withheld: {} }],
       ]),
     } as unknown as Published;
-    const planned = await plan(work, published, "eng", "patch", undefined, false);
+    const planned = await plan({ work, published, namespace: "eng", bump: "patch" });
     expect(planned).toMatchObject({ same: false, from: "1.4.0", version: "1.4.1" });
   });
 
@@ -411,12 +495,27 @@ describe("plan with an export's version", () => {
       ["eng/skill/lint", { id: "lint", version: "0.1.0", digests: ["sha256:older"] }],
     ];
 
-    const past = await plan(work, holding(latest, "0.1.1"), "eng", "patch", undefined, false);
+    const past = await plan({
+      work,
+      published: holding(latest, "0.1.1"),
+      namespace: "eng",
+      bump: "patch",
+    });
     expect(past).toMatchObject({ same: false, from: "0.1.0", version: "0.1.2" });
-    const minor = await plan(work, holding(latest, "0.3.0"), "eng", "minor", undefined, false);
+    const minor = await plan({
+      work,
+      published: holding(latest, "0.3.0"),
+      namespace: "eng",
+      bump: "minor",
+    });
     expect(minor.version).toBe("0.4.0");
 
-    const none = await plan(work, holding([], "0.1.0"), "eng", "patch", undefined, false);
+    const none = await plan({
+      work,
+      published: holding([], "0.1.0"),
+      namespace: "eng",
+      bump: "patch",
+    });
     expect(none).toMatchObject({ from: "0.1.0", version: "0.1.1" });
   });
 });

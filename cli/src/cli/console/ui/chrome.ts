@@ -1,26 +1,20 @@
 import type { ReactElement, ReactNode } from "react";
 import type { AccountRow } from "#core/console/model.ts";
+import { BUILT_IN_VIEWS } from "#core/console/model.ts";
 import type { HintKey } from "#core/host/panel.ts";
 import { clock, displayWidth, truncate, truncateStart } from "#core/term/format.ts";
 import { COLOR, GLYPH } from "#core/term/theme.ts";
 import { box, faint, hints, plain, rule, text } from "./elements.ts";
+import { VIEW_LABELS } from "./view.ts";
 
 export interface Tab {
   id: string;
   label: string;
 }
 
-const BUILT_IN_TABS: readonly Tab[] = [
-  { id: "overview", label: "Overview" },
-  { id: "artifacts", label: "Artifacts" },
-  { id: "jobs", label: "Jobs" },
-  { id: "accounts", label: "Registries" },
-  { id: "settings", label: "Settings" },
-];
-
 /** `after` names the tab to follow; anything unknown lands before Settings. */
 export function tabsWith(panels: readonly { id: string; label: string; after?: string }[]): Tab[] {
-  const tabs = [...BUILT_IN_TABS];
+  const tabs: Tab[] = BUILT_IN_VIEWS.map((id) => ({ id, label: VIEW_LABELS[id] }));
   for (const panel of panels) {
     const at = panel.after === undefined ? -1 : tabs.findIndex((tab) => tab.id === panel.after);
     const fallback = Math.max(0, tabs.length - 1);

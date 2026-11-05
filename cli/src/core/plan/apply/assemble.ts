@@ -46,7 +46,7 @@ export async function assemble(
 
 /** Where any target reads a plugin's manifest: written into the projection, never linked from content. */
 function manifestFolders(): Set<string> {
-  const written = Object.values(resolveTargets()).flatMap((target) =>
+  const written = Object.values(resolveTargets(process.env)).flatMap((target) =>
     (target.kinds.plugin?.manifest ?? []).map((manifest) => manifest.path),
   );
   return new Set([...PLUGIN_MANIFESTS, ...written].map((path) => path.split("/")[0] as string));
@@ -80,7 +80,7 @@ async function writePluginManifest(
   targets: Iterable<string>,
   document: PluginDocument | undefined,
 ): Promise<void> {
-  const table = resolveTargets();
+  const table = resolveTargets(process.env);
   const name = basename(dir);
   const description = document?.description ?? `Artifacts the ${name} namespace publishes.`;
   for (const target of targets) {

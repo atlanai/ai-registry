@@ -6,16 +6,16 @@ export function workflowCommand(
   properties: Readonly<Record<string, string>>,
   message: string,
 ): string {
-  const list = Object.entries(properties).map(([key, value]) => `${key}=${property(value)}`);
-  return `::${command}${list.length === 0 ? "" : ` ${list.join(",")}`}::${data(message)}`;
+  const list = Object.entries(properties).map(([key, value]) => `${key}=${escapeProperty(value)}`);
+  return `::${command}${list.length === 0 ? "" : ` ${list.join(",")}`}::${escapeData(message)}`;
 }
 
-function property(value: string): string {
-  return data(value).replaceAll(":", "%3A").replaceAll(",", "%2C");
+function escapeProperty(value: string): string {
+  return escapeData(value).replaceAll(":", "%3A").replaceAll(",", "%2C");
 }
 
 // The escaping @actions/core applies: a raw newline in a value would start a command of its own.
-function data(value: string): string {
+function escapeData(value: string): string {
   return sanitizeBlock(value)
     .replaceAll("%", "%25")
     .replaceAll("\r", "%0D")

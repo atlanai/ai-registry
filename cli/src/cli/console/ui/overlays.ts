@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { ArtifactGroup, ArtifactRow, ArtifactState } from "#core/console/model.ts";
 import { ARTIFACT_STATES } from "#core/console/model.ts";
 import { STATE_MEANING, stateStyle } from "#core/console/state-style.ts";
+import type { HintKey } from "#core/host/panel.ts";
 import { ago, duration, pad, shortDigest, truncate, truncateStart } from "#core/term/format.ts";
 import { COLOR, GLYPH } from "#core/term/theme.ts";
 import { action, box, dim, faint, plain, text } from "./elements.ts";
@@ -297,42 +298,12 @@ export function activityPanel(props: {
   );
 }
 
-const KEYS: [string, string][] = [
-  ["left right", "previous or next view"],
-  ["1 - 9", "switch registry"],
-  ["click", "a tab, or a row"],
-  ["wheel", "scroll"],
-  ["tab", "next registry"],
-  ["u", "pull latest from the registry"],
-  ["p", "publish a group, or the edited row"],
-  ["up down / j k", "move"],
-  ["h l", "fold or unfold a group"],
-  ["enter", "expand detail, or confirm"],
-  ["R", "run a job now"],
-  ["r", "retry a failed run"],
-  ["space", "enable or disable a job"],
-  ["/", "filter"],
-  ["g", "reload"],
-  ["? q", "keys, quit"],
-];
-
-/**
- * `extra` is each contributed panel's own keys, listed with aireg's rather than
- * under a heading of their own: to a reader they are all just keys.
- */
-export function helpPanel(
-  width: number,
-  extra: readonly { key: string; label: string }[],
-): ReactElement {
-  const keys: [string, string][] = [
-    ...KEYS,
-    ...extra.map((k): [string, string] => [k.key, k.label]),
-  ];
+export function helpPanel(width: number, keys: readonly HintKey[]): ReactElement {
   return panel(
     "Keys",
     width,
-    ...keys.map(([key, meaning]) =>
-      box({ key }, text({ color: COLOR.white }, pad(key, 18)), faint(meaning)),
+    ...keys.map(({ key, label }) =>
+      box({ key }, text({ color: COLOR.white }, pad(key, 18)), faint(label)),
     ),
     box({ marginTop: 1 }, text({ color: COLOR.white, bold: true }, "States")),
     ...ARTIFACT_STATES.map((state: ArtifactState) => {

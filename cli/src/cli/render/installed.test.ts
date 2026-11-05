@@ -8,11 +8,11 @@ describe("watchedFrom", () => {
     const entry = {
       origin: { target: "claude-code", path: ".claude/skills/lint", step: "" },
     } as unknown as LockArtifact;
-    expect(watchedFrom(entry, resolveTargets())).toEqual({
+    expect(watchedFrom(entry, resolveTargets(process.env))).toEqual({
       target: "claude-code",
       harness: "claude",
       path: ".claude/skills/lint",
     });
-    expect(watchedFrom(undefined, resolveTargets())).toBeUndefined();
+    expect(watchedFrom(undefined, resolveTargets(process.env))).toBeUndefined();
   });
 });

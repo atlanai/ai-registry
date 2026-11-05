@@ -72,8 +72,8 @@ export async function moveAside(
 ): Promise<{ from: string; to: string }[]> {
   const moved: { from: string; to: string }[] = [];
   for (const copy of copies) {
-    if (removal(copy.from, roots).how !== "remove") continue;
-    await assertRemovable(copy.from, roots);
+    if (removal(copy.from, roots, process.env).how !== "remove") continue;
+    await assertRemovable(copy.from, roots, process.env);
     const within = join(copy.target, kindDir(kind), name);
     moved.push({ from: copy.from, to: await moveToBackup(copy.from, roots, stamp, within) });
   }

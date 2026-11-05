@@ -178,13 +178,9 @@ export function refuseUndeclared(
   loaded: Loaded,
 ): void {
   if (destination === undefined || known[destination.registry] !== undefined) return;
-  throw unknownRegistry(
-    destination.registry,
-    loaded.roots.scope,
-    Object.keys(known),
-    undefined,
-    knownIn(loaded.roots.scope),
-  );
+  throw unknownRegistry(destination.registry, loaded.roots.scope, Object.keys(known), {
+    searched: knownIn(loaded.roots.scope),
+  });
 }
 
 export async function savedDefault(

@@ -33,7 +33,7 @@ export interface SkippedFile {
 export function checkTargetText(
   path: string,
   text: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv,
 ): TargetFile | SkippedFile {
   const read = readOne(path, text);
   if ("problems" in read) return read;
@@ -255,11 +255,8 @@ function crossProblems(file: TargetFile, others: readonly TargetDefinition[]): s
   );
 }
 
-/**
- * Only your user scope defines a target: a project may select one by id but never define
- * one, so a cloned repository cannot point aireg at paths of its choosing.
- */
-export function loadTargetFiles(env: NodeJS.ProcessEnv = process.env): {
+/** Only user scope defines targets, so a cloned repository cannot point aireg at its paths. */
+export function loadTargetFiles(env: NodeJS.ProcessEnv): {
   files: TargetFile[];
   skipped: SkippedFile[];
 } {

@@ -15,6 +15,8 @@ import { type Outside, scopeRoots } from "./locate.ts";
 
 export interface Loaded {
   roots: Roots;
+  /** This process's, which `targetTable` was resolved with. */
+  env: NodeJS.ProcessEnv;
   manifest: Manifest;
   lock: Lock;
   /** Nothing in a project changes it. */
@@ -57,6 +59,7 @@ function waiting(printer: Printer, scope: Scope, holder: LeaseHolder | undefined
 export async function read(roots: Roots): Promise<Loaded> {
   const lock = await readLock(roots);
   const manifest = await readManifest(roots.manifest);
-  const targetTable = resolveTargets();
-  return { roots, manifest, lock, targetTable, manifestAsRead: formatManifest(manifest) };
+  const env = process.env;
+  const targetTable = resolveTargets(env);
+  return { roots, env, manifest, lock, targetTable, manifestAsRead: formatManifest(manifest) };
 }

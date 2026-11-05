@@ -18,24 +18,39 @@ export async function prepareWrite(
   dryRun = false,
 ): Promise<Recovered> {
   refuseOldCli(manifest.engine);
-  // Recovery removes files, which only a run holding the lease may do; the next real run recovers.
-  return dryRun ? { removed: [], skipped: [] } : recover(roots, lock);
+  // Recovery removes files, which needs the lease; the next real run recovers.
+  return dryRun ? { removed: [], skipped: [] } : recover(roots, lock, process.env);
 }
 
-/** Applies a refused-clean plan between the user's apply hooks; `undo` runs when it fails. */
-export async function commit(
-  loaded: Loaded,
-  plan: Plan,
-  acquired: readonly Acquired[],
-  targets: readonly string[],
-  onStep: (action: Action) => void,
-  undo: () => Promise<void> = async () => {},
-): Promise<ApplyResult> {
+export interface CommitOptions {
+  loaded: Loaded;
+  plan: Plan;
+  acquired: readonly Acquired[];
+  targets: readonly string[];
+  onStep: (action: Action) => void;
+  undo?: (() => Promise<void>) | undefined;
+}
+
+/** Applies a refused-clean plan between the user's apply hooks. */
+export async function commit({
+  loaded,
+  plan,
+  acquired,
+  targets,
+  onStep,
+  undo = async () => {},
+}: CommitOptions): Promise<ApplyResult> {
   const event = { targets: [...targets], aliases: Object.keys(loaded.manifest.registries) };
   let applied: ApplyResult;
   try {
     await runPipelineHooks("preApply", event);
-    applied = await apply(plan, loaded.roots, fetchFrom(acquired), onStep);
+    applied = await apply({
+      plan,
+      roots: loaded.roots,
+      fetch: fetchFrom(acquired),
+      env: process.env,
+      onStep,
+    });
   } catch (error) {
     await undo();
     throw error;
@@ -55,8 +70,8 @@ export async function restore(
   else await writeAtomic(path, before);
 }
 
-/** Whether the lock on disk is still the one the run started from. */
-export async function unrecorded(roots: Roots, lock: Lock): Promise<boolean> {
+/** A lock that no longer reads counts as changed. */
+export async function lockUnchanged(roots: Roots, lock: Lock): Promise<boolean> {
   return readLock(roots).then(
     (now) => lockChanges(lock, now).length === 0,
     () => false,

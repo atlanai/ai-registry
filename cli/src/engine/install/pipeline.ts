@@ -12,7 +12,7 @@ import type { Targets } from "#core/target/contract.ts";
 import type { Printer } from "#core/term/printer.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { type Loaded, read, withScope } from "#engine/scope/load.ts";
-import { commit, prepareWrite, restore, unrecorded } from "./commit.ts";
+import { commit, lockUnchanged, prepareWrite, restore } from "./commit.ts";
 import { appliedNotices, keptMessage, recoveredNotices, warn } from "./notices.ts";
 import { closeAll, plan } from "./plan.ts";
 import {
@@ -32,24 +32,22 @@ import {
 } from "./refusals.ts";
 import { selectTargets } from "./targets.ts";
 
-export interface RunResult {
+/** The targets a run installs for, so a report can name them as they were chosen. */
+export interface Chosen {
+  targets: readonly string[];
+  targetTable: Targets;
+}
+
+export interface RunResult extends Chosen {
   plan: Plan;
   /** What apply did; absent for a dry run, or a plan that was not approved. */
   applied: ApplyResult | undefined;
   /** The lockfile as the run found it, so a report can say what moved. */
   before: Lock;
-  /** The targets this run installed for, so a report names them as they were chosen. */
-  targets: readonly string[];
-  targetTable: Targets;
   scope: Scope;
 }
 
-export interface RunHooks {
-  /**
-   * Asked once the plan is known and before a single byte is written.
-   * Returning false leaves the project untouched.
-   */
-  approve?: ((plan: Plan, targets: readonly string[]) => Promise<boolean>) | undefined;
+export interface RunRequest {
   /** Re-read every source instead of trusting what the lock pins. */
   refresh?: boolean;
   /** Lock rows this run takes the registry's newest of; every other row installs as locked. */
@@ -66,12 +64,6 @@ export interface RunHooks {
   adopt?: ReadonlySet<string>;
 }
 
-/** The targets a run installs for, so a report can name them as they were chosen. */
-export interface Chosen {
-  targets: readonly string[];
-  targetTable: Targets;
-}
-
 /** How a run is shown, which the caller decides: the engine only says what happens. */
 export interface PlanReport {
   /** The whole plan, for a dry run, and the paths a real run would move to backups. */
@@ -80,17 +72,22 @@ export interface PlanReport {
   step(action: Action, plan: Plan, chosen: Chosen): void;
 }
 
+export interface RunOptions {
+  roots: Roots;
+  common: CommonOptions;
+  printer: Printer;
+  cwd: string;
+  report: PlanReport;
+  /** Runs under the scope's lease. */
+  edit?: ((loaded: Loaded) => RunRequest | Promise<RunRequest>) | undefined;
+  /** Asked before a byte is written; false leaves the project untouched. */
+  approve?: ((plan: Plan, chosen: Chosen) => Promise<boolean>) | undefined;
+}
+
 /** The single install path: `add`, `update` and `remove` differ only in `edit`. */
-export async function run(
-  roots: Roots,
-  common: CommonOptions,
-  printer: Printer,
-  cwd: string,
-  report: PlanReport,
-  edit: (loaded: Loaded) => RunHooks | Promise<RunHooks> = () => ({}),
-): Promise<RunResult> {
-  const body = async (loaded: Loaded) =>
-    write(loaded, common, printer, cwd, report, await edit(loaded));
+export async function runPipeline(options: RunOptions): Promise<RunResult> {
+  const { roots, common, printer, edit = () => ({}) } = options;
+  const body = async (loaded: Loaded) => write(loaded, options, await edit(loaded));
   // A dry run writes nothing to the scope, so it takes no lease and leaves no lease folder behind.
   if (common.dryRun) return body(await read(roots));
   return withScope(roots, body, printer);
@@ -98,31 +95,45 @@ export async function run(
 
 async function write(
   loaded: Loaded,
-  common: CommonOptions,
-  printer: Printer,
-  cwd: string,
-  report: PlanReport,
-  hooks: RunHooks,
+  { common, printer, cwd, report, approve }: RunOptions,
+  request: RunRequest,
 ): Promise<RunResult> {
   const { roots, manifest, lock, targetTable } = loaded;
 
   warn(printer, recoveredNotices(roots, await prepareWrite(loaded, common.dryRun)));
 
   const targets = selectTargets(manifest, targetTable, common);
-  // Reports name every tool picked, including those an entry's own `targets:` adds.
-  const named = [
-    ...new Set([
-      ...targets,
-      ...manifest.artifacts
-        .flatMap((ref) => ref.targets ?? [])
-        .filter((name) => name in targetTable),
-    ]),
-  ];
-  const collision = nameCollisionOf(await readConfig());
-  const { planned, acquired } = await plan(loaded, common, printer, cwd, hooks, targets, collision);
+  const chosen: Chosen = {
+    targets: [
+      ...new Set([
+        ...targets,
+        ...manifest.artifacts
+          .flatMap((ref) => ref.targets ?? [])
+          .filter((name) => name in targetTable),
+      ]),
+    ],
+    targetTable,
+  };
+  const nameCollision = nameCollisionOf(await readConfig());
+  const { planned, acquired } = await plan({
+    loaded,
+    common,
+    printer,
+    cwd,
+    request,
+    targets,
+    nameCollision,
+  });
+  const result = (applied: ApplyResult | undefined): RunResult => ({
+    plan: planned,
+    applied,
+    before: lock,
+    ...chosen,
+    scope: roots.scope,
+  });
   try {
-    if (collision === "fail") refuseCollision(planned);
-    refuseClash(planned, hooks.adding);
+    if (nameCollision === "fail") refuseCollision(planned);
+    refuseClash(planned, request.adding);
     for (const warning of planned.warnings) {
       printer.warning(warning.message);
       if (warning.hint !== undefined) printer.hint(warning.hint);
@@ -134,7 +145,7 @@ async function write(
     }
 
     if (common.dryRun) {
-      const guards = await guardsOf(planned, roots);
+      const guards = await guardsOf(planned, { roots, env: process.env });
       const aside = new Set(
         [...guards].flatMap(([path, guard]) => (guard === "backup" ? [path] : [])),
       );
@@ -143,52 +154,36 @@ async function write(
         if (action.kind === "link" && guards.get(action.to) === "keep")
           printer.warning(keptMessage(roots, action.name, action.to, "Would not"));
       }
-      report.plan(planned, roots, aside, { targets: named, targetTable });
+      report.plan(planned, roots, aside, chosen);
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
       refuseUnlisted(planned.unlisted, printer, undefined);
       if (planned.untrusted.length > 0) {
         printer.warning(`Would not install ${untrustedLine(planned.untrusted)} that run as you.`);
         printer.hint(trustHint(planned.untrusted));
       }
-      return {
-        plan: planned,
-        applied: undefined,
-        before: lock,
-        targets: named,
-        targetTable,
-        scope: roots.scope,
-      };
+      return result(undefined);
     }
 
     await refuseBlocked(planned);
 
-    if (hooks.approve !== undefined && !(await hooks.approve(planned, named))) {
-      return {
-        plan: planned,
-        applied: undefined,
-        before: lock,
-        targets: named,
-        targetTable,
-        scope: roots.scope,
-      };
-    }
+    if (approve !== undefined && !(await approve(planned, chosen))) return result(undefined);
 
     const edited = formatManifest(manifest) !== loaded.manifestAsRead;
     // Read under the restore's lease, so only this run's edit is undone.
     const before = edited ? await readTextIfPresent(roots.manifest) : undefined;
     const written = edited ? await writeManifest(roots, manifest) : undefined;
-    const applied = await commit(
+    const applied = await commit({
       loaded,
-      planned,
+      plan: planned,
       acquired,
       targets,
-      (action) => report.step(action, planned, { targets: named, targetTable }),
-      async () => {
+      onStep: (action) => report.step(action, planned, chosen),
+      undo: async () => {
         // Nothing was recorded, so the manifest must not ask for it.
-        if (edited && (await unrecorded(roots, lock)))
+        if (edited && (await lockUnchanged(roots, lock)))
           await restore(roots.manifest, before, written);
       },
-    );
+    });
 
     warn(printer, appliedNotices(roots, applied, targetTable));
 
@@ -198,17 +193,10 @@ async function write(
     if (edited && !landed && (applied.unstaged.length > 0 || planned.untrusted.length > 0))
       await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
-    refuseWithheld(planned, printer, hooks.moving);
-    refuseUnlisted(planned.unlisted, printer, hooks.moving);
+    refuseWithheld(planned, printer, request.moving);
+    refuseUnlisted(planned.unlisted, printer, request.moving);
     refuseUntrusted(planned.untrusted);
-    return {
-      plan: planned,
-      applied,
-      before: lock,
-      targets: named,
-      targetTable,
-      scope: roots.scope,
-    };
+    return result(applied);
   } finally {
     await closeAll(acquired);
   }

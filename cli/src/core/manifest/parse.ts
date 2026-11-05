@@ -46,7 +46,7 @@ export function parseManifest(text: string, filename = "manifest.yml"): Manifest
   } catch (error) {
     // Each check names a field; only here is the file it came from known.
     if (!(error instanceof ManifestError)) throw error;
-    throw new ManifestError(`${filename}: ${error.message}`, error.hint);
+    throw new ManifestError(`${filename}: ${error.message}`, { hint: error.hint });
   }
 }
 
@@ -81,7 +81,7 @@ function parseKnownFields(root: Record<string, unknown>): Manifest {
     if (registries[ref.registry] === undefined) {
       throw new ManifestError(
         `Artifact ${quoted(formatRef(ref))} names registry ${quoted(ref.registry)}, which is not declared under \`registries:\`.`,
-        `Declare it with \`aireg registry add <address> --as ${ref.registry}\`.`,
+        { hint: `Declare it with \`aireg registry add <address> --as ${ref.registry}\`.` },
       );
     }
     // Keyed by address, so declaring one artifact at two versions is caught
@@ -118,10 +118,9 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
   }
   const unshowable = Object.keys(registries).filter((alias) => UNSHOWABLE.test(alias));
   if (unshowable.length > 0) {
-    throw new ManifestError(
-      `${list(unshowable.map(quoted))} cannot name a registry.`,
-      "Rename each one and its `artifacts:` entries in manifest.yml, using lowercase letters, digits and hyphens, then run `aireg install`.",
-    );
+    throw new ManifestError(`${list(unshowable.map(quoted))} cannot name a registry.`, {
+      hint: "Rename each one and its `artifacts:` entries in manifest.yml, using lowercase letters, digits and hyphens, then run `aireg install`.",
+    });
   }
   const out = dict<RegistrySource>();
   // A registry's installed copies live in a folder named after it, and `Team` and `team`
@@ -136,7 +135,9 @@ function parseRegistries(root: Record<string, unknown>): Record<string, Registry
     if (other !== undefined) {
       throw new ManifestError(
         `Registries ${quoted(other)} and ${quoted(alias)} would share the folder .registry/artifacts/${folder}.`,
-        "Rename one of them and its `artifacts:` entries in manifest.yml, using lowercase letters, digits and hyphens, then run `aireg install`.",
+        {
+          hint: "Rename one of them and its `artifacts:` entries in manifest.yml, using lowercase letters, digits and hyphens, then run `aireg install`.",
+        },
       );
     }
     folders.set(folder, alias);
@@ -215,7 +216,7 @@ function selectionOf(entry: Record<string, unknown>, where: string): unknown {
   if (current != null && legacy != null) {
     throw new ManifestError(
       `${where} has both \`targets:\` and \`${LEGACY_TARGETS_KEY}:\`, which is its earlier name.`,
-      `Keep \`targets:\` and delete \`${LEGACY_TARGETS_KEY}:\`.`,
+      { hint: `Keep \`targets:\` and delete \`${LEGACY_TARGETS_KEY}:\`.` },
     );
   }
   return current ?? legacy;
@@ -279,12 +280,12 @@ function publishTo(raw: unknown, registries: Record<string, RegistrySource>): st
   if (Array.isArray(raw)) {
     const [first] = raw;
     const only = typeof first === "string" ? first : "acme/engineering";
-    throw new ManifestError(
-      `${where} names one target, not a list.`,
-      raw.length === 1
-        ? `Write it as \`to: ${only}\`.`
-        : `Keep the one this project publishes to, such as \`to: ${only}\`.`,
-    );
+    throw new ManifestError(`${where} names one target, not a list.`, {
+      hint:
+        raw.length === 1
+          ? `Write it as \`to: ${only}\`.`
+          : `Keep the one this project publishes to, such as \`to: ${only}\`.`,
+    });
   }
   const to = textOf(raw);
   if (to === undefined) {
@@ -303,7 +304,7 @@ function checkTarget(to: string, where: string, registries: Record<string, Regis
     if (parts.length < 2 || !isNamespace(namespace)) {
       throw new ManifestError(
         `${where} names ${quoted(to)}, a folder that does not end in a namespace.`,
-        "End it with the namespace to publish under, such as ./registry/engineering.",
+        { hint: "End it with the namespace to publish under, such as ./registry/engineering." },
       );
     }
     return;
@@ -312,20 +313,19 @@ function checkTarget(to: string, where: string, registries: Record<string, Regis
   if (parts.length !== 2 || registry === "") {
     throw new ManifestError(
       `${where} names ${quoted(to)}, which is neither <registry>/<namespace> nor a folder.`,
-      "Write it as acme/engineering, or start a folder with ./ or /.",
+      { hint: "Write it as acme/engineering, or start a folder with ./ or /." },
     );
   }
   if (registries[registry] === undefined) {
     throw new ManifestError(
       `${where} names registry ${quoted(registry)}, which is not declared under \`registries:\`.`,
-      `Declare it with \`aireg registry add <address> --as ${registry}\`.`,
+      { hint: `Declare it with \`aireg registry add <address> --as ${registry}\`.` },
     );
   }
   if (!isNamespace(namespace)) {
-    throw new ManifestError(
-      `${where} names ${quoted(to)}, whose namespace is not valid.`,
-      "Use lowercase letters, digits and inner hyphens, such as engineering.",
-    );
+    throw new ManifestError(`${where} names ${quoted(to)}, whose namespace is not valid.`, {
+      hint: "Use lowercase letters, digits and inner hyphens, such as engineering.",
+    });
   }
 }
 

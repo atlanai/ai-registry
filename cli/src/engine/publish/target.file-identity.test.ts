@@ -52,7 +52,7 @@ async function fixture(root: string, mapped = false) {
 }
 
 const planned = (work: Work, published: Published) =>
-  plan(work, published, "eng", "patch", undefined, false);
+  plan({ work, published, namespace: "eng", bump: "patch" });
 
 describe("publish file identity", () => {
   test("publishes a path-only rename as a removal and an addition", async ({ tmp }) => {

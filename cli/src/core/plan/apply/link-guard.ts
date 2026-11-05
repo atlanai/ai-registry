@@ -13,15 +13,20 @@ import { moveToBackup } from "#core/store/backups.ts";
  */
 export type LinkGuard = "replace" | "backup" | "keep";
 
+export interface GuardScope {
+  roots: RemovableRoots;
+  env: NodeJS.ProcessEnv;
+}
+
 export async function guardLink(
   to: string,
   recorded: LinkMode | undefined,
-  roots: RemovableRoots,
+  { roots, env }: GuardScope,
   rendered?: { file: string; text: string },
 ): Promise<LinkGuard> {
   const state = await inspect(to);
   if (!state.exists) return "replace";
-  if (removal(to, roots).how === "refuse") return "keep";
+  if (removal(to, roots, env).how === "refuse") return "keep";
   const ours =
     state.isLink && state.target !== undefined
       ? isWithin(canonical(dirname(roots.artifacts)), canonical(state.target))
@@ -45,9 +50,9 @@ async function holdsOnly(to: string, rendered: { file: string; text: string }): 
 export async function backUp(
   to: string,
   target: string,
-  roots: RemovableRoots,
+  { roots, env }: GuardScope,
   stamp: string,
 ): Promise<string> {
-  await assertRemovable(to, roots);
+  await assertRemovable(to, roots, env);
   return moveToBackup(to, roots, stamp, join(target, basename(dirname(to)), basename(to)));
 }

@@ -2,10 +2,8 @@ import { copyDescribed, reasonOf } from "#core/adapter/materialize.ts";
 import { digest } from "#core/fs/digest.ts";
 import { exists, remove, unseal } from "#core/fs/tree.ts";
 import type { Action, Fetch, Plan, Staged } from "#core/plan/model.ts";
-import { guardManagedPath } from "#core/store/managed-paths.ts";
-import { type ActionOf, linkKey, type Run } from "./run.ts";
-
-const stageKey = (source: string, path: string): string => `${source}\0${path}`;
+import { assertManagedPath } from "#core/store/managed-paths.ts";
+import { type ActionOf, type Cloned, type Run, type Staging, stageKey } from "./run.ts";
 
 /** Enough to keep the transport busy; few enough that a failure stops the rest. */
 const AHEAD = 24;
@@ -42,38 +40,31 @@ export function prefetch(
   };
 }
 
-export async function stage(run: Run, action: ActionOf<"stage">): Promise<void> {
+export async function stage(run: Run, action: ActionOf<"stage">): Promise<Staging> {
   // One artifact the source cannot serve intact must not cost a person the
   // other twenty; clone, link and record already skip what was never staged.
   let from: Staged;
   try {
     // The only place bytes are waited for; a dry run never reaches here.
-    from = await run.ahead(action.source, action.path);
+    from = await run.inputs.ahead(action.source, action.path);
   } catch (error) {
-    run.unstaged.set(action.name, { reason: reasonOf(error), error });
-    await guardManagedPath(action.to, run.roots, false);
+    await assertManagedPath(action.to, run.inputs.roots, { leaf: false, env: run.inputs.env });
     await remove(action.to);
-    return;
+    return { staged: undefined, unstaged: [[action.name, { reason: reasonOf(error), error }]] };
   }
-  // A collection that lost a member still installs; say which and why,
-  // because the target will simply not have that skill.
-  for (const { member, reason, error } of from.dropped) {
-    run.unstaged.set(`${action.name}/${member}`, { reason, error });
-  }
-  // Where this artifact's own bytes are: a version directory for a
-  // directory-shaped kind, the one file inside it for a file-shaped one.
-  run.materialized.set(action.name, from);
-  run.upstream.set(action.name, from.contentId);
-  run.performed.stage += 1;
+  // A collection that lost a member still installs, so say which member and why.
+  const unstaged = from.dropped.map(({ member, reason, error }): Staging["unstaged"][number] => [
+    `${action.name}/${member}`,
+    { reason, error },
+  ]);
+  return { staged: from, unstaged };
 }
 
-export async function cloneInto(run: Run, action: ActionOf<"clone">): Promise<void> {
+export async function cloneInto(run: Run, action: ActionOf<"clone">): Promise<Cloned> {
+  const { staged, digests } = run.results;
   // Only bytes this run staged and checked are copied; a stage that failed left none.
-  const from = run.materialized.get(action.name);
-  if (from === undefined || !(await exists(from.path))) {
-    run.skipped.add(linkKey(action.name, action.to));
-    return;
-  }
+  const from = staged.get(action.name);
+  if (from === undefined || !(await exists(from.path))) return { cloned: false };
   await remove(action.to);
   // Only what the envelope describes lands, whatever else sits beside it.
   await copyDescribed(from, action.to);
@@ -81,9 +72,6 @@ export async function cloneInto(run: Run, action: ActionOf<"clone">): Promise<vo
   await unseal(action.to);
   // The lock describes the copy, not the root: a file-shaped kind is a
   // directory upstream and a single file here, and the two never hash alike.
-  if (!run.measured.has(action.name)) {
-    run.measured.add(action.name);
-    run.digests.set(action.name, await digest(action.to));
-  }
-  run.performed.clone += 1;
+  const first = !digests.has(action.name);
+  return { cloned: true, digest: first ? await digest(action.to) : undefined };
 }

@@ -8,6 +8,8 @@ import type { Targets } from "#core/target/contract.ts";
 
 export interface BuildOptions {
   roots: Roots;
+  /** Locates the store and target folders; `targetTable` was resolved with it. */
+  env: NodeJS.ProcessEnv;
   /** Target names to project into, already resolved from manifest or detection. */
   targets: readonly string[];
   /** Every target, built in or defined by a file of yours. */

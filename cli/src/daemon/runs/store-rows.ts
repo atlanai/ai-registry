@@ -65,11 +65,11 @@ export function toEvent(row: Row): RunEvent {
     outcome: optionalText(row.outcome) as ItemOutcome | undefined,
     errorCode: optionalText(row.error_code),
     retryable: row.retryable === 1,
-    data: json(row.data_json),
+    data: parseJsonColumn(row.data_json),
   };
 }
 
-function json(value: unknown): unknown {
+function parseJsonColumn(value: unknown): unknown {
   if (value === null || value === undefined) return undefined;
   if (typeof value !== "string") throw new Error("The run history holds invalid JSON.");
   try {

@@ -1,16 +1,20 @@
 import type { ReactElement } from "react";
 import { plural } from "#adapter/text.ts";
 import { box, dim, faint, heading, plain, text } from "#cli/console/ui/elements.ts";
+import { defineView } from "#cli/console/ui/screen.ts";
 import { underHome } from "#cli/render/home.ts";
 import type { AccountRow, ConsoleState } from "#core/console/model.ts";
 import { pad } from "#core/term/format.ts";
 import { COLOR, GLYPH } from "#core/term/theme.ts";
 
-export function accountsView(props: {
-  width: number;
-  state: ConsoleState;
-  cursor: number;
-}): ReactElement {
+export const ACCOUNTS_VIEW = defineView<readonly AccountRow[]>("accounts", {
+  model: ({ state }) => state.accounts,
+  length: (accounts) => accounts.length,
+  body: ({ frame, cursor }) => accountsView({ width: frame.width, state: frame.state, cursor }),
+  keys: {},
+});
+
+function accountsView(props: { width: number; state: ConsoleState; cursor: number }): ReactElement {
   return box(
     { flexDirection: "column", width: props.width },
     heading("registries"),

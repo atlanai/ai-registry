@@ -74,10 +74,10 @@ export function splitRepository(input: string): { location: string; rest: string
 
 /** An address typed wrong, which the host reports as a usage error. */
 export class SourceParseError extends AdapterError {
-  constructor(input: string, reason: string, hint?: string) {
+  constructor(input: string, reason: string, options: { hint?: string } = {}) {
     const message = `${quoted(withoutCredentials(input))} is not a registry address: ${reason}.`;
     super(ID, "invalid", message, {
-      hint,
+      hint: options.hint,
       problem: { ...problemFromFailure("invalid", message), code: "USAGE" },
     });
   }
@@ -92,11 +92,9 @@ export function parseSource(input: string, cwd = process.cwd()): SourceSpec {
   // A pasted link's anchor points into a page; anywhere else `#` would read as a ref.
   const link = /^(https?:\/\/|www\.)/i.test(trimmed);
   if (!link && trimmed.includes("#")) {
-    throw new SourceParseError(
-      input,
-      "it names a ref with #",
-      "Name a branch or tag with `@ref`, not `#ref`.",
-    );
+    throw new SourceParseError(input, "it names a ref with #", {
+      hint: "Name a branch or tag with `@ref`, not `#ref`.",
+    });
   }
   const unanchored = trimmed.replace(/#.*$/, "");
   const pasted = pastedRepository(unanchored);
@@ -135,11 +133,9 @@ export function parseSource(input: string, cwd = process.cwd()): SourceSpec {
   }
 
   if (!namesHost(address)) {
-    throw new SourceParseError(
-      input,
-      "it names no host",
-      "Name the host too, such as github.com/owner/repo.",
-    );
+    throw new SourceParseError(input, "it names no host", {
+      hint: "Name the host too, such as github.com/owner/repo.",
+    });
   }
 
   let url: URL;

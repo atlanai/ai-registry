@@ -1,4 +1,4 @@
-import type { AccountService } from "#accounts/service.ts";
+import * as accounts from "#accounts/service.ts";
 import type { Identity } from "#adapter/index.ts";
 import type { Account } from "#core/config/model.ts";
 import type { RpcContext } from "#daemon/rpc/methods.ts";
@@ -8,11 +8,10 @@ import { committed } from "./settings-write.ts";
 export async function loginAccount(
   raw: unknown,
   context: RpcContext,
-  accounts: AccountService,
 ): Promise<{ account: Account; created: boolean; identity?: Identity }> {
   const params = inputs.object(raw);
   const { account, created, identity } = await committed(() =>
-    accounts.login(
+    accounts.signIn(
       {
         registry: inputs.text(params, "registry"),
         ...(params.address === undefined ? {} : { address: inputs.text(params, "address") }),
@@ -35,10 +34,9 @@ export async function loginAccount(
 export async function logoutAccount(
   raw: unknown,
   context: RpcContext,
-  accounts: AccountService,
 ): Promise<{ accountId: string }> {
   const accountId = inputs.text(inputs.object(raw), "accountId");
-  await committed(() => accounts.logout(accountId, context.signal));
+  await committed(() => accounts.signOut(accountId, context.signal));
   return { accountId };
 }
 
@@ -46,9 +44,8 @@ export async function logoutAccount(
 export async function removeAccount(
   raw: unknown,
   context: RpcContext,
-  accounts: AccountService,
 ): Promise<{ accountId: string }> {
   const accountId = inputs.text(inputs.object(raw), "accountId");
-  await committed(() => accounts.remove(accountId, context.signal));
+  await committed(() => accounts.removeAccount(accountId, context.signal));
   return { accountId };
 }

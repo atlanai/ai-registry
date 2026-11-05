@@ -73,7 +73,8 @@ describe("doctor", () => {
     const names = payload.data.checks.map((check) => check.name);
     expect(names).toContain("symlinks");
     // `aireg targets` is the one place tools are listed.
-    for (const target of Object.keys(resolveTargets())) expect(names).not.toContain(target);
+    for (const target of Object.keys(resolveTargets(process.env)))
+      expect(names).not.toContain(target);
   });
 
   // Windows keeps no POSIX permission bits for the owner-only check to read.

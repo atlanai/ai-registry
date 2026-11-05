@@ -1,9 +1,11 @@
 import type { Stats } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { ifReadable } from "#adapter/files.ts";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
+import { AiregError } from "#core/errors.ts";
 import { descriptionText, frontmatter } from "#core/frontmatter.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { isDirectory } from "#core/fs/tree.ts";
@@ -51,6 +53,7 @@ async function linked(path: string): Promise<Stats | undefined> {
   try {
     return await stat(path);
   } catch {
+    // Gone, looping or unreadable: no target can load it either.
     return undefined;
   }
 }
@@ -82,27 +85,23 @@ async function directoryEntry(
 }
 
 async function isFile(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isFile();
-  } catch {
-    return false;
-  }
+  return (await ifReadable(stat(path)))?.isFile() ?? false;
 }
 
 async function describe(
   file: string,
   fallback: string,
 ): Promise<{ name: string; description: string | undefined; engine: string | undefined }> {
-  try {
-    const meta = frontmatter(await readFile(file, "utf8"));
-    return {
-      name: sanitizeName(meta.name ?? fallback),
-      description: meta.description === undefined ? undefined : descriptionText(meta.description),
-      engine: meta.engine,
-    };
-  } catch {
+  const text = await ifReadable(readFile(file, "utf8"));
+  if (text === undefined) {
     return { name: sanitizeName(fallback), description: undefined, engine: undefined };
   }
+  const meta = frontmatter(text);
+  return {
+    name: sanitizeName(meta.name ?? fallback),
+    description: meta.description === undefined ? undefined : descriptionText(meta.description),
+    engine: meta.engine,
+  };
 }
 
 async function fileEntry(
@@ -137,16 +136,23 @@ async function describeToml(
   file: string,
   fallback: string,
 ): Promise<{ name: string; description: string | undefined; engine: undefined }> {
+  const keys = tomlKeys(await ifReadable(readFile(file, "utf8")));
+  const text = (key: string) => (typeof keys[key] === "string" ? keys[key] : undefined);
+  const description = text("description");
+  return {
+    name: sanitizeName(text("name") ?? fallback),
+    description: description === undefined ? undefined : descriptionText(description),
+    engine: undefined,
+  };
+}
+
+/** A file too large or not text still names its artifact, by its file name. */
+function tomlKeys(text: string | undefined): NonNullable<ReturnType<typeof readTable>> {
+  if (text === undefined) return {};
   try {
-    const keys = readTable(await readFile(file, "utf8"), []) ?? {};
-    const text = (key: string) => (typeof keys[key] === "string" ? keys[key] : undefined);
-    const description = text("description");
-    return {
-      name: sanitizeName(text("name") ?? fallback),
-      description: description === undefined ? undefined : descriptionText(description),
-      engine: undefined,
-    };
-  } catch {
-    return { name: sanitizeName(fallback), description: undefined, engine: undefined };
+    return readTable(text, []) ?? {};
+  } catch (error) {
+    if (error instanceof AiregError) return {};
+    throw error;
   }
 }

@@ -10,7 +10,7 @@ import { outcome, planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
 import { asksFor } from "#core/manifest/match.ts";
 import { lockView } from "#core/plan/acquire/lock-view.ts";
 import { formatRef, refName } from "#core/ref.ts";
-import { type RunResult, run as runPipeline } from "#engine/install/pipeline.ts";
+import { type RunResult, runPipeline } from "#engine/install/pipeline.ts";
 import { rowsNamed } from "#engine/installed-names.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
@@ -90,29 +90,25 @@ async function update(
   }
 
   let approved = true;
-  const result = await runPipeline(
-    loaded.roots,
+  const result = await runPipeline({
+    roots: loaded.roots,
     common,
-    context.printer,
-    context.cwd,
-    planReport(context.printer),
-    (fresh) => ({
+    printer: context.printer,
+    cwd: context.cwd,
+    report: planReport(context.printer),
+    edit: (fresh) => ({
       refresh: true,
       moving: new Set(
         Object.entries(fresh.lock.artifacts)
           .filter(([name, row]) => named.size === 0 || named.has(name) || named.has(row.registry))
           .map(([name]) => name),
       ),
-      approve: async (plan, targets) => {
-        approved = await confirmIfDestructive(step, plan, {
-          verb: "Update",
-          targets,
-          targetTable: fresh.targetTable,
-        });
-        return approved;
-      },
     }),
-  );
+    approve: async (plan, chosen) => {
+      approved = await confirmIfDestructive(step, plan, { verb: "Update", ...chosen });
+      return approved;
+    },
+  });
 
   if (!approved) {
     cancel(step);

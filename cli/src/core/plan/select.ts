@@ -91,67 +91,119 @@ function inNamespace(namespace: string, entries: readonly Entry[]): Entry[] {
   );
 }
 
-export function select(
-  manifest: Manifest,
-  lock: Lock,
-  acquired: readonly Acquired[],
-  warnings: Warning[],
-  cliVersion?: string,
-  incompatible: Incompatible[] = [],
-  clashes: Clash[] = [],
-  renames: ReadonlyMap<string, string> = new Map(),
-  untrusted: Untrusted[] = [],
-): Selected[] {
+export interface SelectOptions {
+  manifest: Manifest;
+  lock: Lock;
+  acquired: readonly Acquired[];
+  /** Absent, no artifact is checked against the aireg version it needs. */
+  cliVersion?: string | undefined;
+  /** By registry address, the name an artifact takes because another holds its own. */
+  renames?: ReadonlyMap<string, string>;
+}
+
+export interface Selection {
+  /** Sorted by installed name. */
+  selected: Selected[];
+  warnings: Warning[];
+  incompatible: Incompatible[];
+  clashes: Clash[];
+  untrusted: Untrusted[];
+}
+
+/** A plugin left out because it carries what runs on its own, and nobody said yes to it. */
+export interface Untrusted {
+  name: string;
+  registry: string;
+  carries: readonly Carried[];
+}
+
+export function select({
+  manifest,
+  lock,
+  acquired,
+  cliVersion,
+  renames = new Map(),
+}: SelectOptions): Selection {
   const byAlias = new Map(acquired.map((entry) => [entry.alias, entry]));
   const chosen = new Map<string, Selected>();
-  const pass: Choosing = {
+  const byAddress = new Map<string, Selected>();
+  const view: Choosing = {
     locked: lockedNames(lock),
     chosen,
-    byAddress: new Map(),
-    warnings,
+    byAddress,
     cliVersion,
-    incompatible,
-    clashes,
     renames,
     trusted: trustedIn(manifest),
-    untrusted,
+  };
+  const found: Omit<Selection, "selected"> = {
+    warnings: [],
+    incompatible: [],
+    clashes: [],
+    untrusted: [],
+  };
+  const take = (choice: Choice): void => {
+    switch (choice.kind) {
+      case "left":
+        if (choice.warning !== undefined) found.warnings.push(choice.warning);
+        if (choice.incompatible !== undefined) found.incompatible.push(choice.incompatible);
+        if (choice.untrusted !== undefined) addUntrusted(found.untrusted, choice.untrusted);
+        return;
+      case "clash":
+        found.clashes.push(choice.clash);
+        return;
+      case "again":
+        reachedAgain(choice.ref, choice.reached, chosen);
+        return;
+      case "new":
+        chosen.set(choice.selected.name, choice.selected);
+        byAddress.set(addressKey(choice.ref.registry, choice.selected.path), choice.selected);
+        return;
+    }
   };
 
   for (const ref of manifest.artifacts) {
     const source = byAlias.get(ref.registry);
     if (source === undefined) continue;
-    const found = candidates(ref, source);
-    if (found.length === 0) {
-      if (ref.exclude !== undefined) continue;
-      // Published but withheld by status: what keeps or refuses it says why.
-      if (withheldAt(source.catalog.withheld, { ...ref, group: ref.namespace }) !== undefined) {
-        continue;
-      }
-      const { message, guess } = unmatched(ref, source.catalog.entries);
-      warnings.push({ name: undefined, message: guess === "" ? message : `${message} ${guess}` });
+    const matched = matching(ref, source);
+    if (!Array.isArray(matched)) {
+      if (matched !== undefined) found.warnings.push(matched);
       continue;
     }
-    const clash = ambiguous(ref, found);
-    if (clash !== undefined) {
-      warnings.push({ name: undefined, message: clash });
-      continue;
-    }
-    for (const entry of found) choose(ref, source, entry, pass);
+    for (const entry of matched) take(choose(ref, source, entry, view));
   }
+  return { selected: withoutCoveredMembers(chosen), ...found };
+}
 
-  // A plugin already places everything inside it, so a member asked for by name
-  // as well is dropped rather than projected a second time under its own.
+function matching(ref: Ref, source: Acquired): Entry[] | Warning | undefined {
+  const found = candidates(ref, source);
+  if (found.length === 0) {
+    if (ref.exclude !== undefined) return undefined;
+    // Published but withheld by status: what keeps or refuses it says why.
+    if (withheldAt(source.catalog.withheld, { ...ref, group: ref.namespace }) !== undefined) {
+      return undefined;
+    }
+    const { message, guess } = unmatched(ref, source.catalog.entries);
+    return { name: undefined, message: guess === "" ? message : `${message} ${guess}` };
+  }
+  const clash = ambiguous(ref, found);
+  return clash === undefined ? found : { name: undefined, message: clash };
+}
+
+/** A plugin places its members, so one also named on its own is not placed twice. */
+function withoutCoveredMembers(chosen: ReadonlyMap<string, Selected>): Selected[] {
   const plugins = new Set(
     [...chosen.values()]
       .filter((item) => item.kind === "plugin")
       .map((item) => `${item.source}/${item.upstreamName}`),
   );
-  for (const [name, item] of chosen) {
-    if (item.kind === "plugin" || item.group === undefined) continue;
-    if (plugins.has(`${item.source}/${item.group}`)) chosen.delete(name);
-  }
-
-  return [...chosen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...chosen.values()]
+    .filter(
+      (item) =>
+        item.kind === "plugin" ||
+        item.group === undefined ||
+        !plugins.has(`${item.source}/${item.group}`),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -175,10 +227,12 @@ function lockedNames(lock: Lock): Map<string, Map<string, string>> {
 function trustedIn(manifest: Manifest): Set<string> {
   return new Set(
     manifest.artifacts.flatMap((ref) =>
-      (ref.trust ?? []).map((name) => `${ref.registry}\u0000${sanitizeName(name)}`),
+      (ref.trust ?? []).map((name) => addressKey(ref.registry, sanitizeName(name))),
     ),
   );
 }
+
+const addressKey = (registry: string, at: string): string => `${registry}\u0000${at}`;
 
 /** Never a silent pick: choosing between two matches hides a skill that shares a command's name. */
 function ambiguous(ref: Ref, found: readonly Entry[]): string | undefined {
@@ -187,40 +241,56 @@ function ambiguous(ref: Ref, found: readonly Entry[]): string | undefined {
   return `${formatRef(ref)} matches ${plural(found.length, "artifact")}: ${list(shown)}. Name one of them.`;
 }
 
-function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void {
-  const { locked, chosen, byAddress, warnings, cliVersion, incompatible, clashes, renames } = pass;
+interface Choosing {
+  /** By registry, the installed name each source id was locked under. */
+  locked: ReadonlyMap<string, ReadonlyMap<string, string>>;
+  chosen: ReadonlyMap<string, Selected>;
+  /** The same selections by registry and path, so a second address for one is found at once. */
+  byAddress: ReadonlyMap<string, Selected>;
+  cliVersion: string | undefined;
+  renames: ReadonlyMap<string, string>;
+  /** Plugins a manifest entry trusts, by registry and name. */
+  trusted: ReadonlySet<string>;
+}
+
+type Choice =
+  | { kind: "left"; warning?: Warning; incompatible?: Incompatible; untrusted?: Untrusted }
+  | { kind: "clash"; clash: Clash }
+  /** Reached already through another address of the manifest's. */
+  | { kind: "again"; ref: Ref; reached: Selected }
+  | { kind: "new"; ref: Ref; selected: Selected };
+
+function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): Choice {
+  const { locked, chosen, byAddress, cliVersion, renames } = pass;
   if (cliVersion !== undefined && entry.engine !== undefined) {
     const needed = unmetEngine(cliVersion, entry.engine);
     if (needed !== undefined) {
-      warnings.push({ name: entry.name, message: `${quoted(entry.name)} ${needed}.` });
-      if (!isWholeRegistry(ref)) incompatible.push({ name: entry.name, engine: entry.engine });
-      return;
+      return {
+        kind: "left",
+        warning: { name: entry.name, message: `${quoted(entry.name)} ${needed}.` },
+        ...(isWholeRegistry(ref)
+          ? {}
+          : { incompatible: { name: entry.name, engine: entry.engine } }),
+      };
     }
   }
   const placement = source.placements.get(entry.path);
   if (placement === undefined) {
-    warnings.push({
-      name: entry.name,
-      message: `${ref.registry} lists ${quoted(entry.name)} but serves no content for it.`,
-    });
-    return;
+    return {
+      kind: "left",
+      warning: {
+        name: entry.name,
+        message: `${ref.registry} lists ${quoted(entry.name)} but serves no content for it.`,
+      },
+    };
   }
-  if (needsTrust(ref, entry, placement, pass)) return;
+  const untrusted = needsTrust(ref, entry, placement, pass.trusted);
+  if (untrusted !== undefined) return { kind: "left", untrusted };
 
   // Two addresses can reach one artifact, a namespace and a pin inside it, and
   // it installs once, under whichever the manifest wrote first.
-  const reached = byAddress.get(`${ref.registry}\u0000${entry.path}`);
-  if (reached !== undefined) {
-    // Named as well, it holds its version against a dependent like any named artifact.
-    if (ref.name !== undefined) reached.named = true;
-    // A name written with `as:` is the person's choice, wherever the entry sits.
-    if (ref.localName !== undefined && !chosen.has(ref.localName)) {
-      chosen.delete(reached.name);
-      reached.name = ref.localName;
-      chosen.set(reached.name, reached);
-    }
-    return;
-  }
+  const reached = byAddress.get(addressKey(ref.registry, entry.path));
+  if (reached !== undefined) return { kind: "again", ref, reached };
   const held = locked.get(ref.registry);
   const lockedName = held?.get(placement.id) ?? held?.get(`\u0000${entry.path}`);
   const name =
@@ -231,8 +301,7 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void 
   const existing = chosen.get(name);
   if (existing !== undefined) {
     const kept = addressOf({ ...existing, name: existing.upstreamName }, existing.source);
-    clashes.push({ name, kept, dropped: addressOf(entry, ref.registry) });
-    return;
+    return { kind: "clash", clash: { name, kept, dropped: addressOf(entry, ref.registry) } };
   }
 
   const selected: Selected = {
@@ -254,44 +323,38 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): void 
     ...(ref.copy === true ? { copy: true } : {}),
     ...(ref.localName === undefined ? {} : { aliased: true }),
   };
-  chosen.set(name, selected);
-  byAddress.set(`${ref.registry}\u0000${entry.path}`, selected);
-}
-
-/** What one `select` pass reads and fills in as it chooses entries. */
-interface Choosing {
-  /** By registry, the installed name each source id was locked under. */
-  locked: ReadonlyMap<string, ReadonlyMap<string, string>>;
-  chosen: Map<string, Selected>;
-  /** The same selections by registry and path, so a second address for one is found at once. */
-  byAddress: Map<string, Selected>;
-  warnings: Warning[];
-  cliVersion: string | undefined;
-  incompatible: Incompatible[];
-  clashes: Clash[];
-  /** By registry address, the name an artifact takes because another holds its own. */
-  renames: ReadonlyMap<string, string>;
-  /** Plugins a manifest entry trusts, as `<registry>\u0000<name>`. */
-  trusted: ReadonlySet<string>;
-  untrusted: Untrusted[];
-}
-
-/** A plugin left out because it carries what runs on its own, and nobody said yes to it. */
-export interface Untrusted {
-  name: string;
-  registry: string;
-  carries: readonly Carried[];
+  return { kind: "new", ref, selected };
 }
 
 /** A plugin from a source that is not a registry runs nothing until a person trusts it by name. */
-function needsTrust(ref: Ref, entry: Entry, placement: Placement, pass: Choosing): boolean {
+function needsTrust(
+  ref: Ref,
+  entry: Entry,
+  placement: Placement,
+  trusted: ReadonlySet<string>,
+): Untrusted | undefined {
   const carries = placement.plugin?.carries ?? [];
-  if (entry.kind !== "plugin" || carries.length === 0) return false;
-  if (pass.trusted.has(`${ref.registry}\u0000${entry.name}`)) return false;
-  if (!pass.untrusted.some((item) => item.registry === ref.registry && item.name === entry.name)) {
-    pass.untrusted.push({ name: entry.name, registry: ref.registry, carries });
+  if (entry.kind !== "plugin" || carries.length === 0) return undefined;
+  if (trusted.has(addressKey(ref.registry, entry.name))) return undefined;
+  return { name: entry.name, registry: ref.registry, carries };
+}
+
+function addUntrusted(untrusted: Untrusted[], plugin: Untrusted): void {
+  if (!untrusted.some((item) => item.registry === plugin.registry && item.name === plugin.name)) {
+    untrusted.push(plugin);
   }
-  return true;
+}
+
+/** Mutates the selection this pass made: it is the pass's own, not a caller's. */
+function reachedAgain(ref: Ref, reached: Selected, chosen: Map<string, Selected>): void {
+  // Named as well, it holds its version against a dependent like any named artifact.
+  if (ref.name !== undefined) reached.named = true;
+  // A name written with `as:` is the person's choice, wherever the entry sits.
+  if (ref.localName !== undefined && !chosen.has(ref.localName)) {
+    chosen.delete(reached.name);
+    reached.name = ref.localName;
+    chosen.set(reached.name, reached);
+  }
 }
 
 /**

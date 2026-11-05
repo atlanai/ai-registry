@@ -91,8 +91,7 @@ export async function resolveRef(
     throw new GitError(
       "invalid",
       `${quoted(ref)} is both a tag and a branch in ${spec.location}, at different commits.`,
-      "",
-      `Name one: \`refs/tags/${ref}\` or \`refs/heads/${ref}\`.`,
+      { hint: `Name one: \`refs/tags/${ref}\` or \`refs/heads/${ref}\`.` },
     );
   }
 

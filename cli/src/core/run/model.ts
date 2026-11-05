@@ -132,6 +132,16 @@ export const EMPTY_RUN_COUNTS: RunCounts = Object.freeze({
   failed: 0,
 });
 
+export function addCounts(a: RunCounts, b: RunCounts): RunCounts {
+  return {
+    examined: a.examined + b.examined,
+    changed: a.changed + b.changed,
+    skipped: a.skipped + b.skipped,
+    attention: a.attention + b.attention,
+    failed: a.failed + b.failed,
+  };
+}
+
 export interface RunRecord {
   id: string;
   /** Absent for a one-off run started by hand rather than by a job. */

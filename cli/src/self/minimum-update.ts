@@ -58,9 +58,11 @@ export async function probeRelease(
 ): Promise<ResolvedRelease | undefined> {
   try {
     const release = await resolveRelease(env, $fetch, timeoutMs);
+    // A cache that will not write only means asking again next run.
     await writeUpdateCache(cacheFrom(release), env).catch(() => undefined);
     return release;
   } catch {
+    // An unreachable release server never blocks a command.
     return undefined;
   }
 }

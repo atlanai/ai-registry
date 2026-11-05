@@ -21,21 +21,25 @@ export class LeaseBusyError extends AiregError {
   }
 }
 
+interface LeaseErrorOptions {
+  reason?: string | undefined;
+  hint?: string | undefined;
+}
+
 export class LeaseError extends AiregError {
   /** Why the lease failed, for the daemon to tell a lost lease from a stuck one. */
   readonly reason: string | undefined;
 
-  constructor(message: string, reason?: string, hint?: string) {
-    super(message, { code: ErrorCode.Busy, hint });
+  constructor(message: string, options: LeaseErrorOptions = {}) {
+    super(message, { code: ErrorCode.Busy, hint: options.hint });
     this.name = "LeaseError";
-    this.reason = reason;
+    this.reason = options.reason;
   }
 }
 
 export function stuckError(dir: string, code: string): LeaseError {
-  return new LeaseError(
-    `Could not remove the stale lock folder ${dir}.`,
-    code,
-    "Remove it by hand, then run the command again.",
-  );
+  return new LeaseError(`Could not remove the stale lock folder ${dir}.`, {
+    reason: code,
+    hint: "Remove it by hand, then run the command again.",
+  });
 }

@@ -169,10 +169,12 @@ async function dispatch(
     return (await runDaemon(VERSION)) as ExitCode;
   }
   if (argv.length === 3 && argv[0] === REMOVE_AFTER_FLAG) {
+    // This helper's only job; once it fails there is nobody left to tell.
     await removeAfterExit(Number(argv[1]), argv[2] as string).catch(() => undefined);
     return ExitCode.Ok;
   }
   if (argv.length === 1 && argv[0] === UPDATE_CHECK_FLAG) {
+    // A background check: a failure only means asking again next time.
     await refreshUpdates(recycleDaemon).catch(() => undefined);
     return ExitCode.Ok;
   }
@@ -288,6 +290,7 @@ async function runCommand(
     await run(context);
     const code = context.exit ?? ExitCode.Ok;
     if (code === ExitCode.Ok && checksUpdates) {
+      // An optional hint never changes how the command ended.
       await hintUpdate(printer).catch(() => undefined);
     }
     command.info("command finished", { code, durationMs: Date.now() - startedAtMs });
@@ -297,6 +300,7 @@ async function runCommand(
     command.error("command failed", { error, durationMs: Date.now() - startedAtMs });
     return reportError(printer, error);
   } finally {
+    // As above: scheduling the check never changes how the command ended.
     if (checksUpdates) await scheduleUpdateCheck().catch(() => undefined);
     log.close();
   }

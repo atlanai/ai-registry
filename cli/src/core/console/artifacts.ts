@@ -1,5 +1,6 @@
 import { stat } from "node:fs/promises";
 import { basename, resolve } from "node:path";
+import { ifPresent } from "#adapter/files.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { ArtifactStatus } from "#core/plan/status.ts";
 import type { Survey } from "#core/plan/survey.ts";
@@ -128,11 +129,7 @@ function stateOf(
 }
 
 async function changedAt(path: string): Promise<number | undefined> {
-  try {
-    return (await stat(path)).mtimeMs;
-  } catch {
-    return undefined;
-  }
+  return (await ifPresent(stat(path)))?.mtimeMs;
 }
 
 /**

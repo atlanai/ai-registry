@@ -8,13 +8,18 @@ import { ID } from "./errors.ts";
 /** The adapter contract's own words, so the git adapter passes a failure through unchanged. */
 type GitFailure = Extract<Failure, "not_found" | "unauthorized" | "unavailable" | "invalid">;
 
+interface GitErrorOptions {
+  stderr?: string;
+  hint?: string | undefined;
+}
+
 export class GitError extends AdapterError {
   declare readonly failure: GitFailure;
   readonly stderr: string;
 
-  constructor(failure: GitFailure, message: string, stderr = "", hint?: string) {
-    super(ID, failure, message, { hint });
-    this.stderr = stderr;
+  constructor(failure: GitFailure, message: string, options: GitErrorOptions = {}) {
+    super(ID, failure, message, { hint: options.hint });
+    this.stderr = options.stderr ?? "";
   }
 
   /** Refused by an organization's SAML SSO, which needs its own fix. */
@@ -91,20 +96,23 @@ export async function git(args: readonly string[], options: GitOptions): Promise
     if (options.signal?.aborted === true) throw error;
     if (error instanceof GitError) throw error;
     const stderr = (error as { stderr?: string }).stderr ?? "";
-    throw notInstalled(error) ?? new GitError("unavailable", messageOf(error), stderr);
+    throw notInstalled(error) ?? new GitError("unavailable", messageOf(error), { stderr });
   }
   if (ran.timedOut) {
     throw new GitError(
       "unavailable",
       `git timed out after ${timeout < 1000 ? `${timeout}ms` : `${Math.round(timeout / 1000)}s`}.`,
-      ran.stderr,
-      options.timeoutSetting === undefined
-        ? "Clone the repository yourself and add its local path."
-        : `Raise the limit with ${options.timeoutSetting}, or clone the repository yourself and add its local path.`,
+      {
+        stderr: ran.stderr,
+        hint:
+          options.timeoutSetting === undefined
+            ? "Clone the repository yourself and add its local path."
+            : `Raise the limit with ${options.timeoutSetting}, or clone the repository yourself and add its local path.`,
+      },
     );
   }
   if (ran.code === 0) return ran.stdout;
-  throw new GitError(classify(ran.stderr), firstFatal(ran.stderr), ran.stderr);
+  throw new GitError(classify(ran.stderr), firstFatal(ran.stderr), { stderr: ran.stderr });
 }
 
 function spawnTool(args: readonly string[], options: GitOptions, timeout: number): Promise<Ran> {
@@ -126,12 +134,9 @@ function spawnOne(args: readonly string[], options: GitOptions, timeout: number)
     } catch (error) {
       // An empty PATH would find a program in the checkout git works in.
       reject(
-        new GitError(
-          "invalid",
-          messageOf(error),
-          "",
-          "Set PATH to the absolute folders that hold git, then run the command again.",
-        ),
+        new GitError("invalid", messageOf(error), {
+          hint: "Set PATH to the absolute folders that hold git, then run the command again.",
+        }),
       );
       return;
     }
@@ -214,12 +219,9 @@ function aborted(signal: AbortSignal): Error {
 
 function notInstalled(error: unknown): GitError | undefined {
   return (error as NodeJS.ErrnoException).code === "ENOENT"
-    ? new GitError(
-        "invalid",
-        "git is not installed, or not on your PATH.",
-        "",
-        "Install git, then run the command again.",
-      )
+    ? new GitError("invalid", "git is not installed, or not on your PATH.", {
+        hint: "Install git, then run the command again.",
+      })
     : undefined;
 }
 
@@ -249,6 +251,7 @@ export async function gitVersion(): Promise<string | undefined> {
   try {
     return (await git(["--version"], { timeoutMs: 5000 })).trim();
   } catch {
+    // No git, or one that will not run: either way there is no version to show.
     return undefined;
   }
 }

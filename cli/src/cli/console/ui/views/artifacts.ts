@@ -2,13 +2,87 @@ import type { ReactElement, ReactNode } from "react";
 import { windowAround } from "#cli/console/data/list.ts";
 import { summaryStrip } from "#cli/console/ui/chrome.ts";
 import { action, box, dim, faint, plain, text } from "#cli/console/ui/elements.ts";
+import { LAYOUT, listRowAt } from "#cli/console/ui/mouse.ts";
+import { importNow, planForLine } from "#cli/console/ui/publish.ts";
+import { defineView, type Shown, type ViewActions } from "#cli/console/ui/screen.ts";
 import { publishable } from "#core/console/artifacts.ts";
-import type { Line } from "#core/console/flatten.ts";
-import { lineKey } from "#core/console/flatten.ts";
+import { flatten, type Line, lineKey } from "#core/console/flatten.ts";
 import type { ArtifactGroup, ArtifactRow, ConsoleState } from "#core/console/model.ts";
 import { stateStyle } from "#core/console/state-style.ts";
 import { ago, pad, shortDigest, truncate } from "#core/term/format.ts";
 import { COLOR, GLYPH } from "#core/term/theme.ts";
+
+type Model = ReturnType<typeof flatten>;
+
+// Under the list: the filter, a blank, then the column heading.
+const LIST_TOP = LAYOUT.body + 3;
+
+export const ARTIFACTS_VIEW = defineView<Model>("artifacts", {
+  model: ({ state, ui }) =>
+    flatten(state.groups, { folded: ui.folded, filter: ui.filter, only: undefined }),
+  length: (model) => model.lines.length,
+  body: ({ frame, model, cursor }) =>
+    box(
+      { flexDirection: "column" },
+      artifactsView({
+        width: frame.width,
+        height: frame.height,
+        state: frame.state,
+        lines: model.lines,
+        shown: model.shown,
+        cursor,
+        folded: frame.ui.folded,
+        filter: frame.ui.filter,
+        filtering: frame.ui.filtering,
+        nowMs: frame.nowMs,
+      }),
+    ),
+  strip: ({ frame, model, cursor }) =>
+    artifactsSummary({ width: frame.width, line: model.lines[cursor], nowMs: frame.nowMs }),
+  rowAt: ({ frame, model, cursor }, screenRow) =>
+    listRowAt(screenRow, {
+      top: LIST_TOP,
+      total: model.lines.length,
+      cursor,
+      height: frame.height,
+    }),
+  // The routes are the adapter's; which row is selected is not.
+  link: ({ frame, model, cursor }) => {
+    const line = model.lines[cursor];
+    if (line === undefined) return undefined;
+    return line.kind === "artifact"
+      ? frame.upstream?.artifact?.(frame.facts, line.row)
+      : frame.upstream?.namespace?.(frame.facts, line.group.key);
+  },
+  keys: {
+    filter: (_shown, { dispatch }) => dispatch({ type: "open-filter" }),
+    publish: publishSelected,
+    enter: ({ frame, model, cursor }, { dispatch }) => {
+      const line = model.lines[cursor];
+      if (line === undefined) return;
+      if (line.kind === "artifact") {
+        dispatch({ type: "show-overlay", overlay: { kind: "detail", row: line.row } });
+        return;
+      }
+      const group = line.group.key;
+      dispatch({ type: "fold", group, folded: !frame.ui.folded.has(group) });
+    },
+    fold: ({ model, cursor }, { dispatch }, input) => {
+      const group = model.lines[cursor]?.group;
+      if (group !== undefined) dispatch({ type: "fold", group: group.key, folded: input === "h" });
+    },
+  },
+});
+
+// aireg never publishes to a git registry; its rows already say where an edit goes.
+function publishSelected({ frame, model, cursor }: Shown<Model>, actions: ViewActions): void {
+  if (frame.state.account?.publishes === false) return;
+  const line = model.lines[cursor];
+  if (line?.kind === "artifact" && importNow(line.row, actions.run)) return;
+  const plan = planForLine(line, frame);
+  if (plan === undefined) return;
+  actions.dispatch({ type: "show-overlay", overlay: { kind: "publish", plan } });
+}
 
 interface Columns {
   name: number;
@@ -18,7 +92,7 @@ interface Columns {
   changed: number;
 }
 
-export function artifactsView(props: {
+function artifactsView(props: {
   width: number;
   height: number;
   state: ConsoleState;
@@ -201,8 +275,7 @@ function tally(state: ConsoleState): ReactElement {
   );
 }
 
-/** The strip under the list: whatever the cursor is on, in one or two lines. */
-export function artifactsSummary(props: {
+function artifactsSummary(props: {
   width: number;
   line: Line | undefined;
   nowMs: number;

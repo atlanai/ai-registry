@@ -51,11 +51,10 @@ describe("reportError", () => {
 
   test("tells a writer that lost its write lock to run again", () => {
     const { printer, err } = capture("text");
-    const lost = new LeaseError(
-      "Another aireg process took over this project.",
-      "lease_lost",
-      "Run the command again.",
-    );
+    const lost = new LeaseError("Another aireg process took over this project.", {
+      reason: "lease_lost",
+      hint: "Run the command again.",
+    });
     expect(reportError(printer, lost)).toBe(ExitCode.Error);
     expect(err.join("")).toContain("code: busy");
     expect(err.join("")).toContain("hint: Run the command again.");

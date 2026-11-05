@@ -5,6 +5,7 @@ import type { Entry } from "#core/catalog/catalog.ts";
 import type { RegistrySource } from "#core/manifest/model.ts";
 import { test } from "#test/kit/fixtures.ts";
 import {
+  aliasIn,
   atAddress,
   insideRegistry,
   rememberSource,
@@ -27,6 +28,17 @@ vi.mock("#adapters/git/api.ts", async (original) => ({
 const declared: Record<string, RegistrySource> = {
   kit: { location: "github.com/acme/kit", adapter: "git", config: { ref: "v1" } },
 };
+
+describe("aliasIn", () => {
+  test.for([
+    ["kit", "kit"],
+    ["kit/team/lint", "kit"],
+    ["kit@1.0.0", "kit"],
+    ["kit/team/lint@1.0.0", "kit"],
+  ])("reads %s as the registry %s", ([address, alias]) => {
+    expect(aliasIn(address as string)).toBe(alias);
+  });
+});
 
 describe("throughManifest", () => {
   test("leaves an address nothing declares alone", () => {

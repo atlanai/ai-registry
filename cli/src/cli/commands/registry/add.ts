@@ -52,7 +52,7 @@ export const add = action({
     let readable = true;
     let move: Move | undefined;
     try {
-      const source = await probe(input, flags, context.cwd);
+      const source = await probe({ input, flags, cwd: context.cwd });
       try {
         declared = {
           ...source.declared,
@@ -75,6 +75,7 @@ export const add = action({
     } catch (error) {
       if (!(error instanceof AiregError) || error.code !== ErrorCode.Unauthorized) throw error;
       // Adapters that manage credentials without a sign-in flow cannot recover after declaration.
+      // One that will not load is taken to allow a sign-in, which then says why it fails.
       const failed = isAdapterError(error.cause)
         ? await loadAdapter(error.cause.adapter).catch(() => undefined)
         : undefined;

@@ -80,6 +80,7 @@ export async function snapshot(
     await pruneOlder(dirname(final), head);
     return { root: final, commit: head, cached: false };
   } finally {
+    // A leftover staging folder costs only disk; the snapshot or its error stands either way.
     await rm(staging, { recursive: true, force: true }).catch(() => {});
   }
 }
@@ -98,6 +99,7 @@ function snapshotPath(cache: string, spec: SourceSpec, commit: string): string {
 
 /** Every commit of a busy registry would otherwise stay checked out for good. */
 async function pruneOlder(repository: string, current: string): Promise<void> {
+  // Best effort throughout: what a prune misses, the next snapshot of this registry prunes.
   const commits = await readdir(repository, { withFileTypes: true }).catch(() => []);
   const dated = await Promise.all(
     commits

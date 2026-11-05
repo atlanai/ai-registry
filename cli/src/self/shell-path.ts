@@ -56,6 +56,7 @@ function readText(file: string): string | undefined {
   try {
     return readFileSync(file, "utf8");
   } catch {
+    // One that cannot be read, such as a root-owned file, is one `addToPath` could not have edited.
     return undefined;
   }
 }
@@ -145,6 +146,7 @@ export async function addToPath(env: NodeJS.ProcessEnv = process.env): Promise<P
   if (shell === "fish" || existsSync(fishDir(env))) {
     const file = fishFile(env);
     const wanted = `if not contains -- '${binDir(env)}' $PATH; set -gx PATH '${binDir(env)}' $PATH; end\n`;
+    // Unreadable reads as out of date; the write below then reports the file as failed.
     const current = await readFile(file, "utf8").catch(() => undefined);
     if (current !== wanted) {
       try {

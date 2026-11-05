@@ -114,7 +114,8 @@ export async function resolveArtifacts(
   const listed: Listed[] = [];
   const taken = new Map<string, Artifact>();
 
-  for (const [index, artifact] of resolution.artifacts.entries()) check(adapter, artifact, index);
+  for (const [index, artifact] of resolution.artifacts.entries())
+    checkArtifact(adapter, artifact, index);
 
   for (const listedAs of resolution.artifacts) {
     const { name, description } = listedAs.envelope.metadata;
@@ -174,11 +175,8 @@ export async function resolveArtifacts(
   };
 }
 
-/**
- * Everything an adapter returns is checked here, once, rather than by each
- * adapter in its own way. A backend that lies is named in the failure.
- */
-function check(adapter: SourceAdapter, artifact: Artifact, index: number): void {
+/** Checked once here rather than by each adapter; a backend that lies is named in the failure. */
+function checkArtifact(adapter: SourceAdapter, artifact: Artifact, index: number): void {
   const envelope: Envelope | undefined = artifact.envelope;
   const metadata: EnvelopeMetadata | undefined = envelope?.metadata;
   const name = typeof metadata?.name === "string" ? metadata.name : "";

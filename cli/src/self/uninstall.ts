@@ -38,7 +38,7 @@ export async function footprint(env: NodeJS.ProcessEnv = process.env): Promise<F
   const entry = runningEntry();
   if (entry !== undefined && !isWithin(toolHome(env), canonical(entry))) kept.push(entry);
   return {
-    links: linksOf(await teardownPlan(roots("user", homeDir(env), env)), env),
+    links: linksOf(await teardownPlan(roots("user", homeDir(env), env), env), env),
     startupFiles: await onPathIn(env),
     folders: own,
     kept,
@@ -63,26 +63,26 @@ function linksOf(plan: Plan, env: NodeJS.ProcessEnv): string[] {
   );
 }
 
-/** With nothing declared every row is stale, so the planner unlinks all of them, as `remove` would. */
-async function teardownPlan(scope: Roots): Promise<Plan> {
+/** With nothing declared every row is stale, so the planner unlinks all of them. */
+async function teardownPlan(scope: Roots, env: NodeJS.ProcessEnv): Promise<Plan> {
   const manifest = await readManifest(scope.manifest);
   return build(
     { ...manifest, artifacts: [], registries: dict() },
     await readLock(scope),
     [],
     { artifacts: dict() },
-    { roots: scope, targets: [], targetTable: resolveTargets(), force: false, copy: false },
+    { roots: scope, env, targets: [], targetTable: resolveTargets(env), force: false, copy: false },
   );
 }
 
-/** aireg's own teardown of the user scope, under its lease so no job writes beside it. */
-export async function unlinkUserScope(env: NodeJS.ProcessEnv = process.env): Promise<string[]> {
+/** Under the scope's lease, so no job writes beside it. */
+export async function unlinkUserScope(env: NodeJS.ProcessEnv): Promise<string[]> {
   const scope = roots("user", homeDir(env), env);
   return withLease(scope, { wait: true }, async () => {
     // A run that crashed may have linked paths the lock never recorded.
-    await recover(scope, await readLock(scope));
-    const plan = await teardownPlan(scope);
-    await apply(plan, scope, fetchFrom([]));
+    await recover(scope, await readLock(scope), env);
+    const plan = await teardownPlan(scope, env);
+    await apply({ plan, roots: scope, fetch: fetchFrom([]), env });
     return linksOf(plan, env);
   });
 }

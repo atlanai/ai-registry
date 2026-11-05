@@ -10,11 +10,12 @@ export interface Problem {
   fix?: string | undefined;
 }
 
-export async function text(root: string, path: string): Promise<string | undefined> {
+export async function textAt(root: string, path: string): Promise<string | undefined> {
   try {
     const bytes = await rootReader(root)(path);
     return bytes === undefined ? undefined : new TextDecoder().decode(bytes);
   } catch {
+    // The drift check hashes the same file and reports why it will not read.
     return undefined;
   }
 }
@@ -37,6 +38,7 @@ export function parsed(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
+    // A base revision's copy that is not JSON lists nothing to compare against.
     return undefined;
   }
 }
@@ -55,6 +57,7 @@ export async function readDocument(
   root: string,
   at: string,
 ): Promise<Record<string, unknown> | undefined> {
+  // Validation reads the same document through `jsonAt`, which reports why it will not read.
   const raw = await readJson(rootReader(root), at).catch(() => undefined);
   return isRecord(raw) ? raw : undefined;
 }

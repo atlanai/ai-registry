@@ -147,10 +147,12 @@ export class GitVersions {
       throw new GitError(
         "not_found",
         `${this.#context.spec.location} has no tag for ${name} ${version}.`,
-        "",
-        offered.length === 0
-          ? "Leave off the version to install what the repository holds now."
-          : `Use ${offered.slice(0, 5).join(", ")}, or leave off the version for the newest.`,
+        {
+          hint:
+            offered.length === 0
+              ? "Leave off the version to install what the repository holds now."
+              : `Use ${offered.slice(0, 5).join(", ")}, or leave off the version for the newest.`,
+        },
       );
     }
     return found.tag.commit;
@@ -189,6 +191,7 @@ export class GitVersions {
 
   async #pseudoCommit(version: string, pseudo: { stamp: string; sha: string }): Promise<string> {
     const history = await this.history();
+    // A sha this history does not hold is the not_found below, as is any failure to ask.
     const found = SHA12.test(pseudo.sha)
       ? (
           await git(["rev-parse", "--verify", "--quiet", `${pseudo.sha}^{commit}`], {
@@ -203,8 +206,7 @@ export class GitVersions {
       throw new GitError(
         "not_found",
         `${this.#context.spec.location} has no commit for the version ${quoted(version)}.`,
-        "",
-        "Leave off the version to install what the repository holds now.",
+        { hint: "Leave off the version to install what the repository holds now." },
       );
     }
     return found.toLowerCase();
@@ -288,6 +290,7 @@ async function commitTime(
   limits: GitLimits,
   commit = "HEAD",
 ): Promise<Date | undefined> {
+  // No such commit, or no history to ask: no time, which callers treat as not found.
   const out = await git(["log", "-1", "--format=%ct", commit], { ...limits, cwd: dir }).catch(
     () => "",
   );

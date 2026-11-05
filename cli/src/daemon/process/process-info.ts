@@ -16,6 +16,7 @@ async function commandLine(pid: number): Promise<string | undefined> {
   try {
     return (await readFile(`/proc/${String(pid)}/cmdline`, "utf8")).replace(/\0/g, " ").trim();
   } catch {
+    // Gone or hidden from this user; on Linux `ps` would say no more.
     if (process.platform === "linux") return undefined;
   }
   const { code, stdout } = await exec("ps", ["-p", String(pid), "-o", "args="], {

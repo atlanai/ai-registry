@@ -83,7 +83,6 @@ describe("job methods", () => {
         kind: "skill",
         disposition: "synced",
         operation: "none",
-        selected: true,
       }),
     ]);
 

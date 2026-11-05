@@ -1,10 +1,5 @@
-import {
-  DEFAULT_INTERVAL_SECONDS,
-  isScopeStep,
-  type Job,
-  type Step,
-  type StepPolicy,
-} from "#core/config/model.ts";
+import { expandSteps, scopeSteps } from "#core/config/jobs.ts";
+import { DEFAULT_INTERVAL_SECONDS, isScopeStep, type Job, type Step } from "#core/config/model.ts";
 import { type Scope, scopeFor, userScopeDir } from "#core/store/paths.ts";
 import type { SyncPolicy } from "#core/sync/policy.ts";
 import { policyOf } from "#core/sync/policy.ts";
@@ -36,7 +31,8 @@ export interface ScopeWork {
 
 /** The scope one job reconciles, derived from the steps that name a root. */
 export function workOf(job: { id: string; account: string; steps: readonly Step[] }): ScopeWork {
-  const scoped = job.steps.filter(isScopeStep);
+  // A composite step settles nothing until expanded.
+  const scoped = expandSteps(job.steps).filter(isScopeStep);
   const root = scoped.find((step) => step.root !== undefined)?.root ?? userScopeDir();
   return {
     id: job.id,
@@ -50,30 +46,10 @@ export function workOf(job: { id: string; account: string; steps: readonly Step[
 
 /** The runner executes a graph, so a foreground run takes the steps a configured job would have. */
 export function jobOfWork(work: ScopeWork): Job {
-  const leaf = (name: string, kind: string, needs: string[], policy: StepPolicy): Step => ({
-    name,
-    kind,
-    needs,
-    root: work.root,
-    select: [],
-    policy,
-    extra: {},
-  });
-  // Adopt and claim only when asked for: an absent axis is what keeps the defaults.
   return {
     id: work.id,
     account: work.account,
     schedule: { every: DEFAULT_INTERVAL_SECONDS, enabled: false },
-    steps: [
-      leaf("pull", "pull", [], work.policy.pull),
-      leaf("publish", "publish", ["pull"], work.policy.publish),
-      leaf("prune", "prune", ["pull"], work.policy.delete),
-      ...(work.policy.adopt === undefined
-        ? []
-        : [leaf("adopt", "adopt", ["pull"], work.policy.adopt)]),
-      ...(work.policy.claim === undefined
-        ? []
-        : [leaf("claim", "claim", ["pull"], work.policy.claim)]),
-    ],
+    steps: scopeSteps(work.root, work.policy),
   };
 }

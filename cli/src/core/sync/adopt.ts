@@ -1,6 +1,7 @@
 import type { Dirent } from "node:fs";
 import { readdir, readlink, stat } from "node:fs/promises";
 import { basename, dirname, join, posix, resolve } from "node:path";
+import { ifReadable } from "#adapter/files.ts";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { inspect } from "#core/fs/link.ts";
@@ -110,7 +111,7 @@ function kindDirs(
   for (const name of targets) {
     const target = targetTable[name];
     if (target === undefined) continue;
-    const root = targetRoot(target, roots.scope, roots.cwd);
+    const root = targetRoot(target, { scope: roots.scope, cwd: roots.cwd, env: process.env });
     // `SCANNED_KINDS`, not every kind: a target may keep plugins and skills in
     // one folder, so walking both would report every skill twice.
     for (const kind of SCANNED_KINDS) {
@@ -136,12 +137,7 @@ async function collectKindCandidates(
 ): Promise<Candidate[]> {
   const dir = join(root, mapping.subdir);
 
-  let listing: string[];
-  try {
-    listing = (await readdir(dir)).sort();
-  } catch {
-    return [];
-  }
+  const listing = (await ifReadable(readdir(dir))) ?? [];
   if (listing.length === 0) return [];
 
   const entries = await entriesIn(
@@ -198,12 +194,7 @@ function entryOf(kind: ArtifactKind): { entry?: string } {
  * projected as a directory of links into this scope's own tree.
  */
 async function holdsStagedLink(roots: Roots, full: string): Promise<boolean> {
-  let names: string[];
-  try {
-    names = await readdir(full);
-  } catch {
-    return false;
-  }
+  const names = (await ifReadable(readdir(full))) ?? [];
   for (const name of names) {
     const { target } = await inspect(join(full, name));
     if (target !== undefined && isWithin(resolve(roots.artifacts), resolve(target))) return true;
@@ -226,18 +217,13 @@ export async function danglingLinks(
     const dir = join(root, mapping.subdir);
     if (seen.has(dir)) continue;
     seen.add(dir);
-    let items: Dirent[];
-    try {
-      items = await readdir(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
+    const items: Dirent[] = (await ifReadable(readdir(dir, { withFileTypes: true }))) ?? [];
     for (const item of items) {
       if (item.name.startsWith(".") || !item.isSymbolicLink()) continue;
       const path = join(dir, item.name);
       // One aireg made is an installed artifact's `missing`, which status already says.
       if (claimed.has(join(canonical(dir), item.name)) || (await reachable(path))) continue;
-      const points = await readlink(path).catch(() => undefined);
+      const points = await ifReadable(readlink(path));
       if (points === undefined || isWithin(store, resolve(canonical(dir), points))) continue;
       found.push({ path, linksTo: points, target });
     }
@@ -257,6 +243,7 @@ async function reachable(path: string): Promise<boolean> {
     await stat(path);
     return true;
   } catch {
+    // Gone, looping or unreadable: the target cannot load it either.
     return false;
   }
 }

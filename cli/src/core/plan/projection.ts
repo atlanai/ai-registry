@@ -4,7 +4,7 @@ import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
-import { namespaceDir, projectionDir, type Scope } from "#core/store/paths.ts";
+import { namespaceDir, projectionDir, type Scope, type Where } from "#core/store/paths.ts";
 import type { Codec, Targets } from "#core/target/contract.ts";
 import { placementFor, readsFor, takesPlugin } from "#core/target/placement.ts";
 import { pluginProjection, projectionPath } from "#core/target/roots.ts";
@@ -17,9 +17,14 @@ export interface ProjectionOptions {
     scope: Scope;
     artifacts: string;
   };
+  /** Read for a target's own folder variables. */
+  env: NodeJS.ProcessEnv;
   targets: readonly string[];
   targetTable: Targets;
 }
+
+/** A scope's projection without a run's choice of targets: enough to say where a link lands. */
+export type ProjectionScope = Pick<ProjectionOptions, "roots" | "env" | "targetTable">;
 
 export interface PlannedLink {
   target: string;
@@ -48,6 +53,10 @@ export interface PlannedLink {
   keys?: Record<string, KeyRule>;
 }
 
+function whereOf({ roots, env }: Pick<ProjectionOptions, "roots" | "env">): Where {
+  return { scope: roots.scope, cwd: roots.cwd, env };
+}
+
 /**
  * A plugin artifact is its own; anything else wrapped joins the plugin its namespace
  * becomes, or the registry's when it publishes no namespaces.
@@ -63,15 +72,14 @@ export function namespaceOf(item: Pick<Selected, "kind" | "name" | "group" | "so
  */
 export function crowdedContainers(
   wants: Iterable<NamespaceWant>,
-  options: Pick<ProjectionOptions, "roots" | "targetTable">,
+  options: ProjectionScope,
 ): Set<string> {
-  const { scope, cwd } = options.roots;
+  const where = whereOf(options);
   const places: { bare: string; qualified: string | undefined; owner: string }[] = [];
   for (const want of wants) {
     const target = options.targetTable[want.target];
-    if (target === undefined || !takesPlugin(target, scope)) continue;
-    const at = (name: string) =>
-      pluginProjection(target, name, scope, cwd, process.env, want.source);
+    if (target === undefined || !takesPlugin(target, where.scope)) continue;
+    const at = (name: string) => pluginProjection(target, name, where, want.source);
     const bare = at(want.namespace);
     if (bare === undefined) continue;
     const qualified = at(qualifiedName(want.source, want.namespace));
@@ -129,7 +137,7 @@ export interface NamespaceWant {
  */
 export function movedPluginLinks(
   lock: Lock,
-  options: Pick<ProjectionOptions, "roots" | "targetTable">,
+  options: ProjectionScope,
   opened?: ReadonlySet<string>,
 ): Set<string> {
   const { base } = options.roots;
@@ -173,22 +181,15 @@ export function pluginLinkAt(
   link: { target: string; path: string },
   namespace: string,
   source: string,
-  options: Pick<ProjectionOptions, "roots" | "targetTable">,
+  options: ProjectionScope,
 ): { bare: string; qualified: string } | undefined {
-  const { scope, cwd, base } = options.roots;
+  const where = whereOf(options);
   const target = options.targetTable[link.target];
-  if (target === undefined || !takesPlugin(target, scope)) return undefined;
-  const bare = pluginProjection(target, namespace, scope, cwd, process.env, source);
-  const qualified = pluginProjection(
-    target,
-    qualifiedName(source, namespace),
-    scope,
-    cwd,
-    process.env,
-    source,
-  );
+  if (target === undefined || !takesPlugin(target, where.scope)) return undefined;
+  const bare = pluginProjection(target, namespace, where, source);
+  const qualified = pluginProjection(target, qualifiedName(source, namespace), where, source);
   if (bare === undefined || qualified === undefined) return undefined;
-  const at = resolve(base, link.path);
+  const at = resolve(options.roots.base, link.path);
   return at === bare || at === qualified ? { bare, qualified } : undefined;
 }
 
@@ -197,7 +198,7 @@ export function rowPlugin(
   name: string,
   entry: LockArtifact,
   link: { target: string; path: string },
-  options: Pick<ProjectionOptions, "roots" | "targetTable">,
+  options: ProjectionScope,
 ): string | undefined {
   const source = entry.registry;
   const namespace = namespaceOf({ kind: entry.kind, name, group: entry.namespace, source });
@@ -222,7 +223,7 @@ export function linksFor(
     return pluginLinks(item, copy, selected, options, crowded, onUnreadable);
   }
 
-  const { scope, cwd } = options.roots;
+  const where = whereOf(options);
   const links: PlannedLink[] = [];
   const rest: string[] = [];
   for (const name of new Set(selected)) {
@@ -231,23 +232,27 @@ export function linksFor(
     // Its plugins carry only kinds it places as they are; the rest are placed flat or not at all.
     const mapping = target.kinds[item.kind];
     const written = mapping?.codec !== undefined || mapping?.entry !== undefined;
-    if (!wrapped || !takesPlugin(target, scope) || mapping === undefined || written) {
+    if (!wrapped || !takesPlugin(target, where.scope) || mapping === undefined || written) {
       rest.push(name);
       continue;
     }
     const link = pluginLink(item, name, target, options, crowded);
     if (link !== undefined) links.push(link);
   }
-  const placed = placementFor(item.kind, rest, options.targetTable, scope, wrapped);
+  const placed = placementFor(item.kind, rest, {
+    targetTable: options.targetTable,
+    where,
+    wrapped,
+  });
   for (const target of placed.unreadable) onUnreadable(target, item.kind);
   for (const name of placed.targets) {
     const target = options.targetTable[name] as Targets[string];
-    const own = projectionPath(target, item.kind, item.name, scope, cwd);
+    const own = projectionPath(target, item.kind, item.name, where);
     if (own === undefined) continue;
     links.push({
       ...plannedLink(name, own, copy, options, item.kind),
-      ...copyAt(name, item.kind, selected, options.targetTable, scope),
-      ...keysAt(name, item.kind, selected, options.targetTable, scope),
+      ...copyAt(name, item.kind, selected, options.targetTable, where),
+      ...keysAt(name, item.kind, selected, options.targetTable, where),
     });
   }
   return links;
@@ -262,13 +267,13 @@ function pluginLinks(
   crowded: ReadonlySet<string>,
   onUnreadable: Unreadable,
 ): PlannedLink[] {
-  const { scope, cwd } = options.roots;
+  const where = whereOf(options);
   const links: PlannedLink[] = [];
   const rest: string[] = [];
   for (const name of selected) {
     const target = options.targetTable[name];
     if (target === undefined) continue;
-    if (!takesPlugin(target, scope)) {
+    if (!takesPlugin(target, where.scope)) {
       rest.push(name);
       continue;
     }
@@ -276,18 +281,22 @@ function pluginLinks(
     if (link !== undefined) links.push(link);
   }
   for (const kind of new Set(item.contents.map((leaf) => leaf.kind))) {
-    const placed = placementFor(kind, rest, options.targetTable, scope, true);
+    const placed = placementFor(kind, rest, {
+      targetTable: options.targetTable,
+      where,
+      wrapped: true,
+    });
     for (const target of placed.unreadable) onUnreadable(target, kind);
     for (const name of placed.targets) {
       const target = options.targetTable[name] as Targets[string];
       for (const leaf of item.contents.filter((each) => each.kind === kind)) {
-        const path = projectionPath(target, leaf.kind, leaf.name, scope, cwd);
+        const path = projectionPath(target, leaf.kind, leaf.name, where);
         if (path === undefined) continue;
         const from = join(copy, ...leaf.within.split(posix.sep));
         const link = {
           ...plannedLink(name, path, from, options, leaf.kind),
-          ...copyAt(name, leaf.kind, selected, options.targetTable, scope),
-          ...keysAt(name, leaf.kind, selected, options.targetTable, scope),
+          ...copyAt(name, leaf.kind, selected, options.targetTable, where),
+          ...keysAt(name, leaf.kind, selected, options.targetTable, where),
           part: leaf.kind,
         };
         // A skill is a folder, so the command is written as one holding its SKILL.md.
@@ -311,17 +320,15 @@ function pluginLink(
   options: ProjectionOptions,
   crowded: ReadonlySet<string>,
 ): PlannedLink | undefined {
-  const { scope, cwd } = options.roots;
+  const where = whereOf(options);
   const namespace = namespaceOf(item);
-  const shared = pluginProjection(target, namespace, scope, cwd, process.env, item.source);
+  const shared = pluginProjection(target, namespace, where, item.source);
   if (shared === undefined) return undefined;
   // Every registry sharing the directory takes its alias as a prefix, so
   // no one of them depends on which the others sync first.
   const plugin = crowded.has(shared) ? qualifiedName(item.source, namespace) : namespace;
   const container =
-    plugin === namespace
-      ? shared
-      : pluginProjection(target, plugin, scope, cwd, process.env, item.source);
+    plugin === namespace ? shared : pluginProjection(target, plugin, where, item.source);
   if (container === undefined) return undefined;
   // Always the assembled projection, never the content: the content tree holds
   // no manifests. Its directory name is the plugin name.
@@ -364,12 +371,12 @@ function copyAt(
   kind: ArtifactKind,
   selected: readonly string[],
   targetTable: Targets,
-  scope: Scope,
+  where: Where,
 ): { copy?: true } {
   const copied = [...new Set(selected)].some(
     (reader) =>
       targetTable[reader]?.kinds[kind]?.place === "copy" &&
-      readsFor(targetTable, reader, kind, scope).includes(folder),
+      readsFor(targetTable, reader, kind, where).includes(folder),
   );
   return copied ? { copy: true } : {};
 }
@@ -380,11 +387,11 @@ function keysAt(
   kind: ArtifactKind,
   selected: readonly string[],
   targetTable: Targets,
-  scope: Scope,
+  where: Where,
 ): { keys?: Record<string, KeyRule> } {
   const keys: Record<string, KeyRule> = {};
   for (const reader of new Set(selected)) {
-    if (!readsFor(targetTable, reader, kind, scope).includes(folder)) continue;
+    if (!readsFor(targetTable, reader, kind, where).includes(folder)) continue;
     const target = targetTable[reader];
     for (const [key, how] of Object.entries(target?.kinds[kind]?.keys ?? {})) {
       const rule = keys[key] ?? { files: [], refusedBy: [] };
@@ -435,7 +442,7 @@ export function loadsFrom(
   target: string,
   chosen: readonly string[],
   items: readonly Selected[],
-  options: Pick<ProjectionOptions, "roots" | "targetTable">,
+  options: ProjectionScope,
   wrapped = false,
 ): string[] {
   const targets = [...new Set([...chosen, target])];
@@ -443,7 +450,7 @@ export function loadsFrom(
     const links = linksFor(item, "", { ...options, targets }, wrapped);
     const own = links.find((link) => link.target === target);
     if (own !== undefined) return [own.shared === true ? own.absolute : dirname(own.absolute)];
-    const read = readsFor(options.targetTable, target, item.kind, options.roots.scope)
+    const read = readsFor(options.targetTable, target, item.kind, whereOf(options))
       .map((folder) => links.find((link) => link.target === folder && link.shared !== true))
       .find((link) => link !== undefined);
     return read === undefined ? [] : [dirname(read.absolute)];

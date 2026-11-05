@@ -1,7 +1,16 @@
 import type { Scope } from "#core/store/paths.ts";
 import { scopeFlag } from "#core/store/paths.ts";
+import { OPTIONAL_AXES, type SyncPolicy } from "#core/sync/policy.ts";
 import { shellWord } from "#core/term/format.ts";
-import { compositeLeaves, isScopeStep, type Job, type RegistryConfig, type Step } from "./model.ts";
+import {
+  type BuiltinStepKind,
+  compositeLeaves,
+  isScopeStep,
+  type Job,
+  type RegistryConfig,
+  type Step,
+  type StepPolicy,
+} from "./model.ts";
 
 /** A job by id, or by the name a person typed. */
 export function findJob(config: RegistryConfig, wanted: string): Job | undefined {
@@ -17,12 +26,42 @@ export function watchedFolders(job: Pick<Job, "steps">): string[] {
 
 /** The folder a job keeps in sync, as the runner reads it: its first scope step that names one. */
 export function jobRoot(job: Pick<Job, "steps">): string | undefined {
-  return job.steps.find((step) => isScopeStep(step) && step.root !== undefined)?.root;
+  // A composite such as `artifacts` names its root too; its leaves carry it once expanded.
+  return expandSteps(job.steps).find((step) => isScopeStep(step) && step.root !== undefined)?.root;
 }
 
 /** What stops publishing these folders, written so a shell runs it as printed. */
 export function unwatchCommand(folders: readonly string[], scope: Scope): string {
   return `aireg watch remove ${folders.map(shellWord).join(" ")}${scopeFlag(scope)}`;
+}
+
+/**
+ * The leaf steps that sync one scope under `policy`, each after the pull, which waits on `needs`.
+ * Adopt and claim only when the policy names them: an absent axis is what keeps the defaults.
+ */
+export function scopeSteps(
+  root: string,
+  policy: SyncPolicy,
+  needs: readonly string[] = [],
+): Step[] {
+  const leaf = (kind: BuiltinStepKind, level: StepPolicy, after: readonly string[]): Step => ({
+    name: kind,
+    kind,
+    needs: after,
+    root,
+    select: [],
+    policy: level,
+    extra: {},
+  });
+  return [
+    leaf("pull", policy.pull, needs),
+    leaf("publish", policy.publish, ["pull"]),
+    leaf("prune", policy.delete, ["pull"]),
+    ...OPTIONAL_AXES.flatMap((axis) => {
+      const level = policy[axis];
+      return level === undefined ? [] : [leaf(axis, level, ["pull"])];
+    }),
+  ];
 }
 
 /**

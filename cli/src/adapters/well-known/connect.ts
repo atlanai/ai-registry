@@ -98,7 +98,7 @@ async function readIndex(
   site: URL,
 ): Promise<{ url: URL; document: unknown }> {
   for (const url of indexUrls(location)) {
-    const { status, bytes } = await get(context, url, MAX_INDEX);
+    const { status, bytes } = await fetchBytes(context, url, MAX_INDEX);
     if (status === 404) continue;
     if (status !== 200) throw fail("unavailable", `${url.href} answered ${status}.`);
     try {
@@ -108,7 +108,7 @@ async function readIndex(
     }
   }
   // An index without digests cannot be checked, so it is named rather than read.
-  if ((await get(context, new URL(`/${LEGACY}`, site), MAX_INDEX)).status === 200) {
+  if ((await fetchBytes(context, new URL(`/${LEGACY}`, site), MAX_INDEX)).status === 200) {
     throw fail(
       "invalid",
       `${site.origin} has only a /${LEGACY} index, which gives no digests, so aireg does not read it.`,
@@ -143,7 +143,7 @@ function indexUrls(location: string): URL[] {
 type Files = Map<string, { bytes: Uint8Array; executable: boolean }>;
 
 // No credentials and no cookies: a site's index is public, whatever host an entry names.
-async function get(
+async function fetchBytes(
   context: SourceContext,
   url: URL,
   limit: number,
@@ -234,7 +234,7 @@ function entryOf(url: URL, item: Record<string, unknown>, warnings: string[]): E
 // Bytes that do not hash to the digest the index gives never land; the whole read fails.
 async function filesOf(context: SourceContext, entry: Entry): Promise<Files> {
   const limit = entry.type === "archive" ? MAX_ARCHIVE : MAX_SKILL;
-  const { status, bytes } = await get(context, entry.url, limit);
+  const { status, bytes } = await fetchBytes(context, entry.url, limit);
   if (status !== 200) throw fail("unavailable", `${entry.url.href} answered ${status}.`);
   const digest = sha256(bytes);
   if (digest !== entry.digest) {

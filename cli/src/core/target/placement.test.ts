@@ -3,12 +3,13 @@ import { placementFor, readsFor } from "./placement.ts";
 import { resolveTargets } from "./table.ts";
 
 describe("placementFor", () => {
-  const targetTable = resolveTargets({ HOME: "/tmp/home" });
+  const env = { HOME: "/tmp/home" };
+  const targetTable = resolveTargets(env);
   const place = (
     kind: "skill" | "agent",
     selected: string[],
     scope: "project" | "user" = "project",
-  ) => placementFor(kind, selected, targetTable, scope);
+  ) => placementFor(kind, selected, { targetTable, where: { scope, env } });
 
   test.each([
     [["claude-code"], ["claude-code"]],
@@ -54,19 +55,19 @@ describe("placementFor", () => {
 
 describe("built-in reads", () => {
   test("marks the shared folder as not a tool", () => {
-    const table = resolveTargets();
+    const table = resolveTargets(process.env);
     expect(table.universal?.shared).toBe(true);
     expect(table.universal?.detect).toBe("never");
   });
 
   test("defaults a tool with no reads to its own folder", () => {
-    const table = resolveTargets();
+    const table = resolveTargets(process.env);
     expect(readsFor(table, "claude-code", "skill")).toEqual(["claude-code"]);
     expect(readsFor(table, "codex", "agent")).toEqual(["codex"]);
   });
 
   test("reads Cursor's skills from the Codex folder too", () => {
-    const table = resolveTargets();
+    const table = resolveTargets(process.env);
     expect(readsFor(table, "cursor", "skill")).toEqual([
       "universal",
       "cursor",

@@ -23,7 +23,7 @@ function unlink(
   to: string,
   how: { edited?: boolean; link?: LockArtifact["links"][number] } = {},
 ): boolean {
-  const verdict = removal(to, build.options.roots);
+  const verdict = removal(to, build.options.roots, build.options.env);
   if (verdict.how === "refuse") {
     build.warnings.push({
       name,

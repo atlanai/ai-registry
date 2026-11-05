@@ -35,7 +35,7 @@ export function parseConfig(contents: string, filename = "config.yml"): Registry
   } catch (error) {
     // Each check names a field; only here is the file it came from known.
     if (!(error instanceof ConfigError) || error instanceof ConfigConflictError) throw error;
-    throw new ConfigError(`${filename}: ${error.message}`, error.code);
+    throw new ConfigError(`${filename}: ${error.message}`, { code: error.code });
   }
 }
 
@@ -157,7 +157,7 @@ function adapterPins(value: unknown): Readonly<Record<string, string>> {
 }
 
 export function formatConfig(config: RegistryConfig): string {
-  const targetTable = resolveTargets();
+  const targetTable = resolveTargets(process.env);
   const document = {
     ...config,
     accounts: config.accounts.map(({ id, registry, ...rest }) => ({

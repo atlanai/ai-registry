@@ -22,9 +22,24 @@ describe("sameLocation", () => {
   });
 });
 
-test("asAddress reuses the name a repository is already declared under", () => {
-  const known = {
-    tools: { location: "https://github.com/acme/kit.git", adapter: undefined, config: {} },
-  } satisfies Record<string, RegistrySource>;
-  expect(asAddress("https://github.com/acme/kit/team/lint", known)).toBe("tools/team/lint");
+describe("asAddress", () => {
+  test("reuses the name a repository is already declared under", () => {
+    const known = {
+      tools: { location: "https://github.com/acme/kit.git", adapter: undefined, config: {} },
+    } satisfies Record<string, RegistrySource>;
+    expect(asAddress("https://github.com/acme/kit/team/lint", known)).toEqual({
+      address: "tools/team/lint",
+      known,
+    });
+  });
+
+  test("declares a new repository in what it returns, leaving the registries passed in", () => {
+    const known: Record<string, RegistrySource> = {};
+    const { address, known: reached } = asAddress("https://github.com/acme/kit/team/lint", known);
+    expect(address).toBe("kit/team/lint");
+    expect(reached).toEqual({
+      kit: { location: "github.com/acme/kit", adapter: undefined, config: {} },
+    });
+    expect(known).toEqual({});
+  });
 });

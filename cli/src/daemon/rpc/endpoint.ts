@@ -113,6 +113,7 @@ function privateAlready(dir: string): boolean {
   try {
     return isPrivate(lstatSync(dir));
   } catch {
+    // A base that cannot be checked gets a folder of aireg's own inside it, which `usable` checks.
     return false;
   }
 }

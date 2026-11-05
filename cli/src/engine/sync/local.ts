@@ -25,17 +25,26 @@ import { narrowToRelinks, relinksIn } from "./relink.ts";
 import type { Scan } from "./scan.ts";
 import { moved, pinnedNote, unservedNote } from "./served.ts";
 
-export async function applyLocal(
-  loaded: Loaded,
-  common: CommonOptions,
-  scan: Scan,
-  names: ReadonlySet<string>,
-  /** What this run published, and the version each went out as. */
-  published: ReadonlyMap<string, string | undefined>,
+export interface ApplyLocalOptions {
+  loaded: Loaded;
+  common: CommonOptions;
+  scan: Scan;
+  names: ReadonlySet<string>;
+  published: ReadonlyMap<string, string | undefined>;
   /** Restages a locally edited artifact, which otherwise only warns. */
-  force: boolean,
-  onStep: (action: Action) => void,
-): Promise<{ changed: number; notices: ApplyNotice[] }> {
+  force: boolean;
+  onStep: (action: Action) => void;
+}
+
+export async function applyLocal({
+  loaded,
+  common,
+  scan,
+  names,
+  published,
+  force,
+  onStep,
+}: ApplyLocalOptions): Promise<{ changed: number; notices: ApplyNotice[] }> {
   // A run that only published still has something to record, or the lock never
   // learns what this project sent and every later comparison has no base.
   const recording = new Set([...names, ...published.keys()]);
@@ -55,6 +64,7 @@ export async function applyLocal(
     await survey(scan.pinned, loaded.roots),
     {
       roots: loaded.roots,
+      env: loaded.env,
       targets,
       targetTable: loaded.targetTable,
       force,
@@ -77,7 +87,7 @@ export async function applyLocal(
     relinks,
   );
   await refuseBlocked(narrowed);
-  const result = await commit(loaded, narrowed, scan.acquired, targets, onStep);
+  const result = await commit({ loaded, plan: narrowed, acquired: scan.acquired, targets, onStep });
   // What the plan said about a row this run wrote, such as a deprecated version it pulled.
   for (const { name, message, hint } of plan.warnings) {
     // A published row's own note says why its copy stayed; the plan only saw an edit.

@@ -18,17 +18,22 @@ type EdgesFor = (
   planned: (path: string) => Promise<Planned | undefined>,
 ) => Promise<PublishRelationship[] | undefined>;
 
-/** Planned at a patch first; asked how big only when something already published moved. */
+interface PlanAllOptions {
+  where: Map<Work, { registry: string; namespace: string }>;
+  open: (alias: string) => Promise<Published>;
+  bump: Bump | undefined;
+  /** The version `--to` named, which no bump moves. */
+  exact: string | undefined;
+  force: boolean;
+  edgesFor: EdgesFor | undefined;
+}
+
 export async function planAll(
   step: Interaction,
   works: readonly Work[],
-  where: Map<Work, { registry: string; namespace: string }>,
-  open: (alias: string) => Promise<Published>,
-  bump: Bump | undefined,
-  exact: string | undefined,
-  force: boolean,
-  edgesFor: EdgesFor | undefined,
+  options: PlanAllOptions,
 ): Promise<Sending | undefined> {
+  const { where, open, bump, exact, force, edgesFor } = options;
   const at = (how: Bump) => {
     const pending = new Map<Work, Promise<Sending[number]>>();
     for (const work of works) {
@@ -47,7 +52,15 @@ export async function planAll(
         const edges = await edgesFor?.(work, target, published, planned);
         return {
           alias: target.registry,
-          item: await plan(work, published, target.namespace, how, exact, force, edges),
+          item: await plan({
+            work,
+            published,
+            namespace: target.namespace,
+            bump: how,
+            exact,
+            force,
+            relationships: edges,
+          }),
         };
       };
       pending.set(work, next());
@@ -108,14 +121,14 @@ export function opener(
     const cached = opened.get(alias);
     if (cached !== undefined) return cached;
     const declared = known[alias] as RegistrySource;
-    const read = await readPublished(
+    const read = await readPublished({
       alias,
       declared,
-      Object.keys(known),
+      aliases: Object.keys(known),
       cwd,
-      wants.get(alias) ?? [],
-      cloneCommand(alias),
-    );
+      want: wants.get(alias) ?? [],
+      how: cloneCommand(alias),
+    });
     opened.set(alias, read);
     return read;
   };

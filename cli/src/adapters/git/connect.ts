@@ -78,8 +78,7 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
         throw new GitError(
           "invalid",
           `${list(named)} are at different commits of ${spec.location}, which aireg reads at one commit.`,
-          "",
-          "Pin them all to one version, or leave the versions off to take the newest.",
+          { hint: "Pin them all to one version, or leave the versions off to take the newest." },
         );
       }
       return distinct[0] as string;

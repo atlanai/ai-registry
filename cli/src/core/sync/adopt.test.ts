@@ -10,7 +10,7 @@ import { candidates, danglingLinks, registryPath } from "./adopt.ts";
 let root: string;
 let roots: Roots;
 
-const targetTable = resolveTargets();
+const targetTable = resolveTargets(process.env);
 
 const skill = (name: string) => `---\nname: ${name}\ndescription: written here\n---\nbody\n`;
 
