@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/self.json",
+  "title": "aireg self --json",
+  "description": "The `data` each `aireg self` action prints under --json, by action.",
+  "$defs": {
+    "update": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "current",
+        "latest",
+        "action",
+        "dryRun"
+      ],
+      "properties": {
+        "current": {
+          "description": "After an update, the version now installed.",
+          "type": "string"
+        },
+        "latest": {
+          "type": "string"
+        },
+        "action": {
+          "anyOf": [
+            {
+              "const": "already-latest",
+              "type": "string"
+            },
+            {
+              "const": "update-available",
+              "type": "string"
+            },
+            {
+              "const": "would-update",
+              "type": "string"
+            },
+            {
+              "const": "updated",
+              "type": "string"
+            },
+            {
+              "const": "would-rollback",
+              "type": "string"
+            },
+            {
+              "const": "rolled-back",
+              "type": "string"
+            }
+          ]
+        },
+        "bin": {
+          "description": "Only after an update: the executable PATH finds.",
+          "type": "string"
+        },
+        "dryRun": {
+          "type": "boolean"
+        }
+      }
+    },
+    "uninstall": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "action",
+        "dryRun",
+        "daemon",
+        "autostart",
+        "links",
+        "startupFiles",
+        "folders",
+        "kept"
+      ],
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "const": "would-uninstall",
+              "type": "string"
+            },
+            {
+              "const": "uninstalled",
+              "type": "string"
+            }
+          ]
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "daemon": {
+          "type": "boolean"
+        },
+        "autostart": {
+          "type": "boolean"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startupFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kept": {
+          "description": "Left in place: a CLI aireg did not install, or a folder that holds your home.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

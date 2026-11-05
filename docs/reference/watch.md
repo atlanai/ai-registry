@@ -50,7 +50,7 @@ Lists every watched folder on this machine: the folder, where it publishes, the 
 | Action | `data` |
 |---|---|
 | `add` | `{"job": {...}, "revision": 4}`, as for `job add` |
-| `remove` | `{"jobId": "job_skills_acme", "watching": []}`, the folders the job still watches |
+| `remove` | `{"jobId": "job_skills_acme", "watching": []}`, the folders the job still watches; when the folders belonged to several jobs, `{"jobs": [...]}` with one such object for each |
 | `list` | `{"watches": [{"folder": "/home/me/.claude/skills", "to": "acme/engineering", "jobId": "job_skills_acme", "scope": "user", "root": "/home/me/.registry"}]}`: `scope` is `user` or `project`, and `root` is that scope's folder |
 
 ## Exit status

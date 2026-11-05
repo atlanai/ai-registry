@@ -1,3 +1,4 @@
+import { BUMPS } from "#adapter/semver.ts";
 import type { CommandSpec } from "#cli/commands/command.ts";
 import { DRY_RUN, FORCE, USER } from "#cli/options/flags.ts";
 
@@ -26,6 +27,7 @@ export const PUBLISH_COMMAND: CommandSpec = {
     {
       flag: "--bump",
       value: "<level>",
+      choices: BUMPS,
       describe: "How far to move the version: patch, minor or major",
     },
     {

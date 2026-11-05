@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { advertisedCapabilities } from "#adapter/contract.ts";
 import { gte } from "#adapter/semver.ts";
 import { plural, sanitizeText } from "#adapter/text.ts";
+import type { Check, DoctorResult } from "#cli/commands/doctor/result.ts";
 import { DOCTOR_COMMAND } from "#cli/commands/doctor/spec.ts";
 import {
   ownSkillsCommand,
@@ -22,48 +23,46 @@ import { NAME } from "#core/product.ts";
 import { type ReleaseStamp, releaseStamp } from "#core/release/stamp.ts";
 import { cacheDir, credentialsPath, toolHome, userScopeDir } from "#core/store/paths.ts";
 import { displayWidth, pad } from "#core/term/format.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { GLYPH } from "#core/term/theme.ts";
 import { nodeTooOld, VERSION } from "#core/version.ts";
 import { autostartState } from "#daemon/autostart/index.ts";
 import { readUpdateCache, type UpdateCache } from "#self/update-cache.ts";
-import type { CommandContext } from "./command.ts";
+import { defineCommand } from "./define.ts";
 
-interface Check {
-  name: string;
-  ok: boolean;
-  detail: string;
-  /** What fixes or improves it; commands joined with ` && ` print one per line. */
-  fix?: string;
-  /** Worth knowing, with nothing to do. */
-  info?: boolean;
-}
+type Found = Omit<DoctorResult, "problems">;
 
-export async function run(context: CommandContext): Promise<void> {
-  const { positionals } = parse(context.argv, DOCTOR_COMMAND);
-  noArguments(
-    positionals,
-    "doctor",
-    "It only reads. To clear a stuck write lock, run `aireg unlock`.",
-  );
-
-  const found = await loadAdapters();
-  const checks = await checksFor(context.cwd, found);
-  const adapters = found.loaded.map((adapter) => ({
-    id: adapter.id,
-    displayName: adapter.displayName,
-    capabilities: advertisedCapabilities(adapter.capabilities),
-  }));
-  const fatal = checks.some(
-    (check) => (check.name === "git" || check.name === "node") && !check.ok,
-  );
-  if (fatal) context.exit = ExitCode.Error;
-  if (context.printer.format === "json") {
-    const problems = checks.filter((check) => !check.ok).length;
-    context.printer.json({ ok: !fatal, data: { problems, checks, adapters } });
-    return;
-  }
-  render(context, checks);
-}
+export const { run } = defineCommand({
+  spec: DOCTOR_COMMAND,
+  parse(argv): Record<string, never> {
+    const { positionals } = parse(argv, DOCTOR_COMMAND);
+    noArguments(
+      positionals,
+      "doctor",
+      "It only reads. To clear a stuck write lock, run `aireg unlock`.",
+    );
+    return {};
+  },
+  async run(_options, context): Promise<Found> {
+    const found = await loadAdapters();
+    const checks = await checksFor(context.cwd, found);
+    const adapters = found.loaded.map((adapter) => ({
+      id: adapter.id,
+      displayName: adapter.displayName,
+      capabilities: advertisedCapabilities(adapter.capabilities),
+    }));
+    if (fatal(checks)) context.exit = ExitCode.Error;
+    return { checks, adapters };
+  },
+  data: ({ checks, adapters }): DoctorResult => ({
+    problems: checks.filter((check) => !check.ok).length,
+    checks,
+    adapters,
+  }),
+  // Only what stops aireg running fails the envelope; `problems` counts every failed check.
+  ok: ({ checks }) => !fatal(checks),
+  text: ({ checks }, printer) => render(printer, checks),
+});
 
 async function checksFor(
   cwd: string,
@@ -268,8 +267,13 @@ function updates(stamp: ReleaseStamp | undefined, cached: UpdateCache | undefine
       };
 }
 
-function render(context: CommandContext, checks: readonly Check[]): void {
-  const { style } = context.printer;
+/** aireg cannot run here without git or a supported Node.js. */
+function fatal(checks: readonly Check[]): boolean {
+  return checks.some((check) => (check.name === "git" || check.name === "node") && !check.ok);
+}
+
+function render(printer: Printer, checks: readonly Check[]): void {
+  const { style } = printer;
   const version = (name: string) => checks.find((check) => check.name === name);
   const git = version("git");
   const node = version("node");
@@ -278,8 +282,8 @@ function render(context: CommandContext, checks: readonly Check[]): void {
     node?.ok === true ? `Node.js ${node.detail}` : undefined,
     git?.ok === true ? `git ${/\d+(\.\d+)+/.exec(git.detail)?.[0] ?? git.detail}` : undefined,
   ];
-  context.printer.info(style.bold(versions.filter(Boolean).join(" · ")));
-  context.printer.info();
+  printer.info(style.bold(versions.filter(Boolean).join(" · ")));
+  printer.info();
   const rows = checks.filter(
     (check) =>
       check.name !== "cli" && !((check.name === "git" || check.name === "node") && check.ok),
@@ -294,19 +298,16 @@ function render(context: CommandContext, checks: readonly Check[]): void {
           ? style.dim("i")
           : style.green(GLYPH.ok);
     const label = pad(check.name, width);
-    context.printer.info(
-      `  ${mark}  ${label}  ${check.ok ? style.dim(check.detail) : check.detail}`,
-    );
+    printer.info(`  ${mark}  ${label}  ${check.ok ? style.dim(check.detail) : check.detail}`);
     // One copyable command per line, never joined with `&&`.
     for (const command of check.fix?.split(" && ") ?? []) {
-      context.printer.info(`     ${pad("", width)}  ${command}`);
+      printer.info(`     ${pad("", width)}  ${command}`);
     }
   }
-  context.printer.info();
+  printer.info();
   const failed = rows.filter((check) => !check.ok).length;
   const suggested = rows.filter((check) => check.ok && check.fix !== undefined).length;
   const more = suggested === 0 ? "" : ` ${plural(suggested, "suggestion")} above.`;
-  if (failed === 0) context.printer.success(`This machine is ready.${more}`);
-  else
-    context.printer.info(`${style.red(GLYPH.failed)} ${plural(failed, "problem")} to fix.${more}`);
+  if (failed === 0) printer.success(`This machine is ready.${more}`);
+  else printer.info(`${style.red(GLYPH.failed)} ${plural(failed, "problem")} to fix.${more}`);
 }

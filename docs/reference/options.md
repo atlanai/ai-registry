@@ -12,12 +12,14 @@ These options work with every command. `aireg --help` lists them.
 | `--color <when>` | Color the output: `auto` (the default), `always` or `never`. See [Color](output.md#color). |
 | `--no-color` | The same as `--color never`. Can't be combined with `--color`. |
 | `--log-level <level>` | Write diagnostic logs to stderr and to the log file, at `trace`, `debug`, `info`, `warn`, `error` or `fatal`, or `off` for none. Read them with [`aireg logs`](logs.md). |
-| `--map [tree|compact|json]` | Print the whole command tree and exit. `tree` is the default. `json` also lists each command's usage and options. |
+| `--map [tree|compact|json]` | Print the whole command tree and exit. `tree` is the default. `json` also lists each command's usage and options, with the `choices` an option takes or the `integer` range it takes them in. |
 | `-y`, `--yes` | Take the defaults and ask nothing. A command that asks nothing accepts it too. |
 | `-h`, `--help` | Print the help and exit. After a command, print that command's help; `aireg help <command>` does the same. |
 | `-v`, `--version` | Print aireg's version and exit. |
 
 `--json`, `--verbose`, `-q`/`--quiet`, `--color`, `--no-color`, `--log-level`, `--map` and `--help` can go anywhere on the line; `--version` goes before the command name. `-y` and the command options go after the command name; aireg refuses one placed before it, with exit status 2.
+
+An option that takes one of a few values, such as `--kind` or `--level`, takes it in any case, and one that takes a number, such as `--tail` or `--limit`, takes a whole number written in digits. Any other value is refused before the command does anything, with exit status 2.
 
 ## Command options
 

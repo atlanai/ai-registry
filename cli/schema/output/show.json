@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/show.json",
+  "title": "aireg show --json",
+  "description": "The `data` each `aireg show` action prints under --json, by action.",
+  "$defs": {
+    "show": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "description": "An artifact a registry serves.",
+          "type": "object",
+          "required": [
+            "name",
+            "kind",
+            "body",
+            "carries"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "kind": {
+              "anyOf": [
+                {
+                  "const": "plugin",
+                  "type": "string"
+                },
+                {
+                  "const": "skill",
+                  "type": "string"
+                },
+                {
+                  "const": "agent",
+                  "type": "string"
+                }
+              ]
+            },
+            "version": {
+              "description": "The version the registry serves.",
+              "type": "string"
+            },
+            "body": {
+              "description": "The Markdown file as written.",
+              "type": "string"
+            },
+            "carries": {
+              "description": "What a target that loads it starts on its own, by plugin manifest key.",
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "const": "hooks",
+                    "type": "string"
+                  },
+                  {
+                    "const": "mcpServers",
+                    "type": "string"
+                  },
+                  {
+                    "const": "lspServers",
+                    "type": "string"
+                  },
+                  {
+                    "const": "monitors",
+                    "type": "string"
+                  },
+                  {
+                    "const": "bin",
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "A file or folder named by its path.",
+          "type": "object",
+          "required": [
+            "path",
+            "body",
+            "carries"
+          ],
+          "properties": {
+            "path": {
+              "description": "The Markdown file read.",
+              "type": "string"
+            },
+            "body": {
+              "description": "The file as written.",
+              "type": "string"
+            },
+            "carries": {
+              "description": "What a target that loads it starts on its own, by plugin manifest key.",
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "const": "hooks",
+                    "type": "string"
+                  },
+                  {
+                    "const": "mcpServers",
+                    "type": "string"
+                  },
+                  {
+                    "const": "lspServers",
+                    "type": "string"
+                  },
+                  {
+                    "const": "monitors",
+                    "type": "string"
+                  },
+                  {
+                    "const": "bin",
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

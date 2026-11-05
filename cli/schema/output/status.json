@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/status.json",
+  "title": "aireg status --json",
+  "description": "The `data` each `aireg status` action prints under --json, by action.",
+  "$defs": {
+    "status": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "scope",
+        "artifacts",
+        "shadowed",
+        "unmanaged",
+        "dangling"
+      ],
+      "properties": {
+        "scope": {
+          "anyOf": [
+            {
+              "const": "user",
+              "type": "string"
+            },
+            {
+              "const": "project",
+              "type": "string"
+            }
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "state",
+              "targets",
+              "harnesses"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "state": {
+                "description": "`dangling` is what the table calls `replaced`.",
+                "anyOf": [
+                  {
+                    "const": "ok",
+                    "type": "string"
+                  },
+                  {
+                    "const": "missing",
+                    "type": "string"
+                  },
+                  {
+                    "const": "dangling",
+                    "type": "string"
+                  },
+                  {
+                    "const": "edited",
+                    "type": "string"
+                  }
+                ]
+              },
+              "detail": {
+                "description": "Why it is not `ok`, starting with the folder.",
+                "type": "string"
+              },
+              "targets": {
+                "description": "By target id.",
+                "type": "object",
+                "patternProperties": {
+                  "^(.*)$": {
+                    "description": "How one target sees the artifact.",
+                    "anyOf": [
+                      {
+                        "const": "linked",
+                        "type": "string"
+                      },
+                      {
+                        "const": "missing",
+                        "type": "string"
+                      },
+                      {
+                        "const": "replaced",
+                        "type": "string"
+                      },
+                      {
+                        "const": "foreign",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                }
+              },
+              "blocked": {
+                "const": true,
+                "type": "boolean"
+              },
+              "taken": {
+                "const": true,
+                "type": "boolean"
+              },
+              "harnesses": {
+                "description": "`targets` by the ids aireg 0.1 used.",
+                "type": "object",
+                "patternProperties": {
+                  "^(.*)$": {
+                    "description": "How one target sees the artifact.",
+                    "anyOf": [
+                      {
+                        "const": "linked",
+                        "type": "string"
+                      },
+                      {
+                        "const": "missing",
+                        "type": "string"
+                      },
+                      {
+                        "const": "replaced",
+                        "type": "string"
+                      },
+                      {
+                        "const": "foreign",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                }
+              },
+              "neededBy": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "needsApproval": {
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs before the target loads it; never run.",
+                  "type": "object",
+                  "required": [
+                    "target",
+                    "harness",
+                    "run"
+                  ],
+                  "properties": {
+                    "target": {
+                      "type": "string"
+                    },
+                    "harness": {
+                      "type": "string"
+                    },
+                    "run": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "shadowed": {
+          "description": "Installed both here and in the user scope; always empty for -g.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unmanaged": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "kind",
+              "targets",
+              "path",
+              "harnesses"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "plugin",
+                    "type": "string"
+                  },
+                  {
+                    "const": "skill",
+                    "type": "string"
+                  },
+                  {
+                    "const": "agent",
+                    "type": "string"
+                  }
+                ]
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "path": {
+                "type": "string"
+              },
+              "harnesses": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "dangling": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "description": "As aireg 0.1 printed it: `target` is what the link names, `harness` its folder.",
+            "type": "object",
+            "required": [
+              "path",
+              "target",
+              "harness"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "target": {
+                "type": "string"
+              },
+              "harness": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

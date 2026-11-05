@@ -18,9 +18,9 @@ export interface Installed {
   ref: string;
   pinned: boolean;
   targets: string[];
-  watched?: Watched | undefined;
+  watched?: Watched;
   /** What it is installed for, when the manifest does not ask for it itself. */
-  neededBy?: string[] | undefined;
+  neededBy?: string[];
 }
 
 /** The folder a watched row is published from, where its target reads it; nothing is linked. */
@@ -47,6 +47,11 @@ export function installed(lock: Lock, manifest: Manifest, targetTable: Targets):
     .map((name) => {
       const entry = lock.artifacts[name];
       const source = entry === undefined ? undefined : lock.registries[entry.registry];
+      const watched = watchedFrom(entry, targetTable);
+      const neededBy =
+        entry === undefined || asksFor(manifest, entry)
+          ? undefined
+          : entry.neededBy?.map((by) => shown.get(by) ?? by);
       // A row of yours has a ref only once a publish is recorded; a commit sha names the registry.
       // A plugin-loading target is named once, though it also gets a link inside the projection.
       return {
@@ -62,11 +67,8 @@ export function installed(lock: Lock, manifest: Manifest, targetTable: Targets):
             : abbreviate(source.revision)),
         pinned: entry !== undefined && pinOf(manifest, entry) !== undefined,
         targets: [...new Set((entry?.links ?? []).map((link) => link.target))].sort(),
-        watched: watchedFrom(entry, targetTable),
-        neededBy:
-          entry === undefined || asksFor(manifest, entry)
-            ? undefined
-            : entry.neededBy?.map((by) => shown.get(by) ?? by),
+        ...(watched === undefined ? {} : { watched }),
+        ...(neededBy === undefined ? {} : { neededBy }),
       };
     });
 }

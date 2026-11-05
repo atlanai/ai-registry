@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/publish.json",
+  "title": "aireg publish --json",
+  "description": "The `data` each `aireg publish` action prints under --json, by action.",
+  "$defs": {
+    "publish": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dryRun",
+        "target",
+        "artifacts",
+        "skipped"
+      ],
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
+        },
+        "target": {
+          "description": "Where exports went; `null` when each went where it came from.",
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "registry",
+                "namespace"
+              ],
+              "properties": {
+                "registry": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "kind",
+              "registry",
+              "namespace",
+              "from",
+              "version",
+              "digest",
+              "belowLatest",
+              "published",
+              "dependsOn"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "plugin",
+                    "type": "string"
+                  },
+                  {
+                    "const": "skill",
+                    "type": "string"
+                  },
+                  {
+                    "const": "agent",
+                    "type": "string"
+                  }
+                ]
+              },
+              "registry": {
+                "description": "The registry's name, or for `--to <folder>`, the folder as `--to` gave it.",
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "from": {
+                "description": "The version published before, or `null` for a new artifact.",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "version": {
+                "type": "string"
+              },
+              "digest": {
+                "description": "The content's identity: its files and dependencies, not its version.",
+                "type": "string"
+              },
+              "belowLatest": {
+                "type": "boolean"
+              },
+              "published": {
+                "description": "`false` for one already published, or under `--dry-run`.",
+                "type": "boolean"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "to"
+                  ],
+                  "properties": {
+                    "to": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "filesChanged": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "added",
+                  "changed",
+                  "removed"
+                ],
+                "properties": {
+                  "added": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "changed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "removed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "dependsOnChanged": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "added",
+                  "removed"
+                ],
+                "properties": {
+                  "added": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "removed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "kind",
+              "path",
+              "reason"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "plugin",
+                    "type": "string"
+                  },
+                  {
+                    "const": "skill",
+                    "type": "string"
+                  },
+                  {
+                    "const": "agent",
+                    "type": "string"
+                  }
+                ]
+              },
+              "path": {
+                "description": "Where it is, relative to the project.",
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

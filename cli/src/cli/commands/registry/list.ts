@@ -1,60 +1,78 @@
-import { plural, withoutCredentials } from "#adapter/text.ts";
-import type { CommandContext } from "#cli/commands/command.ts";
+import { plural } from "#adapter/text.ts";
+import { action } from "#cli/commands/define.ts";
+import type { DeclaredRegistry, RegistryList } from "#cli/commands/registry/result.ts";
 import { formatRef } from "#core/ref.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { table } from "#core/term/table.ts";
-import type { CommonOptions } from "#engine/options.ts";
 import { load } from "#engine/scope/load.ts";
+import type { Options } from "./options.ts";
 import { described } from "./shared.ts";
 
-export async function list(context: CommandContext, common: CommonOptions): Promise<void> {
-  const loaded = await load(common, context.cwd, "user");
-  const entries = Object.entries(loaded.manifest.registries);
+interface Listed {
+  data: RegistryList;
+  installs: ReadonlyMap<string, string[]>;
+}
 
-  if (context.printer.format === "json") {
-    context.printer.json({
-      ok: true,
+export const list = action({
+  async run({ common }: Options, context): Promise<Listed> {
+    const loaded = await load(common, context.cwd, "user");
+    const installs = new Map<string, string[]>();
+    for (const ref of loaded.manifest.artifacts) {
+      installs.set(ref.registry, [...(installs.get(ref.registry) ?? []), formatRef(ref)]);
+    }
+    return {
       data: {
         scope: loaded.roots.scope,
-        registries: entries.map(([alias, source]) => described(alias, source)),
+        registries: Object.entries(loaded.manifest.registries).map(([alias, source]) =>
+          described(alias, source),
+        ),
       },
-    });
-    return;
-  }
-  if (entries.length === 0) {
-    context.printer.info(`No registries declared in ${scopeName(loaded.roots.scope)}.`);
-    context.printer.hint("Run `aireg registry add <address>` to add one.");
-    return;
-  }
-
-  // What each alias installs, so the list answers "why is this here" too.
-  const used = new Map<string, string[]>();
-  for (const ref of loaded.manifest.artifacts) {
-    used.set(ref.registry, [...(used.get(ref.registry) ?? []), formatRef(ref)]);
-  }
-
-  const style = context.printer.style;
-  context.printer.info(
-    style.bold(
-      `${plural(entries.length, "registry", "registries")} in ${scopeName(loaded.roots.scope)}`,
-    ),
-  );
-  table(
-    context.printer,
-    [
-      { header: "name", value: ([alias]) => alias },
-      { header: "address", value: ([, source]) => withoutCredentials(source.location) },
-      { header: "ref", value: ([, source]) => source.config.ref ?? "", optional: true },
-      { header: "path", value: ([, source]) => source.config.path ?? "", optional: true },
-      { header: "adapter", value: ([, source]) => style.dim(source.adapter ?? ""), optional: true },
-      {
-        header: "installs",
-        value: ([alias]) => {
-          const refs = used.get(alias) ?? [];
-          return refs.length === 0 ? style.dim("nothing") : refs.join(", ");
+      installs,
+    };
+  },
+  data: (result) => result.data,
+  text({ data, installs }, printer) {
+    const { registries } = data;
+    if (registries.length === 0) {
+      printer.info(`No registries declared in ${scopeName(data.scope)}.`);
+      printer.hint("Run `aireg registry add <address>` to add one.");
+      return;
+    }
+    const style = printer.style;
+    printer.info(
+      style.bold(
+        `${plural(registries.length, "registry", "registries")} in ${scopeName(data.scope)}`,
+      ),
+    );
+    table(
+      printer,
+      [
+        { header: "name", value: (entry: DeclaredRegistry) => entry.registry },
+        { header: "address", value: (entry: DeclaredRegistry) => entry.address },
+        {
+          header: "ref",
+          value: (entry: DeclaredRegistry) => entry.config.ref ?? "",
+          optional: true,
         },
-      },
-    ],
-    entries,
-  );
-}
+        {
+          header: "path",
+          value: (entry: DeclaredRegistry) => entry.config.path ?? "",
+          optional: true,
+        },
+        {
+          header: "adapter",
+          value: (entry: DeclaredRegistry) => style.dim(entry.adapter ?? ""),
+          optional: true,
+        },
+        {
+          header: "installs",
+          value: (entry: DeclaredRegistry) => {
+            const refs = installs.get(entry.registry) ?? [];
+            return refs.length === 0 ? style.dim("nothing") : refs.join(", ");
+          },
+        },
+      ],
+      registries,
+    );
+  },
+});

@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/watch.json",
+  "title": "aireg watch --json",
+  "description": "The `data` each `aireg watch` action prints under --json, by action.",
+  "$defs": {
+    "add": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "job",
+        "revision"
+      ],
+      "properties": {
+        "job": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "account",
+            "schedule",
+            "steps"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "account": {
+              "type": "string"
+            },
+            "schedule": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "every",
+                "enabled"
+              ],
+              "properties": {
+                "every": {
+                  "description": "Seconds between runs.",
+                  "type": "number"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "kind",
+                  "needs",
+                  "select",
+                  "policy",
+                  "extra"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "needs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "root": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "select": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "from"
+                      ],
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "match": {
+                          "type": "string"
+                        },
+                        "kinds": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "plugin",
+                                "type": "string"
+                              },
+                              {
+                                "const": "skill",
+                                "type": "string"
+                              },
+                              {
+                                "const": "agent",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        },
+                        "target": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "harness": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "policy": {
+                    "anyOf": [
+                      {
+                        "const": "on",
+                        "type": "string"
+                      },
+                      {
+                        "const": "report",
+                        "type": "string"
+                      },
+                      {
+                        "const": "off",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "extra": {
+                    "type": "object",
+                    "patternProperties": {
+                      "^(.*)$": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "revision": {
+          "type": "number"
+        }
+      }
+    },
+    "remove": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "jobId",
+            "watching"
+          ],
+          "properties": {
+            "jobId": {
+              "type": "string"
+            },
+            "watching": {
+              "description": "The folders the job still watches.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "When the folders belonged to several jobs.",
+          "type": "object",
+          "required": [
+            "jobs"
+          ],
+          "properties": {
+            "jobs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "jobId",
+                  "watching"
+                ],
+                "properties": {
+                  "jobId": {
+                    "type": "string"
+                  },
+                  "watching": {
+                    "description": "The folders the job still watches.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "list": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "watches"
+      ],
+      "properties": {
+        "watches": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "folder",
+              "to",
+              "jobId",
+              "scope",
+              "root"
+            ],
+            "properties": {
+              "folder": {
+                "type": "string"
+              },
+              "to": {
+                "description": "Where it publishes, as <registry>/<namespace>.",
+                "type": "string"
+              },
+              "jobId": {
+                "type": "string"
+              },
+              "scope": {
+                "anyOf": [
+                  {
+                    "const": "user",
+                    "type": "string"
+                  },
+                  {
+                    "const": "project",
+                    "type": "string"
+                  }
+                ]
+              },
+              "root": {
+                "description": "The scope's folder.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/job.json",
+  "title": "aireg job --json",
+  "description": "The `data` each `aireg job` action prints under --json, by action.",
+  "$defs": {
+    "add": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "job",
+        "revision"
+      ],
+      "properties": {
+        "job": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "account",
+            "schedule",
+            "steps"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "account": {
+              "type": "string"
+            },
+            "schedule": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "every",
+                "enabled"
+              ],
+              "properties": {
+                "every": {
+                  "description": "Seconds between runs.",
+                  "type": "number"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "kind",
+                  "needs",
+                  "select",
+                  "policy",
+                  "extra"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "needs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "root": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "select": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "from"
+                      ],
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "match": {
+                          "type": "string"
+                        },
+                        "kinds": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "plugin",
+                                "type": "string"
+                              },
+                              {
+                                "const": "skill",
+                                "type": "string"
+                              },
+                              {
+                                "const": "agent",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        },
+                        "target": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "harness": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "policy": {
+                    "anyOf": [
+                      {
+                        "const": "on",
+                        "type": "string"
+                      },
+                      {
+                        "const": "report",
+                        "type": "string"
+                      },
+                      {
+                        "const": "off",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "extra": {
+                    "type": "object",
+                    "patternProperties": {
+                      "^(.*)$": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "revision": {
+          "type": "number"
+        }
+      }
+    },
+    "list": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "paused",
+        "jobs"
+      ],
+      "properties": {
+        "paused": {
+          "type": "boolean"
+        },
+        "jobs": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "account",
+              "schedule",
+              "steps"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "account": {
+                "type": "string"
+              },
+              "schedule": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "every",
+                  "enabled"
+                ],
+                "properties": {
+                  "every": {
+                    "description": "Seconds between runs.",
+                    "type": "number"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "name",
+                    "kind",
+                    "needs",
+                    "select",
+                    "policy",
+                    "extra"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "needs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "root": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "select": {
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "from"
+                        ],
+                        "properties": {
+                          "from": {
+                            "type": "string"
+                          },
+                          "match": {
+                            "type": "string"
+                          },
+                          "kinds": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "const": "plugin",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "skill",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "agent",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "target": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "harness": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "policy": {
+                      "anyOf": [
+                        {
+                          "const": "on",
+                          "type": "string"
+                        },
+                        {
+                          "const": "report",
+                          "type": "string"
+                        },
+                        {
+                          "const": "off",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "extra": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^(.*)$": {}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "remove": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "jobId"
+      ],
+      "properties": {
+        "jobId": {
+          "type": "string"
+        }
+      }
+    },
+    "start": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "run"
+      ],
+      "properties": {
+        "run": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "accountId",
+            "configRevision",
+            "mode",
+            "trigger",
+            "state",
+            "requestedAtMs",
+            "deadlineAtMs",
+            "counts",
+            "retryable"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "jobId": {
+              "description": "Absent for a run no job started.",
+              "type": "string"
+            },
+            "accountId": {
+              "type": "string"
+            },
+            "configRevision": {
+              "type": "number"
+            },
+            "mode": {
+              "anyOf": [
+                {
+                  "const": "sync",
+                  "type": "string"
+                },
+                {
+                  "const": "pull",
+                  "type": "string"
+                },
+                {
+                  "const": "publish",
+                  "type": "string"
+                }
+              ]
+            },
+            "trigger": {
+              "anyOf": [
+                {
+                  "const": "manual",
+                  "type": "string"
+                },
+                {
+                  "const": "schedule",
+                  "type": "string"
+                },
+                {
+                  "const": "startup",
+                  "type": "string"
+                }
+              ]
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "const": "queued",
+                  "type": "string"
+                },
+                {
+                  "const": "running",
+                  "type": "string"
+                },
+                {
+                  "const": "succeeded",
+                  "type": "string"
+                },
+                {
+                  "const": "attention",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "failed",
+                  "type": "string"
+                },
+                {
+                  "const": "timed_out",
+                  "type": "string"
+                },
+                {
+                  "const": "canceled",
+                  "type": "string"
+                },
+                {
+                  "const": "abandoned",
+                  "type": "string"
+                }
+              ]
+            },
+            "step": {
+              "type": "string"
+            },
+            "requestedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "startedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "deadlineAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "finishedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "counts": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "examined",
+                "changed",
+                "skipped",
+                "attention",
+                "failed"
+              ],
+              "properties": {
+                "examined": {
+                  "type": "number"
+                },
+                "changed": {
+                  "type": "number"
+                },
+                "skipped": {
+                  "type": "number"
+                },
+                "attention": {
+                  "type": "number"
+                },
+                "failed": {
+                  "type": "number"
+                }
+              }
+            },
+            "errorCode": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "enable": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "jobId",
+        "enabled"
+      ],
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "disable": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "jobId",
+        "enabled"
+      ],
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pause": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "paused",
+        "revision"
+      ],
+      "properties": {
+        "paused": {
+          "type": "boolean"
+        },
+        "revision": {
+          "type": "number"
+        }
+      }
+    },
+    "resume": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "paused",
+        "revision"
+      ],
+      "properties": {
+        "paused": {
+          "type": "boolean"
+        },
+        "revision": {
+          "type": "number"
+        }
+      }
+    },
+    "runs": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "runs"
+          ],
+          "properties": {
+            "runs": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id",
+                  "accountId",
+                  "configRevision",
+                  "mode",
+                  "trigger",
+                  "state",
+                  "requestedAtMs",
+                  "deadlineAtMs",
+                  "counts",
+                  "retryable"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "jobId": {
+                    "description": "Absent for a run no job started.",
+                    "type": "string"
+                  },
+                  "accountId": {
+                    "type": "string"
+                  },
+                  "configRevision": {
+                    "type": "number"
+                  },
+                  "mode": {
+                    "anyOf": [
+                      {
+                        "const": "sync",
+                        "type": "string"
+                      },
+                      {
+                        "const": "pull",
+                        "type": "string"
+                      },
+                      {
+                        "const": "publish",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "trigger": {
+                    "anyOf": [
+                      {
+                        "const": "manual",
+                        "type": "string"
+                      },
+                      {
+                        "const": "schedule",
+                        "type": "string"
+                      },
+                      {
+                        "const": "startup",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "state": {
+                    "anyOf": [
+                      {
+                        "const": "queued",
+                        "type": "string"
+                      },
+                      {
+                        "const": "running",
+                        "type": "string"
+                      },
+                      {
+                        "const": "succeeded",
+                        "type": "string"
+                      },
+                      {
+                        "const": "attention",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      },
+                      {
+                        "const": "failed",
+                        "type": "string"
+                      },
+                      {
+                        "const": "timed_out",
+                        "type": "string"
+                      },
+                      {
+                        "const": "canceled",
+                        "type": "string"
+                      },
+                      {
+                        "const": "abandoned",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "step": {
+                    "type": "string"
+                  },
+                  "requestedAtMs": {
+                    "description": "Milliseconds since the Unix epoch.",
+                    "type": "number"
+                  },
+                  "startedAtMs": {
+                    "description": "Milliseconds since the Unix epoch.",
+                    "type": "number"
+                  },
+                  "deadlineAtMs": {
+                    "description": "Milliseconds since the Unix epoch.",
+                    "type": "number"
+                  },
+                  "finishedAtMs": {
+                    "description": "Milliseconds since the Unix epoch.",
+                    "type": "number"
+                  },
+                  "counts": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "examined",
+                      "changed",
+                      "skipped",
+                      "attention",
+                      "failed"
+                    ],
+                    "properties": {
+                      "examined": {
+                        "type": "number"
+                      },
+                      "changed": {
+                        "type": "number"
+                      },
+                      "skipped": {
+                        "type": "number"
+                      },
+                      "attention": {
+                        "type": "number"
+                      },
+                      "failed": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "errorCode": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "With a run id: that run and its events.",
+          "type": "object",
+          "required": [
+            "run",
+            "events"
+          ],
+          "properties": {
+            "run": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "accountId",
+                "configRevision",
+                "mode",
+                "trigger",
+                "state",
+                "requestedAtMs",
+                "deadlineAtMs",
+                "counts",
+                "retryable"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "jobId": {
+                  "description": "Absent for a run no job started.",
+                  "type": "string"
+                },
+                "accountId": {
+                  "type": "string"
+                },
+                "configRevision": {
+                  "type": "number"
+                },
+                "mode": {
+                  "anyOf": [
+                    {
+                      "const": "sync",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pull",
+                      "type": "string"
+                    },
+                    {
+                      "const": "publish",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "trigger": {
+                  "anyOf": [
+                    {
+                      "const": "manual",
+                      "type": "string"
+                    },
+                    {
+                      "const": "schedule",
+                      "type": "string"
+                    },
+                    {
+                      "const": "startup",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "const": "queued",
+                      "type": "string"
+                    },
+                    {
+                      "const": "running",
+                      "type": "string"
+                    },
+                    {
+                      "const": "succeeded",
+                      "type": "string"
+                    },
+                    {
+                      "const": "attention",
+                      "type": "string"
+                    },
+                    {
+                      "const": "partial",
+                      "type": "string"
+                    },
+                    {
+                      "const": "failed",
+                      "type": "string"
+                    },
+                    {
+                      "const": "timed_out",
+                      "type": "string"
+                    },
+                    {
+                      "const": "canceled",
+                      "type": "string"
+                    },
+                    {
+                      "const": "abandoned",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "step": {
+                  "type": "string"
+                },
+                "requestedAtMs": {
+                  "description": "Milliseconds since the Unix epoch.",
+                  "type": "number"
+                },
+                "startedAtMs": {
+                  "description": "Milliseconds since the Unix epoch.",
+                  "type": "number"
+                },
+                "deadlineAtMs": {
+                  "description": "Milliseconds since the Unix epoch.",
+                  "type": "number"
+                },
+                "finishedAtMs": {
+                  "description": "Milliseconds since the Unix epoch.",
+                  "type": "number"
+                },
+                "counts": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "examined",
+                    "changed",
+                    "skipped",
+                    "attention",
+                    "failed"
+                  ],
+                  "properties": {
+                    "examined": {
+                      "type": "number"
+                    },
+                    "changed": {
+                      "type": "number"
+                    },
+                    "skipped": {
+                      "type": "number"
+                    },
+                    "attention": {
+                      "type": "number"
+                    },
+                    "failed": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "errorCode": {
+                  "type": "string"
+                },
+                "retryable": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id",
+                  "runId",
+                  "seq",
+                  "occurredAtMs",
+                  "eventType",
+                  "retryable"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "number"
+                  },
+                  "runId": {
+                    "type": "string"
+                  },
+                  "seq": {
+                    "type": "number"
+                  },
+                  "occurredAtMs": {
+                    "description": "Milliseconds since the Unix epoch.",
+                    "type": "number"
+                  },
+                  "eventType": {
+                    "description": "A daemon of another version may send a new type.",
+                    "type": "string"
+                  },
+                  "step": {
+                    "type": "string"
+                  },
+                  "artifact": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "const": "plugin",
+                        "type": "string"
+                      },
+                      {
+                        "const": "skill",
+                        "type": "string"
+                      },
+                      {
+                        "const": "agent",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "disposition": {
+                    "anyOf": [
+                      {
+                        "const": "synced",
+                        "type": "string"
+                      },
+                      {
+                        "const": "pull",
+                        "type": "string"
+                      },
+                      {
+                        "const": "pull-delete",
+                        "type": "string"
+                      },
+                      {
+                        "const": "publish",
+                        "type": "string"
+                      },
+                      {
+                        "const": "conflict",
+                        "type": "string"
+                      },
+                      {
+                        "const": "adopt",
+                        "type": "string"
+                      },
+                      {
+                        "const": "archive",
+                        "type": "string"
+                      },
+                      {
+                        "const": "removed",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unknown",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unavailable",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "operation": {
+                    "anyOf": [
+                      {
+                        "const": "none",
+                        "type": "string"
+                      },
+                      {
+                        "const": "pull",
+                        "type": "string"
+                      },
+                      {
+                        "const": "remove-local",
+                        "type": "string"
+                      },
+                      {
+                        "const": "publish",
+                        "type": "string"
+                      },
+                      {
+                        "const": "archive",
+                        "type": "string"
+                      },
+                      {
+                        "const": "forget",
+                        "type": "string"
+                      },
+                      {
+                        "const": "attention",
+                        "type": "string"
+                      },
+                      {
+                        "const": "report",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ignore",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "outcome": {
+                    "anyOf": [
+                      {
+                        "const": "changed",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unchanged",
+                        "type": "string"
+                      },
+                      {
+                        "const": "skipped",
+                        "type": "string"
+                      },
+                      {
+                        "const": "attention",
+                        "type": "string"
+                      },
+                      {
+                        "const": "failed",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "errorCode": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "data": {}
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "retry": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "run"
+      ],
+      "properties": {
+        "run": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "accountId",
+            "configRevision",
+            "mode",
+            "trigger",
+            "state",
+            "requestedAtMs",
+            "deadlineAtMs",
+            "counts",
+            "retryable"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "jobId": {
+              "description": "Absent for a run no job started.",
+              "type": "string"
+            },
+            "accountId": {
+              "type": "string"
+            },
+            "configRevision": {
+              "type": "number"
+            },
+            "mode": {
+              "anyOf": [
+                {
+                  "const": "sync",
+                  "type": "string"
+                },
+                {
+                  "const": "pull",
+                  "type": "string"
+                },
+                {
+                  "const": "publish",
+                  "type": "string"
+                }
+              ]
+            },
+            "trigger": {
+              "anyOf": [
+                {
+                  "const": "manual",
+                  "type": "string"
+                },
+                {
+                  "const": "schedule",
+                  "type": "string"
+                },
+                {
+                  "const": "startup",
+                  "type": "string"
+                }
+              ]
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "const": "queued",
+                  "type": "string"
+                },
+                {
+                  "const": "running",
+                  "type": "string"
+                },
+                {
+                  "const": "succeeded",
+                  "type": "string"
+                },
+                {
+                  "const": "attention",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "failed",
+                  "type": "string"
+                },
+                {
+                  "const": "timed_out",
+                  "type": "string"
+                },
+                {
+                  "const": "canceled",
+                  "type": "string"
+                },
+                {
+                  "const": "abandoned",
+                  "type": "string"
+                }
+              ]
+            },
+            "step": {
+              "type": "string"
+            },
+            "requestedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "startedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "deadlineAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "finishedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "counts": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "examined",
+                "changed",
+                "skipped",
+                "attention",
+                "failed"
+              ],
+              "properties": {
+                "examined": {
+                  "type": "number"
+                },
+                "changed": {
+                  "type": "number"
+                },
+                "skipped": {
+                  "type": "number"
+                },
+                "attention": {
+                  "type": "number"
+                },
+                "failed": {
+                  "type": "number"
+                }
+              }
+            },
+            "errorCode": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "cancel": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "run"
+      ],
+      "properties": {
+        "run": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "accountId",
+            "configRevision",
+            "mode",
+            "trigger",
+            "state",
+            "requestedAtMs",
+            "deadlineAtMs",
+            "counts",
+            "retryable"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "jobId": {
+              "description": "Absent for a run no job started.",
+              "type": "string"
+            },
+            "accountId": {
+              "type": "string"
+            },
+            "configRevision": {
+              "type": "number"
+            },
+            "mode": {
+              "anyOf": [
+                {
+                  "const": "sync",
+                  "type": "string"
+                },
+                {
+                  "const": "pull",
+                  "type": "string"
+                },
+                {
+                  "const": "publish",
+                  "type": "string"
+                }
+              ]
+            },
+            "trigger": {
+              "anyOf": [
+                {
+                  "const": "manual",
+                  "type": "string"
+                },
+                {
+                  "const": "schedule",
+                  "type": "string"
+                },
+                {
+                  "const": "startup",
+                  "type": "string"
+                }
+              ]
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "const": "queued",
+                  "type": "string"
+                },
+                {
+                  "const": "running",
+                  "type": "string"
+                },
+                {
+                  "const": "succeeded",
+                  "type": "string"
+                },
+                {
+                  "const": "attention",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "failed",
+                  "type": "string"
+                },
+                {
+                  "const": "timed_out",
+                  "type": "string"
+                },
+                {
+                  "const": "canceled",
+                  "type": "string"
+                },
+                {
+                  "const": "abandoned",
+                  "type": "string"
+                }
+              ]
+            },
+            "step": {
+              "type": "string"
+            },
+            "requestedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "startedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "deadlineAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "finishedAtMs": {
+              "description": "Milliseconds since the Unix epoch.",
+              "type": "number"
+            },
+            "counts": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "examined",
+                "changed",
+                "skipped",
+                "attention",
+                "failed"
+              ],
+              "properties": {
+                "examined": {
+                  "type": "number"
+                },
+                "changed": {
+                  "type": "number"
+                },
+                "skipped": {
+                  "type": "number"
+                },
+                "attention": {
+                  "type": "number"
+                },
+                "failed": {
+                  "type": "number"
+                }
+              }
+            },
+            "errorCode": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

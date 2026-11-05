@@ -1,6 +1,7 @@
 import { plural } from "#adapter/text.ts";
-import type { CommandContext } from "#cli/commands/command.ts";
+import { action } from "#cli/commands/define.ts";
 import { typedFolder } from "#cli/commands/job/find.ts";
+import type { JobList } from "#cli/commands/job/result.ts";
 import { underHome } from "#cli/render/home.ts";
 import { watchedFolders } from "#core/config/jobs.ts";
 import type { Job } from "#core/config/model.ts";
@@ -11,38 +12,44 @@ import { shortDuration } from "#core/term/format.ts";
 import { table } from "#core/term/table.ts";
 import type { Own } from "./options.ts";
 
-export async function list(context: CommandContext): Promise<void> {
-  const config = await readConfig();
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { paused: config.paused, jobs: config.jobs } });
-    return;
-  }
-  if (config.paused) context.printer.info("Jobs are paused, so none runs on its schedule.");
-  if (config.jobs.length === 0) {
-    context.printer.info("No jobs yet.");
-    context.printer.hint("Run `aireg job add` to add one.");
-    return;
-  }
-  const named = new Map(config.accounts.map((item) => [item.id, item.registry]));
-  const rows = await Promise.all(config.jobs.map((job) => describe(job, named)));
-  const { style } = context.printer;
-  context.printer.info(style.bold(plural(rows.length, "job")));
-  table(
-    context.printer,
-    [
-      { header: "job", value: (row: Described) => row.job },
-      { header: "registry", value: (row: Described) => row.registry },
-      { header: "folder", value: (row: Described) => row.root },
-      { header: "every", value: (row: Described) => shortDuration(row.every) },
-      {
-        header: "state",
-        value: (row: Described) =>
-          row.enabled ? style.green("enabled") : style.yellow("disabled"),
-      },
-      { header: "steps", value: (row: Described) => style.dim(row.steps) },
-    ],
-    rows,
-  );
+export const list = action({
+  async run(): Promise<Listed> {
+    const config = await readConfig();
+    const named = new Map(config.accounts.map((item) => [item.id, item.registry]));
+    const rows = await Promise.all(config.jobs.map((job) => describe(job, named)));
+    return { paused: config.paused, jobs: config.jobs, rows };
+  },
+  data: ({ paused, jobs }): JobList => ({ paused, jobs }),
+  text(result, printer) {
+    if (result.paused) printer.info("Jobs are paused, so none runs on its schedule.");
+    if (result.rows.length === 0) {
+      printer.info("No jobs yet.");
+      printer.hint("Run `aireg job add` to add one.");
+      return;
+    }
+    const { style } = printer;
+    printer.info(style.bold(plural(result.rows.length, "job")));
+    table(
+      printer,
+      [
+        { header: "job", value: (row: Described) => row.job },
+        { header: "registry", value: (row: Described) => row.registry },
+        { header: "folder", value: (row: Described) => row.root },
+        { header: "every", value: (row: Described) => shortDuration(row.every) },
+        {
+          header: "state",
+          value: (row: Described) =>
+            row.enabled ? style.green("enabled") : style.yellow("disabled"),
+        },
+        { header: "steps", value: (row: Described) => style.dim(row.steps) },
+      ],
+      result.rows,
+    );
+  },
+});
+
+interface Listed extends JobList {
+  rows: Described[];
 }
 
 interface Described {

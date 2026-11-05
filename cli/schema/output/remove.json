@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/remove.json",
+  "title": "aireg remove --json",
+  "description": "The `data` each `aireg remove` action prints under --json, by action.",
+  "$defs": {
+    "remove": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dryRun",
+        "removed",
+        "pruned",
+        "watched"
+      ],
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
+        },
+        "removed": {
+          "description": "Named and removed; one another artifact still needs stays, and is not here.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pruned": {
+          "description": "Dependencies removed with them.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "watched": {
+          "description": "Kept because a job publishes them from the person's own folders.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

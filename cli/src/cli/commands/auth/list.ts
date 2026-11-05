@@ -1,7 +1,7 @@
 import { heldAt } from "#accounts/registry.ts";
 import { AccountService } from "#accounts/service.ts";
 import { plural, withoutCredentials } from "#adapter/text.ts";
-import type { CommandContext } from "#cli/commands/command.ts";
+import type { AuthList, ListedAccount } from "#cli/commands/auth/result.ts";
 import { comparableLocation } from "#core/adapter/identity.ts";
 import { expandLocation } from "#core/adapter/location.ts";
 import { readConfig } from "#core/config/repository.ts";
@@ -10,11 +10,12 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { RegistrySource } from "#core/manifest/model.ts";
 import { readManifest } from "#core/manifest/repository.ts";
 import { roots } from "#core/store/paths.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { table } from "#core/term/table.ts";
 import { locate } from "#engine/scope/locate.ts";
 import { needsSignIn } from "./shared.ts";
 
-export async function list(context: CommandContext): Promise<void> {
+export async function list(): Promise<AuthList> {
   const config = await readConfig();
   const signedIn = await signedInAccounts();
   const service = new AccountService();
@@ -25,48 +26,44 @@ export async function list(context: CommandContext): Promise<void> {
       ),
     ),
   );
-  if (context.printer.format === "json") {
-    const accounts = config.accounts.map((account) => ({
+  return {
+    accounts: config.accounts.map((account) => ({
       ...account,
       signedIn: signedIn.has(account.id),
       needsSignIn: needs.get(account.id) ?? true,
-    }));
-    context.printer.json({ ok: true, data: { accounts } });
+    })),
+  };
+}
+
+export function printList({ accounts }: AuthList, printer: Printer): void {
+  if (accounts.length === 0) {
+    printer.info("No accounts yet.");
+    printer.hint("Run `aireg auth login <registry>` to sign in.");
     return;
   }
-  if (config.accounts.length === 0) {
-    context.printer.info("No accounts yet.");
-    context.printer.hint("Run `aireg auth login <registry>` to sign in.");
-    return;
-  }
-  const { style } = context.printer;
-  const rows = config.accounts.map((account) => ({
-    account,
-    on: signedIn.has(account.id),
-    needed: needs.get(account.id) ?? true,
-  }));
-  context.printer.info(style.bold(plural(rows.length, "account")));
+  const { style } = printer;
+  printer.info(style.bold(plural(accounts.length, "account")));
   table(
-    context.printer,
+    printer,
     [
-      { header: "registry", value: (row: (typeof rows)[number]) => row.account.registry },
+      { header: "registry", value: (row: ListedAccount) => row.registry },
       {
         header: "state",
-        value: (row: (typeof rows)[number]) =>
-          !row.needed
+        value: (row: ListedAccount) =>
+          !row.needsSignIn
             ? style.dim("no sign-in")
-            : row.on
+            : row.signedIn
               ? style.green("signed in")
               : style.yellow("signed out"),
       },
       {
         header: "namespace",
-        value: (row: (typeof rows)[number]) => row.account.defaultNamespace ?? "",
+        value: (row: ListedAccount) => row.defaultNamespace ?? "",
         optional: true,
       },
-      { header: "account", value: (row: (typeof rows)[number]) => style.dim(row.account.id) },
+      { header: "account", value: (row: ListedAccount) => style.dim(row.id) },
     ],
-    rows,
+    accounts,
   );
 }
 

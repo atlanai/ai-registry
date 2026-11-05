@@ -1,6 +1,7 @@
 import type { CommandSpec } from "#cli/commands/command.ts";
+import { LEVELS } from "#core/log/model.ts";
 
-export const LOGS_COMMAND: CommandSpec = {
+export const LOGS_COMMAND = {
   name: "logs",
   summary: "Read aireg's diagnostic logs",
   group: "Maintain",
@@ -16,6 +17,7 @@ export const LOGS_COMMAND: CommandSpec = {
       flag: "--tail",
       short: "-n",
       value: "<count>",
+      integer: { min: 0 },
       describe: "How many of the newest entries to print",
     },
     {
@@ -24,11 +26,16 @@ export const LOGS_COMMAND: CommandSpec = {
       describe: "Only entries since this time: 15m, 2h, 1d or a date",
     },
     { flag: "--until", value: "<time>", describe: "Only entries until this time" },
-    { flag: "--level", value: "<level>", describe: "Only entries at this level or above" },
+    {
+      flag: "--level",
+      value: "<level>",
+      choices: LEVELS,
+      describe: "Only entries at this level or above",
+    },
     { flag: "--grep", value: "<text>", describe: "Only entries that contain this text" },
     { flag: "--daemon", describe: "Read the daemon's log" },
     { flag: "--cli", describe: "Read the CLI's log" },
     { flag: "--stderr", describe: "Read the daemon's stderr" },
     { flag: "--previous", describe: "Read the last rotated copy instead" },
   ],
-};
+} satisfies CommandSpec;

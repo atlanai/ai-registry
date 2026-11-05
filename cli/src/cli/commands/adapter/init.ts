@@ -2,26 +2,26 @@ import { mkdir, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { parseVersion } from "#adapter/semver.ts";
 import { plural, quoted } from "#adapter/text.ts";
+import type { AdapterInit } from "#cli/commands/adapter/result.ts";
 import { needsInput } from "#cli/options/parse.ts";
 import { parseAdapterId } from "#core/adapter/installed/want.ts";
 import { isBuiltinAdapter } from "#core/adapter/load.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { refuseRedirect, writeFresh } from "#core/fs/fresh.ts";
-import type { HostCommandContext } from "#core/host/extend.ts";
 import { NAME, PACKAGE } from "#core/product.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { NODE_REQUIREMENT, VERSION } from "#core/version.ts";
 
-interface Own {
-  dir?: string | undefined;
+export interface Scaffolded extends AdapterInit {
+  shown: string;
 }
 
 export async function initAdapter(
-  context: HostCommandContext,
+  cwd: string,
   raw: string | undefined,
-  common: { force: boolean; dryRun: boolean },
-  own: Own,
-): Promise<void> {
+  options: { force: boolean; dryRun: boolean; dir: string | undefined },
+): Promise<Scaffolded> {
   if (raw === undefined) {
     throw needsInput("adapter init", "an id", "Name the adapter: `aireg adapter init <id>`.");
   }
@@ -32,11 +32,11 @@ export async function initAdapter(
       hint: "Choose a new id, like acme.",
     });
   }
-  const dir = resolve(context.cwd, own.dir ?? id);
+  const dir = resolve(cwd, options.dir ?? id);
   const planned = files(id);
   for (const path of Object.keys(planned))
     refuseRedirect(dir, join(dir, path), "Remove it, or choose another folder with `--dir`.");
-  if (!common.force) {
+  if (!options.force) {
     const existing = await readdir(dir).catch(() => undefined);
     if (existing !== undefined && existing.length > 0) {
       throw new AiregError(`${dir} already exists.`, {
@@ -45,38 +45,35 @@ export async function initAdapter(
       });
     }
   }
-  if (common.dryRun) {
-    if (context.printer.format === "json") {
-      context.printer.json({
-        ok: true,
-        data: { id, dir, files: Object.keys(planned), dryRun: true },
-      });
-      return;
-    }
-    context.printer.info(
-      `Would write ${plural(Object.keys(planned).length, "file")} under ${dir}.`,
-    );
-    return;
-  }
+  const written = {
+    id,
+    dir,
+    files: Object.keys(planned),
+    dryRun: options.dryRun,
+    shown: relative(cwd, dir) || ".",
+  };
+  if (options.dryRun) return written;
   for (const [path, body] of Object.entries(planned)) {
     const target = join(dir, path);
     await mkdir(dirname(target), { recursive: true });
     // `--force` replaces the file itself, never what it may point to.
-    if (common.force) await writeAtomic(target, body);
+    if (options.force) await writeAtomic(target, body);
     else await writeFresh(target, body, { shown: target, hint: "Pass `--force` to overwrite it." });
   }
-  if (context.printer.format === "json") {
-    context.printer.json({
-      ok: true,
-      data: { id, dir, files: Object.keys(planned), dryRun: false },
-    });
+  return written;
+}
+
+export function printInit(result: Scaffolded, printer: Printer): void {
+  if (result.dryRun) {
+    printer.info(`Would write ${plural(result.files.length, "file")} under ${result.dir}.`);
     return;
   }
-  context.printer.success(`Wrote adapter ${id} at ${dir}.`);
-  context.printer.note(
-    "next",
-    `cd ${relative(context.cwd, dir) || "."} && npm install && npm test`,
-  );
+  printer.success(`Wrote adapter ${result.id} at ${result.dir}.`);
+  printer.note("next", `cd ${result.shown} && npm install && npm test`);
+}
+
+export function initData(result: Scaffolded): AdapterInit {
+  return { id: result.id, dir: result.dir, files: result.files, dryRun: result.dryRun };
 }
 
 /** The scaffolded package's files by path, for a package outside this repository. */

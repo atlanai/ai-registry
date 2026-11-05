@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/unlock.json",
+  "title": "aireg unlock --json",
+  "description": "The `data` each `aireg unlock` action prints under --json, by action.",
+  "$defs": {
+    "unlock": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "description": "Nothing is writing to the scope.",
+          "type": "object",
+          "required": [
+            "scope",
+            "held"
+          ],
+          "properties": {
+            "scope": {
+              "anyOf": [
+                {
+                  "const": "user",
+                  "type": "string"
+                },
+                {
+                  "const": "project",
+                  "type": "string"
+                }
+              ]
+            },
+            "held": {
+              "const": false,
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "The process writing to the scope.",
+          "type": "object",
+          "required": [
+            "scope",
+            "held",
+            "holder"
+          ],
+          "properties": {
+            "scope": {
+              "anyOf": [
+                {
+                  "const": "user",
+                  "type": "string"
+                },
+                {
+                  "const": "project",
+                  "type": "string"
+                }
+              ]
+            },
+            "held": {
+              "const": true,
+              "type": "boolean"
+            },
+            "holder": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "scope",
+                "lock",
+                "host",
+                "pid",
+                "acquiredAtMs"
+              ],
+              "properties": {
+                "id": {
+                  "description": "What `aireg unlock <id>` takes.",
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "lock": {
+                  "type": "string"
+                },
+                "host": {
+                  "type": "string"
+                },
+                "pid": {
+                  "type": "number"
+                },
+                "acquiredAtMs": {
+                  "description": "When it was taken, in milliseconds since 1970.",
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "The lock `aireg unlock <id>` cleared.",
+          "type": "object",
+          "required": [
+            "scope",
+            "broken"
+          ],
+          "properties": {
+            "scope": {
+              "anyOf": [
+                {
+                  "const": "user",
+                  "type": "string"
+                },
+                {
+                  "const": "project",
+                  "type": "string"
+                }
+              ]
+            },
+            "broken": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "scope",
+                "lock",
+                "host",
+                "pid",
+                "acquiredAtMs"
+              ],
+              "properties": {
+                "id": {
+                  "description": "What `aireg unlock <id>` takes.",
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "lock": {
+                  "type": "string"
+                },
+                "host": {
+                  "type": "string"
+                },
+                "pid": {
+                  "type": "number"
+                },
+                "acquiredAtMs": {
+                  "description": "When it was taken, in milliseconds since 1970.",
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

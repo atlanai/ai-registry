@@ -72,6 +72,37 @@ describe("parse, for --as", () => {
   });
 });
 
+describe("parse, for an option's values", () => {
+  const LOGS: Accepts = {
+    name: "logs",
+    options: [
+      { flag: "--level", value: "<level>", choices: ["info", "warn"], describe: "" },
+      { flag: "--tail", value: "<count>", integer: { min: 1, max: 9 }, describe: "" },
+    ],
+  };
+
+  test("hands over a whole number as a number, and a choice as written", () => {
+    expect(parse(["--tail", "3", "--level", "warn"], LOGS).own).toMatchObject({
+      tail: 3,
+      level: "warn",
+    });
+  });
+
+  test("reads a choice in any case, and hands over the choice as declared", () => {
+    expect(parse(["--level", " Warn "], LOGS).own).toMatchObject({ level: "warn" });
+  });
+
+  test.each([
+    [["--level", "loud"], '--level takes info or warn, not "loud".'],
+    [["--tail", "0"], '--tail takes a whole number from 1 to 9, not "0".'],
+    [["--tail", "2.5"], '--tail takes a whole number from 1 to 9, not "2.5".'],
+  ])("refuses %j as a usage error that says what it takes", (argv, message) => {
+    const error = refusal(argv, LOGS);
+    expect(error.message).toBe(message);
+    expect(error.code).toBe(ErrorCode.Usage);
+  });
+});
+
 describe("needsInput", () => {
   test("names the command and what it is missing, as a usage error", () => {
     const error = needsInput("job show", "a job name", "Name the job.");

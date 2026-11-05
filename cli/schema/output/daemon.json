@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/daemon.json",
+  "title": "aireg daemon --json",
+  "description": "The `data` each `aireg daemon` action prints under --json, by action.",
+  "$defs": {
+    "status": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "status",
+        "jobs",
+        "enabled",
+        "paused",
+        "autostart"
+      ],
+      "properties": {
+        "status": {
+          "description": "`outdated` is a daemon an older aireg started that cannot prove it runs as you; `foreign` is another program on the daemon's socket.",
+          "anyOf": [
+            {
+              "const": "down",
+              "type": "string"
+            },
+            {
+              "const": "ready",
+              "type": "string"
+            },
+            {
+              "const": "stopping",
+              "type": "string"
+            },
+            {
+              "const": "outdated",
+              "type": "string"
+            },
+            {
+              "const": "foreign",
+              "type": "string"
+            }
+          ]
+        },
+        "pid": {
+          "description": "Absent while no daemon is running.",
+          "type": "number"
+        },
+        "jobs": {
+          "type": "number"
+        },
+        "enabled": {
+          "type": "number"
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "autostart": {
+          "type": "boolean"
+        }
+      }
+    },
+    "start": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "status",
+        "changed"
+      ],
+      "properties": {
+        "status": {
+          "description": "`outdated` is a daemon an older aireg started that cannot prove it runs as you; `foreign` is another program on the daemon's socket.",
+          "anyOf": [
+            {
+              "const": "down",
+              "type": "string"
+            },
+            {
+              "const": "ready",
+              "type": "string"
+            },
+            {
+              "const": "stopping",
+              "type": "string"
+            },
+            {
+              "const": "outdated",
+              "type": "string"
+            },
+            {
+              "const": "foreign",
+              "type": "string"
+            }
+          ]
+        },
+        "pid": {
+          "description": "Absent while no daemon is running.",
+          "type": "number"
+        },
+        "changed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stop": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "status",
+        "changed"
+      ],
+      "properties": {
+        "status": {
+          "description": "`outdated` is a daemon an older aireg started that cannot prove it runs as you; `foreign` is another program on the daemon's socket.",
+          "anyOf": [
+            {
+              "const": "down",
+              "type": "string"
+            },
+            {
+              "const": "ready",
+              "type": "string"
+            },
+            {
+              "const": "stopping",
+              "type": "string"
+            },
+            {
+              "const": "outdated",
+              "type": "string"
+            },
+            {
+              "const": "foreign",
+              "type": "string"
+            }
+          ]
+        },
+        "pid": {
+          "description": "Absent while no daemon is running.",
+          "type": "number"
+        },
+        "changed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "restart": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "status",
+        "changed"
+      ],
+      "properties": {
+        "status": {
+          "description": "`outdated` is a daemon an older aireg started that cannot prove it runs as you; `foreign` is another program on the daemon's socket.",
+          "anyOf": [
+            {
+              "const": "down",
+              "type": "string"
+            },
+            {
+              "const": "ready",
+              "type": "string"
+            },
+            {
+              "const": "stopping",
+              "type": "string"
+            },
+            {
+              "const": "outdated",
+              "type": "string"
+            },
+            {
+              "const": "foreign",
+              "type": "string"
+            }
+          ]
+        },
+        "pid": {
+          "description": "Absent while no daemon is running.",
+          "type": "number"
+        },
+        "changed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "autostart": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "description": "After `on` or `off`.",
+          "type": "object",
+          "required": [
+            "changed",
+            "mechanism",
+            "location",
+            "registered",
+            "loaded",
+            "current"
+          ],
+          "properties": {
+            "changed": {
+              "type": "boolean"
+            },
+            "mechanism": {
+              "anyOf": [
+                {
+                  "const": "launchd",
+                  "type": "string"
+                },
+                {
+                  "const": "systemd",
+                  "type": "string"
+                },
+                {
+                  "const": "run-key",
+                  "type": "string"
+                }
+              ]
+            },
+            "location": {
+              "description": "The file or registry value holding the definition.",
+              "type": "string"
+            },
+            "registered": {
+              "type": "boolean"
+            },
+            "loaded": {
+              "type": "boolean"
+            },
+            "current": {
+              "description": "The definition on disk is the one turning autostart on would write now.",
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "With `status`, on a platform without one.",
+          "type": "object",
+          "required": [
+            "supported"
+          ],
+          "properties": {
+            "supported": {
+              "const": false,
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "description": "With `status`.",
+          "type": "object",
+          "required": [
+            "supported",
+            "mechanism",
+            "location",
+            "registered",
+            "loaded",
+            "current"
+          ],
+          "properties": {
+            "supported": {
+              "const": true,
+              "type": "boolean"
+            },
+            "mechanism": {
+              "anyOf": [
+                {
+                  "const": "launchd",
+                  "type": "string"
+                },
+                {
+                  "const": "systemd",
+                  "type": "string"
+                },
+                {
+                  "const": "run-key",
+                  "type": "string"
+                }
+              ]
+            },
+            "location": {
+              "description": "The file or registry value holding the definition.",
+              "type": "string"
+            },
+            "registered": {
+              "type": "boolean"
+            },
+            "loaded": {
+              "type": "boolean"
+            },
+            "current": {
+              "description": "The definition on disk is the one turning autostart on would write now.",
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

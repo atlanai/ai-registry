@@ -5,16 +5,23 @@ import { bumpVersion, compareVersion, parseVersion } from "#adapter/semver.ts";
 import { isVersion } from "#adapter/spec/ref.ts";
 import { plural, quoted } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import type { KindBump } from "#cli/commands/kind/result.ts";
 import type { Own } from "#cli/commands/kind.ts";
 import { needsInput } from "#cli/options/parse.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { requireRegistry } from "#core/filespec/init.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
 import { present } from "#core/fs/tree.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { nameOf, valid } from "./fields.ts";
 import { FRESH } from "./files.ts";
 import { keepFromEnvelope } from "./new-from.ts";
 import { locate } from "./place.ts";
+
+export interface Bumped extends KindBump {
+  shown: { from: string; to: string };
+  kept: { relationships: number; blobs: number };
+}
 
 export async function version(
   kind: string,
@@ -22,7 +29,7 @@ export async function version(
   input: string | undefined,
   how: string | undefined,
   own: Own,
-): Promise<void> {
+): Promise<Bumped> {
   if (input === undefined) {
     throw needsInput(
       `${kind} bump`,
@@ -79,25 +86,31 @@ export async function version(
   await rm(join(home, next, ENVELOPE), { force: true });
   const kept = await keepFromEnvelope(join(home, latest), join(home, next));
 
-  const from = relative(context.cwd, join(home, latest)) || ".";
-  const to = relative(context.cwd, join(home, next)) || ".";
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { kind, name: input, from: latest, to: next } });
-    return;
-  }
-  context.printer.success(`Copied ${from} to ${to}.`);
+  return {
+    kind,
+    name: input,
+    from: latest,
+    to: next,
+    shown: {
+      from: relative(context.cwd, join(home, latest)) || ".",
+      to: relative(context.cwd, join(home, next)) || ".",
+    },
+    kept,
+  };
+}
+
+export function printBumped(result: Bumped, printer: Printer): void {
+  const { from, kept } = result;
+  printer.success(`Copied ${result.shown.from} to ${result.shown.to}.`);
   if (kept.relationships > 0) {
-    context.printer.note(
+    printer.note(
       "kept",
-      `${plural(kept.relationships, "relationship")} from ${latest}, in ${ENVELOPE}`,
+      `${plural(kept.relationships, "relationship")} from ${from}, in ${ENVELOPE}`,
     );
   }
   if (kept.blobs > 0) {
-    context.printer.note(
-      "kept",
-      `${plural(kept.blobs, "blob-backed file")} from ${latest}, in ${ENVELOPE}`,
-    );
+    printer.note("kept", `${plural(kept.blobs, "blob-backed file")} from ${from}, in ${ENVELOPE}`);
   }
-  context.printer.note("edit", to);
-  context.printer.note("next", "aireg registry index");
+  printer.note("edit", result.shown.to);
+  printer.note("next", "aireg registry index");
 }

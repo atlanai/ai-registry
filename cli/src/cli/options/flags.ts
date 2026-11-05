@@ -88,6 +88,7 @@ function policy(name: string, what: string): OptionSpec {
   return {
     flag: `--${name}`,
     value: "<policy>",
+    choices: STEP_POLICIES,
     describe: `${what}: ${list(STEP_POLICIES, "or")}`,
   };
 }

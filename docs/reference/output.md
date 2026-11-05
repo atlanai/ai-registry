@@ -32,7 +32,7 @@ With `--json`, aireg prints one JSON object per line on stdout, in one shape for
 {"ok": true, "data": {}}
 ```
 
-`data` holds the command's result. Each command page describes its `data`. A failure prints `ok: false` and an `error` with its code, message and hint:
+`data` holds the command's result. Each command page describes its `data`, and every command publishes it as a JSON Schema in [`cli/schema/output`](https://github.com/atlanai/ai-registry/tree/main/cli/schema/output), one document per command with an entry per action, which the npm package ships too. A failure prints `ok: false` and an `error` with its code, message and hint:
 
 ```json
 {"ok": false, "error": {"code": "usage", "message": "Unknown config action \"frob\".", "hint": "Use list, get, set or path."}}

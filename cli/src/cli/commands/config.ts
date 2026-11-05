@@ -1,4 +1,5 @@
 import { list as listOf, quoted } from "#adapter/text.ts";
+import type { ConfigList, ConfigPath, ConfigSetting } from "#cli/commands/config/result.ts";
 import { CONFIG_COMMAND } from "#cli/commands/config/spec.ts";
 import { needsInput, parse } from "#cli/options/parse.ts";
 import { closest, didYouMean } from "#cli/options/suggest.ts";
@@ -7,7 +8,7 @@ import { isNameCollision, isNamespaceAddress, nameCollisionOf } from "#core/conf
 import { configPath, readConfig, updateConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { table } from "#core/term/table.ts";
-import { type CommandContext, runAction } from "./command.ts";
+import { action, defineCommand } from "./define.ts";
 
 /**
  * Only the settings a person sets by hand. Accounts and jobs have their own
@@ -72,82 +73,99 @@ const SETTINGS = {
 
 type Key = keyof typeof SETTINGS;
 
-export async function run(context: CommandContext): Promise<void> {
-  const spec = CONFIG_COMMAND;
-  const { positionals } = parse(context.argv, spec);
-  const [action = "list", key, value] = positionals;
-  return runAction(spec, action, {
-    list: () => list(context),
-    path: () => path(context),
-    get: () => get(context, key),
-    set: () => set(context, key, value),
-    unset: () => unset(context, key),
-  });
+interface Options {
+  key: string | undefined;
+  value: string | undefined;
 }
 
-async function list(context: CommandContext): Promise<void> {
-  const config = await readConfig();
-  const rows = Object.entries(SETTINGS).map(
-    ([key, setting]) => [key, setting.read(config)] as const,
-  );
-
-  if (context.printer.format === "json") {
-    // `null`, not absent: a key that vanishes when unset makes the shape
-    // depend on the value, and a consumer cannot tell it from a typo.
-    context.printer.json({
-      ok: true,
-      data: Object.fromEntries(rows.map(([key, value]) => [key, value ?? null])),
-    });
-    return;
-  }
-
-  const style = context.printer.style;
-  table(
-    context.printer,
-    [
-      { header: "key", value: ([key]: (typeof rows)[number]) => key },
-      {
-        header: "value",
-        value: ([, current]: (typeof rows)[number]) =>
-          current === undefined ? style.dim("not set") : String(current),
+export const { run } = defineCommand<Options>({
+  spec: CONFIG_COMMAND,
+  parse(argv) {
+    const [verb = "list", key, value] = parse(argv, CONFIG_COMMAND).positionals;
+    return { action: verb, options: { key, value } };
+  },
+  actions: {
+    list: action({
+      run: async (): Promise<ConfigList> => {
+        const config = await readConfig();
+        return Object.fromEntries(
+          Object.entries(SETTINGS).map(([key, setting]) => [key, setting.read(config) ?? null]),
+        );
       },
-    ],
-    rows,
-  );
-  context.printer.note("file", configPath());
-}
+      text: (result, printer) => {
+        const rows = Object.entries(result);
+        table(
+          printer,
+          [
+            { header: "key", value: ([key]: (typeof rows)[number]) => key },
+            {
+              header: "value",
+              value: ([, current]: (typeof rows)[number]) =>
+                current === null ? printer.style.dim("not set") : String(current),
+            },
+          ],
+          rows,
+        );
+        printer.note("file", configPath());
+      },
+    }),
+    path: action({
+      run: async (): Promise<ConfigPath> => ({ path: configPath() }),
+      text: (result, printer) => printer.info(result.path),
+    }),
+    get: action({
+      run: async ({ key }): Promise<ConfigSetting> => {
+        const known = knownKey("get", "aireg config get <key>", key);
+        return { key: known, value: SETTINGS[known].read(await readConfig()) ?? null };
+      },
+      // Nothing but the value, so `$(aireg config get ...)` is usable.
+      text: (result, printer) => {
+        if (result.value !== null) printer.info(String(result.value));
+      },
+    }),
+    set: action({
+      run: async ({ key, value }): Promise<ConfigSetting> => {
+        const known = knownKey("set", "aireg config set <key> <value>", key);
+        if (value === undefined) {
+          throw needsInput(
+            "config set",
+            `a value for ${known}`,
+            `Name the value: \`aireg config set ${known} ${SETTINGS[known].value}\`.`,
+          );
+        }
+        // Each setting checks its value; the file parser would name the file instead.
+        SETTINGS[known].write(await readConfig(), value);
+        const after = await updateConfig((current) => SETTINGS[known].write(current, value));
+        return { key: known, value: SETTINGS[known].read(after) ?? null };
+      },
+      text: (result, printer) => printer.success(`Set ${result.key} to ${String(result.value)}.`),
+    }),
+    unset: action({
+      run: async ({ key }): Promise<ConfigSetting> => {
+        const known = knownKey("unset", "aireg config unset <key>", key);
+        const after = await updateConfig((current) => SETTINGS[known].clear(current));
+        return { key: known, value: SETTINGS[known].read(after) ?? null };
+      },
+      text: (result, printer) =>
+        printer.success(
+          result.value === null
+            ? `Cleared ${result.key}.`
+            : `Set ${result.key} back to ${String(result.value)}.`,
+        ),
+    }),
+  },
+});
 
-async function set(
-  context: CommandContext,
-  key: string | undefined,
-  value: string | undefined,
-): Promise<void> {
-  if (key === undefined) throw needsKey("set", "aireg config set <key> <value>");
-  if (!isKey(key)) throw unknownSetting(key);
-  if (value === undefined) {
+function knownKey(verb: string, usage: string, key: string | undefined): Key {
+  if (key === undefined) {
     throw needsInput(
-      "config set",
-      `a value for ${key}`,
-      `Name the value: \`aireg config set ${key} ${SETTINGS[key].value}\`.`,
+      `config ${verb}`,
+      "a setting name",
+      `Name the setting: \`${usage}\`. ${settings()}`,
     );
   }
-
-  // Each setting checks its value; the file parser would name the file instead.
-  SETTINGS[key].write(await readConfig(), value);
-  const after = await updateConfig((current) => SETTINGS[key].write(current, value));
-
-  const stored = SETTINGS[key].read(after);
-  context.printer.format === "json"
-    ? context.printer.json({ ok: true, data: { key, value: stored } })
-    : context.printer.success(`Set ${key} to ${String(stored)}.`);
-}
-
-function needsKey(action: string, usage: string): AiregError {
-  return needsInput(
-    `config ${action}`,
-    "a setting name",
-    `Name the setting: \`${usage}\`. ${settings()}`,
-  );
+  if (!isKey(key)) throw unknownSetting(key);
+  return key;
 }
 
 function settings(): string {
@@ -163,39 +181,4 @@ function unknownSetting(key: string): AiregError {
     code: ErrorCode.Usage,
     hint: didYouMean(closest(key, Object.keys(SETTINGS)), settings()),
   });
-}
-
-async function path(context: CommandContext): Promise<void> {
-  context.printer.format === "json"
-    ? context.printer.json({ ok: true, data: { path: configPath() } })
-    : context.printer.info(configPath());
-}
-
-async function get(context: CommandContext, key: string | undefined): Promise<void> {
-  if (key === undefined) throw needsKey("get", "aireg config get <key>");
-  if (!isKey(key)) throw unknownSetting(key);
-
-  const current = SETTINGS[key].read(await readConfig());
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { key, value: current ?? null } });
-    return;
-  }
-  // Nothing but the value, so `$(aireg config get ...)` is usable.
-  if (current !== undefined) context.printer.info(String(current));
-}
-
-/** Back to the default, which for a setting with none is not set at all. */
-async function unset(context: CommandContext, key: string | undefined): Promise<void> {
-  if (key === undefined) throw needsKey("unset", "aireg config unset <key>");
-  if (!isKey(key)) throw unknownSetting(key);
-
-  const after = await updateConfig((current) => SETTINGS[key].clear(current));
-  const stored = SETTINGS[key].read(after);
-  if (context.printer.format === "json") {
-    context.printer.json({ ok: true, data: { key, value: stored ?? null } });
-    return;
-  }
-  context.printer.success(
-    stored === undefined ? `Cleared ${key}.` : `Set ${key} back to ${String(stored)}.`,
-  );
 }

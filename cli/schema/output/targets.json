@@ -1,0 +1,3420 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/targets.json",
+  "title": "aireg targets --json",
+  "description": "The `data` each `aireg targets` action prints under --json, by action.",
+  "$defs": {
+    "targets": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "targets",
+        "harnesses",
+        "skipped",
+        "warnings"
+      ],
+      "properties": {
+        "targets": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "aliases",
+              "displayName",
+              "shared",
+              "detected",
+              "origin"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "shared": {
+                "type": "boolean"
+              },
+              "detected": {
+                "type": "boolean"
+              },
+              "by": {
+                "description": "The rule that found it; absent when it was not found.",
+                "anyOf": [
+                  {
+                    "const": "env",
+                    "type": "string"
+                  },
+                  {
+                    "const": "binary",
+                    "type": "string"
+                  },
+                  {
+                    "const": "project",
+                    "type": "string"
+                  },
+                  {
+                    "const": "user",
+                    "type": "string"
+                  }
+                ]
+              },
+              "origin": {
+                "description": "`built-in`, or the path of the file that defines it.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "harnesses": {
+          "description": "The same list as aireg 0.1 printed it, by the ids that version knows.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "displayName",
+              "kind",
+              "shared",
+              "detected",
+              "origin"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "kind": {
+                "description": "aireg 0.1's name for the category.",
+                "anyOf": [
+                  {
+                    "const": "coding",
+                    "type": "string"
+                  },
+                  {
+                    "const": "personal",
+                    "type": "string"
+                  },
+                  {
+                    "const": "shared",
+                    "type": "string"
+                  }
+                ]
+              },
+              "shared": {
+                "type": "boolean"
+              },
+              "detected": {
+                "type": "boolean"
+              },
+              "by": {
+                "description": "The rule that found it; absent when it was not found.",
+                "anyOf": [
+                  {
+                    "const": "env",
+                    "type": "string"
+                  },
+                  {
+                    "const": "binary",
+                    "type": "string"
+                  },
+                  {
+                    "const": "project",
+                    "type": "string"
+                  },
+                  {
+                    "const": "user",
+                    "type": "string"
+                  }
+                ]
+              },
+              "origin": {
+                "description": "`built-in`, or the path of the file that defines it.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "skipped": {
+          "description": "Target files aireg refused.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "path",
+              "problems"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "problems": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "warnings": {
+          "description": "Target files aireg uses but would have you change.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "path",
+              "warnings"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "show": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "target",
+        "harness"
+      ],
+      "properties": {
+        "target": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "name",
+            "displayName",
+            "projectRoot",
+            "userRoot",
+            "detect",
+            "kinds",
+            "reads",
+            "shared",
+            "trust",
+            "origin",
+            "aliases"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "displayName": {
+              "type": "string"
+            },
+            "projectRoot": {
+              "type": "string"
+            },
+            "userRoot": {
+              "description": "Expanded, under your home folder.",
+              "type": "string"
+            },
+            "envHome": {
+              "description": "The variable the target reads to move it.",
+              "type": "string"
+            },
+            "envWithin": {
+              "type": "string"
+            },
+            "detect": {
+              "anyOf": [
+                {
+                  "const": "never",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "env",
+                    "binary",
+                    "paths"
+                  ],
+                  "properties": {
+                    "env": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "binary": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "projectRoot": {
+                      "const": false,
+                      "type": "boolean"
+                    }
+                  }
+                }
+              ]
+            },
+            "kinds": {
+              "additionalProperties": false,
+              "type": "object",
+              "properties": {
+                "plugin": {
+                  "description": "Where one kind lands inside the target's folder.",
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "contents",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "directory",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "fan",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "entry": {
+                          "type": "string"
+                        },
+                        "manifest": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "path"
+                            ],
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "register": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "description": "One edit to a config file the target reads: `value`, `upsert` or `append`.",
+                            "type": "object",
+                            "required": [
+                              "file",
+                              "format",
+                              "at"
+                            ],
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "anyOf": [
+                                  {
+                                    "const": "toml",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "json",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "yaml",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "at": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "init": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "conflict": {
+                                "anyOf": [
+                                  {
+                                    "const": "overwrite",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keep",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "remove": {
+                                "anyOf": [
+                                  {
+                                    "const": "ours",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "entry",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "off": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "value": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "upsert": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "key",
+                                  "item"
+                                ],
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^(.*)$": {
+                                        "description": "Text, a number, true or false, a list or a table."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "append": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "const": false,
+                                  "type": "boolean"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "path",
+                                    "body"
+                                  ],
+                                  "properties": {
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "body": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^(.*)$": {
+                                          "description": "Text, a number, true or false, a list or a table."
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir",
+                        "extension"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "render": {
+                          "additionalProperties": false,
+                          "description": "Deprecated: the frontmatter-toml codec.",
+                          "type": "object",
+                          "required": [
+                            "format",
+                            "fields",
+                            "body"
+                          ],
+                          "properties": {
+                            "format": {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "skill": {
+                  "description": "Where one kind lands inside the target's folder.",
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "contents",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "directory",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "fan",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "entry": {
+                          "type": "string"
+                        },
+                        "manifest": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "path"
+                            ],
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "register": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "description": "One edit to a config file the target reads: `value`, `upsert` or `append`.",
+                            "type": "object",
+                            "required": [
+                              "file",
+                              "format",
+                              "at"
+                            ],
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "anyOf": [
+                                  {
+                                    "const": "toml",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "json",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "yaml",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "at": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "init": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "conflict": {
+                                "anyOf": [
+                                  {
+                                    "const": "overwrite",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keep",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "remove": {
+                                "anyOf": [
+                                  {
+                                    "const": "ours",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "entry",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "off": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "value": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "upsert": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "key",
+                                  "item"
+                                ],
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^(.*)$": {
+                                        "description": "Text, a number, true or false, a list or a table."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "append": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "const": false,
+                                  "type": "boolean"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "path",
+                                    "body"
+                                  ],
+                                  "properties": {
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "body": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^(.*)$": {
+                                          "description": "Text, a number, true or false, a list or a table."
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir",
+                        "extension"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "render": {
+                          "additionalProperties": false,
+                          "description": "Deprecated: the frontmatter-toml codec.",
+                          "type": "object",
+                          "required": [
+                            "format",
+                            "fields",
+                            "body"
+                          ],
+                          "properties": {
+                            "format": {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "agent": {
+                  "description": "Where one kind lands inside the target's folder.",
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "contents",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "directory",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "fan",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "entry": {
+                          "type": "string"
+                        },
+                        "manifest": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "path"
+                            ],
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "register": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "description": "One edit to a config file the target reads: `value`, `upsert` or `append`.",
+                            "type": "object",
+                            "required": [
+                              "file",
+                              "format",
+                              "at"
+                            ],
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "anyOf": [
+                                  {
+                                    "const": "toml",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "json",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "yaml",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "at": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "init": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "conflict": {
+                                "anyOf": [
+                                  {
+                                    "const": "overwrite",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keep",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "remove": {
+                                "anyOf": [
+                                  {
+                                    "const": "ours",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "entry",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "off": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "value": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "upsert": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "key",
+                                  "item"
+                                ],
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^(.*)$": {
+                                        "description": "Text, a number, true or false, a list or a table."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "append": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "const": false,
+                                  "type": "boolean"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "path",
+                                    "body"
+                                  ],
+                                  "properties": {
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "body": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^(.*)$": {
+                                          "description": "Text, a number, true or false, a list or a table."
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir",
+                        "extension"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "render": {
+                          "additionalProperties": false,
+                          "description": "Deprecated: the frontmatter-toml codec.",
+                          "type": "object",
+                          "required": [
+                            "format",
+                            "fields",
+                            "body"
+                          ],
+                          "properties": {
+                            "format": {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "reads": {
+              "additionalProperties": false,
+              "type": "object",
+              "properties": {
+                "plugin": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "skill": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "agent": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "shared": {
+              "type": "boolean"
+            },
+            "verified": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "command",
+                "range"
+              ],
+              "properties": {
+                "command": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "range": {
+                  "type": "string"
+                }
+              }
+            },
+            "trust": {
+              "additionalProperties": false,
+              "type": "object",
+              "properties": {
+                "plugin": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs; never run.",
+                  "type": "object",
+                  "required": [
+                    "run"
+                  ],
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "const": "project",
+                          "type": "string"
+                        },
+                        {
+                          "const": "user",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "skill": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs; never run.",
+                  "type": "object",
+                  "required": [
+                    "run"
+                  ],
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "const": "project",
+                          "type": "string"
+                        },
+                        {
+                          "const": "user",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "agent": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs; never run.",
+                  "type": "object",
+                  "required": [
+                    "run"
+                  ],
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "const": "project",
+                          "type": "string"
+                        },
+                        {
+                          "const": "user",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "reload": {
+              "type": "string"
+            },
+            "origin": {
+              "description": "`built-in`, or the path of the file that defines it.",
+              "type": "string"
+            },
+            "aliases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "harness": {
+          "additionalProperties": false,
+          "description": "As aireg 0.1 knew it.",
+          "type": "object",
+          "required": [
+            "name",
+            "displayName",
+            "projectRoot",
+            "userRoot",
+            "detect",
+            "kinds",
+            "reads",
+            "shared",
+            "trust",
+            "origin",
+            "kind"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "displayName": {
+              "type": "string"
+            },
+            "projectRoot": {
+              "type": "string"
+            },
+            "userRoot": {
+              "description": "Expanded, under your home folder.",
+              "type": "string"
+            },
+            "envHome": {
+              "description": "The variable the target reads to move it.",
+              "type": "string"
+            },
+            "envWithin": {
+              "type": "string"
+            },
+            "detect": {
+              "anyOf": [
+                {
+                  "const": "never",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "env",
+                    "binary",
+                    "paths"
+                  ],
+                  "properties": {
+                    "env": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "binary": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "projectRoot": {
+                      "const": false,
+                      "type": "boolean"
+                    }
+                  }
+                }
+              ]
+            },
+            "kinds": {
+              "additionalProperties": false,
+              "type": "object",
+              "properties": {
+                "plugin": {
+                  "description": "Where one kind lands inside the target's folder.",
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "contents",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "directory",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "fan",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "entry": {
+                          "type": "string"
+                        },
+                        "manifest": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "path"
+                            ],
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "register": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "description": "One edit to a config file the target reads: `value`, `upsert` or `append`.",
+                            "type": "object",
+                            "required": [
+                              "file",
+                              "format",
+                              "at"
+                            ],
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "anyOf": [
+                                  {
+                                    "const": "toml",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "json",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "yaml",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "at": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "init": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "conflict": {
+                                "anyOf": [
+                                  {
+                                    "const": "overwrite",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keep",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "remove": {
+                                "anyOf": [
+                                  {
+                                    "const": "ours",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "entry",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "off": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "value": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "upsert": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "key",
+                                  "item"
+                                ],
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^(.*)$": {
+                                        "description": "Text, a number, true or false, a list or a table."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "append": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "const": false,
+                                  "type": "boolean"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "path",
+                                    "body"
+                                  ],
+                                  "properties": {
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "body": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^(.*)$": {
+                                          "description": "Text, a number, true or false, a list or a table."
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir",
+                        "extension"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "render": {
+                          "additionalProperties": false,
+                          "description": "Deprecated: the frontmatter-toml codec.",
+                          "type": "object",
+                          "required": [
+                            "format",
+                            "fields",
+                            "body"
+                          ],
+                          "properties": {
+                            "format": {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "skill": {
+                  "description": "Where one kind lands inside the target's folder.",
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "contents",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "directory",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "fan",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "entry": {
+                          "type": "string"
+                        },
+                        "manifest": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "path"
+                            ],
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "register": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "description": "One edit to a config file the target reads: `value`, `upsert` or `append`.",
+                            "type": "object",
+                            "required": [
+                              "file",
+                              "format",
+                              "at"
+                            ],
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "anyOf": [
+                                  {
+                                    "const": "toml",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "json",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "yaml",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "at": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "init": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "conflict": {
+                                "anyOf": [
+                                  {
+                                    "const": "overwrite",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keep",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "remove": {
+                                "anyOf": [
+                                  {
+                                    "const": "ours",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "entry",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "off": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "value": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "upsert": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "key",
+                                  "item"
+                                ],
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^(.*)$": {
+                                        "description": "Text, a number, true or false, a list or a table."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "append": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "const": false,
+                                  "type": "boolean"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "path",
+                                    "body"
+                                  ],
+                                  "properties": {
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "body": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^(.*)$": {
+                                          "description": "Text, a number, true or false, a list or a table."
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir",
+                        "extension"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "render": {
+                          "additionalProperties": false,
+                          "description": "Deprecated: the frontmatter-toml codec.",
+                          "type": "object",
+                          "required": [
+                            "format",
+                            "fields",
+                            "body"
+                          ],
+                          "properties": {
+                            "format": {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "agent": {
+                  "description": "Where one kind lands inside the target's folder.",
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "contents",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "directory",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "fan",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "entry": {
+                          "type": "string"
+                        },
+                        "manifest": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "path"
+                            ],
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "register": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "description": "One edit to a config file the target reads: `value`, `upsert` or `append`.",
+                            "type": "object",
+                            "required": [
+                              "file",
+                              "format",
+                              "at"
+                            ],
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "anyOf": [
+                                  {
+                                    "const": "toml",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "json",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "yaml",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "at": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "init": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "conflict": {
+                                "anyOf": [
+                                  {
+                                    "const": "overwrite",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keep",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "remove": {
+                                "anyOf": [
+                                  {
+                                    "const": "ours",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "entry",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "off": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "value": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "upsert": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "key",
+                                  "item"
+                                ],
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^(.*)$": {
+                                        "description": "Text, a number, true or false, a list or a table."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "append": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "const": false,
+                                  "type": "boolean"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "path",
+                                    "body"
+                                  ],
+                                  "properties": {
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "body": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^(.*)$": {
+                                          "description": "Text, a number, true or false, a list or a table."
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir",
+                        "extension"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "render": {
+                          "additionalProperties": false,
+                          "description": "Deprecated: the frontmatter-toml codec.",
+                          "type": "object",
+                          "required": [
+                            "format",
+                            "fields",
+                            "body"
+                          ],
+                          "properties": {
+                            "format": {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "reads": {
+              "additionalProperties": false,
+              "type": "object",
+              "properties": {
+                "plugin": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "skill": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "agent": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "shared": {
+              "type": "boolean"
+            },
+            "verified": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "command",
+                "range"
+              ],
+              "properties": {
+                "command": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "range": {
+                  "type": "string"
+                }
+              }
+            },
+            "trust": {
+              "additionalProperties": false,
+              "type": "object",
+              "properties": {
+                "plugin": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs; never run.",
+                  "type": "object",
+                  "required": [
+                    "run"
+                  ],
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "const": "project",
+                          "type": "string"
+                        },
+                        {
+                          "const": "user",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "skill": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs; never run.",
+                  "type": "object",
+                  "required": [
+                    "run"
+                  ],
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "const": "project",
+                          "type": "string"
+                        },
+                        {
+                          "const": "user",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "agent": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs; never run.",
+                  "type": "object",
+                  "required": [
+                    "run"
+                  ],
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "const": "project",
+                          "type": "string"
+                        },
+                        {
+                          "const": "user",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "reload": {
+              "type": "string"
+            },
+            "origin": {
+              "description": "`built-in`, or the path of the file that defines it.",
+              "type": "string"
+            },
+            "kind": {
+              "description": "aireg 0.1's name for the category.",
+              "anyOf": [
+                {
+                  "const": "coding",
+                  "type": "string"
+                },
+                {
+                  "const": "personal",
+                  "type": "string"
+                },
+                {
+                  "const": "shared",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "check": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "problems",
+        "warnings"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "id": {
+          "description": "Absent when the file defines no usable target.",
+          "type": "string"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

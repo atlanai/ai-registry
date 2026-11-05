@@ -6,23 +6,15 @@ import type { CommandContext } from "#cli/commands/command.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { addAddress } from "./from-address.ts";
 import type { Parsed } from "./options.ts";
+import { emitAdded } from "./render.ts";
 
-/**
- * Adds what another installer's lock file records, one source at a time, taking over each copy
- * already on disk that holds exactly what aireg installs.
- */
+/** Takes over each copy already on disk that holds exactly what aireg installs. */
 export async function addFrom(
   context: CommandContext,
   parsed: Parsed,
   from: string,
 ): Promise<void> {
-  const { positionals, common, own } = parsed;
-  if (positionals.length > 0 || own.registry !== undefined || common.select !== undefined) {
-    throw new AiregError("`aireg add --from` takes no address and no -s.", {
-      code: ErrorCode.Usage,
-      hint: "Run `aireg add --from <file>` on its own: the file says what to add.",
-    });
-  }
+  const { common, own } = parsed;
   const lock = await readSkillLock(resolve(context.cwd, expandHome(from)));
   for (const skipped of lock.skipped) context.printer.warning(skipped);
   if (lock.skills.length === 0) {
@@ -47,7 +39,7 @@ export async function addFrom(
     const names = skills.map((skill) =>
       skill.folder === "." ? skill.name : basename(skill.folder),
     );
-    await addAddress(
+    const added = await addAddress(
       context,
       {
         positionals: [first.address],
@@ -56,5 +48,6 @@ export async function addFrom(
       },
       new Set(names),
     );
+    if (added !== undefined) emitAdded(context.printer, added);
   }
 }
