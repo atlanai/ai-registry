@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
@@ -106,5 +107,19 @@ describe("usage events", () => {
     } finally {
       server.close();
     }
+  });
+  test("leaves no home behind after self uninstall, and gives no notice once it is gone", async ({
+    aireg,
+    home,
+  }) => {
+    // A collector stands in for a release build's server; nothing is sent on these runs.
+    const env = { AIREG_TELEMETRY_URL: "http://127.0.0.1:9/t", CI: "" };
+    expect((await aireg(["config", "list"], { env })).stderr).toContain("collects usage data");
+    expect(existsSync(home.aireg)).toBe(true);
+
+    const removed = await aireg(["self", "uninstall", "--yes"], { env });
+    expect(removed.code, removed.stderr).toBe(0);
+    expect(removed.stderr).not.toContain("collects usage data");
+    expect(existsSync(home.aireg)).toBe(false);
   });
 });
