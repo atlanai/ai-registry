@@ -310,8 +310,11 @@ async function runCommand(
   } finally {
     // As above: scheduling the check never changes how the command ended.
     if (checksUpdates) await scheduleUpdateCheck().catch(() => undefined);
-    await noticeFirst(printer);
-    await flushTelemetry();
+    // `self uninstall` deletes the home; writing the notice's marker would make it again.
+    if (name !== "self") {
+      await noticeFirst(printer);
+      await flushTelemetry();
+    }
     log.close();
   }
 }
