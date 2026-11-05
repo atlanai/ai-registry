@@ -16,11 +16,11 @@ import { recover } from "#core/plan/apply/journal.ts";
 import { build } from "#core/plan/build/build.ts";
 import type { Plan } from "#core/plan/model.ts";
 import { spawnDetached } from "#core/process.ts";
-import { NAME } from "#core/product.ts";
+import { NAME, REMOVE_AFTER_FLAG } from "#core/product.ts";
 import { runningEntry } from "#core/release/launch.ts";
 import { type Roots, roots, toolHome, userScopeDir } from "#core/store/paths.ts";
 import { resolveTargets } from "#core/target/table.ts";
-import { REMOVE_AFTER_FLAG, removeTree } from "./remove-after-exit.ts";
+import { removeTree } from "./remove-after-exit.ts";
 import { onPathIn } from "./shell-path.ts";
 
 /** The files aireg put on this machine outside projects, as `aireg self uninstall` finds them. */

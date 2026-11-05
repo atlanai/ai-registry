@@ -1,5 +1,5 @@
 import { type TObject, type TSchema, Type } from "@sinclair/typebox";
-import type { ConfigValue as Value } from "#core/target/contract.ts";
+import { TARGET_CATEGORIES, type ConfigValue as Value } from "#core/target/contract.ts";
 
 const PROGRAM = "^[A-Za-z0-9][A-Za-z0-9._+-]*$";
 const VARIABLE = "^[A-Za-z_][A-Za-z0-9_]*$";
@@ -196,7 +196,7 @@ export const Target = Type.Object(
     category: Type.Optional(
       Type.Unsafe<string>({
         type: "string",
-        enum: ["coding-agent", "personal-agent", "shared-folder"],
+        enum: [...TARGET_CATEGORIES],
         description:
           "Groups targets; `coding-agent` when absent. A `shared-folder` is never detected and never a default.",
       }),

@@ -13,7 +13,7 @@ import {
   stat,
 } from "node:fs/promises";
 import { basename, dirname, join, posix } from "node:path";
-import { copyRegular, EXECUTABLE, EXECUTE_BITS, PUBLIC_FILE } from "#adapter/files.ts";
+import { copyRegular, EXECUTABLE, EXECUTE_BITS, isAbsent, PUBLIC_FILE } from "#adapter/files.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isStrictlyWithin, posixRelative } from "#core/fs/path.ts";
 
@@ -57,8 +57,7 @@ export async function entries(dir: string): Promise<Dirent[]> {
   try {
     return await readdir(dir, { withFileTypes: true });
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || code === "ENOTDIR") return [];
+    if (isAbsent(error)) return [];
     throw error;
   }
 }

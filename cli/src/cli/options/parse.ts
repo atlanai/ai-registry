@@ -1,4 +1,5 @@
 import { type ParseArgsConfig, parseArgs } from "node:util";
+import { messageOf } from "#adapter/errors.ts";
 import { isNamespace } from "#adapter/filespec/names.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -45,6 +46,11 @@ export function noArguments(
     `\`aireg ${command}\` takes no argument, not ${quoted(positionals[0] as string)}.`,
     { code: ErrorCode.Usage, hint },
   );
+}
+
+/** A required argument or option is missing; `hint` shows the command with it filled in. */
+export function needsInput(command: string, what: string, hint: string): AiregError {
+  return new AiregError(`\`aireg ${command}\` needs ${what}.`, { code: ErrorCode.Usage, hint });
 }
 
 export function parse<T extends Record<string, unknown>>(
@@ -168,7 +174,7 @@ function optionError(
           : undefined;
     if (problem !== undefined) return new AiregError(problem, { code: ErrorCode.Usage, hint });
   }
-  const message = cause instanceof Error ? cause.message : String(cause);
+  const message = messageOf(cause);
   return new AiregError(message.split("\n")[0] as string, {
     code: ErrorCode.Usage,
     hint,

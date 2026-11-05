@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { plural, quoted } from "#adapter/text.ts";
 import { initAdapter } from "#cli/commands/adapter/init.ts";
 import { ADAPTER_COMMAND } from "#cli/commands/adapter/spec.ts";
-import { parse } from "#cli/options/parse.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
 import { cancel, interaction, interactive } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
@@ -85,10 +85,11 @@ async function install(
   { dryRun, force, yes }: { dryRun: boolean; force: boolean; yes: boolean },
 ): Promise<void> {
   if (raw === undefined) {
-    throw new AiregError("`aireg adapter install` needs an adapter id.", {
-      code: ErrorCode.Usage,
-      hint: "Name the adapter: `aireg adapter install acme`, or `aireg adapter install acme@1.4.0` for one version.",
-    });
+    throw needsInput(
+      "adapter install",
+      "an adapter id",
+      "Name the adapter: `aireg adapter install acme`, or `aireg adapter install acme@1.4.0` for one version.",
+    );
   }
   const want = parseWant(raw);
   if (!dryRun && !yes && !isTrusted(want.id) && !(await consents(context, want.id))) return;
@@ -205,10 +206,11 @@ async function remove(
   dryRun: boolean,
 ): Promise<void> {
   if (raw === undefined) {
-    throw new AiregError("`aireg adapter remove` needs an adapter id.", {
-      code: ErrorCode.Usage,
-      hint: "Name the adapter: `aireg adapter remove <id>`.",
-    });
+    throw needsInput(
+      "adapter remove",
+      "an adapter id",
+      "Name the adapter: `aireg adapter remove <id>`.",
+    );
   }
   const id = parseAdapterId(raw);
   const specifier = (await readConfig()).adapters[id];

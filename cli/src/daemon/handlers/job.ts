@@ -1,4 +1,5 @@
 import { AccountService } from "#accounts/service.ts";
+import { messageOf } from "#adapter/errors.ts";
 import { expandHome } from "#adapter/paths.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
@@ -314,7 +315,7 @@ async function bindAccount(config: RegistryConfig, alias: string): Promise<Accou
   try {
     resolved = await service.resolve({ id: "", registry: alias });
   } catch (cause) {
-    throw new ProtocolError(RpcErrorCode.InvalidParams, (cause as Error).message);
+    throw new ProtocolError(RpcErrorCode.InvalidParams, messageOf(cause));
   }
   if (resolved.adapter.auth !== undefined) {
     throw new ProtocolError(

@@ -2,13 +2,13 @@ import { resolve } from "node:path";
 import { list as listOf } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { addContributedJob } from "#cli/commands/job/contributed.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { underHome } from "#cli/render/home.ts";
 import { adapterFor, declaredLayout } from "#core/adapter/load.ts";
 import { expandLocation } from "#core/adapter/location.ts";
 import { readOnlyLayout } from "#core/adapter/read-only.ts";
 import { watchedFolders } from "#core/config/jobs.ts";
 import type { Job } from "#core/config/model.ts";
-import { AiregError, ErrorCode } from "#core/errors.ts";
 import { stepForFlags } from "#core/host/load.ts";
 import { unknownRegistry } from "#core/manifest/errors.ts";
 import { readManifest } from "#core/manifest/repository.ts";
@@ -76,12 +76,12 @@ async function plannedJob(
   const origins = originsOf(own, context.cwd);
   const alias = own.registry ?? origins?.to.split("/")[0];
   if (alias === undefined) {
-    throw new AiregError("`aireg job add` needs --registry, or --watch with --to.", {
-      code: ErrorCode.Usage,
-      hint:
-        "Name the registry: `aireg job add --registry <registry>`, " +
+    throw needsInput(
+      "job add",
+      "--registry, or --watch with --to",
+      "Name the registry: `aireg job add --registry <registry>`, " +
         "or `aireg job add --watch <folder> --to <registry>/<namespace>`.",
-    });
+    );
   }
   const scope = common.scope ?? "project";
   const jobRoot = scope === "user" ? userScopeDir() : resolve(context.cwd, root ?? ".");

@@ -1,6 +1,6 @@
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { sha256Hex } from "#core/fs/hash.ts";
-import { NAME } from "#core/product.ts";
+import { NAME, releaseBinary } from "#core/product.ts";
 import { VERSION } from "#core/version.ts";
 import {
   artifactNamed,
@@ -9,7 +9,7 @@ import {
   verifyManifest,
 } from "./manifest.ts";
 import { artifactUrl, manifestUrl } from "./origin.ts";
-import { binaryName, requireReleasePlatform } from "./platform.ts";
+import { requireReleasePlatform } from "./platform.ts";
 import type { ReleaseStamp } from "./stamp.ts";
 
 export interface ManifestPlan {
@@ -40,7 +40,7 @@ export async function fetchManifest(
 }
 
 export function manifestPlan(stamp: ReleaseStamp, manifest: ReleaseManifest): ManifestPlan {
-  const name = binaryName(requireReleasePlatform());
+  const name = releaseBinary(requireReleasePlatform());
   const entry = artifactNamed(manifest, name);
   if (entry === undefined)
     throw new AiregError(`Release ${manifest.version} has no ${name}.`, {

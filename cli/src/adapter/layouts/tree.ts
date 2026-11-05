@@ -1,7 +1,7 @@
 import type { Dirent } from "node:fs";
 import { lstat, readdir } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { EXECUTE_BITS } from "../files.ts";
+import { EXECUTE_BITS, isAbsent } from "../files.ts";
 import { type ReadPath, SpecError } from "../filespec/documents.ts";
 import { registryPath, rootReader } from "../filespec/folder.ts";
 import { plural } from "../text.ts";
@@ -84,7 +84,7 @@ export async function openTree(root: string, limits: TreeLimits = TREE_LIMITS): 
     const folder = dir === "" ? root : await registryPath(root, dir);
     const entries = await readdir(folder, { withFileTypes: true }).catch(
       (error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT" || error.code === "ENOTDIR") return [];
+        if (isAbsent(error)) return [];
         throw new SpecError(`${dir || "."} cannot be read: ${error.message}`, { path: dir });
       },
     );

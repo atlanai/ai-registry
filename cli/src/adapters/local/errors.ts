@@ -1,23 +1,26 @@
-import { AdapterError, SpecError } from "#adapter/index.ts";
+import { messageOf } from "#adapter/errors.ts";
+import { AdapterError, type Failure, SpecError } from "#adapter/index.ts";
 
 export const ID = "local";
 
 export function fail(
-  failure: "invalid" | "not_found" | "conflict",
+  failure: Extract<Failure, "invalid" | "not_found" | "conflict">,
   message: string,
-  artifact?: string,
-  hint?: string,
+  options: { artifact?: string | undefined; hint?: string | undefined } = {},
 ): AdapterError {
-  return new AdapterError(ID, failure, message, { artifact, hint });
+  return new AdapterError(ID, failure, message, options);
 }
 
 /** A failure as this adapter's, so a spec problem never reads as an unclassified throw. */
 export function translated(error: unknown): AdapterError {
   if (error instanceof AdapterError) return error;
   if (error instanceof SpecError) {
-    return fail(error.missing ? "not_found" : "invalid", error.message, error.artifact, error.hint);
+    return fail(error.missing ? "not_found" : "invalid", error.message, {
+      artifact: error.artifact,
+      hint: error.hint,
+    });
   }
-  return fail("invalid", error instanceof Error ? error.message : String(error));
+  return fail("invalid", messageOf(error));
 }
 
 /** One boundary where a thrown failure becomes an `AdapterError`. */

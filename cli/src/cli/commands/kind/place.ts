@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { basename, join, relative, sep } from "node:path";
-import { isNamespace } from "#adapter/filespec/names.ts";
+import { ARTIFACTS_DIR, isNamespace } from "#adapter/filespec/names.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
@@ -24,7 +24,9 @@ export async function namespaceFor(
   if (own.namespace !== undefined) return valid(own.namespace);
   const inside = namespaceHere(root, cwd);
   if (inside !== undefined) return inside;
-  const existing = (await readdir(join(root, "artifacts"), { withFileTypes: true }).catch(() => []))
+  const existing = (
+    await readdir(join(root, ARTIFACTS_DIR), { withFileTypes: true }).catch(() => [])
+  )
     .filter((item) => item.isDirectory() && isNamespace(item.name))
     .map((item) => item.name)
     .sort();
@@ -55,7 +57,7 @@ export async function namespaceFor(
 }
 
 function namespaceHere(root: string, cwd: string): string | undefined {
-  const artifacts = join(root, "artifacts");
+  const artifacts = join(root, ARTIFACTS_DIR);
   if (!isWithin(artifacts, cwd)) return undefined;
   const inside = relative(artifacts, cwd).split(sep)[0];
   return inside !== undefined && isNamespace(inside) ? inside : undefined;
@@ -78,7 +80,7 @@ export async function registryPlace(
     cancel(step);
     return undefined;
   }
-  const home = join(root, "artifacts", namespace, kind, name);
+  const home = join(root, ARTIFACTS_DIR, namespace, kind, name);
   if (existsSync(home)) {
     throw new AiregError(`${namespace}/${kind}/${name} already exists.`, {
       code: ErrorCode.Conflict,
@@ -118,10 +120,10 @@ export async function locate(
 ): Promise<string> {
   const wanted = namespace ?? namespaceHere(root, cwd);
   const candidates = (
-    await readdir(join(root, "artifacts"), { withFileTypes: true }).catch(() => [])
+    await readdir(join(root, ARTIFACTS_DIR), { withFileTypes: true }).catch(() => [])
   )
     .filter((item) => item.isDirectory() && (wanted === undefined || item.name === wanted))
-    .map((item) => join(root, "artifacts", item.name, kind, name))
+    .map((item) => join(root, ARTIFACTS_DIR, item.name, kind, name))
     .filter((path) => existsSync(path));
   if (candidates.length === 1) return candidates[0] as string;
   if (candidates.length === 0) {

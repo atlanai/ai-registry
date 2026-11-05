@@ -105,4 +105,16 @@ describe("assembling a projection", () => {
     ) as unknown;
     expect(manifest).toEqual({ ...own, name: "kit-toolkit" });
   });
+
+  test("writes a target's manifest over the one the plugin ships, rather than through a link to it", async () => {
+    await publish("skills", "lint");
+    await mkdir(join(content(), ".cursor-plugin"), { recursive: true });
+    await writeFile(join(content(), ".cursor-plugin", "plugin.json"), '{"name":"toolkit"}');
+    await assemble(projection(), content(), ["cursor"]);
+
+    expect((await lstat(join(projection(), ".cursor-plugin"))).isSymbolicLink()).toBe(false);
+    expect(await readFile(join(content(), ".cursor-plugin", "plugin.json"), "utf8")).toBe(
+      '{"name":"toolkit"}',
+    );
+  });
 });

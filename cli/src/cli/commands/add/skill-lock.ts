@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { posix } from "node:path";
+import { isRecord } from "#adapter/fields.ts";
 import { isArtifactName } from "#adapter/filespec/names.ts";
+import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeText } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { isRecord } from "#core/fields.ts";
 
 /** One skill another installer recorded, as aireg reads it again. */
 export interface LockedSkill {
@@ -104,7 +105,7 @@ function addressOf(entry: Record<string, unknown>): string | { skip: string } {
 /** `skills/pdf/SKILL.md` is the folder `skills/pdf`; the root's SKILL.md is the whole source. */
 function folderOf(path: string | undefined): string | undefined {
   if (path === undefined) return undefined;
-  const folder = path.endsWith("SKILL.md") ? posix.dirname(path) : path.replace(/\/+$/, "");
+  const folder = path.endsWith(SKILL_ENTRY) ? posix.dirname(path) : path.replace(/\/+$/, "");
   if (folder === "." || folder === "") return ".";
   return isSafePath(folder) ? folder : undefined;
 }

@@ -2,9 +2,10 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import type { Lock } from "#core/lock.ts";
 import type { ApplyResult } from "#core/plan/apply/run.ts";
-import { type Action, emptyPlan } from "#core/plan/model.ts";
+import type { Action } from "#core/plan/model.ts";
 import { resolveTargets } from "#core/target/table.ts";
 import { Printer } from "#core/term/printer.ts";
+import { emptyPlan } from "#test/kit/builders/plan.ts";
 import { planReport, summarize } from "./plan.ts";
 
 function printed(

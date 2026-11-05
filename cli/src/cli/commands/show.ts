@@ -1,12 +1,13 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
+import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { list, quoted, sanitizeBlock, sanitizeName } from "#adapter/text.ts";
 import { SHOW_COMMAND } from "#cli/commands/show/spec.ts";
-import { parse } from "#cli/options/parse.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { expandUserPath, isMissing } from "#core/fs/path.ts";
 import { isDirectory } from "#core/fs/tree.ts";
-import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY } from "#core/kinds.ts";
 import { type Carried, carries, describeCarried } from "#core/plan/carries.ts";
 import { parseRef } from "#core/ref.ts";
 import {
@@ -31,10 +32,11 @@ export async function run(context: CommandContext): Promise<void> {
   );
   const input = positionals[0];
   if (input === undefined) {
-    throw new AiregError("`aireg show` needs an artifact address.", {
-      code: ErrorCode.Usage,
-      hint: "Name one: `aireg show <registry>/<namespace>/<name>`, or `aireg show <namespace>/<name> --registry <registry>`.",
-    });
+    throw needsInput(
+      "show",
+      "an artifact address",
+      "Name one: `aireg show <registry>/<namespace>/<name>`, or `aireg show <namespace>/<name> --registry <registry>`.",
+    );
   }
 
   const registry = own.registry;

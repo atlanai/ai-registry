@@ -1,6 +1,7 @@
 import { stringify } from "yaml";
+import { messageOf } from "#adapter/errors.ts";
+import { isRecord } from "#adapter/fields.ts";
 import { quoted } from "#adapter/text.ts";
-import { isRecord } from "#core/fields.ts";
 import { isAdapterId } from "#core/release/origin.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { resolveTargets } from "#core/target/table.ts";
@@ -26,7 +27,7 @@ export function parseConfig(contents: string, filename = "config.yml"): Registry
   try {
     document = parseYaml(contents);
   } catch (cause) {
-    const first = (cause as Error).message.split("\n")[0]?.replace(/:$/, "");
+    const first = messageOf(cause).split("\n")[0]?.replace(/:$/, "");
     throw new ConfigError(`${filename} is not valid YAML: ${first}.`);
   }
   try {

@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { BINARY_NAME } from "./platform.ts";
+import { NAME } from "#core/product.ts";
 
 export interface Launch {
   readonly command: string;
@@ -29,5 +29,5 @@ export function runningEntry(
   execPath: string = process.execPath,
 ): string | undefined {
   const name = basename(execPath).replace(/\.exe$/i, "");
-  return name === BINARY_NAME ? execPath : argv[1];
+  return name === NAME ? execPath : argv[1];
 }

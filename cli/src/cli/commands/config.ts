@@ -1,6 +1,6 @@
 import { list as listOf, quoted } from "#adapter/text.ts";
 import { CONFIG_COMMAND } from "#cli/commands/config/spec.ts";
-import { parse } from "#cli/options/parse.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import { closest, didYouMean } from "#cli/options/suggest.ts";
 import type { RegistryConfig } from "#core/config/model.ts";
 import { isNameCollision, isNamespaceAddress, nameCollisionOf } from "#core/config/model.ts";
@@ -125,10 +125,11 @@ async function set(
   if (key === undefined) throw needsKey("set", "aireg config set <key> <value>");
   if (!isKey(key)) throw unknownSetting(key);
   if (value === undefined) {
-    throw new AiregError(`\`aireg config set\` needs a value for ${key}.`, {
-      code: ErrorCode.Usage,
-      hint: `Name the value: \`aireg config set ${key} ${SETTINGS[key].value}\`.`,
-    });
+    throw needsInput(
+      "config set",
+      `a value for ${key}`,
+      `Name the value: \`aireg config set ${key} ${SETTINGS[key].value}\`.`,
+    );
   }
 
   // Each setting checks its value; the file parser would name the file instead.
@@ -142,10 +143,11 @@ async function set(
 }
 
 function needsKey(action: string, usage: string): AiregError {
-  return new AiregError(`\`aireg config ${action}\` needs a setting name.`, {
-    code: ErrorCode.Usage,
-    hint: `Name the setting: \`${usage}\`. ${settings()}`,
-  });
+  return needsInput(
+    `config ${action}`,
+    "a setting name",
+    `Name the setting: \`${usage}\`. ${settings()}`,
+  );
 }
 
 function settings(): string {

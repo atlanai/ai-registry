@@ -1,8 +1,10 @@
 import { join, posix } from "node:path";
+import { isRecord } from "#adapter/fields.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { newest } from "#adapter/filespec/merge.ts";
 import {
+  ARTIFACTS_DIR,
   ENVELOPE,
   INDEX_DOCUMENT,
   isArtifactName,
@@ -14,7 +16,6 @@ import {
 import { contentDigest, type Envelope } from "#adapter/index.ts";
 import { catalogDigest } from "#adapter/spec/canonical.ts";
 import { isVersion } from "#adapter/spec/ref.ts";
-import { isRecord } from "#core/fields.ts";
 import { exists, subdirectories } from "#core/fs/tree.ts";
 import { type Problem, readDocument } from "./read.ts";
 
@@ -56,7 +57,7 @@ export async function catalogProblems(
 /** Each `<namespace>/<kind>/<name>` with a `versions.json`, even one with no version folder left. */
 async function catalogued(root: string): Promise<string[]> {
   const found: string[] = [];
-  const base = join(root, "artifacts");
+  const base = join(root, ARTIFACTS_DIR);
   for (const namespace of (await subdirectories(base)).filter(isNamespace)) {
     for (const kind of (await subdirectories(join(base, namespace))).filter(isKindSegment)) {
       for (const name of await subdirectories(join(base, namespace, kind))) {

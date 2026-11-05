@@ -10,8 +10,8 @@ import {
   DEFAULT_INTERVAL_SECONDS,
   isBuiltinStepKind,
   isNamespaceAddress,
+  isRootedStepKind,
   type Job,
-  ROOTED_STEP_KINDS,
   type Schedule,
   type Selector,
   STEP_FIELDS,
@@ -135,7 +135,7 @@ function step(read: Readers, value: unknown, where: string): Step {
     parsed.to = to;
   }
 
-  if ((ROOTED_STEP_KINDS as readonly string[]).includes(kind) && parsed.root === undefined) {
+  if (isRootedStepKind(kind) && parsed.root === undefined) {
     throw read.fail(`\`${where}\` is a ${kind} step, so it needs a \`root\`.`);
   }
   if (kind === "origins") {

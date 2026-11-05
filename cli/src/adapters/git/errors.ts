@@ -1,4 +1,4 @@
-import { AdapterError, SpecError } from "#adapter/index.ts";
+import { AdapterError, type Failure, SpecError } from "#adapter/index.ts";
 
 export const ID = "git";
 
@@ -7,11 +7,11 @@ export const CREDENTIALS =
   "Sign in with git: run `gh auth login`, or set up a git credential helper.";
 
 export function fail(
-  failure: "invalid" | "not_found",
+  failure: Extract<Failure, "invalid" | "not_found">,
   message: string,
-  artifact?: string,
+  options: { artifact?: string | undefined; hint?: string | undefined } = {},
 ): AdapterError {
-  return new AdapterError(ID, failure, message, { artifact });
+  return new AdapterError(ID, failure, message, options);
 }
 
 /** The file spec speaks its own failures; the client only ever sees the contract's. */

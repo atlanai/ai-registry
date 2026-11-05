@@ -4,7 +4,7 @@ import type { CommandContext } from "#cli/commands/command.ts";
 import { emptyRegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { NAME } from "#core/product.ts";
-import { EMPTY_RUN_COUNTS, type RunEvent, type RunRecord } from "#core/run/model.ts";
+import { EMPTY_RUN_COUNTS, type RunEvent, RunEventType, type RunRecord } from "#core/run/model.ts";
 import { Printer } from "#core/term/printer.ts";
 import type { RpcClient } from "#daemon/rpc/client.ts";
 import { privateDirectory, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
@@ -46,7 +46,7 @@ const record: RunRecord = {
   counts: EMPTY_RUN_COUNTS,
 } as unknown as RunRecord;
 
-function event(id: number, eventType = "artifact.progress"): RunEvent {
+function event(id: number, eventType: RunEventType = RunEventType.Progress): RunEvent {
   return {
     id,
     runId: RUN_ID,
@@ -134,7 +134,7 @@ describe.skipIf(process.platform === "win32")("aireg job runs <id>", () => {
     await vi.waitFor(() => expect(printed).toHaveLength(2));
     server.broadcast("run.event", event(2));
     server.broadcast("run.event", event(3));
-    server.broadcast("run.event", event(4, "run.finished"));
+    server.broadcast("run.event", event(4, RunEventType.Finished));
     await following;
 
     expect(printed.map((line) => (line as { data: { event: RunEvent } }).data.event.id)).toEqual([

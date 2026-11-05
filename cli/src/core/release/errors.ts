@@ -1,3 +1,4 @@
+import { messageOf } from "#adapter/errors.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 
 const RELEASE_CODES: ReadonlySet<ErrorCode> = new Set([
@@ -16,7 +17,7 @@ export function withReleaseHint(error: unknown, hint: string): AiregError {
     if (error.hint !== undefined || !RELEASE_CODES.has(error.code)) return error;
     return new AiregError(error.message, { code: error.code, hint, cause: error.cause });
   }
-  return new AiregError(error instanceof Error ? error.message : String(error), {
+  return new AiregError(messageOf(error), {
     hint,
     cause: error,
   });

@@ -1,7 +1,4 @@
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { NAME, releaseBinary } from "#core/product.ts";
-
-export const BINARY_NAME = NAME;
 
 /**
  * A closed set, because the artifact filename is a path segment on the release
@@ -55,9 +52,4 @@ export function requireReleasePlatform(
       code: ErrorCode.Unavailable,
     });
   return found;
-}
-
-/** The single executable this platform downloads; there is nothing to unpack. */
-export function binaryName(platform: ReleasePlatform): string {
-  return releaseBinary(platform);
 }

@@ -1,14 +1,6 @@
 import { describe, expect, test } from "vitest";
-import {
-  hasOnly,
-  isRecord,
-  namesOf,
-  parseDuration,
-  readers,
-  textMapOf,
-  textOf,
-  unknownKeys,
-} from "./fields.ts";
+import { isRecord, textOf } from "#adapter/fields.ts";
+import { hasOnly, namesOf, parseDuration, readers, textMapOf, unknownKeys } from "./fields.ts";
 
 describe("the plain readers", () => {
   test("take a mapping, and not null or a list", () => {

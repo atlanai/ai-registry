@@ -1,3 +1,4 @@
+import { unlockCommand } from "#core/lease/errors.ts";
 import type { LeaseHolder } from "#core/lease/holder.ts";
 import { withLease } from "#core/lease/lease.ts";
 import { type Lock, readLock } from "#core/lock.ts";
@@ -5,6 +6,7 @@ import { formatManifest } from "#core/manifest/format.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { readManifest } from "#core/manifest/repository.ts";
 import type { Roots, Scope } from "#core/store/paths.ts";
+import { scopeName } from "#core/store/paths.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { resolveTargets } from "#core/target/table.ts";
 import type { Printer } from "#core/term/printer.ts";
@@ -48,11 +50,8 @@ export async function withScope<T>(
 /** Said at once, without --verbose: a silent wait reads as a hang. */
 function waiting(printer: Printer, scope: Scope, holder: LeaseHolder | undefined): void {
   const who = holder === undefined ? `another aireg process` : `aireg (pid ${holder.pid})`;
-  const where = scope === "user" ? "your user scope" : "this project";
-  printer.warning(`Waiting for ${who} to finish writing ${where}.`);
-  printer.hint(
-    `Wait for it to finish, or run \`aireg unlock${scope === "user" ? " -g" : ""}\` if it has stopped.`,
-  );
+  printer.warning(`Waiting for ${who} to finish writing ${scopeName(scope)}.`);
+  printer.hint(`Wait for it to finish, or run ${unlockCommand(scope)} if it has stopped.`);
 }
 
 export async function read(roots: Roots): Promise<Loaded> {

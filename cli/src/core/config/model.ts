@@ -41,10 +41,7 @@ export function isStepPolicy(value: string): value is StepPolicy {
   return (STEP_POLICIES as readonly string[]).includes(value);
 }
 
-/**
- * Kinds aireg implements. `artifacts` is composite: it expands to `pull`,
- * `publish`, `prune` before anything runs, so the leaves are what executes.
- */
+/** Kinds aireg implements; every other kind is an adapter's. */
 const BUILTIN_STEP_KINDS = [
   "origins",
   "artifacts",
@@ -54,41 +51,41 @@ const BUILTIN_STEP_KINDS = [
   "adopt",
   "claim",
 ] as const;
-
 export type BuiltinStepKind = (typeof BUILTIN_STEP_KINDS)[number];
+
+interface BuiltinStep {
+  /** Reconciles a whole scope, and so must be told which one. */
+  rooted: boolean;
+  /** Expanded before anything runs, in the order their dependencies demand. */
+  leaves?: readonly BuiltinStepKind[];
+}
+
+const BUILTIN_STEPS: Readonly<Record<BuiltinStepKind, BuiltinStep>> = {
+  origins: { rooted: false },
+  artifacts: { rooted: true, leaves: ["pull", "publish", "prune"] },
+  pull: { rooted: true },
+  publish: { rooted: true },
+  prune: { rooted: true },
+  adopt: { rooted: true },
+  claim: { rooted: true },
+};
 
 export function isBuiltinStepKind(value: string): value is BuiltinStepKind {
   return (BUILTIN_STEP_KINDS as readonly string[]).includes(value);
 }
 
-/** Kinds aireg reconciles a scope with, once composites are expanded; the rest are an adapter's. */
-const SCOPE_STEP_KINDS = [
-  "origins",
-  "pull",
-  "publish",
-  "prune",
-  "adopt",
-  "claim",
-] as const satisfies readonly BuiltinStepKind[];
-
+/** A kind aireg reconciles a scope with, once composites are expanded. */
 export function isScopeStep(step: Pick<Step, "kind">): boolean {
-  return (SCOPE_STEP_KINDS as readonly string[]).includes(step.kind);
+  return isBuiltinStepKind(step.kind) && BUILTIN_STEPS[step.kind].leaves === undefined;
 }
 
-/** Kinds that reconcile a whole scope, and so need to be told which one. */
-export const ROOTED_STEP_KINDS = [
-  "artifacts",
-  "pull",
-  "publish",
-  "prune",
-  "adopt",
-  "claim",
-] as const satisfies readonly BuiltinStepKind[];
+export function isRootedStepKind(kind: string): boolean {
+  return isBuiltinStepKind(kind) && BUILTIN_STEPS[kind].rooted;
+}
 
-/** The leaves `artifacts` stands for, in the order their dependencies demand. */
-export const COMPOSITE_STEPS: Readonly<Record<string, readonly BuiltinStepKind[]>> = Object.freeze({
-  artifacts: ["pull", "publish", "prune"],
-});
+export function compositeLeaves(kind: string): readonly BuiltinStepKind[] | undefined {
+  return isBuiltinStepKind(kind) ? BUILTIN_STEPS[kind].leaves : undefined;
+}
 
 /** The fields aireg names; every other one on a step is its adapter's. */
 export const STEP_FIELDS = [

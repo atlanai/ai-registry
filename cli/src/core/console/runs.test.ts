@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { emptyRegistryConfig } from "#core/config/model.ts";
-import { EMPTY_RUN_COUNTS, ITEM_EVENT, type RunEvent, type RunRecord } from "#core/run/model.ts";
+import { EMPTY_RUN_COUNTS, type RunEvent, RunEventType, type RunRecord } from "#core/run/model.ts";
 import { carriedPaths, jobRows, newestFinished, upstreamFacts } from "./runs.ts";
 
 function event(over: Partial<RunEvent>): RunEvent {
@@ -9,7 +9,7 @@ function event(over: Partial<RunEvent>): RunEvent {
     runId: "run_1",
     seq: 1,
     occurredAtMs: 0,
-    eventType: ITEM_EVENT,
+    eventType: RunEventType.ItemSettled,
     step: "pull",
     artifact: undefined,
     kind: undefined,

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, vi } from "vitest";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { emptyRegistryConfig } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
+import { RunEventType } from "#core/run/model.ts";
 import { Printer } from "#core/term/printer.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { run } from "./resolve.ts";
@@ -45,7 +46,7 @@ describe("aireg sync resolve --job", () => {
     const asked: unknown[] = [];
     const counts = { examined: 1, changed: 1, skipped: 0, attention: 0, failed: 0 };
     const finished = { id: "run_1", state: "succeeded", counts };
-    const ended = { id: 1, runId: "run_1", eventType: "run.finished", data: {} };
+    const ended = { id: 1, runId: "run_1", eventType: RunEventType.Finished, data: {} };
     const answers: Record<string, unknown> = {
       "conflict.resolve": { run: { id: "run_1", state: "queued" } },
       "run.events": { events: [ended], hasMore: false },

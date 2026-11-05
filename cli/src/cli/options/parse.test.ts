@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { AS } from "./flags.ts";
-import { type Accepts, parse } from "./parse.ts";
+import { type Accepts, needsInput, parse } from "./parse.ts";
 
 const GROUP: Accepts = {
   name: "group",
@@ -69,5 +69,14 @@ describe("parse, for --as", () => {
       expect(error.message, alias).toMatch(/^--as takes a name such as acme, not /);
     }
     expect(refusal(["add", "x", "--as", "a\u202Eb"], ADD).message).toContain('"a\\u202Eb"');
+  });
+});
+
+describe("needsInput", () => {
+  test("names the command and what it is missing, as a usage error", () => {
+    const error = needsInput("job show", "a job name", "Name the job.");
+    expect(error.message).toBe("`aireg job show` needs a job name.");
+    expect(error.code).toBe(ErrorCode.Usage);
+    expect(error.hint).toBe("Name the job.");
   });
 });

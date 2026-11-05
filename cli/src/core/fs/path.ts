@@ -26,12 +26,6 @@ export function isStrictlyWithin(dir: string, path: string): boolean {
   return isWithin(dir, path) && relative(resolve(dir), resolve(path)) !== "";
 }
 
-/** Nothing is at the path, or an ancestor of it is a file, so nothing can be. */
-export function isAbsent(error: unknown): boolean {
-  const code = (error as NodeJS.ErrnoException | undefined)?.code;
-  return code === "ENOENT" || code === "ENOTDIR";
-}
-
 /** Nothing is at the path a filesystem call was given. */
 export function isMissing(error: unknown): boolean {
   return (error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";

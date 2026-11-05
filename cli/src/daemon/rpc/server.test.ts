@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { RunEvent } from "#core/run/model.ts";
+import { RunEventType } from "#core/run/model.ts";
 import { RpcErrorCode } from "./codes.ts";
 import { PROTOCOL_VERSION } from "./methods.ts";
 import { DaemonAlreadyRunningError, RpcServer } from "./server.ts";
@@ -117,7 +118,13 @@ async function client(
 
 /** A run event carrying `data` of any size, for the frame limits. */
 function huge(data: string): RunEvent {
-  return { id: 1, runId: "run_1", occurredAtMs: 0, eventType: "run.phase", data } as RunEvent;
+  return {
+    id: 1,
+    runId: "run_1",
+    occurredAtMs: 0,
+    eventType: RunEventType.Phase,
+    data,
+  } as RunEvent;
 }
 
 function send(socket: Socket, message: Record<string, unknown>): void {

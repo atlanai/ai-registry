@@ -1,5 +1,6 @@
 import { isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { messageOf } from "#adapter/errors.ts";
 import { AdapterError } from "#adapter/index.ts";
 import { assertWithin } from "#adapter/paths.ts";
 import type { HookEvent, HookStage, PipelineHook } from "#core/config/hook-stages.ts";
@@ -43,7 +44,7 @@ async function invoke(hook: PipelineHook, event: HookEvent, home: string): Promi
     await handler(event);
   } catch (cause) {
     if (cause instanceof AdapterError) throw cause;
-    const message = cause instanceof Error ? cause.message : String(cause);
+    const message = messageOf(cause);
     throw new AdapterError("hooks", "invalid", `${hook.id} rejected ${event.stage}: ${message}`, {
       cause,
       problem: {

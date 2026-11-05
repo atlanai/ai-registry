@@ -3,6 +3,7 @@ import { constants, createWriteStream, lstatSync, type Stats } from "node:fs";
 import { type FileHandle, lstat, mkdir, open, rename, rm } from "node:fs/promises";
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
+import { setTimeout as sleep } from "node:timers/promises";
 import { assertWithin } from "./paths.ts";
 import { hashStream } from "./spec/canonical.ts";
 
@@ -11,7 +12,9 @@ import { hashStream } from "./spec/canonical.ts";
 
 /** Modes a copied file is written with, and the mask that says it was executable. */
 export const PUBLIC_FILE = 0o644;
+
 export const EXECUTABLE = 0o755;
+
 export const EXECUTE_BITS = 0o111;
 
 /** Why a path under a root was not read. */
@@ -59,7 +62,7 @@ async function openRegular(
   }
   if (verified?.has(root) !== true) {
     const rootInfo = await lstat(root).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT" || error.code === "ENOTDIR") return undefined;
+      if (isAbsent(error)) return undefined;
       throw error;
     });
     if (rootInfo === undefined) return { kind: "missing" };
@@ -73,7 +76,7 @@ async function openRegular(
     at = join(at, part);
     if (at !== leaf && verified?.has(at) === true) continue;
     const info = await lstat(at).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT" || error.code === "ENOTDIR") return undefined;
+      if (isAbsent(error)) return undefined;
       throw error;
     });
     if (info === undefined) return { kind: "missing" };
@@ -224,7 +227,7 @@ export async function replaceFile(
       const code = (error as NodeJS.ErrnoException).code ?? "";
       if (platform !== "win32" || !HELD.has(code) || Date.now() >= deadline) throw error;
     }
-    await new Promise((resolve) => setTimeout(resolve, wait));
+    await sleep(wait);
   }
 }
 
@@ -271,6 +274,7 @@ export async function writeAtomic(
 
 /** Long enough for a reader or a virus scan to let go; a held lease is refused well before. */
 const REPLACE_RETRY_MS = 5_000;
+
 function scratch(target: string): string {
   return join(dirname(target), `.${process.pid}-${randomUUID()}.tmp`);
 }
@@ -287,4 +291,10 @@ async function syncDirectory(path: string): Promise<void> {
     const unsupported = new Set(["EACCES", "EINVAL", "EISDIR", "ENOTSUP", "EPERM"]);
     if (!unsupported.has((error as NodeJS.ErrnoException).code ?? "")) throw error;
   }
+}
+
+/** Nothing is at the path, or an ancestor of it is a file, so nothing can be. */
+export function isAbsent(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return code === "ENOENT" || code === "ENOTDIR";
 }

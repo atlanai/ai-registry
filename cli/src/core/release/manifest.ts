@@ -1,6 +1,7 @@
+import type { Fields } from "#adapter/fields.ts";
 import { formatVersion, gte, parseVersion } from "#adapter/semver.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { type Fields, hasOnly } from "#core/fields.ts";
+import { hasOnly } from "#core/fields.ts";
 import { isSha256Hex } from "#core/fs/hash.ts";
 import { NAME } from "#core/product.ts";
 import {

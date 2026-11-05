@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { exec } from "#core/process.ts";
+import { DAEMON_FLAG } from "#core/product.ts";
 
 const EXEC_MS = 2_000;
 /** PowerShell alone can take a second or two to start. */
@@ -43,7 +44,7 @@ async function windowsCommandLine(pid: number): Promise<string | undefined> {
 }
 
 function isDaemonCommand(command: string): boolean {
-  return command.includes("--internal-daemon");
+  return command.includes(DAEMON_FLAG);
 }
 
 /** Pids that have this unix socket open. Empty when lsof is missing or the path is idle. */

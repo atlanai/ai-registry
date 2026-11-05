@@ -1,10 +1,9 @@
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { redirection } from "#adapter/files.ts";
 import { readRegistry } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
-import { isNamespace, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
+import { ARTIFACTS_DIR, isNamespace, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { list as listOf, plural, quoted, sanitizeName } from "#adapter/text.ts";
 import { parseSource } from "#adapters/git/api.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
@@ -14,6 +13,7 @@ import { canceled } from "#cli/prompt/model.ts";
 import { text } from "#cli/prompt/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { writeRoot } from "#core/filespec/init.ts";
+import { refuseRedirect } from "#core/fs/fresh.ts";
 import { gitIn } from "#core/process.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Flags } from "./options.ts";
@@ -68,15 +68,15 @@ export async function init(
   if (listed === undefined) return cancel(step);
   const namespaces = namespacesOf(listed);
 
-  refuseLinked(root, ["artifacts", ...namespaces.map((item) => `artifacts/${item}`)]);
-  await mkdir(join(root, "artifacts"), { recursive: true });
+  for (const folder of ["", ...namespaces]) refuseRedirect(root, join(root, ARTIFACTS_DIR, folder));
+  await mkdir(join(root, ARTIFACTS_DIR), { recursive: true });
   const written = await writeRoot(
     root,
     { name, ...(description === "" ? {} : { description }) },
     new Date().toISOString(),
   );
   for (const namespace of namespaces) {
-    await mkdir(join(root, "artifacts", namespace), { recursive: true });
+    await mkdir(join(root, ARTIFACTS_DIR, namespace), { recursive: true });
   }
   const slug = sanitizeName(name);
 
@@ -106,13 +106,10 @@ async function extend(
   shown: string,
   namespaces: readonly string[],
 ): Promise<void> {
-  const added = namespaces.filter((item) => !existsSync(join(root, "artifacts", item)));
-  refuseLinked(
-    root,
-    added.map((item) => `artifacts/${item}`),
-  );
+  const added = namespaces.filter((item) => !existsSync(join(root, ARTIFACTS_DIR, item)));
+  for (const item of added) refuseRedirect(root, join(root, ARTIFACTS_DIR, item));
   for (const namespace of added) {
-    await mkdir(join(root, "artifacts", namespace), { recursive: true });
+    await mkdir(join(root, ARTIFACTS_DIR, namespace), { recursive: true });
   }
   if (context.printer.format === "json") {
     const registry = await readRegistry(rootReader(root));
@@ -129,22 +126,6 @@ async function extend(
     `Added ${plural(added.length, "namespace")} to the registry in ${shown === "." ? "this folder" : shown}: ${listOf(added)}.`,
   );
   for (const namespace of added) context.printer.info(`    artifacts/${namespace}/`);
-}
-
-/**
- * A folder may already hold links, such as an `artifacts` one a cloned repository ships: one
- * anywhere from the root down to a folder `init` makes would put that folder somewhere else.
- */
-function refuseLinked(root: string, folders: readonly string[]): void {
-  for (const folder of folders) {
-    const found = redirection(root, join(root, folder));
-    if (found === undefined) continue;
-    const what = found.problem === "symlink" ? "a symlink" : "not a folder";
-    throw new AiregError(`${found.at} is ${what}, so nothing was written through it.`, {
-      code: ErrorCode.Invalid,
-      hint: "Replace it with a real folder, then run it again.",
-    });
-  }
 }
 
 /** Each namespace once, or a usage error naming the ones that cannot be one. */

@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import { dirname } from "node:path";
-import { isAbsent } from "#core/fs/path.ts";
+import { isAbsent } from "#adapter/files.ts";
 import type { Plan } from "./model.ts";
 
 /** A target a plan would write into, and the directory that would refuse it. */

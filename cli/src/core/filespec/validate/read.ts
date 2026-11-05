@@ -1,6 +1,6 @@
+import { isRecord } from "#adapter/fields.ts";
 import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
-import { isRecord } from "#core/fields.ts";
 
 export interface Problem {
   /** Root-relative, POSIX: the file or folder to look at. */

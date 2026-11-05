@@ -7,6 +7,7 @@ import {
 } from "node:child_process";
 import { constants } from "node:os";
 import { isAbsolute } from "node:path";
+import { messageOf } from "#adapter/errors.ts";
 import { programPath, withAbsolutePath } from "#adapter/paths.ts";
 import { launchArgv } from "#core/release/launch.ts";
 import { gitTimeoutMs } from "./env.ts";
@@ -115,9 +116,7 @@ function launchable(
     // Found without PATH, so it runs; its own children get no PATH to search.
     env = Object.fromEntries(Object.entries(given).filter(([key]) => key.toUpperCase() !== "PATH"));
     const program = programPath(command, env, cwd);
-    return program !== undefined && isAbsolute(program)
-      ? { program, env }
-      : (error as Error).message;
+    return program !== undefined && isAbsolute(program) ? { program, env } : messageOf(error);
   }
   const program = programPath(command, env, cwd);
   return program === undefined ? `${command} was not found.` : { program, env };

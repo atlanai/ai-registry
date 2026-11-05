@@ -1,8 +1,8 @@
 import { list } from "#adapter/text.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { type Interaction, interactive } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
 import { multiselect } from "#cli/prompt/multiselect.ts";
-import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { Export } from "#core/manifest/model.ts";
 import type { Printer } from "#core/term/printer.ts";
 import type { CommonOptions } from "#engine/options.ts";
@@ -49,10 +49,11 @@ async function chooseWork(
   // A dry run sends nothing, so listing everything is the answer to "what would go".
   if (found.length === 0 || common.yes || common.dryRun) return found;
   if (!interactive(step)) {
-    throw new AiregError("`aireg publish` needs a path or an artifact name.", {
-      code: ErrorCode.Usage,
-      hint: `Name one, or pass \`--yes\` to publish everything edited here: ${list(found.map((w) => w.name))}.`,
-    });
+    throw needsInput(
+      "publish",
+      "a path or an artifact name",
+      `Name one, or pass \`--yes\` to publish everything edited here: ${list(found.map((w) => w.name))}.`,
+    );
   }
   const picked = await multiselect(
     {

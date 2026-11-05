@@ -1,9 +1,10 @@
 import { isAbsolute } from "node:path";
+import { type Fields, isRecord } from "#adapter/fields.ts";
 import type { Credential } from "#adapter/index.ts";
 import { quoted } from "#adapter/text.ts";
 import { type Job, STEP_POLICIES } from "#core/config/model.ts";
 import { MINIMUM_INTERVAL_SECONDS, parseJob } from "#core/config/parse-job.ts";
-import { type Fields, isRecord, readers } from "#core/fields.ts";
+import { readers } from "#core/fields.ts";
 import { SCOPES, type Scope } from "#core/store/paths.ts";
 import { NOTHING, OPTIONAL_AXES, type SyncPolicy } from "#core/sync/policy.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";

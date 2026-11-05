@@ -1,6 +1,7 @@
 import type { AccountService } from "#accounts/service.ts";
 import type { Credential } from "#adapter/index.ts";
 import { quoted } from "#adapter/text.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import type { Account } from "#core/config/model.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 
@@ -36,10 +37,11 @@ export function tokensOf(credential: Credential): {
 }
 
 export function needsRegistry(action: string): AiregError {
-  return new AiregError(`\`aireg auth ${action}\` needs a registry name.`, {
-    code: ErrorCode.Usage,
-    hint: `Name the registry: \`aireg auth ${action} <registry>\`.`,
-  });
+  return needsInput(
+    `auth ${action}`,
+    "a registry name",
+    `Name the registry: \`aireg auth ${action} <registry>\`.`,
+  );
 }
 
 export function noAccount(wanted: string): AiregError {

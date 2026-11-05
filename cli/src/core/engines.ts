@@ -1,6 +1,8 @@
+import { isRecord } from "#adapter/fields.ts";
 import { compareVersion, formatVersion, gte, parseVersion } from "#adapter/semver.ts";
-import { isRecord } from "./fields.ts";
+import { AiregError } from "./errors.ts";
 import { NAME } from "./product.ts";
+import { VERSION } from "./version.ts";
 
 /**
  * `0.3.0`, `>=0.3.0` and `>=v0.3.0` all mean this version or newer; a range or a prerelease is
@@ -32,4 +34,10 @@ export function unmetEngine(current: string, engine: string | undefined): string
 export function olderThan(version: string | undefined, than: string | undefined): boolean {
   const [left, right] = [parseVersion(version ?? ""), parseVersion(than ?? "")];
   return left !== undefined && right !== undefined && compareVersion(left, right) < 0;
+}
+
+export function refuseOldCli(engine: string | undefined): void {
+  const why = unmetEngine(VERSION, engine);
+  if (why === undefined) return;
+  throw new AiregError(`This project ${why}.`, { hint: "Run `aireg self update`." });
 }

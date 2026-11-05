@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import { refuseOldCli } from "#core/engines.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { readTextIfPresent } from "#core/fs/path.ts";
 import { runPipelineHooks } from "#core/hook/run.ts";
@@ -10,7 +11,6 @@ import type { ApplyResult } from "#core/plan/apply/run.ts";
 import type { Acquired, Action, Plan } from "#core/plan/model.ts";
 import type { Roots } from "#core/store/paths.ts";
 import type { Loaded } from "#engine/scope/load.ts";
-import { refuseOldCli } from "./refusals.ts";
 
 /** Checks the engine and recovers a crashed run's leftovers. */
 export async function prepareWrite(

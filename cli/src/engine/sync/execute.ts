@@ -7,7 +7,7 @@ import type { Account } from "#core/config/model.ts";
 import { withLease } from "#core/lease/lease.ts";
 import type { RegistrySource } from "#core/manifest/model.ts";
 import { movedPluginLinks } from "#core/plan/projection.ts";
-import { type RunMode, WARNING_EVENT } from "#core/run/model.ts";
+import { RunEventType, type RunMode, type RunPhase } from "#core/run/model.ts";
 import { backupStamp } from "#core/store/backups.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
 import type { CommonOptions } from "#engine/options.ts";
@@ -82,13 +82,13 @@ async function executeScanned(
 
   const publishable = await publishableTo(account, source);
 
-  hooks.event("run.phase", "listing");
+  enter(hooks, "listing");
   const downloaded = new Set<string>();
   const onDownload = (artifact: Artifact) => {
     const name = artifact.envelope.metadata.name;
     if (downloaded.has(name)) return;
     downloaded.add(name);
-    hooks.event("artifact.progress", "downloading", name, { step: "downloading" });
+    hooks.event(RunEventType.Progress, "downloading", name, { step: "downloading" });
   };
   // Only this job's registry: opening another account's lets two organizations on one tree
   // fail each other's runs.
@@ -102,7 +102,7 @@ async function executeScanned(
   const rescan = async () =>
     scanning(loaded, common, { aliases, credentials: await released(), signal, onDownload });
   let current = await rescan();
-  hooks.event("run.phase", "classifying");
+  enter(hooks, "classifying");
   // Before anything is classified: a ref that reaches nothing is the caller's
   // mistake, not an empty run.
   const scoped = scopedKeys(refs, current, account.registry);
@@ -196,13 +196,13 @@ async function executeScanned(
       for (const name of remote.published.keys()) names.add(name);
       for (const claim of claimed) for (const key of claim.keys) names.add(key);
       signal.throwIfAborted();
-      hooks.event("run.phase", "applying");
+      enter(hooks, "applying");
       await applyReported(loaded, common, current, names, remote.published, overrides, hooks);
       await takeTheirs(overrides, current, loaded.roots, account.registry, hooks);
       if (remoteError !== undefined) throw remoteError;
     });
   }
-  hooks.event("run.phase", "finalizing");
+  enter(hooks, "finalizing");
   return execution(outcomes);
 }
 
@@ -329,7 +329,7 @@ async function moveClaimedAside(
     if (moved.length === 0) continue;
     const from = moved.map((copy) => copy.from).join(", ");
     const to = moved.map((copy) => copy.to).join(", ");
-    hooks.event("artifact.progress", "claiming", claim.name, {
+    hooks.event(RunEventType.Progress, "claiming", claim.name, {
       step: "claimed",
       detail: `already in ${registry}; moved ${from} to ${to}`,
     });
@@ -341,7 +341,7 @@ function warnRefused(
   hooks: SyncExecutionHooks,
 ): void {
   for (const { name, reason } of refused) {
-    hooks.event(WARNING_EVENT, "importing", name, {
+    hooks.event(RunEventType.Warning, "importing", name, {
       message: `Kept the previous copy of ${name}: ${reason}.`,
     });
   }
@@ -430,7 +430,8 @@ async function publishAndSettle(
   const attempted = new Set<string>();
   try {
     remote = await mutate({
-      event: (step, artifact) => hooks.event("artifact.progress", "publishing", artifact, { step }),
+      event: (step, artifact) =>
+        hooks.event(RunEventType.Progress, "publishing", artifact, { step }),
       sent: (artifact) => attempted.add(artifact),
       failed: (artifact, error) => refusals.set(artifact, error),
       held: (artifact, reason) => holds.set(artifact, reason),
@@ -486,12 +487,12 @@ async function applyReported(
   const forced = [...overrides.values()].some((item) => item === "pull" || item === "remove-local");
   const applied = await applyLocal(loaded, common, current, names, published, forced, (action) => {
     if (action.kind !== "record") {
-      hooks.event("artifact.progress", "applying", action.name, { step: action.kind });
+      hooks.event(RunEventType.Progress, "applying", action.name, { step: action.kind });
     }
   });
   // What it did to a person's files, said wherever the run is followed.
   for (const notice of applied.notices) {
-    hooks.event(WARNING_EVENT, "applying", undefined, notice);
+    hooks.event(RunEventType.Warning, "applying", undefined, notice);
   }
 }
 
@@ -509,10 +510,14 @@ async function takeTheirs(
   if (theirs.length === 0) return;
   for (const taken of await takeIntoOrigins(roots, theirs, backupStamp())) {
     const kept = taken.backup === undefined ? "" : `; yours is in ${taken.backup}`;
-    hooks.event(WARNING_EVENT, "applying", taken.name, {
+    hooks.event(RunEventType.Warning, "applying", taken.name, {
       message: taken.written
         ? `Wrote ${registry}'s ${taken.name} into ${taken.folder}${kept}.`
         : `Kept ${taken.folder} as it is, since aireg may not replace it.`,
     });
   }
+}
+
+function enter(hooks: SyncExecutionHooks, phase: RunPhase): void {
+  hooks.event(RunEventType.Phase, phase);
 }

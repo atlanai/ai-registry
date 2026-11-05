@@ -1,9 +1,8 @@
 import { access, chmod, copyFile, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
-import { GitError, git, gitTry, stopGit } from "./exec.ts";
+import { GitError, git, stopGit } from "./exec.ts";
 
 const unix = describe.skipIf(process.platform === "win32");
 
@@ -76,19 +75,11 @@ unix("git", () => {
 
   test("stops every running git and its helpers when asked to", async ({ tmp }) => {
     const hung = await hungGit(tmp);
-    const fetching = gitTry(["fetch"], { timeoutMs: 60_000 }).catch((reason: unknown) => reason);
+    const fetching = git(["fetch"], { timeoutMs: 60_000 }).catch((reason: unknown) => reason);
     const helper = await hung.helper();
     stopGit();
     await fetching;
     await expect.poll(() => alive(helper), { timeout: 5_000 }).toBe(false);
-  });
-
-  test("returns a non-zero exit as data", async () => {
-    const attempt = await gitTry(["rev-parse", "--verify", "--quiet", "no-such-ref"], {
-      cwd: tmpdir(),
-      timeoutMs: 60_000,
-    });
-    expect(attempt.code).not.toBe(0);
   });
 
   // Node resolves an empty or relative PATH entry against the child's working folder,
@@ -98,7 +89,7 @@ unix("git", () => {
     await chmod(join(tmp, "git"), 0o755);
     vi.stubEnv("PATH", ["", ".", "bin", process.env.PATH ?? ""].join(delimiter));
     try {
-      await gitTry(["--version"], { cwd: tmp, timeoutMs: 60_000 }).catch(() => undefined);
+      await git(["--version"], { cwd: tmp, timeoutMs: 60_000 }).catch(() => undefined);
     } finally {
       vi.unstubAllEnvs();
     }
@@ -127,7 +118,6 @@ describe.runIf(process.platform === "win32")("git on Windows", () => {
   // Node stands in for a planted git.
   test("never runs a git planted in the folder it works in", async ({ tmp }) => {
     await copyFile(process.execPath, join(tmp, "git.exe"));
-    const attempt = await gitTry(["--version"], { cwd: tmp, timeoutMs: 60_000 });
-    expect(attempt.stdout).toMatch(/^git version/);
+    expect(await git(["--version"], { cwd: tmp, timeoutMs: 60_000 })).toMatch(/^git version/);
   });
 });

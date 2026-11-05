@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import { KINDS } from "#adapter/kinds.ts";
-import { LOCK_VERSION } from "#core/lock.ts";
+import { LINK_MODES, LOCK_VERSION } from "#core/lock.ts";
 
 const EARLIER_ID = Type.Optional(
   Type.String({
@@ -27,12 +27,7 @@ const Link = Type.Object(
       minLength: 1,
       description: "Relative to the scope base, so a committed lock is machine-independent.",
     }),
-    mode: Type.Union([
-      Type.Literal("symlink"),
-      Type.Literal("junction"),
-      Type.Literal("copy"),
-      Type.Literal("fanout"),
-    ]),
+    mode: Type.Union(LINK_MODES.map((mode) => Type.Literal(mode))),
     digest: Type.Optional(
       Type.String({
         pattern: "^sha256:[0-9a-f]{64}$",

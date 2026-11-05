@@ -1,6 +1,7 @@
 import { stringify } from "yaml";
 import { isArtifactName, isNamespace } from "#adapter/filespec/names.ts";
 import { quoted } from "#adapter/text.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { type Interaction, interactive } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
 import { text } from "#cli/prompt/text.ts";
@@ -111,10 +112,7 @@ export async function askFields(
 /** A registry folder's name is never the artifact's, so the name is asked for. */
 export async function askName(kind: string, step: Interaction): Promise<string | undefined> {
   if (!interactive(step))
-    throw new AiregError(`\`aireg ${kind} new\` needs a name in a registry.`, {
-      code: ErrorCode.Usage,
-      hint: `Run \`aireg ${kind} new <name>\`.`,
-    });
+    throw needsInput(`${kind} new`, "a name in a registry", `Run \`aireg ${kind} new <name>\`.`);
   const answer = await text(
     {
       message: "Name",

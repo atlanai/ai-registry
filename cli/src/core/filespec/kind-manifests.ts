@@ -1,14 +1,17 @@
 import { posix } from "node:path";
+import { messageOf } from "#adapter/errors.ts";
+import { isRecord } from "#adapter/fields.ts";
 import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { isKindSegment, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
+import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { dict, isRecord } from "#core/fields.ts";
+import { dict } from "#core/fields.ts";
 import { frontmatterRecord } from "#core/frontmatter.ts";
-import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY } from "#core/kinds.ts";
 import { AGENT_CARD_ENTRY } from "#core/product.ts";
 import agent from "#schema/kinds/agent.json" with { type: "json" };
 import skill from "#schema/kinds/skill.json" with { type: "json" };
@@ -119,7 +122,7 @@ async function served(root: string, url: string): Promise<Served> {
   try {
     await prepareManifest(root, raw);
   } catch (error) {
-    return { problem: `has an invalid kind schema: ${(error as Error).message}` };
+    return { problem: `has an invalid kind schema: ${messageOf(error)}` };
   }
   return { manifest: raw as unknown as KindManifest };
 }
