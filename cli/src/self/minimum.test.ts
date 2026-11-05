@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { runningEntry } from "#core/release/launch.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { isInstalledCli, skipMinimumUpdate } from "./minimum.ts";
+import { installTimeoutMs, isInstalledCli, skipMinimumUpdate } from "./minimum.ts";
 
 const home = { AIREG_HOME: "/tmp/aireg-home" };
 const installed = join("/tmp/aireg-home/cli/0.1.0/aireg");
@@ -51,5 +51,22 @@ describe("runningEntry", () => {
       "/repo/bin/aireg.mjs",
     );
     expect(runningEntry(["/usr/bin/node"], "/usr/bin/node")).toBeUndefined();
+  });
+});
+
+describe("installTimeoutMs", () => {
+  // aireg-windows-amd64.exe in 0.1.8, which took about 790s at 0.15 MB/s against a fixed 600s.
+  const largest = 118_758_192;
+
+  test("leaves a large release time to download on a slow link", () => {
+    expect(installTimeoutMs(largest)).toBeGreaterThan(790_000);
+  });
+
+  test("never drops below ten minutes", () => {
+    expect(installTimeoutMs(1024)).toBe(600_000);
+  });
+
+  test("covers the largest release when the manifest states no size", () => {
+    expect(installTimeoutMs(undefined)).toBeGreaterThan(installTimeoutMs(largest));
   });
 });

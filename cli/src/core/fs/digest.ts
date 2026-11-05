@@ -56,7 +56,7 @@ async function framed(tree: Tree): Promise<string> {
   return sha256(JSON.stringify(entries));
 }
 
-/** What older locks record. It runs one file into the next, so it is matched, never written. */
+/** What older locks record, one file run into the next; written only as aireg 0.1's `digest`. */
 async function unframed(tree: Tree): Promise<string> {
   const hash = createHash("sha256");
   for (const file of tree.files) {

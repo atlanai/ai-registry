@@ -51,18 +51,11 @@ export async function downloadRelease(
   return downloadArtifact(release.plan, $fetch, timeout(timeoutMs));
 }
 
-/**
- * How many bytes `downloadRelease` will pull. A standalone build is 60-85MB, so
- * this is worth saying out loud before an unattended update spends it.
- */
+/** A standalone build is around 100 MB, worth saying before an unattended update spends it. */
 export function downloadSize(release: ResolvedRelease): number | undefined {
   return release.plan.size;
 }
 
-/**
- * Said wherever an update is offered or forced, so the update it leads to is
- * not a 60-85MB surprise on a metered link.
- */
 export function describeSize(sizeBytes: number | undefined): string {
   return sizeBytes === undefined ? "" : ` (${Math.round(sizeBytes / (1024 * 1024))} MB download)`;
 }

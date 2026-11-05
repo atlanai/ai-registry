@@ -26,6 +26,7 @@ import { roots } from "#core/store/paths.ts";
 import { detectAll, resolveTargets } from "#core/target/index.ts";
 import { VERSION } from "#core/version.ts";
 import { probeDaemon, recycleDaemon } from "#daemon/service.ts";
+import { withScope } from "#engine/pipeline.ts";
 import { installBinaryFrom } from "#self/install.ts";
 import { addToPath, isOurs, resolvedOnPath, restartCommand } from "#self/path-setup.ts";
 
@@ -131,9 +132,13 @@ async function offerSkills(
   // A user scope with no targets yet takes the ones found here, so later -g installs reach
   // them too; one someone already set is left, and only this entry names the targets.
   const wanted = found.map((item) => item.target.name);
-  const defaulted = manifest.targets.length === 0;
-  if (defaulted) await writeManifest(user, { ...manifest, targets: wanted });
-  const sameAsScope = defaulted || wanted.join() === manifest.targets.join();
+  const scopeTargets = await withScope(user, async ({ manifest: now }) => {
+    if (now.targets.length > 0) return now.targets;
+    await writeManifest(user, { ...now, targets: wanted });
+    return undefined;
+  });
+  const defaulted = scopeTargets === undefined;
+  const sameAsScope = scopeTargets === undefined || wanted.join() === scopeTargets.join();
   let declared = false;
   try {
     await quietly(async () => {
@@ -165,8 +170,9 @@ async function offerSkills(
   } catch (error) {
     // A registry declared without its skills would read as the user's choice on the next run.
     if (defaulted) {
-      const now = await readManifest(user.manifest);
-      await writeManifest(user, { ...now, targets: [] }).catch(() => undefined);
+      await withScope(user, ({ manifest: now }) =>
+        writeManifest(user, { ...now, targets: [] }),
+      ).catch(() => undefined);
     }
     if (declared) {
       await (await import("#cli/commands/registry.ts"))

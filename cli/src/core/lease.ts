@@ -11,6 +11,7 @@ import { PRIVATE_FILE } from "#core/fs/mode.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { ensureHome, leasesDir, type Roots, type Scope } from "#core/store/paths.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
+import { isRecord } from "./fields.ts";
 import { processAlive } from "./process.ts";
 
 /** A lease older than this with no heartbeat is reclaimable. */
@@ -183,10 +184,25 @@ function asideOf(dir: string, id: string): string {
 
 async function readHolder(dir: string): Promise<LeaseHolder | undefined> {
   try {
-    return JSON.parse(await readFile(metaPath(dir), "utf8")) as LeaseHolder;
+    return parseHolder(JSON.parse(await readFile(metaPath(dir), "utf8")));
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Any process that can write the home can write this file, so a holder whose fields are off
+ * is no holder: a pid such as -1 or 0 names a process group, which would always look alive.
+ */
+function parseHolder(value: unknown): LeaseHolder | undefined {
+  if (!isRecord(value)) return undefined;
+  const { id, scope, lock, host, pid, acquiredAtMs } = value;
+  if (typeof id !== "string" || typeof scope !== "string" || typeof lock !== "string") {
+    return undefined;
+  }
+  if (typeof host !== "string" || typeof acquiredAtMs !== "number") return undefined;
+  if (typeof pid !== "number" || !Number.isSafeInteger(pid) || pid <= 0) return undefined;
+  return { id, scope, lock, host, pid, acquiredAtMs };
 }
 
 /** Absolute: a clock stepped back leaves an mtime in the future, and that must still age out. */

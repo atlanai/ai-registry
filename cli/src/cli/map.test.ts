@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ErrorCode, ExitCode } from "#core/errors.ts";
 import { Printer } from "#core/output.ts";
+import { homeTest } from "#test/kit/fixtures.ts";
 import { buildMap, findMapFormat, type MapNode, runMap } from "./map.ts";
 import { GLOBAL_OPTIONS } from "./options.ts";
 
@@ -31,7 +32,7 @@ describe("findMapFormat", () => {
 });
 
 describe("buildMap", () => {
-  it("carries summary, group and aliases from the command spec", async () => {
+  homeTest("carries summary, group and aliases from the command spec", async () => {
     const root = await buildMap();
     const init = root.children?.find((c) => c.path === "aireg init");
     expect(init?.summary).toBe("Set up a project (creates .registry/manifest.yml)");
@@ -40,7 +41,7 @@ describe("buildMap", () => {
     expect(rm?.aliases).toEqual(["rm"]);
   });
 
-  it("gives every list action the ls alias and every remove action rm", async () => {
+  homeTest("gives every list action the ls alias and every remove action rm", async () => {
     const walk = (node: MapNode): MapNode[] => [node, ...(node.children ?? []).flatMap(walk)];
     const nodes = walk(await buildMap());
     const lists = nodes.filter(({ path }) => path.endsWith(" list"));
@@ -51,29 +52,32 @@ describe("buildMap", () => {
     for (const { path, aliases } of removes) expect(aliases, path).toContain("rm");
   });
 
-  it("carries only the global options at the root", async () => {
+  homeTest("carries only the global options at the root", async () => {
     const root = await buildMap();
     expect(root.options?.map((o) => o.flag)).toEqual(GLOBAL_OPTIONS.map((o) => o.flag));
     expect(root.options?.map((o) => o.flag)).not.toContain("--user");
   });
 
-  it("carries each command's usage and options, and each action's, inheriting nothing", async () => {
-    const root = await buildMap();
-    const add = root.children?.find((c) => c.path === "aireg add");
-    expect(add?.usage?.[0]).toMatch(/^aireg add /);
-    expect(add?.options).toContainEqual(
-      expect.objectContaining({ flag: "--select", short: "-s", value: "<name>", multiple: true }),
-    );
-    expect(add?.docs).toBe("https://atlanai.github.io/ai-registry/reference/add/");
-    const registry = root.children?.find((c) => c.path === "aireg registry");
-    const list = registry?.children?.find((c) => c.path === "aireg registry list");
-    expect(list?.summary).toBe("List the registries you have declared");
-    expect(list?.options?.map((o) => o.flag)).toEqual(["--user"]);
-    const doctor = root.children?.find((c) => c.path === "aireg doctor");
-    expect(doctor?.options).toBeUndefined();
-  });
+  homeTest(
+    "carries each command's usage and options, and each action's, inheriting nothing",
+    async () => {
+      const root = await buildMap();
+      const add = root.children?.find((c) => c.path === "aireg add");
+      expect(add?.usage?.[0]).toMatch(/^aireg add /);
+      expect(add?.options).toContainEqual(
+        expect.objectContaining({ flag: "--select", short: "-s", value: "<name>", multiple: true }),
+      );
+      expect(add?.docs).toBe("https://atlanai.github.io/ai-registry/reference/add/");
+      const registry = root.children?.find((c) => c.path === "aireg registry");
+      const list = registry?.children?.find((c) => c.path === "aireg registry list");
+      expect(list?.summary).toBe("List the registries you have declared");
+      expect(list?.options?.map((o) => o.flag)).toEqual(["--user"]);
+      const doctor = root.children?.find((c) => c.path === "aireg doctor");
+      expect(doctor?.options).toBeUndefined();
+    },
+  );
 
-  it("never lists a hidden option", async () => {
+  homeTest("never lists a hidden option", async () => {
     const root = await buildMap();
     const update = root.children?.find((c) => c.path === "aireg update");
     expect(update?.options?.map((o) => o.flag)).not.toContain("--force");
@@ -82,7 +86,7 @@ describe("buildMap", () => {
 });
 
 describe("runMap", () => {
-  it("prints an indented tree by default, root before children before actions", async () => {
+  homeTest("prints an indented tree by default, root before children before actions", async () => {
     const { printer, out } = capture("text");
     const code = await runMap(printer, "tree");
     expect(code).toBe(ExitCode.Ok);
@@ -94,7 +98,7 @@ describe("runMap", () => {
     expect(text).toContain("    aireg registry add");
   });
 
-  it("prints one path per line, parents before children, in compact format", async () => {
+  homeTest("prints one path per line, parents before children, in compact format", async () => {
     const { printer, out } = capture("text");
     await runMap(printer, "compact");
     const lines = out.join("").trimEnd().split("\n");
@@ -103,7 +107,7 @@ describe("runMap", () => {
     expect(lines.some((line) => line.includes("\t"))).toBe(false);
   });
 
-  it("prints the indented JSON tree directly when --json was not given", async () => {
+  homeTest("prints the indented JSON tree directly when --json was not given", async () => {
     const { printer, out } = capture("text");
     await runMap(printer, "json");
     const tree = JSON.parse(out.join(""));
@@ -111,7 +115,7 @@ describe("runMap", () => {
     expect(tree.options).toHaveLength(GLOBAL_OPTIONS.length);
   });
 
-  it("wraps the tree in the ok envelope when the global --json flag is given", async () => {
+  homeTest("wraps the tree in the ok envelope when the global --json flag is given", async () => {
     const { printer, out } = capture("json");
     await runMap(printer, "tree");
     const payload = JSON.parse(out.join(""));
@@ -119,7 +123,7 @@ describe("runMap", () => {
     expect(payload.data.path).toBe("aireg");
   });
 
-  it("rejects an unknown format as a usage error naming the valid ones", async () => {
+  homeTest("rejects an unknown format as a usage error naming the valid ones", async () => {
     const { printer } = capture("text");
     await expect(runMap(printer, "yaml")).rejects.toMatchObject({
       name: "AiregError",

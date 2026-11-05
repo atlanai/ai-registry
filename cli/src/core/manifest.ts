@@ -75,7 +75,7 @@ export interface Manifest {
   description: string | undefined;
   /** Oldest aireg CLI that can read this file. Plain SemVer, meaning >=. */
   engine: string | undefined;
-  /** `targets:`, the targets to project into. Empty means every target detected. */
+  /** `targets:`, the targets to project into. Empty means `DEFAULT_TARGETS`. */
   targets: string[];
   /** `registries:`, keyed by the name a reference uses. */
   registries: Record<string, RegistrySource>;
