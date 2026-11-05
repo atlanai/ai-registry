@@ -35,7 +35,7 @@ describe("noticeFirst", () => {
     };
 
     await run();
-    expect(err).toContain("notice: aireg collects anonymous usage data");
+    expect(err).toContain("notice: aireg collects usage data under a random ID");
     expect($spawn).not.toHaveBeenCalled();
 
     err = "";

@@ -32,7 +32,7 @@ export async function noticeFirst(
     if (shown === NOTICE_VERSION) return;
     printer.notice(
       [
-        "aireg collects anonymous usage data to improve the CLI.",
+        "aireg collects usage data under a random ID to improve the CLI.",
         `  Learn more, including how to opt out: ${DOCS_URL}reference/environment/#network-and-privacy`,
       ].join("\n"),
     );
