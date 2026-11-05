@@ -1,13 +1,13 @@
 import { stripVTControlCharacters } from "node:util";
 import { render } from "ink";
 import type { ReactElement } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { type Activity, header, tabsWith } from "./chrome.ts";
 
 const ids = (tabs: readonly { id: string }[]) => tabs.map((tab) => tab.id);
 
 describe("tabsWith", () => {
-  it("puts a panel after the tab it named", () => {
+  test("puts a panel after the tab it named", () => {
     const tabs = tabsWith([{ id: "sessions", label: "Sessions", after: "artifacts" }]);
     expect(ids(tabs)).toEqual([
       "overview",
@@ -19,9 +19,7 @@ describe("tabsWith", () => {
     ]);
   });
 
-  // Settings is the last tab by convention, and a panel naming a tab the host
-  // does not have must not displace it.
-  it("keeps Settings last when the panel names a tab that is not here", () => {
+  test("keeps Settings last when the panel names a tab that is not here", () => {
     const tabs = tabsWith([{ id: "probe", label: "Probe", after: "nowhere" }]);
     expect(ids(tabs).slice(-2)).toEqual(["probe", "settings"]);
   });
@@ -72,17 +70,17 @@ function top(width: number, overrides: Partial<Parameters<typeof header>[0]> = {
 }
 
 describe("header", () => {
-  it("names aireg, then the pull and the daemon", () => {
+  test("names aireg, then the pull and the daemon", () => {
     const line = top(100);
     expect(line).toMatch(/^◆ aireg console +pulled 22:56 · u pull {3}● daemon · read 23:00$/);
     expect(line).toHaveLength(100);
   });
 
-  it("says when nothing has been pulled yet", () => {
+  test("says when nothing has been pulled yet", () => {
     expect(top(100, { lastPullAtMs: undefined })).toContain("not pulled yet · u pull");
   });
 
-  it("drops the daemon first, then the pull, and never wraps", () => {
+  test("drops the daemon first, then the pull, and never wraps", () => {
     const activity: Activity = {
       label: "pull latest",
       line: "examined 120 of 340 artifacts across every namespace",
@@ -95,7 +93,7 @@ describe("header", () => {
     expect(top(40)).toMatch(/^◆ aireg console +read 23:00$/);
   });
 
-  it("shows a running command in place of the pull hint", () => {
+  test("shows a running command in place of the pull hint", () => {
     const activity: Activity = {
       label: "pull latest",
       line: "2 examined",

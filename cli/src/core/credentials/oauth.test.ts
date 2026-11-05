@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServer, get, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import type { Credential } from "#adapter/index.ts";
 import { type SignInPrompt, signInWithOAuth } from "./oauth.ts";
 
@@ -143,7 +143,7 @@ afterEach(async () => {
 });
 
 describe("signInWithOAuth", () => {
-  it("signs in with PKCE, and tells the tab only once the sign-in is stored", async () => {
+  test("signs in with PKCE, and tells the tab only once the sign-in is stored", async () => {
     server = await stub();
     const prompt = browser();
     let stored = false;
@@ -171,14 +171,14 @@ describe("signInWithOAuth", () => {
     expect(page.headers.get("referrer-policy")).toBe("no-referrer");
   });
 
-  it("says the person declined, and never the server's own words", async () => {
+  test("says the person declined, and never the server's own words", async () => {
     server = await stub({ refuse: "access_denied" });
     await expect(
       signInWithOAuth({ issuer: server.issuer, clientId: "client-1" }, browser(), never, keep),
     ).rejects.toThrow(/^The sign-in was declined in the browser\.$/);
   });
 
-  it.each([
+  test.each([
     [{ metadataIssuer: "https://elsewhere.example" }, "metadata is for another server"],
     [{ tokenOrigin: "https://elsewhere.example" }, "token endpoint is not on"],
     [{ iss: "https://elsewhere.example" }, "came back from a server other than"],
@@ -194,7 +194,7 @@ describe("signInWithOAuth", () => {
     },
   );
 
-  it("ignores an answer for another sign-in, or sent to another host name", async () => {
+  test("ignores an answer for another sign-in, or sent to another host name", async () => {
     server = await stub();
     const prompt = browser();
     const statuses: number[] = [];

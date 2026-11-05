@@ -2,8 +2,8 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { marketplace, skillsFolder } from "#test/kit/builders/layouts.ts";
 import { test } from "#test/kit/fixtures.ts";
-import type { RemotePlugin } from "./layout.ts";
 import { marketplaceLayout } from "./marketplace.ts";
+import type { RemotePlugin } from "./model.ts";
 import { openTree } from "./tree.ts";
 
 const context = { namespace: "mkt", rootName: "mkt" };

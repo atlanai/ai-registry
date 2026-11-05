@@ -1,6 +1,6 @@
 import { formatVersion, parseVersion } from "#adapter/semver.ts";
 import { quoted } from "#adapter/text.ts";
-import { isBuiltinAdapter } from "#core/adapter/registry.ts";
+import { isBuiltinAdapter } from "#core/adapter/load.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { isAdapterId } from "#core/release/origin.ts";
 

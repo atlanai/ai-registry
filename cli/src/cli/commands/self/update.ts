@@ -1,14 +1,15 @@
 import { gte } from "#adapter/semver.ts";
-import { actionOf, builtin, type CommandContext } from "#cli/commands/index.ts";
-import { parse } from "#cli/options.ts";
+import { actionOf, type CommandContext } from "#cli/commands/command.ts";
+import { parse } from "#cli/options/parse.ts";
 import { withReleaseHint } from "#core/release/errors.ts";
 import { shimPath, versionBin } from "#core/release/layout.ts";
 import { VERSION } from "#core/version.ts";
-import { recycleDaemon } from "#daemon/service.ts";
-import { cacheFrom, writeUpdateCache } from "#self/check.ts";
+import { recycleDaemon } from "#daemon/process/lifecycle.ts";
 import { installedVersion, previousInstalled, rollback } from "#self/install.ts";
-import { installRelease } from "#self/minimum.ts";
-import { resolveRelease } from "#self/source.ts";
+import { installRelease } from "#self/minimum-update.ts";
+import { resolveRelease } from "#self/release.ts";
+import { cacheFrom, writeUpdateCache } from "#self/update-cache.ts";
+import { SELF_COMMAND } from "./spec.ts";
 
 interface Own extends Record<string, unknown> {
   check?: boolean;
@@ -16,7 +17,7 @@ interface Own extends Record<string, unknown> {
 }
 
 export async function run(context: CommandContext): Promise<void> {
-  const { common, own } = parse<Own>(context.argv, actionOf(builtin("self"), "update"));
+  const { common, own } = parse<Own>(context.argv, actionOf(SELF_COMMAND, "update"));
 
   try {
     await execute(context, common.dryRun, common.force, own);

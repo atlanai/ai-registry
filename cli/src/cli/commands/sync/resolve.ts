@@ -1,19 +1,21 @@
-import { actionOf, builtin, type CommandContext } from "#cli/commands/index.ts";
+import { actionOf, type CommandContext } from "#cli/commands/command.ts";
 import { attentionHints, type Followed, follow, stoppedError } from "#cli/commands/sync/follow.ts";
-import { matchInstalled, rowsNamed } from "#cli/names.ts";
-import { parse } from "#cli/options.ts";
-import { cannotPublish } from "#cli/publish/target.ts";
-import { loadAdapter } from "#core/adapter/registry.ts";
-import { findJob, type Job } from "#core/config/model.ts";
+import { parse } from "#cli/options/parse.ts";
+import { loadAdapter } from "#core/adapter/load.ts";
+import { findJob } from "#core/config/jobs.ts";
+import type { Job } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { readLock } from "#core/lock.ts";
 import { roots, scopeFor } from "#core/store/paths.ts";
+import { withDaemon } from "#daemon/process/lifecycle.ts";
 import type { RpcClient } from "#daemon/rpc/client.ts";
-import { withDaemon } from "#daemon/service.ts";
-import { FOREGROUND_POLICY } from "#engine/foreground.ts";
-import { load } from "#engine/pipeline.ts";
+import { matchInstalled, rowsNamed } from "#engine/installed-names.ts";
+import { cannotPublish } from "#engine/publish/target.ts";
+import { load } from "#engine/scope/load.ts";
+import { FOREGROUND_POLICY } from "#engine/sync/work.ts";
+import { SYNC_COMMAND } from "./spec.ts";
 
 interface Own extends Record<string, unknown> {
   mine?: boolean;
@@ -22,10 +24,7 @@ interface Own extends Record<string, unknown> {
 }
 
 export async function run(context: CommandContext): Promise<void> {
-  const { common, positionals, own } = parse<Own>(
-    context.argv,
-    actionOf(builtin("sync"), "resolve"),
-  );
+  const { common, positionals, own } = parse<Own>(context.argv, actionOf(SYNC_COMMAND, "resolve"));
   const name = positionals[0];
   if (name === undefined) {
     throw new AiregError("`aireg sync resolve` needs an artifact name.", {
@@ -97,7 +96,7 @@ async function jobKey(job: Job | undefined, name: string): Promise<string> {
   const root = job?.steps.find((step) => step.root !== undefined)?.root;
   if (root === undefined) return name;
   const lock = await readLock(roots(scopeFor(root), root));
-  // A name this scope doesn't know goes as typed: the daemon says which job it looked in.
+  // An unknown name goes as typed: the daemon says which job it looked in.
   if (matchInstalled(name, lock).rows.length === 0) return name;
   return rowsNamed(name, lock)[0] as string;
 }

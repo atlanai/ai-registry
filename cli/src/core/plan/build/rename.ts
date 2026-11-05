@@ -5,13 +5,12 @@ import { addressOf } from "#core/plan/select.ts";
 /** Kinds whose name a target reads from front matter, which a rename rewrites. */
 const RENAMEABLE = new Set(["skill", "agent"]);
 
-/** How a person reads an address: `ops/review`, without the registry or the kind. */
+/** How a person reads an address: namespace and name, without the registry or the kind. */
 export function shownAddress(address: string): string {
   const parts = address.split("/");
   return parts.length >= 4 ? `${parts[1]}/${parts[3]}` : (parts.at(-1) ?? address);
 }
 
-/** The one command that changes what an install does about a taken name. */
 export const NAME_COLLISION_HINT =
   "To change the default, run `aireg config set defaults.name-collision <rename|report|fail>`.";
 
@@ -29,13 +28,6 @@ export function renamedTo(
 ): string | undefined {
   const leaf = leafOf(item.name);
   return RENAMEABLE.has(item.kind) && leaf !== item.upstreamName ? leaf : undefined;
-}
-
-/** Its namespace and name, then the registry's too: never install order, so every machine agrees. */
-function candidates(item: Selected): string[] {
-  const own = [item.group ?? item.source, item.upstreamName].join("-");
-  if (item.group === undefined) return [own];
-  return [own, [item.source, item.group, item.upstreamName].join("-")];
 }
 
 /**
@@ -64,6 +56,13 @@ export function renamesFor(
     renames.set(clash.dropped, name);
   }
   return renames;
+}
+
+/** Its namespace and name, then the registry's too: never install order, so every machine agrees. */
+function candidates(item: Selected): string[] {
+  const own = [item.group ?? item.source, item.upstreamName].join("-");
+  if (item.group === undefined) return [own];
+  return [own, [item.source, item.group, item.upstreamName].join("-")];
 }
 
 /** The renames a second plan carried out: the ones it no longer reports as left out. */

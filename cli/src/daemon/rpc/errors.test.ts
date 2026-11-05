@@ -1,20 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { AdapterError } from "#adapter/index.ts";
 import { CredentialStoreError } from "#core/credentials/store.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { LeaseError } from "#core/lease.ts";
-import { ManifestError } from "#core/manifest.ts";
+import { LeaseError } from "#core/lease/errors.ts";
+import { ManifestError } from "#core/manifest/errors.ts";
 import { RpcErrorCode } from "./codes.ts";
 import { rpcError } from "./errors.ts";
 import { ProtocolError } from "./protocol.ts";
 
 describe("rpcError", () => {
-  it("keeps a protocol failure as-is", () => {
+  test("keeps a protocol failure as-is", () => {
     const error = new ProtocolError(RpcErrorCode.NotFound, "account not found");
     expect(rpcError(error)).toBe(error);
   });
 
-  it("names an adapter failure instead of swallowing it as internal", () => {
+  test("names an adapter failure instead of swallowing it as internal", () => {
     const mapped = rpcError(new AdapterError("acme", "invalid", "Acme served 50 of 78"));
     expect(mapped).toMatchObject({
       code: RpcErrorCode.Server,
@@ -23,7 +23,7 @@ describe("rpcError", () => {
     });
   });
 
-  it("puts an adapter's problem on a wrapped AiregError", () => {
+  test("puts an adapter's problem on a wrapped AiregError", () => {
     const cause = new AdapterError("acme", "unauthorized", "Token expired", {
       problem: { code: "token_expired", title: "Token expired", status: 401 },
     });
@@ -34,7 +34,7 @@ describe("rpcError", () => {
     });
   });
 
-  it("names a packed adapter throw the CLI did not construct", () => {
+  test("names a packed adapter throw the CLI did not construct", () => {
     const packed = new Error("Acme served 50 of 78");
     packed.name = "AdapterError";
     Object.assign(packed, { adapter: "acme", failure: "invalid" });
@@ -45,7 +45,7 @@ describe("rpcError", () => {
     });
   });
 
-  it("maps a usage AiregError to invalid params, keeping its code", () => {
+  test("maps a usage AiregError to invalid params, keeping its code", () => {
     expect(rpcError(new AiregError("Nothing to add.", { code: ErrorCode.Usage }))).toMatchObject({
       code: RpcErrorCode.InvalidParams,
       message: "Nothing to add.",
@@ -53,7 +53,7 @@ describe("rpcError", () => {
     });
   });
 
-  it("names a missing thing as not found, and carries a hint", () => {
+  test("names a missing thing as not found, and carries a hint", () => {
     const missing = new AiregError('No account named "acme".', {
       code: ErrorCode.NotFound,
       hint: "Run `aireg auth list` to see the accounts.",
@@ -64,12 +64,12 @@ describe("rpcError", () => {
     });
   });
 
-  it("names an invalid manifest as invalid params, and any other failure as a server error", () => {
+  test("names an invalid manifest as invalid params, and any other failure as a server error", () => {
     expect(rpcError(new ManifestError("bad yaml")).code).toBe(RpcErrorCode.InvalidParams);
     expect(rpcError(new AiregError("Unknown target: claude.")).code).toBe(RpcErrorCode.Server);
   });
 
-  it("names a credential store failure, with its cause only when it has one", () => {
+  test("names a credential store failure, with its cause only when it has one", () => {
     const cause = new Error("EACCES: permission denied\nstack");
     expect(rpcError(new CredentialStoreError("Could not read it.", { cause }))).toMatchObject({
       code: RpcErrorCode.InvalidParams,
@@ -78,14 +78,14 @@ describe("rpcError", () => {
     expect(rpcError(new CredentialStoreError("Not a valid file")).message).toBe("Not a valid file");
   });
 
-  it("names a lease failure instead of calling it internal", () => {
+  test("names a lease failure instead of calling it internal", () => {
     expect(rpcError(new LeaseError("Another process took over", "lease_lost"))).toMatchObject({
       code: RpcErrorCode.Server,
       message: "Another process took over",
     });
   });
 
-  it("names a full disk, from the file system or from SQLite", () => {
+  test("names a full disk, from the file system or from SQLite", () => {
     const enospc = Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });
     const full = Object.assign(new Error("database or disk is full"), {
       code: "ERR_SQLITE_ERROR",
@@ -100,7 +100,7 @@ describe("rpcError", () => {
     }
   });
 
-  it("does not leak an unclassified throw", () => {
+  test("does not leak an unclassified throw", () => {
     expect(rpcError(new Error("EACCES /secret"))).toMatchObject({
       code: RpcErrorCode.Internal,
       message: "The aireg daemon hit an unexpected error. Run `aireg logs --daemon` to see it.",

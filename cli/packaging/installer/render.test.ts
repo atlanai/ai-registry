@@ -183,8 +183,8 @@ describe("renderWindowsInstaller", () => {
 // install.sh is checked with POSIX sh and bash, which Windows runners do not ship as `sh`.
 describe.skipIf(process.platform === "win32")("the rendered installer", () => {
   test("is valid POSIX sh", () => {
-    execFileSync("sh", ["-n"], { input: render() });
-    execFileSync("bash", ["-n"], { input: render() });
+    expect(() => execFileSync("sh", ["-n"], { input: render() })).not.toThrow();
+    expect(() => execFileSync("bash", ["-n"], { input: render() })).not.toThrow();
   }, 30_000);
 
   // A `curl | sh` cut off mid-download must run nothing. The whole body is one

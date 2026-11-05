@@ -66,7 +66,7 @@ describe("an address naming its own account or port", () => {
   });
 });
 
-// Real git, asked for the credential the gh rung would send, so the helper line is proven to parse.
+// Real git, asked for the credential the gh rung would send, proves the helper line parses.
 describe.skipIf(process.platform === "win32")("the gh rung", () => {
   test("signs git in with gh alone, never a gh planted where git works", async ({ tmp }) => {
     const bin = join(tmp, "bin");

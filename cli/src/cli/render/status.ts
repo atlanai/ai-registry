@@ -1,29 +1,16 @@
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, plural } from "#adapter/text.ts";
 import { STATE_MEANING, stateTone } from "#core/console/state-style.ts";
-import type { ArtifactKind } from "#core/kinds.ts";
-import type { Printer } from "#core/output.ts";
 import type { ArtifactStatus, LinkState, State } from "#core/plan/status.ts";
 import { type Scope, scopeName } from "#core/store/paths.ts";
-import type { Targets } from "#core/target/index.ts";
+import type { Targets } from "#core/target/contract.ts";
+import type { Printer } from "#core/term/printer.ts";
 import { table } from "#core/term/table.ts";
 import { heading, type Installed, identity } from "./installed.ts";
 import { loadedBy, skipLine, stateFor, toolName } from "./tools.ts";
 
 /** A state as a person reads it; `--json` keeps the name the state has in the lockfile check. */
 const SHOWN_STATE: Partial<Record<State, string>> = { dangling: "replaced" };
-
-function cell(printer: Printer, seen: LinkState | undefined): string {
-  const { style } = printer;
-  if (seen === undefined) return style.dim("-");
-  if (seen === "linked") return style.green("✓");
-  return seen === "missing" ? style.red(seen) : style.yellow(seen);
-}
-
-/** Which targets each artifact was chosen for, so columns name targets rather than folders. */
-export interface Chosen {
-  targetTable: Targets;
-  for: (name: string) => readonly string[];
-}
 
 export function renderStatus(
   printer: Printer,
@@ -147,6 +134,19 @@ export function renderStatus(
   repairHint(printer, statuses, scope, chosen, kindOf);
 }
 
+/** Which targets each artifact was chosen for, so columns name targets rather than folders. */
+export interface Chosen {
+  targetTable: Targets;
+  for: (name: string) => readonly string[];
+}
+
+function cell(printer: Printer, seen: LinkState | undefined): string {
+  const { style } = printer;
+  if (seen === undefined) return style.dim("-");
+  if (seen === "linked") return style.green("✓");
+  return seen === "missing" ? style.red(seen) : style.yellow(seen);
+}
+
 /** What to run next: `install --force` for a copy aireg wrote, `sync` for an edit, else `install`. */
 function repairHint(
   printer: Printer,
@@ -155,8 +155,6 @@ function repairHint(
   chosen: Chosen,
   kindOf: (item: ArtifactStatus) => ArtifactKind | undefined,
 ): void {
-  // An edit is the one state `install` will not repair: it refuses to overwrite
-  // an edit, so point at `sync`, which reconciles one.
   const flag = scope === "user" ? " -g" : "";
   // A copy aireg writes into a target's folder holds no edit sync could send back.
   const writtenFor = (item: ArtifactStatus): { tool: string; kind: string } | undefined => {
@@ -182,6 +180,7 @@ function repairHint(
       `${list(tools)} read${tools.length === 1 ? "s" : ""} a copy aireg writes from the ${kind}: run \`aireg install${flag} --force\` to write it again, and change the ${kind} in its registry.`,
     );
   } else if (edited) {
+    // `install` refuses to overwrite an edit, so point at `sync`, which reconciles one.
     printer.hint(
       `Run \`aireg sync${flag}\` to compare the edits with the registry` +
         (absent ? `, and \`aireg install${flag}\` to restore what is missing.` : "."),

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { Styler } from "#core/output.ts";
+import { describe, expect, test } from "vitest";
+import { Styler } from "#core/term/printer.ts";
 import { KEY, terminal } from "#test/kit/fake-terminal.ts";
-import { CANCEL } from "./prompt.ts";
+import { CANCEL } from "./model.ts";
 import { confirm, type SelectOptions, select } from "./select.ts";
 
 const { up, down, enter, space, escape: esc, ctrlC } = KEY;
@@ -29,7 +29,7 @@ async function pick<T>(options: Omit<SelectOptions<T>, "style">, keys: string[])
 }
 
 describe("select", () => {
-  it("completes and writes its answer when output is redirected", async () => {
+  test("completes and writes its answer when output is redirected", async () => {
     const term = terminal();
     const run = select(
       { ...scope, style },
@@ -40,7 +40,7 @@ describe("select", () => {
     expect(term.screen()).toEqual(["◇  Installation scope  Project"]);
   });
 
-  it("draws its options with hints, the cursor on the first", async () => {
+  test("draws its options with hints, the cursor on the first", async () => {
     const { frame } = await pick(scope, [enter]);
     expect(frame).toEqual([
       "◆  Installation scope",
@@ -53,16 +53,16 @@ describe("select", () => {
     ]);
   });
 
-  it("wraps at either end, since the cursor is the answer", async () => {
+  test("wraps at either end, since the cursor is the answer", async () => {
     expect((await pick(scope, [up, enter])).value).toBe("user");
     expect((await pick(scope, [down, down, enter])).value).toBe("project");
   });
 
-  it("collapses to the answer", async () => {
+  test("collapses to the answer", async () => {
     expect((await pick(scope, [down, enter])).screen).toEqual(["◇  Installation scope  User"]);
   });
 
-  it("collapses to an option's shorter answer when it has one", async () => {
+  test("collapses to an option's shorter answer when it has one", async () => {
     const method = {
       message: "How should they be installed?",
       options: [
@@ -75,23 +75,23 @@ describe("select", () => {
     ]);
   });
 
-  it("starts on the initial value, or the first when it matches nothing", async () => {
+  test("starts on the initial value, or the first when it matches nothing", async () => {
     expect((await pick({ ...scope, initial: "user" }, [enter])).value).toBe("user");
     expect((await pick({ ...scope, initial: "nowhere" }, [enter])).value).toBe("project");
   });
 
-  it("ignores space and other letters", async () => {
+  test("ignores space and other letters", async () => {
     expect((await pick(scope, [space, "x", down, enter])).value).toBe("user");
   });
 
-  it("cancels on escape and on ctrl+c", async () => {
+  test("cancels on escape and on ctrl+c", async () => {
     const escaped = await pick(scope, [esc]);
     expect(escaped.value).toBe(CANCEL);
     expect(escaped.screen).toEqual(["■  Installation scope  canceled"]);
     expect((await pick(scope, [ctrlC])).value).toBe(CANCEL);
   });
 
-  it("draws registry text in its options as inert text, answering with the value as it is", async () => {
+  test("draws registry text in its options as inert text, answering with the value as it is", async () => {
     const hostile = "kit\u001B]8;;https://example.test/\u0007x\u001B]8;;\u0007\u001B[8mhidden";
     const term = terminal();
     const run = select(
@@ -110,7 +110,7 @@ describe("select", () => {
     expect(term.screen()).toEqual(["◇  Pick  kitxhidden"]);
   });
 
-  it("moves to an option by its letter, in either case", async () => {
+  test("moves to an option by its letter, in either case", async () => {
     const lettered = {
       message: "Pick",
       options: [
@@ -134,7 +134,7 @@ describe("confirm", () => {
     return { value: await run, frame, screen: term.screen() };
   }
 
-  it("is yes by default, with y and n as keys", async () => {
+  test("is yes by default, with y and n as keys", async () => {
     const { value, frame, screen } = await ask(undefined, [enter]);
     expect(value).toBe(true);
     expect(frame).toEqual([
@@ -149,11 +149,11 @@ describe("confirm", () => {
     expect(screen).toEqual(["◇  Proceed?  Yes"]);
   });
 
-  it("starts on No when asked to", async () => {
+  test("starts on No when asked to", async () => {
     expect((await ask(false, [enter])).value).toBe(false);
   });
 
-  it("takes n and y before enter", async () => {
+  test("takes n and y before enter", async () => {
     expect((await ask(true, ["n", enter])).value).toBe(false);
     expect((await ask(false, ["n", "y", enter])).value).toBe(true);
   });

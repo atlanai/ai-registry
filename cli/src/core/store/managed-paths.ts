@@ -4,11 +4,6 @@ import { isWithin } from "#adapter/paths.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { type Roots, stagingDir, toolHome, toolHomeRoot } from "#core/store/paths.ts";
 
-/** Where the walk for links starts: a project from its own folder, the user scope from its own. */
-function scopeRoot(roots: Roots): string {
-  return roots.scope === "project" ? roots.cwd : dirname(roots.artifacts);
-}
-
 /** Target roots may be shared; only scope-owned and staging trees are guarded here. */
 export async function guardManagedPath(
   path: string,
@@ -29,6 +24,11 @@ export async function guardManagedPath(
       await assertUnredirected(home, staging, includeLeaf, verified);
     }
   }
+}
+
+/** Where the walk for links starts: a project from its own folder, the user scope from its own. */
+function scopeRoot(roots: Roots): string {
+  return roots.scope === "project" ? roots.cwd : dirname(roots.artifacts);
 }
 
 /**

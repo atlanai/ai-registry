@@ -1,10 +1,14 @@
 import { readFileSync } from "node:fs";
 import { releaseBinary } from "#core/product.ts";
-import { RELEASE_PLATFORMS, type ReleasePlatform, releasePlatform } from "#core/release/urls.ts";
+import {
+  RELEASE_PLATFORMS,
+  type ReleasePlatform,
+  releasePlatform,
+} from "#core/release/platform.ts";
 
 /**
- * Exact, never a range: a standalone binary IS its Bun runtime, so `latest` would make every
- * release a different, untested runtime. `.bun-version` is also what CI installs.
+ * Exact, never a range: a standalone binary is its Bun runtime, so `latest` would make every
+ * release a different, untested runtime. CI installs `.bun-version` too.
  */
 export const BUN_VERSION = readFileSync(new URL("../.bun-version", import.meta.url), "utf8").trim();
 export const BUN_COMMIT = (
@@ -17,7 +21,6 @@ export interface Target {
   readonly platform: ReleasePlatform;
   readonly os: string;
   readonly arch: string;
-  /** `--target` for `bun build --compile`. */
   readonly bunTarget: string;
   /** Published artifact name, and the name install.sh downloads. */
   readonly filename: string;

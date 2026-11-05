@@ -10,6 +10,36 @@ export class ComplianceError extends Error {
   }
 }
 
+/** For an adapter's own tests: its declaration, then a live handle against a real registry. */
+export async function assertAdapterCompliance(
+  adapter: SourceAdapter,
+  context: SourceContext,
+): Promise<void> {
+  checkDeclaration(adapter);
+  const handle = await adapter.connect(context);
+  try {
+    checkCapabilities(adapter, handle);
+    await checkListing(adapter, handle);
+  } finally {
+    await handle.close();
+  }
+}
+
+function checkDeclaration(adapter: SourceAdapter): void {
+  if (!ADAPTER_ID.test(adapter.id)) {
+    throw new ComplianceError(`Adapter id ${JSON.stringify(adapter.id)} is not ${ADAPTER_ID}.`);
+  }
+  if (adapter.protocol !== ADAPTER_PROTOCOL) {
+    throw new ComplianceError(`${adapter.id} implements protocol ${adapter.protocol}.`);
+  }
+  const unserved = (adapter.publishKinds ?? []).filter(
+    (kind) => !adapter.artifactKinds.includes(kind),
+  );
+  if (unserved.length > 0) {
+    throw new ComplianceError(`${adapter.id} publishes ${unserved.join(", ")} it does not serve.`);
+  }
+}
+
 function checkCapabilities(adapter: SourceAdapter, handle: SourceHandle): void {
   const flags = advertisedCapabilities(adapter.capabilities);
   if (flags.publish && handle.publish === undefined) {
@@ -49,34 +79,4 @@ async function checkListing(adapter: SourceAdapter, handle: SourceHandle): Promi
     }
   }
   return [...listing.artifacts];
-}
-
-function checkDeclaration(adapter: SourceAdapter): void {
-  if (!ADAPTER_ID.test(adapter.id)) {
-    throw new ComplianceError(`Adapter id ${JSON.stringify(adapter.id)} is not ${ADAPTER_ID}.`);
-  }
-  if (adapter.protocol !== ADAPTER_PROTOCOL) {
-    throw new ComplianceError(`${adapter.id} implements protocol ${adapter.protocol}.`);
-  }
-  const unserved = (adapter.publishKinds ?? []).filter(
-    (kind) => !adapter.artifactKinds.includes(kind),
-  );
-  if (unserved.length > 0) {
-    throw new ComplianceError(`${adapter.id} publishes ${unserved.join(", ")} it does not serve.`);
-  }
-}
-
-/** The checks an adapter's own test runs: its declaration, then a live handle against a real registry. */
-export async function assertAdapterCompliance(
-  adapter: SourceAdapter,
-  context: SourceContext,
-): Promise<void> {
-  checkDeclaration(adapter);
-  const handle = await adapter.connect(context);
-  try {
-    checkCapabilities(adapter, handle);
-    await checkListing(adapter, handle);
-  } finally {
-    await handle.close();
-  }
 }

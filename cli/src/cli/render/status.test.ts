@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { Printer } from "#core/output.ts";
+import { describe, expect, test } from "vitest";
 import type { ArtifactStatus } from "#core/plan/status.ts";
-import { resolveTargets } from "#core/target/index.ts";
+import { resolveTargets } from "#core/target/table.ts";
+import { Printer } from "#core/term/printer.ts";
 import { withoutKind } from "#test/kit/target.ts";
 import type { Installed } from "./installed.ts";
 import { renderStatus } from "./status.ts";
@@ -32,7 +32,7 @@ const row = (name: string, kind: string, extra: Partial<Installed> = {}): Instal
 });
 
 describe("renderStatus", () => {
-  it("shows a watched artifact under the target whose folder it is", () => {
+  test("shows a watched artifact under the target whose folder it is", () => {
     const watched = { target: "claude-code", harness: "claude", path: "~/.claude/skills/lint" };
     const lines = rendered(
       [{ name: "lint", state: "ok", detail: undefined, targets: {} }],
@@ -42,7 +42,7 @@ describe("renderStatus", () => {
     expect(lines).toContain("  lint      skill  0.1.0    acme  watched      ok");
   });
 
-  it("has a column per chosen target, filled from the folder each one reads", () => {
+  test("has a column per chosen target, filled from the folder each one reads", () => {
     const lines = rendered(
       [
         {
@@ -65,7 +65,7 @@ describe("renderStatus", () => {
     expect(lines).toContain("  reviewer   agent  0.1.0    acme  missing      -      missing");
   });
 
-  it("says replaced, drops the folder from a detail, and explains each dash and ok", () => {
+  test("says replaced, drops the folder from a detail, and explains each dash and ok", () => {
     const lines = rendered(
       [
         {
@@ -86,7 +86,7 @@ describe("renderStatus", () => {
     expect(lines).toContain("ok  matches the lockfile, links intact");
     expect(lines).toContain("1 artifact needs attention.");
   });
-  it("points an edit to a file aireg writes for a target at install --force, not sync", () => {
+  test("points an edit to a file aireg writes for a target at install --force, not sync", () => {
     const edited = (name: string, folder: string) => ({
       name,
       state: "edited" as const,
@@ -104,7 +104,7 @@ describe("renderStatus", () => {
     expect(both.join("\n")).toContain("Run `aireg sync` to compare the edits with the registry.");
   });
 
-  it("points an edit to a skill a target takes as a copy at install --force", () => {
+  test("points an edit to a skill a target takes as a copy at install --force", () => {
     const claude = chosen.targetTable["claude-code"];
     const skill = claude?.kinds.skill;
     if (claude === undefined || skill?.shape !== "directory") throw new Error("no claude skill");

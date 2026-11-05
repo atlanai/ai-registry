@@ -2,7 +2,7 @@ import { access, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { writeInstallRecord } from "#core/adapter/installed/record.ts";
-import { adapterFor, limitsFor, loadAdapter } from "#core/adapter/registry.ts";
+import { adapterFor, limitsFor, loadAdapter } from "#core/adapter/load.ts";
 import { sha256Hex } from "#core/fs/hash.ts";
 import { homeTest as test } from "#test/kit/fixtures.ts";
 import { registerBuiltinAdapters } from "./index.ts";

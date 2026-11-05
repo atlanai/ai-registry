@@ -1,27 +1,17 @@
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list } from "#adapter/text.ts";
-import type { ArtifactKind } from "#core/kinds.ts";
-import { askingFor, type Manifest, type Pinnable } from "#core/manifest.ts";
+import { askingFor, type Pinnable } from "#core/manifest/match.ts";
+import type { Manifest } from "#core/manifest/model.ts";
 import type { LinkState } from "#core/plan/status.ts";
-import { DEFAULT_TARGETS, names, readsFor, type Targets } from "#core/target/index.ts";
+import type { Targets } from "#core/target/contract.ts";
+import { DEFAULT_TARGETS, names } from "#core/target/ids.ts";
+import { readsFor } from "#core/target/placement.ts";
 
 /** A target by the name a person picks it by: a tool's own name, or a shared folder's path. */
 export function toolName(targetTable: Targets | undefined, name: string): string {
   const target = targetTable?.[name];
   if (target === undefined) return name;
   return target.shared ? target.projectRoot : target.displayName;
-}
-
-/** Whether a target loads an artifact placed in these folders, its own or one it reads the kind from. */
-function loads(
-  targetTable: Targets,
-  tool: string,
-  kind: ArtifactKind | undefined,
-  folders: readonly string[],
-): boolean {
-  if (folders.includes(tool)) return true;
-  return (
-    kind !== undefined && readsFor(targetTable, tool, kind).some((read) => folders.includes(read))
-  );
 }
 
 /**
@@ -47,17 +37,26 @@ export function loadedBy(
   return [...picked, ...others, ...unread];
 }
 
+/** Whether a target loads an artifact placed in these folders, its own or one it reads the kind from. */
+function loads(
+  targetTable: Targets,
+  tool: string,
+  kind: ArtifactKind | undefined,
+  folders: readonly string[],
+): boolean {
+  if (folders.includes(tool)) return true;
+  return (
+    kind !== undefined && readsFor(targetTable, tool, kind).some((read) => folders.includes(read))
+  );
+}
+
 /** The targets a scope installs for, read without refusing a name this aireg does not know. */
 export function scopeTargets(manifest: Manifest, targetTable: Targets): string[] {
   const wanted = manifest.targets.length > 0 ? manifest.targets : DEFAULT_TARGETS;
   return wanted.includes("*") ? names(targetTable) : [...wanted];
 }
 
-/**
- * The targets a scope installs a row for: those of each manifest entry that
- * asks for it, the scope's own for an entry that names none or for a row only
- * something else needs.
- */
+/** Each entry's own targets, or the scope's for an entry naming none or a row only others need. */
 export function chosenFor(manifest: Manifest, scope: readonly string[], row: Pinnable): string[] {
   const asking = askingFor(manifest, row);
   if (asking.length === 0) return [...scope];
@@ -106,7 +105,6 @@ export function unhandled(
   return kinds.filter((kind) => target.kinds[kind] === undefined);
 }
 
-/** `Codex skips reviewer: it does not load agents.`, said the same by the plan and by status. */
 export function skipLine(
   targetTable: Targets,
   tool: string,

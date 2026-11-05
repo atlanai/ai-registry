@@ -10,27 +10,50 @@ import {
   type StoppedRun,
   stoppedError,
 } from "#cli/commands/sync/follow.ts";
-import { parse } from "#cli/options.ts";
-import { renderSync } from "#cli/render/sync.ts";
-import { trackSync } from "#cli/telemetry.ts";
+import { renderSync } from "#cli/commands/sync/render.ts";
+import { SYNC_COMMAND } from "#cli/commands/sync/spec.ts";
+import { parse } from "#cli/options/parse.ts";
+import { trackSync } from "#cli/telemetry/events.ts";
 import { isStepPolicy, STEP_POLICIES } from "#core/config/model.ts";
 import { registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
-import { unknownRegistry } from "#core/manifest.ts";
+import { unknownRegistry } from "#core/manifest/errors.ts";
 import type { RunRecord } from "#core/run/model.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { type Candidate, displayPath } from "#core/sync/adopt.ts";
 import { UNSETTLED } from "#core/sync/model.ts";
 import { POLICY_AXES, type PolicyAxis, type SyncPolicy } from "#core/sync/policy.ts";
-import { withDaemon } from "#daemon/service.ts";
-import { shadowedByYours, surveyClaims } from "#engine/claim.ts";
-import { FOREGROUND_POLICY } from "#engine/foreground.ts";
+import { withDaemon } from "#daemon/process/lifecycle.ts";
 import type { CommonOptions } from "#engine/options.ts";
-import { load } from "#engine/pipeline.ts";
-import { closeScan, scan } from "#engine/scan.ts";
-import { builtin, type CommandContext } from "./index.ts";
+import { load } from "#engine/scope/load.ts";
+import { shadowedByYours, surveyClaims } from "#engine/sync/claim.ts";
+import { closeScan, scan } from "#engine/sync/scan.ts";
+import { FOREGROUND_POLICY } from "#engine/sync/work.ts";
+import type { CommandContext } from "./command.ts";
 
 type Own = Record<string, unknown> & Partial<Record<PolicyAxis, string>>;
+
+/**
+ * Reconciles this scope with its registries, under a policy that pulls but
+ * never publishes unasked. `--dry-run` reports without writing.
+ */
+export async function run(context: CommandContext): Promise<void> {
+  // Dispatched before parsing: `parse` is strict and knows only the common
+  // options, so it would reject resolve's own flags such as `--mine`.
+  if (context.argv[0] === "resolve") {
+    const { run: settle } = await import("#cli/commands/sync/resolve.ts");
+    return settle({ ...context, argv: context.argv.slice(1) });
+  }
+
+  const { common, positionals, own } = parse<Own>(context.argv, SYNC_COMMAND);
+  const policy = policyFrom(own);
+
+  if (common.dryRun) return report(context, common, policy, positionals[0]);
+  return reconcile(context, common, policy, positionals[0]);
+}
+
+type Scanned = Awaited<ReturnType<typeof scan>>;
+type Loaded = Awaited<ReturnType<typeof load>>;
 
 /** Flags override the policy one axis at a time, so the others keep their guarantee. */
 function policyFrom(own: Own): SyncPolicy {
@@ -47,71 +70,6 @@ function policyFrom(own: Own): SyncPolicy {
     policy[axis] = value;
   }
   return policy;
-}
-
-type Scanned = Awaited<ReturnType<typeof scan>>;
-type Loaded = Awaited<ReturnType<typeof load>>;
-
-/**
- * A copy of what a registry this scope installs publishes is linked by the
- * next sync when its bytes match, and held when someone changed it.
- */
-async function claimable(found: Scanned): Promise<{ linkable: Candidate[]; changed: Candidate[] }> {
-  const linkable: Candidate[] = [];
-  const changed: Candidate[] = [];
-  for (const source of found.acquired) {
-    const theirs = found.undeclared.filter(
-      (item) => found.publisher.get(`${item.kind}:${item.name}`) === source.alias,
-    );
-    for (const claim of await surveyClaims(theirs, found.acquired, source.alias)) {
-      const item = theirs.find((each) => each.kind === claim.kind && each.name === claim.name);
-      if (item === undefined) continue;
-      if (claim.different.length > 0) changed.push(item);
-      else linkable.push(item);
-    }
-  }
-  return { linkable, changed };
-}
-
-async function nextSteps(
-  context: CommandContext,
-  loaded: Loaded,
-  found: Scanned,
-  undeclared: Candidate[],
-): Promise<void> {
-  const { items, local, publisher } = found;
-  const has = (...dispositions: string[]) =>
-    items.some((item) => dispositions.includes(item.disposition));
-  if (has("pull", "pull-delete")) {
-    context.printer.hint("Run `aireg sync` to take the registry's changes.");
-  }
-  const conflict = items.find((item) => item.disposition === "conflict");
-  if (conflict !== undefined) {
-    const names = items.map((item) => item.name);
-    context.printer.hint(await conflictHint(loaded, names, conflict.name, conflict.source));
-  }
-  if (has(...PUBLISHED_BY_YOU) || local.length > 0) context.printer.hint(PUBLISH_HINT);
-  if (undeclared.length > 0) {
-    const names = undeclared
-      .map((item) => {
-        const alias = publisher.get(`${item.kind}:${item.name}`);
-        return alias === undefined ? item.name : `${alias}/${item.name}`;
-      })
-      .join(" ");
-    context.printer.hint(`Run \`aireg add ${names}\` to install them from their registry.`);
-  }
-}
-
-/** The registries a run covers: the one named, or every one the scope declares. */
-function covered(loaded: Loaded, only: string | undefined): string[] {
-  const declared = Object.keys(loaded.manifest.registries).sort();
-  const wanted = only === undefined ? declared : declared.filter((alias) => alias === only);
-  if (wanted.length > 0) return wanted;
-  if (only !== undefined) throw unknownRegistry(only, loaded.roots.scope, declared);
-  throw new AiregError(`No registry is declared in ${scopeName(loaded.roots.scope)}.`, {
-    code: ErrorCode.Usage,
-    hint: "Run `aireg registry add <address>` to declare one.",
-  });
 }
 
 /** `--dry-run`: scans the registries a sync would cover and reports what it would do. */
@@ -143,6 +101,18 @@ async function report(
   } finally {
     await closeScan(found);
   }
+}
+
+/** The registries a run covers: the one named, or every one the scope declares. */
+function covered(loaded: Loaded, only: string | undefined): string[] {
+  const declared = Object.keys(loaded.manifest.registries).sort();
+  const wanted = only === undefined ? declared : declared.filter((alias) => alias === only);
+  if (wanted.length > 0) return wanted;
+  if (only !== undefined) throw unknownRegistry(only, loaded.roots.scope, declared);
+  throw new AiregError(`No registry is declared in ${scopeName(loaded.roots.scope)}.`, {
+    code: ErrorCode.Usage,
+    hint: "Run `aireg registry add <address>` to declare one.",
+  });
 }
 
 /** What `--dry-run` prints of one scan. */
@@ -202,6 +172,56 @@ async function print(
     local.length > 0 ||
     found.undeclared.length > 0;
   if (unsettled) context.exit = ExitCode.Changed;
+}
+
+/**
+ * A copy of what a registry this scope installs publishes is linked by the
+ * next sync when its bytes match, and held when someone changed it.
+ */
+async function claimable(found: Scanned): Promise<{ linkable: Candidate[]; changed: Candidate[] }> {
+  const linkable: Candidate[] = [];
+  const changed: Candidate[] = [];
+  for (const source of found.acquired) {
+    const theirs = found.undeclared.filter(
+      (item) => found.publisher.get(`${item.kind}:${item.name}`) === source.alias,
+    );
+    for (const claim of await surveyClaims(theirs, found.acquired, source.alias)) {
+      const item = theirs.find((each) => each.kind === claim.kind && each.name === claim.name);
+      if (item === undefined) continue;
+      if (claim.different.length > 0) changed.push(item);
+      else linkable.push(item);
+    }
+  }
+  return { linkable, changed };
+}
+
+async function nextSteps(
+  context: CommandContext,
+  loaded: Loaded,
+  found: Scanned,
+  undeclared: Candidate[],
+): Promise<void> {
+  const { items, local, publisher } = found;
+  const has = (...dispositions: string[]) =>
+    items.some((item) => dispositions.includes(item.disposition));
+  if (has("pull", "pull-delete")) {
+    context.printer.hint("Run `aireg sync` to take the registry's changes.");
+  }
+  const conflict = items.find((item) => item.disposition === "conflict");
+  if (conflict !== undefined) {
+    const names = items.map((item) => item.name);
+    context.printer.hint(await conflictHint(loaded, names, conflict.name, conflict.source));
+  }
+  if (has(...PUBLISHED_BY_YOU) || local.length > 0) context.printer.hint(PUBLISH_HINT);
+  if (undeclared.length > 0) {
+    const names = undeclared
+      .map((item) => {
+        const alias = publisher.get(`${item.kind}:${item.name}`);
+        return alias === undefined ? item.name : `${alias}/${item.name}`;
+      })
+      .join(" ");
+    context.printer.hint(`Run \`aireg add ${names}\` to install them from their registry.`);
+  }
 }
 
 /**
@@ -287,23 +307,4 @@ async function reconcile(
     }
     context.exit = ExitCode.Changed;
   }
-}
-
-/**
- * Reconciles this scope with its registries, under a policy that pulls but
- * never publishes unasked. `--dry-run` reports without writing.
- */
-export async function run(context: CommandContext): Promise<void> {
-  // Dispatched before parsing: `parse` is strict and knows only the common
-  // options, so it would reject resolve's own flags such as `--mine`.
-  if (context.argv[0] === "resolve") {
-    const { run: settle } = await import("#cli/commands/sync/resolve.ts");
-    return settle({ ...context, argv: context.argv.slice(1) });
-  }
-
-  const { common, positionals, own } = parse<Own>(context.argv, builtin("sync"));
-  const policy = policyFrom(own);
-
-  if (common.dryRun) return report(context, common, policy, positionals[0]);
-  return reconcile(context, common, policy, positionals[0]);
 }

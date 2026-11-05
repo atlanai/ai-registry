@@ -4,29 +4,6 @@ import type { AutostartBackend, Exec, ServiceSpec } from "./model.ts";
 
 const RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
-function runKeyValue(suffix: string): string {
-  return suffix === "" ? SERVICE.runKey : `${SERVICE.runKey}-${suffix}`;
-}
-
-/** Windows paths cannot hold a quote, so quoting each argument is enough. */
-function renderRunCommand(spec: ServiceSpec): string {
-  return spec.starter
-    .map((arg) => {
-      if (arg.includes('"')) throw new Error("The daemon's login command cannot contain a quote.");
-      return `"${arg}"`;
-    })
-    .join(" ");
-}
-
-/** The data column of `reg query` output: name, type, then the rest of the line. */
-function queried(stdout: string, value: string): string | undefined {
-  for (const row of stdout.split(/\r?\n/)) {
-    const match = /^\s*(\S+)\s+REG_SZ\s+(.*)$/.exec(row);
-    if (match?.[1] === value) return match[2]?.trim();
-  }
-  return undefined;
-}
-
 /**
  * A login hook, not a supervisor: `daemon start` runs once at sign-in and a
  * crash waits for the next command that needs the daemon.
@@ -89,4 +66,27 @@ export function runKeyBackend(spec: ServiceSpec, exec: Exec): AutostartBackend {
     rewrite: () => backend.install(),
   };
   return backend;
+}
+
+function runKeyValue(suffix: string): string {
+  return suffix === "" ? SERVICE.runKey : `${SERVICE.runKey}-${suffix}`;
+}
+
+/** The data column of `reg query` output: name, type, then the rest of the line. */
+function queried(stdout: string, value: string): string | undefined {
+  for (const row of stdout.split(/\r?\n/)) {
+    const match = /^\s*(\S+)\s+REG_SZ\s+(.*)$/.exec(row);
+    if (match?.[1] === value) return match[2]?.trim();
+  }
+  return undefined;
+}
+
+/** Windows paths cannot hold a quote, so quoting each argument is enough. */
+function renderRunCommand(spec: ServiceSpec): string {
+  return spec.starter
+    .map((arg) => {
+      if (arg.includes('"')) throw new Error("The daemon's login command cannot contain a quote.");
+      return `"${arg}"`;
+    })
+    .join(" ");
 }

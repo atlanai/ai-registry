@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { formatAddress, formatRef, parseRef, RefParseError, withLocalName } from "./ref.ts";
 
 describe("parseRef", () => {
-  it.each([
+  test.each([
     ["kit", { registry: "kit" }],
     ["kit/sales", { registry: "kit", namespace: "sales" }],
     ["kit/skill/lint", { registry: "kit", kind: "skill", name: "lint" }],
@@ -15,7 +15,6 @@ describe("parseRef", () => {
       "kit/sales/skill/deploy@2.0.0",
       { registry: "kit", namespace: "sales", kind: "skill", name: "deploy", version: "2.0.0" },
     ],
-    // Three segments read as namespace and name when the middle is not a kind.
     ["kit/sales/deploy", { registry: "kit", namespace: "sales", name: "deploy" }],
     [
       "kit/sales/deploy@2.0.0",
@@ -25,13 +24,13 @@ describe("parseRef", () => {
     expect(parseRef(input)).toEqual(expected);
   });
 
-  it("treats `latest` as the absence of a pin, so it never becomes one", () => {
+  test("treats `latest` as the absence of a pin, so it never becomes one", () => {
     const ref = parseRef("kit/skill/lint@latest");
     expect(ref.version).toBeUndefined();
     expect(formatRef(ref)).toBe("kit/skill/lint");
   });
 
-  it.each([
+  test.each([
     ["kit@1.0.0", /only one artifact can be pinned to a version/],
     ["kit/sales@1.0.0", /only one artifact can be pinned to a version/],
     ["kit/skill/lint@", /no version follows the @/],
@@ -47,7 +46,7 @@ describe("parseRef", () => {
     expect(() => parseRef(input)).toThrow(message);
   });
 
-  it.each([
+  test.each([
     ["kit/plugin/deploy", "kit/deploy"],
     ["kit/plugin/deploy@1.0.0", "kit/deploy"],
     ["kit/sales/plugin/deploy", "kit/deploy"],
@@ -59,12 +58,12 @@ describe("parseRef", () => {
 });
 
 describe("withLocalName", () => {
-  it("takes a name in the spec's grammar", () => {
+  test("takes a name in the spec's grammar", () => {
     expect(withLocalName(parseRef("kit/skill/lint"), "my-lint").localName).toBe("my-lint");
   });
 
   // On a case-insensitive disk `Foo` and `foo` are one folder.
-  it.each(["Foo", "a:b", "-lint", "con", "..", "a/b", "a\\b", ""])("refuses %j", (name) => {
+  test.each(["Foo", "a:b", "-lint", "con", "..", "a/b", "a\\b", ""])("refuses %j", (name) => {
     expect(() => withLocalName(parseRef("kit/skill/lint"), name)).toThrow(
       `${JSON.stringify(name.trim())} cannot be a local name.`,
     );
@@ -73,7 +72,7 @@ describe("withLocalName", () => {
 
 describe("formatting", () => {
   // formatRef is what the manifest stores, so the short form survives as written.
-  it.each(["kit/sales/skill/deploy@2.0.0", "kit/sales/deploy@2.0.0", "kit/skill/lint"])(
+  test.each(["kit/sales/skill/deploy@2.0.0", "kit/sales/deploy@2.0.0", "kit/skill/lint"])(
     "round-trips %s through formatRef",
     (input) => {
       expect(formatRef(parseRef(input))).toBe(input);
@@ -81,7 +80,7 @@ describe("formatting", () => {
     },
   );
 
-  it.each([
+  test.each([
     ["kit/skill/lint@1.2.0", "kit/skill/lint"],
     ["kit/skill/lint", "kit/skill/lint"],
     ["kit/sales/deploy", "kit/sales/deploy"],

@@ -1,17 +1,18 @@
+import { type ArtifactKind, isKind, KINDS } from "#adapter/kinds.ts";
 import { list, plural, quoted, withoutCredentials } from "#adapter/text.ts";
-import { parse } from "#cli/options.ts";
-import { knownRegistries, undeclaredRegistry } from "#cli/registries.ts";
-import { search } from "#cli/search.ts";
-import { probe, type Resolved, throughManifest } from "#cli/source.ts";
-import { trackSearch } from "#cli/telemetry.ts";
+import { search } from "#cli/commands/search/rank.ts";
+import { SEARCH_COMMAND } from "#cli/commands/search/spec.ts";
+import { parse } from "#cli/options/parse.ts";
+import { trackSearch } from "#cli/telemetry/events.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { type ArtifactKind, isKind, KINDS } from "#core/kinds.ts";
 import { formatAddress } from "#core/ref.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { truncate } from "#core/term/format.ts";
 import { table } from "#core/term/table.ts";
-import { scopeRoots } from "#engine/pipeline.ts";
-import { builtin, type CommandContext } from "./index.ts";
+import { probe, type Resolved, throughManifest } from "#engine/address/probe.ts";
+import { knownRegistries, undeclaredRegistry } from "#engine/address/registries.ts";
+import { scopeRoots } from "#engine/scope/locate.ts";
+import type { CommandContext } from "./command.ts";
 
 /** Room for the description once the other columns are printed. */
 const DESCRIPTION_WIDTH = 60;
@@ -37,7 +38,7 @@ interface Skipped {
 export async function run(context: CommandContext): Promise<void> {
   const { positionals, common, own } = parse<{ registry?: string; kind?: string }>(
     context.argv,
-    builtin("search"),
+    SEARCH_COMMAND,
   );
   const query = positionals.join(" ").trim();
   if (query === "") {
@@ -104,6 +105,15 @@ export async function run(context: CommandContext): Promise<void> {
   report(context, query, found, skipped);
 }
 
+function kindOf(raw: string): ArtifactKind {
+  const kind = raw.trim().toLowerCase();
+  if (isKind(kind)) return kind;
+  throw new AiregError(`${quoted(raw)} is not a kind.`, {
+    code: ErrorCode.Usage,
+    hint: `Use ${list(KINDS, "or")}.`,
+  });
+}
+
 /** Read through the same listing `aireg registry show` prints. */
 async function matchesIn(target: Resolved, cwd: string): Promise<Match[]> {
   const source = await probe(target.input, target.flags, cwd, [], target);
@@ -144,15 +154,6 @@ async function matchesIn(target: Resolved, cwd: string): Promise<Match[]> {
   } finally {
     await source.close();
   }
-}
-
-function kindOf(raw: string): ArtifactKind {
-  const kind = raw.trim().toLowerCase();
-  if (isKind(kind)) return kind;
-  throw new AiregError(`${quoted(raw)} is not a kind.`, {
-    code: ErrorCode.Usage,
-    hint: `Use ${list(KINDS, "or")}.`,
-  });
 }
 
 function report(

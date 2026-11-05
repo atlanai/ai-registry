@@ -66,10 +66,10 @@ interface ManifestSignature {
  * fields so transport whitespace and key order cannot change them.
  */
 export function canonicalPayload(manifest: ReleaseManifest): Uint8Array {
+  // `adapter` is omitted when absent, so releases signed before the field still verify.
   return new TextEncoder().encode(
     JSON.stringify({
       schema: MANIFEST_SCHEMA,
-      // Omitted when absent, so releases signed before the field still verify.
       ...(manifest.adapter === undefined ? {} : { adapter: manifest.adapter }),
       channel: manifest.channel,
       version: manifest.version,
@@ -84,7 +84,7 @@ export function canonicalPayload(manifest: ReleaseManifest): Uint8Array {
   );
 }
 
-/** The manifest, or a thrown reason. `channel` is the one this build asked for. */
+/** Throws on any defect. An undefined `channel` skips the channel check. */
 export function verifyManifest(raw: string, keys: TrustedKeys, channel?: Channel): ReleaseManifest {
   if (raw.length === 0 || raw.length > MAX_MANIFEST_BYTES) {
     throw new AiregError("The release manifest size is invalid.", { code: ErrorCode.Invalid });
@@ -118,39 +118,6 @@ export function verifyManifest(raw: string, keys: TrustedKeys, channel?: Channel
   return manifest;
 }
 
-export function artifactNamed(
-  manifest: ReleaseManifest,
-  name: string,
-): ManifestArtifact | undefined {
-  return manifest.artifacts.find((artifact) => artifact.name === name);
-}
-
-/**
- * One trusted signature is enough, but a bad signature from a trusted key is
- * fatal: that is a broken or substituted publisher, not an unknown one.
- */
-function verifySignatures(
-  payload: Uint8Array,
-  signatures: readonly ManifestSignature[],
-  keys: TrustedKeys,
-): void {
-  let trusted = false;
-  for (const signature of signatures) {
-    const key = keys.get(signature.keyId);
-    if (key === undefined) continue;
-    if (!verifyEd25519(key, payload, signature.value)) {
-      throw new AiregError("The release manifest signature verification failed.", {
-        code: ErrorCode.Integrity,
-      });
-    }
-    trusted = true;
-  }
-  if (!trusted)
-    throw new AiregError("The release manifest is not signed by a trusted key.", {
-      code: ErrorCode.Integrity,
-    });
-}
-
 function parseManifestBody(doc: Fields): ReleaseManifest | undefined {
   if (doc.schema !== MANIFEST_SCHEMA) return undefined;
   const { adapter } = doc;
@@ -174,6 +141,18 @@ function parseManifestBody(doc: Fields): ReleaseManifest | undefined {
     publishedAt: doc.published_at,
     artifacts,
   };
+}
+
+/** Refuses `v1.2.3` and `1.02.3`: the stored path is built from this string. */
+function exactVersion(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const parsed = parseVersion(value);
+  if (parsed === undefined || formatVersion(parsed) !== value) return undefined;
+  return value;
+}
+
+function isTimestamp(value: string): boolean {
+  return TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value));
 }
 
 function parseArtifacts(raw: unknown): ManifestArtifact[] | undefined {
@@ -211,14 +190,35 @@ function parseSignatures(raw: unknown): ManifestSignature[] | undefined {
   return signatures;
 }
 
-/** Refuses `v1.2.3` and `1.02.3`: the stored path is built from this string. */
-function exactVersion(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const parsed = parseVersion(value);
-  if (parsed === undefined || formatVersion(parsed) !== value) return undefined;
-  return value;
+/**
+ * One trusted signature is enough, but a bad signature from a trusted key is
+ * fatal: that is a broken or substituted publisher, not an unknown one.
+ */
+function verifySignatures(
+  payload: Uint8Array,
+  signatures: readonly ManifestSignature[],
+  keys: TrustedKeys,
+): void {
+  let trusted = false;
+  for (const signature of signatures) {
+    const key = keys.get(signature.keyId);
+    if (key === undefined) continue;
+    if (!verifyEd25519(key, payload, signature.value)) {
+      throw new AiregError("The release manifest signature verification failed.", {
+        code: ErrorCode.Integrity,
+      });
+    }
+    trusted = true;
+  }
+  if (!trusted)
+    throw new AiregError("The release manifest is not signed by a trusted key.", {
+      code: ErrorCode.Integrity,
+    });
 }
 
-function isTimestamp(value: string): boolean {
-  return TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value));
+export function artifactNamed(
+  manifest: ReleaseManifest,
+  name: string,
+): ManifestArtifact | undefined {
+  return manifest.artifacts.find((artifact) => artifact.name === name);
 }

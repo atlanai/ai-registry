@@ -6,14 +6,14 @@ import { join, relative, sep } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { onPath } from "#adapter/paths.ts";
-import { resolveTargets } from "#core/target/index.ts";
+import { resolveTargets } from "#core/target/table.ts";
 import { registry } from "#test/kit/builders/registry.ts";
 import { homeEnv } from "#test/kit/home.ts";
 import { runCli } from "#test/kit/run.ts";
 import { testRoot } from "#test/kit/temp.ts";
 
 /** One command of the coding agent's own that lists what it loaded, and what its output holds. */
-export interface Probe {
+interface Probe {
   /** Run from the project for `project`, from the home folder for `user`. */
   scope: "project" | "user";
   argv: string[];

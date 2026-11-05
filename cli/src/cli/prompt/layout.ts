@@ -1,5 +1,5 @@
-import type { Styler } from "#core/output.ts";
 import { cells, cut, displayWidth, ESC } from "#core/term/format.ts";
+import type { Styler } from "#core/term/printer.ts";
 import { GLYPH } from "#core/term/theme.ts";
 
 /**
@@ -27,6 +27,16 @@ export function fitLines(text: string | undefined, width: number, count: number)
   return lines;
 }
 
+function ellipsized(words: readonly string[], width: number): string {
+  let kept = "";
+  for (const word of words) {
+    const next = kept === "" ? word : `${kept} ${word}`;
+    if (displayWidth(next) + 1 > width) break;
+    kept = next;
+  }
+  return `${kept === "" ? cut(words.join(" "), width - 1) : kept}…`;
+}
+
 /** One line's worth of words; a word longer than the line is split. */
 function filled(words: readonly string[], width: number): [string, string[]] {
   const [first = "", ...others] = words;
@@ -42,16 +52,6 @@ function filled(words: readonly string[], width: number): [string, string[]] {
     taken += 1;
   }
   return [line, words.slice(taken)];
-}
-
-function ellipsized(words: readonly string[], width: number): string {
-  let kept = "";
-  for (const word of words) {
-    const next = kept === "" ? word : `${kept} ${word}`;
-    if (displayWidth(next) + 1 > width) break;
-    kept = next;
-  }
-  return `${kept === "" ? cut(words.join(" "), width - 1) : kept}…`;
 }
 
 const RESETS = new Set([`${ESC}[0m`, `${ESC}[m`]);

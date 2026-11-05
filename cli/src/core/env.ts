@@ -4,8 +4,8 @@ import { AiregError, ErrorCode } from "./errors.ts";
 import { NAME } from "./product.ts";
 
 /**
- * Every setting aireg reads from its environment, as `AIREG_<name>`. A setting is
- * added here first; docs/reference/environment.md lists each public one.
+ * Every setting aireg reads from its environment, as `AIREG_<name>`; docs/reference/environment.md
+ * lists each public one. A `build` setting is stamped into a release; the built CLI never reads it.
  */
 export const SETTINGS = {
   HOME: { public: true },
@@ -20,10 +20,8 @@ export const SETTINGS = {
   TELEMETRY_URL: { public: false },
   NO_MODIFY_PATH: { public: true },
   NO_DEFAULT_REGISTRIES: { public: true },
-  // Set on the process a minimum update restarts, and by the service manager that started the daemon.
   SKIP_MIN_UPDATE: { public: false },
   DAEMON_SUPERVISOR: { public: false },
-  // Read when a release is built and stamped into it; the built CLI never reads them.
   RELEASE_VERSION: { public: false, build: true },
   RELEASE_ORIGIN: { public: false, build: true },
   RELEASE_KEYRING: { public: false, build: true },
@@ -41,7 +39,7 @@ export function present(name: string, env: NodeJS.ProcessEnv = process.env): boo
   return (env[name] ?? "").trim() !== "";
 }
 
-/** The value as set, or undefined when it is unset or empty. */
+/** The trimmed value, or undefined when it is unset or blank. */
 export function setting(name: Setting, env: NodeJS.ProcessEnv = process.env): string | undefined {
   const value = env[envName(name)]?.trim();
   return value === undefined || value === "" ? undefined : value;
@@ -54,7 +52,7 @@ export function isSet(name: Setting, env: NodeJS.ProcessEnv = process.env): bool
 
 const GIT_TIMEOUT_MS = 5 * 60 * 1000;
 
-/** How long one git operation may take: the setting, which must be whole milliseconds, else five minutes. */
+/** How long one git operation may take: the setting in whole milliseconds, else five minutes. */
 export function gitTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
   const raw = setting("GIT_TIMEOUT_MS", env);
   if (raw === undefined) return GIT_TIMEOUT_MS;
@@ -84,17 +82,17 @@ export function tokenVariable(alias: string): string {
   return `${TOKEN_PREFIX}${alias.toUpperCase().replaceAll(/[^A-Z0-9]/g, "_")}`;
 }
 
-// Windows reads aireg_token_acme as AIREG_TOKEN_ACME, so the prefix matches in any case.
-function isTokenVariable(name: string): boolean {
-  return name.toUpperCase().startsWith(TOKEN_PREFIX);
-}
-
 /** `env` with no `AIREG_TOKEN_<NAME>` in it. */
 export function withoutTokens(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([name]) => !isTokenVariable(name)));
 }
 
-/** Deletes every `AIREG_TOKEN_<NAME>` from this process's environment, for one that must hold none. */
+// Windows reads aireg_token_acme as AIREG_TOKEN_ACME, so the prefix matches in any case.
+function isTokenVariable(name: string): boolean {
+  return name.toUpperCase().startsWith(TOKEN_PREFIX);
+}
+
+/** Deletes every `AIREG_TOKEN_<NAME>` from this process's env, for one that must hold none. */
 export function removeTokens(): void {
   for (const name of Object.keys(process.env)) if (isTokenVariable(name)) delete process.env[name];
 }

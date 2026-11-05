@@ -7,10 +7,9 @@ import { App, type AppProps } from "./app.ts";
  * on a CommonJS module hands back a namespace whose shape depends on the bundler.
  */
 export async function runApp(props: AppProps): Promise<void> {
+  // patchConsole: a stray console write would push a frame into the scrollback.
   const instance = render(createElement(App, props), {
     exitOnCtrlC: true,
-    // The console owns the whole screen; leaving frames in the scrollback
-    // would leave a 700-row list behind every repaint.
     patchConsole: true,
   });
   await instance.waitUntilExit();

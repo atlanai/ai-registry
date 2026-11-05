@@ -1,19 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { LogLevelError, resolveLevel } from "./level.ts";
 
 describe("resolveLevel", () => {
-  it.each([
+  test.each([
     ["falls back when nothing asks for a level", {}, undefined, "info"],
     ["reads the environment", { AIREG_LOG_LEVEL: "debug" }, undefined, "debug"],
     ["lets the flag beat the environment", { AIREG_LOG_LEVEL: "warn" }, "trace", "trace"],
-    // So a daemon can be silenced without finding the sink.
     ["accepts off", { AIREG_LOG_LEVEL: "off" }, undefined, "off"],
     ["ignores case and whitespace", { AIREG_LOG_LEVEL: "  WARN " }, undefined, "warn"],
   ])("%s", (_, env, flag, level) => {
     expect(resolveLevel("info", flag === undefined ? { env } : { flag, env })).toBe(level);
   });
 
-  it("names the accepted levels, and where a bad level came from", () => {
+  test("names the accepted levels, and where a bad level came from", () => {
     expect(() => resolveLevel("info", { flag: "loud" })).toThrow(LogLevelError);
     expect(() => resolveLevel("info", { flag: "loud" })).toThrow(
       '--log-level takes trace, debug, info, warn, error, fatal or off, not "loud".',

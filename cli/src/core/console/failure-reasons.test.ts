@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
-import { DAEMON_LOG_FILE, logPath } from "#core/log/index.ts";
+import { DAEMON_LOG_FILE, logPath } from "#core/log/sink.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { failureReasons } from "./runs.ts";
 

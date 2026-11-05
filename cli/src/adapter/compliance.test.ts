@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { assertAdapterCompliance, ComplianceError } from "./compliance.ts";
 import { ADAPTER_PROTOCOL, type SourceAdapter, type SourceContext } from "./contract.ts";
 import { defineAdapter } from "./define.ts";
@@ -49,11 +49,11 @@ function serving(): SourceAdapter {
 }
 
 describe("assertAdapterCompliance", () => {
-  it("accepts a well-formed adapter", async () => {
+  test("accepts a well-formed adapter", async () => {
     await expect(assertAdapterCompliance(serving(), context())).resolves.toBeUndefined();
   });
 
-  it("refuses a sign-in the capabilities do not declare", async () => {
+  test("refuses a sign-in the capabilities do not declare", async () => {
     const quiet: SourceAdapter = {
       ...serving(),
       auth: { login: async () => ({ credential: { type: "bearer", accessToken: "synthetic" } }) },
@@ -63,7 +63,7 @@ describe("assertAdapterCompliance", () => {
     );
   });
 
-  it("refuses a digest mismatch and a publish flag without a method", async () => {
+  test("refuses a digest mismatch and a publish flag without a method", async () => {
     const broken = serving();
     const original = broken.connect;
     broken.connect = async (ctx) => {
@@ -89,18 +89,18 @@ describe("assertAdapterCompliance", () => {
     await expect(assertAdapterCompliance(published, context())).rejects.toThrow(/no publish/);
   });
 
-  it("refuses a foreign protocol", async () => {
+  test("refuses a foreign protocol", async () => {
     const adapter = serving();
     (adapter as { protocol: number }).protocol = ADAPTER_PROTOCOL + 1;
     await expect(assertAdapterCompliance(adapter, context())).rejects.toThrow(/protocol/);
   });
 
-  it("refuses an id a manifest could not name", async () => {
+  test("refuses an id a manifest could not name", async () => {
     const adapter = { ...serving(), id: "Probe.v2" };
     await expect(assertAdapterCompliance(adapter, context())).rejects.toThrow(/is not/);
   });
 
-  it("refuses publishing a kind the adapter does not serve", async () => {
+  test("refuses publishing a kind the adapter does not serve", async () => {
     const adapter = { ...serving(), publishKinds: ["agent" as const] };
     await expect(assertAdapterCompliance(adapter, context())).rejects.toThrow(
       /publishes agent it does not serve/,

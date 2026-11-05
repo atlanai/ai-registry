@@ -12,7 +12,7 @@ test.beforeAll(({ aireg: run }) => {
 });
 
 describe("an export's own version", () => {
-  /** A repository whose one export, a skill, fixes its version, publishing into its own registry folder. */
+  // A repository whose one export, a skill, fixes its version; it publishes to a folder inside it.
   let repo: string;
   const skill = () => join(repo, ".claude", "skills", "lint", "SKILL.md");
   const versionsAt = () =>

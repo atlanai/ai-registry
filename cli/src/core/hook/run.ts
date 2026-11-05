@@ -6,25 +6,28 @@ import type { HookEvent, HookStage, PipelineHook } from "#core/config/hook-stage
 import { readConfig } from "#core/config/repository.ts";
 import { toolHome } from "#core/store/paths.ts";
 
-function handlerFile(handler: string, home: string): string {
-  const resolved = isAbsolute(handler) ? handler : join(home, handler);
-  assertWithin(home, resolved, "hook handler");
-  return resolved;
+/** User hooks from `~/.aireg/config.yml` only. Never from a project manifest. */
+export async function configuredHooks(): Promise<readonly PipelineHook[]> {
+  return (await readConfig()).hooks;
 }
 
-async function loadHandler(
-  hook: PipelineHook,
-  home: string,
-): Promise<(event: HookEvent) => unknown> {
-  const url = pathToFileURL(handlerFile(hook.handler, home)).href;
-  const module = (await import(url)) as Record<string, unknown>;
-  const candidate = module.default ?? module.handler;
-  if (typeof candidate !== "function") {
-    throw new AdapterError("hooks", "invalid", `${hook.id} exported no handler.`, {
-      problem: { code: "HOOK_REJECTED", title: `${hook.id} exported no handler.` },
-    });
+/** `given` is the hook list read once per connection. */
+export async function runPipelineHooks(
+  stage: HookStage,
+  event: Omit<HookEvent, "stage"> = {},
+  signal?: AbortSignal,
+  given?: readonly PipelineHook[],
+): Promise<void> {
+  signal?.throwIfAborted();
+  const home = toolHome();
+  const hooks = given ?? (await configuredHooks());
+  if (hooks.length === 0) return;
+  const full: HookEvent = signal === undefined ? { ...event, stage } : { ...event, stage, signal };
+  for (const hook of hooks) {
+    signal?.throwIfAborted();
+    if (!matches(hook, full)) continue;
+    await invoke(hook, full, home);
   }
-  return candidate as (event: HookEvent) => unknown;
 }
 
 function matches(hook: PipelineHook, event: HookEvent): boolean {
@@ -51,26 +54,23 @@ async function invoke(hook: PipelineHook, event: HookEvent, home: string): Promi
   }
 }
 
-/** User hooks from `~/.aireg/config.yml` only. Never from a project manifest. */
-export async function configuredHooks(): Promise<readonly PipelineHook[]> {
-  return (await readConfig()).hooks;
+async function loadHandler(
+  hook: PipelineHook,
+  home: string,
+): Promise<(event: HookEvent) => unknown> {
+  const url = pathToFileURL(handlerFile(hook.handler, home)).href;
+  const module = (await import(url)) as Record<string, unknown>;
+  const candidate = module.default ?? module.handler;
+  if (typeof candidate !== "function") {
+    throw new AdapterError("hooks", "invalid", `${hook.id} exported no handler.`, {
+      problem: { code: "HOOK_REJECTED", title: `${hook.id} exported no handler.` },
+    });
+  }
+  return candidate as (event: HookEvent) => unknown;
 }
 
-/** Runs the hooks for `stage`: those given, read once for a whole connection, else the configured ones. */
-export async function runPipelineHooks(
-  stage: HookStage,
-  event: Omit<HookEvent, "stage"> = {},
-  signal?: AbortSignal,
-  given?: readonly PipelineHook[],
-): Promise<void> {
-  signal?.throwIfAborted();
-  const home = toolHome();
-  const hooks = given ?? (await configuredHooks());
-  if (hooks.length === 0) return;
-  const full: HookEvent = signal === undefined ? { ...event, stage } : { ...event, stage, signal };
-  for (const hook of hooks) {
-    signal?.throwIfAborted();
-    if (!matches(hook, full)) continue;
-    await invoke(hook, full, home);
-  }
+function handlerFile(handler: string, home: string): string {
+  const resolved = isAbsolute(handler) ? handler : join(home, handler);
+  assertWithin(home, resolved, "hook handler");
+  return resolved;
 }

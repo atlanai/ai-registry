@@ -1,23 +1,26 @@
-/** Exit statuses are a contract scripts branch on, so never a literal at the call site. */
+/**
+ * Exit statuses are a contract scripts branch on, so never a literal at the call site. `Changed`
+ * means something installed, or about to be, differs from what was recorded or published.
+ */
 export const ExitCode = {
   Ok: 0,
   Error: 1,
-  /** The command line can't run as typed: an unknown command or option, or a bad argument. */
   Usage: 2,
-  /** Something installed, or about to be, differs from what was recorded or published. */
   Changed: 3,
   AuthRequired: 4,
 } as const;
 
 export type ExitCode = (typeof ExitCode)[keyof typeof ExitCode];
 
-/** Stable codes `--json` reports for a failure; each maps to one exit status. */
+/**
+ * Stable codes `--json` reports for a failure; each maps to one exit status. Only adapters raise
+ * `forbidden`; aireg itself never refuses access.
+ */
 export const ErrorCode = {
   Error: "error",
   Usage: "usage",
   NotFound: "not_found",
   Unauthorized: "unauthorized",
-  /** Raised only by adapters, as their `forbidden` failure; aireg itself never refuses access. */
   Forbidden: "forbidden",
   Conflict: "conflict",
   Changed: "changed",

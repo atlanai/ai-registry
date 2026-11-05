@@ -1,5 +1,5 @@
-import { beforeAll, describe, expect, it } from "vitest";
-import { registerBuiltinAdapter } from "#core/adapter/registry.ts";
+import { beforeAll, describe, expect, test } from "vitest";
+import { registerBuiltinAdapter } from "#core/adapter/load.ts";
 import { AiregError } from "#core/errors.ts";
 import { parseAdapterId, parseWant } from "./want.ts";
 
@@ -10,12 +10,12 @@ beforeAll(() => {
 });
 
 describe("parseWant", () => {
-  it("reads an id, and an exact pin", () => {
+  test("reads an id, and an exact pin", () => {
     expect(parseWant("acme")).toEqual({ id: "acme", version: undefined });
     expect(parseWant("Acme@1.4.0")).toEqual({ id: "acme", version: "1.4.0" });
   });
 
-  it("refuses a path-shaped id, a built-in id, or a v-prefixed pin", () => {
+  test("refuses a path-shaped id, a built-in id, or a v-prefixed pin", () => {
     expect(() => parseWant("../etc")).toThrow(AiregError);
     expect(() => parseWant("git")).toThrow(/built into aireg/);
     expect(() => parseWant("local@1.0.0")).toThrow(/built into aireg/);
@@ -24,7 +24,7 @@ describe("parseWant", () => {
 });
 
 describe("parseAdapterId", () => {
-  it("lowercases an id and leaves refusing a built-in one to the caller", () => {
+  test("lowercases an id and leaves refusing a built-in one to the caller", () => {
     expect(parseAdapterId("Git")).toBe("git");
   });
 });

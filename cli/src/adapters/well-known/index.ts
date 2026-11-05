@@ -2,11 +2,11 @@ import { defineAdapter } from "#adapter/index.ts";
 import { connect } from "./connect.ts";
 import { ID } from "./errors.ts";
 
+// Claims any web address but a code host's or a repository's: a git URL stays git's.
 export default defineAdapter({
   id: ID,
   displayName: "Agent Skills index",
   artifactKinds: ["skill"],
-  // Any web address but a code host's or a repository's: a git URL stays git's.
   dispatch: {
     sites: {
       schemes: ["https", "http"],

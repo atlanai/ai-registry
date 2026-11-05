@@ -15,7 +15,7 @@ const test = base
     projectTemplate(join(fileTmp, "initialised"), [["init", "--for", "claude-code"]]),
   )
   .extend("mkt", { scope: "file" }, ({ fileTmp }) => marketplace(join(fileTmp, "mkt")).write())
-  /** A project for Claude Code that declares the stock marketplace, which no test changes. */
+  // `declared`: a Claude Code project that declares the stock marketplace, which no test changes.
   .extend("declared", { scope: "file" }, ({ fileTmp, mkt }) =>
     projectTemplate(join(fileTmp, "declared"), [
       ["init", "--for", "claude-code"],

@@ -19,16 +19,13 @@ export function installerOrigin(origin: string): string | undefined {
   return normalized;
 }
 
-/**
- * The artifact directory for one release, from (origin, version) alone and only
- * for an origin that survives the narrowing above.
- */
+/** One release's artifact directory, or undefined for an origin `installerOrigin` refuses. */
 export function artifactBaseUrl(origin: string, version: string): string | undefined {
   const safe = installerOrigin(origin);
   return safe === undefined ? undefined : releaseArtifactBaseUrl(safe, version);
 }
 
-/** Where every release's folder sits, for an origin that survives the narrowing above. */
+/** The folder every release sits in, or undefined for an origin `installerOrigin` refuses. */
 export function artifactsUrl(origin: string): string | undefined {
   const safe = installerOrigin(origin);
   return safe === undefined ? undefined : releaseArtifactsUrl(safe);

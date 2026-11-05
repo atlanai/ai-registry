@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { skillBody, writeSpecRoot } from "#test/kit/spec-root.ts";
 import { contentDigest } from "../spec/canonical.ts";
 import type { Envelope } from "../spec/types.ts";
@@ -47,19 +47,19 @@ afterEach(async () => {
 
 // Both built-in adapters read through this, so one table holds them to the same rules.
 describe("file spec containment", () => {
-  it("refuses an envelope locator that climbs out of the source", async () => {
+  test("refuses an envelope locator that climbs out of the source", async () => {
     await locator("../../../../../../sentinel");
     const files = openFolderRegistry();
     const artifact = (await files.resolve(root, [])).artifacts[0]!;
     await expect(files.fetch(artifact, artifact.files[0]!)).rejects.toEqual(refused);
   });
-  it("refuses a symlinked metadata file", async () => {
+  test("refuses a symlinked metadata file", async () => {
     const index = join(root, "index.json");
     await rename(index, join(home, "index.json"));
     await symlink(join(home, "index.json"), index);
     await expect(openFolderRegistry().resolve(root, [])).rejects.toEqual(refused);
   });
-  it("refuses a symlinked content file", async () => {
+  test("refuses a symlinked content file", async () => {
     const files = openFolderRegistry();
     const artifact = (await files.resolve(root, [])).artifacts[0]!;
     const file = join(root, id, "SKILL.md");
@@ -67,14 +67,14 @@ describe("file spec containment", () => {
     await symlink(join(home, "sentinel"), file);
     await expect(files.fetch(artifact, artifact.files[0]!)).rejects.toEqual(refused);
   });
-  it("refuses a redirected version directory in the in-place shortcut", async () => {
+  test("refuses a redirected version directory in the in-place shortcut", async () => {
     const files = openFolderRegistry();
     const artifact = (await files.resolve(root, [])).artifacts[0]!;
     await rename(join(root, id), join(home, "version"));
     await symlink(join(home, "version"), join(root, id));
     await expect(files.localRoot(artifact)).rejects.toEqual(refused);
   });
-  it.each(["/absolute", "C:/absolute", "..\\sentinel", "safe/../sentinel", "bad\u0000path"])(
+  test.each(["/absolute", "C:/absolute", "..\\sentinel", "safe/../sentinel", "bad\u0000path"])(
     "refuses unsafe locator %s",
     async (path) => {
       const files = openFolderRegistry();
@@ -84,12 +84,12 @@ describe("file spec containment", () => {
       ).rejects.toBeInstanceOf(SpecError);
     },
   );
-  it("refuses a replaced registry root", async () => {
+  test("refuses a replaced registry root", async () => {
     await rename(root, join(home, "redirected-root"));
     await symlink(join(home, "redirected-root"), root);
     await expect(openFolderRegistry().resolve(root, [])).rejects.toEqual(refused);
   });
-  it("reads nothing it did not list, and nothing after it forgets", async () => {
+  test("reads nothing it did not list, and nothing after it forgets", async () => {
     const files = openFolderRegistry();
     const artifact = (await files.resolve(root, [])).artifacts[0]!;
     files.forget();
@@ -98,7 +98,7 @@ describe("file spec containment", () => {
       artifact: id,
     });
   });
-  it("reads valid regular content", async () => {
+  test("reads valid regular content", async () => {
     const files = openFolderRegistry();
     const artifact = (await files.resolve(root, [])).artifacts[0]!;
     expect(Buffer.from(await files.fetch(artifact, artifact.files[0]!)).toString()).toBe(body);
@@ -107,7 +107,7 @@ describe("file spec containment", () => {
 });
 
 describe("an immutable folder", () => {
-  it("is read once per listing, and still reads files afterwards", async () => {
+  test("is read once per listing, and still reads files afterwards", async () => {
     const first = openFolderRegistry({ immutable: true });
     await first.resolve(root, []);
     await rm(join(root, "index.json"));

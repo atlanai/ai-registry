@@ -48,7 +48,17 @@ export async function writeInstallRecord(
   await writeAtomic(installRecordPath(modulePath), `${JSON.stringify(formatRecord(record))}\n`);
 }
 
-/** Hash the module and refuse it when an install record disagrees. */
+function formatRecord(record: AdapterInstallRecord): Record<string, unknown> {
+  return {
+    schema: INSTALL_RECORD_SCHEMA,
+    id: record.id,
+    sha256: record.sha256,
+    protocol: record.protocol,
+    dispatch: record.dispatch,
+  };
+}
+
+/** Refuses a module whose install record names another id or digest; no record passes. */
 export async function assertInstallRecord(modulePath: string, id: string): Promise<void> {
   const record = await readInstallRecord(modulePath);
   if (record === undefined) return;
@@ -81,16 +91,6 @@ export function parseInstallRecord(raw: string): AdapterInstallRecord | undefine
   if (dispatch === undefined) return undefined;
   if (!isSha256Hex(doc.sha256)) return undefined;
   return { id: doc.id, sha256: doc.sha256, protocol: doc.protocol, dispatch };
-}
-
-function formatRecord(record: AdapterInstallRecord): Record<string, unknown> {
-  return {
-    schema: INSTALL_RECORD_SCHEMA,
-    id: record.id,
-    sha256: record.sha256,
-    protocol: record.protocol,
-    dispatch: record.dispatch,
-  };
 }
 
 export function parseDispatch(raw: unknown): Dispatch | undefined {

@@ -1,7 +1,7 @@
 import { chmod, mkdir, mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { privateDirectory, rpcEndpoint } from "./endpoint.ts";
 
 const home = { AIREG_HOME: "/nonexistent/aireg-endpoint-test" };
@@ -9,7 +9,7 @@ const home = { AIREG_HOME: "/nonexistent/aireg-endpoint-test" };
 const PREFIX = "rt-";
 
 describe.skipIf(process.platform === "win32")("rpcEndpoint", () => {
-  it("keeps the socket out of a directory other users can write to", async () => {
+  test("keeps the socket out of a directory other users can write to", async () => {
     const shared = await mkdtemp(join(tmpdir(), PREFIX));
     await chmod(shared, 0o1777);
     const endpoint = rpcEndpoint({ ...home, XDG_RUNTIME_DIR: shared });
@@ -19,14 +19,14 @@ describe.skipIf(process.platform === "win32")("rpcEndpoint", () => {
     expect(dirname(rpcEndpoint({ ...home, XDG_RUNTIME_DIR: own }))).toBe(own);
   });
 
-  it("finds a shorter directory when the runtime one would not fit a socket path", async () => {
+  test("finds a shorter directory when the runtime one would not fit a socket path", async () => {
     const deep = join(await mkdtemp(join(tmpdir(), PREFIX)), "d".repeat(120));
     await mkdir(deep, { mode: 0o700 });
     const endpoint = rpcEndpoint({ ...home, XDG_RUNTIME_DIR: deep });
     expect(Buffer.byteLength(endpoint)).toBeLessThan(104);
   });
 
-  it("passes over a socket folder others can enter", async () => {
+  test("passes over a socket folder others can enter", async () => {
     const shared = await mkdtemp(join(tmpdir(), PREFIX));
     await chmod(shared, 0o1777);
     const taken = join(shared, `aireg-${process.getuid?.()}`);
@@ -40,7 +40,7 @@ describe.skipIf(process.platform === "win32")("rpcEndpoint", () => {
 describe("rpcEndpoint on Windows", () => {
   const PIPE = /^\\\\\.\\pipe\\aireg-[0-9a-f]{16}-([0-9a-f]{32})$/;
 
-  it("names the pipe with a secret kept in the home, the same on every call", async () => {
+  test("names the pipe with a secret kept in the home, the same on every call", async () => {
     const env = { AIREG_HOME: await mkdtemp(join(tmpdir(), PREFIX)) };
     const name = rpcEndpoint(env, "win32");
     const secret = PIPE.exec(name)?.[1];
@@ -51,7 +51,7 @@ describe("rpcEndpoint on Windows", () => {
     if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600);
   });
 
-  it("gives every home a pipe of its own", async () => {
+  test("gives every home a pipe of its own", async () => {
     const one = rpcEndpoint({ AIREG_HOME: await mkdtemp(join(tmpdir(), PREFIX)) }, "win32");
     const two = rpcEndpoint({ AIREG_HOME: await mkdtemp(join(tmpdir(), PREFIX)) }, "win32");
     expect(one).not.toBe(two);
@@ -59,7 +59,7 @@ describe("rpcEndpoint on Windows", () => {
 });
 
 describe.skipIf(process.platform === "win32")("privateDirectory", () => {
-  it("creates the directory for this user alone, and refuses one others can enter", async () => {
+  test("creates the directory for this user alone, and refuses one others can enter", async () => {
     const dir = join(await mkdtemp(join(tmpdir(), PREFIX)), "aireg");
     await privateDirectory(dir);
     expect((await stat(dir)).mode & 0o777).toBe(0o700);

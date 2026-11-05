@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { memorySink } from "#test/kit/memory-sink.ts";
 import { createLogger } from "./logger.ts";
 
@@ -11,7 +11,7 @@ function setup(level: Parameters<typeof createLogger>[0]["level"] = "debug") {
 }
 
 describe("createLogger", () => {
-  it("suppresses anything below the threshold", () => {
+  test("suppresses anything below the threshold", () => {
     const { sink, logger } = setup("warn");
     logger.debug("noise");
     logger.info("noise");
@@ -19,25 +19,25 @@ describe("createLogger", () => {
     expect(sink.records.map((record) => record.body)).toEqual(["kept"]);
   });
 
-  it("reports what it would emit without formatting it", () => {
+  test("reports what it would emit without formatting it", () => {
     const { logger } = setup("warn");
     expect(logger.enabled("debug")).toBe(false);
     expect(logger.enabled("error")).toBe(true);
   });
 
-  it("carries bound context onto every line below it", () => {
+  test("carries bound context onto every line below it", () => {
     const { sink, logger } = setup();
     logger.child({ runId: "run_1" }).child({ jobId: "w1" }).info("started");
     expect(sink.records[0]?.attributes).toMatchObject({ runId: "run_1", jobId: "w1" });
   });
 
-  it("stamps the OTel severity alongside the name", () => {
+  test("stamps the OTel severity alongside the name", () => {
     const { sink, logger } = setup();
     logger.error("boom");
     expect(sink.records[0]).toMatchObject({ severity_text: "error", severity_number: 17 });
   });
 
-  it("lifts a thrown value out of the fields and keeps the cause chain", () => {
+  test("lifts a thrown value out of the fields and keeps the cause chain", () => {
     const { sink, logger } = setup();
     logger.error("failed", { error: new Error("outer", { cause: new Error("inner") }) });
     const record = sink.records[0];
@@ -46,13 +46,13 @@ describe("createLogger", () => {
     expect(record?.error?.cause?.message).toBe("inner");
   });
 
-  it("redacts a token that reaches a field", () => {
+  test("redacts a token that reaches a field", () => {
     const { sink, logger } = setup();
     logger.info("calling", { authorization: `Bearer ${TOKEN}` });
     expect(JSON.stringify(sink.records[0])).not.toContain(TOKEN);
   });
 
-  it("redacts a credential quoted in an error message", () => {
+  test("redacts a credential quoted in an error message", () => {
     const { sink, logger } = setup();
     logger.error("clone failed", {
       error: new Error(`fatal: unable to access 'https://x:${TOKEN}@github.com/a/b'`),

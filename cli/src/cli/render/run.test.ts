@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { FAILURES } from "#adapter/errors.ts";
-import { Printer } from "#core/output.ts";
 import { RunErrorCode, type RunEvent } from "#core/run/model.ts";
+import { Printer } from "#core/term/printer.ts";
 import { eventLine, failureWords } from "./run.ts";
 
 const printer = new Printer({ out: { write: () => true, isTTY: false }, color: "never" });
@@ -27,18 +27,18 @@ function event(eventType: string, fields: Partial<RunEvent> = {}): RunEvent {
 }
 
 describe("eventLine", () => {
-  it("names each phase in words", () => {
+  test("names each phase in words", () => {
     expect(eventLine(printer, event("run.phase", { step: "listing" }))).toBe(
       "  reading the registry",
     );
     expect(eventLine(printer, event("run.phase", { step: "classifying" }))).toBe("  comparing");
   });
 
-  it("leaves progress out, since each artifact's own line says what happened", () => {
+  test("leaves progress out, since each artifact's own line says what happened", () => {
     expect(eventLine(printer, event("artifact.progress", { artifact: "lint" }))).toBeUndefined();
   });
 
-  it("says what happened to an artifact, and why it needs you", () => {
+  test("says what happened to an artifact, and why it needs you", () => {
     const pulled = event("item.settled", {
       artifact: "lint",
       outcome: "changed",
@@ -55,7 +55,7 @@ describe("eventLine", () => {
     expect(eventLine(printer, waiting)).toBe("  attention  lint  edited here");
   });
 
-  it("ends with the state the run finished in, and why it failed in words", () => {
+  test("ends with the state the run finished in, and why it failed in words", () => {
     const failed = event("run.finished", { errorCode: "sync_failed", data: { state: "failed" } });
     expect(eventLine(printer, failed)).toBe("  finished   failed  stopped by an error");
     const reason = 'manifest.yml: Artifact "pr-review" names registry "pr-review".';
@@ -69,7 +69,7 @@ describe("eventLine", () => {
     );
   });
 
-  it("names every failure code in words", () => {
+  test("names every failure code in words", () => {
     for (const code of [...Object.values(RunErrorCode), ...FAILURES.map((f) => `adapter_${f}`)]) {
       expect(failureWords(code)).not.toMatch(/_/);
     }

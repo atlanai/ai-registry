@@ -2,9 +2,7 @@ import { useStdin, useStdout } from "ink";
 import { useEffect, useRef } from "react";
 import { ESC } from "#core/term/format.ts";
 
-// Mouse reporting, which Ink does not do. SGR events (1006) because the older encoding
-// cannot express a column past 223, and this console is meant to be full width.
-
+// SGR (1006) reporting, which Ink lacks: the older encoding cannot express a column past 223.
 const ENABLE = `${ESC}[?1000h${ESC}[?1006h`;
 const DISABLE = `${ESC}[?1006l${ESC}[?1000l`;
 
@@ -16,13 +14,6 @@ export interface MouseEvent {
   row: number;
   column: number;
   kind: "press" | "release" | "wheel-up" | "wheel-down";
-}
-
-function decode(button: number, final: string): MouseEvent["kind"] | undefined {
-  if ((button & 64) !== 0) return (button & 1) === 0 ? "wheel-up" : "wheel-down";
-  // Only the left button drives anything here; a drag is a press we ignore.
-  if ((button & 3) !== 0 || (button & 32) !== 0) return undefined;
-  return final === "M" ? "press" : "release";
 }
 
 export function useMouse(onEvent: (event: MouseEvent) => void): void {
@@ -59,12 +50,15 @@ export function useMouse(onEvent: (event: MouseEvent) => void): void {
   }, [stdin, stdout, setRawMode, isRawModeSupported]);
 }
 
-/**
- * Constants rather than measurements: the views lay out in a fixed order, and a measured
- * layout would need Ink to report geometry it does not expose.
- */
+function decode(button: number, final: string): MouseEvent["kind"] | undefined {
+  if ((button & 64) !== 0) return (button & 1) === 0 ? "wheel-up" : "wheel-down";
+  // Only the left button drives anything here; a drag is a press we ignore.
+  if ((button & 3) !== 0 || (button & 32) !== 0) return undefined;
+  return final === "M" ? "press" : "release";
+}
+
+/** Fixed: Ink does not expose the geometry a measured layout would need. */
 export const LAYOUT = {
-  /** Header, its rule, the registry tabs, their rule, the view tabs. */
   accountTabs: 2,
   viewTabs: 4,
   body: 6,

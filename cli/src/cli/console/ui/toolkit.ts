@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { windowAround } from "#cli/console/model/list.ts";
+import { windowAround } from "#cli/console/data/list.ts";
 import type { PanelBoxProps, PanelNode, PanelTextProps, PanelToolkit } from "#core/host/panel.ts";
 import {
   ago,
@@ -16,9 +16,7 @@ import { COLOR, GLYPH } from "#core/term/theme.ts";
 import { summaryStrip } from "./chrome.ts";
 import { action, box, dim, faint, heading, plain, rule, text } from "./elements.ts";
 
-// The renderer, lent to a contributed panel. `PanelNode` is `unknown` on the
-// far side of that boundary, which is what these casts pay for.
-
+// `PanelNode` is `unknown` on the panel's side, which is what these casts pay for.
 const node = (value: PanelNode): ReactNode => value as ReactNode;
 const nodes = (values: PanelNode[]): ReactNode[] => values.map(node);
 

@@ -1,5 +1,5 @@
 import type { SourceAdapter } from "#adapter/index.ts";
-import { loadAdapters } from "#core/adapter/registry.ts";
+import { loadAdapters } from "#core/adapter/load.ts";
 import {
   type AdapterExtension,
   type CommandContribution,
@@ -8,14 +8,6 @@ import {
   type StepContribution,
 } from "./extend.ts";
 import type { PanelContribution, UpstreamContribution } from "./panel.ts";
-
-/** Every loaded adapter's extension. A broken module is skipped, not fatal. */
-async function loadedExtensions(): Promise<readonly { extend: AdapterExtension }[]> {
-  return (await loadAdapters()).loaded.flatMap((adapter) => {
-    const extend = extensionOf(adapter);
-    return extend === undefined ? [] : [{ extend }];
-  });
-}
 
 export async function contributedCommands(): Promise<readonly CommandContribution[]> {
   const commands: CommandContribution[] = [];
@@ -28,6 +20,14 @@ export async function contributedCommands(): Promise<readonly CommandContributio
     }
   }
   return commands;
+}
+
+/** Every loaded adapter's extension. A broken module is skipped, not fatal. */
+async function loadedExtensions(): Promise<readonly { extend: AdapterExtension }[]> {
+  return (await loadAdapters()).loaded.flatMap((adapter) => {
+    const extend = extensionOf(adapter);
+    return extend === undefined ? [] : [{ extend }];
+  });
 }
 
 export function stepOn(adapter: SourceAdapter, kind: string): StepContribution | undefined {
@@ -84,7 +84,7 @@ export async function stepForFlags(
 /** Console tabs, in load order. A duplicate id is dropped, as for commands. */
 // biome-ignore lint/suspicious/noExplicitAny: each panel names its own state.
 export async function contributedPanels(): Promise<readonly PanelContribution<any>[]> {
-  // biome-ignore lint/suspicious/noExplicitAny: as above.
+  // biome-ignore lint/suspicious/noExplicitAny: each panel names its own state.
   const panels: PanelContribution<any>[] = [];
   const seen = new Set<string>();
   for (const { extend } of await loadedExtensions()) {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { formatConfig, parseConfig } from "./parse.ts";
 
 const HEAD = `schemaVersion: 1
@@ -13,7 +13,7 @@ function config(jobs: string): string {
 }
 
 describe("parseConfig", () => {
-  it("reads a job as a graph of steps", () => {
+  test("reads a job as a graph of steps", () => {
     const parsed = parseConfig(
       config(`  - id: job_1
     name: this machine
@@ -36,7 +36,7 @@ describe("parseConfig", () => {
     expect(job?.steps[1]?.needs).toEqual(["mine"]);
   });
 
-  it("reads a selector's `target` or `harness`, its aireg 0.1 name, and writes `harness`", () => {
+  test("reads a selector's `target` or `harness`, its aireg 0.1 name, and writes `harness`", () => {
     const step = (select: string) =>
       config(`  - id: job_1
     account: acc_1
@@ -61,7 +61,7 @@ describe("parseConfig", () => {
     ).toThrow("names different targets under `target` and `harness`");
   });
 
-  it("takes a selector with both keys when they name the same targets, as the daemon hands it out", () => {
+  test("takes a selector with both keys when they name the same targets, as the daemon hands it out", () => {
     const parsed = parseConfig(
       config(`  - id: job_1
     account: acc_1
@@ -75,7 +75,7 @@ describe("parseConfig", () => {
     });
   });
 
-  it("takes a duration in seconds, minutes or hours", () => {
+  test("takes a duration in seconds, minutes or hours", () => {
     const every = (value: string) =>
       parseConfig(
         config(`  - id: job_1
@@ -90,7 +90,7 @@ describe("parseConfig", () => {
     expect(every("2h")).toBe(7200);
   });
 
-  it("refuses a schedule shorter than a minute", () => {
+  test("refuses a schedule shorter than a minute", () => {
     expect(() =>
       parseConfig(
         config(`  - id: job_1
@@ -103,7 +103,7 @@ describe("parseConfig", () => {
     ).toThrow(/at least 60 seconds/);
   });
 
-  it("refuses a step that needs one the job does not have", () => {
+  test("refuses a step that needs one the job does not have", () => {
     expect(() =>
       parseConfig(
         config(`  - id: job_1
@@ -115,14 +115,14 @@ describe("parseConfig", () => {
     ).toThrow(/needs "missing"/);
   });
 
-  it("refuses a scope step with no root, and an origins step with no destination", () => {
+  test("refuses a scope step with no root, and an origins step with no destination", () => {
     const bare = (step: string) =>
       parseConfig(config(`  - id: job_1\n    account: acc_1\n    steps:\n      - ${step}\n`));
     expect(() => bare("{ name: pull, kind: pull }")).toThrow(/needs a `root`/);
     expect(() => bare("{ name: mine, kind: origins }")).toThrow(/needs a `to`/);
   });
 
-  it("keeps an adapter's own fields but refuses a typo on a built-in step", () => {
+  test("keeps an adapter's own fields but refuses a typo on a built-in step", () => {
     const parsed = parseConfig(
       config(`  - id: job_1
     account: acc_1
@@ -142,7 +142,7 @@ describe("parseConfig", () => {
     ).toThrow(/does not take "contnet"/);
   });
 
-  it("refuses an adapter pin under a name that is not an adapter id", () => {
+  test("refuses an adapter pin under a name that is not an adapter id", () => {
     expect(
       parseConfig(`${HEAD}jobs: []\nadapters:\n  acme: ./adapters/acme/1.0.0/adapter.mjs\n`)
         .adapters,
@@ -154,7 +154,7 @@ describe("parseConfig", () => {
     );
   });
 
-  it("round-trips through format", () => {
+  test("round-trips through format", () => {
     const text = config(`  - id: job_1
     account: acc_1
     schedule: { every: 900, enabled: false }
@@ -164,19 +164,19 @@ describe("parseConfig", () => {
     expect(parseConfig(formatConfig(parseConfig(text)))).toEqual(parseConfig(text));
   });
 
-  it("writes an account's registry as `registry:`", () => {
+  test("writes an account's registry as `registry:`", () => {
     const written = formatConfig(parseConfig(config("  []\n")));
     expect(written).toContain("    registry: acme\n");
     expect(parseConfig(written).accounts[0]?.registry).toBe("acme");
   });
 
-  it("refuses a default namespace the grammar refuses, as every writer does", () => {
+  test("refuses a default namespace the grammar refuses, as every writer does", () => {
     expect(() => parseConfig(`${HEAD}jobs: []\ndefaults:\n  namespace: Acme/Eng\n`)).toThrow(
       "`defaults.namespace` must be <registry>/<namespace>.",
     );
   });
 
-  it("refuses a step destination the grammar refuses", () => {
+  test("refuses a step destination the grammar refuses", () => {
     const origins = (to: string) =>
       parseConfig(
         config(

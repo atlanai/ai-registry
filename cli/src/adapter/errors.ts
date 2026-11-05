@@ -2,19 +2,16 @@ import { FAILURE_CODES } from "./codes.ts";
 import { failureFromStatus, problemFromFailure } from "./problem.ts";
 import type { Problem } from "./spec/types.ts";
 
-/** Every failure an adapter can report, classified so callers branch on shape. */
+/**
+ * Every failure an adapter can report. `unavailable` is the server's fault (5xx, a timeout, a
+ * refused account); `invalid` is a wrong request, or an answer the contract did not promise.
+ */
 export const FAILURES = [
-  // A credential is missing or was refused.
   "unauthorized",
-  // Authenticated, but this operation is not permitted.
   "forbidden",
-  // The source or artifact is not there.
   "not_found",
-  // Someone else got there first.
   "conflict",
-  // The server is at fault: 5xx, a timeout, a refused account.
   "unavailable",
-  // The request was wrong, or the answer was not what the contract promised.
   "invalid",
 ] as const;
 
@@ -70,12 +67,12 @@ export function isAdapterError(error: unknown): error is AdapterError {
   return (FAILURES as readonly string[]).includes(candidate.failure as string);
 }
 
-/** Retrying a 404 wastes a round trip and retrying a 403 cannot succeed. */
+/** Only `unavailable` retries: retrying a 404 wastes a round trip and a 403 cannot succeed. */
 export function isRetryable(error: unknown): boolean {
   return isAdapterError(error) && error.failure === "unavailable";
 }
 
-/** Signing in again, or as someone allowed, is what fixes it. */
+/** Whether signing in again, or as someone allowed, is what fixes it. */
 export function isAuthFailure(failure: Failure | undefined): boolean {
   return failure === "unauthorized" || failure === "forbidden";
 }
@@ -97,4 +94,11 @@ export function failureOf(problem: Problem): Failure {
     if (FAILURE_CODES[failure] === problem.code) return failure;
   }
   return "invalid";
+}
+
+/** The adapter failure behind an error, raised directly or wrapped as its cause. */
+export function adapterOf(error: unknown) {
+  if (isAdapterError(error)) return error;
+  if (error instanceof Error && isAdapterError(error.cause)) return error.cause;
+  return undefined;
 }

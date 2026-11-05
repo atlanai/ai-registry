@@ -10,7 +10,7 @@ const machine = vi.hoisted(() => ({
   stopped: 0,
 }));
 
-vi.mock("#daemon/service.ts", () => ({
+vi.mock("#daemon/process/lifecycle.ts", () => ({
   probeDaemon: async () => ({ status: machine.running ? "ready" : "down" }),
   stopDaemon: async () => {
     machine.stopped += 1;

@@ -1,12 +1,9 @@
 import { type TObject, type TSchema, Type } from "@sinclair/typebox";
 import type { ConfigValue as Value } from "#core/target/contract.ts";
 
-/** The shape of a target file in `$AIREG_HOME/targets/`. The loader stays the authority. */
-
 const PROGRAM = "^[A-Za-z0-9][A-Za-z0-9._+-]*$";
 const VARIABLE = "^[A-Za-z_][A-Za-z0-9_]*$";
 
-/** A shared definition, written once under `$defs`. */
 const ref = (name: string) => Type.Unsafe({ $ref: `#/$defs/${name}` });
 
 /** One of a few words, which an editor offers and an error lists. */
@@ -180,6 +177,7 @@ const PerKind = <T extends TSchema>(schema: T) =>
     { additionalProperties: false },
   );
 
+/** The shape of a target file in `$AIREG_HOME/targets/`. The loader stays the authority. */
 export const Target = Type.Object(
   {
     $schema: Type.Optional(

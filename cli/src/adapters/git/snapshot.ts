@@ -16,24 +16,6 @@ export interface Snapshot {
   cached: boolean;
 }
 
-/**
- * Keyed by repository and commit, because for git the commit already is the
- * content address. Shared, so two aliases for one repository clone it once.
- */
-function snapshotPath(cache: string, spec: SourceSpec, commit: string): string {
-  const segments =
-    spec.host !== undefined && spec.slug !== undefined
-      ? [sanitizeName(spec.host), ...spec.slug.split("/").map(sanitizeName)]
-      : [`${sanitizeName(spec.alias)}-${sha256(spec.location).slice(7, 15)}`];
-  return join(cache, ...segments, commit);
-}
-
-/** Checkouts kept per repository: the one just taken and the one before, which a run may still read. */
-const KEPT_PER_REPOSITORY = 2;
-
-/** Checkouts an open connection in this process still reads, which no prune removes. */
-const IN_USE = new Map<string, number>();
-
 /** Keeps a checkout from being pruned until the connection reading it lets go. */
 export function holdSnapshot(root: string): () => void {
   IN_USE.set(root, (IN_USE.get(root) ?? 0) + 1);
@@ -47,28 +29,17 @@ export function holdSnapshot(root: string): () => void {
   };
 }
 
-/** Every commit of a busy registry would otherwise stay checked out for good. */
-async function pruneOlder(repository: string, current: string): Promise<void> {
-  const commits = await readdir(repository, { withFileTypes: true }).catch(() => []);
-  const dated = await Promise.all(
-    commits
-      .filter((entry) => entry.isDirectory() && entry.name !== current)
-      .filter((entry) => !IN_USE.has(join(repository, entry.name)))
-      .map(async (entry) => {
-        const path = join(repository, entry.name);
-        return { path, at: (await stat(path).catch(() => undefined))?.mtimeMs ?? 0 };
-      }),
-  );
-  const older = dated.sort((left, right) => right.at - left.at).slice(KEPT_PER_REPOSITORY - 1);
-  for (const { path } of older) await rm(path, { recursive: true, force: true }).catch(() => {});
-}
+/** Checkouts kept per repository: the latest and the one before, which a run may still read. */
+const KEPT_PER_REPOSITORY = 2;
+
+/** Checkouts an open connection in this process still reads, which no prune removes. */
+const IN_USE = new Map<string, number>();
 
 /**
  * A local registry is read where it lies: copying it into the store would
  * mean edits to the directory a person is authoring in never take effect.
  */
 export async function snapshot(
-  /** The adapter's cache folder, from the host. */
   cache: () => string,
   spec: SourceSpec,
   ref: string | undefined,
@@ -111,4 +82,32 @@ export async function snapshot(
   } finally {
     await rm(staging, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+/**
+ * Keyed by repository and commit, because for git the commit already is the
+ * content address. Shared, so two aliases for one repository clone it once.
+ */
+function snapshotPath(cache: string, spec: SourceSpec, commit: string): string {
+  const segments =
+    spec.host !== undefined && spec.slug !== undefined
+      ? [sanitizeName(spec.host), ...spec.slug.split("/").map(sanitizeName)]
+      : [`${sanitizeName(spec.alias)}-${sha256(spec.location).slice(7, 15)}`];
+  return join(cache, ...segments, commit);
+}
+
+/** Every commit of a busy registry would otherwise stay checked out for good. */
+async function pruneOlder(repository: string, current: string): Promise<void> {
+  const commits = await readdir(repository, { withFileTypes: true }).catch(() => []);
+  const dated = await Promise.all(
+    commits
+      .filter((entry) => entry.isDirectory() && entry.name !== current)
+      .filter((entry) => !IN_USE.has(join(repository, entry.name)))
+      .map(async (entry) => {
+        const path = join(repository, entry.name);
+        return { path, at: (await stat(path).catch(() => undefined))?.mtimeMs ?? 0 };
+      }),
+  );
+  const older = dated.sort((left, right) => right.at - left.at).slice(KEPT_PER_REPOSITORY - 1);
+  for (const { path } of older) await rm(path, { recursive: true, force: true }).catch(() => {});
 }

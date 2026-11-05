@@ -1,8 +1,3 @@
-/*
- * Every write the console performs is an `aireg` command, run as a child: the
- * CLI owns the lease, and two writers in one process would take it twice.
- */
-
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { spawnDetached } from "#core/process.ts";
@@ -16,12 +11,21 @@ export interface Command {
   argv: string[];
 }
 
-/** Shown as a POSIX shell would need it typed, so the confirm screen can be pasted. */
-function shown(argv: string[]): Command {
-  const words = argv.map((arg) =>
-    /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`,
-  );
-  return { display: `${NAME} ${words.join(" ")}`, argv };
+export function pullLatest(alias: string | undefined, scope: Scope): Command {
+  // A pull is a pull: nothing here may send or remove anything.
+  const argv = [
+    "sync",
+    ...scoped(scope),
+    "--pull",
+    "on",
+    "--publish",
+    "off",
+    "--delete",
+    "off",
+    "--yes",
+    ...data(alias === undefined ? [] : [alias]),
+  ];
+  return shown(argv);
 }
 
 /** The tree the console is reading, so a child command acts on the same one. */
@@ -37,21 +41,12 @@ function data(values: readonly string[]): string[] {
   return values.length === 0 ? [] : ["--", ...values];
 }
 
-export function pullLatest(alias: string | undefined, scope: Scope): Command {
-  const argv = [
-    "sync",
-    ...scoped(scope),
-    "--pull",
-    "on",
-    // A pull is a pull: nothing here may send or remove anything.
-    "--publish",
-    "off",
-    "--delete",
-    "off",
-    "--yes",
-    ...data(alias === undefined ? [] : [alias]),
-  ];
-  return shown(argv);
+/** Shown as a POSIX shell would need it typed, so the confirm screen can be pasted. */
+function shown(argv: string[]): Command {
+  const words = argv.map((arg) =>
+    /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`,
+  );
+  return { display: `${NAME} ${words.join(" ")}`, argv };
 }
 
 /** Installed work goes back where it came from; only authored work needs a `<alias>/<namespace>`. */
@@ -83,13 +78,13 @@ export interface Running {
   cancel(): void;
 }
 
-/** `root` is the folder the console shows, so the child acts on that tree, not the caller's. */
+/** Every write runs as a child CLI, which owns the lease; a writer here would take it twice. */
 export function start(command: Command, root: string, onLine: (line: string) => void): Running {
   // The same launcher self-update uses: a standalone build is its own interpreter.
   const launch = launchArgv(runningEntry() ?? NAME, command.argv);
+  // The console owns the terminal, so the child gets pipes and never stdin.
   const child = spawn(launch.command, [...launch.args], {
     cwd: root,
-    // The console owns the terminal, so the child gets pipes and never stdin.
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, NO_COLOR: "1" },
   });

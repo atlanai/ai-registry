@@ -2,7 +2,7 @@ import { PassThrough, Writable } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 import { render } from "ink";
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import type { AccountRow, ConsoleState } from "#core/console/model.ts";
 import type { HostCommandContext } from "#core/host/extend.ts";
 import { App } from "./app.ts";
@@ -108,22 +108,20 @@ async function screen(rows: number, columns: number, keys: string[] = []): Promi
 }
 
 describe("App", () => {
-  // Ink writes a newline after every frame, so a frame as tall as the terminal
-  // scrolls it by one row and the header leaves the screen.
-  it("leaves the last row free so the header stays on screen", async () => {
+  test("leaves the last row free so the header stays on screen", async () => {
     const lines = await screen(24, 100);
     expect(lines).toHaveLength(23);
     expect(lines[0]).toMatch(/^◆ aireg console /);
     expect(lines.at(-1)).toMatch(/v0\.0\.0$/);
   });
 
-  it("says there are no runs yet rather than leaving the section blank", async () => {
+  test("says there are no runs yet rather than leaving the section blank", async () => {
     const lines = await screen(30, 100);
     const recent = lines.findIndex((line) => line.startsWith("RECENT"));
     expect(lines[recent + 1]?.trim()).toBe("No runs yet.");
   });
 
-  it("keeps the header and footer when an overlay is taller than the screen", async () => {
+  test("keeps the header and footer when an overlay is taller than the screen", async () => {
     const lines = await screen(24, 100, ["?"]);
     expect(lines).toHaveLength(23);
     expect(lines.join("\n")).toContain("previous or next view");
@@ -135,7 +133,7 @@ describe("App", () => {
     expect(lines.at(-1)).toMatch(/v0\.0\.0$/);
   });
 
-  it("redraws at the new terminal dimensions after a resize", async () => {
+  test("redraws at the new terminal dimensions after a resize", async () => {
     const app = await terminal({ rows: 30, columns: 100 });
     try {
       expect(await app.lines()).toHaveLength(29);
@@ -153,7 +151,7 @@ describe("App", () => {
     }
   });
 
-  it("renders to a writable stream without terminal dimensions", async () => {
+  test("renders to a writable stream without terminal dimensions", async () => {
     const app = await terminal();
     try {
       const lines = await app.lines();

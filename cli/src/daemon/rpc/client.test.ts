@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import { createConnection, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { NAME } from "#core/product.ts";
 import type { RunEvent } from "#core/run/model.ts";
 import { homeTest } from "#test/kit/fixtures.ts";
@@ -11,7 +11,8 @@ import { cliClient, followRun, RpcClient, RpcClientError, withFreshConfig } from
 import { RpcErrorCode } from "./codes.ts";
 import { daemonProof } from "./endpoint.ts";
 import { FrameDecoder } from "./frames.ts";
-import { encodeMessage, PROTOCOL_VERSION } from "./protocol.ts";
+import { PROTOCOL_VERSION } from "./methods.ts";
+import { encodeMessage } from "./protocol.ts";
 import { RpcServer } from "./server.ts";
 
 const paths: string[] = [];
@@ -77,7 +78,7 @@ describe.skipIf(process.platform === "win32")("rpc handshake", () => {
     },
   );
 
-  it("sends nothing to a socket another user owns", async () => {
+  test("sends nothing to a socket another user owns", async () => {
     const server = new RpcServer();
     const asked: string[] = [];
     server.method("initialize", async () => {
@@ -186,7 +187,7 @@ homeTest("sends nothing more to a daemon that cannot prove it runs as you", asyn
 });
 
 describe("withFreshConfig", () => {
-  it("redoes a write against a fresh snapshot while another writer gets there first", async () => {
+  test("redoes a write against a fresh snapshot while another writer gets there first", async () => {
     let revision = 1;
     const seen: number[] = [];
     const client = {
@@ -218,7 +219,7 @@ describe("followRun", () => {
   const event = (id: number, eventType = "item.settled") =>
     ({ id, runId: "run_1", eventType }) as unknown as RunEvent;
 
-  it("shows each stored and broadcast event once, in order, until the run finishes", async () => {
+  test("shows each stored and broadcast event once, in order, until the run finishes", async () => {
     let notify: (method: string, params: unknown) => void = () => {};
     const client = {
       request: async (method: string) => {

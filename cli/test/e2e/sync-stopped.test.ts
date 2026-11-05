@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
-import { leaseKey } from "#core/lease.ts";
+import { leaseKey } from "#core/lease/location.ts";
 import { registry } from "#test/kit/builders/registry.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { BIN } from "#test/kit/run.ts";

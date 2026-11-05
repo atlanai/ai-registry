@@ -39,108 +39,6 @@ export interface WrittenOffer {
   refused: PublishRefusal[];
 }
 
-function destination(change: PublishInput): { namespace: string; version: string; at: string } {
-  const { namespace, version, kind, name } = change;
-  if (namespace === undefined || version === undefined) {
-    throw new SpecError(
-      `${name} has no namespace or version, so there is no path in the registry to offer it at.`,
-      { path: name },
-    );
-  }
-  // These become path segments. The reader refuses anything else, and a value
-  // that climbs out of the root must never reach `join`.
-  if (!isNamespace(namespace))
-    throw new SpecError(`${quoted(namespace)} is not a namespace.`, { path: name });
-  if (!isKindSegment(kind)) throw new SpecError(`${quoted(kind)} is not a kind.`, { path: name });
-  if (!isArtifactName(name))
-    throw new SpecError(`${quoted(name)} is not a valid artifact name.`, { path: name });
-  if (!isVersion(version))
-    throw new SpecError(`${quoted(version)} is not a version.`, { path: name });
-  const device = [namespace, kind, name, version].find(isDeviceName);
-  if (device !== undefined)
-    throw new SpecError(`${quoted(device)} is a device name on Windows.`, { path: name });
-  return { namespace, version, at: versionDir(namespace, kind, name, version) };
-}
-
-function envelopeFor(change: PublishInput, files: readonly FileDescriptor[]): Envelope {
-  return buildEnvelope({
-    kind: change.kind,
-    metadata: {
-      name: change.name,
-      ...(change.namespace === undefined ? {} : { namespace: change.namespace }),
-      ...(change.version === undefined ? {} : { version: change.version }),
-      ...(change.description === undefined ? {} : { description: change.description }),
-    },
-    files,
-    spec: change.spec,
-    // The envelope is where the file spec keeps a version's edges, so its digest covers them.
-    ...(change.relationships === undefined ? {} : { relationships: [...change.relationships] }),
-  });
-}
-
-function sealed(
-  change: PublishInput,
-  files: readonly FileDescriptor[],
-): { envelope: Envelope; digest: string } {
-  const envelope = envelopeFor(change, files);
-  const digest = envelope.metadata.digest;
-  if (digest === undefined) {
-    throw new SpecError(`${change.name} produced no content digest.`, { path: change.name });
-  }
-  return { envelope, digest };
-}
-
-function descriptorsOf(change: PublishInput): FileDescriptor[] {
-  return change.files.map((file) =>
-    describeFile(file.path, sha256(file.content), file.content.byteLength),
-  );
-}
-
-function under(root: string, path: string): string {
-  return join(root, ...path.split(posix.sep));
-}
-
-/** The digest the root already pins for this version, if the directory is there. */
-async function existingDigest(read: ReadPath, at: string): Promise<string | undefined> {
-  const raw = await readJson(read, `${at}/${ENVELOPE}`);
-  if (typeof raw !== "object" || raw === null) return undefined;
-  const metadata = (raw as { metadata?: { digest?: unknown } }).metadata;
-  return typeof metadata?.digest === "string" ? metadata.digest : undefined;
-}
-
-async function listedDigest(
-  read: ReadPath,
-  change: PublishInput,
-  namespace: string,
-  version: string,
-): Promise<string | undefined> {
-  const raw = await readJson(read, versionsPath(namespace, change.kind, change.name));
-  const rows = (raw as { versions?: unknown } | undefined)?.versions;
-  if (!Array.isArray(rows)) return undefined;
-  const row = rows.find((each) => (each as { version?: unknown })?.version === version) as
-    | { digest?: unknown }
-    | undefined;
-  return typeof row?.digest === "string" ? row.digest : undefined;
-}
-
-async function checkChange(read: ReadPath, change: PublishInput) {
-  const { namespace, version, at } = destination(change);
-  const { envelope, digest } = sealed(change, descriptorsOf(change));
-  const existing =
-    (await existingDigest(read, at)) ?? (await listedDigest(read, change, namespace, version));
-  // A released version is never rewritten, nor quietly offered as another: the caller
-  // reports the version it asked for, so different bytes there are refused.
-  if (existing !== undefined && existing !== digest) {
-    throw fail(
-      "conflict",
-      `${namespace}/${change.kind}/${change.name}@${version} is already published with other content.`,
-      change.name,
-      "A published version is never rewritten; publish this one as a new version.",
-    );
-  }
-  return { change, namespace, version, at, envelope, digest, unchanged: existing === digest };
-}
-
 /**
  * One writer per registry folder, so two publishes never write one version at once.
  * With `partial`, a refused change is returned by position and the rest are written.
@@ -212,4 +110,106 @@ async function writeOfferNow(
   await writeAtomic(under(root, INDEX_DOCUMENT), specJson(index));
 
   return { unchanged: checked.every((each) => each.unchanged), refused };
+}
+
+async function checkChange(read: ReadPath, change: PublishInput) {
+  const { namespace, version, at } = destination(change);
+  const { envelope, digest } = sealed(change, descriptorsOf(change));
+  const existing =
+    (await existingDigest(read, at)) ?? (await listedDigest(read, change, namespace, version));
+  // A released version is never rewritten, nor quietly offered as another: the caller
+  // reports the version it asked for, so different bytes there are refused.
+  if (existing !== undefined && existing !== digest) {
+    throw fail(
+      "conflict",
+      `${namespace}/${change.kind}/${change.name}@${version} is already published with other content.`,
+      change.name,
+      "A published version is never rewritten; publish this one as a new version.",
+    );
+  }
+  return { change, namespace, version, at, envelope, digest, unchanged: existing === digest };
+}
+
+function destination(change: PublishInput): { namespace: string; version: string; at: string } {
+  const { namespace, version, kind, name } = change;
+  if (namespace === undefined || version === undefined) {
+    throw new SpecError(
+      `${name} has no namespace or version, so there is no path in the registry to offer it at.`,
+      { path: name },
+    );
+  }
+  // These become path segments. The reader refuses anything else, and a value
+  // that climbs out of the root must never reach `join`.
+  if (!isNamespace(namespace))
+    throw new SpecError(`${quoted(namespace)} is not a namespace.`, { path: name });
+  if (!isKindSegment(kind)) throw new SpecError(`${quoted(kind)} is not a kind.`, { path: name });
+  if (!isArtifactName(name))
+    throw new SpecError(`${quoted(name)} is not a valid artifact name.`, { path: name });
+  if (!isVersion(version))
+    throw new SpecError(`${quoted(version)} is not a version.`, { path: name });
+  const device = [namespace, kind, name, version].find(isDeviceName);
+  if (device !== undefined)
+    throw new SpecError(`${quoted(device)} is a device name on Windows.`, { path: name });
+  return { namespace, version, at: versionDir(namespace, kind, name, version) };
+}
+
+function sealed(
+  change: PublishInput,
+  files: readonly FileDescriptor[],
+): { envelope: Envelope; digest: string } {
+  const envelope = envelopeFor(change, files);
+  const digest = envelope.metadata.digest;
+  if (digest === undefined) {
+    throw new SpecError(`${change.name} produced no content digest.`, { path: change.name });
+  }
+  return { envelope, digest };
+}
+
+function envelopeFor(change: PublishInput, files: readonly FileDescriptor[]): Envelope {
+  // The envelope is where the file spec keeps a version's edges, so its digest covers them.
+  return buildEnvelope({
+    kind: change.kind,
+    metadata: {
+      name: change.name,
+      ...(change.namespace === undefined ? {} : { namespace: change.namespace }),
+      ...(change.version === undefined ? {} : { version: change.version }),
+      ...(change.description === undefined ? {} : { description: change.description }),
+    },
+    files,
+    spec: change.spec,
+    ...(change.relationships === undefined ? {} : { relationships: [...change.relationships] }),
+  });
+}
+
+function descriptorsOf(change: PublishInput): FileDescriptor[] {
+  return change.files.map((file) =>
+    describeFile(file.path, sha256(file.content), file.content.byteLength),
+  );
+}
+
+/** The digest the root already pins for this version, if the directory is there. */
+async function existingDigest(read: ReadPath, at: string): Promise<string | undefined> {
+  const raw = await readJson(read, `${at}/${ENVELOPE}`);
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const metadata = (raw as { metadata?: { digest?: unknown } }).metadata;
+  return typeof metadata?.digest === "string" ? metadata.digest : undefined;
+}
+
+async function listedDigest(
+  read: ReadPath,
+  change: PublishInput,
+  namespace: string,
+  version: string,
+): Promise<string | undefined> {
+  const raw = await readJson(read, versionsPath(namespace, change.kind, change.name));
+  const rows = (raw as { versions?: unknown } | undefined)?.versions;
+  if (!Array.isArray(rows)) return undefined;
+  const row = rows.find((each) => (each as { version?: unknown })?.version === version) as
+    | { digest?: unknown }
+    | undefined;
+  return typeof row?.digest === "string" ? row.digest : undefined;
+}
+
+function under(root: string, path: string): string {
+  return join(root, ...path.split(posix.sep));
 }

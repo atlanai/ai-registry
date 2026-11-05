@@ -17,9 +17,9 @@ export function canonicalize(value: unknown): string {
   }
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   if (typeof value === "object") {
+    // RFC 8785 sorts keys by UTF-16 code unit.
     const entries = Object.entries(value as Record<string, unknown>)
       .filter(([, held]) => held !== undefined)
-      // By UTF-16 code unit, which is what RFC 8785 specifies.
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     return `{${entries.map(([key, held]) => `${JSON.stringify(key)}:${canonicalize(held)}`).join(",")}}`;
   }

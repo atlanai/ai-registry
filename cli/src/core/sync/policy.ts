@@ -74,11 +74,6 @@ export const CHANGING_OPERATIONS: readonly SyncOperation[] = [
   "forget",
 ];
 
-function selected(value: StepPolicy, change: SyncOperation) {
-  if (value === "on") return change;
-  return value === "report" ? "report" : "ignore";
-}
-
 export function operation(disposition: Disposition, policy: SyncPolicy): SyncOperation {
   switch (disposition) {
     case "synced":
@@ -97,9 +92,14 @@ export function operation(disposition: Disposition, policy: SyncPolicy): SyncOpe
       return "forget";
     case "conflict":
     case "unknown":
-    // A person has to look: retrying on a schedule would hide a withdrawn
-    // artifact behind an error that never changes.
+    // A person has to look: retrying on a schedule would hide a withdrawn artifact
+    // behind an error that never changes.
     case "unavailable":
       return "attention";
   }
+}
+
+function selected(value: StepPolicy, change: SyncOperation) {
+  if (value === "on") return change;
+  return value === "report" ? "report" : "ignore";
 }

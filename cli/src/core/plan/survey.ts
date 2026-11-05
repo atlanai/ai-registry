@@ -1,13 +1,12 @@
 import { resolve } from "node:path";
+import { CONCURRENCY, limiter } from "#core/concurrency.ts";
 import { dict } from "#core/fields.ts";
 import { digest } from "#core/fs/digest.ts";
 import { inspect } from "#core/fs/link.ts";
 import { exists } from "#core/fs/tree.ts";
-import { CONCURRENCY, limiter } from "#core/limit.ts";
-import type { Lock } from "#core/lock.ts";
+import type { LinkMode, Lock, LockArtifact } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
-import type { Survey } from "./model.ts";
 
 /**
  * The only reader of installed state. Keeping it in one place is what lets
@@ -60,4 +59,61 @@ export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
   );
 
   return { artifacts };
+}
+
+export interface ArtifactSurvey {
+  /** Present in this scope's writable copy. */
+  staged: boolean;
+  /** Undefined when nothing is staged. */
+  digest: string | undefined;
+  links: Record<
+    string,
+    {
+      present: boolean;
+      isLink: boolean;
+      target: string | undefined;
+      mode: LinkMode;
+      /** A copy's digest now, compared with the one the lock recorded. */
+      digest?: string | undefined;
+    }
+  >;
+}
+
+export interface Survey {
+  artifacts: Record<string, ArtifactSurvey>;
+}
+
+/** A target's copy that no longer matches what was written there. */
+export function copyEdited(
+  link: { path: string; mode: LinkMode; digest?: string | undefined },
+  state: ArtifactSurvey | undefined,
+): boolean {
+  const seen = state?.links[link.path];
+  return (
+    link.mode === "copy" &&
+    link.digest !== undefined &&
+    seen?.digest !== undefined &&
+    seen.digest !== link.digest
+  );
+}
+
+/** The copy here no longer matches what the lock says was installed. */
+export function editedHere(
+  entry: LockArtifact | undefined,
+  state: ArtifactSurvey | undefined,
+): boolean {
+  return (
+    state?.staged === true &&
+    entry !== undefined &&
+    entry.digest !== "" &&
+    state.digest !== entry.digest
+  );
+}
+
+/** Edited in this scope's copy or in a target's own copy, so not ours to replace unasked. */
+export function editedAnywhere(
+  entry: LockArtifact | undefined,
+  state: ArtifactSurvey | undefined,
+): boolean {
+  return editedHere(entry, state) || (entry?.links ?? []).some((link) => copyEdited(link, state));
 }

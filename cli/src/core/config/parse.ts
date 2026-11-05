@@ -2,10 +2,11 @@ import { stringify } from "yaml";
 import { quoted } from "#adapter/text.ts";
 import { isRecord } from "#core/fields.ts";
 import { isAdapterId } from "#core/release/origin.ts";
-import { resolveTargets, type Targets } from "#core/target/index.ts";
+import type { Targets } from "#core/target/contract.ts";
+import { resolveTargets } from "#core/target/table.ts";
 import { parseYaml } from "#core/yaml.ts";
+import { ConfigConflictError, ConfigError, fields } from "./errors.ts";
 import { isHookStage, type PipelineHook } from "./hook-stages.ts";
-import { earlierIds, parseJob } from "./job.ts";
 import {
   CONFIG_SCHEMA_VERSION,
   type Defaults,
@@ -16,73 +17,9 @@ import {
   type Step,
 } from "./model.ts";
 import { parseAccount } from "./parse-account.ts";
-import { ConfigConflictError, ConfigError, fields } from "./parse-errors.ts";
+import { earlierIds, parseJob } from "./parse-job.ts";
 
 const { onlyKnown, optionalFlag, record, text } = fields;
-
-function unique(values: readonly string[], message: string): void {
-  if (new Set(values).size !== values.length) throw new ConfigError(message);
-}
-
-/** Each pin maps an adapter id to the module config.yml loads for it. */
-function adapterPins(value: unknown): Readonly<Record<string, string>> {
-  if (value === undefined) return {};
-  const entries = Object.entries(record(value, "adapters"));
-  const misnamed = entries.find(([id]) => !isAdapterId(id));
-  if (misnamed !== undefined) {
-    throw new ConfigError(`\`adapters\` names ${quoted(misnamed[0])}, which is not an adapter id.`);
-  }
-  if (entries.some(([, item]) => typeof item !== "string")) {
-    throw new ConfigError("`adapters` must map each adapter id to a module path.");
-  }
-  const result: Record<string, string> = {};
-  for (const [key, item] of entries.sort(([left], [right]) => left.localeCompare(right))) {
-    result[key] = item as string;
-  }
-  return Object.freeze(result);
-}
-
-function defaults(value: unknown, where: string): Defaults {
-  if (value === undefined || value === null) return {};
-  const entry = record(value, where);
-  onlyKnown(entry, ["namespace", "nameCollision"], where);
-  const result: Defaults = {};
-  if (entry.namespace !== undefined) {
-    const namespace = text(entry, "namespace", where);
-    if (!isNamespaceAddress(namespace)) {
-      throw new ConfigError(`\`${where}.namespace\` must be <registry>/<namespace>.`);
-    }
-    result.namespace = namespace;
-  }
-  if (entry.nameCollision !== undefined) {
-    const policy = text(entry, "nameCollision", where);
-    if (!isNameCollision(policy)) {
-      throw new ConfigError(`\`${where}.nameCollision\` must be rename, report or fail.`);
-    }
-    result.nameCollision = policy;
-  }
-  return result;
-}
-
-function parseHooks(value: unknown): PipelineHook[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value)) throw new ConfigError("`hooks` must be a list.");
-  return value.map((item, index) => {
-    const where = `hooks[${index}]`;
-    const entry = record(item, where);
-    onlyKnown(entry, ["id", "stage", "handler", "matcher"], where);
-    const stage = text(entry, "stage", where);
-    if (!isHookStage(stage)) {
-      throw new ConfigError(`\`${where}.stage\` names an unknown stage, ${quoted(stage)}.`);
-    }
-    return {
-      id: text(entry, "id", where),
-      stage,
-      handler: text(entry, "handler", where),
-      ...(entry.matcher === undefined ? {} : { matcher: text(entry, "matcher", where) }),
-    };
-  });
-}
 
 export function parseConfig(contents: string, filename = "config.yml"): RegistryConfig {
   let document: unknown;
@@ -165,26 +102,68 @@ function parseDocument(document: unknown): RegistryConfig {
   };
 }
 
-/** Targets under `harness`, by their 0.1 ids: an adapter built against 0.1 reads only those. */
-function writtenSelector(
-  { target, harness: _, ...rest }: Selector,
-  targetTable: Targets,
-): Record<string, unknown> {
-  return target === undefined ? { ...rest } : { ...rest, harness: earlierIds(targetTable, target) };
+function defaults(value: unknown, where: string): Defaults {
+  if (value === undefined || value === null) return {};
+  const entry = record(value, where);
+  onlyKnown(entry, ["namespace", "nameCollision"], where);
+  const result: Defaults = {};
+  if (entry.namespace !== undefined) {
+    const namespace = text(entry, "namespace", where);
+    if (!isNamespaceAddress(namespace)) {
+      throw new ConfigError(`\`${where}.namespace\` must be <registry>/<namespace>.`);
+    }
+    result.namespace = namespace;
+  }
+  if (entry.nameCollision !== undefined) {
+    const policy = text(entry, "nameCollision", where);
+    if (!isNameCollision(policy)) {
+      throw new ConfigError(`\`${where}.nameCollision\` must be rename, report or fail.`);
+    }
+    result.nameCollision = policy;
+  }
+  return result;
 }
 
-/** Steps carry an `extra` bag aireg never names; it is spread back out. */
-function written(step: Step, targetTable: Targets): Record<string, unknown> {
-  const { extra, ...rest } = step;
-  const entry: Record<string, unknown> = { name: rest.name, kind: rest.kind };
-  if (rest.needs.length > 0) entry.needs = [...rest.needs];
-  if (rest.root !== undefined) entry.root = rest.root;
-  if (rest.to !== undefined) entry.to = rest.to;
-  if (rest.select.length > 0) {
-    entry.select = rest.select.map((item) => writtenSelector(item, targetTable));
+function unique(values: readonly string[], message: string): void {
+  if (new Set(values).size !== values.length) throw new ConfigError(message);
+}
+
+function parseHooks(value: unknown): PipelineHook[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new ConfigError("`hooks` must be a list.");
+  return value.map((item, index) => {
+    const where = `hooks[${index}]`;
+    const entry = record(item, where);
+    onlyKnown(entry, ["id", "stage", "handler", "matcher"], where);
+    const stage = text(entry, "stage", where);
+    if (!isHookStage(stage)) {
+      throw new ConfigError(`\`${where}.stage\` names an unknown stage, ${quoted(stage)}.`);
+    }
+    return {
+      id: text(entry, "id", where),
+      stage,
+      handler: text(entry, "handler", where),
+      ...(entry.matcher === undefined ? {} : { matcher: text(entry, "matcher", where) }),
+    };
+  });
+}
+
+/** Each pin maps an adapter id to the module config.yml loads for it. */
+function adapterPins(value: unknown): Readonly<Record<string, string>> {
+  if (value === undefined) return {};
+  const entries = Object.entries(record(value, "adapters"));
+  const misnamed = entries.find(([id]) => !isAdapterId(id));
+  if (misnamed !== undefined) {
+    throw new ConfigError(`\`adapters\` names ${quoted(misnamed[0])}, which is not an adapter id.`);
   }
-  if (rest.policy !== "on") entry.policy = rest.policy;
-  return { ...entry, ...extra };
+  if (entries.some(([, item]) => typeof item !== "string")) {
+    throw new ConfigError("`adapters` must map each adapter id to a module path.");
+  }
+  const result: Record<string, string> = {};
+  for (const [key, item] of entries.sort(([left], [right]) => left.localeCompare(right))) {
+    result[key] = item as string;
+  }
+  return Object.freeze(result);
 }
 
 export function formatConfig(config: RegistryConfig): string {
@@ -208,4 +187,26 @@ export function formatConfig(config: RegistryConfig): string {
     })),
   };
   return stringify(document, { indent: 2, defaultStringType: "PLAIN", lineWidth: 0 });
+}
+
+/** Steps carry an `extra` bag aireg never names; it is spread back out. */
+function written(step: Step, targetTable: Targets): Record<string, unknown> {
+  const { extra, ...rest } = step;
+  const entry: Record<string, unknown> = { name: rest.name, kind: rest.kind };
+  if (rest.needs.length > 0) entry.needs = [...rest.needs];
+  if (rest.root !== undefined) entry.root = rest.root;
+  if (rest.to !== undefined) entry.to = rest.to;
+  if (rest.select.length > 0) {
+    entry.select = rest.select.map((item) => writtenSelector(item, targetTable));
+  }
+  if (rest.policy !== "on") entry.policy = rest.policy;
+  return { ...entry, ...extra };
+}
+
+/** Targets under `harness`, by their 0.1 ids: an adapter built against 0.1 reads only those. */
+function writtenSelector(
+  { target, harness: _, ...rest }: Selector,
+  targetTable: Targets,
+): Record<string, unknown> {
+  return target === undefined ? { ...rest } : { ...rest, harness: earlierIds(targetTable, target) };
 }

@@ -14,6 +14,8 @@ export interface Home {
 
 /** The variables that keep a test off the real machine and out of CI-only behavior. */
 export function homeEnv(dir: string): Record<string, string> {
+  // Cleared: under GitHub Actions validate diffs against the base branch and setup edits
+  // GITHUB_PATH, and inside a coding agent aireg prints differently from what a person sees.
   return {
     HOME: dir,
     USERPROFILE: dir,
@@ -25,10 +27,8 @@ export function homeEnv(dir: string): Record<string, string> {
     XDG_RUNTIME_DIR: join(dir, ".run"),
     AIREG_DISABLE_UPDATE_CHECK: "1",
     NO_COLOR: "1",
-    // Set by GitHub Actions: validate diffs against the base branch, setup edits GITHUB_PATH.
     GITHUB_ACTIONS: "",
     GITHUB_BASE_REF: "",
-    // A suite run from inside a coding agent must print what a person sees.
     ...Object.fromEntries(
       ["AI_AGENT", ...SIGNALS.flatMap((signal) => signal.env)].map((name) => [name, ""]),
     ),

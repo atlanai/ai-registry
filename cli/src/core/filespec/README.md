@@ -4,8 +4,9 @@ Registry authoring: what `aireg registry init`, `index`, `validate`, `skill new`
 
 | File | What it does |
 |---|---|
-| `write/init.ts` | Finds the registry around a folder, and writes an empty one |
-| `write/indexer.ts` | Gives every unlisted version folder its `artifact.json`, a `versions.json` row and an `index.json` entry |
-| `write/validate.ts` | Everything a pull request could get wrong; git, for `--base`, is the caller's to supply |
-| `write/kinds.ts` | Kind manifests: the files a kind needs and the `spec` its front matter fills |
-| `write/offer.ts` | One artifact on disk as an adapter takes it for a publish |
+| `init.ts` | Finds the registry around a folder, and writes an empty one |
+| `indexer.ts` | Gives every unlisted version folder its `artifact.json`, a `versions.json` row and an `index.json` entry |
+| `validate/` | Everything a pull request could get wrong: documents read, the `--base` diff, version folders and catalog rows; git, for `--base`, is the caller's to supply |
+| `kind-manifests.ts` | Kind manifests: the files a kind needs and the `spec` its front matter fills |
+| `offer.ts` | One artifact on disk as an adapter takes it for a publish |
+| `schema.ts` | Checks a document against a kind's JSON Schema |

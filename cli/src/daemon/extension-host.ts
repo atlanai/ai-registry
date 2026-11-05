@@ -4,7 +4,7 @@ import { bindAdapter } from "#core/hook/bind.ts";
 import type { ExtensionHost } from "#core/host/extend.ts";
 import type { RunStore } from "#core/run/store.ts";
 import { ensureHome } from "#core/store/paths.ts";
-import { runDatabasePath, SqliteRunStore } from "./run-store.ts";
+import { runDatabasePath, SqliteRunStore } from "#daemon/runs/store.ts";
 
 export function extensionHost(version: string): ExtensionHost {
   const accounts = new AccountService();

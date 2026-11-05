@@ -3,7 +3,7 @@ import type { Artifact } from "../contract.ts";
 import { SpecError } from "../filespec/documents.ts";
 import { isArtifactName } from "../filespec/names.ts";
 import { quoted } from "../text.ts";
-import { contentArtifact } from "./envelope.ts";
+import { contentArtifact } from "./content-artifact.ts";
 import { artifactOf, ROOT_ID, SKILL_FILE, skipped } from "./folder.ts";
 import type { Tree } from "./tree.ts";
 
@@ -80,158 +80,6 @@ export async function pluginManifest(
   return undefined;
 }
 
-function listOf(value: unknown): unknown[] {
-  if (value === undefined || value === null) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
-/**
- * The manifest a target loads: the entry alone when the plugin has none, else the plugin's own
- * with the entry's components appended, which `strict: false` refuses.
- */
-function effectiveManifest(own: Json | undefined, entry: Json | undefined): Json | "conflict" {
-  const listed = Object.fromEntries(
-    Object.entries(entry ?? {}).filter(([key]) => !ENTRY_ONLY.has(key)),
-  );
-  if (own === undefined) return listed;
-  const adds = COMPONENTS.filter((key) => entry?.[key] !== undefined);
-  if (adds.length === 0) return own;
-  if (entry?.strict === false) return "conflict";
-  const merged: Json = { ...own };
-  for (const key of adds) {
-    if (key === "hooks" && isRecord(own.hooks) && isRecord(entry?.hooks)) {
-      merged.hooks = { ...own.hooks, ...entry.hooks };
-    } else if (key === "commands" && isRecord(own.commands) && isRecord(entry?.commands)) {
-      merged.commands = { ...own.commands, ...entry.commands };
-    } else {
-      merged[key] = [...listOf(own[key]), ...listOf(entry?.[key])];
-    }
-  }
-  return merged;
-}
-
-/** A manifest path, `./x` relative to the plugin, as a path in the tree; undefined if it leaves. */
-function inside(dir: string, path: unknown): string | undefined {
-  if (typeof path !== "string") return undefined;
-  if (path === "." || path === "./") return dir;
-  if (!path.startsWith("./") || path.includes("\\")) return undefined;
-  const rest = posix.normalize(path.slice(2)).replace(/\/+$/, "");
-  if (rest === "." || rest === "") return dir;
-  if (rest.startsWith("../") || rest === "..") return undefined;
-  return under(dir, rest);
-}
-
-/** Skill folders under each place a manifest names: one holding SKILL.md, or a folder of them. */
-async function skillDirs(tree: Tree, places: readonly string[]): Promise<string[]> {
-  const found = new Set<string>();
-  for (const place of places) {
-    if (await tree.isFile(under(place, SKILL_FILE))) {
-      found.add(place);
-      continue;
-    }
-    for (const entry of await tree.list(place)) {
-      if (entry.type === "folder" && (await tree.isFile(`${entry.path}/${SKILL_FILE}`))) {
-        found.add(entry.path);
-      }
-    }
-  }
-  return [...found].sort();
-}
-
-/** `*.md` files: those a manifest names, or each one directly in the default folder. */
-async function markdownFiles(tree: Tree, dir: string, named: unknown, folder: string) {
-  const places =
-    named === undefined ? [under(dir, folder)] : listOf(named).map((p) => inside(dir, p));
-  const files: string[] = [];
-  for (const place of places) {
-    if (place === undefined) continue;
-    if (place.endsWith(".md") && (await tree.isFile(place))) {
-      files.push(place);
-      continue;
-    }
-    for (const entry of await tree.list(place)) {
-      if (entry.type === "file" && entry.name.endsWith(".md")) files.push(entry.path);
-    }
-  }
-  return [...new Set(files)].sort();
-}
-
-/** A command as a person runs it, `/plugin:name`, and the file it is written in. */
-interface Command {
-  name: string;
-  path: string;
-}
-
-async function commandsOf(tree: Tree, dir: string, manifest: Json): Promise<Command[]> {
-  const declared = manifest.commands;
-  if (isRecord(declared)) {
-    const commands: Command[] = [];
-    for (const [name, value] of Object.entries(declared)) {
-      const path = isRecord(value) ? inside(dir, value.source) : undefined;
-      if (path !== undefined && (await tree.isFile(path))) commands.push({ name, path });
-    }
-    return commands;
-  }
-  return (await markdownFiles(tree, dir, declared, "commands")).map((path) => ({
-    name: posix.basename(path, ".md"),
-    path,
-  }));
-}
-
-/** What a plugin listing names it, how it was found, and where it lives. */
-export interface PluginInput {
-  /** The plugin's folder in the tree, `""` for the root. */
-  dir: string;
-  /** Its marketplace entry, when a marketplace lists it. */
-  entry?: Json | undefined;
-  /** Its entry's name, which it installs under; alone, the name to use when its manifest has none. */
-  name: string;
-  /** Listed by a marketplace whose source is its own root, so only the skills it names count. */
-  rootSource: boolean;
-}
-
-/** Files of a plugin whose folder is the whole source: only what it names, never its neighbors. */
-const ROOT_FILES = [
-  "hooks",
-  "bin",
-  "monitors",
-  ".mcp.json",
-  ".lsp.json",
-  ".claude-plugin/plugin.json",
-];
-
-async function filesOf(tree: Tree, input: PluginInput, named: readonly string[]) {
-  const places = input.rootSource ? [...named, ...ROOT_FILES] : [input.dir];
-  const prefix = input.dir === "" ? "" : `${input.dir}/`;
-  const files = new Map<string, { path: string; locator: string; executable: boolean }>();
-  const warnings: string[] = [];
-  for (const place of places) {
-    if (place.endsWith(".md") || place.endsWith(".json")) {
-      if (await tree.isFile(place)) {
-        files.set(place, { path: place.slice(prefix.length), locator: place, executable: false });
-      }
-      continue;
-    }
-    const walked = await tree.walk(place);
-    for (const skip of walked.skipped) warnings.push(skipped(skip));
-    for (const file of walked.files) {
-      files.set(file.path, {
-        path: file.path.slice(prefix.length),
-        locator: file.path,
-        executable: file.executable,
-      });
-    }
-  }
-  return { files: [...files.values()], warnings };
-}
-
-/** Listed, a plugin installs under its entry's name, as Claude Code does; its own still namespaces. */
-function namesOf(manifest: Json, input: PluginInput): { name: string; manifestName?: string } {
-  const manifestName = textOf(manifest.name);
-  const name = input.entry === undefined ? (manifestName ?? input.name) : input.name;
-  return manifestName === undefined ? { name } : { name, manifestName };
-}
-
 /**
  * One plugin, whole, as a `plugin` artifact, followed by its skills and agents on their own, so
  * a target without plugins gets its parts and `-s` can take one. Undefined when it is skipped.
@@ -283,6 +131,7 @@ export async function readPlugin(
 
   const prefix = dir === "" ? "" : `${dir}/`;
   const description = textOf(manifest.description);
+  // The manifest goes in as text, since it may hold numbers an envelope cannot.
   const plugin = await contentArtifact(tree, {
     id: dir === "" ? ROOT_ID : dir,
     kind: "plugin",
@@ -292,7 +141,6 @@ export async function readPlugin(
     spec: {
       name,
       ...(description === undefined ? {} : { description }),
-      // As text, since a manifest may hold numbers an envelope cannot.
       manifest: JSON.stringify({ ...manifest, name: manifestName ?? name }),
       commands: commands.map((command) => ({
         name: command.name,
@@ -309,7 +157,7 @@ export async function readPlugin(
       await artifactOf(tree, { kind: "skill", at, name: member, namespace: name }, warnings),
     );
   }
-  // Only an agent directly in its folder: a nested one's name is the folder path, which aireg cannot install under.
+  // A nested agent's name is its folder path, which aireg cannot install under.
   for (const at of agents) {
     const member = posix.basename(at, ".md");
     if (!isArtifactName(member) || posix.dirname(at) !== under(dir, "agents")) continue;
@@ -318,4 +166,156 @@ export async function readPlugin(
     );
   }
   return [plugin, ...members];
+}
+
+/**
+ * The manifest a target loads: the entry alone when the plugin has none, else the plugin's own
+ * with the entry's components appended, which `strict: false` refuses.
+ */
+function effectiveManifest(own: Json | undefined, entry: Json | undefined): Json | "conflict" {
+  const listed = Object.fromEntries(
+    Object.entries(entry ?? {}).filter(([key]) => !ENTRY_ONLY.has(key)),
+  );
+  if (own === undefined) return listed;
+  const adds = COMPONENTS.filter((key) => entry?.[key] !== undefined);
+  if (adds.length === 0) return own;
+  if (entry?.strict === false) return "conflict";
+  const merged: Json = { ...own };
+  for (const key of adds) {
+    if (key === "hooks" && isRecord(own.hooks) && isRecord(entry?.hooks)) {
+      merged.hooks = { ...own.hooks, ...entry.hooks };
+    } else if (key === "commands" && isRecord(own.commands) && isRecord(entry?.commands)) {
+      merged.commands = { ...own.commands, ...entry.commands };
+    } else {
+      merged[key] = [...listOf(own[key]), ...listOf(entry?.[key])];
+    }
+  }
+  return merged;
+}
+
+function listOf(value: unknown): unknown[] {
+  if (value === undefined || value === null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+/** A listed plugin installs under its entry's name, as in Claude Code; its own still namespaces. */
+function namesOf(manifest: Json, input: PluginInput): { name: string; manifestName?: string } {
+  const manifestName = textOf(manifest.name);
+  const name = input.entry === undefined ? (manifestName ?? input.name) : input.name;
+  return manifestName === undefined ? { name } : { name, manifestName };
+}
+
+/** A manifest path, `./x` relative to the plugin, as a path in the tree; undefined if it leaves. */
+function inside(dir: string, path: unknown): string | undefined {
+  if (typeof path !== "string") return undefined;
+  if (path === "." || path === "./") return dir;
+  if (!path.startsWith("./") || path.includes("\\")) return undefined;
+  const rest = posix.normalize(path.slice(2)).replace(/\/+$/, "");
+  if (rest === "." || rest === "") return dir;
+  if (rest.startsWith("../") || rest === "..") return undefined;
+  return under(dir, rest);
+}
+
+/** Skill folders under each place a manifest names: one holding SKILL.md, or a folder of them. */
+async function skillDirs(tree: Tree, places: readonly string[]): Promise<string[]> {
+  const found = new Set<string>();
+  for (const place of places) {
+    if (await tree.isFile(under(place, SKILL_FILE))) {
+      found.add(place);
+      continue;
+    }
+    for (const entry of await tree.list(place)) {
+      if (entry.type === "folder" && (await tree.isFile(`${entry.path}/${SKILL_FILE}`))) {
+        found.add(entry.path);
+      }
+    }
+  }
+  return [...found].sort();
+}
+
+/** What a plugin listing names it, how it was found, and where it lives. */
+export interface PluginInput {
+  /** The plugin's folder in the tree, `""` for the root. */
+  dir: string;
+  /** Its marketplace entry, when a marketplace lists it. */
+  entry?: Json | undefined;
+  /** Installs under it; for a lone plugin, the name when its manifest has none. */
+  name: string;
+  /** Listed by a marketplace whose source is its own root, so only the skills it names count. */
+  rootSource: boolean;
+}
+
+/** `*.md` files: those a manifest names, or each one directly in the default folder. */
+async function markdownFiles(tree: Tree, dir: string, named: unknown, folder: string) {
+  const places =
+    named === undefined ? [under(dir, folder)] : listOf(named).map((p) => inside(dir, p));
+  const files: string[] = [];
+  for (const place of places) {
+    if (place === undefined) continue;
+    if (place.endsWith(".md") && (await tree.isFile(place))) {
+      files.push(place);
+      continue;
+    }
+    for (const entry of await tree.list(place)) {
+      if (entry.type === "file" && entry.name.endsWith(".md")) files.push(entry.path);
+    }
+  }
+  return [...new Set(files)].sort();
+}
+
+/** A command as a person runs it, `/plugin:name`, and the file it is written in. */
+interface Command {
+  name: string;
+  path: string;
+}
+
+async function commandsOf(tree: Tree, dir: string, manifest: Json): Promise<Command[]> {
+  const declared = manifest.commands;
+  if (isRecord(declared)) {
+    const commands: Command[] = [];
+    for (const [name, value] of Object.entries(declared)) {
+      const path = isRecord(value) ? inside(dir, value.source) : undefined;
+      if (path !== undefined && (await tree.isFile(path))) commands.push({ name, path });
+    }
+    return commands;
+  }
+  return (await markdownFiles(tree, dir, declared, "commands")).map((path) => ({
+    name: posix.basename(path, ".md"),
+    path,
+  }));
+}
+
+/** Files of a plugin whose folder is the whole source: only what it names, never its neighbors. */
+const ROOT_FILES = [
+  "hooks",
+  "bin",
+  "monitors",
+  ".mcp.json",
+  ".lsp.json",
+  ".claude-plugin/plugin.json",
+];
+
+async function filesOf(tree: Tree, input: PluginInput, named: readonly string[]) {
+  const places = input.rootSource ? [...named, ...ROOT_FILES] : [input.dir];
+  const prefix = input.dir === "" ? "" : `${input.dir}/`;
+  const files = new Map<string, { path: string; locator: string; executable: boolean }>();
+  const warnings: string[] = [];
+  for (const place of places) {
+    if (place.endsWith(".md") || place.endsWith(".json")) {
+      if (await tree.isFile(place)) {
+        files.set(place, { path: place.slice(prefix.length), locator: place, executable: false });
+      }
+      continue;
+    }
+    const walked = await tree.walk(place);
+    for (const skip of walked.skipped) warnings.push(skipped(skip));
+    for (const file of walked.files) {
+      files.set(file.path, {
+        path: file.path.slice(prefix.length),
+        locator: file.path,
+        executable: file.executable,
+      });
+    }
+  }
+  return { files: [...files.values()], warnings };
 }

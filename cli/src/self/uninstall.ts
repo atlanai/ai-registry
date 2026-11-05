@@ -5,21 +5,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { dict } from "#core/fields.ts";
-import { canonical } from "#core/fs/canonical.ts";
 import { homeDir } from "#core/fs/path.ts";
-import { withLease } from "#core/lease.ts";
+import { canonical } from "#core/fs/realpath.ts";
+import { withLease } from "#core/lease/lease.ts";
 import { readLock } from "#core/lock.ts";
-import { readManifest } from "#core/manifest.ts";
-import { apply, recover } from "#core/plan/apply.ts";
-import { build } from "#core/plan/build.ts";
-import { fetchFrom, type Plan } from "#core/plan/model.ts";
+import { readManifest } from "#core/manifest/repository.ts";
+import { fetchFrom } from "#core/plan/acquire/sources.ts";
+import { apply } from "#core/plan/apply/apply.ts";
+import { recover } from "#core/plan/apply/journal.ts";
+import { build } from "#core/plan/build/build.ts";
+import type { Plan } from "#core/plan/model.ts";
 import { spawnDetached } from "#core/process.ts";
 import { NAME } from "#core/product.ts";
 import { runningEntry } from "#core/release/launch.ts";
 import { type Roots, roots, toolHome, userScopeDir } from "#core/store/paths.ts";
-import { resolveTargets } from "#core/target/index.ts";
-import { onPathIn } from "./path-setup.ts";
-import { REMOVE_AFTER_FLAG, removeTree } from "./remove-after.ts";
+import { resolveTargets } from "#core/target/table.ts";
+import { REMOVE_AFTER_FLAG, removeTree } from "./remove-after-exit.ts";
+import { onPathIn } from "./shell-path.ts";
 
 /** The files aireg put on this machine outside projects, as `aireg self uninstall` finds them. */
 export interface Footprint {
@@ -29,36 +31,6 @@ export interface Footprint {
   folders: string[];
   /** Left in place: a CLI aireg did not install, or a folder that holds your home. */
   kept: string[];
-}
-
-/** With nothing declared every row is stale, so the planner unlinks all of them, as `remove` would. */
-async function teardownPlan(scope: Roots): Promise<Plan> {
-  const manifest = await readManifest(scope.manifest);
-  return build(
-    { ...manifest, artifacts: [], registries: dict() },
-    await readLock(scope),
-    [],
-    { artifacts: dict() },
-    { roots: scope, targets: [], targetTable: resolveTargets(), force: false, copy: false },
-  );
-}
-
-/** The links in target folders; the copies they point at go with the scope's folder. */
-function linksOf(plan: Plan, env: NodeJS.ProcessEnv): string[] {
-  const dir = userScopeDir(env);
-  return plan.actions.flatMap((action) =>
-    action.kind === "unlink" && !isWithin(dir, action.to) ? [action.to] : [],
-  );
-}
-
-/** aireg's two folders that exist; a moved home that holds the home directory itself is kept. */
-function folders(env: NodeJS.ProcessEnv): { folders: string[]; kept: string[] } {
-  const home = homeDir(env);
-  const found = { folders: [] as string[], kept: [] as string[] };
-  for (const dir of [userScopeDir(env), toolHome(env)]) {
-    if (existsSync(dir)) (isWithin(dir, home) ? found.kept : found.folders).push(dir);
-  }
-  return found;
 }
 
 export async function footprint(env: NodeJS.ProcessEnv = process.env): Promise<Footprint> {
@@ -71,6 +43,36 @@ export async function footprint(env: NodeJS.ProcessEnv = process.env): Promise<F
     folders: own,
     kept,
   };
+}
+
+/** aireg's two folders that exist; a moved home that holds the home directory itself is kept. */
+function folders(env: NodeJS.ProcessEnv): { folders: string[]; kept: string[] } {
+  const home = homeDir(env);
+  const found = { folders: [] as string[], kept: [] as string[] };
+  for (const dir of [userScopeDir(env), toolHome(env)]) {
+    if (existsSync(dir)) (isWithin(dir, home) ? found.kept : found.folders).push(dir);
+  }
+  return found;
+}
+
+/** The links in target folders; the copies they point at go with the scope's folder. */
+function linksOf(plan: Plan, env: NodeJS.ProcessEnv): string[] {
+  const dir = userScopeDir(env);
+  return plan.actions.flatMap((action) =>
+    action.kind === "unlink" && !isWithin(dir, action.to) ? [action.to] : [],
+  );
+}
+
+/** With nothing declared every row is stale, so the planner unlinks all of them, as `remove` would. */
+async function teardownPlan(scope: Roots): Promise<Plan> {
+  const manifest = await readManifest(scope.manifest);
+  return build(
+    { ...manifest, artifacts: [], registries: dict() },
+    await readLock(scope),
+    [],
+    { artifacts: dict() },
+    { roots: scope, targets: [], targetTable: resolveTargets(), force: false, copy: false },
+  );
 }
 
 /** aireg's own teardown of the user scope, under its lease so no job writes beside it. */
@@ -114,10 +116,6 @@ export async function deleteFolders(
   return { deleted, failed };
 }
 
-function helperPath(suffix: string): string {
-  return join(tmpdir(), `${NAME}-${suffix}-${randomBytes(4).toString("hex")}.exe`);
-}
-
 /** Into the temp folder, which Windows cleans; this fails when TEMP is on another drive. */
 async function moveToTemp(path: string): Promise<string | undefined> {
   const to = helperPath("uninstalled");
@@ -125,6 +123,10 @@ async function moveToTemp(path: string): Promise<string | undefined> {
     () => to,
     () => undefined,
   );
+}
+
+function helperPath(suffix: string): string {
+  return join(tmpdir(), `${NAME}-${suffix}-${randomBytes(4).toString("hex")}.exe`);
 }
 
 /**

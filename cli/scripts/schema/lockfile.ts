@@ -1,8 +1,6 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#core/kinds.ts";
+import { KINDS } from "#adapter/kinds.ts";
 import { LOCK_VERSION } from "#core/lock.ts";
-
-/** The shape of `manifest.lock.yml`, as written. Reading is deliberately looser. */
 
 const EARLIER_ID = Type.Optional(
   Type.String({
@@ -183,6 +181,7 @@ const Artifact = Type.Object(
   { additionalProperties: false },
 );
 
+/** The shape of `manifest.lock.yml`, as written. Reading is deliberately looser. */
 export const Lockfile = Type.Object(
   {
     version: Type.Literal(LOCK_VERSION, {

@@ -7,8 +7,8 @@ import {
   type SourceContext,
 } from "#adapter/index.ts";
 import { list, plural, quoted, sanitizeText, withoutCredentials } from "#adapter/text.ts";
+import { hostServices } from "#core/adapter/connect.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
-import { hostServices } from "#core/adapter/source.ts";
 import type { Account, RegistryConfig } from "#core/config/model.ts";
 import { readConfig, writeConfig } from "#core/config/repository.ts";
 import { credentialOrigin } from "#core/credentials/origin.ts";
@@ -21,7 +21,7 @@ import {
   saveCredential,
 } from "#core/credentials/store.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { withLease } from "#core/lease.ts";
+import { withLease } from "#core/lease/lease.ts";
 import { credentialsPath, type Scope } from "#core/store/paths.ts";
 import {
   declareRegistryFor,
@@ -30,7 +30,6 @@ import {
   resolveRegistry,
 } from "./registry.ts";
 
-/** A login either minted an account or replaced the credential on one. */
 export interface LoginResult {
   account: Account;
   /** False means an existing row kept its id, so every job naming it keeps working. */

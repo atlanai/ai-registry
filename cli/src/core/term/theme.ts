@@ -15,6 +15,7 @@ export const COLOR = {
   selection: "#1e2430",
 } as const;
 
+// `twig` and `twigLast` are the picker's softer tree; the console keeps `branch` and `last`.
 export const GLYPH = {
   ok: "✓",
   edited: "~",
@@ -29,7 +30,6 @@ export const GLYPH = {
   open: "▾",
   branch: "├─",
   last: "└─",
-  // The picker's softer tree; the console keeps its own above.
   twig: "├╴",
   twigLast: "╰╴",
   bullet: "●",

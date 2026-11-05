@@ -9,23 +9,17 @@ export const REGISTRY_DOCUMENT = "registry.json";
 export const INDEX_DOCUMENT = "index.json";
 /** An artifact's list of its versions, beside its version folders. */
 export const VERSIONS_DOCUMENT = "versions.json";
-/**
- * The spec reserves this name in a version directory, so it can never be
- * authored content: it stays out of digests and out of any copy a target loads.
- */
+/** Reserved in a version folder: never authored content, digested or copied to a target. */
 export const ENVELOPE = "artifact.json";
 
 /** The longest namespace or name segment section 2.1 allows. */
 export const MAX_SEGMENT = 64;
 
-/** Section 2.1. Segments are case-sensitive and a version may not be `latest`. */
 const SEGMENT = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/;
 const KIND_SEGMENT = /^[a-z][a-z0-9_]{0,31}$/;
 
 /** Windows opens a device, not a folder, at these names, in any case and with any extension. */
 const DEVICE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
-
-export { isVersion };
 
 /** Section 2.1: no path segment may be one, or the registry cannot be checked out on Windows. */
 export function isDeviceName(value: string): boolean {
@@ -67,7 +61,7 @@ export interface ArtifactPlace {
   version: string | undefined;
 }
 
-/** The innermost `artifacts/<namespace>/<kind>/<name>` in a path, read as the file spec lays it out. */
+/** The innermost `artifacts/<namespace>/<kind>/<name>` in a path. */
 export function artifactAt(path: string): ArtifactPlace | undefined {
   const parts = path.split("/").filter(Boolean);
   for (let at = parts.length - 4; at >= 0; at -= 1) {

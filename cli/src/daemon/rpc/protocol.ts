@@ -1,8 +1,6 @@
 import { isRecord } from "#core/fields.ts";
 import { RpcErrorCode } from "./codes.ts";
 
-export * from "./methods.ts";
-
 export type RpcId = string | number;
 
 interface RpcRequest {
@@ -50,21 +48,6 @@ export class ProtocolError extends Error {
     this.code = code;
     this.data = data;
   }
-}
-
-function object(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) {
-    throw new ProtocolError(RpcErrorCode.InvalidRequest, "JSON-RPC message must be an object.");
-  }
-  return value;
-}
-
-function id(value: unknown, nullable = false): RpcId | null {
-  if (nullable && value === null) return null;
-  if (typeof value === "string" || (typeof value === "number" && Number.isSafeInteger(value))) {
-    return value;
-  }
-  throw new ProtocolError(RpcErrorCode.InvalidRequest, "JSON-RPC id must be a string or integer.");
 }
 
 export function parseMessage(contents: string): RpcMessage {
@@ -116,6 +99,21 @@ export function parseMessage(contents: string): RpcMessage {
       "A successful response id cannot be null.",
     );
   return { jsonrpc: "2.0", id: responseId, result: message.result };
+}
+
+function object(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new ProtocolError(RpcErrorCode.InvalidRequest, "JSON-RPC message must be an object.");
+  }
+  return value;
+}
+
+function id(value: unknown, nullable = false): RpcId | null {
+  if (nullable && value === null) return null;
+  if (typeof value === "string" || (typeof value === "number" && Number.isSafeInteger(value))) {
+    return value;
+  }
+  throw new ProtocolError(RpcErrorCode.InvalidRequest, "JSON-RPC id must be a string or integer.");
 }
 
 export function encodeMessage(message: RpcMessage): string {

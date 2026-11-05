@@ -1,41 +1,23 @@
 import { ExitCode } from "#core/errors.ts";
 import { LOG_FILE, NAME } from "#core/product.ts";
 import { ensureHome } from "#core/store/paths.ts";
+import { CLI_DEFAULT, DAEMON_DEFAULT, resolveLevel } from "./level.ts";
+import { createLogger, nullLogger } from "./logger.ts";
+import type { Level, Logger, Sink } from "./model.ts";
 import {
-  CLI_DEFAULT,
-  createLogger,
-  DAEMON_DEFAULT,
   DAEMON_LOG_FILE,
   DAEMON_STDERR_FILE,
   fileSink,
-  type Level,
-  type Logger,
   logPath,
   multiSink,
-  nullLogger,
-  resolveLevel,
-  type Sink,
   stderrSink,
-  throttleSink,
   trimCapture,
-} from "./index.ts";
+} from "./sink.ts";
+import { throttleSink } from "./throttle.ts";
 
 export interface LogBootstrap {
   logger: Logger;
   close(): void;
-}
-
-function build(
-  level: Level | "off",
-  sink: () => Sink,
-  bindings: Record<string, unknown>,
-): LogBootstrap {
-  if (level === "off") return { logger: nullLogger(), close: () => {} };
-  const destination = sink();
-  return {
-    logger: createLogger({ sink: destination, level, bindings }),
-    close: () => destination.close?.(),
-  };
 }
 
 /**
@@ -51,6 +33,19 @@ export function openDaemonLog(version: string, env: NodeJS.ProcessEnv = process.
     () => throttleSink(fileSink({ path: logPath(home, DAEMON_LOG_FILE) })),
     { "service.name": `${NAME}-daemon`, "service.version": version, pid: process.pid },
   );
+}
+
+function build(
+  level: Level | "off",
+  sink: () => Sink,
+  bindings: Record<string, unknown>,
+): LogBootstrap {
+  if (level === "off") return { logger: nullLogger(), close: () => {} };
+  const destination = sink();
+  return {
+    logger: createLogger({ sink: destination, level, bindings }),
+    close: () => destination.close?.(),
+  };
 }
 
 /** Foreground runs stay silent until asked, and never write to stdout. */

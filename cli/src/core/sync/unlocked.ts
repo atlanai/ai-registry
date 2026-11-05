@@ -3,7 +3,7 @@ import type { ArtifactKind } from "#adapter/index.ts";
 import { subdirectories } from "#core/fs/tree.ts";
 import { KIND_SPECS, kindDir, SCANNED_KINDS } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
-import type { Manifest } from "#core/manifest.ts";
+import type { Manifest } from "#core/manifest/model.ts";
 import { namespaceDir, type Roots, registryDir } from "#core/store/paths.ts";
 import { entriesIn } from "#core/sync/scan.ts";
 

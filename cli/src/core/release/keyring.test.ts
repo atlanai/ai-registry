@@ -1,5 +1,5 @@
 import { generateKeyPairSync, sign } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { decodeBase64, decodeTrustedKeys, SIGNATURE_BYTES, verifyEd25519 } from "./keyring.ts";
 
 function keypair() {
@@ -14,14 +14,14 @@ function keyring(entries: Record<string, string>): string {
 }
 
 describe("decodeTrustedKeys", () => {
-  it("reads base64-of-JSON key id to raw Ed25519 key", () => {
+  test("reads base64-of-JSON key id to raw Ed25519 key", () => {
     const first = keypair();
     const second = keypair();
     const keys = decodeTrustedKeys(keyring({ "release-1": first.encoded, r2: second.encoded }));
     expect([...(keys?.keys() ?? [])]).toEqual(["release-1", "r2"]);
   });
 
-  it("fails closed on an unresolved, malformed or short keyring", () => {
+  test("fails closed on an unresolved, malformed or short keyring", () => {
     expect(decodeTrustedKeys("")).toBeUndefined();
     expect(decodeTrustedKeys("__RELEASE_KEYRING__")).toBeUndefined();
     expect(decodeTrustedKeys(keyring({}))).toBeUndefined();
@@ -32,7 +32,7 @@ describe("decodeTrustedKeys", () => {
 });
 
 describe("verifyEd25519", () => {
-  it("accepts its own signature and rejects one byte of drift", () => {
+  test("accepts its own signature and rejects one byte of drift", () => {
     const { privateKey, encoded } = keypair();
     const keys = decodeTrustedKeys(keyring({ release: encoded }));
     const key = keys?.get("release");
@@ -47,7 +47,7 @@ describe("verifyEd25519", () => {
 });
 
 describe("decodeBase64", () => {
-  it("is strict about padding, length and stray characters", () => {
+  test("is strict about padding, length and stray characters", () => {
     const raw = new Uint8Array(SIGNATURE_BYTES).fill(7);
     const encoded = Buffer.from(raw).toString("base64");
     expect(decodeBase64(encoded, SIGNATURE_BYTES)).toEqual(raw);

@@ -15,12 +15,10 @@ import {
   type DaemonMethods,
   type DaemonNotification,
   type DaemonNotifications,
-  encodeMessage,
   MAX_PAGE_SIZE,
   PROTOCOL_VERSION,
-  type RpcId,
-  type RpcResponse,
-} from "./protocol.ts";
+} from "./methods.ts";
+import { encodeMessage, type RpcId, type RpcResponse } from "./protocol.ts";
 
 interface Pending {
   resolve(value: unknown): void;
@@ -46,6 +44,14 @@ function waited(ms: number): string {
   return ms < 1_000 ? plural(ms, "millisecond") : plural(Math.round(ms / 1_000), "second");
 }
 
+/** The daemon's package version, which can differ while the protocol version matches. */
+function handshakeVersion(value: unknown): string | undefined {
+  if (!compatibleHandshake(value)) return undefined;
+  const server = (value as Record<string, unknown>).server;
+  if (!isRecord(server) || server.name !== NAME) return undefined;
+  return typeof server.version === "string" && server.version !== "" ? server.version : undefined;
+}
+
 function compatibleHandshake(value: unknown): boolean {
   if (!isRecord(value) || !isRecord(value.daemon)) return false;
   const { daemon } = value;
@@ -55,14 +61,6 @@ function compatibleHandshake(value: unknown): boolean {
     Number.isSafeInteger(daemon.startedAtMs) &&
     Number.isSafeInteger(daemon.serverNowMs)
   );
-}
-
-/** The daemon's package version, which can differ while the protocol version matches. */
-function handshakeVersion(value: unknown): string | undefined {
-  if (!compatibleHandshake(value)) return undefined;
-  const server = (value as Record<string, unknown>).server;
-  if (!isRecord(server) || server.name !== NAME) return undefined;
-  return typeof server.version === "string" && server.version !== "" ? server.version : undefined;
 }
 
 /** What answered may be another user's process, or a daemon an older aireg started. */

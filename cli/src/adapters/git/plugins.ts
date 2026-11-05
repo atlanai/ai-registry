@@ -1,28 +1,11 @@
 import { isSafePath, quoted, registryPath, type SourceContext, type Want } from "#adapter/index.ts";
-import type { FetchedPlugin, RemotePlugin } from "#adapter/layouts/layout.ts";
+import type { FetchedPlugin, RemotePlugin } from "#adapter/layouts/model.ts";
 import { fail } from "./errors.ts";
 import type { GitLimits } from "./exec.ts";
 import { resolveRef } from "./resolve.ts";
 import { holdSnapshot, snapshot } from "./snapshot.ts";
 import { parseSource, type SourceSpec } from "./url.ts";
 import { GitVersions } from "./versions.ts";
-
-/** `owner/repo`, which a github source names and a git-subdir one may. */
-const SHORTHAND = /^[\w.-]+\/[\w.-]+$/;
-
-/** Where a plugin source says its repository is, held to the transports a registry may use. */
-function specOf(plugin: RemotePlugin): SourceSpec {
-  const shorthand = plugin.type !== "url" && SHORTHAND.test(plugin.location);
-  if (plugin.type === "github" && !shorthand) {
-    throw fail("invalid", `its repo, ${quoted(plugin.location)}, is not owner/repo`);
-  }
-  if (/^(http|git):\/\//i.test(plugin.location)) {
-    throw fail("invalid", `${quoted(plugin.location)} has no transport security`);
-  }
-  const spec = parseSource(shorthand ? `github.com/${plugin.location}` : plugin.location);
-  if (spec.kind !== "git") throw fail("invalid", `${quoted(plugin.location)} is not a repository`);
-  return spec;
-}
 
 /**
  * Fetches each plugin a marketplace lists by repository, at its own commit: the entry's sha,
@@ -58,4 +41,21 @@ export function pluginFetcher(
     const version = (await versions.versionsAt(at, [plugin.name], placed.root)).get(plugin.name);
     return { root, revision: at, version };
   };
+}
+
+/** `owner/repo`, which a github source names and a git-subdir one may. */
+const SHORTHAND = /^[\w.-]+\/[\w.-]+$/;
+
+/** Where a plugin source says its repository is, held to the transports a registry may use. */
+function specOf(plugin: RemotePlugin): SourceSpec {
+  const shorthand = plugin.type !== "url" && SHORTHAND.test(plugin.location);
+  if (plugin.type === "github" && !shorthand) {
+    throw fail("invalid", `its repo, ${quoted(plugin.location)}, is not owner/repo`);
+  }
+  if (/^(http|git):\/\//i.test(plugin.location)) {
+    throw fail("invalid", `${quoted(plugin.location)} has no transport security`);
+  }
+  const spec = parseSource(shorthand ? `github.com/${plugin.location}` : plugin.location);
+  if (spec.kind !== "git") throw fail("invalid", `${quoted(plugin.location)} is not a repository`);
+  return spec;
 }

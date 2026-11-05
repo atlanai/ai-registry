@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { Codec } from "#core/target/contract.ts";
 import { applyCodec } from "./index.ts";
 
@@ -11,7 +11,7 @@ const AGENT: Codec = {
 const agent = (front: string, body: string) => `---\n${front}\n---\n${body}`;
 
 describe("frontmatter-toml", () => {
-  it("keeps the fields it names and the body, and leaves out any other front matter", () => {
+  test("keeps the fields it names and the body, and leaves out any other front matter", () => {
     const source = agent(
       "name: reviewer\ndescription: Reviews code.\ntools: Read, Grep\nmodel: sonnet\ncolor: cyan",
       "\n# Reviewer\n\nReview the diff.\n",
@@ -27,7 +27,7 @@ describe("frontmatter-toml", () => {
     });
   });
 
-  it("escapes backslashes, control characters and runs of quotes, and keeps unicode", () => {
+  test("escapes backslashes, control characters and runs of quotes, and keeps unicode", () => {
     const body =
       'Say """hi""" to C:\\temp\\new.\r\nTab\there, bell\u0007, caf\u00e9 \u{1F600}.\r\nEnd "quoted""';
     const out = applyCodec(AGENT, agent('name: r\ndescription: "A \\"quoted\\" one"', body));
@@ -42,14 +42,14 @@ describe("frontmatter-toml", () => {
     });
   });
 
-  it("writes a multi-line description as one escaped line, as YAML reads it", () => {
+  test("writes a multi-line description as one escaped line, as YAML reads it", () => {
     const out = applyCodec(AGENT, agent("name: r\ndescription: |\n  Two\n  lines", "Go."));
     expect(out).toMatchObject({
       text: expect.stringContaining('description = "Two\\nlines\\n"\n'),
     });
   });
 
-  it.each([
+  test.each([
     ["no front matter", "Just text.", "it has no front matter"],
     ["a missing field", agent("name: r", "Go."), "it has no description"],
     [

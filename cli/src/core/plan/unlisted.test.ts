@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { build } from "#core/plan/build.ts";
+import { describe, expect, test } from "vitest";
+import { build } from "#core/plan/build/build.ts";
 import {
   acquired,
   entry,
@@ -21,7 +21,7 @@ const readComplete = (entries = [entry({ name: "fmt", path: "skills/fmt" })]) =>
   }));
 
 describe("unlistedRows", () => {
-  it("finds a row the manifest asks for that its registry no longer lists", () => {
+  test("finds a row the manifest asks for that its registry no longer lists", () => {
     const rows = unlistedRows(
       kitManifest(),
       installed(),
@@ -30,24 +30,24 @@ describe("unlistedRows", () => {
     expect(rows).toEqual([{ name: "lint", registry: "kit", empty: false }]);
   });
 
-  it("says so when the registry lists nothing at all", () => {
+  test("says so when the registry lists nothing at all", () => {
     expect(unlistedRows(kitManifest(), installed(), readWhole([]))).toEqual([
       { name: "lint", registry: "kit", empty: true },
     ]);
   });
 
-  it("does not call a registry empty when the run asked it for only some artifacts", () => {
+  test("does not call a registry empty when the run asked it for only some artifacts", () => {
     expect(unlistedRows(kitManifest(), installed(), acquired([]))).toEqual([
       { name: "lint", registry: "kit", empty: false },
     ]);
   });
 
-  it("leaves a row that is still listed, and one the manifest no longer asks for", () => {
+  test("leaves a row that is still listed, and one the manifest no longer asks for", () => {
     expect(unlistedRows(kitManifest(), installed(), acquired([entry()]))).toEqual([]);
     expect(unlistedRows(kitManifest([]), installed(), acquired([]))).toEqual([]);
   });
 
-  it("leaves a row a whole-registry entry excludes, as `aireg remove` writes it", () => {
+  test("leaves a row a whole-registry entry excludes, as `aireg remove` writes it", () => {
     expect(unlistedRows(kitManifest(["kit"]), installed(), acquired([]))).toHaveLength(1);
     const manifest = kitManifest(["kit"]);
     const [whole] = manifest.artifacts;
@@ -57,23 +57,23 @@ describe("unlistedRows", () => {
 });
 
 describe("unlistedRows, for a listing its adapter says is complete", () => {
-  it("leaves out a row only a whole-registry entry reaches", () => {
+  test("leaves out a row only a whole-registry entry reaches", () => {
     expect(unlistedRows(kitManifest(["kit"]), installed(), readComplete())).toEqual([]);
   });
 
-  it("keeps a row an entry names", () => {
+  test("keeps a row an entry names", () => {
     expect(unlistedRows(kitManifest(), installed(), readComplete())).toEqual([
       { name: "lint", registry: "kit", empty: false },
     ]);
   });
 
-  it("keeps a row when the listing is empty", () => {
+  test("keeps a row when the listing is empty", () => {
     expect(unlistedRows(kitManifest(["kit"]), installed(), readComplete([]))).toEqual([
       { name: "lint", registry: "kit", empty: true },
     ]);
   });
 
-  it("keeps a row when the run did not read the registry whole", () => {
+  test("keeps a row when the run did not read the registry whole", () => {
     const partial = readComplete().map((source) => ({ ...source, whole: false }));
     expect(unlistedRows(kitManifest(["kit"]), installed(), partial)).toEqual([
       { name: "lint", registry: "kit", empty: false },
@@ -82,7 +82,7 @@ describe("unlistedRows, for a listing its adapter says is complete", () => {
 });
 
 describe("a plan over a registry that stopped listing a row", () => {
-  it("keeps the row and unlinks nothing", () => {
+  test("keeps the row and unlinks nothing", () => {
     const plan = build(kitManifest(), installed(), readWhole([]), SYNCED, PLAN_OPTIONS);
     expect(plan.actions.filter((action) => action.kind === "unlink")).toEqual([]);
     const record = plan.actions.find((action) => action.kind === "record");
@@ -90,7 +90,7 @@ describe("a plan over a registry that stopped listing a row", () => {
     expect(plan.unlisted).toEqual([{ name: "lint", registry: "kit", empty: true }]);
   });
 
-  it("still removes a row the manifest dropped", () => {
+  test("still removes a row the manifest dropped", () => {
     const plan = build(kitManifest([]), installed(), acquired([]), SYNCED, PLAN_OPTIONS);
     expect(plan.actions.some((action) => action.kind === "unlink")).toBe(true);
     expect(plan.unlisted).toEqual([]);

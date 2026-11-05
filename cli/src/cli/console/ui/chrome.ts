@@ -49,22 +49,6 @@ const piece = (color: string, value: string, bold = false): Piece => ({
 
 const widthOf = (pieces: readonly Piece[]) => pieces.reduce((sum, p) => sum + p.width, 0);
 
-function row(pieces: readonly Piece[]): ReactElement {
-  return box(null, ...pieces.map((p) => p.node));
-}
-
-/** A running command, in the slot the pull hint takes, with its line cut to `room`. */
-function running(activity: Activity, room: number): Piece[] {
-  const label = piece(
-    activity.failed ? COLOR.red : COLOR.yellow,
-    `${GLYPH.spin} ${activity.label}`,
-  );
-  const cancel = activity.done ? [] : [piece(COLOR.faint, "  esc cancel")];
-  const budget = Math.min(48, room - label.width - widthOf(cancel));
-  const line = activity.line === undefined || budget < 2 ? "" : truncate(activity.line, budget - 1);
-  return [label, piece(COLOR.faint, line === "" ? "" : ` ${line}`), ...cancel];
-}
-
 /** One line, never wrapped: as the width shrinks the daemon goes first, then the pull. */
 export function header(props: {
   width: number;
@@ -97,6 +81,22 @@ export function header(props: {
     box({ justifyContent: "space-between" }, row(brand), row(right)),
     rule(props.width),
   );
+}
+
+/** A running command, in the slot the pull hint takes, with its line cut to `room`. */
+function running(activity: Activity, room: number): Piece[] {
+  const label = piece(
+    activity.failed ? COLOR.red : COLOR.yellow,
+    `${GLYPH.spin} ${activity.label}`,
+  );
+  const cancel = activity.done ? [] : [piece(COLOR.faint, "  esc cancel")];
+  const budget = Math.min(48, room - label.width - widthOf(cancel));
+  const line = activity.line === undefined || budget < 2 ? "" : truncate(activity.line, budget - 1);
+  return [label, piece(COLOR.faint, line === "" ? "" : ` ${line}`), ...cancel];
+}
+
+function row(pieces: readonly Piece[]): ReactElement {
+  return box(null, ...pieces.map((p) => p.node));
 }
 
 /** Rendered width of each registry tab, so a click can be mapped back to one. */

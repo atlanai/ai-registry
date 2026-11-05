@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { ADAPTER_PROTOCOL } from "./contract.ts";
 import { defineAdapter } from "./define.ts";
 
 describe("defineAdapter", () => {
-  it("defaults protocol and fills missing capability flags", () => {
+  test("defaults protocol and fills missing capability flags", () => {
     const adapter = defineAdapter({
       id: "probe",
       displayName: "Probe",
@@ -29,7 +29,7 @@ describe("defineAdapter", () => {
     });
   });
 
-  it("refuses an id that is not a path segment, and a foreign protocol", () => {
+  test("refuses an id that is not a path segment, and a foreign protocol", () => {
     const base = {
       displayName: "Probe",
       artifactKinds: ["skill" as const],

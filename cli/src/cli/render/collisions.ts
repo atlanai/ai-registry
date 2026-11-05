@@ -1,7 +1,7 @@
 import { ExitCode } from "#core/errors.ts";
-import type { Printer } from "#core/output.ts";
 import { leafOf, NAME_COLLISION_HINT, shownAddress } from "#core/plan/build/rename.ts";
 import type { Plan } from "#core/plan/model.ts";
+import type { Printer } from "#core/term/printer.ts";
 
 /**
  * Each artifact a run renamed or left out because another holds its name, and the setting

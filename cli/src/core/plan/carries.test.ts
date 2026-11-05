@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
 import { carriedIn, carries, describeCarried } from "./carries.ts";
 
@@ -69,7 +69,7 @@ describe("carriedIn", () => {
     files,
   });
 
-  it("finds a bin folder, and a digest that moves with what runs and nothing else", () => {
+  test("finds a bin folder, and a digest that moves with what runs and nothing else", () => {
     const plain = carriedIn(envelope([file("skills/a/SKILL.md")]), undefined);
     expect(plain).toEqual({ carries: [], fingerprint: undefined });
 
@@ -84,7 +84,7 @@ describe("carriedIn", () => {
     expect(toolMoved.fingerprint).not.toBe(before.fingerprint);
   });
 
-  it("counts what the placing manifest declares inline", () => {
+  test("counts what the placing manifest declares inline", () => {
     const declared = carriedIn(envelope([file("skills/a/SKILL.md")]), { mcpServers: { a: {} } });
     expect(declared.carries).toEqual(["mcpServers"]);
     const changed = carriedIn(envelope([file("skills/a/SKILL.md")]), { mcpServers: { b: {} } });

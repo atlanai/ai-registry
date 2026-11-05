@@ -1,5 +1,5 @@
 import { isCI, present } from "#core/env.ts";
-import { CALLER_SIGNALS } from "#core/target/index.ts";
+import { CALLER_SIGNALS } from "#core/target/detect.ts";
 
 /**
  * Agents that run aireg without being a target it installs into. One that

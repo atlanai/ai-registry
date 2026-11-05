@@ -58,15 +58,6 @@ export function bumpVersion(current: string | undefined, how: Bump = "patch"): s
   return `${major}.${minor}.${patch + 1}`;
 }
 
-function cmpIdent(left: string, right: string): number {
-  const leftNum = /^\d+$/.test(left);
-  const rightNum = /^\d+$/.test(right);
-  if (leftNum && rightNum) return Number(left) - Number(right);
-  if (leftNum) return -1;
-  if (rightNum) return 1;
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
 /** Negative, zero or positive as `left` is older than, the same as or newer than `right`. */
 export function compareVersion(left: Version, right: Version): number {
   if (left.major !== right.major) return left.major < right.major ? -1 : 1;
@@ -81,6 +72,15 @@ export function compareVersion(left: Version, right: Version): number {
     if (cmp !== 0) return cmp;
   }
   return left.prerelease.length - right.prerelease.length;
+}
+
+function cmpIdent(left: string, right: string): number {
+  const leftNum = /^\d+$/.test(left);
+  const rightNum = /^\d+$/.test(right);
+  if (leftNum && rightNum) return Number(left) - Number(right);
+  if (leftNum) return -1;
+  if (rightNum) return 1;
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 export function gte(current: string, min: string): boolean {

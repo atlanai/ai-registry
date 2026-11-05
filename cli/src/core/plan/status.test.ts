@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { Lock } from "#core/lock.ts";
 import { LOCK_VERSION } from "#core/lock.ts";
 import { artifactPath, projectionDir, roots } from "#core/store/paths.ts";
-import type { Survey } from "./model.ts";
 import { status, worstState } from "./status.ts";
+import type { Survey } from "./survey.ts";
 
 const base = roots("project", "/work");
 // Derived, so a change to either layout cannot silently break these.
@@ -62,15 +62,15 @@ function survey(over: Partial<Survey["artifacts"]["lint"]> = {}): Survey {
 }
 
 describe("status", () => {
-  it("reports ok when disk matches the lock", () => {
+  test("reports ok when disk matches the lock", () => {
     expect(status(lock, survey(), base)[0]?.state).toBe("ok");
   });
 
-  it("reports edited when the project copy was edited", () => {
+  test("reports edited when the project copy was edited", () => {
     expect(status(lock, survey({ digest: "sha256:other" }), base)[0]?.state).toBe("edited");
   });
 
-  it("reports dangling when a link points outside this scope's own trees", () => {
+  test("reports dangling when a link points outside this scope's own trees", () => {
     const off = survey({
       links: {
         [INSIDE]: { present: true, isLink: true, target: "/elsewhere", mode: "symlink" },
@@ -83,7 +83,7 @@ describe("status", () => {
     });
   });
 
-  it("says a link a folder of yours took the place of was replaced by you", () => {
+  test("says a link a folder of yours took the place of was replaced by you", () => {
     const yours = survey({
       links: {
         [INSIDE]: { present: true, isLink: false, target: undefined, mode: "symlink" },
@@ -97,7 +97,7 @@ describe("status", () => {
     });
   });
 
-  it("reports missing when nothing is staged, naming the scope", () => {
+  test("reports missing when nothing is staged, naming the scope", () => {
     const empty = survey({ staged: false, digest: undefined });
     expect(status(lock, empty, base)[0]).toMatchObject({
       state: "missing",
@@ -108,7 +108,7 @@ describe("status", () => {
     );
   });
 
-  it("takes the worst state across artifacts", () => {
+  test("takes the worst state across artifacts", () => {
     expect(
       worstState([
         { name: "a", state: "ok", detail: undefined, targets: {} },
@@ -125,7 +125,7 @@ describe("links that could not be made", () => {
     return { ...lock, artifacts: { lint: { ...row, blocked } } };
   };
 
-  it("are missing, naming what holds the path", () => {
+  test("are missing, naming what holds the path", () => {
     const [mine] = status(
       blockedLock([{ target: "codex", path: ".agents/skills/lint" }]),
       survey(),

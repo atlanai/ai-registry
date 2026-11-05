@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { FAILURE_CODES } from "./codes.ts";
 import {
   AdapterError,
@@ -25,7 +25,7 @@ class PackedAdapterError extends Error {
 }
 
 describe("isAdapterError", () => {
-  it("matches the class and a packed copy the CLI did not construct", () => {
+  test("matches the class and a packed copy the CLI did not construct", () => {
     const local = new AdapterError("acme", "unauthorized", "missing token");
     const packed = new PackedAdapterError("acme", "unauthorized", "missing token");
     expect(isAdapterError(local)).toBe(true);
@@ -35,7 +35,7 @@ describe("isAdapterError", () => {
     expect(isRetryable(packed)).toBe(false);
   });
 
-  it("rejects a similarly named throw that is not an adapter failure", () => {
+  test("rejects a similarly named throw that is not an adapter failure", () => {
     const spoofed = new Error("nope");
     spoofed.name = "AdapterError";
     expect(isAdapterError(spoofed)).toBe(false);
@@ -44,14 +44,14 @@ describe("isAdapterError", () => {
     );
   });
 
-  it("recognizes conflict and mints a catalog problem when none was given", () => {
+  test("recognizes conflict and mints a catalog problem when none was given", () => {
     const error = new AdapterError("acme", "conflict", "already exists");
     expect(isAdapterError(error)).toBe(true);
     expect(error.problem).toEqual(problemFromFailure("conflict", "already exists"));
     expect(error.problem.code).toBe(FAILURE_CODES.conflict);
   });
 
-  it("mints a catalog problem for a packed throw that omitted one", () => {
+  test("mints a catalog problem for a packed throw that omitted one", () => {
     const packed = new PackedAdapterError("acme", "unauthorized", "missing token");
     expect(isAdapterError(packed)).toBe(true);
     expect(adapterProblem(packed as unknown as AdapterError)).toEqual(
@@ -61,7 +61,7 @@ describe("isAdapterError", () => {
 });
 
 describe("failureOf", () => {
-  it("prefers HTTP status over a free-form origin code", () => {
+  test("prefers HTTP status over a free-form origin code", () => {
     expect(failureOf({ code: "token_expired", title: "expired", status: 401 })).toBe(
       "unauthorized",
     );
@@ -70,7 +70,7 @@ describe("failureOf", () => {
 });
 
 describe("isAuthFailure", () => {
-  it("is a credential that is missing, refused or not allowed, and nothing else", () => {
+  test("is a credential that is missing, refused or not allowed, and nothing else", () => {
     expect(FAILURES.filter(isAuthFailure)).toEqual(["unauthorized", "forbidden"]);
   });
 });

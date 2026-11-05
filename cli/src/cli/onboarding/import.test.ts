@@ -1,7 +1,7 @@
 import { lstat, mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
-import { acquire } from "#core/lease.ts";
+import { acquire } from "#core/lease/lease.ts";
 import { roots } from "#core/store/paths.ts";
 import { test as base } from "#test/kit/fixtures.ts";
 import { applyImport, planImport } from "./import.ts";

@@ -4,7 +4,6 @@ import { describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
 import { follow } from "./tail.ts";
 
-/** Collects what `follow` yields until the test aborts it. */
 function collect(path: string): { lines: string[]; done: Promise<void>; stop: () => void } {
   const controller = new AbortController();
   const lines: string[] = [];

@@ -44,26 +44,18 @@ const NOT_FOUND_MARKERS = [
   "couldn't find remote ref",
 ];
 
-/** Git repeats itself across several lines; the first fatal line is the cause. */
-function firstFatal(stderr: string): string {
-  const lines = stderr
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const fatal = lines.find((line) => line.startsWith("fatal:") || line.startsWith("error:"));
-  return (fatal ?? lines[0] ?? "git failed").replace(/^(fatal|error):\s*/, "");
+/** In its own group git does not get the terminal's Ctrl-C, so an interrupt passes it on. */
+export function stopGit(): void {
+  for (const child of running) kill(child);
 }
 
-/**
- * Failures are classified once, here. Repeating substring checks at each call
- * site is how a new caller silently loses the SSO hint.
- */
-function classify(stderr: string): GitFailure {
-  const text = stderr.toLowerCase();
-  if (SSO_MARKERS.some((m) => text.includes(m))) return "unauthorized";
-  if (NOT_FOUND_MARKERS.some((m) => text.includes(m))) return "not_found";
-  if (AUTH_MARKERS.some((m) => text.includes(m))) return "unauthorized";
-  return "unavailable";
+function kill(child: ChildProcess): void {
+  try {
+    if (GROUPED && child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
+    else child.kill("SIGKILL");
+  } catch {
+    // Already gone.
+  }
 }
 
 /** What the host allows a git operation: from the connection's limits, or set for the call. */
@@ -82,59 +74,35 @@ export interface GitOptions extends GitLimits {
 
 const MAX_BUFFER = 32 * 1024 * 1024;
 
-/** Its own process group, so a timeout also stops the helpers git starts, such as `git-remote-http`. */
+/** Its own process group, so a timeout also stops git's helpers, such as `git-remote-http`. */
 const GROUPED = process.platform !== "win32";
 
 /** Git runs still going, so an interrupted command can stop them on its way out. */
 const running = new Set<ChildProcess>();
 
-function kill(child: ChildProcess): void {
+export async function git(args: readonly string[], options: GitOptions): Promise<string> {
+  const timeout = options.timeoutMs;
+  let ran: Ran;
   try {
-    if (GROUPED && child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
-    else child.kill("SIGKILL");
-  } catch {
-    // Already gone.
+    ran = await spawnTool(args, options, timeout);
+  } catch (error) {
+    if (options.signal?.aborted === true) throw error;
+    if (error instanceof GitError) throw error;
+    const stderr = (error as { stderr?: string }).stderr ?? "";
+    throw notInstalled(error) ?? new GitError("unavailable", (error as Error).message, stderr);
   }
-}
-
-/** In its own group git does not get the terminal's Ctrl-C, so an interrupt passes it on. */
-export function stopGit(): void {
-  for (const child of running) kill(child);
-}
-
-function aborted(signal: AbortSignal): Error {
-  return Object.assign(new Error("The operation was aborted"), {
-    name: "AbortError",
-    code: "ABORT_ERR",
-    cause: signal.reason,
-  });
-}
-
-interface Ran {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-  timedOut: boolean;
-}
-
-/** At most this many git network calls at once, so dozens of registries stay under a host's limits. */
-const NETWORK_AT_ONCE = 6;
-const NETWORK = new Set(["clone", "fetch", "ls-remote"]);
-let networking = 0;
-const queued: (() => void)[] = [];
-
-/** Runs `task` once a network slot is free; local git work is never held back. */
-async function inNetworkSlot<T>(task: () => Promise<T>): Promise<T> {
-  if (networking >= NETWORK_AT_ONCE) await new Promise<void>((admit) => queued.push(admit));
-  else networking += 1;
-  try {
-    return await task();
-  } finally {
-    // Handed over, not released and retaken, which would let another in.
-    const next = queued.shift();
-    if (next === undefined) networking -= 1;
-    else next();
+  if (ran.timedOut) {
+    throw new GitError(
+      "unavailable",
+      `git timed out after ${timeout < 1000 ? `${timeout}ms` : `${Math.round(timeout / 1000)}s`}.`,
+      ran.stderr,
+      options.timeoutSetting === undefined
+        ? "Clone the repository yourself and add its local path."
+        : `Raise the limit with ${options.timeoutSetting}, or clone the repository yourself and add its local path.`,
+    );
   }
+  if (ran.code === 0) return ran.stdout;
+  throw new GitError(classify(ran.stderr), firstFatal(ran.stderr), ran.stderr);
 }
 
 function spawnTool(args: readonly string[], options: GitOptions, timeout: number): Promise<Ran> {
@@ -222,6 +190,41 @@ function spawnOne(args: readonly string[], options: GitOptions, timeout: number)
   });
 }
 
+interface Ran {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+}
+
+/** At most this many git network calls at once, keeping dozens of registries under host limits. */
+const NETWORK_AT_ONCE = 6;
+const NETWORK = new Set(["clone", "fetch", "ls-remote"]);
+let networking = 0;
+const queued: (() => void)[] = [];
+
+function aborted(signal: AbortSignal): Error {
+  return Object.assign(new Error("The operation was aborted"), {
+    name: "AbortError",
+    code: "ABORT_ERR",
+    cause: signal.reason,
+  });
+}
+
+/** Runs `task` once a network slot is free; local git work is never held back. */
+async function inNetworkSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (networking >= NETWORK_AT_ONCE) await new Promise<void>((admit) => queued.push(admit));
+  else networking += 1;
+  try {
+    return await task();
+  } finally {
+    // Handed over, not released and retaken, which would let another in.
+    const next = queued.shift();
+    if (next === undefined) networking -= 1;
+    else next();
+  }
+}
+
 function notInstalled(error: unknown): GitError | undefined {
   return (error as NodeJS.ErrnoException).code === "ENOENT"
     ? new GitError(
@@ -233,29 +236,26 @@ function notInstalled(error: unknown): GitError | undefined {
     : undefined;
 }
 
-export async function git(args: readonly string[], options: GitOptions): Promise<string> {
-  const timeout = options.timeoutMs;
-  let ran: Ran;
-  try {
-    ran = await spawnTool(args, options, timeout);
-  } catch (error) {
-    if (options.signal?.aborted === true) throw error;
-    if (error instanceof GitError) throw error;
-    const stderr = (error as { stderr?: string }).stderr ?? "";
-    throw notInstalled(error) ?? new GitError("unavailable", (error as Error).message, stderr);
-  }
-  if (ran.timedOut) {
-    throw new GitError(
-      "unavailable",
-      `git timed out after ${timeout < 1000 ? `${timeout}ms` : `${Math.round(timeout / 1000)}s`}.`,
-      ran.stderr,
-      options.timeoutSetting === undefined
-        ? "Clone the repository yourself and add its local path."
-        : `Raise the limit with ${options.timeoutSetting}, or clone the repository yourself and add its local path.`,
-    );
-  }
-  if (ran.code === 0) return ran.stdout;
-  throw new GitError(classify(ran.stderr), firstFatal(ran.stderr), ran.stderr);
+/**
+ * Failures are classified once, here. Repeating substring checks at each call
+ * site is how a new caller silently loses the SSO hint.
+ */
+function classify(stderr: string): GitFailure {
+  const text = stderr.toLowerCase();
+  if (SSO_MARKERS.some((m) => text.includes(m))) return "unauthorized";
+  if (NOT_FOUND_MARKERS.some((m) => text.includes(m))) return "not_found";
+  if (AUTH_MARKERS.some((m) => text.includes(m))) return "unauthorized";
+  return "unavailable";
+}
+
+/** Git repeats itself across several lines; the first fatal line is the cause. */
+function firstFatal(stderr: string): string {
+  const lines = stderr
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const fatal = lines.find((line) => line.startsWith("fatal:") || line.startsWith("error:"));
+  return (fatal ?? lines[0] ?? "git failed").replace(/^(fatal|error):\s*/, "");
 }
 
 export interface GitAttempt {

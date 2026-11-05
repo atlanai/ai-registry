@@ -58,13 +58,9 @@ export function matches(entry: Entry, filter: Filter): boolean {
   return true;
 }
 
-/** How much of a log is read at a time, from its end back. */
 const CHUNK_BYTES = 64 * 1024;
 
-/**
- * The newest `limit` matching entries, oldest first. Read from the end back and stopped once
- * there are enough, so the last few lines of a large log cost kilobytes.
- */
+/** Oldest first; read from the end, so a big log is cheap. */
 export function newestEntries(path: string, filter: Filter, limit: number): Entry[] {
   if (limit <= 0) return [];
   let fd: number;
@@ -80,7 +76,7 @@ export function newestEntries(path: string, filter: Filter, limit: number): Entr
   };
   try {
     let position = fstatSync(fd).size;
-    // The start of a line whose beginning is in a chunk not read yet.
+    // The end of a line whose start lies in a chunk not read yet.
     let partial = Buffer.alloc(0);
     while (position > 0 && found.length < limit) {
       const size = Math.min(CHUNK_BYTES, position);

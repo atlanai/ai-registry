@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, test } from "vitest";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
 import { targetProblems } from "./check.ts";
 import type { KindMapping, TargetDefinition } from "./contract.ts";
 
 describe("built-in targets", () => {
-  it("resolve every id they name, fill every template, and stay in their roots", () => {
+  test("resolve every id they name, fill every template, and stay in their roots", () => {
     expect(targetProblems(BUILTIN_TARGETS)).toEqual([]);
   });
 });
@@ -25,11 +25,11 @@ const plugin = (mapping: Partial<Extract<KindMapping, { shape: "directory" }>>) 
   });
 
 describe("targetProblems", () => {
-  it("finds nothing wrong with a minimal definition", () => {
+  test("finds nothing wrong with a minimal definition", () => {
     expect(targetProblems([target()])).toEqual([]);
   });
 
-  it.each([
+  test.each([
     ["a duplicate id", [target(), target()], /defined twice/],
     ["a read of no target", [target({ reads: { skill: ["ghost"] } })], /not a target/],
     [
