@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { CONCURRENCY, limiter } from "#core/concurrency.ts";
+import { CONCURRENCY, limiter } from "#adapter/concurrency.ts";
 import { dict } from "#core/fields.ts";
 import { digest } from "#core/fs/digest.ts";
 import { inspect } from "#core/fs/link.ts";

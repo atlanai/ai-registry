@@ -1,12 +1,5 @@
+import { type Fields, isRecord, textOf } from "#adapter/fields.ts";
 import { list, quoted } from "#adapter/text.ts";
-
-/** A parsed document or message, read field by field because none of it is trusted yet. */
-export type Fields = Record<string, unknown>;
-
-/** A JSON object or YAML mapping: not null, and not a list. */
-export function isRecord(value: unknown): value is Fields {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** Names that would reach an object's prototype when used as a map key. */
 export const RESERVED_KEYS: ReadonlySet<string> = new Set([
@@ -23,11 +16,6 @@ export function dict<T>(entries: Iterable<readonly [string, T]> = []): Record<st
   const out = Object.create(null) as Record<string, T>;
   for (const [key, value] of entries) out[key] = value;
   return out;
-}
-
-/** A string with more than whitespace in it, or undefined. */
-export function textOf(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
 /** A non-empty list of non-blank strings, or undefined. */

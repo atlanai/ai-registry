@@ -123,8 +123,10 @@ async function checkChange(read: ReadPath, change: PublishInput) {
     throw fail(
       "conflict",
       `${namespace}/${change.kind}/${change.name}@${version} is already published with other content.`,
-      change.name,
-      "A published version is never rewritten; publish this one as a new version.",
+      {
+        artifact: change.name,
+        hint: "A published version is never rewritten; publish this one as a new version.",
+      },
     );
   }
   return { change, namespace, version, at, envelope, digest, unchanged: existing === digest };

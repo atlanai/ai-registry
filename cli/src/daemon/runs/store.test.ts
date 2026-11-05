@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, onTestFinished, vi } from "vitest";
 import { carriedPaths, upstreamFacts } from "#core/console/runs.ts";
-import { ITEM_EVENT } from "#core/run/model.ts";
+import { RunEventType } from "#core/run/model.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { SqliteRunStore } from "./store.ts";
 import {
@@ -52,7 +52,7 @@ describe("SQLite run store", () => {
     // the finished run's counts non-empty.
     store.progress("run_1", "pull", {
       occurredAtMs: 111,
-      eventType: ITEM_EVENT,
+      eventType: RunEventType.ItemSettled,
       step: "pull",
       artifact: "a.txt",
       operation: "pull",
@@ -60,7 +60,7 @@ describe("SQLite run store", () => {
     });
     store.progress("run_1", "pull", {
       occurredAtMs: 112,
-      eventType: ITEM_EVENT,
+      eventType: RunEventType.ItemSettled,
       step: "pull",
       artifact: "b.txt",
       operation: "none",
@@ -78,20 +78,20 @@ describe("SQLite run store", () => {
       failed: 0,
     });
     expect(store.events("run_1", 0, 2)).toHaveLength(2);
-    expect(store.lastEvent("run_1")?.eventType).toBe("run.finished");
+    expect(store.lastEvent("run_1")?.eventType).toBe(RunEventType.Finished);
     expect(store.events("run_1").map(({ seq, eventType }) => [seq, eventType])).toEqual([
-      [1, "run.queued"],
-      [2, "run.started"],
-      [3, ITEM_EVENT],
-      [4, ITEM_EVENT],
-      [5, "run.finished"],
+      [1, RunEventType.Queued],
+      [2, RunEventType.Started],
+      [3, RunEventType.ItemSettled],
+      [4, RunEventType.ItemSettled],
+      [5, RunEventType.Finished],
     ]);
     expect(() => store.finish("run_1", { state: "failed", finishedAtMs: 130 })).toThrow(
       "has already finished",
     );
     expect(store.abandonActive(140)).toBe(0);
     expect(
-      store.events("run_1").filter(({ eventType }) => eventType === "run.finished"),
+      store.events("run_1").filter(({ eventType }) => eventType === RunEventType.Finished),
     ).toHaveLength(1);
   });
 
@@ -112,7 +112,7 @@ describe("SQLite run store", () => {
     const item = (artifact: string, over: Record<string, unknown> = {}) =>
       store.progress("run_1", "pull", {
         occurredAtMs: 111,
-        eventType: ITEM_EVENT,
+        eventType: RunEventType.ItemSettled,
         step: "pull",
         artifact,
         operation: "none",
@@ -177,7 +177,7 @@ describe("SQLite run store", () => {
       for (let item = 0; item < perRun; item += 1) {
         store.progress(id, "pull", {
           occurredAtMs: 1_000 + index,
-          eventType: ITEM_EVENT,
+          eventType: RunEventType.ItemSettled,
           step: "pull",
           artifact: `a${item}`,
           outcome: "unchanged",

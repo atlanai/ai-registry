@@ -4,6 +4,7 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { EXECUTE_BITS } from "#adapter/files.ts";
 import { ENVELOPE } from "#adapter/filespec/names.ts";
+import { setRecent } from "#adapter/lru.ts";
 import { hashStream, sha256 } from "#adapter/spec/canonical.ts";
 import { authored, type FileRecord, isDirectory, walk } from "#core/fs/tree.ts";
 
@@ -50,10 +51,7 @@ export function rememberEarlier(framed: string, earlier: string): void {
 }
 
 function remember(framed: string, earlier: string): void {
-  EARLIER.delete(framed);
-  EARLIER.set(framed, earlier);
-  const [oldest] = EARLIER.keys();
-  if (EARLIER.size > KNOWN_LIMIT && oldest !== undefined) EARLIER.delete(oldest);
+  setRecent(EARLIER, framed, earlier, KNOWN_LIMIT);
 }
 
 /**
@@ -98,10 +96,7 @@ async function taken(tree: Tree, encoding: Encoding): Promise<string> {
   const value = held[encoding] ?? (await (encoding === "framed" ? framed : unframed)(tree));
   const newestMs = tree.files.reduce((newest, file) => Math.max(newest, file.mtimeMs), 0);
   if (Date.now() - newestMs >= RACY_MS) {
-    KNOWN.delete(tree.key);
-    KNOWN.set(tree.key, { ...held, [encoding]: value });
-    const [oldest] = KNOWN.keys();
-    if (KNOWN.size > KNOWN_LIMIT && oldest !== undefined) KNOWN.delete(oldest);
+    setRecent(KNOWN, tree.key, { ...held, [encoding]: value }, KNOWN_LIMIT);
   }
   return value;
 }

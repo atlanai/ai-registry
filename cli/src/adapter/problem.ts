@@ -1,5 +1,6 @@
 import { FAILURE_CODES } from "./codes.ts";
 import type { Failure } from "./errors.ts";
+import { type Fields, isRecord } from "./fields.ts";
 import type { Problem } from "./spec/types.ts";
 
 /** How an HTTP status is classified. A server's own `code` is not rewritten here. */
@@ -69,9 +70,8 @@ export function readProblem(status: number | undefined, body: unknown): Problem 
   return problem;
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
-  return value as Record<string, unknown>;
+function asRecord(value: unknown): Fields | undefined {
+  return isRecord(value) ? value : undefined;
 }
 
 function stringField(record: Record<string, unknown> | undefined, key: string): string | undefined {

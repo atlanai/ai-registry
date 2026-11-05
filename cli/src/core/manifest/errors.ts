@@ -1,6 +1,6 @@
 import { list, quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { type Scope, scopeName } from "#core/store/paths.ts";
+import { type Scope, scopeFlag, scopeName } from "#core/store/paths.ts";
 
 /** A manifest that does not read: one field's problem, which the caller prefixes with the file. */
 export class ManifestError extends AiregError {
@@ -23,7 +23,7 @@ export function unknownRegistry(
   searched = scopeName(scope),
 ): AiregError {
   const names = [...known].sort();
-  const declare = `\`aireg registry add <address>${scope === "user" ? " -g" : ""}\``;
+  const declare = `\`aireg registry add <address>${scopeFlag(scope)}\``;
   return new AiregError(`No registry named ${quoted(alias)} in ${searched}.`, {
     code: ErrorCode.NotFound,
     hint:

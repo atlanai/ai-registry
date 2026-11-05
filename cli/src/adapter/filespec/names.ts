@@ -9,6 +9,7 @@ export const REGISTRY_DOCUMENT = "registry.json";
 export const INDEX_DOCUMENT = "index.json";
 /** An artifact's list of its versions, beside its version folders. */
 export const VERSIONS_DOCUMENT = "versions.json";
+export const ARTIFACTS_DIR = "artifacts";
 /** Reserved in a version folder: never authored content, digested or copied to a target. */
 export const ENVELOPE = "artifact.json";
 
@@ -41,14 +42,19 @@ export function isKindSegment(value: string): boolean {
   return KIND_SEGMENT.test(value);
 }
 
+/** Relative to the registry root. */
+export function artifactDir(namespace: string, kind: string, name: string): string {
+  return `${ARTIFACTS_DIR}/${namespace}/${kind}/${name}`;
+}
+
 /** Where an artifact's `versions.json` is, relative to the root. */
 export function versionsPath(namespace: string, kind: string, name: string): string {
-  return `artifacts/${namespace}/${kind}/${name}/${VERSIONS_DOCUMENT}`;
+  return `${artifactDir(namespace, kind, name)}/${VERSIONS_DOCUMENT}`;
 }
 
 /** Where one version's folder is, relative to the root. */
 export function versionDir(namespace: string, kind: string, name: string, version: string): string {
-  return `artifacts/${namespace}/${kind}/${name}/${version}`;
+  return `${artifactDir(namespace, kind, name)}/${version}`;
 }
 
 /** Where a path inside a registry points: an artifact folder, a version in it, or a file in that. */
@@ -66,7 +72,7 @@ export function artifactAt(path: string): ArtifactPlace | undefined {
   const parts = path.split("/").filter(Boolean);
   for (let at = parts.length - 4; at >= 0; at -= 1) {
     const [top, namespace = "", kind = "", name = "", version] = parts.slice(at);
-    if (top !== "artifacts" || !isNamespace(namespace)) continue;
+    if (top !== ARTIFACTS_DIR || !isNamespace(namespace)) continue;
     if (!isKindSegment(kind) || !isArtifactName(name)) continue;
     // Beside the version folders an artifact holds only its versions document.
     const pinned = version !== undefined && version !== VERSIONS_DOCUMENT && isVersion(version);

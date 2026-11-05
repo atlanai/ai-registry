@@ -92,11 +92,25 @@ export interface ItemSettled {
   retryable?: boolean;
 }
 
-/** The one event type a count is taken over, in both planes. */
-export const ITEM_EVENT = "item.settled";
+/** `ItemSettled` is what counts are taken over. `Warning` data is `{ message, hint? }`. */
+export const RunEventType = {
+  Queued: "run.queued",
+  Started: "run.started",
+  Phase: "run.phase",
+  Progress: "artifact.progress",
+  ItemSettled: "item.settled",
+  Warning: "run.warning",
+  Finished: "run.finished",
+} as const;
+export type RunEventType = (typeof RunEventType)[keyof typeof RunEventType];
 
-/** Something a run did to a person's files, or left undone: `{ message, hint? }`. */
-export const WARNING_EVENT = "run.warning";
+/** In order. */
+const RUN_PHASES = ["listing", "classifying", "applying", "finalizing"] as const;
+export type RunPhase = (typeof RUN_PHASES)[number];
+
+export function isRunPhase(value: string | undefined): value is RunPhase {
+  return (RUN_PHASES as readonly (string | undefined)[]).includes(value);
+}
 
 /**
  * Derived from `run_events`, never stored: a count written beside the events it
@@ -146,6 +160,7 @@ export interface RunEvent {
   runId: string;
   seq: number;
   occurredAtMs: number;
+  /** A daemon of another version may send a type this one does not know. */
   eventType: string;
   step: string | undefined;
   /** The item this is about, as the step that emitted it names it. */

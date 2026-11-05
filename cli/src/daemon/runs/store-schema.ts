@@ -1,5 +1,5 @@
 import { KINDS } from "#adapter/index.ts";
-import { ITEM_OUTCOMES, RUN_STATES, RUN_TRIGGERS } from "#core/run/model.ts";
+import { ACTIVE_RUN_STATES, ITEM_OUTCOMES, RUN_STATES, RUN_TRIGGERS } from "#core/run/model.ts";
 import { DISPOSITIONS } from "#core/sync/model.ts";
 import { SYNC_OPERATIONS } from "#core/sync/policy.ts";
 
@@ -19,6 +19,9 @@ export const RUN_HISTORY_PER_ACCOUNT = 50;
 function oneOf(values: readonly string[]): string {
   return values.map((value) => `'${value}'`).join(", ");
 }
+
+/** The partial index matches only this exact text. */
+export const ACTIVE = `state IN (${oneOf(ACTIVE_RUN_STATES)})`;
 
 export const RUN_SCHEMA = `
 -- One execution of exactly one job. Counts are not stored: they are derived
@@ -43,8 +46,8 @@ CREATE TABLE runs (
   -- Run-level failure only. A single bad artifact is an event, not this.
   error_code TEXT,
   retryable INTEGER NOT NULL DEFAULT 0 CHECK (retryable IN (0, 1)),
-  CHECK ((state IN ('queued', 'running') AND finished_at_ms IS NULL) OR
-         (state NOT IN ('queued', 'running') AND finished_at_ms IS NOT NULL))
+  CHECK ((${ACTIVE} AND finished_at_ms IS NULL) OR
+         (NOT (${ACTIVE}) AND finished_at_ms IS NOT NULL))
 ) STRICT;
 
 -- What happened, item by item. A row with an artifact is one item's outcome;
@@ -75,7 +78,7 @@ CREATE TABLE run_events (
 
 -- NULLs are distinct in a UNIQUE index, which is exactly right here: it bounds
 -- a job to one live run while leaving one-off runs unconstrained.
-CREATE UNIQUE INDEX active_run_per_job ON runs(job_id) WHERE state IN ('queued', 'running');
+CREATE UNIQUE INDEX active_run_per_job ON runs(job_id) WHERE ${ACTIVE};
 CREATE INDEX runs_by_job_time ON runs(job_id, requested_at_ms DESC, id DESC);
 CREATE INDEX runs_by_account_time ON runs(account_id, requested_at_ms DESC, id DESC);
 CREATE INDEX runs_by_state_time ON runs(state, requested_at_ms DESC, id DESC);

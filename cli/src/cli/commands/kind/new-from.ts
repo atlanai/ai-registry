@@ -1,14 +1,15 @@
 import { existsSync } from "node:fs";
 import { cp, lstat, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { isRecord } from "#adapter/fields.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
-import { ENVELOPE } from "#adapter/filespec/names.ts";
+import { ARTIFACTS_DIR, ENVELOPE } from "#adapter/filespec/names.ts";
 import { list, sanitizeName } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import type { Own } from "#cli/commands/kind.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { isRecord } from "#core/fields.ts";
 import { inBlobStore } from "#core/filespec/indexer.ts";
 import { requireRegistry } from "#core/filespec/init.ts";
 import {
@@ -19,10 +20,11 @@ import {
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
 import { withName } from "#core/frontmatter.ts";
+import { refuseRedirect } from "#core/fs/fresh.ts";
 import { expandUserPath } from "#core/fs/path.ts";
 import { authored, type Irregular, refusal } from "#core/fs/tree.ts";
 import { nameOf } from "./fields.ts";
-import { FRESH, refuseRedirect } from "./files.ts";
+import { FRESH } from "./files.ts";
 import { namespaceFor } from "./place.ts";
 
 /** One existing folder, read and checked before anything is copied. */
@@ -43,10 +45,11 @@ export async function newFrom(
   yes: boolean,
 ): Promise<void> {
   if (paths.length === 0) {
-    throw new AiregError(`\`aireg ${kind} new --from\` needs a folder.`, {
-      code: ErrorCode.Usage,
-      hint: `Name the folder: \`aireg ${kind} new --from <path>\`.`,
-    });
+    throw needsInput(
+      `${kind} new --from`,
+      "a folder",
+      `Name the folder: \`aireg ${kind} new --from <path>\`.`,
+    );
   }
   if (own.name !== undefined && paths.length > 1) {
     throw new AiregError("--name renames one folder, and more than one was given.", {
@@ -71,8 +74,8 @@ export async function newFrom(
   const namespace = await namespaceFor(root, context.cwd, own, context, yes);
   if (namespace === undefined) return;
   for (const item of found) {
-    refuseRedirect(root, join(root, "artifacts", namespace, kind, item.name, "0.1.0"));
-    if (existsSync(join(root, "artifacts", namespace, kind, item.name))) {
+    refuseRedirect(root, join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0"));
+    if (existsSync(join(root, ARTIFACTS_DIR, namespace, kind, item.name))) {
       throw new AiregError(`${namespace}/${kind}/${item.name} already exists.`, {
         code: ErrorCode.Conflict,
         hint: `Start its next version with \`aireg ${kind} bump ${item.name}\`.`,
@@ -82,7 +85,7 @@ export async function newFrom(
 
   const copied: { name: string; at: string }[] = [];
   for (const item of found) {
-    const at = join(root, "artifacts", namespace, kind, item.name, "0.1.0");
+    const at = join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0");
     await mkdir(at, { recursive: true });
     for (const path of item.entries) {
       await cp(join(item.dir, path), join(at, path), FRESH);

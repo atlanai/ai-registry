@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { binaryName, releasePlatform, requireReleasePlatform } from "./platform.ts";
+import { releasePlatform, requireReleasePlatform } from "./platform.ts";
 
 describe("releasePlatform", () => {
   test("names only the platforms a standalone build is published for", () => {
@@ -22,12 +22,5 @@ describe("requireReleasePlatform", () => {
   test("fails loudly rather than deriving a URL for a platform with no build", () => {
     expect(requireReleasePlatform("linux", "x64")).toBe("linux-amd64");
     expect(() => requireReleasePlatform("freebsd", "arm64")).toThrow(/No aireg build/);
-  });
-});
-
-describe("binaryName", () => {
-  test("names the download after the platform", () => {
-    expect(binaryName("darwin-arm64")).toBe("aireg-darwin-arm64");
-    expect(binaryName("windows-arm64")).toBe("aireg-windows-arm64.exe");
   });
 });

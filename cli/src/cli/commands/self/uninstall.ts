@@ -1,3 +1,4 @@
+import { messageOf } from "#adapter/errors.ts";
 import { list, plural, quoted } from "#adapter/text.ts";
 import { actionOf, type CommandContext } from "#cli/commands/command.ts";
 import { parse } from "#cli/options/parse.ts";
@@ -85,7 +86,7 @@ export async function run(context: CommandContext): Promise<void> {
   try {
     stopped = await stopEverything();
   } catch (error) {
-    throw new AiregError(`Could not stop the daemon: ${(error as Error).message}`, {
+    throw new AiregError(`Could not stop the daemon: ${messageOf(error)}`, {
       cause: error,
       hint: "Nothing was removed. Run `aireg daemon stop`, then `aireg self uninstall` again.",
     });
@@ -94,7 +95,7 @@ export async function run(context: CommandContext): Promise<void> {
   try {
     links = await unlinkUserScope();
   } catch (error) {
-    throw new AiregError(`Could not remove your user scope's links: ${(error as Error).message}`, {
+    throw new AiregError(`Could not remove your user scope's links: ${messageOf(error)}`, {
       cause: error,
       hint: "Only the daemon was stopped. Fix the cause, then run `aireg self uninstall` again.",
     });

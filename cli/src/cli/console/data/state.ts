@@ -1,3 +1,4 @@
+import { messageOf } from "#adapter/errors.ts";
 import { chosenFor, loadedBy, scopeTargets, toolName } from "#cli/render/tools.ts";
 import type { RegistryConfig } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
@@ -135,7 +136,7 @@ export async function collect(
           store,
         });
       } catch (error) {
-        problems.push(`${panel.label}: ${error instanceof Error ? error.message : String(error)}`);
+        problems.push(`${panel.label}: ${messageOf(error)}`);
       }
     }
 

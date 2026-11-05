@@ -1,6 +1,7 @@
 import type { WriteStream } from "node:tty";
 import { sanitizeBlock } from "#adapter/text.ts";
 import { isCI } from "#core/env.ts";
+import { GLYPH } from "./theme.ts";
 
 export type OutputFormat = "text" | "json";
 
@@ -156,7 +157,12 @@ export class Printer {
   success(message: string): void {
     this.followsProblem = false;
     if (this.format === "json" || this.quiet) return;
-    this.print(`${this.style.green("✓")} ${message}\n`);
+    this.print(`${this.style.green(GLYPH.ok)} ${message}\n`);
+  }
+
+  /** Closes a dry run, whose report otherwise reads like the real run's. */
+  dryRun(): void {
+    this.info(this.style.dim("Dry run. Nothing was changed."));
   }
 
   /** A step in a longer operation. Verbose only. */

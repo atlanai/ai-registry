@@ -32,26 +32,34 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | Every name aireg leaves on disk, in the OS or in a release | `core/product.ts` |
 | Every `AIREG_*` environment setting | `core/env.ts` |
 | Exit statuses, error codes and the `AiregError` base class | `core/errors.ts` |
+| The message of anything thrown | `messageOf` in `adapter/errors.ts` |
 | JSON-RPC error codes on the daemon socket | `daemon/rpc/codes.ts` |
 | Artifact kinds | `core/kinds.ts` |
+| A skill's entry file and where a plugin keeps its manifest | `adapter/kinds.ts` |
 | Run states, modes and failure codes | `core/run/model.ts` |
 | Job step kinds and fields | `core/config/model.ts` |
 | Sync policies, dispositions and operations | `core/sync/policy.ts`, `core/sync/model.ts` |
-| Readers for untrusted fields in files and RPC input | `core/fields.ts` |
+| Readers for untrusted fields in files and RPC input | `adapter/fields.ts`, `core/fields.ts` |
 | Finding, loading and calling the adapter for an address | `core/adapter/` |
 | The adapters built into aireg | `adapters/index.ts` |
 | What an adapter adds beside the contract: commands, job steps and console tabs | `core/host/` |
-| Reading a file spec registry from any `read(path)`, its name rules and document names | `adapter/filespec/` |
+| Reading a file spec registry from any `read(path)`, its name rules, and its folder and document names | `adapter/filespec/` |
 | How a source on disk lays out what it holds, and reading one that is not a registry, such as a folder of skills | `adapter/layouts/` |
 | The merges a publish writes into `versions.json` and `index.json` | `adapter/filespec/merge.ts` |
 | Registry authoring: init, index, validate, kinds and offers | `core/filespec/` |
 | SemVer ordering, digests, safe file reads and writes, and message text helpers | `adapter/semver.ts`, `adapter/spec/canonical.ts`, `adapter/files.ts`, `adapter/text.ts` |
 | Paths, the home folder, hashing, file modes and processes | `adapter/paths.ts`, `core/fs/path.ts`, `core/fs/hash.ts`, `core/fs/mode.ts`, `core/process.ts` |
+| Scaffold writes that refuse a link and never replace a file | `core/fs/fresh.ts` |
+| Concurrency limits, bounded caches, and waits with a deadline | `adapter/concurrency.ts`, `adapter/lru.ts`, `core/wait.ts` |
+| Front matter, read in full by the CLI, and as a YAML subset by the contract, which imports no package | `core/frontmatter.ts`, `adapter/layouts/frontmatter.ts` |
+| The engine range a project or manifest needs, and refusing an older aireg | `core/engines.ts` |
 | The lockfile, `.registry/manifest.lock.yml` | `core/lock.ts` |
 | Running git | `adapters/git/exec.ts`, reached through `adapters/git/api.ts` |
-| The scope a command installs into, and where it places artifacts | `core/store/paths.ts` |
+| The scope a command installs into, how messages name it, and where it places artifacts | `core/store/paths.ts` |
 | Edits to a target's own config file, such as registering a plugin | `core/target/register/` |
 | A command's name, options, help and docs link | `cli/commands/<command>/spec.ts` |
+| Usage errors for a missing or stray argument | `needsInput` and `noArguments` in `cli/options/parse.ts` |
+| Status marks and the closing line of a dry run | `GLYPH` in `core/term/theme.ts`, `Printer.dryRun` |
 | The command types; the built-in specs in help order and the names they reserve; each built-in's lazy module | `cli/commands/command.ts`, `cli/commands/builtins.ts`, `cli/commands/index.ts` |
 | The values a release build stamps in, for tsup and `bun build --compile` | `packaging/defines.ts` |
 

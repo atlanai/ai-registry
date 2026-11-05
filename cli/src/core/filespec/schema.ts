@@ -6,10 +6,11 @@ import {
   type ValidateFunction,
 } from "ajv/dist/2020.js";
 import { RE2JS, RE2JSSyntaxException } from "re2js";
+import { messageOf } from "#adapter/errors.ts";
+import { isRecord } from "#adapter/fields.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { quoted } from "#adapter/text.ts";
-import { isRecord } from "#core/fields.ts";
 import manifestSchema from "#schema/kind-manifest.schema.json" with { type: "json" };
 
 /** Validators follow the lifetime of the manifest objects loaded for an operation. */
@@ -35,7 +36,7 @@ const re2: NonNullable<CodeOptions["regExp"]> = Object.assign(
       const reason =
         error instanceof RE2JSSyntaxException
           ? [error.getDescription(), error.getPattern()].filter(Boolean).join(" at ")
-          : (error as Error).message;
+          : messageOf(error);
       throw new Error(`pattern ${quoted(pattern)} uses syntax aireg does not support: ${reason}`);
     }
   },
@@ -98,7 +99,7 @@ export function check(schema: SchemaObject, value: unknown): string[] {
         return ["kind schema uses unsupported asynchronous validation"];
       compiled.set(schema, validate);
     } catch (error) {
-      return [`kind schema is invalid: ${(error as Error).message}`];
+      return [`kind schema is invalid: ${messageOf(error)}`];
     }
   }
   return validate(value) ? [] : (validate.errors ?? []).map((error) => message(error, value));

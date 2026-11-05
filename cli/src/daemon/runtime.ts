@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { AccountService } from "#accounts/service.ts";
+import type { Fields } from "#adapter/fields.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { updateAdapters } from "#core/adapter/installed/update.ts";
 import type { Account } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { removeTokens, tokenVariable, withRegistryTokens } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import type { Fields } from "#core/fields.ts";
 import { nullLogger } from "#core/log/logger.ts";
 import type { Logger } from "#core/log/model.ts";
 import { installCrashHandlers, openDaemonLog } from "#core/log/open.ts";
@@ -22,7 +22,7 @@ import {
   type RunEvent,
   type RunRecord,
 } from "#core/run/model.ts";
-import { type Scope, toolHome, userScopeDir } from "#core/store/paths.ts";
+import { scopeName, toolHome, userScopeDir } from "#core/store/paths.ts";
 import { refreshAutostart, supervised } from "#daemon/autostart/index.ts";
 import { RESTART_EXIT_CODE } from "#daemon/autostart/model.ts";
 import { loginAccount, logoutAccount, removeAccount } from "#daemon/handlers/account.ts";
@@ -33,9 +33,14 @@ import { startDaemon } from "#daemon/process/lifecycle.ts";
 import { liveDaemonPid, releaseDaemonPid, writeDaemonPid } from "#daemon/process/pid-file.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { privateDirectory, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
-import { type DaemonInfo, MAX_PAGE_SIZE, PROTOCOL_VERSION } from "#daemon/rpc/methods.ts";
+import {
+  type DaemonInfo,
+  MAX_PAGE_SIZE,
+  PROTOCOL_VERSION,
+  type RpcContext,
+} from "#daemon/rpc/methods.ts";
 import { ProtocolError } from "#daemon/rpc/protocol.ts";
-import { DaemonAlreadyRunningError, type RpcContext, RpcServer } from "#daemon/rpc/server.ts";
+import { DaemonAlreadyRunningError, RpcServer } from "#daemon/rpc/server.ts";
 import { SyncRunner } from "#daemon/runs/runner.ts";
 import { JobScheduler } from "#daemon/runs/scheduler.ts";
 import { runDatabasePath, SqliteRunStore } from "#daemon/runs/store.ts";
@@ -55,10 +60,6 @@ const HOME_WATCH_MS = 15_000;
 
 function noRun(runId: string): ProtocolError {
   return new ProtocolError(RpcErrorCode.NotFound, `No run named ${quoted(runId)}.`);
-}
-
-function where(scope: Scope): string {
-  return scope === "user" ? "your user scope" : "this project";
 }
 
 export class DaemonRuntime {
@@ -101,57 +102,57 @@ export class DaemonRuntime {
   }
 
   #register(): void {
-    this.#server.method("initialize", async () => ({
-      protocolVersion: PROTOCOL_VERSION,
-      server: { name: NAME, version: this.#version },
-      daemon: this.#daemonInfo(),
-    }));
-    this.#server.method("state.snapshot", async () => {
-      const activeRuns = ACTIVE_RUN_STATES.flatMap((state) =>
-        this.#runs.list({ state, limit: MAX_PAGE_SIZE }),
-      )
-        .sort((left, right) => right.requestedAtMs - left.requestedAtMs)
-        .slice(0, MAX_PAGE_SIZE);
-      return {
-        config: await readConfig(),
-        activeRuns,
+    this.#server.methods({
+      initialize: async () => ({
+        protocolVersion: PROTOCOL_VERSION,
+        server: { name: NAME, version: this.#version },
         daemon: this.#daemonInfo(),
-      };
-    });
-    this.#server.method("settings.patch", async (raw) => patchSettings(raw));
-    this.#server.method("job.create", async (raw, context) => createJob(raw, context.signal));
-    this.#server.method("conflict.resolve", (raw, context) =>
-      resolveConflict(raw, context, this.#runner),
-    );
-    this.#server.method("account.login", async (raw, context) => {
-      // Never the credential, only that one was written: enough to answer "am I signed in".
-      const result = await loginAccount(raw, context, this.#accounts);
-      this.#log.info("account authenticated", { accountId: result.account.id });
-      return result;
-    });
-    this.#server.method("account.logout", async (raw, context) => {
-      const result = await logoutAccount(raw, context, this.#accounts);
-      this.#log.info("account signed out");
-      return result;
-    });
-    this.#server.method("account.remove", async (raw, context) => {
-      const result = await removeAccount(raw, context, this.#accounts);
-      this.#log.info("account removed");
-      return result;
-    });
-    this.#server.method("sync.start", async (raw) => this.#syncStart(raw));
-    this.#server.method("sync.resolve", async (raw, context) => this.#syncResolve(raw, context));
-    this.#server.method("run.start", async (raw) => this.#start(raw));
-    this.#server.method("run.retry", async (raw) => this.#retry(raw));
-    this.#server.method("run.list", async (raw) => this.#listRuns(raw));
-    this.#server.method("run.get", async (raw) => this.#getRun(raw));
-    this.#server.method("run.events", async (raw) => this.#events(raw));
-    this.#server.method("run.cancel", async (raw) => this.#cancel(raw));
-    this.#server.method("shutdown", async () => {
-      setImmediate(() => {
-        void this.close();
-      });
-      return { ok: true as const };
+      }),
+      "state.snapshot": async () => {
+        const activeRuns = ACTIVE_RUN_STATES.flatMap((state) =>
+          this.#runs.list({ state, limit: MAX_PAGE_SIZE }),
+        )
+          .sort((left, right) => right.requestedAtMs - left.requestedAtMs)
+          .slice(0, MAX_PAGE_SIZE);
+        return {
+          config: await readConfig(),
+          activeRuns,
+          daemon: this.#daemonInfo(),
+        };
+      },
+      "settings.patch": async (raw) => patchSettings(raw),
+      "job.create": async (raw, context) => createJob(raw, context.signal),
+      "conflict.resolve": (raw, context) => resolveConflict(raw, context, this.#runner),
+      "account.login": async (raw, context) => {
+        // Never the credential, only that one was written: enough to answer "am I signed in".
+        const result = await loginAccount(raw, context, this.#accounts);
+        this.#log.info("account authenticated", { accountId: result.account.id });
+        return result;
+      },
+      "account.logout": async (raw, context) => {
+        const result = await logoutAccount(raw, context, this.#accounts);
+        this.#log.info("account signed out");
+        return result;
+      },
+      "account.remove": async (raw, context) => {
+        const result = await removeAccount(raw, context, this.#accounts);
+        this.#log.info("account removed");
+        return result;
+      },
+      "sync.start": async (raw) => this.#syncStart(raw),
+      "sync.resolve": async (raw, context) => this.#syncResolve(raw, context),
+      "run.start": async (raw) => this.#start(raw),
+      "run.retry": async (raw) => this.#retry(raw),
+      "run.list": async (raw) => this.#listRuns(raw),
+      "run.get": async (raw) => this.#getRun(raw),
+      "run.events": async (raw) => this.#events(raw),
+      "run.cancel": async (raw) => this.#cancel(raw),
+      shutdown: async () => {
+        setImmediate(() => {
+          void this.close();
+        });
+        return { ok: true as const };
+      },
     });
   }
 
@@ -237,7 +238,7 @@ export class DaemonRuntime {
     return withSuppliedToken(params, () =>
       startResolution(this.#runner, params, job, account, {
         signal: context.signal,
-        place: `from ${account.registry} in ${where(job.scope)}`,
+        place: `from ${account.registry} in ${scopeName(job.scope)}`,
         ephemeral: true,
       }),
     );

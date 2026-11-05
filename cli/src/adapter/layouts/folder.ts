@@ -1,14 +1,12 @@
 import { posix } from "node:path";
 import type { Artifact } from "../contract.ts";
 import { isArtifactName, isNamespace } from "../filespec/names.ts";
+import { SKILL_ENTRY } from "../kinds.ts";
 import { quoted } from "../text.ts";
 import { type ContentFile, contentArtifact } from "./content-artifact.ts";
 import { type Frontmatter, readFrontmatter, textField } from "./frontmatter.ts";
 import type { Found, Layout, LayoutContext } from "./model.ts";
 import { type Skip, type Tree, walksInto } from "./tree.ts";
-
-/** The file that makes a folder a skill. */
-export const SKILL_FILE = "SKILL.md";
 
 /** The id of a source that is one skill, since an id is never empty. */
 export const ROOT_ID = ".";
@@ -62,7 +60,7 @@ async function candidates(tree: Tree, context: LayoutContext, warnings: string[]
 
 /** Skill folders up to `SKILL_DEPTH` below the root, never looking inside one it found. */
 async function skillFolders(tree: Tree, warnings: string[]): Promise<string[]> {
-  if (await tree.isFile(SKILL_FILE)) return [""];
+  if (await tree.isFile(SKILL_ENTRY)) return [""];
   const found: string[] = [];
   const visit = async (dir: string, depth: number): Promise<void> => {
     for (const entry of await tree.list(dir)) {
@@ -70,7 +68,7 @@ async function skillFolders(tree: Tree, warnings: string[]): Promise<string[]> {
         warnings.push(skipped({ path: entry.path, reason: "is a symlink" }));
       }
       if (entry.type !== "folder" || !walksInto(entry.name)) continue;
-      if (await tree.isFile(`${entry.path}/${SKILL_FILE}`)) found.push(entry.path);
+      if (await tree.isFile(`${entry.path}/${SKILL_ENTRY}`)) found.push(entry.path);
       else if (depth < SKILL_DEPTH) await visit(entry.path, depth + 1);
     }
   };
@@ -160,7 +158,7 @@ export async function artifactOf(
 
 function entryOf(candidate: Candidate): string {
   if (candidate.kind === "agent") return candidate.at;
-  return candidate.at === ROOT_ID ? SKILL_FILE : `${candidate.at}/${SKILL_FILE}`;
+  return candidate.at === ROOT_ID ? SKILL_ENTRY : `${candidate.at}/${SKILL_ENTRY}`;
 }
 
 async function frontOf(tree: Tree, path: string): Promise<Frontmatter | undefined> {
@@ -180,7 +178,7 @@ function checkName(candidate: Candidate, front: Frontmatter | undefined, warning
 
 export const folderLayout: Layout = {
   id: "folder",
-  looksFor: [SKILL_FILE, "agents/*.md"],
+  looksFor: [SKILL_ENTRY, "agents/*.md"],
   async match(tree) {
     const found = await candidates(tree, { namespace: "", rootName: "" }, []);
     return found.length > 0 ? "yes" : "no";

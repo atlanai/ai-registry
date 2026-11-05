@@ -1,4 +1,5 @@
 import { extname, join } from "node:path";
+import { artifactDir } from "#adapter/filespec/names.ts";
 import {
   AdapterError,
   type Artifact,
@@ -24,7 +25,7 @@ import { emptyCatalog, finalize, merge } from "#core/catalog/catalog.ts";
 import { newestFrom, withheldFrom } from "#core/catalog/withheld.ts";
 import { engineFromUnknown } from "#core/engines.ts";
 import { bindAdapter } from "#core/hook/bind.ts";
-import { KIND_SPECS, specKindDir } from "#core/kinds.ts";
+import { KIND_SPECS } from "#core/kinds.ts";
 import { withLease } from "#core/lease/lease.ts";
 import { cacheDir, ensureHome } from "#core/store/paths.ts";
 import { type SourceConfig, sourceKey } from "./identity.ts";
@@ -277,7 +278,7 @@ function entryPath(artifact: Artifact): string | undefined {
       : (artifact.group ?? artifact.envelope.metadata.namespace ?? artifact.envelope.metadata.name),
   );
   const name = sanitizeName(artifact.envelope.metadata.name);
-  const address = `artifacts/${namespace}/${specKindDir(artifact.kind)}/${name}`;
+  const address = artifactDir(namespace, artifact.kind, name);
   if (KIND_SPECS[artifact.kind].shape === "directory") return address;
 
   const only = artifact.files.length === 1 ? artifact.files[0] : undefined;

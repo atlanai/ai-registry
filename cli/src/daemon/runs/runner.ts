@@ -17,11 +17,11 @@ import { nullLogger } from "#core/log/logger.ts";
 import type { Logger } from "#core/log/model.ts";
 import {
   EMPTY_RUN_COUNTS,
-  ITEM_EVENT,
   type ItemSettled,
   isActive,
   type RunCounts,
   type RunEvent,
+  RunEventType,
   type RunMode,
   type RunRecord,
   type RunTrigger,
@@ -31,10 +31,10 @@ import type { CreateRun, RunStore } from "#core/run/store.ts";
 import { scopeFor, userScopeDir } from "#core/store/paths.ts";
 import type { SyncOperation } from "#core/sync/policy.ts";
 import { policyOf } from "#core/sync/policy.ts";
+import { settledWithin } from "#core/wait.ts";
 import { extensionHost } from "#daemon/extension-host.ts";
 import { RpcErrorCode } from "#daemon/rpc/codes.ts";
 import { ProtocolError } from "#daemon/rpc/protocol.ts";
-import { settledWithin } from "#daemon/settled.ts";
 import type { SyncExecutionHooks } from "#engine/sync/decide.ts";
 import { executeSync } from "#engine/sync/execute.ts";
 import type { RunScope } from "#engine/sync/narrow.ts";
@@ -42,7 +42,7 @@ import type { ScopeWork } from "#engine/sync/work.ts";
 import { CANCELED, classifyFailure, SHUTDOWN, TIMED_OUT } from "./failure.ts";
 
 /** Which terminal state wins when steps disagree. */
-const WORSE: Readonly<Record<string, number>> = {
+const WORSE = {
   succeeded: 0,
   attention: 1,
   partial: 2,
@@ -50,7 +50,7 @@ const WORSE: Readonly<Record<string, number>> = {
   timed_out: 4,
   failed: 5,
   abandoned: 6,
-};
+} as const satisfies Record<TerminalRunState, number>;
 
 const RUN_TIMEOUT_MS = 30 * 60 * 1_000;
 /**
@@ -204,7 +204,7 @@ export class SyncRunner {
 
   private event(
     runId: string,
-    type: string,
+    type: RunEventType,
     step: string,
     artifact?: string,
     data?: unknown,
@@ -228,7 +228,7 @@ export class SyncRunner {
   ): void {
     const recorded = this.#store.progress(runId, step, {
       occurredAtMs: Date.now(),
-      eventType: ITEM_EVENT,
+      eventType: RunEventType.ItemSettled,
       step,
       artifact,
       ...settled,
@@ -389,7 +389,7 @@ export class SyncRunner {
         attention: counts.attention + result.counts.attention,
         failed: counts.failed + result.counts.failed,
       };
-      if ((WORSE[result.state] ?? 0) > (WORSE[state] ?? 0)) {
+      if (WORSE[result.state] > WORSE[state]) {
         state = result.state;
         errorCode = result.errorCode;
         retryable = result.retryable;

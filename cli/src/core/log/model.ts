@@ -1,4 +1,4 @@
-import type { Fields } from "#core/fields.ts";
+import type { Fields } from "#adapter/fields.ts";
 
 export const LEVELS = ["trace", "debug", "info", "warn", "error", "fatal"] as const;
 export type Level = (typeof LEVELS)[number];

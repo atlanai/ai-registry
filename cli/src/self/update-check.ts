@@ -2,6 +2,7 @@ import { gte } from "#adapter/semver.ts";
 import { updateAdapters } from "#core/adapter/installed/update.ts";
 import { isCI, isSet } from "#core/env.ts";
 import { spawnDetached } from "#core/process.ts";
+import { UPDATE_CHECK_FLAG } from "#core/product.ts";
 import { launchArgv, runningEntry } from "#core/release/launch.ts";
 import { versionBin } from "#core/release/layout.ts";
 import { releaseStamp } from "#core/release/stamp.ts";
@@ -19,11 +20,11 @@ import { readUpdateCache, writeUpdateCache } from "./update-cache.ts";
 
 /** Matches the daemon's check, so a machine with no daemon keeps the same pace. */
 const CHECK_INTERVAL_MS = 15 * 60 * 1000;
+
 /** Nobody waits on the background check, so it can give a slow link longer. */
 const REFRESH_TIMEOUT_MS = 30_000;
-const ADAPTER_TIMEOUT_MS = 10_000;
 
-export const UPDATE_CHECK_FLAG = "--internal-update-check";
+const ADAPTER_TIMEOUT_MS = 10_000;
 
 export function skipUpdateCheck(env: NodeJS.ProcessEnv, json: boolean, tty: boolean): boolean {
   if (json || !tty) return true;

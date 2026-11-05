@@ -1,11 +1,11 @@
 import { lstat, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { withName } from "#core/frontmatter.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { digest } from "#core/fs/digest.ts";
 import { fanOut, inspect, link } from "#core/fs/link.ts";
 import { exists, pruneEmptyParent, remove } from "#core/fs/tree.ts";
-import { SKILL_ENTRY } from "#core/kinds.ts";
 import type { LinkMode } from "#core/lock.ts";
 import type { Plan } from "#core/plan/model.ts";
 import { assertRemovable, removal, removeContained } from "#core/plan/removable.ts";

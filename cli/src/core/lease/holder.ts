@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { isRecord } from "#core/fields.ts";
+import { isRecord } from "#adapter/fields.ts";
 import { metaPath } from "./location.ts";
 
 export interface LeaseHolder {

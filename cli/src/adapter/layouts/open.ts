@@ -3,6 +3,7 @@ import { readJson, SpecError } from "../filespec/documents.ts";
 import { openFolderRegistry, registryPath, rootReader } from "../filespec/folder.ts";
 import { REGISTRY_DOCUMENT } from "../filespec/names.ts";
 import { besideEnvelope } from "../filespec/resolve.ts";
+import { setRecent } from "../lru.ts";
 import { list } from "../text.ts";
 import { folderLayout, ROOT_ID } from "./folder.ts";
 import type { LayoutId } from "./ids.ts";
@@ -191,10 +192,7 @@ async function enumerated(
   // A fetched plugin may follow a branch, so only what the checkout alone holds is kept, and
   // only a whole reading of it.
   if (immutable && found.roots === undefined && context.asked === undefined) {
-    SETTLED.delete(key);
-    SETTLED.set(key, structuredClone(found));
-    const [oldest] = SETTLED.keys();
-    if (SETTLED.size > SETTLED_LIMIT && oldest !== undefined) SETTLED.delete(oldest);
+    setRecent(SETTLED, key, structuredClone(found), SETTLED_LIMIT);
   }
   return found;
 }

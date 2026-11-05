@@ -1,8 +1,8 @@
 import { isDeepStrictEqual } from "node:util";
 import { Document, isMap, isScalar, isSeq, parseDocument, YAMLSeq } from "yaml";
+import { isRecord } from "#adapter/fields.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { isRecord } from "#core/fields.ts";
 import { NAME } from "#core/product.ts";
 import type { ConfigValue } from "#core/target/contract.ts";
 import { dropTable, readTable, setKeys, type TomlScalar, unsetKeys } from "./toml.ts";

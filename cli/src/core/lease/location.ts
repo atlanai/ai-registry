@@ -5,7 +5,7 @@ import { redirection } from "#adapter/files.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { shortHash } from "#core/fs/hash.ts";
 import { posixRelative } from "#core/fs/path.ts";
-import { ensureHome, leasesDir, type Roots } from "#core/store/paths.ts";
+import { ensureHome, LEASES_DIR, leasesDir, type Roots } from "#core/store/paths.ts";
 
 /**
  * Canonical, because `/tmp` and `/private/tmp`, or `~/Desktop` and `~/desktop`, reaching one
@@ -40,7 +40,7 @@ export function leaseDir(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.Proce
 function parentOf(roots: Pick<Roots, "scope" | "lock">, env: NodeJS.ProcessEnv): string {
   return roots.scope === "user"
     ? leasesDir(env)
-    : join(dirname(canonicalLock(roots.lock)), "leases");
+    : join(dirname(canonicalLock(roots.lock)), LEASES_DIR);
 }
 
 /** Refuses a path the lease would write or remove through a link. */

@@ -1,5 +1,5 @@
 import { join, posix } from "node:path";
-import { VERSIONS_DOCUMENT, versionsPath } from "#adapter/filespec/names.ts";
+import { ARTIFACTS_DIR, VERSIONS_DOCUMENT, versionsPath } from "#adapter/filespec/names.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { exists } from "#core/fs/tree.ts";
@@ -27,7 +27,7 @@ export async function baseDiff(root: string, base: string): Promise<BaseDiff> {
       hint: "Fetch it, or pass another `--base <ref>`.",
     });
   }
-  const diff = await gitIn(root, ["diff", "--name-only", commit, "--", "artifacts"]);
+  const diff = await gitIn(root, ["diff", "--name-only", commit, "--", ARTIFACTS_DIR]);
   if (diff.code !== 0) {
     throw new AiregError(`Could not compare with ${quoted(base)}: ${sentence(diff.stderr)}`, {
       code: ErrorCode.NotFound,
@@ -87,7 +87,7 @@ export async function releasedChanges(diff: BaseDiff): Promise<Map<string, strin
   const changed = new Map<string, string[]>();
   for (const path of diff.paths) {
     const parts = path.split("/");
-    if (parts.length < 6 || parts[0] !== "artifacts") continue;
+    if (parts.length < 6 || parts[0] !== ARTIFACTS_DIR) continue;
     const folder = parts.slice(0, 5).join("/");
     const [, namespace, kind, name, version] = parts as [string, string, string, string, string];
     if (!(await diff.released(versionsPath(namespace, kind, name))).has(version)) continue;
@@ -104,7 +104,8 @@ export async function droppedReleases(root: string, diff: BaseDiff): Promise<Pro
   const problems: Problem[] = [];
   for (const path of diff.paths) {
     const parts = path.split("/");
-    if (parts.length !== 5 || parts[0] !== "artifacts" || parts[4] !== VERSIONS_DOCUMENT) continue;
+    if (parts.length !== 5 || parts[0] !== ARTIFACTS_DIR || parts[4] !== VERSIONS_DOCUMENT)
+      continue;
     const now = await readDocument(root, path);
     const gone = now === undefined && !(await exists(join(root, ...path.split(posix.sep))));
     if (now === undefined && !gone) continue;

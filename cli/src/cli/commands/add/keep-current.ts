@@ -1,3 +1,4 @@
+import { messageOf } from "#adapter/errors.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { DEFAULT_INTERVAL_WORDS } from "#core/config/model.ts";
 import { scopeFor, userScopeDir } from "#core/store/paths.ts";
@@ -39,7 +40,7 @@ export async function keepCurrent(
     );
   } catch (error) {
     context.printer.warning(
-      `Installed, but could not turn on background updates: ${(error as Error).message}`,
+      `Installed, but could not turn on background updates: ${messageOf(error)}`,
     );
     context.printer.hint(`Run \`aireg job add -g --registry ${alias}\` to try again.`);
     return undefined;

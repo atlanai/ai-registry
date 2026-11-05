@@ -1,6 +1,7 @@
 import { readSync } from "node:fs";
 import { appendFile } from "node:fs/promises";
 import { basename } from "node:path";
+import { messageOf } from "#adapter/errors.ts";
 import { list } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { defaultIo, quietly } from "#cli/prompt/ask.ts";
@@ -12,8 +13,8 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { canonical } from "#core/fs/realpath.ts";
 import { readManifest, writeManifest } from "#core/manifest/repository.ts";
 import { handOff } from "#core/process.ts";
+import { NAME } from "#core/product.ts";
 import { binDir, shimPath } from "#core/release/layout.ts";
-import { BINARY_NAME } from "#core/release/platform.ts";
 import { roots } from "#core/store/paths.ts";
 import { detectAll } from "#core/target/detect.ts";
 import { resolveTargets } from "#core/target/table.ts";
@@ -43,7 +44,7 @@ export async function install(
 ): Promise<number> {
   const { printer } = context;
   // Under Node, execPath is the interpreter, which must never be copied into place.
-  if (basename(process.execPath).replace(/\.exe$/i, "") !== BINARY_NAME) {
+  if (basename(process.execPath).replace(/\.exe$/i, "") !== NAME) {
     throw new AiregError("Only a standalone aireg build installs itself.", {
       code: ErrorCode.Usage,
       hint: "Run it from a release build of aireg, not from source.",
@@ -65,7 +66,7 @@ export async function install(
       await appendFile(githubPath, `${binDir(env)}\n`);
       printer.success(`Added ${binDir(env)} to PATH for the steps that follow.`);
     } catch (error) {
-      printer.warning(`Could not add ${binDir(env)} to $GITHUB_PATH: ${(error as Error).message}`);
+      printer.warning(`Could not add ${binDir(env)} to $GITHUB_PATH: ${messageOf(error)}`);
     }
     return 0;
   }
@@ -255,7 +256,7 @@ async function offerSkills(
         .catch(() => undefined);
     }
     spin?.stop();
-    printer.warning(`The aireg skills were not installed: ${(error as Error).message}`);
+    printer.warning(`The aireg skills were not installed: ${messageOf(error)}`);
     printer.hint(`Run \`${ownSkillsCommand(aireg)}\` to install them later.`);
     return;
   }

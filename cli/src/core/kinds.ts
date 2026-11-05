@@ -1,5 +1,6 @@
 import { basename, extname, join } from "node:path";
 import { type ArtifactKind, KINDS } from "#adapter/index.ts";
+import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { AGENT_CARD_ENTRY } from "./product.ts";
 
 /** How a kind appears in a registry, and what it is called there. */
@@ -17,9 +18,6 @@ export interface KindSpec {
   /** Entry filenames a file-shaped kind can install; companion files stay in the registry. */
   served?: readonly string[];
 }
-
-/** The file that makes a directory a skill and holds its front matter. */
-export const SKILL_ENTRY = "SKILL.md";
 
 /** The one file a registry's agent version folder holds. */
 export const AGENT_ENTRY = "AGENT.md";
@@ -41,14 +39,6 @@ export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter((kind) => kin
 /** Target-shaped and plural: what the writable copy and every target use. */
 export function kindDir(kind: ArtifactKind): string {
   return KIND_SPECS[kind].dir;
-}
-
-/**
- * Spec-shaped and singular: what a file spec root addresses a kind by, so a
- * mirror is readable by anything that speaks the spec.
- */
-export function specKindDir(kind: ArtifactKind): string {
-  return kind;
 }
 
 /** Anything stranger than a short alphanumeric suffix is not an extension. */

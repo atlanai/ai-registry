@@ -1,3 +1,4 @@
+import { messageOf } from "#adapter/errors.ts";
 import { gte } from "#adapter/semver.ts";
 import { DAEMON_COMMAND } from "#cli/commands/daemon/spec.ts";
 import { parse } from "#cli/options/parse.ts";
@@ -109,7 +110,7 @@ async function autostartEnable(context: CommandContext): Promise<void> {
   try {
     change = await enableAutostart(stopDaemon);
   } catch (error) {
-    throw new AiregError(`Could not turn autostart on: ${(error as Error).message}`, {
+    throw new AiregError(`Could not turn autostart on: ${messageOf(error)}`, {
       code: ErrorCode.Unavailable,
       cause: error,
       hint: PROFILE_HINT,

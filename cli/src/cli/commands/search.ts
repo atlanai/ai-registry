@@ -2,7 +2,7 @@ import { type ArtifactKind, isKind, KINDS } from "#adapter/kinds.ts";
 import { list, plural, quoted, withoutCredentials } from "#adapter/text.ts";
 import { search } from "#cli/commands/search/rank.ts";
 import { SEARCH_COMMAND } from "#cli/commands/search/spec.ts";
-import { parse } from "#cli/options/parse.ts";
+import { needsInput, parse } from "#cli/options/parse.ts";
 import { trackSearch } from "#cli/telemetry/events.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { formatAddress } from "#core/ref.ts";
@@ -42,10 +42,11 @@ export async function run(context: CommandContext): Promise<void> {
   );
   const query = positionals.join(" ").trim();
   if (query === "") {
-    throw new AiregError("`aireg search` needs something to search for.", {
-      code: ErrorCode.Usage,
-      hint: "Name it: `aireg search <query>`, such as `aireg search review`.",
-    });
+    throw needsInput(
+      "search",
+      "something to search for",
+      "Name it: `aireg search <query>`, such as `aireg search review`.",
+    );
   }
   const kind = own.kind === undefined ? undefined : kindOf(own.kind);
 

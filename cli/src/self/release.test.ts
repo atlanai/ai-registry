@@ -1,9 +1,10 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { sha256Hex } from "#core/fs/hash.ts";
+import { releaseBinary } from "#core/product.ts";
 import { decodeTrustedKeys } from "#core/release/keyring.ts";
 import { canonicalPayload, type ReleaseManifest } from "#core/release/manifest.ts";
-import { binaryName, releasePlatform } from "#core/release/platform.ts";
+import { releasePlatform } from "#core/release/platform.ts";
 import type { ReleaseStamp } from "#core/release/stamp.ts";
 import { downloadRelease, resolveRelease } from "./release.ts";
 
@@ -24,7 +25,7 @@ const MANIFEST = `${ORIGIN}/channels/stable/manifest.json`;
 /** This host's own artifact, so the derived URL is the one the client builds. */
 const PLATFORM = releasePlatform();
 if (PLATFORM === undefined) throw new Error(`no release platform for ${process.platform}`);
-const BINARY = binaryName(PLATFORM);
+const BINARY = releaseBinary(PLATFORM);
 const ARTIFACT = `${ORIGIN}/artifacts/v0.2.0/${BINARY}`;
 const EVIL = "https://evil.example/pwn";
 

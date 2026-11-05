@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import type { Target } from "./contract.ts";
-import { canonicalId, canonicalIds, earlierId, earlierTable } from "./ids.ts";
+import { canonicalId, canonicalIds, categoryOfEarlier, earlierId, earlierTable } from "./ids.ts";
 import { resolveTargets } from "./table.ts";
 
 describe("resolveTargets", () => {
@@ -136,4 +136,9 @@ describe("canonicalId", () => {
       "codex",
     ]);
   });
+});
+
+test("reads aireg 0.1's kind as the category that replaced it", () => {
+  expect(categoryOfEarlier("personal")).toBe("personal-agent");
+  expect(categoryOfEarlier("coding-agent")).toBeUndefined();
 });

@@ -1,12 +1,13 @@
 import { resolve } from "node:path";
 import type { ArtifactKind } from "#adapter/kinds.ts";
+import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { gitignore } from "#core/fs/gitignore.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { authored } from "#core/fs/tree.ts";
-import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY } from "#core/kinds.ts";
 import type { ExportFile } from "#core/manifest/export-fields.ts";
 import type { Export } from "#core/manifest/model.ts";
 

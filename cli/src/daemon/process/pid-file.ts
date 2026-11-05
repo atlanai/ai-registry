@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
 import { isMissing } from "#core/fs/path.ts";
 import { processAlive } from "#core/process.ts";
-import { ensureHome, toolHome } from "#core/store/paths.ts";
+import { ensureHome, stateDir } from "#core/store/paths.ts";
 import { isDaemonProcess } from "./process-info.ts";
 
 export async function writeDaemonPid(
@@ -15,7 +15,7 @@ export async function writeDaemonPid(
 }
 
 function daemonPidPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(toolHome(env), "state", "daemon.pid");
+  return join(stateDir(env), "daemon.pid");
 }
 
 export async function readDaemonPid(

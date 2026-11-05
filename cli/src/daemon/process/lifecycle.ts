@@ -7,9 +7,11 @@ import { PRIVATE_FILE } from "#core/fs/mode.ts";
 import { withLease } from "#core/lease/lease.ts";
 import { DAEMON_STDERR_FILE, logPath } from "#core/log/sink.ts";
 import { spawnDetached } from "#core/process.ts";
+import { DAEMON_FLAG } from "#core/product.ts";
 import { launchArgv, runningEntry } from "#core/release/launch.ts";
 import { ensureHome } from "#core/store/paths.ts";
 import { VERSION } from "#core/version.ts";
+import { pollUntil } from "#core/wait.ts";
 import { NO_EXECUTABLE, startManaged } from "#daemon/autostart/index.ts";
 import { cliClient, RpcClient, UnprovenDaemonError } from "#daemon/rpc/client.ts";
 import { assertOwnSocket, listening, privateDirectory, rpcEndpoint } from "#daemon/rpc/endpoint.ts";
@@ -96,12 +98,8 @@ async function askShutdown(endpoint: string): Promise<boolean> {
 }
 
 async function waitUntilDown(endpoint: string, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!(await listening(endpoint))) return true;
-    await sleep(50);
-  }
-  return !(await listening(endpoint));
+  const down = async () => !(await listening(endpoint));
+  return (await pollUntil(down, timeoutMs, 50)) || (await down());
 }
 
 async function signalListener(endpoint: string): Promise<void> {
@@ -146,7 +144,7 @@ export async function startDaemon(entry: string, version: string): Promise<void>
   }
   // Here as well as in the daemon, so a directory it would refuse is named to the user.
   await privateDirectory(dirname(rpcEndpoint()));
-  const launch = launchArgv(entry, ["--internal-daemon"]);
+  const launch = launchArgv(entry, [DAEMON_FLAG]);
   const stderr = stderrCapture();
   try {
     spawnDetached(launch.command, launch.args, {
@@ -165,14 +163,15 @@ export async function startDaemon(entry: string, version: string): Promise<void>
   }
 }
 
-async function waitFor(version: string, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const found = await probeDaemon(version);
-    if (found.status === "ready" && found.version === version) return true;
-    await sleep(50);
-  }
-  return false;
+function waitFor(version: string, timeoutMs: number): Promise<boolean> {
+  return pollUntil(
+    async () => {
+      const found = await probeDaemon(version);
+      return found.status === "ready" && found.version === version;
+    },
+    timeoutMs,
+    50,
+  );
 }
 
 /**

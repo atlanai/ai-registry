@@ -1,6 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { SIGNALS } from "#cli/prompt/caller.ts";
+import { HOME_DIR } from "#core/product.ts";
+import { SCOPE_DIR } from "#core/store/paths.ts";
 
 export interface Home {
   /** HOME and USERPROFILE. */
@@ -19,8 +21,8 @@ export function homeEnv(dir: string): Record<string, string> {
   return {
     HOME: dir,
     USERPROFILE: dir,
-    AIREG_HOME: join(dir, ".aireg"),
-    AIREG_USER_SCOPE: join(dir, ".registry"),
+    AIREG_HOME: join(dir, HOME_DIR),
+    AIREG_USER_SCOPE: join(dir, SCOPE_DIR),
     CLAUDE_CONFIG_DIR: join(dir, ".claude"),
     CODEX_HOME: join(dir, ".codex"),
     XDG_CONFIG_HOME: join(dir, ".config"),

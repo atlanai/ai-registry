@@ -1,4 +1,4 @@
-import { adapterProblem } from "#adapter/errors.ts";
+import { adapterProblem, messageOf } from "#adapter/errors.ts";
 import { isAdapterError } from "#adapter/index.ts";
 import { ConfigConflictError } from "#core/config/errors.ts";
 import { CredentialStoreError } from "#core/credentials/store.ts";
@@ -16,11 +16,7 @@ export function rpcError(error: unknown): ProtocolError {
       ? error.cause
       : undefined;
   if (adapter !== undefined) {
-    return new ProtocolError(
-      RpcErrorCode.Server,
-      (error as Error).message,
-      adapterProblem(adapter),
-    );
+    return new ProtocolError(RpcErrorCode.Server, messageOf(error), adapterProblem(adapter));
   }
   // Another writer moved the config first: the caller resyncs and retries.
   if (error instanceof ConfigConflictError) {

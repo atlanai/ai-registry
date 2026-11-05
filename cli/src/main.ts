@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { messageOf } from "#adapter/errors.ts";
 import { list, quoted, sanitizeBlock } from "#adapter/text.ts";
 import { stopGit } from "#adapters/git/api.ts";
 import { registerBuiltinAdapters } from "#adapters/index.ts";
@@ -17,7 +18,6 @@ import {
 } from "#cli/options/globals.ts";
 import { closest, didYouMean } from "#cli/options/suggest.ts";
 import { reportError } from "#cli/render/error.ts";
-import { TELEMETRY_FLAG } from "#cli/telemetry/model.ts";
 import { flushTelemetry, noticeFirst } from "#cli/telemetry/queue.ts";
 import { sendQueued } from "#cli/telemetry/send.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
@@ -25,18 +25,19 @@ import { releaseLeasesOnInterrupt } from "#core/lease/lease.ts";
 import { LogLevelError } from "#core/log/level.ts";
 import { type LogBootstrap, openCliLog } from "#core/log/open.ts";
 import { readStdin } from "#core/process.ts";
+import {
+  DAEMON_FLAG,
+  REMOVE_AFTER_FLAG,
+  TELEMETRY_FLAG,
+  UPDATE_CHECK_FLAG,
+} from "#core/product.ts";
 import { Printer } from "#core/term/printer.ts";
 import { NODE_REQUIREMENT, nodeTooOld, VERSION, versionInfo } from "#core/version.ts";
 import { extensionHost } from "#daemon/extension-host.ts";
 import { recycleDaemon } from "#daemon/process/lifecycle.ts";
 import { applyMinimumUpdate } from "#self/minimum-update.ts";
-import { REMOVE_AFTER_FLAG, removeAfterExit } from "#self/remove-after-exit.ts";
-import {
-  hintUpdate,
-  refreshUpdates,
-  scheduleUpdateCheck,
-  UPDATE_CHECK_FLAG,
-} from "#self/update-check.ts";
+import { removeAfterExit } from "#self/remove-after-exit.ts";
+import { hintUpdate, refreshUpdates, scheduleUpdateCheck } from "#self/update-check.ts";
 
 registerBuiltinAdapters();
 
@@ -171,7 +172,7 @@ async function dispatch(
   const misused = misusedGlobal(values);
   if (misused !== undefined) return reportError(printer, misused);
 
-  if (argv.length === 1 && argv[0] === "--internal-daemon") {
+  if (argv.length === 1 && argv[0] === DAEMON_FLAG) {
     // A daemon outlives whatever started it, so it must not keep that
     // process's directory: one it cannot read fails every `process.cwd()`.
     process.chdir(homedir());
@@ -277,7 +278,7 @@ async function runCommand(
     log = openCliLog(VERSION, values["log-level"] as string | undefined);
   } catch (error) {
     // Reached before the logger exists, so this one is only ever printed.
-    const message = error instanceof Error ? error.message : String(error);
+    const message = messageOf(error);
     const code = error instanceof LogLevelError ? ErrorCode.Usage : ErrorCode.Error;
     return reportError(printer, new AiregError(message, { code, hint: GLOBALS_HINT }));
   }

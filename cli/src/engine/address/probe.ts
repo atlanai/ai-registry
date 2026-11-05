@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { credentialFor, credentialForLocation } from "#accounts/credentials.ts";
-import { adapterOf, isAuthFailure } from "#adapter/errors.ts";
+import { adapterOf, isAuthFailure, messageOf } from "#adapter/errors.ts";
 import { type ArtifactPlace, artifactAt, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import {
   isAdapterError,
@@ -450,7 +450,7 @@ export async function probe(
       refused && isAdapterError(cause)
         ? await loadAdapter(cause.adapter).catch(() => undefined)
         : undefined;
-    throw new AiregError(String((cause as Error).message), {
+    throw new AiregError(messageOf(cause), {
       cause,
       ...(refused
         ? {

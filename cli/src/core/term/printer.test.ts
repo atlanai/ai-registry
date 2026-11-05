@@ -13,6 +13,15 @@ function capture(options: PrinterOptions) {
 }
 
 describe("Printer", () => {
+  test("closes a dry run on stdout, and says nothing under --json", () => {
+    const text = capture({ color: "never" });
+    text.printer.dryRun();
+    expect(text.out()).toBe("Dry run. Nothing was changed.\n");
+    const json = capture({ format: "json" });
+    json.printer.dryRun();
+    expect(json.out()).toBe("");
+  });
+
   test("strips terminal escapes from every diagnostic, where remote text arrives in messages", () => {
     const { printer, err } = capture({ verbose: true });
     const hostile = "zz\u001B]0;title\u0007\u001B]52;c;Zm9v\u0007\u001B[31mred\u202E";

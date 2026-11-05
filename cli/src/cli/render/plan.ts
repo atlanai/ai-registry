@@ -357,9 +357,7 @@ function renderPlan(
   if (others.length > 0 && shown.some((action) => action.kind !== "unlink")) {
     printer.info(style.dim(`  ${plural(others.length, "other artifact")} already up to date`));
   }
-  // Said plainly, because the list above is identical to what a real run does
-  // and a dry run that ends in a success line reads as a completed one.
-  printer.info(style.dim("Dry run. Nothing was changed."));
+  printer.dryRun();
 }
 
 /** The kind the plan records for an artifact, which says which targets load it. */

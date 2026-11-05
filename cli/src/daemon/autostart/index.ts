@@ -7,7 +7,7 @@ import { userHome } from "#core/fs/path.ts";
 import { canonical } from "#core/fs/realpath.ts";
 import { DAEMON_STDERR_FILE, logPath } from "#core/log/sink.ts";
 import { exec } from "#core/process.ts";
-import { HOME_DIR } from "#core/product.ts";
+import { DAEMON_FLAG, HOME_DIR } from "#core/product.ts";
 import { launchArgv, runningEntry } from "#core/release/launch.ts";
 import { cliRoot, currentBin, shimPath } from "#core/release/layout.ts";
 import { toolHome } from "#core/store/paths.ts";
@@ -71,7 +71,7 @@ export function serviceSpec(options: AutostartOptions = {}): ServiceSpec {
 
   return {
     suffix: overridden ? homeIdentity(home) : "",
-    daemon: argv(["--internal-daemon"]),
+    daemon: argv([DAEMON_FLAG]),
     starter: argv(["daemon", "start"]),
     env: service,
     stderrLog: logPath(home, DAEMON_STDERR_FILE),

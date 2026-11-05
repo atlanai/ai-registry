@@ -1,11 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawnDetached } from "#core/process.ts";
-import { DOCS_URL, TELEMETRY_NOTICE_FILE } from "#core/product.ts";
+import { DOCS_URL, TELEMETRY_FLAG, TELEMETRY_NOTICE_FILE } from "#core/product.ts";
 import { launchArgv, runningEntry } from "#core/release/launch.ts";
 import { ensureHome } from "#core/store/paths.ts";
 import type { Printer } from "#core/term/printer.ts";
-import { type Queued, TELEMETRY_FLAG } from "./model.ts";
+import type { Queued } from "./model.ts";
 import { savedTelemetryState, telemetryState } from "./state.ts";
 
 const pending: Queued[] = [];

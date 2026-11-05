@@ -1,6 +1,7 @@
+import { isRecord, textOf } from "#adapter/fields.ts";
 import { formatVersion, parseVersion } from "#adapter/semver.ts";
 import { quoted } from "#adapter/text.ts";
-import { isRecord, textOf, withoutUndefined } from "#core/fields.ts";
+import { withoutUndefined } from "#core/fields.ts";
 import { formatAddress, formatRef, parseRef, type Ref, RefParseError } from "#core/ref.ts";
 import { ManifestError } from "./errors.ts";
 import {

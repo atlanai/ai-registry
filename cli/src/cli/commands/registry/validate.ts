@@ -9,6 +9,7 @@ import { ExitCode } from "#core/errors.ts";
 import { requireRegistry } from "#core/filespec/init.ts";
 import { kindsOf } from "#core/filespec/kind-manifests.ts";
 import { validateRoot } from "#core/filespec/validate/validate.ts";
+import { GLYPH } from "#core/term/theme.ts";
 
 const MAX_PROBLEM = 2000;
 
@@ -80,7 +81,7 @@ function printProblems(
     byPath.set(problem.path, [...(byPath.get(problem.path) ?? []), problem]);
   }
   for (const [path, found] of byPath) {
-    printer.info(`${style.red("✗")} ${pathText(path)}`);
+    printer.info(`${style.red(GLYPH.failed)} ${pathText(path)}`);
     for (const problem of found) {
       printer.info(`    ${sanitizeText(problem.message, MAX_PROBLEM)}`);
       if (problem.fix !== undefined) {

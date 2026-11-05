@@ -1,3 +1,4 @@
+import { messageOf } from "#adapter/errors.ts";
 import {
   AdapterError,
   type Credential,
@@ -190,7 +191,7 @@ export class AccountService {
       .catch((error: unknown) => {
         if (isAdapterError(error)) throw error;
         // A sign-in that failed is one still needed, whatever the adapter threw.
-        throw new AdapterError(resolved.adapter.id, "unauthorized", (error as Error).message, {
+        throw new AdapterError(resolved.adapter.id, "unauthorized", messageOf(error), {
           cause: error,
         });
       });

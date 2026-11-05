@@ -1,6 +1,3 @@
-/** Runs aireg as the detached sender, which reads the queued events from stdin. */
-export const TELEMETRY_FLAG = "--internal-telemetry";
-
 /** Kept only once GitHub confirms every repository the event came from is public. */
 export const NAMING_FIELDS = ["source", "artifacts", "query"] as const;
 

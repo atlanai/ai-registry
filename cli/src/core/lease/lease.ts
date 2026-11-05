@@ -7,9 +7,9 @@ import { dirname } from "node:path";
 import { quoted } from "#adapter/text.ts";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
 import { processAlive } from "#core/process.ts";
-import type { Roots, Scope } from "#core/store/paths.ts";
+import { type Roots, type Scope, scopeName } from "#core/store/paths.ts";
 import { POLL_MS, removeDir, STUCK_MS, taken, withCoordination } from "./coordination.ts";
-import { LeaseBusyError, LeaseError, stuckError, unlockCommand, where } from "./errors.ts";
+import { LeaseBusyError, LeaseError, stuckError, unlockCommand } from "./errors.ts";
 import { type LeaseHolder, readHolder } from "./holder.ts";
 import {
   asideOf,
@@ -237,7 +237,7 @@ export async function withLease<T>(
 async function assertOwned(dir: string, id: string, scope: Scope): Promise<void> {
   if ((await readHolder(dir))?.id === id) return;
   throw new LeaseError(
-    `Another aireg process took over ${where(scope)}, so this command stopped.`,
+    `Another aireg process took over ${scopeName(scope)}, so this command stopped.`,
     "lease_lost",
     "Run the command again.",
   );

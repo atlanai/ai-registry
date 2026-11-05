@@ -1,10 +1,11 @@
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
+import { isRecord } from "#adapter/fields.ts";
 import { readRegular } from "#adapter/files.ts";
 import type { Envelope } from "#adapter/index.ts";
+import { PLUGIN_MANIFESTS } from "#adapter/kinds.ts";
 import { sha256 } from "#adapter/spec/canonical.ts";
 import { list } from "#adapter/text.ts";
-import { isRecord } from "#core/fields.ts";
 import { isDirectory } from "#core/fs/tree.ts";
 import type { Lock } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
@@ -37,8 +38,6 @@ const FILES: readonly [string, Carried][] = [
   ["monitors/monitors.json", "monitors"],
 ];
 
-const MANIFESTS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "plugin.json"];
-
 /** What the plugin at `root` would have a target start; empty for anything that is not a folder. */
 export async function carries(root: string): Promise<Carried[]> {
   const dir = await realpath(root).catch(() => undefined);
@@ -53,7 +52,7 @@ export async function carries(root: string): Promise<Carried[]> {
     }
   }
   if (await isDirectory(join(dir, BIN))) found.add("bin");
-  for (const path of MANIFESTS) {
+  for (const path of PLUGIN_MANIFESTS) {
     const file = await readRegular(dir, path, verified);
     if (file.kind !== "file") continue;
     try {

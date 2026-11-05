@@ -1,9 +1,9 @@
 import { isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import { list as listOf, withoutCredentials } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import { needsInput } from "#cli/options/parse.ts";
 import { underHome } from "#cli/render/home.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
-import { AiregError, ErrorCode } from "#core/errors.ts";
 import { findRegistry } from "#core/filespec/init.ts";
 import { abbreviate } from "#core/term/printer.ts";
 import { fields, table } from "#core/term/table.ts";
@@ -105,11 +105,11 @@ async function onlyDeclared(context: CommandContext, common: CommonOptions): Pro
   // In a clone of a registry, it is the one meant.
   const here = aliases.length === 0 ? findRegistry(context.cwd) : undefined;
   if (here !== undefined) return here;
-  throw new AiregError("`aireg registry show` needs a registry name.", {
-    code: ErrorCode.Usage,
-    hint:
-      aliases.length === 0
-        ? "Name the registry: `aireg registry show <registry>`, such as github.com/owner/repo, a URL or a folder."
-        : `Name one of ${listOf(aliases, "or")}: \`aireg registry show <registry>\`.`,
-  });
+  throw needsInput(
+    "registry show",
+    "a registry name",
+    aliases.length === 0
+      ? "Name the registry: `aireg registry show <registry>`, such as github.com/owner/repo, a URL or a folder."
+      : `Name one of ${listOf(aliases, "or")}: \`aireg registry show <registry>\`.`,
+  );
 }
