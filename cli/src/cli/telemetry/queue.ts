@@ -33,7 +33,7 @@ export async function noticeFirst(
     printer.notice(
       [
         "aireg collects usage data to improve the CLI. Events never include your identity.",
-        `  Learn more, including how to opt out: ${DOCS_URL}reference/environment/#network-and-privacy`,
+        `  Learn more or opt out: ${DOCS_URL}reference/environment/#network-and-privacy`,
       ].join("\n"),
     );
     await writeFile(file, `${NOTICE_VERSION}\n`, { mode: 0o600 });
