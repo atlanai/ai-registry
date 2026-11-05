@@ -1,6 +1,6 @@
 import { isAbsolute } from "node:path";
 import { isKindSegment } from "#adapter/filespec/names.ts";
-import type { ArtifactKind } from "#adapter/kinds.ts";
+import { type ArtifactKind, isBuiltinKind } from "#adapter/kinds.ts";
 import { quoted } from "#adapter/text.ts";
 import { kindSpec } from "#core/kinds.ts";
 import type { ConfigValue, KindMapping, RegisterEntry, TargetDefinition } from "./contract.ts";
@@ -135,7 +135,11 @@ function profileProblems(root: string, report: Report) {
 }
 
 function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Report) {
-  if (mapping.shape === "contents") return;
+  if (mapping.shape === "contents") {
+    // A plugin's contents hold built-in kinds alone, so no other kind is placed as them.
+    if (!isBuiltinKind(kind)) report(`kinds.${kind}: only a plugin is placed as its contents.`);
+    return;
+  }
   pathProblem(mapping.subdir, TEMPLATE_VARS.placement, report);
   for (const entry of mapping.manifest ?? []) {
     pathProblem(entry.path, [], report);

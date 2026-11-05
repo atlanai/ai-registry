@@ -1,7 +1,8 @@
 import { resolve } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { sanitizeText } from "#adapter/text.ts";
-import type { Lock } from "#core/lock.ts";
+import { kindSpec } from "#core/kinds.ts";
+import type { Lock, LockArtifact } from "#core/lock.ts";
 import { NAME } from "#core/product.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
 import { copyEdited, editedHere, type Survey } from "./survey.ts";
@@ -75,7 +76,7 @@ export function status(lock: Lock, survey: Survey, roots: Roots): ArtifactStatus
     out.push({
       name,
       state: worst,
-      detail,
+      detail: shownDetail(entry, worst, detail),
       targets,
       ...((entry.blocked?.length ?? 0) > 0 ? { blocked: true as const } : {}),
       ...(entry.blocked?.some((held) => held.by !== undefined) ? { taken: true as const } : {}),
@@ -83,6 +84,12 @@ export function status(lock: Lock, survey: Survey, roots: Roots): ArtifactStatus
   }
 
   return out;
+}
+
+/** Without its kind's spec its copy cannot be found; only its links were checked. */
+function shownDetail(entry: LockArtifact, worst: State, detail: string | undefined) {
+  if (worst !== "ok" || kindSpec(entry.kind) !== undefined) return detail;
+  return "copy not checked: no loaded adapter declares its kind";
 }
 
 /** How one recorded link looks on disk: the state it adds, why, and what its target sees. */

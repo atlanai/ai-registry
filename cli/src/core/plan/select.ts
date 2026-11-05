@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { isBuiltinKind } from "#adapter/kinds.ts";
 import { isReadOnlyLayout } from "#adapter/layouts/ids.ts";
 import { list, plural, quoted, sanitizeName } from "#adapter/text.ts";
 import {
@@ -368,7 +369,8 @@ function contentsOf(
 ): Contained[] {
   const contents: Contained[] = [];
   for (const entry of entriesIn(entries, plugin.name)) {
-    if (entry.kind === "plugin") continue;
+    // A plugin's members are skills and agents; a declared kind is placed on its own.
+    if (entry.kind === "plugin" || !isBuiltinKind(entry.kind)) continue;
     const leaf = stagedLeaf(entry.kind, entry.name, entry.path);
     contents.push({
       name: entry.name,

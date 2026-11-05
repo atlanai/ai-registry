@@ -33,6 +33,7 @@ import type { Catalog, Entry } from "#core/catalog/catalog.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { findRegistry } from "#core/filespec/init.ts";
 import { dotRelative, posixRelative } from "#core/fs/path.ts";
+import { kindSpec, knownKinds } from "#core/kinds.ts";
 import type { RegistrySource } from "#core/manifest/model.ts";
 import { manifestOf } from "#core/plan/acquire/placement.ts";
 import { type Carried, carriedIn } from "#core/plan/carries.ts";
@@ -147,6 +148,13 @@ export function throughManifest(
       alias,
       aliases: Object.keys(registries),
     };
+  }
+  // A lockfile or manifest row may name any kind; an address a person typed names a known one.
+  if (ref.kind !== undefined && kindSpec(ref.kind) === undefined) {
+    throw new AiregError(`${quoted(ref.kind)} in ${quoted(input)} is not a kind aireg knows.`, {
+      code: ErrorCode.Usage,
+      hint: `Use ${list(knownKinds(), "or")}, or install the adapter that declares it.`,
+    });
   }
   return {
     input: source.location,

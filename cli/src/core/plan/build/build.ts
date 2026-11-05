@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { list, plural, sanitizeText } from "#adapter/text.ts";
 import { statusWarning } from "#core/catalog/withheld.ts";
 import { dict } from "#core/fields.ts";
-import { kindPlural } from "#core/kinds.ts";
+import { kindPlural, kindSpec } from "#core/kinds.ts";
 import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { dropUnusedSources, lockSourceOf } from "#core/plan/acquire/sources.ts";
@@ -12,7 +12,10 @@ import { crowdedContainers } from "#core/plan/projection.ts";
 import { addressOf, select } from "#core/plan/select.ts";
 import type { Survey } from "#core/plan/survey.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
+import type { Targets } from "#core/target/contract.ts";
+import { publishOnly } from "#core/target/placement.ts";
 import {
+  carryUndeclared,
   carryUnlisted,
   carryUnopened,
   carryUnresolved,
@@ -72,13 +75,14 @@ function planWith(
     cliVersion,
     renames,
   });
-  const { selected, incompatible, clashes, untrusted } = selection;
+  const { incompatible, clashes, untrusted } = selection;
   const warnings: Warning[] = [
     ...acquired.flatMap((source) =>
       source.catalog.warnings.map((message) => ({ name: source.alias, message })),
     ),
     ...selection.warnings,
   ];
+  const selected = installable(selection.selected, options.targetTable, warnings);
   const next = emptyLock();
   for (const source of acquired) {
     next.registries[source.alias] = lockSourceOf(source.origin);
@@ -120,6 +124,7 @@ function planWith(
     }
   }
   const carried = carryUnopened(state);
+  carryUndeclared(state);
   const held = heldElsewhere(state, manifest, acquired, carried);
   state.crowded = crowdedContainers(namespaceWants(selected, carried, held, state), options);
   for (const item of selected) state.wants.set(item.name, wantedLinks(item, state));
@@ -166,6 +171,22 @@ function planWith(
     untrusted,
   };
   return { plan, selected };
+}
+
+/**
+ * A registry may serve a publish-only kind beside its skills; it is left out with a note. A kind
+ * no loaded adapter declares is never planned: `carryUndeclared` keeps its row as it is.
+ */
+function installable(selected: Selected[], targetTable: Targets, warnings: Warning[]): Selected[] {
+  return selected.filter((item) => {
+    if (kindSpec(item.kind) === undefined) return false;
+    if (!publishOnly(item.kind, targetTable)) return true;
+    warnings.push({
+      name: item.name,
+      message: `${addressOf({ ...item, name: item.upstreamName }, item.source)} is of the kind ${item.kind}, which aireg publishes but installs into no target, so it is left out.`,
+    });
+    return false;
+  });
 }
 
 function isLinked(lock: Lock, item: Selected): boolean {

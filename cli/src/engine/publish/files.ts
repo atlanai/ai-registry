@@ -1,13 +1,13 @@
 import { resolve } from "node:path";
 import type { ArtifactKind } from "#adapter/kinds.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { isBuiltinKind, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { gitignore } from "#core/fs/gitignore.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { authored } from "#core/fs/tree.ts";
-import { AGENT_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, kindSpec } from "#core/kinds.ts";
 import type { ExportFile } from "#core/manifest/export-fields.ts";
 import type { Export } from "#core/manifest/model.ts";
 
@@ -36,10 +36,15 @@ export async function chooseFiles(choosing: Choosing, base: string): Promise<Cho
   const matched = patterns
     .filter(({ pattern }) => !unmatched.has(pattern))
     .map(({ entry: each, pattern }) => ignoredBy(each, pattern));
-  const files = [{ from: entry, as: entry }, ...kept.filter((file) => file.from !== entry)];
+  const files =
+    entry === undefined
+      ? kept
+      : [{ from: entry, as: entry }, ...kept.filter((file) => file.from !== entry)];
   refuseShared(files, shown);
 
   const unique = [...new Map(files.map((file) => [`${file.from}\0${file.as}`, file])).values()];
+  // A folder kind with no entry file sorts every file alike.
+  if (entry === undefined) return { files: unique.sort((a, b) => byPath(a.as, b.as)), matched };
   const [first, ...rest] = unique;
   const sorted = rest.sort((a, b) => byPath(a.as, b.as));
   return { files: [first as ExportFile, ...sorted], matched };
@@ -67,7 +72,8 @@ export interface Chosen {
   matched: string[];
 }
 
-function entryOf(kind: ArtifactKind): string {
+function entryOf(kind: ArtifactKind): string | undefined {
+  if (!isBuiltinKind(kind)) return kindSpec(kind)?.entry;
   return kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
 }
 

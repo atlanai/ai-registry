@@ -6,6 +6,7 @@ import { expandSteps, orderSteps } from "#core/config/jobs.ts";
 import { type Account, isScopeStep, type Job, type RegistryConfig } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import type { StepRunResult } from "#core/host/extend.ts";
+import { loadDeclaredKinds } from "#core/host/kinds.ts";
 import { stepContribution, stepOn } from "#core/host/load.ts";
 import { nullLogger } from "#core/log/logger.ts";
 import type { Logger } from "#core/log/model.ts";
@@ -202,6 +203,10 @@ export class SyncRunner {
       this.#store.start(run.id, "starting", startedAtMs);
       log.info("run started");
       this.#emitLast(run.id);
+      // A run reads kinds as the adapters configured now declare them.
+      for (const warning of await loadDeclaredKinds().catch(() => [])) {
+        log.warn("an adapter's kind was refused", { warning });
+      }
       const result = await this.#run(request, signal, tally);
       if (signal.aborted) {
         this.#finishFailure(request, { signal, error: signal.reason, counts: result.counts });

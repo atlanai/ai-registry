@@ -1,5 +1,6 @@
 import { isAbsolute, join, resolve } from "node:path";
 import type { ArtifactKind, PublishRelationship, SourceAdapter, Want } from "#adapter/index.ts";
+import { isBuiltinKind } from "#adapter/kinds.ts";
 import { isLocalPath } from "#adapter/paths.ts";
 import { plural, quoted } from "#adapter/text.ts";
 import { comparableLocation, sourceKey } from "#core/adapter/identity.ts";
@@ -13,7 +14,7 @@ import type { Export, ExportDependency, Manifest, RegistrySource } from "#core/m
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { artifactRoot } from "./reach.ts";
 import { artifactKey, type Destination, type Planned, type Published } from "./target.ts";
-import { fromPath, type Work } from "./work.ts";
+import { declaredWork, fromPath, type Work } from "./work.ts";
 
 /** Rejects duplicate kind/name identities. */
 export async function exportWork(
@@ -24,7 +25,9 @@ export async function exportWork(
   const seen = new Map<string, Work>();
   for (const [path, entry] of found) {
     if (entry.publish === false) continue;
-    const work: Work = { ...(await fromPath(path)), exported: entry };
+    const declared = entry.kind !== undefined && !isBuiltinKind(entry.kind);
+    const read = declared ? await declaredWork(path, entry.kind as string) : await fromPath(path);
+    const work: Work = { ...read, exported: entry };
     const key = `${work.kind}/${work.name}`;
     const other = seen.get(key);
     if (other !== undefined) {

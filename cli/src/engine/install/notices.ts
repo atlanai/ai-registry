@@ -47,7 +47,10 @@ export function appliedNotices(
 }
 
 function keptNotice(roots: Roots, kept: ApplyResult["kept"][number]): string {
-  const { name, path, reason, config } = kept;
+  const { name, path, reason, config, key } = kept;
+  if (reason === undefined && key !== undefined) {
+    return `Left ${displayPath(roots, path)} as it is for ${name}: ${key} there is someone else's.`;
+  }
   if (reason === undefined) return keptMessage(roots, name, path, "Did not");
   const shown = displayPath(roots, path);
   // Registration runs for removals too, so it names the file it left rather than an install.

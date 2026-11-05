@@ -9,7 +9,7 @@ import { isWithin } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { descriptionText, frontmatter } from "#core/frontmatter.ts";
-import { AGENT_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, kindSpec } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { ExportFile } from "#core/manifest/export-fields.ts";
 import type { Export } from "#core/manifest/model.ts";
@@ -67,6 +67,25 @@ export async function fromPath(path: string): Promise<Work> {
     kind,
     path: folder ? root : path,
     description: meta.description === undefined ? undefined : descriptionText(meta.description),
+    home: undefined,
+    row: undefined,
+    base: undefined,
+  };
+}
+
+/** Named for its folder or file; its entry, or the one file it is, says what it is about. */
+export async function declaredWork(path: string, kind: ArtifactKind): Promise<Work> {
+  const spec = kindSpec(kind);
+  const file = spec?.shape === "file";
+  let entry = spec?.entry === undefined ? undefined : join(path, spec.entry);
+  if (file) entry = path;
+  const text = entry === undefined ? undefined : await textAt(entry);
+  const description = text === undefined ? undefined : frontmatter(text).description;
+  return {
+    name: sanitizeName(file ? basename(path, extname(path)) : basename(path)),
+    kind,
+    path,
+    description: description === undefined ? undefined : descriptionText(description),
     home: undefined,
     row: undefined,
     base: undefined,

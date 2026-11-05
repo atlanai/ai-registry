@@ -6,6 +6,7 @@ import { SEARCH_COMMAND } from "#cli/commands/search/spec.ts";
 import { needsInput, parse } from "#cli/options/parse.ts";
 import { trackSearch } from "#cli/telemetry/events.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { kindSpec, knownKinds } from "#core/kinds.ts";
 import { formatAddress } from "#core/ref.ts";
 import { scopeName } from "#core/store/paths.ts";
 import { truncate } from "#core/term/format.ts";
@@ -17,6 +18,15 @@ import { scopeRoots } from "#engine/scope/locate.ts";
 import { defineCommand } from "./define.ts";
 
 const DESCRIPTION_WIDTH = 60;
+
+/** Checked once adapters have declared their kinds, which happens after parsing. */
+function refuseUnknownKind(kind: string): void {
+  if (kindSpec(kind) !== undefined) return;
+  throw new AiregError(`--kind takes ${list(knownKinds(), "or")}, not ${quoted(kind)}.`, {
+    code: ErrorCode.Usage,
+    hint: "Run `aireg search --help` for the options it takes.",
+  });
+}
 
 interface Match {
   address: string;
@@ -59,9 +69,11 @@ export const { run } = defineCommand({
         "Name it: `aireg search <query>`, such as `aireg search review`.",
       );
     }
-    return { query, registry: own.registry, kind: own.kind, common };
+    // `--kind Skill` names the same kind as `--kind skill`.
+    return { query, registry: own.registry, kind: own.kind?.trim().toLowerCase(), common };
   },
   async run({ query, registry, kind, common }, context): Promise<Searched> {
+    if (kind !== undefined) refuseUnknownKind(kind);
     const known = await knownRegistries(common, context.cwd);
     const targets =
       registry === undefined

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
-import type { ArtifactKind } from "#adapter/kinds.ts";
+import { type ArtifactKind, isBuiltinKind } from "#adapter/kinds.ts";
+import { kindSpec } from "#core/kinds.ts";
 import type { Scope, Where } from "#core/store/paths.ts";
 import type { Target, Targets } from "./contract.ts";
 import { userTargetRoot } from "./roots.ts";
@@ -159,4 +160,10 @@ export function takesPlugin(target: Target, scope: Scope = "user"): boolean {
   }
   // A kind pinned to one scope is not placed in the others at all.
   return mapping.scope === undefined || mapping.scope === scope;
+}
+
+/** A declared kind no target maps is published, never installed. */
+export function publishOnly(kind: ArtifactKind, targetTable: Targets): boolean {
+  if (isBuiltinKind(kind) || kindSpec(kind) === undefined) return false;
+  return !Object.values(targetTable).some((target) => target.kinds[kind] !== undefined);
 }

@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import type { ArtifactKind } from "#adapter/kinds.ts";
+import { type ArtifactKind, isBuiltinKind } from "#adapter/kinds.ts";
 import { digestHex } from "#adapter/spec/ref.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import { setting } from "#core/env.ts";
@@ -8,7 +8,7 @@ import { isSha256Hex, sha256Hex, shortHash } from "#core/fs/hash.ts";
 import { PRIVATE_DIR } from "#core/fs/mode.ts";
 import { homeDir } from "#core/fs/path.ts";
 import { canonical } from "#core/fs/realpath.ts";
-import { kindDir, stagedLeaf } from "#core/kinds.ts";
+import { kindDir, kindSpec, stagedLeaf } from "#core/kinds.ts";
 import { HOME_DIR, LEGACY_TARGETS_DIR, TARGETS_DIR } from "#core/product.ts";
 
 export const SCOPES = ["user", "project"] as const;
@@ -143,6 +143,9 @@ export function cacheDir(env: NodeJS.ProcessEnv = process.env): string {
 /** Dot-prefixed so it cannot collide with a registry alias, which `sanitizeName` never dots. */
 export const PROJECTIONS_DIR = ".projections";
 
+/** Kinds adapters declare, kept out of every namespace folder, which a target may load as a plugin. */
+const DECLARED_KINDS_DIR = ".kinds";
+
 export function registryDir(roots: Pick<Roots, "artifacts">, source: string): string {
   return join(roots.artifacts, sanitizeName(source));
 }
@@ -183,6 +186,17 @@ export function artifactPath(
   sourcePath: string,
 ): string {
   if (kind === "plugin") return namespaceDir(roots, source, name);
+  if (!isBuiltinKind(kind)) {
+    const at = join(
+      roots.artifacts,
+      DECLARED_KINDS_DIR,
+      sanitizeName(source),
+      kind,
+      sanitizeName(namespace ?? source),
+    );
+    // Nothing installs a kind no loaded adapter declares, so this only names a place to look.
+    return join(at, kindSpec(kind) === undefined ? name : stagedLeaf(kind, name, sourcePath));
+  }
   return join(
     namespaceDir(roots, source, namespace),
     kindDir(kind),

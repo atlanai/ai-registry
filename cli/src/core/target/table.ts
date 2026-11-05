@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { expandUserPath } from "#core/fs/path.ts";
+import { declaredKinds } from "#core/kinds.ts";
 import { codecOf } from "#core/target/codecs/index.ts";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
 import type { KindMapping, Target, TargetDefinition, Targets } from "./contract.ts";
@@ -18,7 +19,8 @@ export function resolveTargets(env: NodeJS.ProcessEnv): Targets {
     definitions.set(file.definition.id, { definition: file.definition, origin: file.path });
   }
   const out: Targets = {};
-  for (const { definition, origin } of definitions.values()) {
+  for (const { definition: own, origin } of definitions.values()) {
+    const definition = withDeclaredKinds(own);
     out[definition.id] = toTarget(definition, env, origin);
     for (const profile of profilesOf(definition, env, origin)) out[profile.name] = profile;
   }
@@ -28,6 +30,17 @@ export function resolveTargets(env: NodeJS.ProcessEnv): Targets {
     }
   }
   return out;
+}
+
+/** An adapter's mapping fills in only a kind the target does not already map. */
+function withDeclaredKinds(definition: TargetDefinition): TargetDefinition {
+  const added: Record<string, KindMapping> = {};
+  for (const { name, targets } of declaredKinds()) {
+    const mapping = targets[definition.id];
+    if (mapping !== undefined && definition.kinds[name] === undefined) added[name] = mapping;
+  }
+  if (Object.keys(added).length === 0) return definition;
+  return { ...definition, kinds: { ...definition.kinds, ...added } };
 }
 
 function toTarget(

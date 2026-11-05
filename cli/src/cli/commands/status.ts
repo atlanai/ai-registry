@@ -3,7 +3,7 @@ import { relative } from "node:path";
 import { ifPresent } from "#adapter/files.ts";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
-import { plural } from "#adapter/text.ts";
+import { plural, quoted } from "#adapter/text.ts";
 import type { Approval, StatusResult } from "#cli/commands/status/result.ts";
 import { STATUS_COMMAND } from "#cli/commands/status/spec.ts";
 import { noArguments, parse } from "#cli/options/parse.ts";
@@ -12,6 +12,7 @@ import { type Installed, installed } from "#cli/render/installed.ts";
 import { renderStatus } from "#cli/render/status.ts";
 import { chosenFor, scopeTargets, toolName } from "#cli/render/tools.ts";
 import { ExitCode } from "#core/errors.ts";
+import { kindSpec } from "#core/kinds.ts";
 import { type Lock, readLock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
@@ -69,6 +70,13 @@ export const { run } = defineCommand({
     const dangling = await danglingLinks(roots, targetTable, names(targetTable), lock);
     const loose = await Promise.all(found.local.map(unmanaged));
     const rows = installed(lock, manifest, targetTable);
+    // Without its kind's spec aireg cannot find the copy, so it says so rather than calling it ok.
+    for (const [name, row] of Object.entries(lock.artifacts)) {
+      if (kindSpec(row.kind) !== undefined) continue;
+      context.printer.warning(
+        `Did not check ${quoted(name)}: no loaded adapter declares its kind, ${quoted(row.kind)}.`,
+      );
+    }
     if (worstState(statuses) !== "ok") context.exit = ExitCode.Changed;
     return { roots, manifest, lock, targetTable, statuses, rows, clashes, loose, dangling };
   },

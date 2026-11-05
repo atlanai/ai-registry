@@ -7,6 +7,7 @@ import {
   SKILL_ENTRY,
 } from "#adapter/kinds.ts";
 import { quoted } from "#adapter/text.ts";
+import type { KindMapping } from "#core/target/contract.ts";
 import { AiregError, ErrorCode } from "./errors.ts";
 import { AGENT_CARD_ENTRY } from "./product.ts";
 
@@ -39,21 +40,45 @@ const BUILTIN_SPECS: Readonly<Record<BuiltinKind, KindSpec>> = {
   },
 };
 
+/** A kind an adapter declared, accepted when adapters loaded. */
+export interface DeclaredKind {
+  name: string;
+  spec: KindSpec;
+  description: string | undefined;
+  /** By canonical target id; a target's own mapping for the kind wins. */
+  targets: Readonly<Record<string, KindMapping>>;
+}
+
+let declared = new Map<string, DeclaredKind>();
+
+/** Replaces what an earlier load declared, so a removed adapter takes its kinds with it. */
+export function declareKinds(kinds: readonly DeclaredKind[]): void {
+  declared = new Map(kinds.map((kind) => [kind.name, kind]));
+}
+
+export function declaredKinds(): readonly DeclaredKind[] {
+  return [...declared.values()];
+}
+
 /** Undefined for a kind aireg does not know, which is stored as is but never installed. */
 export function kindSpec(kind: ArtifactKind): KindSpec | undefined {
-  return isBuiltinKind(kind) ? BUILTIN_SPECS[kind] : undefined;
+  return isBuiltinKind(kind) ? BUILTIN_SPECS[kind] : declared.get(kind)?.spec;
 }
 
 /** Every kind with a spec, built-ins first. */
 export function knownKinds(): ArtifactKind[] {
-  return [...KINDS];
+  return [...KINDS, ...[...declared.keys()].sort()];
 }
 
-/** Kinds the registry scanner walks; `plugin` is found by its manifest. */
+/**
+ * Kinds the scanner walks; `plugin` is found by its manifest. A folder kind with no entry file
+ * would take any folder, so it is never scanned.
+ */
 export function scannedKinds(): [ArtifactKind, KindSpec][] {
   return knownKinds().flatMap((kind) => {
     const spec = kindSpec(kind);
-    return kind === "plugin" || spec === undefined ? [] : [[kind, spec]];
+    if (kind === "plugin" || spec === undefined) return [];
+    return spec.shape === "directory" && spec.entry === undefined ? [] : [[kind, spec]];
   });
 }
 

@@ -139,7 +139,9 @@ describe("codex plugins as a local marketplace", () => {
     expect(text.startsWith(theirs)).toBe(true);
     expect(text.match(/\[marketplaces\.acme-prod\]/g)).toHaveLength(1);
     await expect(lstat(index("acme-prod"))).rejects.toThrow();
-    expect(result.kept).toEqual([{ name: "acme-prod", path: config }]);
+    expect(result.kept).toEqual([
+      { name: "acme-prod", path: config, key: "marketplaces.acme-prod" },
+    ]);
   });
 
   test("records the new mode for every artifact that shares the plugin it relinked", async () => {

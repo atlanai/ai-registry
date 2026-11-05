@@ -11,14 +11,14 @@ import {
   sha256,
   type UploadFile,
 } from "#adapter/index.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { isBuiltinKind, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { describeFile } from "#adapter/spec/envelope.ts";
 import { isVersion } from "#adapter/spec/ref.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { frontmatterRecord, ownDescription } from "#core/frontmatter.ts";
+import { descriptionText, frontmatterRecord, ownDescription } from "#core/frontmatter.ts";
 import { authoredArtifact, isDirectory, refusal } from "#core/fs/tree.ts";
-import { AGENT_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, type KindSpec, kindSpec } from "#core/kinds.ts";
 import { envelopeSpec } from "./kind-manifests.ts";
 
 const reading = limiter(CONCURRENCY);
@@ -56,15 +56,24 @@ export async function offerFrom(
   const descriptors = files.map((file) =>
     describeFile(file.path, sha256(file.content), file.content.byteLength),
   );
-  const description = target.description ?? ownDescription(bytes, target.name);
+  const declared = isBuiltinKind(target.kind) ? undefined : kindSpec(target.kind);
+  // A declared kind's entry, when it has one, describes it; its other files never do.
+  const own = declared === undefined ? undefined : ownEntry(declared, files);
+  const front =
+    own === undefined ? undefined : frontmatterRecord(Buffer.from(own.content).toString("utf8"));
+  const description =
+    target.description ??
+    (declared === undefined ? ownDescription(bytes, target.name) : textField(front?.description));
   // An explicitly supplied native agent file is its entry, even when the target
   // names it reviewer.md. Registry directories still use only declared entries.
   const [entry] = files;
   const nativeAgent = target.kind === "agent" && path.endsWith(".md") && !(await isDirectory(path));
-  const spec =
-    nativeAgent && entry !== undefined
-      ? (frontmatterRecord(Buffer.from(entry.content).toString("utf8")) ?? {})
-      : envelopeSpec(target.kind, bytes, undefined, target.name);
+  let spec: Record<string, unknown>;
+  if (declared !== undefined) {
+    spec = { ...front, name: target.name, ...(description === undefined ? {} : { description }) };
+  } else if (nativeAgent && entry !== undefined) {
+    spec = frontmatterRecord(Buffer.from(entry.content).toString("utf8")) ?? {};
+  } else spec = envelopeSpec(target.kind, bytes, undefined, target.name);
   // Relationships are part of the content identity: a version whose only change is an edge is new.
   const input: PublishInput = {
     ...(target.id === undefined || target.id === "" ? {} : { id: target.id }),
@@ -185,8 +194,20 @@ function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
   return { path: AGENT_ENTRY, content: Buffer.from(filled, "utf8"), executable: false };
 }
 
+/** The file a declared kind is read from: its entry, or the one file a file kind is. */
+function ownEntry(spec: KindSpec, files: readonly UploadFile[]): UploadFile | undefined {
+  if (spec.shape === "file") return files.length === 1 ? files[0] : undefined;
+  return spec.entry === undefined ? undefined : files.find((file) => file.path === spec.entry);
+}
+
+function textField(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? descriptionText(value) : undefined;
+}
+
 function firstOf<T extends { path: string }>(kind: ArtifactKind, files: readonly T[]): T[] {
-  const entry = kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
+  let entry = kindSpec(kind)?.entry;
+  if (isBuiltinKind(kind)) entry = kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
+  if (entry === undefined) return [...files];
   return [
     ...files.filter((file) => file.path === entry),
     ...files.filter((file) => file.path !== entry),

@@ -1,5 +1,5 @@
 import { join, posix } from "node:path";
-import type { ArtifactKind } from "#adapter/index.ts";
+import { type ArtifactKind, isBuiltinKind } from "#adapter/index.ts";
 import { subdirectories } from "#core/fs/tree.ts";
 import { scannedKinds } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
@@ -39,7 +39,8 @@ export async function unlockedCopies(
     for (const namespace of await subdirectories(registryDir(roots, registry))) {
       if (plugins.has(`${registry}\u0000${namespace}`)) continue;
       const base = namespaceDir(roots, registry, namespace);
-      for (const [kind, spec] of scannedKinds()) {
+      // A declared kind's copies are kept apart from the namespace, so only built-ins are here.
+      for (const [kind, spec] of scannedKinds().filter(([kind]) => isBuiltinKind(kind))) {
         const entries = await entriesIn(
           base,
           join(base, spec.dir),
