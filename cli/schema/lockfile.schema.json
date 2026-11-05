@@ -102,6 +102,10 @@
                 {
                   "const": "agent",
                   "type": "string"
+                },
+                {
+                  "const": "knowledge",
+                  "type": "string"
                 }
               ]
             },

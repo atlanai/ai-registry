@@ -175,9 +175,24 @@ describe("exports and publish", () => {
     expect(formatManifest(manifest)).toBe(`${declared}${text}`);
   });
 
+  test("reads `kind: knowledge`", () => {
+    const manifest = read(
+      "exports:\n  - path: knowledge/accounts-and-signals\n    kind: knowledge\n",
+    );
+    expect(manifest.exports).toEqual([
+      {
+        path: "knowledge/accounts-and-signals",
+        kind: "knowledge",
+        version: undefined,
+        dependsOn: [],
+        publish: undefined,
+      },
+    ]);
+  });
+
   test("refuses a `kind` it does not export", () => {
     expect(refused(entry("    kind: plugin\n"))).toThrow(
-      'manifest.yml: `kind` of export ".claude/agents/reviewer.md" must be skill or agent.',
+      'manifest.yml: `kind` of export ".claude/agents/reviewer.md" must be skill, agent or knowledge.',
     );
   });
 

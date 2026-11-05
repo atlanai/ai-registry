@@ -9,7 +9,8 @@ import type { ArtifactKind } from "#core/kinds.ts";
 import { AGENT_ENTRY, SKILL_ENTRY } from "#core/kinds.ts";
 import type { Export, ExportFile } from "#core/manifest.ts";
 
-function entryOf(kind: ArtifactKind): string {
+function entryOf(kind: ArtifactKind): string | undefined {
+  if (kind === "knowledge") return undefined;
   return kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
 }
 
@@ -123,10 +124,16 @@ export async function chooseFiles(choosing: Choosing, base: string): Promise<Exp
   for (const { entry: each, pattern } of patterns) {
     if (!unmatched.has(pattern)) choosing.matched.add(`${each.path}\0${pattern}`);
   }
-  const files = [{ from: entry, as: entry }, ...kept.filter((file) => file.from !== entry)];
+  // A knowledge bundle has no entry file, so every file is sorted alike.
+  const files =
+    entry === undefined
+      ? kept
+      : [{ from: entry, as: entry }, ...kept.filter((file) => file.from !== entry)];
   refuseShared(files, shown);
 
   const unique = [...new Map(files.map((file) => [`${file.from}\0${file.as}`, file])).values()];
+  const byPath = (a: ExportFile, b: ExportFile) => (a.as < b.as ? -1 : a.as > b.as ? 1 : 0);
+  if (entry === undefined) return unique.sort(byPath);
   const [first, ...rest] = unique;
-  return [first as ExportFile, ...rest.sort((a, b) => (a.as < b.as ? -1 : a.as > b.as ? 1 : 0))];
+  return [first as ExportFile, ...rest.sort(byPath)];
 }

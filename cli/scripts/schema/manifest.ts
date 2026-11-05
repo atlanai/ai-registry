@@ -165,8 +165,9 @@ const DetailedExport = Type.Object(
         "One path relative to the project: an artifact, such as .claude/agents/reviewer.md, or a folder, whose artifacts directly inside it are each exported.",
     }),
     kind: Type.Optional(
-      Type.Union([Type.Literal("skill"), Type.Literal("agent")], {
-        description: "When set, every artifact the entry reaches must be this kind.",
+      Type.Union([Type.Literal("skill"), Type.Literal("agent"), Type.Literal("knowledge")], {
+        description:
+          "When set, every artifact the entry reaches must be this kind. knowledge names the folder itself as one knowledge bundle, since a bundle has no entry file to find it by.",
       }),
     ),
     version: Type.Optional(

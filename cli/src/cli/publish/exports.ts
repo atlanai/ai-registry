@@ -17,7 +17,7 @@ import {
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { artifactRoot } from "./reach.ts";
 import type { Destination, Planned, Published } from "./target.ts";
-import { fromPath, type Work } from "./work.ts";
+import { bundleWork, fromPath, type Work } from "./work.ts";
 
 /** Collect publishable exports and reject duplicate kind/name identities. */
 export async function exportWork(
@@ -28,7 +28,8 @@ export async function exportWork(
   const seen = new Map<string, Work>();
   for (const [path, entry] of found) {
     if (entry.publish === false) continue;
-    const work: Work = { ...(await fromPath(path)), exported: entry };
+    const read = entry.kind === "knowledge" ? bundleWork(path) : await fromPath(path);
+    const work: Work = { ...read, exported: entry };
     const key = `${work.kind}/${work.name}`;
     const other = seen.get(key);
     if (other !== undefined) {
@@ -103,7 +104,9 @@ export function forTarget(
 function untaken(work: Work, adapter: SourceAdapter, alias: string): string | undefined {
   if (work.exported === undefined) return undefined;
   const kinds = adapter.publishKinds ?? adapter.artifactKinds;
-  if (!kinds.includes(work.kind)) return `${alias} does not take ${work.kind}s`;
+  if (!kinds.includes(work.kind)) {
+    return `${alias} does not take ${work.kind === "knowledge" ? "knowledge bundles" : `${work.kind}s`}`;
+  }
   const files = work.exported.files?.length ?? 1;
   if (work.kind !== "agent" || files <= 1 || adapter.capabilities.agentFolders === true) {
     return undefined;

@@ -243,7 +243,7 @@
                 "type": "string"
               },
               "kind": {
-                "description": "When set, every artifact the entry reaches must be this kind.",
+                "description": "When set, every artifact the entry reaches must be this kind. knowledge names the folder itself as one knowledge bundle, since a bundle has no entry file to find it by.",
                 "anyOf": [
                   {
                     "const": "skill",
@@ -251,6 +251,10 @@
                   },
                   {
                     "const": "agent",
+                    "type": "string"
+                  },
+                  {
+                    "const": "knowledge",
                     "type": "string"
                   }
                 ]

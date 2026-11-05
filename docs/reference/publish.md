@@ -13,7 +13,7 @@ aireg publish [<path> | <glob> | <name>]... [--to <registry>/<namespace>[/<name>
 
 ## Description
 
-`aireg publish` sends skills and agents to a registry as new versions. Each argument can be:
+`aireg publish` sends skills and agents, and the knowledge bundles a repository exports, to a registry as new versions. Each argument can be:
 
 - a path to a skill folder (a folder holding `SKILL.md`) or to an agent's `.md` file
 - a glob over paths, such as `'.claude/skills/*'`
@@ -114,6 +114,18 @@ publish:
 ```
 
 `depends_on` names an artifact in the project, as `./<path>`, or a declared installed artifact. A path no entry reaches is exported with it, at its next version; one an entry keeps with `publish: false` or leaves out with `exclude` is refused. Remote pins belong in `artifacts:`; publish records the exact installed release label and refuses a stale pin until `aireg install` updates it. Dependencies must belong to the publishing registry. An unpinned parent gets a new version when its exact dependency changes; bump a fixed parent version explicitly.
+
+A knowledge bundle is a folder of Open Knowledge Format documents and the files they describe, such as JSON or SQL. It has no entry file, so an export names one with `kind: knowledge`, and the folder itself is the bundle, named after the folder:
+
+```yaml
+exports:
+  - path: knowledge/accounts-and-signals
+    kind: knowledge
+publish:
+  to: acme/engineering
+```
+
+Everything in the folder is published as written, under its path in the folder. Before anything is sent, `publish` refuses a bundle with a Markdown file other than `index.md` or `log.md` that has no YAML front matter with a non-empty `type`, a path that is not a safe relative path, longer than 1024 bytes or deeper than 16 levels, `bundle.zip` or `bundle.tar.gz` at its root, or more than 10,000 files or 64 MiB, and names each path. Only a registry whose adapter takes knowledge accepts one; the others skip it, and a registry folder does not take knowledge yet. aireg publishes knowledge bundles but installs none: `aireg add` refuses one, and a sync leaves one out with a note.
 
 An agent folder contains `AGENT.md` and its companion files. Exports may set `version`, `include` (with optional `as`), and `publish: false`. `include` lists the only files an artifact publishes besides its `AGENT.md` or `SKILL.md`, so a folder agent with `include` leaves out every companion file it doesn't list. The preview shows added, modified and removed files; publishing looks up each exported artifact by name instead of resolving the entire registry.
 

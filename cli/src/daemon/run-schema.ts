@@ -3,8 +3,8 @@ import { ITEM_OUTCOMES, RUN_STATES, RUN_TRIGGERS } from "#core/run/model.ts";
 import { DISPOSITIONS } from "#core/sync/model.ts";
 import { SYNC_OPERATIONS } from "#core/sync/policy.ts";
 
-/** History is a cache, so any other layout is rebuilt. */
-export const RUN_SCHEMA_VERSION = 1;
+/** History is a cache, so any other layout is rebuilt. 2: `kind` admits knowledge. */
+export const RUN_SCHEMA_VERSION = 2;
 
 /** Newest runs kept per job. Older ones take their events with them. */
 export const RUN_HISTORY_PER_JOB = 200;

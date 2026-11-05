@@ -23,7 +23,7 @@ Under the table, `next` is the command that installs the best match.
 | Option | Description |
 |---|---|
 | `-r`, `--registry <registry>` | Search only this registry, by name or address. |
-| `--kind <kind>` | Only artifacts of this kind: `plugin`, `skill` or `agent`. |
+| `--kind <kind>` | Only artifacts of this kind: `plugin`, `skill`, `agent` or `knowledge`. |
 | `-g`, `--user` | Search the registries your user scope declares. |
 
 See [Command options](options.md#command-options).

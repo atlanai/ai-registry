@@ -118,6 +118,19 @@ export async function fromPath(path: string): Promise<Work> {
   };
 }
 
+/** A knowledge bundle is named for its folder: it has no entry file to carry a name. */
+export function bundleWork(path: string): Work {
+  return {
+    name: sanitizeName(basename(path)),
+    kind: "knowledge",
+    path,
+    description: undefined,
+    home: undefined,
+    row: undefined,
+    base: undefined,
+  };
+}
+
 export async function expand(pattern: string, cwd: string): Promise<string[]> {
   const found: string[] = [];
   for await (const match of glob(pattern, { cwd })) found.push(resolve(cwd, match));

@@ -86,6 +86,8 @@ function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
 }
 
 function firstOf<T extends { path: string }>(kind: ArtifactKind, files: readonly T[]): T[] {
+  // A knowledge bundle has no entry file to put first.
+  if (kind === "knowledge") return [...files];
   const entry = kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
   return [
     ...files.filter((file) => file.path === entry),
@@ -139,6 +141,14 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
   );
 }
 
+/**
+ * A knowledge bundle's spec is its name and description alone. Its files are never read for
+ * one: a bundle's JSON is its content, not a card, so it never stands in for the spec.
+ */
+function knowledgeSpec(name: string, description: string | undefined): Record<string, unknown> {
+  return { name, ...(description === undefined ? {} : { description }) };
+}
+
 /** One artifact on disk as an adapter takes it, described the way an adapter reads one. */
 export async function offerFrom(
   path: string,
@@ -157,15 +167,20 @@ export async function offerFrom(
   const descriptors = files.map((file) =>
     describeFile(file.path, sha256(file.content), file.content.byteLength),
   );
-  const description = target.description ?? ownDescription(bytes, target.name);
+  // A bundle's documents each describe themselves; none describes the bundle.
+  const description =
+    target.description ??
+    (target.kind === "knowledge" ? undefined : ownDescription(bytes, target.name));
   // An explicitly supplied native agent file is its entry, even when the target
   // names it reviewer.md. Registry directories still use only declared entries.
   const [entry] = files;
   const nativeAgent = target.kind === "agent" && path.endsWith(".md") && !(await isDirectory(path));
   const spec =
-    nativeAgent && entry !== undefined
-      ? (frontmatterRecord(Buffer.from(entry.content).toString("utf8")) ?? {})
-      : envelopeSpec(target.kind, bytes, undefined, target.name);
+    target.kind === "knowledge"
+      ? knowledgeSpec(target.name, description)
+      : nativeAgent && entry !== undefined
+        ? (frontmatterRecord(Buffer.from(entry.content).toString("utf8")) ?? {})
+        : envelopeSpec(target.kind, bytes, undefined, target.name);
   const input: PublishInput = {
     ...(target.id === undefined || target.id === "" ? {} : { id: target.id }),
     name: target.name,

@@ -87,5 +87,5 @@ $ aireg search lint --kind widget
 ? 2
 error: "widget" is not a kind.
   code: usage
-hint: Use plugin, skill or agent.
+hint: Use plugin, skill, agent or knowledge.
 ```
