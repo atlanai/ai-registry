@@ -18,10 +18,6 @@ These describe the CLI's own files. The registry documents an artifact is
 published as - `registry.json`, `index.json`, `versions.json`, `artifact.json` -
 are the file spec's, and their schemas live in [`spec/schemas`](../../spec/schemas).
 
-Each output schema is checked at compile time against the result type the command
-declares in `src/cli/commands/<command>/result.ts`, and a contract test runs the
-real command and validates what it prints.
-
 ## Policies
 
 **The parser is authoritative, not the schema.** These exist so an editor can
