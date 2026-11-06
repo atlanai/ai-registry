@@ -1,0 +1,5 @@
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint/
+project/.agents/skills/lint/SKILL.md 033c42c8b599
