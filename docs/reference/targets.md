@@ -42,6 +42,7 @@ Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agent
 | Grok Build | `grok` | `.grok/skills/` | `~/.grok/skills/` |
 | Pi | `pi` | `.agents/skills/` | `~/.agents/skills/` |
 | Google Antigravity | `antigravity` | `.agents/skills/` | `~/.gemini/config/skills/` |
+| Hermes Agent | `hermes-agent` | `.agents/skills/` | `~/.hermes/skills/` |
 | Shared `.agents` folder | `universal` | `.agents/skills/` | `~/.agents/skills/` |
 
 ### Agents
@@ -58,15 +59,17 @@ Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agent
 | Google Antigravity | `antigravity` | none | `~/.gemini/config/agents/` |
 | Shared `.agents` folder | `universal` | `.agents/agents/` | `~/.agents/agents/` |
 
-Pi has no agents, so aireg installs none for it.
+Pi and Hermes Agent have no agents, so aireg installs none for them.
 
-A user folder moves with its target's own variable: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, `GROK_HOME`, `PI_CODING_AGENT_DIR`, or `XDG_CONFIG_HOME` for OpenCode.
+A user folder moves with its target's own variable: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, `GROK_HOME`, `HERMES_HOME`, `PI_CODING_AGENT_DIR`, or `XDG_CONFIG_HOME` for OpenCode.
 
 With `GEMINI_CLI_HOME` set, Gemini CLI reads `.agents/skills` inside that folder, not the shared `~/.agents/skills`. aireg places Gemini CLI's own skills under the variable, but a skill you install for Gemini CLI together with a target that reads `~/.agents`, such as Codex, lands only in that shared folder, where Gemini CLI does not look. While the variable is set, install for Gemini CLI on its own: `aireg add -g <source> --for gemini-cli`.
 
 Google Antigravity covers its App, IDE and CLI, which share `~/.gemini/config`. aireg writes its skills as copies, and its agents only in your user scope, since a project's `.agents/agents` holds other tools' agents.
 
-When a target's own folder is a shared folder's, as Antigravity's `.agents/skills` is in a project, aireg writes that folder once for both, as copies if either takes copies.
+Hermes Agent reads a project's skills only at its repository root, once you run `hermes skills trust`, and your own skills only from `~/.hermes/skills`, not `~/.agents/skills`. It rewrites a skill as it learns, so aireg writes its skills as copies, and `aireg status` shows what it changed. On Windows, where its folder is `%LOCALAPPDATA%\hermes`, set `HERMES_HOME`.
+
+When a target's own folder is a shared folder's, as Antigravity's and Hermes Agent's `.agents/skills` is in a project, aireg writes that folder once for both, as copies if either takes copies.
 
 The shared `.agents` folder is one several coding agents read, not a coding agent, so aireg never detects it and never installs into it by default.
 
