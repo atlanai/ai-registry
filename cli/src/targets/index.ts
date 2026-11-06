@@ -5,6 +5,7 @@ import { cursor } from "./cursor.ts";
 import { geminiCli } from "./gemini-cli.ts";
 import { githubCopilot } from "./github-copilot.ts";
 import { grok } from "./grok.ts";
+import { hermesAgent } from "./hermes-agent.ts";
 import { opencode } from "./opencode.ts";
 import { pi } from "./pi.ts";
 import { universal } from "./universal.ts";
@@ -20,5 +21,6 @@ export const BUILTIN_TARGETS = [
   grok,
   pi,
   antigravity,
+  hermesAgent,
   universal,
 ] as const;

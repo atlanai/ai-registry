@@ -46,6 +46,16 @@ describe("placementFor", () => {
     ]);
   });
 
+  // Hermes Agent drops a skill it finds in both of a project's folders, and reads no `~/.agents`.
+  test("gives Hermes Agent a project's shared folder and its own in your user scope", () => {
+    expect(place("skill", ["hermes-agent", "codex"]).targets).toEqual(["universal"]);
+    expect(place("skill", ["hermes-agent", "codex"], "user").targets).toEqual([
+      "hermes-agent",
+      "universal",
+    ]);
+    expect(place("agent", ["hermes-agent"])).toEqual({ targets: [], unreadable: ["hermes-agent"] });
+  });
+
   test("ignores names it does not know and repeats it was given", () => {
     expect(place("skill", ["claude-code", "claude-code", "missing"]).targets).toEqual([
       "claude-code",
