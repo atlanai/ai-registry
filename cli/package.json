@@ -1,6 +1,6 @@
 {
   "name": "@atlanai/aireg",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "Install agent artifacts from any registry into any coding agent.",
   "keywords": [
