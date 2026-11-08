@@ -23,7 +23,8 @@
 | `COPILOT_HOME` | Where GitHub Copilot keeps its user folder, if not `~/.copilot`. |
 | `GEMINI_CLI_HOME` | The folder that holds Gemini CLI's `.gemini` user folder, if not your home folder. |
 | `PI_CODING_AGENT_DIR` | Where Pi keeps its user folder, if not `~/.pi/agent`. |
-| `AI_AGENT`, `CLAUDECODE`, `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_THREAD_ID`, `CURSOR_AGENT`, `COPILOT_CLI`, `GEMINI_CLI`, `GROK_SESSION_ID`, `PI_CODING_AGENT`, `ANTIGRAVITY_AGENT`, `AUGMENT_AGENT`, `OPENCODE`, `REPL_ID` | Set by a coding agent that runs aireg, which then asks no questions. See [When aireg asks questions](options.md#when-aireg-asks-questions). |
+| `HERMES_HOME` | Where Hermes Agent keeps its user folder, if not `~/.hermes`. |
+| `AI_AGENT`, `CLAUDECODE`, `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_THREAD_ID`, `CURSOR_AGENT`, `COPILOT_CLI`, `GEMINI_CLI`, `GROK_SESSION_ID`, `PI_CODING_AGENT`, `ANTIGRAVITY_AGENT`, `HERMES_AGENT`, `AUGMENT_AGENT`, `OPENCODE`, `REPL_ID` | Set by a coding agent that runs aireg, which then asks no questions. See [When aireg asks questions](options.md#when-aireg-asks-questions). |
 | `CI` | Any value means a CI service runs aireg. aireg then asks no questions, skips its update check, and the installer offers no skills. |
 | `BROWSER` | The browser `aireg auth login` and the console open a link in, instead of the system default. The first program of a `:`-separated list (`;` on Windows), run with the link as its only argument. |
 | `TERM` | `dumb` turns color and animation off. |

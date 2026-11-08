@@ -1,0 +1,23 @@
+{
+  "id": "hermes-agent",
+  "displayName": "Hermes Agent",
+  "category": "personal-agent",
+  "overrides": true,
+  "roots": {
+    "project": ".agents",
+    "user": { "default": "~/.hermes", "env": "HERMES_HOME" }
+  },
+  "detect": { "env": ["HERMES_HOME"], "binary": ["hermes"], "projectRoot": false },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": {
+      "shape": "directory",
+      "subdir": "skills",
+      "place": "copy",
+      "keys": { "disable-model-invocation": false }
+    }
+  },
+  "verified": { "command": ["hermes", "--version"], "range": "0.23.0" },
+  "trust": { "skill": { "run": "hermes skills trust", "scope": "project" } },
+  "reload": "Hermes Agent sees the change at your next message; run /reload-skills to refresh its slash commands."
+}
