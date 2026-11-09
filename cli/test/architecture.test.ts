@@ -195,7 +195,7 @@ describe("architecture", () => {
 test("no source file holds a literal control byte", () => {
   const found = sources(SRC).filter((file) =>
     [...readFileSync(file, "utf8")].some(
-      (char) => char.charCodeAt(0) < 32 && char !== "\n" && char !== "\t",
+      (char) => char.charCodeAt(0) < 32 && char !== "\n" && char !== "\r" && char !== "\t",
     ),
   );
   expect(found.map((file) => relative(PACKAGE, file))).toEqual([]);

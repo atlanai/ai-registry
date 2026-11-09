@@ -56,7 +56,11 @@ async function place(source: string, name: string): Promise<string> {
   const at = placement(source, name);
   await mkdir(join(at, ".."), { recursive: true });
   await mkdir(join(home, "artifacts", name), { recursive: true });
-  await symlink(join(home, "artifacts", name), at);
+  await symlink(
+    join(home, "artifacts", name),
+    at,
+    process.platform === "win32" ? "junction" : undefined,
+  );
   return at;
 }
 
@@ -397,7 +401,11 @@ describe("applyRegister, kept to the run's target roots", () => {
     const at = join(elsewhere, "plugins", "acme", "sales");
     await mkdir(join(at, ".."), { recursive: true });
     await mkdir(join(home, "artifacts", "sales"), { recursive: true });
-    await symlink(join(home, "artifacts", "sales"), at);
+    await symlink(
+    join(home, "artifacts", "sales"),
+    at,
+    process.platform === "win32" ? "junction" : undefined,
+  );
 
     await applyRegister([{ path: at, target: "tool" }], {
       targetTable: target([SETTINGS]),
