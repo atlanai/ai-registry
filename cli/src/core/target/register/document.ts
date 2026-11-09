@@ -233,7 +233,7 @@ export function yamlDocument(text: string | undefined, start: Table, file: strin
       node.items.splice(index, 1);
       return true;
     },
-    render: () => doc.toString(),
+    render: () => doc.toString({ lineWidth: 0 }),
     value: () => doc.toJS(),
   };
 }
