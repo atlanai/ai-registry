@@ -1,3 +1,4 @@
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { sanitizeName } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
@@ -8,11 +9,15 @@ import { exitOnClash } from "#cli/render/collisions.ts";
 import { planReport } from "#cli/render/plan.ts";
 import { trackRun } from "#cli/telemetry/events.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
+import { kindPlural } from "#core/kinds.ts";
 import { coveredByWhole } from "#core/manifest/match.ts";
 import type { RegistrySource } from "#core/manifest/model.ts";
 import { reached } from "#core/plan/acquire/lock-view.ts";
 import { describeCarried } from "#core/plan/carries.ts";
 import { formatAddress, parseRef } from "#core/ref.ts";
+import { publishOnly } from "#core/target/placement.ts";
+import { resolveTargets } from "#core/target/table.ts";
 import type { Probed, Resolved } from "#engine/address/probe.ts";
 import { runPipeline } from "#engine/install/pipeline.ts";
 import { openAddress, showable } from "./address.ts";
@@ -36,6 +41,7 @@ export async function addAddress(
   }
   const { declared, input, within, resolved, asked, partial, asking, source, alias } = opened;
   const { catalogAlias, entries } = opened;
+  refusePublishOnly(input, resolved.kind);
 
   const gathered = await gather({
     step: asking,
@@ -64,6 +70,8 @@ export async function addAddress(
   );
 
   const refs = requestedRefs(resolved, input, alias, within, choices.select);
+  // A short form or a selection can still land on one once the catalog is read.
+  for (const text of refs) refusePublishOnly(text, parseRef(text).kind);
 
   let approved = true;
   let introduced = false;
@@ -178,6 +186,17 @@ async function trustFor(
     if (await confirmTrust(step, entry.name, describeCarried(carries))) trust.push(entry.name);
   }
   return trust;
+}
+
+function refusePublishOnly(address: string, kind: ArtifactKind | undefined): void {
+  if (kind === undefined || !publishOnly(kind, resolveTargets(process.env))) return;
+  throw new AiregError(
+    `${address} is of the kind ${kind}, which aireg publishes but does not install.`,
+    {
+      code: ErrorCode.Usage,
+      hint: `No target places ${kindPlural(kind)}, so read it from its registry instead.`,
+    },
+  );
 }
 
 // `add acme/my-team --all` takes everything in that address, not every other team.

@@ -51,6 +51,10 @@
               "config": {
                 "const": true,
                 "type": "boolean"
+              },
+              "key": {
+                "description": "The table someone else holds in that config file, dotted.",
+                "type": "string"
               }
             }
           }

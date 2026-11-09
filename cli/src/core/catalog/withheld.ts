@@ -1,5 +1,6 @@
 import type { Withheld as Reported, Newest as ReportedNewest } from "#adapter/contract.ts";
-import { type ArtifactKind, isKind } from "#adapter/kinds.ts";
+import { isKindSegment } from "#adapter/filespec/names.ts";
+import type { ArtifactKind } from "#adapter/kinds.ts";
 import { compareVersion, parseVersion } from "#adapter/semver.ts";
 import { sanitizeName, sanitizeText } from "#adapter/text.ts";
 
@@ -22,7 +23,7 @@ export function withheldFrom(reported: unknown): Withheld[] {
   return reported.flatMap((item: Partial<Reported>) => {
     const [name, version, status] = [text(item?.name), text(item?.version), text(item?.status)];
     if (name === undefined || version === undefined || status === undefined) return [];
-    if (typeof item.kind !== "string" || !isKind(item.kind)) return [];
+    if (typeof item.kind !== "string" || !isKindSegment(item.kind)) return [];
     const group = text(item.namespace);
     const reason = text(item.reason);
     return [
@@ -52,7 +53,7 @@ export function newestFrom(reported: unknown): Newest[] {
   return reported.flatMap((item: Partial<ReportedNewest>) => {
     const [name, version] = [text(item?.name), text(item?.version)];
     if (name === undefined || version === undefined) return [];
-    if (typeof item.kind !== "string" || !isKind(item.kind)) return [];
+    if (typeof item.kind !== "string" || !isKindSegment(item.kind)) return [];
     const group = text(item.namespace);
     return [
       {

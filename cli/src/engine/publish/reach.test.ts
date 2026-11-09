@@ -1,6 +1,7 @@
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect } from "vitest";
+import { afterEach, describe, expect } from "vitest";
+import { declareKinds } from "#core/kinds.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { parseManifest } from "#core/manifest/parse.ts";
 import { lock } from "#test/kit/builders/lock.ts";
@@ -265,7 +266,7 @@ describe("exportsOn, for a folder of artifacts", () => {
     await expect(
       exportsOn(manifestWith("  - path: skills\n    kind: skill\n"), base),
     ).rejects.toMatchObject({
-      message: 'Export "skills" reaches skills/helper.md, which is an agent, not a skill.',
+      message: 'Export "skills" reaches skills/helper.md, which is of the kind agent, not skill.',
       hint: "Leave it out with `exclude`, move it, or remove `kind`.",
       code: "invalid",
     });
@@ -274,6 +275,74 @@ describe("exportsOn, for a folder of artifacts", () => {
       base,
     );
     expect(found.get(join(base, "skills", "review"))?.kind).toBe("skill");
+  });
+});
+
+describe("exportsOn, a kind an adapter declares", () => {
+  afterEach(() => declareKinds([]));
+
+  const declare = () =>
+    declareKinds([
+      {
+        name: "knowledge",
+        spec: { dir: "knowledge", shape: "directory", extensions: [] },
+        description: undefined,
+        targets: {},
+      },
+      {
+        name: "prompt",
+        spec: { dir: "prompt_files", shape: "file", extensions: [".md"] },
+        description: undefined,
+        targets: {},
+      },
+    ]);
+  const accounts = async () => {
+    await mkdir(join(base, "knowledge", "accounts", "contracts"), { recursive: true });
+    await writeFile(join(base, "knowledge", "accounts", "contracts", "routing.json"), "{}\n");
+    await writeFile(join(base, "knowledge", "accounts", "index.md"), "# Contents\n");
+    // An entry file inside does not make it a skill: `kind` says what it is.
+    await writeFile(join(base, "knowledge", "accounts", "SKILL.md"), "---\nname: x\n---\n");
+  };
+
+  test("is the folder `kind` names, with every file it holds and no entry first", async () => {
+    declare();
+    await accounts();
+    const { found } = await exportsOn(
+      manifestWith("  - path: knowledge/accounts\n    kind: knowledge\n"),
+      base,
+    );
+    const at = join(base, "knowledge", "accounts");
+    expect([...found.keys()]).toEqual([at]);
+    expect(found.get(at)?.files?.map((file) => file.as)).toEqual([
+      "SKILL.md",
+      "contracts/routing.json",
+      "index.md",
+    ]);
+  });
+
+  test("refuses a file named as a folder kind, and a folder as a file kind", async () => {
+    declare();
+    await accounts();
+    const reached = (entry: string) => exportsOn(manifestWith(entry), base);
+    await expect(
+      reached("  - path: knowledge/accounts/index.md\n    kind: knowledge\n"),
+    ).rejects.toThrow(
+      'Export "knowledge/accounts/index.md" is a file, but each of the knowledge artifacts is one folder.',
+    );
+    await expect(reached("  - path: knowledge/accounts\n    kind: prompt\n")).rejects.toThrow(
+      'Export "knowledge/accounts" is a folder, but each of the prompt artifacts is one file.',
+    );
+  });
+
+  test("refuses a kind no loaded adapter declares", async () => {
+    await accounts();
+    await expect(
+      exportsOn(manifestWith("  - path: knowledge/accounts\n    kind: knowledge\n"), base),
+    ).rejects.toMatchObject({
+      message:
+        'Export "knowledge/accounts" is of the kind "knowledge", which no loaded adapter declares.',
+      code: "invalid",
+    });
   });
 });
 

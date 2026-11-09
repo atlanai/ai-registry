@@ -1,4 +1,5 @@
 import { type TObject, type TSchema, Type } from "@sinclair/typebox";
+import { KIND_SEGMENT } from "#adapter/filespec/names.ts";
 import { TARGET_CATEGORIES, type ConfigValue as Value } from "#core/target/contract.ts";
 
 const PROGRAM = "^[A-Za-z0-9][A-Za-z0-9._+-]*$";
@@ -166,6 +167,7 @@ const KindMapping = tagged(
   "Where one kind lands inside the target's folder.",
 );
 
+/** The built-ins by name; any other kind in the grammar, for one an adapter declares. */
 const PerKind = <T extends TSchema>(schema: T) =>
   Type.Object(
     {
@@ -173,7 +175,7 @@ const PerKind = <T extends TSchema>(schema: T) =>
       skill: Type.Optional(schema),
       agent: Type.Optional(schema),
     },
-    { additionalProperties: false },
+    { patternProperties: { [KIND_SEGMENT.source]: schema }, additionalProperties: false },
   );
 
 /** The shape of a target file in `$AIREG_HOME/targets/`. The loader stays the authority. */

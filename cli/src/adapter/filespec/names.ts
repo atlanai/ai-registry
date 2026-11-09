@@ -11,7 +11,8 @@ export const ENVELOPE = "artifact.json";
 export const MAX_SEGMENT = 64;
 
 const SEGMENT = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/;
-const KIND_SEGMENT = /^[a-z][a-z0-9_]{0,31}$/;
+/** The file spec's kind grammar; `isKindSegment` tests it. */
+export const KIND_SEGMENT = /^[a-z][a-z0-9_]{0,31}$/;
 
 // Windows opens a device at these names, in any case and with any extension.
 const DEVICE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;

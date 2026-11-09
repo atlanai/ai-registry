@@ -1,6 +1,7 @@
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, plural } from "#adapter/text.ts";
 import { STATE_MEANING, stateTone } from "#core/console/state-style.ts";
+import { kindSpec } from "#core/kinds.ts";
 import type { ArtifactStatus, LinkState, State } from "#core/plan/status.ts";
 import { type Scope, scopeFlag, scopeName } from "#core/store/paths.ts";
 import type { Targets } from "#core/target/contract.ts";
@@ -125,7 +126,8 @@ export function renderStatus(
     );
   }
   if (attention === 0) {
-    printer.success("Everything matches the lockfile.");
+    const unchecked = rows.some((row) => kindSpec(row.kind) === undefined);
+    printer.success(`Everything${unchecked ? " else" : ""} matches the lockfile.`);
     return;
   }
   if (attention < statuses.length) printer.info(printer.style.dim(`ok  ${STATE_MEANING.ok}`));

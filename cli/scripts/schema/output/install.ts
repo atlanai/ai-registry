@@ -16,6 +16,9 @@ export const OUTCOME = {
         path: Type.String(),
         reason: Type.Optional(Type.String()),
         config: Type.Optional(Type.Literal(true)),
+        key: Type.Optional(
+          Type.String({ description: "The table someone else holds in that config file, dotted." }),
+        ),
       },
       { additionalProperties: false },
     ),

@@ -25,7 +25,7 @@ import { emptyCatalog, finalize, merge } from "#core/catalog/catalog.ts";
 import { newestFrom, withheldFrom } from "#core/catalog/withheld.ts";
 import { engineFromUnknown } from "#core/engines.ts";
 import { bindAdapter } from "#core/hook/bind.ts";
-import { KIND_SPECS } from "#core/kinds.ts";
+import { type KindSpec, kindSpec } from "#core/kinds.ts";
 import { withLease } from "#core/lease/lease.ts";
 import { cacheDir, ensureHome } from "#core/store/paths.ts";
 import { type SourceConfig, sourceKey } from "./identity.ts";
@@ -117,12 +117,19 @@ export async function resolveArtifacts(
 
   for (const listedAs of resolution.artifacts) {
     const { name, description } = listedAs.envelope.metadata;
-    const served = asServed(listedAs);
+    const spec = kindSpec(listedAs.kind);
+    if (spec === undefined) {
+      catalog.warnings.push(
+        `${quoted(name)} is of the kind ${quoted(listedAs.kind)}, which no loaded adapter declares, so it is left out.`,
+      );
+      continue;
+    }
+    const served = asServed(listedAs, spec);
     const artifact = served?.artifact ?? listedAs;
-    const path = served === undefined ? undefined : entryPath(artifact);
+    const path = served === undefined ? undefined : entryPath(artifact, spec);
     if (path === undefined) {
       catalog.warnings.push(
-        `${quoted(name)} is ${artifact.kind === "agent" ? "an" : "a"} ${artifact.kind}, which is one file, but ${artifact.files.length} were published and none is its entry file.`,
+        `${quoted(name)} publishes ${artifact.files.length} files, but ${spec.dir} are one file each and none is its entry file.`,
       );
       continue;
     }
@@ -250,8 +257,10 @@ function checkFiles(envelope: Envelope, artifact: Artifact, fail: Fail): void {
 
 type Fail = (message: string) => never;
 
-function asServed(artifact: Artifact): { artifact: Artifact; leftOut?: string[] } | undefined {
-  const spec = KIND_SPECS[artifact.kind];
+function asServed(
+  artifact: Artifact,
+  spec: KindSpec,
+): { artifact: Artifact; leftOut?: string[] } | undefined {
   if (spec.shape !== "file" || artifact.files.length <= 1) return { artifact };
   const entry = (spec.served ?? [])
     .map((name) => artifact.files.find((file) => file.path === name))
@@ -265,7 +274,7 @@ function asServed(artifact: Artifact): { artifact: Artifact; leftOut?: string[] 
  * The address the file spec gives this artifact inside its registry, which is
  * where its bytes sit in the mirror. File-shaped entries keep the extension.
  */
-function entryPath(artifact: Artifact): string | undefined {
+function entryPath(artifact: Artifact, spec: KindSpec): string | undefined {
   // A plugin is its own namespace; anything else is filed under the one it
   // belongs to, and an artifact with neither is filed under its own name.
   const namespace = sanitizeName(
@@ -275,7 +284,7 @@ function entryPath(artifact: Artifact): string | undefined {
   );
   const name = sanitizeName(artifact.envelope.metadata.name);
   const address = artifactDir(namespace, artifact.kind, name);
-  if (KIND_SPECS[artifact.kind].shape === "directory") return address;
+  if (spec.shape === "directory") return address;
 
   const only = artifact.files.length === 1 ? artifact.files[0] : undefined;
   return only === undefined ? undefined : `${address}${extname(only.path)}`;

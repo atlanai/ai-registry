@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
-import { KIND_SPECS } from "#core/kinds.ts";
+import { type KindSpec, kindSpec } from "#core/kinds.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { entriesIn } from "./scan.ts";
 
@@ -22,7 +22,7 @@ describe("entriesIn", () => {
     const found = await entriesIn(
       root,
       join(root, "skills"),
-      { kind: "skill", ...KIND_SPECS.skill },
+      { kind: "skill", ...(kindSpec("skill") as KindSpec) },
       undefined,
     );
     expect(found.map((entry) => [entry.name, entry.description])).toEqual([["mine", "Mine."]]);

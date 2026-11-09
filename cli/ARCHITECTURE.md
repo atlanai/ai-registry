@@ -34,7 +34,7 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | Exit statuses, error codes and the `AiregError` base class | `core/errors.ts` |
 | The message of anything thrown | `messageOf` in `adapter/errors.ts` |
 | JSON-RPC error codes on the daemon socket | `daemon/rpc/codes.ts` |
-| Artifact kinds | `core/kinds.ts` |
+| Artifact kinds, built in and declared by adapters | `core/kinds.ts`; checked at load in `core/host/kinds.ts` |
 | A skill's entry file and where a plugin keeps its manifest | `adapter/kinds.ts` |
 | Run states, modes and failure codes | `core/run/model.ts` |
 | Job step kinds and fields | `core/config/model.ts` |
@@ -42,7 +42,7 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | Readers for untrusted fields in files and RPC input | `adapter/fields.ts`, `core/fields.ts` |
 | Finding, loading and calling the adapter for an address | `core/adapter/` |
 | The adapters built into aireg | `adapters/index.ts` |
-| What an adapter adds beside the contract: commands, job steps and console tabs | `core/host/` |
+| What an adapter adds beside the contract: commands, job steps, console tabs and kinds | `core/host/` |
 | Reading a file spec registry from any `read(path)`, its name rules, and its folder and document names | `adapter/filespec/` |
 | How a source on disk lays out what it holds, and reading one that is not a registry, such as a folder of skills | `adapter/layouts/` |
 | The merges a publish writes into `versions.json` and `index.json` | `adapter/filespec/merge.ts` |

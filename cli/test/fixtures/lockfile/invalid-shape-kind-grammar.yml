@@ -1,0 +1,16 @@
+version: 1
+registries:
+  kit:
+    source: https://github.com/acme/agent-kit.git
+    adapter: git
+    key: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+artifacts:
+  thing:
+    registry: kit
+    id: widgets/thing
+    name: thing
+    kind: Widget
+    address: widgets/thing
+    content: "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    links: []

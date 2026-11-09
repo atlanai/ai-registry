@@ -15,6 +15,7 @@ import { isTrusted, parseAdapterId, parseWant } from "#core/adapter/installed/wa
 import { configPath, readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { exists } from "#core/fs/tree.ts";
+import { loadDeclaredKinds } from "#core/host/kinds.ts";
 import { withReleaseHint } from "#core/release/errors.ts";
 import { runningEntry } from "#core/release/launch.ts";
 import { releaseStamp } from "#core/release/stamp.ts";
@@ -146,6 +147,8 @@ async function install(
   if (present && !force) return { dryRun, action: "already-installed", id, version, specifier };
   const bytes = await downloadAdapter(release);
   await writeInstalled(release.id, release.version, bytes);
+  // Said now, so a declaration aireg refuses is not first heard of in another command.
+  for (const warning of await loadDeclaredKinds().catch(() => [])) context.printer.warning(warning);
   await recycle();
   return { dryRun, action: "installed", id, version, specifier };
 }

@@ -1,4 +1,5 @@
 import { isRecord, textOf } from "#adapter/fields.ts";
+import { isKindSegment } from "#adapter/filespec/names.ts";
 import type { ArtifactKind } from "#adapter/index.ts";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
@@ -30,14 +31,13 @@ export function pathProblem(path: string): string | undefined {
 
 export const PATH_HINT = "Write it relative to the project, such as .claude/skills/review.";
 
-const EXPORT_KINDS: readonly ArtifactKind[] = ["skill", "agent"];
-
+/** Any kind name but plugin, so a manifest naming a kind an adapter declares stays readable. */
 export function exportKind(raw: unknown, path: string): ArtifactKind | undefined {
   if (raw === undefined || raw === null) return undefined;
-  if (typeof raw === "string" && (EXPORT_KINDS as readonly string[]).includes(raw)) {
-    return raw as ArtifactKind;
-  }
-  throw new ManifestError(`\`kind\` of export ${quoted(path)} must be skill or agent.`);
+  if (typeof raw === "string" && raw !== "plugin" && isKindSegment(raw)) return raw;
+  throw new ManifestError(
+    `\`kind\` of export ${quoted(path)} must be skill, agent or a kind an adapter declares.`,
+  );
 }
 
 /** Names of folders or files directly inside the entry's folder, which it then does not reach. */

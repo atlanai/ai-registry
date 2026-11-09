@@ -1,18 +1,20 @@
 import { isAbsolute, join, resolve } from "node:path";
 import type { ArtifactKind, PublishRelationship, SourceAdapter, Want } from "#adapter/index.ts";
+import { isBuiltinKind } from "#adapter/kinds.ts";
 import { isLocalPath } from "#adapter/paths.ts";
 import { plural, quoted } from "#adapter/text.ts";
 import { comparableLocation, sourceKey } from "#core/adapter/identity.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { canonical } from "#core/fs/realpath.ts";
+import { kindPlural } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import { artifactFor } from "#core/manifest/match.ts";
 import type { Export, ExportDependency, Manifest, RegistrySource } from "#core/manifest/model.ts";
 import { formatAddress, type Ref } from "#core/ref.ts";
 import { artifactRoot } from "./reach.ts";
 import { artifactKey, type Destination, type Planned, type Published } from "./target.ts";
-import { fromPath, type Work } from "./work.ts";
+import { declaredWork, fromPath, type Work } from "./work.ts";
 
 /** Rejects duplicate kind/name identities. */
 export async function exportWork(
@@ -23,7 +25,9 @@ export async function exportWork(
   const seen = new Map<string, Work>();
   for (const [path, entry] of found) {
     if (entry.publish === false) continue;
-    const work: Work = { ...(await fromPath(path)), exported: entry };
+    const declared = entry.kind !== undefined && !isBuiltinKind(entry.kind);
+    const read = declared ? await declaredWork(path, entry.kind as string) : await fromPath(path);
+    const work: Work = { ...read, exported: entry };
     const key = `${work.kind}/${work.name}`;
     const other = seen.get(key);
     if (other !== undefined) {
@@ -135,7 +139,7 @@ export interface Taken {
 function untaken(work: Work, adapter: SourceAdapter, alias: string): string | undefined {
   if (work.exported === undefined) return undefined;
   const kinds = adapter.publishKinds ?? adapter.artifactKinds;
-  if (!kinds.includes(work.kind)) return `${alias} does not take ${work.kind}s`;
+  if (!kinds.includes(work.kind)) return `${alias} does not take ${kindPlural(work.kind)}`;
   const files = work.exported.files?.length ?? 1;
   if (work.kind !== "agent" || files <= 1 || adapter.capabilities.agentFolders === true) {
     return undefined;

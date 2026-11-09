@@ -4,7 +4,7 @@ Usage: aireg search <query> [--registry <registry>] [--kind <kind>] [-g]
 
 Options:
   -r, --registry <registry>  Search only this registry, by name or address
-      --kind <kind>          Only this kind: plugin, skill or agent
+      --kind <kind>          Only this kind: plugin, skill, agent, or one an adapter declares
   -g, --user                 Act on your user scope instead of this project
 
 Examples:

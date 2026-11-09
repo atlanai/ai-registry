@@ -1,5 +1,5 @@
 import type { ArtifactKind } from "#adapter/kinds.ts";
-import { SCANNED_KINDS } from "#core/kinds.ts";
+import { scannedKinds } from "#core/kinds.ts";
 import { listedAt } from "#core/plan/acquire/sources.ts";
 import {
   EMPTY_RUN_COUNTS,
@@ -236,7 +236,7 @@ function adopt(
 ): { outcomes: SyncOutcome[]; mutates: boolean } {
   const outcomes: SyncOutcome[] = [];
   let mutates = false;
-  const takesNone = !SCANNED_KINDS.some((kind) => publishable(kind));
+  const takesNone = !scannedKinds().some(([kind]) => publishable(kind));
   for (const candidate of scan.local) {
     if (!selected(scoped, candidate.kind, candidate.name)) continue;
     // A registry that takes no publishes at all, such as a git one, is not waiting

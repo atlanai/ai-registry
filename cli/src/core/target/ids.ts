@@ -54,7 +54,7 @@ export function earlierTable(targetTable: Targets): Record<string, EarlierTarget
     const reads = Object.fromEntries(
       Object.entries(target.reads).map(([kind, ids]) => [
         kind,
-        ids.map((read) => earlierId(targetTable, read)),
+        (ids ?? []).map((read) => earlierId(targetTable, read)),
       ]),
     );
     out[name] = { ...target, name, reads, kind: EARLIER_KINDS[target.category] };

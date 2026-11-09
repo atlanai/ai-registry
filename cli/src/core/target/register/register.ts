@@ -39,6 +39,8 @@ export interface Kept {
   reason?: string;
   /** A target config file left unedited, for an install or a removal alike. */
   config?: true;
+  /** The table in it that someone else holds, dotted. */
+  key?: string;
 }
 
 interface OpenFile {
@@ -244,7 +246,8 @@ async function reconcile({
       }
       const doc = await files.get(file, entry, vars, stop);
       if (!edit(entry, doc, group)) continue;
-      kept.push({ name: expand(entry.at.at(-1) ?? entry.file, vars), path: file });
+      const key = entry.at.map((part) => expand(part, vars));
+      kept.push({ name: key.at(-1) ?? expand(entry.file, vars), path: file, key: key.join(".") });
       for (const path of group.present.keys()) blocked.add(path);
     }
   }

@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import type { ShowResult } from "#cli/commands/show/result.ts";
+import { Kind } from "#scripts/schema/kind.ts";
 import { matching, oneOf, outputDocument } from "./match.ts";
 
 const CARRIED = ["hooks", "mcpServers", "lspServers", "monitors", "bin"] as const;
@@ -12,7 +12,7 @@ const Carries = Type.Array(oneOf(CARRIED), {
 const Artifact = Type.Object(
   {
     name: Type.String(),
-    kind: oneOf(KINDS),
+    kind: Kind,
     version: Type.Optional(Type.String({ description: "The version the registry serves." })),
     body: Type.String({ description: "The Markdown file as written." }),
     carries: Carries,

@@ -113,6 +113,33 @@ describe("SQLite run store", () => {
     expect(store.events("run_1").map((event) => event.eventType)).toContain("trace.exported");
   });
 
+  test("records an item of a kind an adapter declares", async () => {
+    const store = await SqliteRunStore.open(":memory:");
+    onTestFinished(() => store.close());
+    store.create({
+      id: "run_1",
+      jobId: "job_1",
+      accountId: "acc_1",
+      configRevision: 1,
+      mode: "sync",
+      trigger: "manual",
+      requestedAtMs: 100,
+      deadlineAtMs: 1_000,
+    });
+    store.start("run_1", "publish", 110);
+    store.progress("run_1", "publish", {
+      occurredAtMs: 111,
+      eventType: RunEventType.ItemSettled,
+      step: "publish",
+      artifact: "accounts",
+      kind: "knowledge",
+      operation: "publish",
+      outcome: "changed",
+    });
+
+    expect(store.events("run_1").map((event) => event.kind)).toContain("knowledge");
+  });
+
   test("returns only the events the console reads, and they tell it everything", async () => {
     const store = await SqliteRunStore.open(":memory:");
     onTestFinished(() => store.close());

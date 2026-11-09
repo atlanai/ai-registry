@@ -2,6 +2,7 @@ import { relative } from "node:path";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, plural } from "#adapter/text.ts";
 import { olderThan } from "#core/engines.ts";
+import { kindPlural } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import type { ApplyResult } from "#core/plan/apply/run.ts";
 import { describeCarried } from "#core/plan/carries.ts";
@@ -232,7 +233,7 @@ function followUps(
       if (run !== undefined && kind !== undefined) {
         const key = `${target.name}\0${run}`;
         const step = steps.get(key) ?? { target: target.displayName, run, kinds: new Set() };
-        step.kinds.add(`${kind}s`);
+        step.kinds.add(kindPlural(kind));
         steps.set(key, step);
       }
     }

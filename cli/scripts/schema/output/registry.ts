@@ -1,5 +1,4 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import { LAYOUT_IDS } from "#adapter/layouts/ids.ts";
 import type {
   RegistryAdded,
@@ -10,9 +9,8 @@ import type {
   RegistryShown,
   RegistryValidated,
 } from "#cli/commands/registry/result.ts";
+import { Kind } from "#scripts/schema/kind.ts";
 import { matching, oneOf, outputDocument } from "./match.ts";
-
-const Kind = oneOf(KINDS);
 
 const Declared = {
   registry: Type.String(),

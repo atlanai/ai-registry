@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { stringify } from "yaml";
 import { messageOf } from "#adapter/errors.ts";
 import { isRecord, textOf } from "#adapter/fields.ts";
-import { type ArtifactKind, isKind } from "#adapter/index.ts";
+import { type ArtifactKind, isKindSegment } from "#adapter/index.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { canonicalConfig, type SourceConfig } from "#core/adapter/identity.ts";
@@ -191,7 +191,7 @@ function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
   const registry = textOf(entry.registry);
   const kind = textOf(entry.kind);
   const name = textOf(entry.name);
-  if (registry === undefined || kind === undefined || !isKind(kind)) return undefined;
+  if (registry === undefined || kind === undefined || !isKindSegment(kind)) return undefined;
   if (name === undefined || !isLeafName(name)) return undefined;
   const path = textOf(entry.path) === undefined ? "" : scopePathOf(entry.path, scope);
   if (path === undefined) return undefined;

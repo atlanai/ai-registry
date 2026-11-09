@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
-import { KINDS } from "#adapter/kinds.ts";
 import { LINK_MODES, LOCK_VERSION } from "#core/lock.ts";
+import { Kind } from "./kind.ts";
 
 const EARLIER_ID = Type.Optional(
   Type.String({
@@ -104,7 +104,7 @@ const Artifact = Type.Object(
       }),
     ),
     name: Type.String({ minLength: 1, description: "What the registry called it." }),
-    kind: Type.Union(KINDS.map((kind) => Type.Literal(kind))),
+    kind: Kind,
     namespace: Type.Optional(
       Type.String({ minLength: 1, description: "The owner inside the registry." }),
     ),

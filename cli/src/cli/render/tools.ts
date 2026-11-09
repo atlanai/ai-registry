@@ -1,5 +1,6 @@
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list } from "#adapter/text.ts";
+import { kindPlural } from "#core/kinds.ts";
 import { askingFor, type Pinnable } from "#core/manifest/match.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import type { LinkState } from "#core/plan/status.ts";
@@ -103,7 +104,6 @@ export function skipLine(
   kinds: readonly ArtifactKind[],
 ): string {
   const reason = unhandled(targetTable, tool, kinds);
-  const because =
-    reason.length === 0 ? "" : `: it does not load ${list(reason.map((kind) => `${kind}s`))}`;
+  const because = reason.length === 0 ? "" : `: it does not load ${list(reason.map(kindPlural))}`;
   return `${toolName(targetTable, tool)} skips ${list(names)}${because}.`;
 }

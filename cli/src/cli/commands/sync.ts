@@ -17,6 +17,7 @@ import { trackSync } from "#cli/telemetry/events.ts";
 import { isStepPolicy, STEP_POLICIES } from "#core/config/model.ts";
 import { registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
+import { kindSpec } from "#core/kinds.ts";
 import { unknownRegistry } from "#core/manifest/errors.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
 import { type Candidate, displayPath } from "#core/sync/adopt.ts";
@@ -112,6 +113,12 @@ async function report(
 ): Promise<Preview> {
   const loaded = await load(common, context.cwd);
   const wanted = covered(loaded, only);
+  for (const [name, row] of Object.entries(loaded.lock.artifacts)) {
+    if (!wanted.includes(row.registry) || kindSpec(row.kind) !== undefined) continue;
+    context.printer.warning(
+      `Left ${quoted(name)} as it is: no loaded adapter declares its kind, ${quoted(row.kind)}.`,
+    );
+  }
   const found = await scan(loaded, common, {
     ...(only === undefined ? {} : { aliases: wanted }),
     onStep: (message) => context.printer.step(message),
@@ -268,6 +275,12 @@ async function reconcile(
 ): Promise<void> {
   const loaded = await load(common, context.cwd);
   const wanted = covered(loaded, only);
+  for (const [name, row] of Object.entries(loaded.lock.artifacts)) {
+    if (!wanted.includes(row.registry) || kindSpec(row.kind) !== undefined) continue;
+    context.printer.warning(
+      `Left ${quoted(name)} as it is: no loaded adapter declares its kind, ${quoted(row.kind)}.`,
+    );
+  }
 
   let attention = false;
   const failed: string[] = [];
