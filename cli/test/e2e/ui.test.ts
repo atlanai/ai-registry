@@ -5,6 +5,8 @@ import { marketplace } from "#test/kit/builders/layouts.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { send, serveUi } from "#test/kit/ui.ts";
 
+const CLEAN_EXIT = process.platform === "win32" ? null : 0;
+
 const ACME = join(import.meta.dirname, "..", "..", "..", "examples", "acme-registry");
 
 interface Listed {
@@ -54,7 +56,8 @@ describe("aireg ui", () => {
       });
       expect(huge.status).toBe(413);
     } finally {
-      expect(await ui.stop()).toBe(0);
+      // SIGINT lets the server close and exit 0; Windows has no signals and ends the process.
+      expect(await ui.stop()).toBe(CLEAN_EXIT);
     }
   });
 
