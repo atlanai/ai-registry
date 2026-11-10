@@ -29,6 +29,8 @@ A link aireg did not make is `missing` too, with the reason: a folder of yours a
 
 Below the table, `status` lists the unmanaged artifacts: skills and agents in your target folders that aireg didn't install. A link of yours counts, such as a skill kept in one folder and linked into each target: it is listed once, with every target that holds it or links it, at the real folder's path. So does an agent in a target's own format, such as a Codex `.toml` agent, though `aireg publish` takes its Markdown file instead. Publish one to a registry to manage it, with [`aireg publish`](publish.md). [`aireg sync`](sync.md) still never adopts a link of yours, since whoever made it owns what it points at.
 
+Then `status` lists duplicates: skills that are copies of each other, installed or not, and unmanaged skills that share a name but not their files. Copies match when every file is the same, apart from line endings and the `name` in `SKILL.md`, so a renamed copy or one with Windows line endings is still a copy, but one changed line or one extra file is not. Two unmanaged skills of one name in different target folders are different skills, and each target may load a different one. A link of yours is the folder it points at, never a copy of it. Remove the copies you do not need with `rm -r`, or [`aireg remove`](remove.md) for an installed one. Duplicates don't change the exit status.
+
 After that, `status` lists the dangling links in your target folders: links of yours whose destination is gone, which the target cannot load. Remove one with `rm`. A link aireg made that lost its target is reported as `missing` in the table instead.
 
 In a project, `status` also warns about an artifact installed in both the project and your user scope, because your coding agent decides which one it loads.
@@ -45,17 +47,18 @@ In a project, `status` also warns about an artifact installed in both the projec
   "artifacts": [{"name": "engineering/pr-review", "state": "ok", "targets": {"claude-code": "linked", "universal": "linked"}, "harnesses": {"claude": "linked", "agents": "linked"}, "needsApproval": [{"target": "tool", "harness": "tool", "run": "tool trust"}]}],
   "shadowed": [],
   "unmanaged": [{"name": "lint", "kind": "skill", "targets": ["claude-code"], "harnesses": ["claude"], "path": "/home/me/project/.claude/skills/lint"}],
+  "duplicates": [{"match": "identical", "artifacts": [{"name": "pr-check", "path": "/home/me/project/.claude/skills/pr-check"}, {"name": "pr-review", "path": "/home/me/project/.registry/artifacts/acme/engineering/skills/pr-review", "registry": "acme"}]}],
   "dangling": [{"path": "/home/me/project/.claude/agents/old.md", "target": "/home/me/agents/old.md", "harness": "claude"}]
 }}
 ```
 
-In JSON, `targets` is keyed by target id, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. `dangling` gives each dangling link's `path`, what it links to as written (`target`), and the target folder it is in (`harness`, by the id aireg 0.1 used). `needsApproval` lists each target that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
+In JSON, `targets` is keyed by target id, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. Each `duplicates` group has a `match`, `identical` for copies or `name` for unmanaged skills that share a name, and its `artifacts`, each with the real folder as `path` and, when installed, its `registry`. `dangling` gives each dangling link's `path`, what it links to as written (`target`), and the target folder it is in (`harness`, by the id aireg 0.1 used). `needsApproval` lists each target that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
 
 Each field that names a target is also printed under the name aireg 0.1 gave it, with the id that version knows, for scripts written against it: `harnesses` beside `targets`, and `harness` beside `target`, such as `claude` for `claude-code`. A `dangling` entry keeps exactly the shape aireg 0.1 printed. Read `targets` and `target`; the earlier names are kept for compatibility and will be removed in a later release.
 
 ## Exit status
 
-- `0`: every artifact is `ok`, or nothing is installed. Unmanaged artifacts don't change the exit status.
+- `0`: every artifact is `ok`, or nothing is installed. Unmanaged artifacts and duplicates don't change the exit status.
 - `2`: an argument was given.
 - `3`: at least one artifact is `missing`, `replaced` or `edited`.
 
