@@ -63,4 +63,4 @@ aireg console --json
 
 ## See also
 
-[`aireg status`](status.md), [`aireg job`](job.md), [CLI reference](index.md)
+[`aireg ui`](ui.md), [`aireg status`](status.md), [`aireg job`](job.md), [CLI reference](index.md)
