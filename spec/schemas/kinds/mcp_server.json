@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kinds/mcp_server.json",
+  "title": "mcp_server",
+  "description": "A Model Context Protocol (MCP) server descriptor. Defines command invocation, transport protocols (stdio or sse), and environment variable contracts for agent tool execution.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Server name. MUST equal metadata.name in the envelope.",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 64
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "transport": {
+      "type": "string",
+      "enum": [
+        "stdio",
+        "sse"
+      ],
+      "description": "MCP communication transport protocol."
+    },
+    "command": {
+      "type": "string",
+      "description": "Executable binary or runner command (e.g., npx, uvx, docker, python)."
+    },
+    "args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Command line arguments passed to the server binary."
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Endpoint URL when transport is sse."
+    },
+    "env": {
+      "type": "array",
+      "description": "Environment variable contracts required by the server.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean",
+            "default": true
+          },
+          "secret": {
+            "type": "boolean",
+            "default": false
+          },
+          "default": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "transport"
+  ],
+  "additionalProperties": false,
+  "x-registry-schema-version": 1,
+  "x-registry-searchable": [
+    "/name",
+    "/description"
+  ],
+  "x-registry-embeddings": [
+    "/description"
+  ],
+  "x-registry-edges": [
+    {
+      "rel_type": "depends_on",
+      "to_kinds": [
+        "mcp_server"
+      ],
+      "cardinality": "many",
+      "direction": "outbound"
+    }
+  ],
+  "x-registry-files": {
+    "required": [
+      {
+        "path": "mcp.json",
+        "media_type": "application/json"
+      }
+    ],
+    "optional": [
+      {
+        "path": "README.md",
+        "media_type": "text/markdown"
+      }
+    ]
+  },
+  "x-registry-attachment": false,
+  "x-registry-gated": false
+}

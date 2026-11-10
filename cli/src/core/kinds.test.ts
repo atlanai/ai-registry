@@ -14,6 +14,15 @@ describe("KIND_SPECS", () => {
       expect(spec.extensions.length > 0, kind).toBe(spec.shape === "file");
     }
   });
+
+  test("configures mcp_server as a directory kind with mcp.json entry", () => {
+    expect(KINDS).toContain("mcp_server");
+    const spec = KIND_SPECS.mcp_server;
+    expect(spec.shape).toBe("directory");
+    expect(spec.dir).toBe("mcp-servers");
+    expect(spec.entry).toBe("mcp.json");
+    expect(spec.extensions).toEqual([]);
+  });
 });
 
 describe("stagedLeaf", () => {
@@ -22,6 +31,7 @@ describe("stagedLeaf", () => {
       "api-design",
     );
     expect(stagedLeaf("plugin", "acme-core", "plugins/acme-core")).toBe("acme-core");
+    expect(stagedLeaf("mcp_server", "postgres-mcp", "mcp-servers/postgres-mcp")).toBe("postgres-mcp");
   });
 
   test("keeps the extension the source actually used", () => {
