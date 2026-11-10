@@ -17,6 +17,7 @@ import { requireRegistry } from "#core/filespec/init.ts";
 import {
   fileProblems,
   type KindManifest,
+  SPEC_TEXT,
   specFile,
   specOf,
 } from "#core/filespec/kind-manifests.ts";
@@ -141,7 +142,7 @@ async function incoming(
     : [basename(source)];
 
   const texts = new Map<string, string>();
-  for (const path of entries.filter((item) => /\.(md|json)$/.test(item))) {
+  for (const path of entries.filter((item) => SPEC_TEXT.test(item))) {
     texts.set(path, await readFile(join(dir, path), "utf8"));
   }
   const spec = specOf(manifest, texts, named);

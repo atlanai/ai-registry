@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -13,6 +13,7 @@ import {
 import { check } from "./schema.ts";
 
 const text = (body: string) => new TextEncoder().encode(body);
+const OSSIE = join(import.meta.dirname, "..", "..", "..", "test", "fixtures", "ossie");
 
 describe("fileProblems", async () => {
   const { skill, agent } = (await kindsOf(undefined)) as Record<string, KindManifest>;
@@ -194,5 +195,81 @@ describe("a kind manifest a registry serves", () => {
         message: 'lists "../note", which is not a kind name, so it is not used',
       },
     ]);
+  });
+});
+
+describe("a custom kind whose entry is YAML", () => {
+  // The shape a semantic_model kind holding an Apache Ossie document takes.
+  const semanticModel = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: "kinds/semantic_model.json",
+    title: "semantic_model",
+    type: "object",
+    properties: {
+      name: { type: "string", pattern: "^[a-z0-9]+(-[a-z0-9]+)*$", maxLength: 64 },
+      description: { type: "string", minLength: 1, maxLength: 1024 },
+      model: { type: "object" },
+    },
+    required: ["name", "model"],
+    additionalProperties: false,
+    "x-registry-schema-version": 1,
+    "x-registry-files": {
+      required: [{ path: "semantic_model.yaml", media_type: "application/vnd.ossie+yaml" }],
+      optional: [{ glob: "source/**" }],
+    },
+  } as KindManifest;
+  const kinds = { semantic_model: semanticModel };
+  const model =
+    "name: Flights\ndescription: Flight bookings by route.\ndatasets:\n  - name: flights\n";
+  const parsed = {
+    name: "Flights",
+    description: "Flight bookings by route.",
+    datasets: [{ name: "flights" }],
+  };
+
+  test("wraps the document under the key its manifest declares, as an agent's card is", () => {
+    const files = new Map([["semantic_model.yaml", text(model)]]);
+    const spec = envelopeSpec("semantic_model", files, kinds, "flights");
+    expect(spec).toEqual({
+      name: "flights",
+      description: "Flight bookings by route.",
+      model: parsed,
+    });
+    expect(check(semanticModel, spec)).toEqual([]);
+  });
+
+  test("names it by the document's own name, made a slug, when no folder names it", () => {
+    const files = new Map([["semantic_model.yaml", text(model)]]);
+    expect(envelopeSpec("semantic_model", files, kinds).name).toBe("flights");
+  });
+
+  test("reads the file the manifest names, not a YAML file kept under source/", () => {
+    const files = new Map([
+      ["source/dbt_project.yml", text("name: jaffle_shop\n")],
+      ["semantic_model.yaml", text(model)],
+    ]);
+    expect(envelopeSpec("semantic_model", files, kinds, "flights").model).toEqual(parsed);
+  });
+
+  test.for([
+    ["tpcds_semantic_model.yaml", "TPC-DS retail semantic model for sales and customer analytics"],
+    ["flights.semantic_model.yaml", undefined],
+  ] as const)("reads Apache Ossie's own example %s", async ([file, description]) => {
+    const source = new Uint8Array(await readFile(join(OSSIE, file)));
+    const spec = envelopeSpec(
+      "semantic_model",
+      new Map([["semantic_model.yaml", source]]),
+      kinds,
+      "retail",
+    );
+    expect(spec.name).toBe("retail");
+    expect(spec.description).toBe(description);
+    expect((spec.model as { datasets: unknown[] }).datasets.length).toBeGreaterThan(0);
+    expect(check(semanticModel, spec)).toEqual([]);
+  });
+
+  test("has no spec when the YAML does not parse", () => {
+    const files = new Map([["semantic_model.yaml", text("name: [unclosed\n")]]);
+    expect(envelopeSpec("semantic_model", files, kinds)).toEqual({});
   });
 });

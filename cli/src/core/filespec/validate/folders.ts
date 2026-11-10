@@ -14,6 +14,7 @@ import {
   fileProblems,
   type KindManifest,
   type kindsOf,
+  SPEC_TEXT,
   specOf,
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
@@ -93,8 +94,7 @@ export async function folderProblems(
   const present = new Set(records.map((record) => record.path));
   const contents = new Map<string, string>();
   for (const path of present) {
-    if (/\.(md|json)$/.test(path))
-      contents.set(path, (await textAt(root, `${where}/${path}`)) ?? "");
+    if (SPEC_TEXT.test(path)) contents.set(path, (await textAt(root, `${where}/${path}`)) ?? "");
   }
   for (const message of versionProblems(manifest, folder, present, contents)) {
     problems.push({ path: where, message });
