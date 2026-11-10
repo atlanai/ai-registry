@@ -190,6 +190,27 @@ describe("a plugin marketplace", () => {
     expect((await aireg(["install"])).code).toBe(0);
   });
 
+  test("names each plugin awaiting trust in a dry run's data, with what it runs", async ({
+    aireg,
+    initialised,
+    mkt,
+    project,
+  }) => {
+    await initialised(project);
+    const planned = await aireg(["add", mkt, "--all", "--dry-run", "--json"]);
+    expect(planned.code, planned.stderr).toBe(0);
+    expect(JSON.parse(planned.stdout).data.untrusted).toEqual([
+      {
+        name: "deploy-kit",
+        registry: "acme-tools",
+        carries: ["hooks", "mcpServers"],
+        fingerprint: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      },
+    ]);
+    // A dry run writes nothing, not even an empty lockfile.
+    await expect(read(lockPath(project))).rejects.toThrow("ENOENT");
+  });
+
   // util-linux's `script` runs aireg on a terminal of its own; other systems' `script` differs.
   test.runIf(process.platform === "linux")(
     "asks on a terminal before a plugin the address names exactly",
