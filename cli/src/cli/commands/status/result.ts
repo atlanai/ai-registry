@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "#adapter/kinds.ts";
+import type { Duplicate } from "#cli/commands/status/duplicates.ts";
 import type { LinkState, State } from "#core/plan/status.ts";
 import type { Scope } from "#core/store/paths.ts";
 
@@ -8,6 +9,8 @@ export interface StatusResult {
   /** Installed both here and in the user scope; always empty for `-g`. */
   shadowed: string[];
   unmanaged: UnmanagedArtifact[];
+  /** Skills that are copies of each other, then unmanaged skills that share a name. */
+  duplicates: Duplicate[];
   dangling: DanglingEntry[];
 }
 
