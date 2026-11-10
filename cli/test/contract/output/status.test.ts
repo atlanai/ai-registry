@@ -1,4 +1,4 @@
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
 import { registry } from "#test/kit/builders/registry.ts";
@@ -26,6 +26,36 @@ test("status prints data its schema describes", async ({ aireg, project, tmp }) 
   await mkdir(mine, { recursive: true });
   await writeFile(join(mine, "SKILL.md"), "---\nname: mine\ndescription: Mine.\n---\n");
   await symlink(join(tmp, "gone"), join(project, ".claude", "skills", "ghost"));
+  // Fills `duplicates`: a copy of an installed skill, a renamed copy, and another `mine`.
+  await cp(
+    join(project, ".claude", "skills", "lint"),
+    join(project, ".claude", "skills", "lint-copy"),
+    {
+      recursive: true,
+      dereference: true,
+    },
+  );
+  await mkdir(join(project, ".claude", "skills", "also-mine"));
+  await writeFile(
+    join(project, ".claude", "skills", "also-mine", "SKILL.md"),
+    "---\nname: also-mine\ndescription: Mine.\n---\n",
+  );
+  await mkdir(join(project, ".gemini", "skills", "mine"), { recursive: true });
+  await writeFile(
+    join(project, ".gemini", "skills", "mine", "SKILL.md"),
+    "---\nname: mine\ndescription: Not mine.\n---\n",
+  );
+  const { data } = JSON.parse((await aireg(["status", "--json"])).stdout);
+  expect(
+    data.duplicates.map((group: { match: string; artifacts: { registry?: string }[] }) => [
+      group.match,
+      group.artifacts.some((copy) => copy.registry !== undefined),
+    ]),
+  ).toEqual([
+    ["identical", false],
+    ["identical", true],
+    ["name", false],
+  ]);
 
   expect(await contract.violations(aireg, ["status"], "status")).toBe("");
   expect(contract.unchecked()).toEqual([]);

@@ -4,6 +4,7 @@ import { ifPresent } from "#adapter/files.ts";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { plural } from "#adapter/text.ts";
+import { type Copy, type Duplicate, duplicates } from "#cli/commands/status/duplicates.ts";
 import type { Approval, StatusResult } from "#cli/commands/status/result.ts";
 import { STATUS_COMMAND } from "#cli/commands/status/spec.ts";
 import { noArguments, parse } from "#cli/options/parse.ts";
@@ -12,12 +13,14 @@ import { type Installed, installed } from "#cli/render/installed.ts";
 import { renderStatus } from "#cli/render/status.ts";
 import { chosenFor, scopeTargets, toolName } from "#cli/render/tools.ts";
 import { ExitCode } from "#core/errors.ts";
+import { canonical } from "#core/fs/realpath.ts";
+import { exists } from "#core/fs/tree.ts";
 import { type Lock, readLock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
 import { type ArtifactStatus, status, worstState } from "#core/plan/status.ts";
 import { survey } from "#core/plan/survey.ts";
-import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
+import { artifactPath, copyLeaf, roots as makeRoots, type Roots } from "#core/store/paths.ts";
 import { type Candidate, candidates, type DanglingLink, danglingLinks } from "#core/sync/adopt.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { byEarlierIds, earlierId, names } from "#core/target/ids.ts";
@@ -44,6 +47,7 @@ interface Found {
   rows: Installed[];
   clashes: string[];
   loose: Unmanaged[];
+  copies: Duplicate[];
   dangling: DanglingLink[];
 }
 
@@ -68,9 +72,13 @@ export const { run } = defineCommand({
     });
     const dangling = await danglingLinks(roots, targetTable, names(targetTable), lock);
     const loose = await Promise.all(found.local.map(unmanaged));
+    const copies = await duplicates(
+      await installedSkills(lock, roots),
+      unmanagedSkills(found.local),
+    );
     const rows = installed(lock, manifest, targetTable);
     if (worstState(statuses) !== "ok") context.exit = ExitCode.Changed;
-    return { roots, manifest, lock, targetTable, statuses, rows, clashes, loose, dangling };
+    return { roots, manifest, lock, targetTable, statuses, rows, clashes, loose, copies, dangling };
   },
   data(found): StatusResult {
     const { roots, lock, targetTable, rows } = found;
@@ -98,6 +106,7 @@ export const { run } = defineCommand({
         ...item,
         harnesses: item.targets.map((id) => earlierId(targetTable, id)),
       })),
+      duplicates: found.copies,
       // As aireg 0.1 printed it, where `target` is the destination the link names.
       dangling: found.dangling.map(({ path, linksTo, target }) => ({
         path,
@@ -140,6 +149,7 @@ export const { run } = defineCommand({
       );
       printer.note("next", "aireg publish <path> --to <registry>/<namespace>");
     }
+    printDuplicates(printer, roots, found.copies);
     printDangling(printer, roots, targetTable, found.dangling);
   },
 });
@@ -179,6 +189,38 @@ async function isLink(path: string): Promise<boolean> {
   return (await ifPresent(lstat(path)))?.isSymbolicLink() ?? false;
 }
 
+/** Each installed skill by its stored copy, which every target's link points at. */
+async function installedSkills(lock: Lock, roots: Roots): Promise<Copy[]> {
+  const copies = await Promise.all(
+    Object.entries(lock.artifacts)
+      .filter(([, entry]) => entry.kind === "skill")
+      .map(async ([name, entry]) => {
+        const path = artifactPath(
+          roots,
+          entry.registry,
+          entry.namespace,
+          entry.kind,
+          copyLeaf(name, entry.name),
+          entry.path,
+        );
+        return (await exists(path)) ? [{ name, path, registry: entry.registry }] : [];
+      }),
+  );
+  return copies.flat();
+}
+
+/** Every real folder an unmanaged skill is in: a link of yours is the folder it points at. */
+function unmanagedSkills(found: readonly Candidate[]): Copy[] {
+  return found
+    .filter((item) => item.kind === "skill")
+    .flatMap((item) => {
+      const folders = new Set(
+        [item.from, ...item.elsewhere.map(({ from }) => from)].map(canonical),
+      );
+      return [...folders].map((path) => ({ name: item.name, path }));
+    });
+}
+
 function needsApproval(lock: Lock, roots: Roots, targetTable: Targets): Map<string, Approval[]> {
   const out = new Map<string, Approval[]>();
   for (const [name, entry] of Object.entries(lock.artifacts)) {
@@ -210,6 +252,41 @@ function shown(roots: { scope: string; base: string }, path: string): string {
   return roots.scope === "project" && isWithin(roots.base, path)
     ? relative(roots.base, path)
     : underHome(path);
+}
+
+const MATCH: Record<Duplicate["match"], string> = { identical: "identical", name: "same name" };
+
+interface CopyRow {
+  match: string;
+  copy: Copy;
+}
+
+/** One row per copy, the match named on the first row of its group. */
+function printDuplicates(
+  printer: Printer,
+  roots: { scope: string; base: string },
+  found: readonly Duplicate[],
+): void {
+  if (found.length === 0) return;
+  printer.info();
+  printer.info(printer.style.bold(plural(found.length, "duplicate")));
+  const rows: CopyRow[] = found.flatMap(({ match, artifacts }) =>
+    artifacts.map((copy, at) => ({ match: at === 0 ? MATCH[match] : "", copy })),
+  );
+  table(
+    printer,
+    [
+      { header: "match", value: (row: CopyRow) => row.match },
+      { header: "artifact", value: (row: CopyRow) => row.copy.name },
+      {
+        header: "where",
+        value: ({ copy }: CopyRow) =>
+          copy.registry === undefined ? shown(roots, copy.path) : `installed from ${copy.registry}`,
+      },
+    ],
+    rows,
+  );
+  printer.note("next", "rm -r <path> for a copy you do not need, or aireg remove <artifact>");
 }
 
 function printDangling(
