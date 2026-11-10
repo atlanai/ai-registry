@@ -54,6 +54,40 @@ export function publish(names: readonly string[], to: string | undefined, scope:
   return shown(argv);
 }
 
+export interface AddChoices {
+  /** Narrows a source of many artifacts to these names. */
+  select?: readonly string[];
+  /** Plugins the person read and chose to trust, by name. */
+  trust?: readonly string[];
+  /** Plans and prints the plan as data, writing nothing. */
+  dryRun: boolean;
+  /** Prints what was installed as data, for a caller that reads it. */
+  json?: boolean;
+}
+
+/** Values ride in `--flag=value` form, so one such as `--all` stays a value. */
+export function add(address: string, choices: AddChoices, scope: Scope): Command {
+  const argv = ["add", ...scoped(scope)];
+  for (const name of choices.select ?? []) argv.push(`--select=${name}`);
+  for (const name of choices.trust ?? []) argv.push(`--trust=${name}`);
+  argv.push(
+    ...(choices.dryRun
+      ? ["--dry-run", "--json"]
+      : ["--yes", ...(choices.json === true ? ["--json"] : [])]),
+    ...data([address]),
+  );
+  return shown(argv);
+}
+
+/** The screen that names the command is the confirmation, as for a publish. */
+export function remove(names: readonly string[], scope: Scope, dryRun = false): Command {
+  return shown(["remove", ...scoped(scope), dryRun ? "--dry-run" : "--yes", ...data(names)]);
+}
+
+export function doctor(): Command {
+  return shown(["doctor", "--json"]);
+}
+
 export function runJob(id: string): Command {
   const argv = ["job", "start", ...data([id])];
   return shown(argv);
