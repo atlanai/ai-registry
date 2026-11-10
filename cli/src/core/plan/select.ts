@@ -108,6 +108,8 @@ export interface Untrusted {
   name: string;
   registry: string;
   carries: readonly Carried[];
+  /** A digest of what it runs, so a yes given to one version is never read as a yes to another. */
+  fingerprint?: string;
 }
 
 export function select({
@@ -329,7 +331,13 @@ function needsTrust(
   const carries = placement.plugin?.carries ?? [];
   if (entry.kind !== "plugin" || carries.length === 0) return undefined;
   if (trusted.has(addressKey(ref.registry, entry.name))) return undefined;
-  return { name: entry.name, registry: ref.registry, carries };
+  const fingerprint = placement.plugin?.fingerprint;
+  return {
+    name: entry.name,
+    registry: ref.registry,
+    carries,
+    ...(fingerprint === undefined ? {} : { fingerprint }),
+  };
 }
 
 function addUntrusted(untrusted: Untrusted[], plugin: Untrusted): void {

@@ -25,6 +25,12 @@ export const DATABASE_FILE = `${NAME}.db`;
 
 export const LOG_FILE = `${NAME}.log`;
 
+/** Under `AIREG_HOME`: where `aireg ui` moves a retired folder written here, to restore later. */
+export const UI_ARCHIVE_DIR = "retired";
+
+/** Beside each retired folder, recording where it came from. */
+export const UI_ARCHIVE_NOTE = ".retired.json";
+
 /** Usage events: the install ID and the notice shown, in the home, and the path on the release server. */
 export const TELEMETRY_ID_FILE = "telemetry-id";
 export const TELEMETRY_NOTICE_FILE = "telemetry-notice";

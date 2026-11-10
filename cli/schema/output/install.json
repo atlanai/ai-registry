@@ -103,6 +103,59 @@
             }
           }
         },
+        "untrusted": {
+          "description": "Plugins left out until trusted by name with `--trust`.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "registry",
+              "carries"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "registry": {
+                "type": "string"
+              },
+              "carries": {
+                "description": "What the plugin starts that runs as you.",
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "const": "hooks",
+                      "type": "string"
+                    },
+                    {
+                      "const": "mcpServers",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lspServers",
+                      "type": "string"
+                    },
+                    {
+                      "const": "monitors",
+                      "type": "string"
+                    },
+                    {
+                      "const": "bin",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "fingerprint": {
+                "description": "A digest of what it runs; it changes when any of those parts change.",
+                "type": "string"
+              }
+            }
+          }
+        },
         "unchanged": {
           "description": "The artifacts already up to date.",
           "type": "array",

@@ -22,6 +22,7 @@ aireg keeps three folders apart: its own, and one for each scope it installs int
   leases/                  which process is writing to your user scope
   journals/                what an install in progress has written, one per scope, kept here so a clone cannot supply one
   cache/                   fetched copies of remote registries; deleting it costs a refetch
+  retired/                 folders written here that `aireg ui` retired, each beside a note of where it came from
 
 ~/.registry/               your user scope, what -g installs (AIREG_USER_SCOPE)
   manifest.yml

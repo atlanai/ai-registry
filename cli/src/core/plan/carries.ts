@@ -14,7 +14,8 @@ import type { Plan } from "./model.ts";
 /** What a loaded plugin starts on its own (commands that run as you), by manifest key. */
 export type Carried = "hooks" | "mcpServers" | "lspServers" | "monitors" | "bin";
 
-const ORDER: readonly Carried[] = ["hooks", "mcpServers", "lspServers", "monitors", "bin"];
+/** Every kind, in the order a message names them. */
+export const CARRIED: readonly Carried[] = ["hooks", "mcpServers", "lspServers", "monitors", "bin"];
 
 const WORDS: Record<Carried, string> = {
   hooks: "hooks",
@@ -59,12 +60,12 @@ export async function carries(root: string): Promise<Carried[]> {
       // A target refuses a manifest it cannot parse, so it starts nothing from it.
     }
   }
-  return ORDER.filter((what) => found.has(what));
+  return CARRIED.filter((what) => found.has(what));
 }
 
 function declared(manifest: Record<string, unknown>): Carried[] {
   const experimental = isRecord(manifest.experimental) ? manifest.experimental : {};
-  return ORDER.filter(
+  return CARRIED.filter(
     (key) => (manifest[key] ?? (key === "monitors" ? experimental.monitors : undefined)) != null,
   );
 }
@@ -82,7 +83,7 @@ export function carriedIn(
     found.add(what);
     files.push([file.path, file.digest]);
   }
-  const carries = ORDER.filter((what) => found.has(what));
+  const carries = CARRIED.filter((what) => found.has(what));
   if (carries.length === 0) return { carries, fingerprint: undefined };
   const declaredBy = Object.fromEntries(
     carries.flatMap((key) => (manifest?.[key] === undefined ? [] : [[key, manifest[key]]])),

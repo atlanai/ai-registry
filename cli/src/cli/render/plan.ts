@@ -4,8 +4,9 @@ import { list, plural } from "#adapter/text.ts";
 import { olderThan } from "#core/engines.ts";
 import type { Lock } from "#core/lock.ts";
 import type { ApplyResult } from "#core/plan/apply/run.ts";
-import { describeCarried } from "#core/plan/carries.ts";
+import { type Carried, describeCarried } from "#core/plan/carries.ts";
 import type { Action, Plan, Renamed } from "#core/plan/model.ts";
+import type { Untrusted } from "#core/plan/select.ts";
 import type { Roots } from "#core/store/paths.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { trustFor } from "#core/target/placement.ts";
@@ -27,6 +28,15 @@ export interface Outcome {
   kept: ApplyResult["kept"];
   renamed?: Renamed[];
   unlinked?: Unlinked[];
+  /** Plugins left out until trusted by name, so a caller never reads trust from a sentence. */
+  untrusted?: UntrustedPlugin[];
+}
+
+interface UntrustedPlugin {
+  name: string;
+  registry: string;
+  carries: Carried[];
+  fingerprint?: string;
 }
 
 /** What each action does for the person, rather than how it is done. */
@@ -281,6 +291,16 @@ export function outcome({ plan, applied }: RunResult, dryRun: boolean): Outcome 
       ].sort(),
     kept: applied?.kept ?? [],
     ...collisionFields(plan),
+    ...(plan.untrusted.length === 0 ? {} : { untrusted: plan.untrusted.map(untrustedField) }),
+  };
+}
+
+function untrustedField({ name, registry, carries, fingerprint }: Untrusted): UntrustedPlugin {
+  return {
+    name,
+    registry,
+    carries: [...carries],
+    ...(fingerprint === undefined ? {} : { fingerprint }),
   };
 }
 

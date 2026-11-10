@@ -14,6 +14,7 @@
       "scripts/**/*.ts",
       "packaging/**/*.ts",
       "bin/**/*.mjs",
+      "ui/public/js/*.js",
       "*.ts",
       "*.mjs",
       "*.json",
@@ -143,6 +144,38 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["ui/public/js/*.js"],
+      "javascript": {
+        "globals": [
+          "document",
+          "window",
+          "location",
+          "history",
+          "sessionStorage",
+          "navigator",
+          "fetch",
+          "CSS",
+          "DOMParser",
+          "MutationObserver",
+          "HTMLElement",
+          "HTMLInputElement",
+          "HTMLTextAreaElement",
+          "HTMLSelectElement",
+          "KeyboardEvent",
+          "Event",
+          "performance",
+          "getComputedStyle"
+        ]
+      },
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUndeclaredVariables": "error"
+          }
+        }
+      }
+    },
     {
       "includes": ["**/*.test.ts", "test/**"],
       "linter": {
