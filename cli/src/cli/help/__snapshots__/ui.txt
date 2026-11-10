@@ -1,0 +1,15 @@
+Browse your registries and what is installed, in your browser
+
+Usage: aireg ui [--port <port>] [--no-open]
+
+Options:
+      --port <port>  Listen on this port instead of a free one
+      --no-open      Print the address without opening a browser
+
+Examples:
+  $ aireg ui                   open it in your browser
+  $ aireg ui --no-open --json  print its address as data, for a script
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/ui/

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>aireg ui</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230f172a%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230f172a%22/><text x=%2216%22 y=%2221%22 font-family=%22system-ui,-apple-system%22 font-size=%2214%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23ffffff%22>ai</text></svg>">
+</head>
+<body>
+  <div id="liveStatus" class="visually-hidden" role="status" aria-live="polite"></div>
+  <div class="workspace-root">
+    <!-- Top System Bar -->
+    <header class="sys-bar">
+      <div class="sys-bar-left">
+        <div class="brand">
+          <div class="brand-icon">ai</div>
+          <span class="brand-name">aireg</span>
+          <span class="brand-tag">ui</span>
+        </div>
+        <div class="status-strip">
+          <span class="status-chip">
+            <span class="pulse-dot"></span>
+            <span id="daemonStatusText">Reading aireg…</span>
+          </span>
+          <span class="status-chip" id="manifestStatusText">Reading…</span>
+          <span class="status-chip" id="harnessStatusText"></span>
+          <span class="status-chip countdown-chip" id="nextSyncCountdown">Next sync in: --</span>
+        </div>
+      </div>
+
+      <div class="sys-bar-right">
+        <button class="sys-btn sys-btn-accent" id="addArtifactBtn" title="Install from a registry, a git repository or a folder">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Add</span>
+        </button>
+        <button class="sys-btn" id="cmdKBtn" title="Find an artifact (⌘K)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>Find</span>
+          <kbd class="kbd-badge">⌘K</kbd>
+        </button>
+        <button class="sys-btn" id="doctorModalBtn" title="Inspect system diagnostics">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>Check this machine</span>
+        </button>
+        <button class="sys-btn sys-btn-primary" id="refreshBtn" title="Trigger on-demand sync">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span id="syncBtnText">Sync now</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Master-Detail 3-Pane Workspace -->
+    <div id="problemsStrip" class="problems-strip" role="alert" hidden></div>
+    <div class="workspace-body">
+      <!-- Pane 1: Navigation & Filter Rail (Left) -->
+      <aside class="sidebar-rail">
+        <!-- Top Mode Switcher -->
+        <div class="sidebar-mode-switcher">
+          <button class="mode-btn active" data-mode="artifacts">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <span>Artifacts</span>
+          </button>
+          <button class="mode-btn" data-mode="sync">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span>Jobs and runs</span>
+            <span class="mode-counter" id="jobsCountBadge">0</span>
+          </button>
+          <button class="mode-btn" data-mode="audit">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Needs a look</span>
+            <span class="mode-counter warn" id="auditCountBadge">0</span>
+          </button>
+        </div>
+
+        <!-- Mode-Specific Sidebar Content: Artifacts Mode -->
+        <div class="mode-sidebar-content" id="sidebarArtifactsMode">
+          <div class="sidebar-search-box">
+            <div class="input-with-icon">
+              <svg class="search-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" id="sidebarSearchInput" aria-label="Filter artifacts" placeholder="Filter artifacts" autocomplete="off" spellcheck="false">
+              <kbd class="kbd-hint">/</kbd>
+            </div>
+          </div>
+
+          <nav class="sidebar-nav">
+            <div class="nav-section">
+              <div class="nav-section-title">Namespaces</div>
+              <ul class="nav-list" id="namespaceNav" aria-label="Namespaces"></ul>
+            </div>
+
+            <div class="nav-section">
+              <div class="nav-section-title">Targets</div>
+              <ul class="nav-list" id="harnessNav" aria-label="Targets"></ul>
+            </div>
+
+            <div class="nav-section">
+              <div class="nav-section-title">Registries</div>
+              <div id="registryList"></div>
+            </div>
+          </nav>
+        </div>
+
+        <!-- Mode-Specific Sidebar Content: Sync Engine Mode -->
+        <div class="mode-sidebar-content u1" id="sidebarSyncMode">
+          <div class="sync-sidebar-meta">
+            <div class="meta-sidebar-block">
+              <span class="nav-section-title">Daemon</span>
+              <div class="daemon-stat-card">
+                <div class="daemon-stat-row">
+                  <span class="pulse-dot"></span>
+                  <strong>Background daemon</strong>
+                </div>
+                <div class="daemon-meta-line">PID: <code id="daemonPidText">—</code></div>
+                <div class="daemon-meta-line">Jobs: <span id="daemonJobsText">—</span></div>
+                <div class="daemon-meta-line">Sync every: <code id="syncIntervalText">—</code></div>
+              </div>
+            </div>
+
+            <div class="meta-sidebar-block">
+              <span class="nav-section-title">Sync policy</span>
+              <div class="policy-card" id="syncPolicyList"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode-Specific Sidebar Content: Drift & Audit Mode -->
+        <div class="mode-sidebar-content u1" id="sidebarAuditMode">
+          <nav class="sidebar-nav">
+            <div class="nav-section">
+              <div class="nav-section-title">Show</div>
+              <ul class="nav-list" id="auditCategoryNav">
+                <li><button type="button" class="nav-item active" data-audit="all" aria-pressed="true">
+                  <span class="nav-label">Everything</span>
+                  <span class="nav-count" id="auditCountAll">0</span>
+                </button></li>
+                <li><button type="button" class="nav-item" data-audit="unpublished" aria-pressed="false">
+                  <span class="nav-label">
+                    <span class="nav-bullet dot-studio"></span>
+                    <span>Written here</span>
+                  </span>
+                  <span class="nav-count" id="auditCountUnpublished">0</span>
+                </button></li>
+                <li><button type="button" class="nav-item" data-audit="drifted" aria-pressed="false">
+                  <span class="nav-label">
+                    <span class="nav-bullet dot-style"></span>
+                    <span>Edited after install</span>
+                  </span>
+                  <span class="nav-count" id="auditCountDrifted">0</span>
+                </button></li>
+                <li><button type="button" class="nav-item" data-audit="broken" aria-pressed="false">
+                  <span class="nav-label">
+                    <span class="nav-bullet dot-core"></span>
+                    <span>Missing or dangling links</span>
+                  </span>
+                  <span class="nav-count" id="auditCountBroken">0</span>
+                </button></li>
+                <li><button type="button" class="nav-item" data-audit="retired" aria-pressed="false">
+                  <span class="nav-label">
+                    <span class="nav-bullet dot-aireg"></span>
+                    <span>Retired</span>
+                  </span>
+                  <span class="nav-count" id="auditCountRetired">0</span>
+                </button></li>
+              </ul>
+            </div>
+          </nav>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="lockfile-integrity-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span id="lockfileSummary">Reading the lockfile…</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- VIEW 1: ARTIFACTS VIEW (Default) -->
+      <div class="workspace-main-view" id="viewArtifacts">
+        <!-- Pane 2: Artifacts List Stream (Middle) -->
+        <section class="artifact-stream-pane">
+          <div class="stream-header">
+            <div class="stream-meta">
+              <span class="stream-title" id="streamNamespaceTitle">All artifacts</span>
+              <span class="stream-count" id="streamCount">0</span>
+            </div>
+            <div class="custom-select-wrap">
+              <select id="sortSelect" class="stream-select" aria-label="Sort artifacts">
+                <option value="name-asc">A → Z</option>
+                <option value="name-desc">Z → A</option>
+                <option value="namespace">Namespace</option>
+                <option value="version">Version</option>
+              </select>
+              <svg class="select-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </div>
+
+          <div class="stream-list" id="artifactsList">
+            <div class="stream-loading">
+              <div class="subtle-spinner"></div>
+              <span>Reading lockfile...</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Pane 3: Inspector & SKILL.md Reader (Right) -->
+        <main class="inspector-pane" id="inspectorPane">
+          <div class="empty-inspector" id="emptyInspector">
+            <div class="empty-inspector-box">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+              <p>Select an artifact or press <kbd>⌘K</kbd> to inspect</p>
+            </div>
+          </div>
+
+          <div class="active-inspector u1" id="activeInspector">
+            <!-- Inspector Top Action Bar -->
+            <div class="inspector-action-bar">
+              <div class="inspector-heading-cluster">
+                <div class="insp-badge-row">
+                  <span class="ns-pill" id="inspNsPill"></span>
+                  <span class="ver-pill" id="inspVerPill"></span>
+                  <span class="drift-badge pending" id="inspDriftBadge"></span>
+                </div>
+                <h1 class="insp-title" id="inspTitle"></h1>
+              </div>
+              <div class="insp-btn-group">
+                <button class="subtle-btn" id="copyCliBtn" title="Copy CLI inspect command">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>Copy CLI</span>
+                </button>
+                <button class="subtle-btn" id="copyDigestBtn" title="Copy the content digest">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  <span>Digest</span>
+                </button>
+                <button class="subtle-btn btn-retire" id="retireSkillBtn" title="Remove it from every target, or move a folder written here aside">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <span>Retire</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Description Lead -->
+            <div class="insp-lead" id="inspDescription">
+              Choice architecture, decision ergonomics, and AX as UX.
+            </div>
+
+            <!-- Dual-Legibility Metadata Box -->
+            <div class="metadata-provenance-box">
+              <div class="meta-row">
+                <div class="meta-col">
+                  <span class="meta-label">SHA-256 Digest</span>
+                  <code class="meta-code" id="inspDigest"></code>
+                </div>
+                <div class="meta-col">
+                  <span class="meta-label">Registry</span>
+                  <span class="meta-val" id="inspRegistry"></span>
+                </div>
+                <div class="meta-col">
+                  <span class="meta-label">State</span>
+                  <span class="status-verified-tag" id="inspIntegrity"></span>
+                </div>
+              </div>
+
+              <!-- Harness Projections Card List -->
+              <div class="projections-block">
+                <div class="projections-title">Target links</div>
+                <div class="projections-cards-list" id="projectionsList">
+                  <!-- dynamic projection rows -->
+                </div>
+              </div>
+            </div>
+
+            <!-- SKILL.md Reader Header & Body -->
+            <div class="doc-viewer-container">
+              <div class="doc-viewer-header">
+                <div class="doc-tab-label">File</div>
+                <div class="doc-file-path" id="inspFilePath"></div>
+              </div>
+              <article class="doc-article markdown-content" id="inspMarkdown">
+                <!-- Rendered Markdown goes here -->
+              </article>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- VIEW 2: SYNC ENGINE & DAEMON VIEW -->
+      <div class="workspace-main-view dashboard-view u1" id="viewSyncEngine">
+        <div class="dashboard-scrollable">
+          <div class="dashboard-container">
+            <div class="dashboard-header">
+              <div class="dashboard-title-cluster">
+                <h1 class="dash-title">Jobs and runs</h1>
+                <p class="dash-lead">The background daemon runs these jobs to keep each scope up to date. Each run is recorded here.</p>
+              </div>
+              <div class="dash-actions">
+                <button class="sys-btn sys-btn-primary" id="dashSyncBtn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                  <span>Sync now</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Metrics Overview Grid -->
+            <div class="dash-metrics-grid">
+              <div class="dash-metric-card">
+                <span class="metric-label">Daemon</span>
+                <div class="metric-val-row">
+                  <span class="pulse-dot"></span>
+                  <span class="metric-val" id="telemetryDaemonPid">—</span>
+                </div>
+                <span class="metric-sub" id="telemetryDaemonStatus"></span>
+              </div>
+
+              <div class="dash-metric-card">
+                <span class="metric-label">Sync every</span>
+                <div class="metric-val" id="telemetryCadence">—</div>
+                <span class="metric-sub" id="telemetryNextCountdown"></span>
+              </div>
+
+              <div class="dash-metric-card">
+                <span class="metric-label">Runs on record</span>
+                <div class="metric-val" id="telemetryTotalRuns">--</div>
+                <span class="metric-sub">Across every job</span>
+              </div>
+
+              <div class="dash-metric-card">
+                <span class="metric-label">Results</span>
+                <div class="metric-val" id="telemetryRunResults">—</div>
+                <span class="metric-sub" id="telemetryRunFailures"></span>
+              </div>
+            </div>
+
+            <!-- Registered Jobs Section -->
+            <div class="dash-section">
+              <h2 class="dash-section-title">Jobs</h2>
+              <div class="jobs-table-wrap">
+                <table class="clean-table" id="daemonJobsTable">
+                  <thead>
+                    <tr>
+                      <th>Job</th>
+                      <th>Account</th>
+                      <th>Steps</th>
+                      <th>Interval</th>
+                      <th>Last run</th>
+                      <th>Next run</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="daemonJobsBody">
+                    <!-- dynamic jobs -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Run History Audit Table -->
+            <div class="dash-section">
+              <div class="dash-section-header">
+                <h2 class="dash-section-title">Recent runs</h2>
+                <span class="dash-badge-sub" id="telemetryRunsCount"></span>
+              </div>
+              <div class="jobs-table-wrap">
+                <table class="clean-table" id="syncRunsTable">
+                  <thead>
+                    <tr>
+                      <th>Run</th>
+                      <th>Job</th>
+                      <th>Trigger</th>
+                      <th>Examined</th>
+                      <th>Changed</th>
+                      <th>Skipped</th>
+                      <th>Duration</th>
+                      <th>Finished</th>
+                      <th>Result</th>
+                    </tr>
+                  </thead>
+                  <tbody id="syncRunsBody">
+                    <!-- dynamic runs -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: DRIFT & INTEGRITY AUDIT VIEW -->
+      <div class="workspace-main-view dashboard-view u1" id="viewAudit">
+        <div class="dashboard-scrollable">
+          <div class="dashboard-container">
+            <div class="dashboard-header">
+              <div class="dashboard-title-cluster">
+                <h1 class="dash-title">Needs a look</h1>
+                <p class="dash-lead">Artifacts edited after install, links that are missing or point elsewhere, and work written here that no registry holds yet.</p>
+              </div>
+            </div>
+
+            <!-- Audit Metrics Summary Cards -->
+            <div class="dash-metrics-grid">
+              <div class="dash-metric-card">
+                <span class="metric-label">Written here</span>
+                <div class="metric-val" id="auditLocalCount">0</div>
+                <span class="metric-sub">In no registry yet</span>
+              </div>
+
+              <div class="dash-metric-card">
+                <span class="metric-label">Edited</span>
+                <div class="metric-val" id="auditDriftCount">0</div>
+                <span class="metric-sub">Changed since install</span>
+              </div>
+
+              <div class="dash-metric-card">
+                <span class="metric-label">Missing or dangling</span>
+                <div class="metric-val" id="auditBrokenCount">0</div>
+                <span class="metric-sub">Links a target cannot load</span>
+              </div>
+
+              <div class="dash-metric-card">
+                <span class="metric-label">In order</span>
+                <div class="metric-val" id="auditOkCount">—</div>
+                <span class="metric-sub">Installed and matching the lockfile</span>
+              </div>
+            </div>
+
+            <!-- Unmanaged Local Skills Table -->
+            <div class="dash-section">
+              <div class="dash-section-header">
+                <div>
+                  <h2 class="dash-section-title">What needs a look</h2>
+                  <p class="u2">
+                    Each row says what aireg found and the command that settles it.
+                  </p>
+                </div>
+              </div>
+              <div class="jobs-table-wrap">
+                <table class="clean-table" id="auditTable">
+                  <thead>
+                    <tr>
+                      <th>Artifact</th>
+                      <th>State</th>
+                      <th>Targets</th>
+                      <th>Folder</th>
+                      <th>Next step</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditTableBody">
+                    <!-- dynamic audit items -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Command Palette (⌘K) Modal -->
+    <div class="cmd-palette-backdrop" id="cmdPaletteBackdrop">
+      <div class="cmd-palette-box" aria-label="Find an artifact">
+        <div class="cmd-input-row">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="cmdInput" aria-label="Find an artifact" placeholder="Type an artifact or namespace to jump to it" autocomplete="off">
+          <kbd class="kbd-badge">ESC</kbd>
+        </div>
+        <div class="cmd-results" id="cmdResults">
+          <!-- fast search matches -->
+        </div>
+        <div class="cmd-footer">
+          <span><kbd class="kbd-mini">↑</kbd><kbd class="kbd-mini">↓</kbd> Navigate</span>
+          <span><kbd class="kbd-mini">↵</kbd> Select</span>
+          <span><kbd class="kbd-mini">ESC</kbd> Close</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Doctor Diagnostic Modal -->
+    <div class="doctor-modal-backdrop" id="doctorModalBackdrop">
+      <div class="doctor-modal-box">
+        <div class="doctor-modal-header">
+          <div class="doctor-modal-title">
+            <span class="status-verified-tag">aireg doctor</span>
+            <h2>aireg doctor & daemon diagnostic</h2>
+          </div>
+          <button class="modal-close" id="doctorModalClose">&times;</button>
+        </div>
+        <div class="doctor-modal-body" id="doctorModalContent">
+          <!-- dynamically rendered checks -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Retire Skill Confirmation Modal -->
+    <div class="doctor-modal-backdrop" id="retireModalBackdrop">
+      <div class="doctor-modal-box u3">
+        <div class="doctor-modal-header">
+          <div class="doctor-modal-title">
+            <span class="status-pill failed">aireg remove</span>
+            <h2 id="retireModalTitle">Retire</h2>
+          </div>
+          <button class="modal-close" id="retireModalClose">&times;</button>
+        </div>
+        <div class="doctor-modal-body u4">
+          <p class="u5">
+            An artifact a registry installed is removed from every target and from the lockfile. A skill written here is moved aside, where Restore can put it back.
+          </p>
+
+          <div class="bezel-card-inner u6">
+            <span class="meta-label">What aireg would change:</span>
+            <div class="u7" id="retireTargetsList">
+            </div>
+          </div>
+
+          <div class="u8">
+            <button class="sys-btn" id="retireCancelBtn">Cancel</button>
+            <button class="sys-btn btn-danger" id="retireConfirmBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <span id="retireConfirmText">Retire it</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Artifact Modal -->
+    <div class="doctor-modal-backdrop" id="addModalBackdrop">
+      <div class="doctor-modal-box u9">
+        <div class="doctor-modal-header">
+          <div class="doctor-modal-title">
+            <span class="status-verified-tag">aireg add</span>
+            <h2>Add artifacts</h2>
+          </div>
+          <button class="modal-close" id="addModalClose">&times;</button>
+        </div>
+        <div class="doctor-modal-body u10" id="addModalBody">
+          <p class="u11">
+            Install skills, agents or plugins from a declared registry, a git repository, a plugin marketplace or a folder. Run the dry run first to see what would change.
+          </p>
+
+          <div class="u12">
+            <label class="u13" for="addSourceInput">Address <span class="u14">*</span></label>
+            <input type="text" id="addSourceInput" class="form-input u15" placeholder="e.g. acme/engineering, github.com/acme/ai-registry, or ./my-registry" />
+            <span class="u16">A declared registry and namespace, a git repository, or a folder.</span>
+          </div>
+
+          <div class="u12">
+            <label class="u13" for="addSelectInput">Only these artifacts (optional)</label>
+            <input type="text" id="addSelectInput" class="form-input u15" placeholder="e.g. pr-review, reviewer (comma-separated)" />
+            <span class="u16">Leave empty to install all artifacts, or list specific skill names.</span>
+          </div>
+
+          <div class="u17">
+            <div class="u18">
+              <input class="u19" type="checkbox" id="addTrustCheckbox">
+              <label class="u20" for="addTrustCheckbox">
+                <strong>Trust plugins that run programs as you</strong>
+                <div class="u21">
+                  Run the dry run first. It names each plugin that carries MCP servers, hooks or programs that run as you; tick this only after you read what they run.
+                </div>
+              </label>
+            </div>
+            <div class="u22" id="addTrustNameRow">
+              <label class="u23" for="addTrustNameInput">Plugins to trust, from the dry run:</label>
+              <input type="text" id="addTrustNameInput" class="form-input u24" placeholder="Filled in by the dry run" />
+            </div>
+          </div>
+
+          <!-- Prominent High-Contrast Status & Plan Container -->
+          <div id="addPreviewBox" class="hidden u25">
+            <div class="u26">
+              <span class="u27" id="addPreviewTitle">Dry run</span>
+              <span id="addPreviewBadge" class="status-pill verified u28">Ready</span>
+            </div>
+            <pre class="u29" id="addPreviewContent"></pre>
+          </div>
+
+          <div class="u30">
+            <button class="sys-btn" id="addPreviewBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>Dry run</span>
+            </button>
+            <div class="u31">
+              <button class="sys-btn" id="addCancelBtn">Cancel</button>
+              <button class="sys-btn sys-btn-primary" id="addConfirmBtn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span id="addConfirmText">Install</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

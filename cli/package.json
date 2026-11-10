@@ -79,9 +79,10 @@
     "test:coverage": "vitest run --coverage --project unit --project integration --project contract",
     "schema": "node --experimental-strip-types scripts/schema/generate.ts",
     "notices": "node --experimental-strip-types scripts/notices/generate.ts",
+    "ui": "node --experimental-strip-types --no-warnings scripts/ui/build.ts",
     "check:package": "publint --strict",
     "release:compile": "node --experimental-strip-types packaging/main.ts compile",
-    "verify": "pnpm run typecheck && pnpm run lint:ci && pnpm run knip && pnpm run notices --check && pnpm run build && pnpm run check:package && pnpm run test"
+    "verify": "pnpm run typecheck && pnpm run lint:ci && pnpm run knip && pnpm run notices --check && pnpm run ui --check && pnpm run build && pnpm run check:package && pnpm run test"
   },
   "dependencies": {
     "ajv": "8.20.0",

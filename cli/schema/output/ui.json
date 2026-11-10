@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/ui.json",
+  "title": "aireg ui --json",
+  "description": "The `data` each `aireg ui` action prints under --json, by action.",
+  "$defs": {
+    "ui": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "url",
+        "port"
+      ],
+      "properties": {
+        "url": {
+          "description": "The page's address. It carries this session's token after `#`, so treat it as a password.",
+          "type": "string"
+        },
+        "port": {
+          "description": "The port on 127.0.0.1 it serves from.",
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
