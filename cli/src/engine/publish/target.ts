@@ -28,7 +28,7 @@ import {
   withheldFrom,
 } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { kindsOf } from "#core/filespec/kind-manifests.ts";
+import { kindsOf, SPEC_TEXT } from "#core/filespec/kind-manifests.ts";
 import { type OfferTarget, offerFrom } from "#core/filespec/offer.ts";
 import { versionProblems } from "#core/filespec/validate/folders.ts";
 import { posixRelative } from "#core/fs/path.ts";
@@ -577,8 +577,8 @@ async function refuseInvalid(
   const manifest = (await kindsOf(undefined))[work.kind];
   if (manifest === undefined) return;
   const decoder = new TextDecoder();
-  // Only a Markdown or JSON file can hold the spec, so a binary is never decoded.
-  const texts = input.files.filter((file) => /\.(md|json)$/.test(file.path));
+  // Only a Markdown, JSON or YAML file can hold the spec, so a binary is never decoded.
+  const texts = input.files.filter((file) => SPEC_TEXT.test(file.path));
   const problems = versionProblems(
     manifest,
     work,

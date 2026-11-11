@@ -12,6 +12,20 @@ import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { quoted } from "#adapter/text.ts";
 import manifestSchema from "#schema/kind-manifest.schema.json" with { type: "json" };
+import ossie011 from "#schema/kinds/vendor/ossie/0.1.1/osi-schema.json" with { type: "json" };
+import ossie020 from "#schema/kinds/vendor/ossie/0.2.0.dev0/ossie-schema.json" with {
+  type: "json",
+};
+
+/**
+ * The schemas a bundled kind manifest refers to, under the path its `$ref` resolves to. A
+ * registry that serves its own manifest serves these beside it, and `prepareManifest` reads them
+ * from there.
+ */
+const BUNDLED_REFS: Readonly<Record<string, SchemaObject>> = {
+  "kinds/vendor/ossie/0.1.1/osi-schema.json": ossie011,
+  "kinds/vendor/ossie/0.2.0.dev0/ossie-schema.json": ossie020,
+};
 
 /** Validators follow the lifetime of the manifest objects loaded for an operation. */
 const compiled = new WeakMap<object, ValidateFunction>();
@@ -96,7 +110,10 @@ export function check(schema: SchemaObject, value: unknown): string[] {
   let validate = compiled.get(schema);
   if (validate === undefined) {
     try {
-      validate = compiler().compile(schema);
+      const ajv = compiler();
+      for (const [path, referenced] of Object.entries(BUNDLED_REFS))
+        ajv.addSchema(referenced, path);
+      validate = ajv.compile(schema);
       if (schema.$async !== undefined)
         return ["kind schema uses unsupported asynchronous validation"];
       compiled.set(schema, validate);
@@ -104,7 +121,10 @@ export function check(schema: SchemaObject, value: unknown): string[] {
       return [`kind schema is invalid: ${messageOf(error)}`];
     }
   }
-  return validate(value) ? [] : (validate.errors ?? []).map((error) => message(error, value));
+  if (validate(value)) return [];
+  // A failed `if`/`then` repeats, as "must match then schema", what the branch's own errors say.
+  const errors = (validate.errors ?? []).filter((error) => error.keyword !== "if");
+  return errors.map((error) => message(error, value));
 }
 
 function message(error: ErrorObject, value: unknown): string {

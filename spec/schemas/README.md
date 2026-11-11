@@ -16,7 +16,8 @@ themselves and [file-spec.md](../file-spec.md) are the contract.
 | [relationship.schema.json](relationship.schema.json) | one `relationships[]` edge | §3.4, §4.3, §6 |
 | [host.schema.json](host.schema.json) | the host document at `/.well-known/registry.json` | §8 |
 | [kind-manifest.schema.json](kind-manifest.schema.json) | what `kinds[].manifest_url` points at | §3.1 |
-| [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json) | the `spec` of those kinds | §3.4 |
+| [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json), [kinds/semantic_model.json](kinds/semantic_model.json) | the `spec` of those kinds | §3.4 |
+| [kinds/vendor/ossie/](kinds/vendor/ossie/README.md) | Apache Ossie's own schemas, unchanged, which `kinds/semantic_model.json` refers to | §3.4 |
 | [common.schema.json](common.schema.json) | shared `$defs`; never instantiated | §2.1, §4 |
 
 An envelope is validated against **both** artifact schemas on purpose. The plain one is the
@@ -32,7 +33,9 @@ A kind manifest chooses its own policy for `spec`. The skill schema is closed; t
 preserves additional native front-matter fields. Writers validate against that policy at publish.
 
 **`$id`s are relative, and are identifiers rather than locations.** A schema's `$id` is the path it
-sits at under this directory, and every `$ref` is a relative path resolved the same way. Nothing
+sits at under this directory, and every `$ref` is a relative path resolved the same way. The one
+exception is a schema under a `vendor/` folder, which is another project's file copied byte for
+byte and keeps that project's `$id`; it is still reached by its path here. Nothing
 dereferences an `$id` over the network, so a validator preloads this directory into a resolver
 rather than fetching `$ref`s. No schema file is covered by a content digest or a catalog digest, so
 giving the `$id`s an absolute base later moves no digest.
@@ -60,8 +63,12 @@ files must stay inside the registry and must be regular files, not symlinks. Ext
 are reported as unresolved; validation never downloads a schema. `format` is an annotation in
 the CLI. Validation does not coerce values, insert defaults or remove fields.
 
-For built-in kinds, extraction reads only `SKILL.md`, `AGENT.md` or `agent-card.json`. An agent
-must carry exactly one of its two entry files. Optional file patterns are non-exhaustive
+For built-in kinds, extraction reads only `SKILL.md`, `AGENT.md`, `agent-card.json`,
+`semantic_model.yaml` or `semantic_model.json`. An agent must carry exactly one of its two entry
+files, and so must a semantic model. A semantic model's manifest refers to the Apache Ossie
+schemas under `kinds/vendor/ossie/`, so validating its `spec` validates the model. A registry that
+serves its own `kinds/semantic_model.json` serves those schemas beside it; aireg bundles both for
+a registry that lists no kinds. Optional file patterns are non-exhaustive
 conventions; other supporting files are permitted and never replace the native entry.
 
 The CLI enforces exact required file paths and the complete alternatives declared by `one_of`.

@@ -28,7 +28,7 @@ index.json                                   # catalog: every (namespace, kind, 
 
 artifacts/                                   # every artifact lives here and nothing else does
   <namespace>/                               # the owner inside this root: a workspace, a team, a GitHub owner
-    <kind>/                                  # skill, agent, mcp_server, …
+    <kind>/                                  # skill, agent, semantic_model, mcp_server, …
       <name>/
         versions.json                        # one entry per version: version, digest, catalog_digest, published_at, status, yanked
         <version>/
@@ -189,6 +189,18 @@ its description to `spec.description`, and uses the registry slug for `spec.name
 own `name` remains its human-readable name and need not equal the slug. An agent MUST carry
 exactly one of these native entry files. Other supporting files are permitted; the optional
 file patterns in a kind manifest are non-exhaustive conventions.
+
+A semantic model carries one [Apache Ossie](https://github.com/apache/ossie) document, as
+`semantic_model.yaml` or `semantic_model.json`, and MUST carry exactly one of the two. It wraps
+that document, parsed and otherwise unchanged, in `spec.model`, and uses the registry slug for
+`spec.name`. The model's own `name` remains in the document and need not equal the slug.
+`spec.description` copies the model's description when it has one: the root `description`, or
+that of the one model a 0.1.1 document lists. `spec.model` MUST satisfy the Ossie schema for the
+`version` it declares. Those schemas are copied unchanged into
+[`schemas/kinds/vendor/ossie/`](schemas/kinds/vendor/ossie/README.md), so a writer validates a
+model without fetching anything. A model whose document holds a non-integer number cannot be
+published as it stands, since section 4.2 forbids one in an envelope. The files a model was
+converted from MAY sit beside it under `source/`.
 
 ### 3.5 Native files
 

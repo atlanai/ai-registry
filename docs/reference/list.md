@@ -13,7 +13,7 @@ aireg list <name> [-g]
 
 ## Description
 
-`aireg list` lists the artifacts installed in the current project, or with `-g` or outside a project in your user scope, from the lockfile. It doesn't contact any registry. The table shows each artifact's kind, version and registry, and the targets that load it. A version marked `pinned` is held by the manifest. An artifact installed only because others depend on it names them under `needed by`. A skill or agent from a watched folder shows the target that reads it, such as `Cursor (watched)`.
+`aireg list` lists the artifacts installed in the current project, or with `-g` or outside a project in your user scope, from the lockfile. It doesn't contact any registry. The table shows each artifact's kind, version and registry, and the targets that load it. A semantic model, which no target loads, shows the folder its file is in. A version marked `pinned` is held by the manifest. An artifact installed only because others depend on it names them under `needed by`. A skill or agent from a watched folder shows the target that reads it, such as `Cursor (watched)`.
 
 The table names each artifact by the shortest name no other installed artifact shares, such as `pr-review`. Wherever aireg asks for an installed artifact's name, a longer form works too, such as `engineering/pr-review` or `acme/engineering/skill/pr-review`.
 

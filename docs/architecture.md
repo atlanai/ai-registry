@@ -38,7 +38,7 @@ index.json                                   # catalog: every artifact with its 
 
 artifacts/                                   # every artifact lives here and nothing else does
   <namespace>/                               # the owner inside this root: a workspace, a team, a GitHub owner
-    <kind>/                                  # skill or agent
+    <kind>/                                  # skill, agent or semantic_model
       <name>/
         versions.json                        # one entry per version: digest, status, yanked; names latest
         <version>/

@@ -2,10 +2,11 @@ import { rm, rmdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fanOut } from "#core/fs/link.ts";
 import { entries, remove } from "#core/fs/tree.ts";
+import { isStoreOnly } from "#core/kinds.ts";
 import { assertLeasesHeld } from "#core/lease/lease.ts";
 import { type Lock, readLock } from "#core/lock.ts";
 import { carriedBy } from "#core/plan/carries.ts";
-import type { Action, Fetch, Plan } from "#core/plan/model.ts";
+import { type Action, type Fetch, type Plan, storeOnlyNames } from "#core/plan/model.ts";
 import { assertRemovable } from "#core/plan/removable.ts";
 import { backupStamp } from "#core/store/backups.ts";
 import { ensureScopeIgnore } from "#core/store/ignore.ts";
@@ -23,14 +24,32 @@ import {
   addRecorded,
   addStaging,
   addUnlinked,
+  linkKey,
   type Run,
   type RunInputs,
+  type RunResults,
   startRun,
 } from "./run.ts";
 import { cloneInto, prefetch, stage } from "./stage.ts";
 
-const linked = (lock: Lock | undefined, name: string): number =>
-  lock?.artifacts[name]?.links.length ?? 0;
+/** How many places hold the artifact: its links, or its own copy for a kind that has none. */
+const linked = (lock: Lock | undefined, name: string): number => {
+  const artifact = lock?.artifacts[name];
+  if (artifact === undefined) return 0;
+  return isStoreOnly(artifact.kind) ? 1 : artifact.links.length;
+};
+
+/** The store-only artifacts this run copied into the scope: for them the copy is the install. */
+function copied(plan: Plan, results: RunResults): string[] {
+  const storeOnly = storeOnlyNames(results.recorded);
+  return plan.actions.flatMap((action) =>
+    action.kind === "clone" &&
+    storeOnly.has(action.name) &&
+    !results.skipped.has(linkKey(action.name, action.to))
+      ? [action.name]
+      : [],
+  );
+}
 
 export interface ApplyOptions {
   plan: Plan;
@@ -74,7 +93,7 @@ export async function apply({
   const { results } = run;
   return {
     performed: results.performed,
-    installed: [...results.installed].sort(),
+    installed: [...new Set([...results.installed, ...copied(plan, results)])].sort(),
     added: Object.keys(results.recorded?.artifacts ?? {})
       .filter((name) => linked(before, name) === 0)
       .sort(),
