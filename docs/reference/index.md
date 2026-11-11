@@ -63,7 +63,7 @@ aireg add <registry>/<namespace>[/<name>[@<version>]] [options]
 | [`aireg sync`](sync.md) | Sync this project with its registries. |
 | [`aireg publish`](publish.md) | Publish artifacts to a registry, as new versions. |
 | [`aireg watch`](watch.md) | Publish a folder's skills and agents whenever they change. |
-| [`aireg skill`, `aireg agent`](kinds.md) | Create a skill or an agent, or start its next version. |
+| [`aireg skill`, `aireg agent`, `aireg semantic_model`](kinds.md) | Create a skill, an agent or a semantic model, or start its next version. |
 
 ### Automate
 

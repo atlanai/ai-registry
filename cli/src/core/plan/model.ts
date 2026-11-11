@@ -4,6 +4,7 @@ import type { LayoutId } from "#adapter/layouts/ids.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
 import type { Catalog } from "#core/catalog/catalog.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
+import { isStoreOnly } from "#core/kinds.ts";
 import type { LinkMode, Lock } from "#core/lock.ts";
 import type { Codec, KeyFile } from "#core/target/contract.ts";
 import type { Carried } from "./carries.ts";
@@ -247,6 +248,18 @@ export interface Rewritten {
   version: string;
   locked: string;
   served: string;
+}
+
+/**
+ * The artifacts of a kind that is installed as the scope's own copy, such as a semantic model:
+ * each is installed once the lockfile holds it, though nothing links to it.
+ */
+export function storeOnlyNames(lock: Lock | undefined): Set<string> {
+  return new Set(
+    Object.entries(lock?.artifacts ?? {}).flatMap(([name, artifact]) =>
+      isStoreOnly(artifact.kind) ? [name] : [],
+    ),
+  );
 }
 
 export function recordOf(plan: Plan): Lock {

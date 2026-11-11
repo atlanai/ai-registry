@@ -16,6 +16,11 @@ export interface KindSpec {
   entry?: string;
   /** Entry filenames a file-shaped kind can install; companion files stay in the registry. */
   served?: readonly string[];
+  /**
+   * No coding agent has a folder for this kind, so the scope's own copy is the install: it is
+   * staged and locked, and linked into no target.
+   */
+  storeOnly?: true;
 }
 
 /** The one file a registry's agent version folder holds. */
@@ -30,7 +35,14 @@ export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
     extensions: [".md"],
     served: [AGENT_ENTRY, AGENT_CARD_ENTRY],
   },
+  // A directory, so the files a model was converted from, under `source/`, come with it.
+  semantic_model: { dir: "semantic_models", shape: "directory", extensions: [], storeOnly: true },
 };
+
+/** Whether installing this kind means keeping the scope's copy, with no link into a target. */
+export function isStoreOnly(kind: ArtifactKind | undefined): boolean {
+  return kind !== undefined && KIND_SPECS[kind].storeOnly === true;
+}
 
 /** Kinds the registry scanner walks; `plugin` is found by its manifest. */
 export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter((kind) => kind !== "plugin");

@@ -124,6 +124,28 @@ export async function askName(kind: string, step: Interaction): Promise<string |
   return canceled(answer) ? undefined : nameOf(answer, answer);
 }
 
+/**
+ * A semantic model to start from, in the Apache Ossie release (0.1.1): the file is the model
+ * itself, where a skill's file is front matter over the fields its manifest asks for.
+ */
+export function starterModel(name: string): { document: Record<string, unknown>; todo: string[] } {
+  const model = {
+    name,
+    description: PLACEHOLDER,
+    datasets: [{ name: PLACEHOLDER, source: PLACEHOLDER }],
+  };
+  return {
+    document: { version: "0.1.1", semantic_model: [model] },
+    todo: ["description", "datasets"],
+  };
+}
+
+/** A whole document, as JSON or as YAML with no front-matter fences. */
+export function renderDocument(path: string, document: Record<string, unknown>): string {
+  if (path.endsWith(".json")) return `${JSON.stringify(document, undefined, 2)}\n`;
+  return stringify(document, { lineWidth: 0 });
+}
+
 export function render(path: string, fields: Record<string, unknown>): string {
   if (path.endsWith(".json")) return `${JSON.stringify(fields, undefined, 2)}\n`;
   return `---\n${stringify(fields, { lineWidth: 0 })}---\n`;

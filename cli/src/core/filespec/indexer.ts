@@ -39,7 +39,7 @@ import {
 import { catalogDigest } from "#adapter/spec/canonical.ts";
 import { describeFile } from "#adapter/spec/envelope.ts";
 import { isDigest, isVersion } from "#adapter/spec/ref.ts";
-import { ownDescription } from "#core/frontmatter.ts";
+import { descriptionText, ownDescription } from "#core/frontmatter.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { authored, exists, refusal, subdirectories } from "#core/fs/tree.ts";
 import { withLease } from "#core/lease/lease.ts";
@@ -280,7 +280,15 @@ async function envelopeOf(
   const onDisk = new Set(records.map((record) => record.path));
   files.push(...(await blobFiles(root, folder, existing, onDisk, blobUrl)));
   const { digest: _digest, ...kept } = existing?.metadata ?? {};
-  const description = ownDescription(bytes, folder.name) ?? kept.description;
+  const spec =
+    existing?.spec === undefined
+      ? envelopeSpec(folder.kind, bytes, kinds, folder.name)
+      : (existing.spec as Record<string, unknown>);
+  // A kind whose file is a document, such as a semantic model, is described by its `spec`.
+  const description =
+    ownDescription(bytes, folder.name) ??
+    (typeof spec.description === "string" ? descriptionText(spec.description) : undefined) ??
+    kept.description;
   return buildEnvelope({
     kind: folder.kind as ArtifactKind,
     metadata: {
@@ -291,10 +299,7 @@ async function envelopeOf(
       ...(description === undefined ? {} : { description }),
     },
     files,
-    spec:
-      existing?.spec === undefined
-        ? envelopeSpec(folder.kind, bytes, kinds, folder.name)
-        : (existing.spec as Record<string, unknown>),
+    spec,
     ...(Array.isArray(existing?.relationships)
       ? { relationships: existing.relationships as never }
       : {}),

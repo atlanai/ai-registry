@@ -1,6 +1,6 @@
-# aireg skill and aireg agent
+# aireg skill, aireg agent and aireg semantic_model
 
-Create a skill or an agent, or start its next version.
+Create a skill, an agent or a semantic model, or start its next version.
 
 ## Synopsis
 
@@ -10,11 +10,11 @@ aireg skill new --from <path>... [--name <name>] [--namespace <namespace>] [-y]
 aireg skill bump <name> [patch | minor | major | <version>] [--namespace <namespace>]
 ```
 
-`aireg agent` takes the same actions.
+`aireg agent` and `aireg semantic_model` take the same actions.
 
 ## Description
 
-aireg has one command for each kind of artifact. `skill` and `agent` are always there. In a registry whose `registry.json` lists its kinds, the commands are those kinds instead. A kind named like one of aireg's own commands, such as `status`, gets no command of its own, and aireg warns about it.
+aireg has one command for each kind of artifact. `skill`, `agent` and `semantic_model` are always there. In a registry whose `registry.json` lists its kinds, the commands are those kinds instead. A kind named like one of aireg's own commands, such as `status`, gets no command of its own, and aireg warns about it.
 
 ### new
 
@@ -43,6 +43,40 @@ To copy in an agent, `--from` takes a folder that holds an `AGENT.md` or an `age
 For a card named `Recipe Agent`, import derives the registry slug `recipe-agent`. Pass
 `--name recipe-helper` to choose a different slug. Both choices leave the card bytes unchanged.
 The normal artifact-name and collision checks apply.
+
+### Semantic models
+
+A semantic model is one [Apache Ossie](https://github.com/apache/ossie) document: a team's datasets, fields, relationships and metric definitions, with instructions for agents. Its version folder holds `semantic_model.yaml` or `semantic_model.json`, exactly one of them, and the files it was converted from can sit beside it under `source/`.
+
+To publish a model you already have, copy it in with `new --from`. It takes the file under any name and stores it under the kind's:
+
+```bash
+aireg semantic_model new --from models/retail.yaml --name retail --namespace analytics
+aireg registry index
+```
+
+`new --from`, [`aireg registry index`](registry.md#aireg-registry-index) and [`aireg registry validate`](registry.md#aireg-registry-validate) each check the document against the Ossie schema for the `version` it declares, `0.1.1` or `0.2.0.dev0`, and refuse a document that fails. The schemas are part of aireg, so the check reads nothing from the network. A file that isn't a semantic model, such as an Ossie ontology document, is refused with the fields that are wrong:
+
+```console
+$ aireg semantic_model new --from models/flights-ontology.yaml --name flights --namespace analytics
+error: models/flights-ontology.yaml is not a valid semantic_model: `model.datasets` is required; `model.requires` is not a field this kind takes; `model.ontology` is not a field this kind takes; `model.ontology_mappings` is not a field this kind takes.
+  code: invalid
+hint: Fix it where it is, then run `aireg semantic_model new --from models/flights-ontology.yaml` again.
+```
+
+The registry folder supplies the slug in the envelope's `spec.name`, as it does for an agent card. The model keeps its own `name`, which need not be a slug. `spec.model` holds the whole document and `spec.description` copies its description. A model that holds a number with a decimal point can't be indexed, because the file spec allows only integers in an envelope: write the value as a string.
+
+Without `--from`, `new` writes a starter model in Ossie 0.1.1 with `TODO` where the description and the first dataset go.
+
+No coding agent has a folder for semantic models, so [`aireg add`](add.md) keeps a model in the scope's own folder and links it nowhere:
+
+```console
+$ aireg add acme/analytics/semantic_model/retail
+✓ Installed retail.
+  at     .registry/artifacts/acme/analytics/semantic_models/retail
+```
+
+Point a skill or an agent at that path. [`aireg update`](update.md) replaces the file with the newest version, and `@1.0.0` pins one, as for any artifact. [`aireg publish`](publish.md) doesn't take a semantic model: add it to the registry's folder with `new --from`.
 
 ### bump
 
@@ -92,7 +126,7 @@ Each version in `versions.json` has a status, which you change by hand and then 
 ## Exit status
 
 - `0`: created or copied, or canceled at a question.
-- `1`: the artifact or version already exists, a path is missing or isn't a valid skill or agent, or there is no version to start from.
+- `1`: the artifact or version already exists, a path is missing or isn't a valid skill, agent or semantic model, or there is no version to start from.
 - `2`: the action, namespace, name or version isn't valid, a namespace or, in a registry, a name is missing and aireg can't ask, or `--from` or `bump` is run outside a registry.
 
 ## Examples

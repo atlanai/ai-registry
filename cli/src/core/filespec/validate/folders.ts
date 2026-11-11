@@ -34,7 +34,7 @@ export function versionProblems(
   const problems = fileProblems(manifest, present);
   const spec = specOf(manifest, contents, at.name);
   if (spec === undefined) return [...problems, "has no front matter to read its fields from"];
-  problems.push(...check(manifest, spec));
+  problems.push(...check(manifest, spec), ...fractionProblems(spec));
   for (const field of placeholders(spec)) problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
   if (typeof spec.name === "string" && spec.name !== at.name) {
     problems.push(`is named ${quoted(spec.name)} in its front matter but sits in ${at.name}/`);
@@ -42,9 +42,26 @@ export function versionProblems(
   return problems;
 }
 
+/**
+ * Section 4.2: an envelope holds whole numbers only, so that every canonicalizer agrees on its
+ * digest. Said here with the field, where the indexer could only refuse the whole envelope.
+ */
+export function fractionProblems(value: unknown, at = ""): string[] {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value)
+      ? []
+      : [`\`${at}\` is ${value}, and an envelope takes whole numbers only: write it as a string`];
+  }
+  if (!isRecord(value) && !Array.isArray(value)) return [];
+  return Object.entries(value).flatMap(([key, item]) =>
+    fractionProblems(item, at === "" ? key : `${at}.${key}`),
+  );
+}
+
 function placeholders(value: unknown, at = ""): string[] {
   if (value === PLACEHOLDER) return [at];
-  if (!isRecord(value)) return [];
+  // A document a kind wraps, such as a semantic model, holds its fields in lists too.
+  if (!isRecord(value) && !Array.isArray(value)) return [];
   return Object.entries(value).flatMap(([key, item]) =>
     placeholders(item, at === "" ? key : `${at}.${key}`),
   );

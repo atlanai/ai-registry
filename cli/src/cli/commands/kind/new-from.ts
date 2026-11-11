@@ -15,6 +15,7 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { inBlobStore } from "#core/filespec/indexer.ts";
 import { requireRegistry } from "#core/filespec/init.ts";
 import {
+  entryName,
   fileProblems,
   type KindManifest,
   SPEC_TEXT,
@@ -22,6 +23,7 @@ import {
   specOf,
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
+import { fractionProblems } from "#core/filespec/validate/folders.ts";
 import { withName } from "#core/frontmatter.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
 import { expandUserPath } from "#core/fs/path.ts";
@@ -34,7 +36,9 @@ import { namespaceFor } from "./place.ts";
 interface Incoming {
   input: string;
   dir: string;
+  /** Each file to copy, and the path it takes in the version folder when that differs. */
   entries: string[];
+  stored: ReadonlyMap<string, string>;
   name: string;
   front: { file: string; name: string } | undefined;
 }
@@ -95,7 +99,7 @@ export async function newFrom(
     const at = join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0");
     await mkdir(at, { recursive: true });
     for (const path of item.entries) {
-      await cp(join(item.dir, path), join(at, path), FRESH);
+      await cp(join(item.dir, path), join(at, item.stored.get(path) ?? path), FRESH);
     }
     await rm(join(at, ENVELOPE), { force: true });
     // Rename in the front matter too, since index checks the folder against it.
@@ -141,17 +145,23 @@ async function incoming(
     ? found.files.map((record) => record.path).filter(visible)
     : [basename(source)];
 
+  // A lone document, such as a semantic model saved as `retail.yaml`, takes the kind's file name.
+  const stored = new Map(
+    isDirectory ? [] : entries.map((path) => [path, entryName(manifest, path)] as const),
+  );
   const texts = new Map<string, string>();
   for (const path of entries.filter((item) => SPEC_TEXT.test(item))) {
-    texts.set(path, await readFile(join(dir, path), "utf8"));
+    texts.set(stored.get(path) ?? path, await readFile(join(dir, path), "utf8"));
   }
   const spec = specOf(manifest, texts, named);
   const problems = [
     ...found.irregular
       .filter((entry) => visible(entry.path))
       .map((entry) => `${entry.path} ${refusal(entry)}`),
-    ...fileProblems(manifest, new Set(entries)),
-    ...(spec === undefined ? ["has no front matter"] : check(manifest, spec)),
+    ...fileProblems(manifest, new Set(entries.map((path) => stored.get(path) ?? path))),
+    ...(spec === undefined
+      ? ["has no front matter"]
+      : [...check(manifest, spec), ...fractionProblems(spec)]),
   ];
   const fallback =
     typeof spec?.name === "string"
@@ -167,7 +177,7 @@ async function incoming(
   const file = specFile(manifest, texts);
   const front =
     file !== undefined && typeof spec?.name === "string" ? { file, name: spec.name } : undefined;
-  return { input, dir, entries, name, front };
+  return { input, dir, entries, stored, name, front };
 }
 
 /** One file named by `--from`, refused as a link the way a folder's entries are. */

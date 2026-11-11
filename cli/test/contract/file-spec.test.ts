@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix, sep } from "node:path";
 import { Ajv2020, type SchemaObject } from "ajv/dist/2020.js";
 import { describe, expect, test } from "vitest";
 import { buildEnvelope } from "#adapter/index.ts";
@@ -12,12 +12,21 @@ function ajv(): Ajv2020 {
   // The schemas declare `format` keywords ajv carries no validator for;
   // the shapes, not the string formats, are what is asserted.
   const compiler = new Ajv2020({ allErrors: true, strict: false, validateFormats: false });
+  const parse = (path: string): SchemaObject =>
+    JSON.parse(readFileSync(join(SCHEMAS, path), "utf8")) as SchemaObject;
   const load = (path: string): void => {
-    compiler.addSchema(JSON.parse(readFileSync(join(SCHEMAS, path), "utf8")) as SchemaObject);
+    compiler.addSchema(parse(path));
   };
   // Each file carries its own relative `$id`, which is what the cross-refs use.
   for (const name of readdirSync(SCHEMAS).filter((n) => n.endsWith(".schema.json"))) load(name);
-  for (const name of readdirSync(join(SCHEMAS, "kinds"))) load(join("kinds", name));
+  const kinds = readdirSync(join(SCHEMAS, "kinds"), { recursive: true, encoding: "utf8" })
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => posix.join("kinds", ...name.split(sep)));
+  for (const path of kinds) {
+    // Another project's schema keeps that project's `$id`, so it is reached by its path here.
+    if (path.includes("/vendor/")) compiler.addSchema(parse(path), path);
+    else load(path);
+  }
   return compiler;
 }
 

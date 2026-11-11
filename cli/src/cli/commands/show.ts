@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { ifPresent } from "#adapter/files.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { SEMANTIC_MODEL_ENTRIES, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { list, quoted, sanitizeBlock, sanitizeName } from "#adapter/text.ts";
 import type { ShowResult } from "#cli/commands/show/result.ts";
 import { SHOW_COMMAND } from "#cli/commands/show/spec.ts";
@@ -151,7 +151,9 @@ async function markdownIn(dir: string): Promise<string | undefined> {
   const names = (await readdir(dir)).sort();
   const own =
     [SKILL_ENTRY, AGENT_ENTRY, "README.md"].find((name) => names.includes(name)) ??
-    names.find((name) => name.endsWith(".md"));
+    names.find((name) => name.endsWith(".md")) ??
+    // A semantic model has no Markdown: its document is what there is to read.
+    SEMANTIC_MODEL_ENTRIES.find((name) => names.includes(name));
   return own === undefined ? undefined : join(dir, own);
 }
 

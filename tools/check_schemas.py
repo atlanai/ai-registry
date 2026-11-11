@@ -51,6 +51,11 @@ def rel(path: Path) -> str:
     return path.relative_to(SCHEMA_DIR).as_posix()
 
 
+def is_vendored(key: str) -> bool:
+    """A schema copied unchanged from another project, under a vendor/ folder."""
+    return "vendor" in Path(key).parts
+
+
 def resolve_pointer(doc, pointer: str):
     """Resolve an RFC 6901 JSON Pointer, or raise KeyError."""
     node = doc
@@ -91,6 +96,9 @@ def check_structure(rep: Report) -> dict[str, dict]:
         if doc.get("$schema") != DIALECT:
             rep.error(f"{key}: $schema is {doc.get('$schema')!r}, expected {DIALECT}")
         ident = doc.get("$id")
+        if is_vendored(key):
+            # Another project's schema, byte for byte: its $id is that project's, not a path here.
+            continue
         if ident is None:
             rep.error(f"{key}: no $id")
         elif ident != key:

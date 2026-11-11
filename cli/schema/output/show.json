@@ -33,6 +33,10 @@
                 {
                   "const": "agent",
                   "type": "string"
+                },
+                {
+                  "const": "semantic_model",
+                  "type": "string"
                 }
               ]
             },

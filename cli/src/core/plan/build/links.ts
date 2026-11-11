@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { list, quoted } from "#adapter/text.ts";
+import { isStoreOnly } from "#core/kinds.ts";
 import type { LinkMode, LockArtifact } from "#core/lock.ts";
 import type { Action, Selected } from "#core/plan/model.ts";
 import { claim, linksFor, type PlannedLink } from "#core/plan/projection.ts";
@@ -63,7 +64,14 @@ export function placeLinks(
   });
   // Said only when it lands nowhere: a tool skipping a kind another tool reads is
   // expected, and a clash or a refusal has already said where it went instead.
-  if (links.length === 0 && claimed.blocked.length === 0 && !refused && !yours) {
+  // A kind no coding agent has a folder for is installed once the scope holds its copy.
+  if (
+    links.length === 0 &&
+    claimed.blocked.length === 0 &&
+    !refused &&
+    !yours &&
+    !isStoreOnly(item.kind)
+  ) {
     const other = build.options.roots.scope === "project" ? "user" : "project";
     const reasons = [
       ...(claimed.skipped.size === 0
