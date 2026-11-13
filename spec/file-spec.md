@@ -156,6 +156,8 @@ At `artifacts/<namespace>/<kind>/<name>/versions.json`. Schema: [`schemas/versio
 
 A client MUST NOT remove an installed copy because its status changed. When an update finds the installed version blocked and no other version to move to, the client SHOULD fail, naming the version and its `reason`, and leave removal to the user.
 
+A client MUST NOT install a yanked version that its lockfile does not already hold, even when the request names that version. Where the lockfile holds it, the client installs it as it would any other version, so existing setups keep working, and SHOULD warn that it is yanked, naming the `reason`. `yanked` and `status` apply independently: a yanked `deprecated` version installs from the lockfile with both warnings, and a yanked `blocked` version does not install at all. Yanking withdraws a version from new installs; blocking withdraws it everywhere.
+
 ### 3.4 `<version>/artifact.json`
 
 The envelope: a fixed header, an open `spec` the kind owns, the files the version carries, and its outbound relationships. Schema: [`schemas/artifact.schema.json`](schemas/artifact.schema.json), with the kind manifests applied to `spec` in [`schemas/artifact-known-kinds.schema.json`](schemas/artifact-known-kinds.schema.json).
