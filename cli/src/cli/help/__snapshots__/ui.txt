@@ -3,7 +3,7 @@ Browse your registries and what is installed, in your browser
 Usage: aireg ui [--port <port>] [--no-open]
 
 Options:
-      --port <port>  Listen on this port instead of a free one
+      --port <port>  Listen on this port instead of the default (3456)
       --no-open      Print the address without opening a browser
 
 Examples:
