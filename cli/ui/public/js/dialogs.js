@@ -92,11 +92,18 @@ export async function openDoctorModal() {
   } catch (err) {
     el.doctorModalContent.innerHTML = `<p class="u44">Error: ${escapeHtml(err.message)}</p>`;
   }
+  if (state.problems?.length) {
+    el.doctorModalContent.innerHTML += `<section aria-label="Unavailable information"><h3>Unavailable information</h3><ul>${state.problems.map((problem) => `<li>${escapeHtml(problem)}</li>`).join("")}</ul></section>`;
+  }
 }
 
 export function closeDoctorModal() {
   el.doctorModalBackdrop.classList.remove("open");
 }
+
+// The confirmation remains bound to the artifact whose preview was shown.
+let retireOffer = null;
+let retireRequest = 0;
 
 // Retire Modal Functions
 export async function openRetireModal() {
@@ -109,11 +116,13 @@ export async function openRetireModal() {
     return;
   }
 
-  el.retireModalTitle.textContent = `Retire ${artifact.name}`;
+  const request = ++retireRequest;
+  retireOffer = null;
+  el.retireModalTitle.textContent = `Remove ${artifact.name}`;
   el.retireModalBackdrop.classList.add("open");
-  el.retireConfirmText.textContent = "Retire it";
+  el.retireConfirmText.textContent = "Remove";
   el.retireConfirmBtn.disabled = true;
-  el.retireTargetsList.textContent = "Asking aireg what this would change…";
+  el.retireTargetsList.textContent = "Checking…";
 
   try {
     const res = await api("/api/retire", {
@@ -121,25 +130,32 @@ export async function openRetireModal() {
       body: JSON.stringify({ key: artifact.key, dryRun: true }),
     });
     const json = await res.json();
+    if (request !== retireRequest) return;
+    retireOffer = json.ok ? artifact : null;
     // The server's own plan, word for word: nothing here is guessed.
+    el.retireConfirmText.textContent = "Remove";
     el.retireTargetsList.textContent = json.ok
-      ? json.message
-      : json.error || json.message || "aireg would not retire it.";
+      ? [json.message, json.recovery].filter(Boolean).join("\n\n")
+      : json.error || json.message || "Could not preview removal.";
     el.retireConfirmBtn.disabled = !json.ok;
   } catch (_) {
+    if (request !== retireRequest) return;
     el.retireTargetsList.textContent = "The server did not answer.";
   }
 }
 
 export function closeRetireModal() {
+  retireOffer = null;
+  retireRequest += 1;
   el.retireModalBackdrop.classList.remove("open");
 }
 
 export async function confirmRetire() {
-  const artifact = state.artifacts.find((a) => a.key === state.selectedKey);
-  if (!artifact) return;
+  const artifact = retireOffer;
+  if (!artifact || el.retireConfirmBtn.disabled) return;
+  const request = retireRequest;
 
-  el.retireConfirmText.textContent = "Retiring...";
+  el.retireConfirmText.textContent = "Removing…";
   el.retireConfirmBtn.disabled = true;
 
   try {
@@ -148,10 +164,11 @@ export async function confirmRetire() {
       body: JSON.stringify({ key: artifact.key, dryRun: false }),
     });
     const json = await res.json();
+    if (request !== retireRequest) return;
     if (!json.ok) {
       // Stay open and say why, so a failure never looks like success.
-      el.retireTargetsList.textContent = json.error || json.message || "aireg did not retire it.";
-      el.retireConfirmText.textContent = "Retire it";
+      el.retireTargetsList.textContent = json.error || json.message || "Could not remove it.";
+      el.retireConfirmText.textContent = "Remove";
       el.retireConfirmBtn.disabled = false;
       return;
     }
@@ -159,8 +176,9 @@ export async function confirmRetire() {
     await loadArtifacts();
     await loadConsoleData();
   } catch (_err) {
+    if (request !== retireRequest) return;
     el.retireTargetsList.textContent = "The server did not answer.";
-    el.retireConfirmText.textContent = "Retire it";
+    el.retireConfirmText.textContent = "Remove";
     el.retireConfirmBtn.disabled = false;
   }
 }

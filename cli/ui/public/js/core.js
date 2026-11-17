@@ -1,26 +1,23 @@
 // Shared by every module: the session token and API client, the page state and its elements,
 // escaping, and the sanitizer every rendered file passes through.
+import { sessionResult, sessionToken } from "./session.js";
 
 // The server prints an address with a token after `#`, which the browser never sends.
 // It moves to this tab's session storage and out of the address bar.
-export const TOKEN_KEY = "aireg-web-token";
-export const token = (() => {
-  const match = /(?:^#|&)token=([A-Za-z0-9_-]{16,128})/.exec(location.hash);
-  // Out of the address bar first, whether or not this tab can keep it in storage.
-  if (match) history.replaceState(null, "", location.pathname);
-  try {
-    if (match) sessionStorage.setItem(TOKEN_KEY, match[1]);
-    return match ? match[1] : sessionStorage.getItem(TOKEN_KEY) || "";
-  } catch (_) {
-    return match ? match[1] : "";
-  }
-})();
+const token = await sessionToken();
 
 /** Every call to the server carries the token; a write is always JSON. */
-export function api(url, options = {}) {
+export async function api(url, options = {}) {
   const headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
   if (options.method === "POST") headers["Content-Type"] = "application/json";
-  return fetch(url, { ...options, headers, credentials: "omit", cache: "no-store" });
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: "omit",
+    cache: "no-store",
+  });
+  sessionResult(response.status);
+  return response;
 }
 
 /** Says a result to screen readers, and shows it in the status line. */
@@ -145,6 +142,7 @@ export const el = {
   daemonStatusText: document.getElementById("daemonStatusText"),
   manifestStatusText: document.getElementById("manifestStatusText"),
   harnessStatusText: document.getElementById("harnessStatusText"),
+  activeScope: document.getElementById("activeScope"),
   nextSyncCountdown: document.getElementById("nextSyncCountdown"),
   cmdKBtn: document.getElementById("cmdKBtn"),
   doctorModalBtn: document.getElementById("doctorModalBtn"),
@@ -206,7 +204,6 @@ export const el = {
   retireConfirmBtn: document.getElementById("retireConfirmBtn"),
   retireConfirmText: document.getElementById("retireConfirmText"),
   retireTargetsList: document.getElementById("retireTargetsList"),
-  auditCountRetired: document.getElementById("auditCountRetired"),
 
   // Add Artifact Modal
   addArtifactBtn: document.getElementById("addArtifactBtn"),

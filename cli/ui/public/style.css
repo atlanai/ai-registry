@@ -2043,13 +2043,6 @@ textarea:focus-visible {
 .u48 { padding:16px !important; text-align:center !important; color:var(--ink-muted) !important; font-size:12px !important; }
 .u49 { display:flex; align-items:center !important; gap:8px !important; padding:20px !important; justify-content:center !important; color:var(--ink-muted) !important; font-size:12px !important; }
 
-.problems-strip {
-  padding: 8px 16px;
-  background: #fef3c7;
-  color: #7c2d12;
-  font-size: 12.5px;
-  border-bottom: 1px solid #f59e0b;
-}
 
 button.nav-item {
   width: 100%;
@@ -2060,3 +2053,12 @@ button.nav-item {
   text-align: left;
   cursor: pointer;
 }
+
+.session-gate { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: #f4f6fa; color: #172033; }
+.session-gate[hidden] { display: none; }
+.session-gate > div { width: min(100%, 560px); padding: 32px; background: #fff; border: 1px solid #d7dce4; border-radius: 16px; box-shadow: 0 12px 48px #17203312; }
+.session-gate h1 { font-size: 24px; margin-bottom: 16px; }
+.session-gate p { font-size: 15px; line-height: 1.6; margin: 12px 0; }
+
+
+#retireTargetsList { white-space: pre-line; }

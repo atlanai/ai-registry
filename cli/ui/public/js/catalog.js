@@ -13,11 +13,16 @@ export async function loadArtifacts() {
     state.stats = json.data.stats || { total: 0, namespaces: {}, harnesses: {} };
     state.registries = json.data.registries || [];
     state.problems = json.data.problems || [];
+    el.doctorModalBtn.setAttribute(
+      "aria-label",
+      state.problems.length
+        ? `Check this machine: ${state.problems.length} diagnostics`
+        : "Check this machine",
+    );
 
     updateHeaderStats();
     renderSidebarCounts();
     renderRegistries();
-    renderProblems();
     hooks.updateAttentionCounts();
     if (state.activeMode === "audit") hooks.renderAuditDashboard();
     renderStream();
@@ -97,7 +102,7 @@ export function getFilteredArtifacts() {
   let items = [...state.artifacts];
 
   if (state.activeNamespace !== "all") {
-    items = items.filter((a) => a.namespace === state.activeNamespace);
+    items = items.filter((a) => (a.namespace || a.registry) === state.activeNamespace);
   }
 
   if (state.activeHarness !== "all") {
@@ -139,7 +144,7 @@ export function renderStream() {
   drawStream();
   // A background read redraws the list; a keyboard user keeps their place in it.
   if (hadFocus)
-    el.artifactsList.querySelector(".artifact-row.active")?.focus({ preventScroll: true });
+    el.artifactsList.querySelector('.artifact-row[tabindex="0"]')?.focus({ preventScroll: true });
 }
 
 function drawStream() {
@@ -158,7 +163,10 @@ function drawStream() {
   }
 
   el.artifactsList.innerHTML = items
-    .map((a) => {
+    .map((a, index) => {
+      const tabbable =
+        a.key === state.selectedKey ||
+        (index === 0 && !items.some((item) => item.key === state.selectedKey));
       const isSelected = a.key === state.selectedKey;
       const harnessBadges = a.harnesses
         .map((h) => `<span class="harness-micro-badge">${escapeHtml(h)}</span>`)
@@ -166,7 +174,7 @@ function drawStream() {
       const shortDigest = a.digest ? a.digest.slice(7, 15) : "";
 
       return `
-      <div class="artifact-row ${isSelected ? "active" : ""}" data-key="${escapeHtml(a.key)}" role="option" tabindex="${isSelected ? "0" : "-1"}" aria-selected="${isSelected}">
+      <div class="artifact-row ${isSelected ? "active" : ""}" data-key="${escapeHtml(a.key)}" role="option" tabindex="${tabbable ? "0" : "-1"}" aria-selected="${isSelected}">
         <div class="artifact-row-top">
           <div class="row-name-group">
             ${a.namespace ? `<span class="row-ns-badge ns-${cssToken(a.namespace)}">${escapeHtml(a.namespace)}</span>` : ""}
@@ -233,11 +241,14 @@ function showHeader(artifact) {
   if (el.retireSkillBtn) {
     const available = artifact.state === "available";
     const label = el.retireSkillBtn.querySelector("span");
-    if (label) label.textContent = available ? "Install" : "Retire";
+    if (label) label.textContent = available ? "Install" : "Remove";
+    el.retireSkillBtn.disabled = !available && !artifact.removable;
     el.retireSkillBtn.classList.toggle("btn-retire", !available);
-    el.retireSkillBtn.title = available
-      ? `Install it from ${artifact.registry}, with a dry run first`
-      : "Remove it from every target, or move a folder written here aside";
+    el.retireSkillBtn.title = artifact.removable
+      ? "Remove this installed artifact"
+      : "This local folder is not managed by aireg";
+    if (available)
+      el.retireSkillBtn.title = `Install it from ${artifact.registry}, with a dry run first`;
   }
 }
 
@@ -385,15 +396,6 @@ function registryTag(registry) {
 function linkWord(link) {
   if (!link.present) return "missing";
   return link.ok ? "linked" : "points elsewhere";
-}
-
-/** What the server could not read, said where a person sees it, not only on hover. */
-function renderProblems() {
-  const strip = document.getElementById("problemsStrip");
-  if (!strip) return;
-  const problems = state.problems || [];
-  strip.hidden = problems.length === 0;
-  strip.textContent = problems.length === 0 ? "" : problems.join(" · ");
 }
 
 /** True while any registry is still being read, so the page reads again soon. */

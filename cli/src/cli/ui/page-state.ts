@@ -8,6 +8,7 @@ import { toolName } from "#cli/render/tools.ts";
 import { type ArtifactRow, type ConsoleState, LOCAL_GROUP } from "#core/console/model.ts";
 import { frontmatter } from "#core/frontmatter.ts";
 import { resolveTargets } from "#core/target/table.ts";
+import { SqliteRunStore } from "#daemon/runs/store.ts";
 import type { Catalog, Catalogs } from "./catalogs.ts";
 
 const TARGET_TABLE = resolveTargets(process.env);
@@ -265,9 +266,48 @@ export function joined(catalogs: readonly Catalog[], rows: readonly Installed[])
       ),
     );
   }
-  return artifacts.sort(
+  return reconcileLocal(artifacts).sort(
     (a, b) => a.name.localeCompare(b.name) || a.registry.localeCompare(b.registry),
   );
+}
+
+/** Merge duplicate observations, retaining all diagnostics and affected targets. */
+function reconcileLocal(artifacts: KeptArtifact[]): KeptArtifact[] {
+  const copies = new Map<string, KeptArtifact>();
+  const result: KeptArtifact[] = [];
+  for (const artifact of artifacts) {
+    const prior = artifact.local && artifact.copy !== "" ? copies.get(artifact.copy) : undefined;
+    if (prior === undefined) {
+      result.push(artifact);
+      if (artifact.local && artifact.copy !== "") copies.set(artifact.copy, artifact);
+      continue;
+    }
+    const states = [...new Set([prior.state, artifact.state])].sort();
+    prior.detail = [
+      ...new Set([
+        prior.detail,
+        artifact.detail,
+        ...(states.length > 1 ? [`Reported states: ${states.join(", ")}.`] : []),
+      ]),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const attention = ["failed", "missing", "dangling", "edited", "duplicate"];
+    prior.state = attention.find((state) => states.includes(state)) ?? states[0] ?? prior.state;
+    prior.harnesses = [...new Set([...prior.harnesses, ...artifact.harnesses])];
+    for (const link of artifact.links) {
+      const existing = prior.links.find(
+        (item) => item.target === link.target && item.path === link.path,
+      );
+      if (existing === undefined) prior.links.push(link);
+      else {
+        existing.ok &&= link.ok;
+        existing.present &&= link.present;
+      }
+    }
+    prior.description ||= artifact.description;
+  }
+  return result;
 }
 
 /** Everything the page shows, read once and shared for a few seconds. */
@@ -300,7 +340,26 @@ export class PageReader {
 
   async #readNow(): Promise<PageState> {
     // Catalogs are read in the scope the console shows, so the list and every write agree.
-    const installed = await readInstalled(this.#context);
+    const historyProblems = new Set<string>();
+    const context = {
+      ...this.#context,
+      host: {
+        ...this.#context.host,
+        openRunStore: async () => {
+          try {
+            return await this.#context.host.openRunStore();
+          } catch (error) {
+            const code = (error as NodeJS.ErrnoException).code;
+            if (code !== "EPERM" && code !== "EACCES" && code !== "EROFS") throw error;
+            historyProblems.add(
+              "Run history is unavailable: aireg cannot access its state database. Installed artifacts are still shown. Run aireg ui in a terminal with access to its home folder.",
+            );
+            return SqliteRunStore.open(":memory:");
+          }
+        },
+      },
+    };
+    const installed = await readInstalled(context);
     const { catalogs, problem } = await this.#catalogs.read(installed.first.scope);
     const artifacts = joined(catalogs, installed.rows);
     await Promise.all(
@@ -336,6 +395,7 @@ export class PageReader {
         ],
       },
       problems: [
+        ...historyProblems,
         ...(problem === undefined ? [] : [problem]),
         ...catalogs.flatMap((c) =>
           c.error === undefined ? [] : [`${c.name} did not list its artifacts: ${c.error}`],

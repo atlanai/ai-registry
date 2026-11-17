@@ -6,7 +6,7 @@ const PAGE = join(ROOT, "ui", "public");
 const OUT = join(ROOT, "src", "cli", "ui", "assets.ts");
 
 /** The page's own files, by the path the server serves each at. */
-const MODULES = ["core", "markdown", "catalog", "machine", "dialogs", "main"];
+const MODULES = ["session", "core", "markdown", "catalog", "machine", "dialogs", "main"];
 
 const FILES: readonly [path: string, file: string, type: string][] = [
   ["/", "index.html", "text/html; charset=utf-8"],

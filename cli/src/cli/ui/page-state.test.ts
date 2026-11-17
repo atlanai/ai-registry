@@ -137,3 +137,19 @@ describe("the page's list", () => {
     expect(before[0]?.key).toBe(after[0]?.key);
   });
 });
+
+test("one local folder has one selectable row even when accounts report different states", () => {
+  const list = joined(
+    [],
+    [
+      { local: true, row: row({ copy: "/tmp/skill-one", state: "unpublished" }) },
+      { local: true, row: row({ copy: "/tmp/skill-one", state: "failed" }) },
+      { local: true, row: row({ copy: "/tmp/skill-two", state: "unpublished" }) },
+    ],
+  );
+  expect(list).toHaveLength(2);
+  expect(list[0]?.state).toBe("failed");
+  expect(list[0]?.detail).toContain("failed, unpublished");
+  expect(new Set(list.map((artifact) => artifact.key)).size).toBe(2);
+  expect(list.map((artifact) => artifact.copy)).toEqual(["/tmp/skill-one", "/tmp/skill-two"]);
+});

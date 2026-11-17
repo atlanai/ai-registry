@@ -33,6 +33,10 @@ import {
   updateAttentionCounts,
 } from "./machine.js";
 
+export function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
 // Mode Switcher Handler
 export function switchMode(mode) {
   state.activeMode = mode;
@@ -161,7 +165,13 @@ function wireCopyButtons() {
   el.copyCliBtn.addEventListener("click", () => {
     const art = selected();
     // `aireg show` takes the registry's full address; work written here is read from its folder.
-    if (art) copy(el.copyCliBtn, art.listed ? `aireg show ${art.key}` : `aireg show ${art.path}`);
+    if (art)
+      copy(
+        el.copyCliBtn,
+        art.listed
+          ? `aireg show -- ${shellQuote(art.key)}`
+          : `aireg show -- ${shellQuote(art.path)}`,
+      );
   });
   el.copyDigestBtn.addEventListener("click", () => {
     const art = selected();
@@ -211,7 +221,7 @@ function onKey(e) {
   if ((e.metaKey || e.ctrlKey) && e.key === "k") {
     e.preventDefault();
     if (state.cmdPaletteOpen) closeCommandPalette();
-    else openCommandPalette();
+    else if (!document.querySelector(".open[data-dialog]")) openCommandPalette();
   } else if (e.key === "Escape") {
     closeAll();
   } else if (state.cmdPaletteOpen) {

@@ -1,20 +1,15 @@
 import { randomBytes } from "node:crypto";
-import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { messageOf } from "#adapter/errors.ts";
 import { readRegular } from "#adapter/files.ts";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
-import { isWithin } from "#adapter/paths.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { underHome } from "#cli/render/home.ts";
 import * as commands from "#core/console/actions.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { type Carried, describeCarried } from "#core/plan/carries.ts";
-import { UI_ARCHIVE_DIR, UI_ARCHIVE_NOTE } from "#core/product.ts";
-import { toolHome } from "#core/store/paths.ts";
 import { Catalogs } from "./catalogs.ts";
 import { type Ran, run } from "./child.ts";
 import { API_PREFIX, type Bound, refusal } from "./guard.ts";
@@ -83,10 +78,8 @@ interface Server {
   assets: Readonly<Record<string, Asset>>;
   /** True while a write runs: one at a time, as the lease allows anyway. */
   busy: boolean;
-  /** The plugins the last dry run of an address left out until trusted. */
   /** `aireg show` children reading a file a registry serves; a few at a time. */
   showing: number;
-  /** The plugins the last dry run held back, each with a digest of what it runs. */
   offer: Offer | undefined;
 }
 
@@ -164,15 +157,6 @@ const ROUTES: Readonly<Record<string, Route>> = {
   },
   "POST /api/add": async (request, _url, server) => addFrom(await body(request), server),
   "POST /api/retire": async (request, _url, server) => retire(await body(request), server),
-  "GET /api/retired": async () => [200, { ok: true, retired: await retired() }],
-  "POST /api/restore": async (request, _url, server) => {
-    const payload = await body(request);
-    return exclusive(server, async () => {
-      const answer = await restore(payload);
-      await server.reader.read(true);
-      return answer;
-    });
-  },
 };
 
 async function answer(
@@ -230,9 +214,10 @@ function artifactsOf(state: PageState): object {
     ok: true,
     data: {
       total: state.artifacts.length,
-      artifacts: state.artifacts.map(
-        ({ copy: _copy, installedKey: _key, local: _local, ...shown }) => shown,
-      ),
+      artifacts: state.artifacts.map(({ copy: _copy, installedKey, local: _local, ...shown }) => ({
+        ...shown,
+        removable: installedKey !== undefined,
+      })),
       stats: { total: state.artifacts.length, namespaces, harnesses },
       registries: state.registries,
       problems: state.problems,
@@ -526,7 +511,7 @@ function dryRunSaid(ran: Ran, scope: string): string {
   return said.length === 0 ? "Nothing would change." : said.join("\n");
 }
 
-/** Uninstalls what a registry installed; moves work written here into aireg's own archive. */
+/** Remove only artifacts the existing CLI manages. */
 async function retire(payload: Record<string, unknown>, server: Server): Promise<[number, object]> {
   const artifact = await find(payload.key, server, true);
   const dryRun = payload.dryRun === true;
@@ -534,7 +519,7 @@ async function retire(payload: Record<string, unknown>, server: Server): Promise
     throw new PageError(
       400,
       `${artifact.name} comes with the plugin ${artifact.carriedBy}.`,
-      `Retire ${artifact.carriedBy} to remove it.`,
+      `Remove ${artifact.carriedBy} to remove it.`,
     );
   }
   if (artifact.state === "available")
@@ -548,144 +533,15 @@ async function retire(payload: Record<string, unknown>, server: Server): Promise
       dryRun,
       name: artifact.name,
       targets: artifact.harnesses,
+      action: "remove",
+      recovery: "The registry copy is unchanged.",
       message:
         ran.code === 0
           ? `${dryRun ? "Would remove" : "Removed"} ${artifact.name} from ${where}.`
           : ran.lines.join("\n"),
     }));
   }
-  return exclusive(server, async () => {
-    const answer = await retireFolder(artifact, dryRun, where);
-    if (!dryRun) await server.reader.read(true);
-    return answer;
-  });
-}
-
-/**
- * Work written here: its folder is the source, so it moves aside, never away. The note that
- * says where it came from sits beside it, written first and only as a new file, so nothing
- * inside the folder, such as a link named like the note, is ever written through.
- */
-async function retireFolder(
-  artifact: KeptArtifact,
-  dryRun: boolean,
-  where: string,
-): Promise<[number, object]> {
-  const from = artifact.copy;
-  const stat = from === "" ? undefined : await lstat(from).catch(() => undefined);
-  if (!artifact.local || !SAFE_NAME.test(artifact.name) || stat?.isDirectory() !== true) {
-    throw new PageError(400, `${artifact.name} is not a folder the page can retire.`);
-  }
-  const id = `${artifact.name}-${Date.now()}`;
-  const archived = join(archiveDir(), id);
-  if (dryRun) {
-    return [
-      200,
-      {
-        ok: true,
-        dryRun: true,
-        name: artifact.name,
-        targets: artifact.harnesses,
-        message: `Would move ${underHome(from)} to ${underHome(archived)}, so ${where} stops loading it.`,
-      },
-    ];
-  }
-  await mkdir(archiveDir(), { recursive: true });
-  const note = notePath(id);
-  await writeFile(note, JSON.stringify({ name: artifact.name, from, retiredAtMs: Date.now() }), {
-    flag: "wx",
-  });
-  try {
-    await rename(from, archived);
-  } catch (error) {
-    await rm(note, { force: true });
-    throw error;
-  }
-  return [
-    200,
-    {
-      ok: true,
-      name: artifact.name,
-      archived: true,
-      archivePath: underHome(archived),
-      message: `Retired ${artifact.name} to ${underHome(archived)}.`,
-    },
-  ];
-}
-
-function notePath(id: string): string {
-  return join(archiveDir(), `${id}${UI_ARCHIVE_NOTE}`);
-}
-
-function archiveDir(): string {
-  return join(toolHome(), UI_ARCHIVE_DIR);
-}
-
-interface Note {
-  name: string;
-  from: string;
-  retiredAtMs: number;
-}
-
-async function noteOf(id: string): Promise<Note | undefined> {
-  try {
-    const note = JSON.parse(await readFile(notePath(id), "utf8")) as Partial<Note>;
-    return typeof note.name === "string" && typeof note.from === "string"
-      ? (note as Note)
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-async function retired(): Promise<object[]> {
-  const entries = await readdir(archiveDir(), { withFileTypes: true }).catch(() => []);
-  const found = await Promise.all(
-    entries
-      .filter((entry) => entry.isDirectory() && SAFE_NAME.test(entry.name))
-      .map(async (entry) => {
-        const note = await noteOf(entry.name);
-        return note === undefined
-          ? []
-          : [
-              {
-                id: entry.name,
-                name: note.name,
-                from: underHome(note.from),
-                path: underHome(join(archiveDir(), entry.name)),
-                description: `Retired from ${underHome(note.from)}`,
-                retiredAtMs: note.retiredAtMs,
-              },
-            ];
-      }),
-  );
-  return found.flat();
-}
-
-/** Puts a retired folder back where it came from, and never over something already there. */
-async function restore(payload: Record<string, unknown>): Promise<[number, object]> {
-  const id = payload.id;
-  if (typeof id !== "string" || !SAFE_NAME.test(id))
-    throw new PageError(400, "Name one retired folder.");
-  const note = await noteOf(id);
-  // The note is aireg's own, but a folder outside the home folder is never written to.
-  if (note === undefined || !isWithin(homedir(), note.from) || note.from === homedir()) {
-    throw new PageError(404, "That retired folder does not say where it came from.");
-  }
-  if ((await lstat(note.from).catch(() => undefined)) !== undefined) {
-    throw new PageError(409, `${underHome(note.from)} already exists, so nothing was moved.`);
-  }
-  const held = join(archiveDir(), id);
-  if ((await lstat(held).catch(() => undefined))?.isDirectory() !== true) {
-    throw new PageError(404, "That retired folder is not in the archive.");
-  }
-  await mkdir(dirname(note.from), { recursive: true });
-  await rename(held, note.from);
-  await rm(notePath(id), { force: true });
-  return [
-    200,
-    { ok: true, name: note.name, message: `Restored ${note.name} to ${underHome(note.from)}.` },
-  ];
+  throw new PageError(400, "This local folder is not managed by aireg. No files were changed.");
 }
 
 function sendAsset(

@@ -6,11 +6,17 @@
   <title>aireg ui</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230f172a%22/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230f172a%22/><text x=%2216%22 y=%2221%22 font-family=%22system-ui,-apple-system%22 font-size=%2214%22 font-weight=%22700%22 text-anchor=%22middle%22 fill=%22%23ffffff%22>ai</text></svg>">
 </head>
 <body>
+  <section id="sessionGate" class="session-gate" role="alert" hidden>
+    <div><h1>Connect this browser to aireg</h1>
+      <p>This browser has no active session, or the server was restarted. Your skills have not been removed.</p>
+      <p>Open the UI with <code>aireg ui</code> and use the tab it opens. Other tabs in that browser reconnect automatically while an authenticated tab is open.</p>
+      <p>If you are using another browser, open the complete launch address printed by that command there. Keep that address private.</p>
+    </div>
+  </section>
   <div id="liveStatus" class="visually-hidden" role="status" aria-live="polite"></div>
-  <div class="workspace-root">
+  <div class="workspace-root" id="appSurface">
     <!-- Top System Bar -->
     <header class="sys-bar">
       <div class="sys-bar-left">
@@ -26,6 +32,7 @@
           </span>
           <span class="status-chip" id="manifestStatusText">Reading…</span>
           <span class="status-chip" id="harnessStatusText"></span>
+          <span class="status-chip" id="activeScope">Loading scope…</span>
           <span class="status-chip countdown-chip" id="nextSyncCountdown">Next sync in: --</span>
         </div>
       </div>
@@ -52,7 +59,7 @@
     </header>
 
     <!-- Master-Detail 3-Pane Workspace -->
-    <div id="problemsStrip" class="problems-strip" role="alert" hidden></div>
+
     <div class="workspace-body">
       <!-- Pane 1: Navigation & Filter Rail (Left) -->
       <aside class="sidebar-rail">
@@ -156,13 +163,7 @@
                   </span>
                   <span class="nav-count" id="auditCountBroken">0</span>
                 </button></li>
-                <li><button type="button" class="nav-item" data-audit="retired" aria-pressed="false">
-                  <span class="nav-label">
-                    <span class="nav-bullet dot-aireg"></span>
-                    <span>Retired</span>
-                  </span>
-                  <span class="nav-count" id="auditCountRetired">0</span>
-                </button></li>
+
               </ul>
             </div>
           </nav>
@@ -233,9 +234,9 @@
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                   <span>Digest</span>
                 </button>
-                <button class="subtle-btn btn-retire" id="retireSkillBtn" title="Remove it from every target, or move a folder written here aside">
+                <button class="subtle-btn btn-retire" id="retireSkillBtn" title="Remove this installed artifact">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                  <span>Retire</span>
+                  <span>Remove</span>
                 </button>
               </div>
             </div>
@@ -496,18 +497,13 @@
       <div class="doctor-modal-box u3">
         <div class="doctor-modal-header">
           <div class="doctor-modal-title">
-            <span class="status-pill failed">aireg remove</span>
-            <h2 id="retireModalTitle">Retire</h2>
+            <h2 id="retireModalTitle">Remove</h2>
           </div>
           <button class="modal-close" id="retireModalClose">&times;</button>
         </div>
         <div class="doctor-modal-body u4">
-          <p class="u5">
-            An artifact a registry installed is removed from every target and from the lockfile. A skill written here is moved aside, where Restore can put it back.
-          </p>
-
           <div class="bezel-card-inner u6">
-            <span class="meta-label">What aireg would change:</span>
+            <span class="meta-label">What happens</span>
             <div class="u7" id="retireTargetsList">
             </div>
           </div>
@@ -516,7 +512,7 @@
             <button class="sys-btn" id="retireCancelBtn">Cancel</button>
             <button class="sys-btn btn-danger" id="retireConfirmBtn">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              <span id="retireConfirmText">Retire it</span>
+              <span id="retireConfirmText">Remove</span>
             </button>
           </div>
         </div>

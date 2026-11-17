@@ -16,7 +16,7 @@ export const UI_COMMAND = {
       flag: "--port",
       value: "<port>",
       integer: { min: 1024, max: 65535 },
-      describe: "Listen on this port instead of a free one",
+      describe: "Listen on this port instead of the default (3456)",
     },
     { flag: "--no-open", describe: "Print the address without opening a browser" },
   ],

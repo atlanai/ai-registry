@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { marketplace } from "#test/kit/builders/layouts.ts";
@@ -104,6 +104,48 @@ describe("aireg ui", () => {
     }
   });
 
+  test("leaves unmanaged local skills untouched and offers no archive endpoints", async ({
+    home,
+    project,
+  }) => {
+    const folder = join(home.dir, ".claude", "skills", "local-example");
+    await mkdir(folder, { recursive: true });
+    const markdown =
+      "---\nname: local-example\ndescription: Local fixture\n---\nKeep this source.\n";
+    await writeFile(join(folder, "SKILL.md"), markdown);
+    const ui = await serveUi(home, project);
+    try {
+      const port = ui.printed.data.port;
+      const auth = { authorization: `Bearer ${ui.token}` };
+      const listed = JSON.parse((await send(port, "/api/artifacts", { headers: auth })).body).data
+        .artifacts;
+      const local = listed.find((item: Listed) => item.name === "local-example");
+      expect(local).toMatchObject({ removable: false });
+      for (const dryRun of [true, false]) {
+        const response = await send(port, "/api/retire", {
+          method: "POST",
+          headers: json(ui.token, ui.origin),
+          body: JSON.stringify({ key: local.key, dryRun }),
+        });
+        expect(response.status).toBe(400);
+        expect(JSON.parse(response.body).error).toContain("not managed by aireg");
+      }
+      expect((await send(port, "/api/retired", { headers: auth })).status).toBe(404);
+      expect(
+        (
+          await send(port, "/api/restore", {
+            method: "POST",
+            headers: json(ui.token, ui.origin),
+            body: JSON.stringify({ id: "local-example" }),
+          })
+        ).status,
+      ).toBe(404);
+      expect(await readFile(join(folder, "SKILL.md"), "utf8")).toBe(markdown);
+    } finally {
+      await ui.stop();
+    }
+  });
+
   test("takes names only as data, and trust only from a dry run", async ({ home, project }) => {
     const ui = await serveUi(home, project);
     try {
@@ -119,67 +161,13 @@ describe("aireg ui", () => {
           ).body,
         );
       expect((await post("/api/retire", { key: "--all" })).error).toBe("No artifact by that name.");
-      // A name that is not one path segment is refused before anything is looked up.
-      expect((await post("/api/restore", { id: ".." })).error).toBe("Name one retired folder.");
-      expect((await post("/api/restore", { id: "a/b" })).error).toBe("Name one retired folder.");
-      expect((await post("/api/restore", { id: "nothing-here" })).error).toBe(
-        "That retired folder does not say where it came from.",
-      );
+      expect((await post("/api/restore", { id: "any" })).ok).toBe(false);
       expect((await post("/api/add", { source: "--force" })).ok).toBe(false);
       expect((await post("/api/add", { source: ACME, select: ["--all"] })).ok).toBe(false);
-      expect(
-        (await post("/api/add", { source: ACME, trust: true, trustName: "evil" })).error,
-      ).toContain("dry run");
-      expect((await post("/api/add", { source: "https://me:token@example.com/r" })).ok).toBe(false);
-    } finally {
-      await ui.stop();
-    }
-  });
-
-  test("retires a skill written here aside, and restores it where it was", async ({
-    home,
-    project,
-  }) => {
-    const folder = join(home.dir, ".claude", "skills", "notes");
-    await mkdir(folder, { recursive: true });
-    await writeFile(
-      join(folder, "SKILL.md"),
-      "---\nname: notes\ndescription: Notes.\n---\n# Notes\n",
-    );
-    const ui = await serveUi(home, project);
-    try {
-      const port = ui.printed.data.port;
-      const auth = { authorization: `Bearer ${ui.token}` };
-      const post = async (path: string, body: object) =>
-        JSON.parse(
-          (
-            await send(port, path, {
-              method: "POST",
-              headers: json(ui.token, ui.origin),
-              body: JSON.stringify(body),
-            })
-          ).body,
-        );
-      const listed = JSON.parse((await send(port, "/api/artifacts", { headers: auth })).body).data
-        .artifacts as Listed[];
-      const notes = listed.find((a) => a.name === "notes");
-      expect(notes).toMatchObject({ registry: "this machine", state: "unpublished" });
-
-      expect((await post("/api/retire", { key: notes?.key, dryRun: true })).message).toMatch(
-        /^Would move/,
+      expect((await post("/api/add", { source: ACME, trust: true, trustName: "evil" })).error).toBe(
+        "Run the dry run first: it did not name evil as needing trust.",
       );
-      expect(await readdir(join(home.dir, ".claude", "skills"))).toContain("notes");
-      expect((await post("/api/retire", { key: notes?.key })).ok).toBe(true);
-      expect(await readdir(join(home.dir, ".claude", "skills"))).not.toContain("notes");
-
-      const retired = JSON.parse(
-        (await send(port, "/api/retired", { headers: auth })).body,
-      ).retired;
-      expect(retired).toEqual([
-        expect.objectContaining({ name: "notes", from: "~/.claude/skills/notes" }),
-      ]);
-      expect((await post("/api/restore", { id: retired[0].id })).ok).toBe(true);
-      expect(await readdir(join(home.dir, ".claude", "skills"))).toContain("notes");
+      expect((await post("/api/add", { source: "https://me:token@example.com/r" })).ok).toBe(false);
     } finally {
       await ui.stop();
     }
@@ -230,47 +218,6 @@ describe("aireg ui", () => {
       const doctor = JSON.parse((await send(port, "/api/doctor", { headers: auth })).body);
       expect(doctor.data.checks.length).toBeGreaterThan(0);
       expect((await post("/api/sync", {})).ok).toBe(true);
-    } finally {
-      await ui.stop();
-    }
-  });
-
-  test("never writes through a link a retired folder holds, and shows a restored folder at once", async ({
-    home,
-    project,
-  }) => {
-    const folder = join(home.dir, ".claude", "skills", "trap");
-    await mkdir(folder, { recursive: true });
-    await writeFile(join(folder, "SKILL.md"), "---\nname: trap\ndescription: Trap.\n---\n# Trap\n");
-    const victim = join(home.dir, "victim.txt");
-    await writeFile(victim, "untouched");
-    await symlink(victim, join(folder, ".retired.json"));
-    const ui = await serveUi(home, project);
-    try {
-      const port = ui.printed.data.port;
-      const auth = { authorization: `Bearer ${ui.token}` };
-      const post = async (path: string, body: object) =>
-        JSON.parse(
-          (
-            await send(port, path, {
-              method: "POST",
-              headers: json(ui.token, ui.origin),
-              body: JSON.stringify(body),
-            })
-          ).body,
-        );
-      const artifacts = async () =>
-        JSON.parse((await send(port, "/api/artifacts", { headers: auth })).body).data
-          .artifacts as Listed[];
-      const trap = (await artifacts()).find((a) => a.name === "trap");
-      expect((await post("/api/retire", { key: trap?.key })).ok).toBe(true);
-      expect(await readFile(victim, "utf8")).toBe("untouched");
-
-      const retired = JSON.parse(
-        (await send(port, "/api/retired", { headers: auth })).body,
-      ).retired;
-      expect((await post("/api/restore", { id: retired[0].id })).ok).toBe(true);
-      expect((await artifacts()).some((a) => a.name === "trap")).toBe(true);
     } finally {
       await ui.stop();
     }

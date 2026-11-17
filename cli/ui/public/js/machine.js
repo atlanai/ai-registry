@@ -58,6 +58,10 @@ export function updateAttentionCounts() {
 export function updateConsoleTelemetry() {
   if (!state.consoleData) return;
   const cd = state.consoleData;
+  if (el.activeScope) {
+    el.activeScope.textContent = cd.scope === "project" ? "Project scope" : "User scope";
+    el.activeScope.title = cd.scope === "project" ? cd.root : "Installed for this user";
+  }
   showDaemon(cd.daemon);
   showJobs(cd.jobs || [], cd.policy || {});
   showRuns(cd.runs || []);
@@ -234,73 +238,6 @@ export function renderSyncEngineDashboard() {
 
 // What needs a look
 export async function renderAuditDashboard() {
-  // If retired archive filter
-  if (state.auditFilter === "retired") {
-    try {
-      const res = await api("/api/retired");
-      const json = await res.json();
-      const retired = json.retired || [];
-      if (el.auditCountRetired) el.auditCountRetired.textContent = retired.length;
-
-      if (retired.length === 0) {
-        el.auditTableBody.innerHTML = `
-          <tr>
-            <td class="u36" colspan="5">
-              Nothing is retired. Retiring a skill written here moves it aside, to restore later.
-            </td>
-          </tr>
-        `;
-        return;
-      }
-
-      el.auditTableBody.innerHTML = retired
-        .map(
-          (item) => `
-        <tr>
-          <td><strong class="u37">${escapeHtml(item.name)}</strong></td>
-          <td><span class="status-pill warn">retired</span></td>
-          <td><span class="u38">${escapeHtml(item.description)}</span></td>
-          <td><code class="u34">${escapeHtml(item.from)}</code></td>
-          <td>
-            <button class="subtle-btn restore-btn u39" data-id="${escapeHtml(item.id)}">
-              Restore
-            </button>
-          </td>
-        </tr>
-      `,
-        )
-        .join("");
-
-      el.auditTableBody.querySelectorAll(".restore-btn").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          const id = btn.getAttribute("data-id");
-          btn.textContent = "Restoring…";
-          try {
-            const res = await api("/api/restore", {
-              method: "POST",
-              body: JSON.stringify({ id }),
-            });
-            const json = await res.json();
-            if (!json.ok) {
-              btn.textContent = "Not restored";
-              btn.title = json.error || "";
-              return;
-            }
-            await hooks.loadArtifacts();
-            await loadConsoleData();
-            void renderAuditDashboard();
-          } catch (err) {
-            console.error("Restore error:", err);
-            btn.textContent = "Failed";
-          }
-        });
-      });
-      return;
-    } catch (err) {
-      console.error("Error loading retired skills:", err);
-    }
-  }
-
   const filteredRows = needsLook(state.auditFilter);
   if (filteredRows.length === 0) {
     el.auditTableBody.innerHTML = `
