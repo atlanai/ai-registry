@@ -21,6 +21,7 @@ import { SHOW_COMMAND } from "#cli/commands/show/spec.ts";
 import { STATUS_COMMAND } from "#cli/commands/status/spec.ts";
 import { SYNC_COMMAND } from "#cli/commands/sync/spec.ts";
 import { TARGETS_COMMAND } from "#cli/commands/targets/spec.ts";
+import { UI_COMMAND } from "#cli/commands/ui/spec.ts";
 import { UNLOCK_COMMAND } from "#cli/commands/unlock/spec.ts";
 import { UPDATE_COMMAND } from "#cli/commands/update/spec.ts";
 import { WATCH_COMMAND } from "#cli/commands/watch/spec.ts";
@@ -39,6 +40,7 @@ export const BUILTIN_SPECS: readonly CommandSpec[] = [
   UPDATE_COMMAND,
   SHOW_COMMAND,
   CONSOLE_COMMAND,
+  UI_COMMAND,
   STATUS_COMMAND,
   LIST_COMMAND,
   OUTDATED_COMMAND,

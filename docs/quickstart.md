@@ -223,7 +223,7 @@ Jobs      1 of 1 enabled
 Autostart off
 ```
 
-If you installed the aireg skills, `Jobs` counts their job too. Autostart is off until you run `aireg daemon autostart on`, which starts the daemon at login. `aireg console` shows installed artifacts, jobs and registries in one view.
+If you installed the aireg skills, `Jobs` counts their job too. Autostart is off until you run `aireg daemon autostart on`, which starts the daemon at login. `aireg console` shows installed artifacts, jobs and registries in one view. `aireg ui` shows your registries and what is installed, in your browser.
 
 ## Let your coding agent do it
 
