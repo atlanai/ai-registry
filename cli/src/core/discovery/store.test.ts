@@ -1,7 +1,7 @@
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
-import { UI_DISCOVERY_FILE } from "#core/product.ts";
+import { DISCOVERY_SETTINGS_FILE } from "#core/product.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { DiscoveryStore, type UsageEvent } from "./store.ts";
 
@@ -21,7 +21,7 @@ describe("local discovery history", () => {
     const home = join(tmp, "home");
     await mkdir(home, { mode: 0o700 });
     await writeFile(
-      join(home, UI_DISCOVERY_FILE),
+      join(home, DISCOVERY_SETTINGS_FILE),
       JSON.stringify({
         registries: [],
         telemetry: true,
@@ -44,7 +44,7 @@ describe("local discovery history", () => {
     await mkdir(home, { mode: 0o700 });
     const target = join(tmp, "synthetic-target.json");
     await writeFile(target, "untouched");
-    await symlink(target, join(home, UI_DISCOVERY_FILE));
+    await symlink(target, join(home, DISCOVERY_SETTINGS_FILE));
     const store = new DiscoveryStore({ AIREG_HOME: home });
     await expect(store.settings([], true)).rejects.toThrow("cannot be read safely");
     expect(await readFile(target, "utf8")).toBe("untouched");

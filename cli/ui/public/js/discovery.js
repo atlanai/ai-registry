@@ -55,12 +55,13 @@ async function act(label, work) {
 }
 function renderStatus() {
   const s = snapshot;
-  const ready = s.connected && s.eligible > 0 && s.indexed === s.eligible && !s.job.running;
+  const ready =
+    s.connected && s.eligible > 0 && s.indexed === s.eligible && !s.job.running && !s.busy;
   get("discoveryConnection").textContent = s.connected ? "Gemini connected" : "Setup needed";
   get("discoverySearchButton").disabled = running || !ready;
   get("discoveryStopButton").disabled = !s.job.running;
-  get("discoveryIndexButton").disabled = running || !s.connected || s.job.running;
-  get("discoveryDisconnect").disabled = running || !s.connected || s.job.running;
+  get("discoveryIndexButton").disabled = running || !s.connected || s.job.running || s.busy;
+  get("discoveryDisconnect").disabled = running || !s.connected || s.job.running || s.busy;
   get("discoveryIndexStatus").textContent =
     s.job.error ||
     (s.job.running
@@ -72,6 +73,8 @@ function renderStatus() {
     "Open Setup and build the index before searching. If a registry is missing, check Artifacts first.";
   if (ready)
     next = `${s.indexed} skills ready. Search text and candidate descriptions will be sent to Google.`;
+  if (s.busy && !s.job.running)
+    next = "Another discovery operation is running. This view updates when it finishes.";
   if (!s.connected) next = "Start in Setup: connect your key and choose registries.";
   get("discoveryNext").textContent = next;
   renderUsage(s);
@@ -92,7 +95,7 @@ async function refresh(setup = false) {
   renderStatus();
   if (setup) renderSetup();
   clearTimeout(polling);
-  if (snapshot.job.running)
+  if (snapshot.job.running || snapshot.busy)
     polling = setTimeout(() => {
       void refresh().catch((error) => message(error.message, true));
     }, 1500);
@@ -275,7 +278,7 @@ export function wireDiscovery() {
         throw error;
       }
       renderResults();
-      message("Search complete.");
+      message(result.warnings?.join(" ") || "Search complete.");
       await refresh();
     });
   });
@@ -295,7 +298,12 @@ export function wireDiscovery() {
     });
   });
   get("discoveryClear").addEventListener("click", () => {
-    if (!window.confirm("Clear the local discovery usage history? This cannot be undone.")) return;
+    if (
+      !window.confirm(
+        "Clear local history and expire saved recommendations? This cannot be undone.",
+      )
+    )
+      return;
     void act("Clearing usage…", async () => {
       const data = await request("clear");
       message(data.message);

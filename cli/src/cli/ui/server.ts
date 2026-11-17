@@ -5,6 +5,8 @@ import { basename, dirname, join } from "node:path";
 import { messageOf } from "#adapter/errors.ts";
 import { readRegular } from "#adapter/files.ts";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { Catalogs } from "#cli/catalog/registries.ts";
+import { CatalogReader, type CatalogState, type KeptArtifact } from "#cli/catalog/state.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { underHome } from "#cli/render/home.ts";
 import * as commands from "#core/console/actions.ts";
@@ -12,11 +14,9 @@ import { Discovery } from "#core/discovery/service.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { scoreSkill } from "#core/score/skill.ts";
 import * as uiCommands from "./actions.ts";
-import { Catalogs } from "./catalogs.ts";
 import { type Ran, run } from "./child.ts";
 import { discoveryRoute } from "./discovery.ts";
 import { API_PREFIX, type Bound, refusal } from "./guard.ts";
-import { type KeptArtifact, PageReader, type PageState } from "./page-state.ts";
 
 export interface Asset {
   type: string;
@@ -66,7 +66,7 @@ const HEADERS = {
 
 interface Server {
   discovery: Discovery;
-  reader: PageReader;
+  reader: CatalogReader;
   context: CommandContext;
   assets: Readonly<Record<string, Asset>>;
   /** True while a write runs: one at a time, as the lease allows anyway. */
@@ -79,7 +79,7 @@ export async function serve(options: ServeOptions): Promise<Serving> {
   const token = randomBytes(32).toString("base64url");
   const server: Server = {
     discovery: new Discovery(),
-    reader: new PageReader(options.context, new Catalogs(options.context)),
+    reader: new CatalogReader(options.context, new Catalogs(options.context)),
     context: options.context,
     assets: options.assets,
     busy: false,
@@ -201,7 +201,7 @@ class PageError extends Error {
 }
 
 /** What the page lists: everything but where each row is on disk. */
-function artifactsOf(state: PageState): object {
+function artifactsOf(state: CatalogState): object {
   const namespaces: Record<string, number> = {};
   const harnesses: Record<string, number> = {};
   for (const artifact of state.artifacts) {
@@ -225,7 +225,7 @@ function artifactsOf(state: PageState): object {
   };
 }
 
-function consoleOf(state: PageState): object {
+function consoleOf(state: CatalogState): object {
   return {
     ...state.console,
     groups: state.console.groups.map((group) => ({

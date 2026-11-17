@@ -1,0 +1,25 @@
+Find and route skills with Gemini, or manage local discovery
+
+Usage: aireg discover <action> [arguments] [--input-stdin]
+
+Actions:
+  status      Show connection, index and local history
+  setup       Test and save consent, registries and an optional key from JSON stdin
+  index       Build the index and wait for completion
+  search      Recommend a skill for a task
+  handoff     Prepare a handoff for a search request ID
+  feedback    Record helpful or not_helpful feedback for a request ID
+  usage       Read local discovery usage
+  telemetry   Turn local recording on or off
+  clear       Clear local history and recommendation receipts
+  disconnect  Remove the Gemini connection and index
+  score       Score markdown supplied in a JSON object on stdin
+
+Examples:
+  $ aireg discover search "Review a pull request" --json  retrieve candidates and recommend a skill
+  $ aireg discover index --json                           build or refresh the saved index without a browser
+
+Learn more:
+  Run `aireg discover <action> --help` for an action's options.
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/discover/

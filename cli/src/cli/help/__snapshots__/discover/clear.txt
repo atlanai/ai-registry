@@ -1,0 +1,7 @@
+Clear local history and recommendation receipts
+
+Usage: aireg discover clear
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/discover/

@@ -1,0 +1,7 @@
+Turn local recording on or off
+
+Usage: aireg discover telemetry on|off
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/discover/

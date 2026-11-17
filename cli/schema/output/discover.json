@@ -1,0 +1,665 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/discover.json",
+  "title": "aireg discover --json",
+  "description": "The `data` each `aireg discover` action prints under --json, by action.",
+  "$defs": {
+    "status": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "busy",
+        "connected",
+        "registries",
+        "telemetry",
+        "telemetryWarning",
+        "available",
+        "eligible",
+        "indexed",
+        "embeddingModel",
+        "decisionModel",
+        "job",
+        "events"
+      ],
+      "properties": {
+        "busy": {
+          "type": "boolean"
+        },
+        "connected": {
+          "type": "boolean"
+        },
+        "registries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "telemetry": {
+          "type": "boolean"
+        },
+        "telemetryWarning": {
+          "type": "string"
+        },
+        "available": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "eligible": {
+          "type": "number"
+        },
+        "indexed": {
+          "type": "number"
+        },
+        "embeddingModel": {
+          "type": "string"
+        },
+        "decisionModel": {
+          "type": "string"
+        },
+        "job": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "running",
+            "done",
+            "total",
+            "error"
+          ],
+          "properties": {
+            "running": {
+              "type": "boolean"
+            },
+            "done": {
+              "type": "number"
+            },
+            "total": {
+              "type": "number"
+            },
+            "error": {
+              "type": "string"
+            }
+          }
+        },
+        "events": {
+          "maxItems": 1000,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "at",
+              "type",
+              "requestId",
+              "skillKey",
+              "durationMs",
+              "outcome"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "const": "search",
+                    "type": "string"
+                  },
+                  {
+                    "const": "recommendation",
+                    "type": "string"
+                  },
+                  {
+                    "const": "handoff",
+                    "type": "string"
+                  },
+                  {
+                    "const": "feedback",
+                    "type": "string"
+                  },
+                  {
+                    "const": "error",
+                    "type": "string"
+                  }
+                ]
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "skillKey": {
+                "type": "string"
+              },
+              "skillVersion": {
+                "type": "string"
+              },
+              "skillDigest": {
+                "type": "string"
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "outcome": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "usage": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "busy",
+        "connected",
+        "registries",
+        "telemetry",
+        "telemetryWarning",
+        "available",
+        "eligible",
+        "indexed",
+        "embeddingModel",
+        "decisionModel",
+        "job",
+        "events"
+      ],
+      "properties": {
+        "busy": {
+          "type": "boolean"
+        },
+        "connected": {
+          "type": "boolean"
+        },
+        "registries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "telemetry": {
+          "type": "boolean"
+        },
+        "telemetryWarning": {
+          "type": "string"
+        },
+        "available": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "eligible": {
+          "type": "number"
+        },
+        "indexed": {
+          "type": "number"
+        },
+        "embeddingModel": {
+          "type": "string"
+        },
+        "decisionModel": {
+          "type": "string"
+        },
+        "job": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "running",
+            "done",
+            "total",
+            "error"
+          ],
+          "properties": {
+            "running": {
+              "type": "boolean"
+            },
+            "done": {
+              "type": "number"
+            },
+            "total": {
+              "type": "number"
+            },
+            "error": {
+              "type": "string"
+            }
+          }
+        },
+        "events": {
+          "maxItems": 1000,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "at",
+              "type",
+              "requestId",
+              "skillKey",
+              "durationMs",
+              "outcome"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "const": "search",
+                    "type": "string"
+                  },
+                  {
+                    "const": "recommendation",
+                    "type": "string"
+                  },
+                  {
+                    "const": "handoff",
+                    "type": "string"
+                  },
+                  {
+                    "const": "feedback",
+                    "type": "string"
+                  },
+                  {
+                    "const": "error",
+                    "type": "string"
+                  }
+                ]
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "skillKey": {
+                "type": "string"
+              },
+              "skillVersion": {
+                "type": "string"
+              },
+              "skillDigest": {
+                "type": "string"
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "outcome": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "setup": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "index": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "search": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "requestId",
+        "warnings",
+        "status",
+        "confidence",
+        "candidates",
+        "selected"
+      ],
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "anyOf": [
+            {
+              "const": "recommended",
+              "type": "string"
+            },
+            {
+              "const": "none",
+              "type": "string"
+            },
+            {
+              "const": "clarify",
+              "type": "string"
+            }
+          ]
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidates": {
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "key",
+              "name",
+              "registry",
+              "namespace",
+              "version",
+              "digest",
+              "description"
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "registry": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "selected": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "key",
+                "name",
+                "registry",
+                "namespace",
+                "version",
+                "digest",
+                "description"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "registry": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "digest": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "handoff": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "handoff"
+      ],
+      "properties": {
+        "handoff": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "schema",
+            "requestId",
+            "skill",
+            "instruction"
+          ],
+          "properties": {
+            "schema": {
+              "const": "aireg.skill-handoff.v1",
+              "type": "string"
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "skill": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "key",
+                "name",
+                "registry",
+                "namespace",
+                "version",
+                "digest"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "registry": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "digest": {
+                  "type": "string"
+                }
+              }
+            },
+            "instruction": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "feedback": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "telemetry": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "clear": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "disconnect": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "score": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "rubric",
+        "status",
+        "score",
+        "digest",
+        "checks",
+        "review",
+        "safety",
+        "performance"
+      ],
+      "properties": {
+        "rubric": {
+          "const": "authoring-signals-v1",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "const": "scored",
+              "type": "string"
+            },
+            {
+              "const": "unavailable",
+              "type": "string"
+            }
+          ]
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "digest": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "label",
+              "points",
+              "earned",
+              "evidence",
+              "improvement"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "points": {
+                "type": "number"
+              },
+              "earned": {
+                "type": "number"
+              },
+              "evidence": {
+                "type": "string"
+              },
+              "improvement": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "review": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "safety": {
+          "const": "not-assessed",
+          "type": "string"
+        },
+        "performance": {
+          "const": "not-measured",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

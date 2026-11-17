@@ -5,6 +5,7 @@ import { AUTH_COMMAND } from "#cli/commands/auth/spec.ts";
 import { CONFIG_COMMAND } from "#cli/commands/config/spec.ts";
 import { CONSOLE_COMMAND } from "#cli/commands/console/spec.ts";
 import { DAEMON_COMMAND } from "#cli/commands/daemon/spec.ts";
+import { DISCOVER_COMMAND } from "#cli/commands/discover/spec.ts";
 import { DOCTOR_COMMAND } from "#cli/commands/doctor/spec.ts";
 import { INIT_COMMAND } from "#cli/commands/init/spec.ts";
 import { INSTALL_COMMAND } from "#cli/commands/install/spec.ts";
@@ -34,6 +35,7 @@ export const BUILTIN_SPECS: readonly CommandSpec[] = [
   REGISTRY_COMMAND,
   AUTH_COMMAND,
   SEARCH_COMMAND,
+  DISCOVER_COMMAND,
   ADD_COMMAND,
   REMOVE_COMMAND,
   INSTALL_COMMAND,

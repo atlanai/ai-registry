@@ -22,6 +22,8 @@ Set up:
 
 Install:
   search    Find artifacts in the registries you have declared
+  discover  Find and route skills with Gemini, or manage local discovery
+            status  setup  index  search  handoff  feedback  usage  telemetry  clear  disconnect  score
   add       Install artifacts from a registry
   remove    Uninstall artifacts
   install   Make this project match its manifest

@@ -79,9 +79,11 @@ export const REMOVE_AFTER_FLAG = "--internal-remove-after";
 export const TELEMETRY_FLAG = "--internal-telemetry";
 
 /** Optional skill discovery, isolated from release telemetry. */
-export const UI_DISCOVERY_FILE = "ui-discovery.json";
-export const UI_DISCOVERY_INDEX_FILE = "ui-discovery-index.json";
-export const UI_GEMINI_ACCOUNT_ID = "acc_ui_gemini";
+export const DISCOVERY_RECEIPTS_FILE = "discovery-receipts.json";
+export const DISCOVERY_OPERATION_LOCK = "discovery-operation";
+export const DISCOVERY_SETTINGS_FILE = "ui-discovery.json";
+export const DISCOVERY_INDEX_FILE = "ui-discovery-index.json";
+export const GEMINI_ACCOUNT_ID = "acc_ui_gemini";
 
 /** UI launcher defaults and private local rendezvous names; no installation behavior. */
 export const UI_DEFAULT_PORT = 3456;

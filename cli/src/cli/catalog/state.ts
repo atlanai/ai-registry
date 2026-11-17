@@ -9,7 +9,7 @@ import { type ArtifactRow, type ConsoleState, LOCAL_GROUP } from "#core/console/
 import { frontmatter } from "#core/frontmatter.ts";
 import { resolveTargets } from "#core/target/table.ts";
 import { SqliteRunStore } from "#daemon/runs/store.ts";
-import type { Catalog, Catalogs } from "./catalogs.ts";
+import type { Catalog, Catalogs } from "./registries.ts";
 
 const TARGET_TABLE = resolveTargets(process.env);
 
@@ -17,7 +17,7 @@ const TARGET_TABLE = resolveTargets(process.env);
 export const THIS_MACHINE = "this machine";
 
 /** One row of the page's list: something a registry publishes, or something installed here. */
-interface PageArtifact {
+interface CatalogArtifact {
   /** `<registry>/<namespace>/<kind>/<name>` for a listed artifact, unique for the rest. */
   key: string;
   name: string;
@@ -42,7 +42,7 @@ interface PageArtifact {
 }
 
 /** What the page's server keeps beside each row and never sends: where it is on disk. */
-export interface KeptArtifact extends PageArtifact {
+export interface KeptArtifact extends CatalogArtifact {
   copy: string;
   /** The lockfile key `aireg remove` takes; undefined for work authored here or carried by a plugin. */
   installedKey: string | undefined;
@@ -51,7 +51,7 @@ export interface KeptArtifact extends PageArtifact {
   carriedBy: string | undefined;
 }
 
-export interface PageState {
+export interface CatalogState {
   artifacts: KeptArtifact[];
   registries: {
     name: string;
@@ -124,7 +124,7 @@ async function ownDescription(row: ArtifactRow): Promise<string> {
 
 function artifactOf(
   base: Pick<
-    PageArtifact,
+    CatalogArtifact,
     "key" | "name" | "namespace" | "registry" | "kind" | "version" | "description" | "listed"
   >,
   installed: Installed | undefined,
@@ -311,18 +311,18 @@ function reconcileLocal(artifacts: KeptArtifact[]): KeptArtifact[] {
 }
 
 /** Everything the page shows, read once and shared for a few seconds. */
-export class PageReader {
+export class CatalogReader {
   readonly #context: CommandContext;
   readonly #catalogs: Catalogs;
-  #last: PageState | undefined;
-  #pending: Promise<PageState> | undefined;
+  #last: CatalogState | undefined;
+  #pending: Promise<CatalogState> | undefined;
 
   constructor(context: CommandContext, catalogs: Catalogs) {
     this.#context = context;
     this.#catalogs = catalogs;
   }
 
-  read(fresh = false): Promise<PageState> {
+  read(fresh = false): Promise<CatalogState> {
     if (!fresh && this.#last !== undefined && Date.now() - this.#last.readAtMs < 3000) {
       return Promise.resolve(this.#last);
     }
@@ -338,7 +338,7 @@ export class PageReader {
     return tracked;
   }
 
-  async #readNow(): Promise<PageState> {
+  async #readNow(): Promise<CatalogState> {
     // Catalogs are read in the scope the console shows, so the list and every write agree.
     const historyProblems = new Set<string>();
     const context = {
@@ -371,7 +371,7 @@ export class PageReader {
         }),
     );
     const first = installed.first;
-    const state: PageState = {
+    const state: CatalogState = {
       artifacts,
       registries: catalogs.map((catalog) => ({
         name: catalog.name,

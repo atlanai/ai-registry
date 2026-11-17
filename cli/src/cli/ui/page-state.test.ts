@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
+import type { Catalog } from "#cli/catalog/registries.ts";
+import { joined, THIS_MACHINE } from "#cli/catalog/state.ts";
 import type { ArtifactRow } from "#core/console/model.ts";
-import type { Catalog } from "./catalogs.ts";
-import { joined, THIS_MACHINE } from "./page-state.ts";
 
 function row(over: Partial<ArtifactRow>): ArtifactRow {
   return {

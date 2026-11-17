@@ -64,6 +64,14 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | The command types; the built-in specs in help order and the names they reserve; each built-in's lazy module | `cli/commands/command.ts`, `cli/commands/builtins.ts`, `cli/commands/index.ts` |
 | The values a release build stamps in, for tsup and `bun build --compile` | `packaging/defines.ts` |
 
+## Discovery clients
+
+`core/discovery/` owns the optional Gemini workflow and shared operation dispatch.
+`cli/catalog/` reads the catalog independently of a browser; `cli/discovery/` projects
+its skills for discovery. Both `aireg discover` and the web UI use these modules.
+Recommendation receipts and per-home leases coordinate separate CLI and UI processes.
+The UI owns HTTP envelopes and background scheduling, not discovery policy.
+
 ## How a command runs
 
 1. `main.ts` finds the command in `cli/commands/index.ts` and loads its module.

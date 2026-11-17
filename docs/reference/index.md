@@ -39,6 +39,7 @@ aireg add <registry>/<namespace>[/<name>[@<version>]] [options]
 
 | Command | Description |
 |---|---|
+| [`aireg discover`](discover.md) | Find and route skills with Gemini, or manage local discovery. |
 | [`aireg search`](search.md) | Find artifacts in the registries you have declared. |
 | [`aireg add`](add.md) | Install artifacts from a registry. |
 | [`aireg remove`](remove.md) | Uninstall artifacts. |

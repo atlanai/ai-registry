@@ -92,7 +92,8 @@ aireg ui --no-open --json
 
 ## Skill discovery preview
 
-**Find skills** adds an optional Gemini workflow alongside the catalog. Existing
+**Find skills** is a browser client of [`aireg discover`](discover.md). The same
+setup, index, routing, handoff, scoring and history work without a browser. Existing
 install, remove, sync, and trust behavior is unchanged. Discovery does not install
 or execute a skill, and does not modify manifests, lockfiles, or target folders.
 
@@ -143,7 +144,9 @@ and self-reported feedback. Repeated preparation of one handoff does not inflate
 its count, and one recommendation accepts feedback once. These events contain
 local skill identifiers, versions, digests, timings and outcomes, never search
 text, source content or API keys. Counts cover retained events, not lifetime usage.
-Pause/resume and clearing history work locally without calling Google. A recording
+Pause/resume and clearing history work locally without calling Google. Clearing
+also expires recommendation receipts, which otherwise survive process exits for up
+to 24 hours (at most 100 retained). A recording
 failure is shown in Usage and does not discard an otherwise successful search.
 
 ### Skill score

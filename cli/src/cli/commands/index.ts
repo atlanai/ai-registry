@@ -19,6 +19,7 @@ const LOADERS: Readonly<Record<string, Command["load"]>> = {
   registry: () => import("./registry.ts"),
   auth: () => import("./auth.ts"),
   search: () => import("./search.ts"),
+  discover: () => import("./discover.ts"),
   add: () => import("./add.ts"),
   remove: () => import("./remove.ts"),
   install: () => import("./install.ts"),

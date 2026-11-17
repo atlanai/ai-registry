@@ -28,7 +28,7 @@ vi.mock("#cli/commands/registry/show.ts", () => ({
   },
 }));
 
-const { Catalogs } = await import("./catalogs.ts");
+const { Catalogs } = await import("#cli/catalog/registries.ts");
 const context = {} as CommandContext;
 
 beforeEach(() => {

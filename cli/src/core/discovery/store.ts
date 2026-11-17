@@ -4,7 +4,7 @@ import { readRegular } from "#adapter/files.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
 import { withLease } from "#core/lease/lease.ts";
-import { UI_DISCOVERY_FILE } from "#core/product.ts";
+import { DISCOVERY_SETTINGS_FILE } from "#core/product.ts";
 import { ensureHome } from "#core/store/paths.ts";
 import { DiscoveryError } from "./gemini.ts";
 
@@ -31,7 +31,7 @@ export class DiscoveryStore {
   }
   private async edit(change: (saved: Saved) => void): Promise<Saved> {
     const home = ensureHome(this.env);
-    const path = join(home, UI_DISCOVERY_FILE);
+    const path = join(home, DISCOVERY_SETTINGS_FILE);
     return withLease({ scope: "user", lock: path }, { wait: true, env: this.env }, async () => {
       const saved = await this.read();
       change(saved);
@@ -40,7 +40,7 @@ export class DiscoveryStore {
     });
   }
   async read(): Promise<Saved> {
-    const result = await readRegular(ensureHome(this.env), UI_DISCOVERY_FILE);
+    const result = await readRegular(ensureHome(this.env), DISCOVERY_SETTINGS_FILE);
     if (result.kind === "missing") return { registries: [], events: [], telemetry: true };
     if (result.kind !== "file")
       throw new DiscoveryError("The discovery settings file cannot be read safely.");

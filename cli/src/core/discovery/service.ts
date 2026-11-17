@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { hostname } from "node:os";
+import { join } from "node:path";
 import { deleteCredential, readCredential, saveCredential } from "#core/credentials/store.ts";
-import { UI_GEMINI_ACCOUNT_ID } from "#core/product.ts";
+import { LeaseBusyError } from "#core/lease/errors.ts";
+import { readHolder } from "#core/lease/holder.ts";
+import { withLease } from "#core/lease/lease.ts";
+import { leaseDir } from "#core/lease/location.ts";
+import { processAlive } from "#core/process.ts";
+import { DISCOVERY_OPERATION_LOCK, GEMINI_ACCOUNT_ID } from "#core/product.ts";
+import { ensureHome } from "#core/store/paths.ts";
 import {
   DECISION_MODEL,
   DiscoveryError,
@@ -9,52 +17,39 @@ import {
   Gemini,
 } from "./gemini.ts";
 import { DiscoveryIndex } from "./index.ts";
+import type { DiscoveryStatus, Handoff, Job, Message, Recommendation } from "./model.ts";
+import { type Receipt, Receipts } from "./receipts.ts";
 import { description, fingerprint, type Indexed, retrieve, type Skill } from "./retrieval.ts";
 import { DiscoveryStore, type UsageEvent } from "./store.ts";
 
-interface Result {
-  requestId: string;
-  status: string;
-  confidence: number | null;
-  candidates: Skill[];
-  selected: Skill | null;
-}
-interface Job {
-  running: boolean;
-  done: number;
-  total: number;
-  error: string;
-}
-
-/** One UI process owns operations; a private incremental cache survives restarts. */
+/** CLI and UI share the same state and serialize writes through a per-home lease. */
 export class Discovery {
-  private client: Gemini | undefined;
   private index = new Map<string, Indexed>();
-  private results = new Map<string, Result>();
+  private readonly receipts: Receipts;
   private busy = false;
   private telemetryWarning = "";
   private stopping = false;
   private job: Job = { running: false, done: 0, total: 0, error: "" };
   private readonly cache: DiscoveryIndex;
-  private readonly handedOff = new Set<string>();
-  private readonly feedbackGiven = new Set<string>();
   private readonly store: DiscoveryStore;
   private readonly env: NodeJS.ProcessEnv;
   private readonly send: typeof fetch;
   constructor(env: NodeJS.ProcessEnv = process.env, send: typeof fetch = fetch) {
     this.env = env;
     this.send = send;
+    this.receipts = new Receipts(env);
     this.store = new DiscoveryStore(env);
     this.cache = new DiscoveryIndex(env);
   }
   private async connect(): Promise<Gemini> {
-    if (this.client) return this.client;
-    const stored = await readCredential(UI_GEMINI_ACCOUNT_ID, this.env);
+    // Read the shared credential on each operation so another process can revoke it.
+    const stored = await readCredential(GEMINI_ACCOUNT_ID, this.env);
     if (stored?.origin !== GEMINI_ORIGIN || stored.credential.type !== "apiKey") {
-      throw new DiscoveryError("Connect your AI Studio key in Setup first.");
+      throw new DiscoveryError(
+        "Connect your AI Studio key with `aireg discover setup` or the UI Setup tab first.",
+      );
     }
-    this.client = new Gemini(stored.credential.value, this.send);
-    return this.client;
+    return new Gemini(stored.credential.value, this.send);
   }
   private async loadIndex(skills: Skill[]): Promise<void> {
     const cached = await this.cache.read();
@@ -65,12 +60,24 @@ export class Discovery {
       }),
     );
   }
-  async status(skills: Skill[]): Promise<object> {
+  async status(skills: Skill[]): Promise<DiscoveryStatus> {
+    const holder = await readHolder(
+      leaseDir(
+        { scope: "user", lock: join(ensureHome(this.env), DISCOVERY_OPERATION_LOCK) },
+        this.env,
+      ),
+    );
+    const held =
+      holder !== undefined &&
+      (holder.host === hostname()
+        ? processAlive(holder.pid)
+        : Date.now() - holder.acquiredAtMs < 10 * 60_000);
     const cached = await this.cache.read();
     const saved = await this.store.read();
-    const credential = await readCredential(UI_GEMINI_ACCOUNT_ID, this.env);
+    const credential = await readCredential(GEMINI_ACCOUNT_ID, this.env);
     const eligible = skills.filter((s) => saved.registries.includes(s.registry));
     return {
+      busy: this.busy || held,
       connected: credential?.origin === GEMINI_ORIGIN && credential.credential.type === "apiKey",
       registries: saved.registries,
       telemetry: saved.telemetry,
@@ -84,7 +91,7 @@ export class Discovery {
       decisionModel: DECISION_MODEL,
     };
   }
-  async setup(payload: Record<string, unknown>, skills: Skill[]): Promise<object> {
+  async setup(payload: Record<string, unknown>, skills: Skill[]): Promise<Message> {
     return this.exclusive(async () => {
       const registries = payload.registries;
       if (
@@ -103,7 +110,7 @@ export class Discovery {
         client = new Gemini(key, this.send);
         await client.test();
         await saveCredential(
-          UI_GEMINI_ACCOUNT_ID,
+          GEMINI_ACCOUNT_ID,
           {
             origin: GEMINI_ORIGIN,
             credential: { type: "apiKey", header: "x-goog-api-key", value: key },
@@ -115,25 +122,19 @@ export class Discovery {
         await client.test();
       }
       await this.store.settings([...new Set(registries as string[])], payload.telemetry !== false);
-      this.client = client;
       await this.loadIndex(skills.filter((s) => registries.includes(s.registry)));
       await this.cache.save(this.index.values());
-      this.results.clear();
-      this.handedOff.clear();
-      this.feedbackGiven.clear();
+      await this.receipts.save([]);
       this.job = { running: false, done: 0, total: 0, error: "" };
       return { message: "Both Gemini models connected. Build your search index next." };
     });
   }
-  async disconnect(): Promise<object> {
+  async disconnect(): Promise<Message> {
     return this.exclusive(async () => {
-      // Revoke in-memory authority first, even if a later storage operation fails.
-      this.client = undefined;
+      // Revoke the shared credential before unrelated storage operations.
+      await deleteCredential(GEMINI_ACCOUNT_ID, this.env);
       this.index.clear();
-      this.results.clear();
-      this.handedOff.clear();
-      this.feedbackGiven.clear();
-      await deleteCredential(UI_GEMINI_ACCOUNT_ID, this.env);
+      await this.receipts.save([]);
       await this.store.settings([], (await this.store.read()).telemetry);
       await this.cache.save([]);
       return {
@@ -142,12 +143,16 @@ export class Discovery {
       };
     });
   }
-  async build(skills: Skill[]): Promise<object> {
-    return this.exclusive(async () => {
+  async build(skills: Skill[], background = false): Promise<Message> {
+    let ready: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const task = this.exclusive(async () => {
       const saved = await this.store.read();
       const client = await this.connect();
       const eligible = skills.filter((s) => saved.registries.includes(s.registry));
-      if (eligible.length === 0)
+      if (!eligible.length)
         throw new DiscoveryError(
           "No skills in the selected registries. Check the catalog and Setup.",
         );
@@ -158,11 +163,26 @@ export class Discovery {
       await this.loadIndex(eligible);
       this.stopping = false;
       this.job = { running: true, done: 0, total: eligible.length, error: "" };
-      void this.indexAll(eligible, client);
-      return { message: "Indexing started. You can follow progress here." };
+      ready?.();
+      await this.indexAll(eligible, client);
+      if (this.job.error) throw new DiscoveryError(this.job.error);
+      return {
+        message: this.stopping
+          ? "Indexing stopped. Completed embeddings are saved."
+          : "Search index is ready.",
+      };
     });
+    if (!background) return task;
+    // Attach a rejection handler immediately: the UI observes subsequent failures in status.
+    void task.catch((error: unknown) => {
+      this.job.error = safeError(error);
+    });
+    return Promise.race([
+      task,
+      started.then(() => ({ message: "Indexing started. You can follow progress here." })),
+    ]);
   }
-  stop(): object {
+  stop(): Message {
     this.stopping = true;
     return {
       message:
@@ -170,6 +190,7 @@ export class Discovery {
     };
   }
   private async indexAll(skills: Skill[], client: Gemini): Promise<void> {
+    let changed = 0;
     try {
       const keep = new Set(skills.map((s) => s.key));
       for (const key of this.index.keys()) if (!keep.has(key)) this.index.delete(key);
@@ -181,9 +202,13 @@ export class Discovery {
             fingerprint: hash,
             vector: await client.embed(description(skill)),
           });
+          changed++;
         }
         this.job.done++;
-        if (this.job.done % 10 === 0) await this.cache.save(this.index.values());
+        if (changed >= 10) {
+          await this.cache.save(this.index.values());
+          changed = 0;
+        }
       }
     } catch (error) {
       this.job.error = safeError(error);
@@ -196,7 +221,7 @@ export class Discovery {
       this.job.running = false;
     }
   }
-  async search(payload: Record<string, unknown>, skills: Skill[]): Promise<object> {
+  async search(payload: Record<string, unknown>, skills: Skill[]): Promise<Recommendation> {
     return this.exclusive(async () => {
       await this.loadIndex(skills);
       const query = payload.query;
@@ -235,20 +260,37 @@ export class Discovery {
         });
         const decision = await client.decide(query, criteria);
         const selected = candidates.find((_s, i) => decision.choice === `candidate_${i}`) ?? null;
-        const result: Result = {
+        const abstention = decision.choice === "clarify" ? "clarify" : "none";
+        const result: Recommendation = {
           requestId,
-          status: selected ? "recommended" : decision.choice,
+          warnings: [],
+          status: selected ? "recommended" : abstention,
           confidence: decision.confidence,
           candidates,
           selected,
         };
-        this.results.set(requestId, result);
-        if (this.results.size > 100) {
-          const oldest = this.results.keys().next().value ?? "";
-          this.results.delete(oldest);
-          this.handedOff.delete(oldest);
-          this.feedbackGiven.delete(oldest);
-        }
+        const receipts = await this.receipts.read();
+        const identity = selected
+          ? {
+              key: selected.key,
+              name: selected.name,
+              registry: selected.registry,
+              namespace: selected.namespace,
+              version: selected.version,
+              digest: selected.digest,
+            }
+          : null;
+        await this.receipts.save([
+          ...receipts,
+          {
+            requestId,
+            at: Date.now(),
+            skill: identity,
+            fingerprint: selected ? fingerprint(selected) : "",
+            handedOff: false,
+            feedback: false,
+          },
+        ]);
         await this.record({
           type: "search",
           requestId,
@@ -264,6 +306,7 @@ export class Discovery {
             skillDigest: selected.digest,
             outcome: "recommended",
           });
+        if (this.telemetryWarning) result.warnings.push(this.telemetryWarning);
         return result;
       } catch (error) {
         await this.record({
@@ -276,21 +319,21 @@ export class Discovery {
       }
     });
   }
-  async handoff(payload: Record<string, unknown>, skills: Skill[]): Promise<object> {
+  async handoff(payload: Record<string, unknown>, skills: Skill[]): Promise<Handoff> {
     return this.exclusive(async () => {
-      const result = this.result(payload);
+      const result = await this.result(payload);
       const saved = await this.store.read();
-      const skill = result.selected;
+      const skill = result.skill;
       if (
         !skill ||
         !saved.registries.includes(skill.registry) ||
-        !skills.some((s) => s.key === skill.key && fingerprint(s) === fingerprint(skill))
+        !skills.some((s) => s.key === skill.key && fingerprint(s) === result.fingerprint)
       ) {
         throw new DiscoveryError(
           "This recommendation is stale. Search again before creating a handoff.",
         );
       }
-      if (!this.handedOff.has(result.requestId))
+      if (!result.handedOff)
         await this.record({
           type: "handoff",
           requestId: result.requestId,
@@ -299,7 +342,7 @@ export class Discovery {
           skillDigest: skill.digest,
           outcome: "prepared",
         });
-      this.handedOff.add(result.requestId);
+      await this.updateReceipt({ ...result, handedOff: true });
       return {
         handoff: {
           schema: "aireg.skill-handoff.v1",
@@ -318,25 +361,25 @@ export class Discovery {
       };
     });
   }
-  async feedback(payload: Record<string, unknown>): Promise<object> {
+  async feedback(payload: Record<string, unknown>): Promise<Message> {
     return this.exclusive(async () => {
-      const result = this.result(payload);
-      if (!result.selected || !["helpful", "not_helpful"].includes(String(payload.outcome))) {
+      const result = await this.result(payload);
+      if (!result.skill || !["helpful", "not_helpful"].includes(String(payload.outcome))) {
         throw new DiscoveryError("Choose feedback for a recommended skill.");
       }
       if (!(await this.store.read()).telemetry)
         return { message: "Recording is paused; feedback was not saved." };
-      if (this.feedbackGiven.has(result.requestId))
+      if (result.feedback)
         throw new DiscoveryError("Feedback is already recorded for this recommendation.");
       await this.record({
         type: "feedback",
         requestId: result.requestId,
-        skillKey: result.selected.key,
-        skillVersion: result.selected.version,
-        skillDigest: result.selected.digest,
+        skillKey: result.skill.key,
+        skillVersion: result.skill.version,
+        skillDigest: result.skill.digest,
         outcome: String(payload.outcome),
       });
-      this.feedbackGiven.add(result.requestId);
+      if (!this.telemetryWarning) await this.updateReceipt({ ...result, feedback: true });
       return {
         message:
           this.telemetryWarning ||
@@ -344,7 +387,7 @@ export class Discovery {
       };
     });
   }
-  telemetry(payload: Record<string, unknown>): Promise<object> {
+  telemetry(payload: Record<string, unknown>): Promise<Message> {
     return this.exclusive(async () => {
       if (typeof payload.enabled !== "boolean")
         throw new DiscoveryError("Choose whether to record local history.");
@@ -354,17 +397,22 @@ export class Discovery {
       return { message: payload.enabled ? "Local recording resumed." : "Local recording paused." };
     });
   }
-  clear(): Promise<object> {
+  clear(): Promise<Message> {
     return this.exclusive(async () => {
       await this.store.clear();
-      return { message: "Local usage history cleared." };
+      await this.receipts.save([]);
+      return { message: "Local usage history and recommendation receipts cleared." };
     });
   }
-  private result(payload: Record<string, unknown>): Result {
-    const result =
-      typeof payload.requestId === "string" ? this.results.get(payload.requestId) : undefined;
+  private async result(payload: Record<string, unknown>): Promise<Receipt> {
+    const result = (await this.receipts.read()).find((r) => r.requestId === payload.requestId);
     if (!result) throw new DiscoveryError("That search has expired. Search again.");
     return result;
+  }
+  private async updateReceipt(receipt: Receipt): Promise<void> {
+    await this.receipts.save(
+      (await this.receipts.read()).map((r) => (r.requestId === receipt.requestId ? receipt : r)),
+    );
   }
   private async record(
     event: Partial<UsageEvent> & Pick<UsageEvent, "type" | "requestId" | "outcome">,
@@ -382,12 +430,20 @@ export class Discovery {
       this.telemetryWarning = "Local history could not be saved. Check storage permissions.";
     }
   }
-  private async exclusive(work: () => Promise<object>): Promise<object> {
+  private async exclusive<T extends object>(work: () => Promise<T>): Promise<T> {
     if (this.busy || this.job.running)
       throw new DiscoveryError("Another discovery operation is running. Wait for it to finish.");
     this.busy = true;
     try {
-      return await work();
+      return await withLease(
+        { scope: "user", lock: join(ensureHome(this.env), DISCOVERY_OPERATION_LOCK) },
+        { env: this.env },
+        work,
+      );
+    } catch (error) {
+      if (error instanceof LeaseBusyError)
+        throw new DiscoveryError("Another discovery operation is running. Wait for it to finish.");
+      throw error;
     } finally {
       this.busy = false;
     }

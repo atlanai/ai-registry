@@ -4,7 +4,7 @@ import { readRegular } from "#adapter/files.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { PRIVATE_FILE } from "#core/fs/mode.ts";
 import { withLease } from "#core/lease/lease.ts";
-import { UI_DISCOVERY_INDEX_FILE } from "#core/product.ts";
+import { DISCOVERY_INDEX_FILE } from "#core/product.ts";
 import { ensureHome } from "#core/store/paths.ts";
 import { DiscoveryError, EMBEDDING_MODEL, validVector } from "./gemini.ts";
 import type { Indexed } from "./retrieval.ts";
@@ -17,7 +17,7 @@ export class DiscoveryIndex {
   }
 
   async read(): Promise<Map<string, Indexed>> {
-    const file = await readRegular(ensureHome(this.env), UI_DISCOVERY_INDEX_FILE);
+    const file = await readRegular(ensureHome(this.env), DISCOVERY_INDEX_FILE);
     if (file.kind === "missing") return new Map();
     if (file.kind !== "file") throw new DiscoveryError("The search index cannot be read safely.");
     try {
@@ -48,9 +48,9 @@ export class DiscoveryIndex {
   }
 
   async save(entries: Iterable<Indexed>): Promise<void> {
-    const path = join(ensureHome(this.env), UI_DISCOVERY_INDEX_FILE);
+    const path = join(ensureHome(this.env), DISCOVERY_INDEX_FILE);
     await withLease({ scope: "user", lock: path }, { wait: true, env: this.env }, async () => {
-      const existing = await readRegular(ensureHome(this.env), UI_DISCOVERY_INDEX_FILE);
+      const existing = await readRegular(ensureHome(this.env), DISCOVERY_INDEX_FILE);
       if (existing.kind === "refused")
         throw new DiscoveryError("The search index cannot be written safely.");
       await writeAtomic(

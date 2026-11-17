@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
-import { UI_DISCOVERY_FILE } from "#core/product.ts";
+import { DISCOVERY_SETTINGS_FILE } from "#core/product.ts";
 import { test } from "#test/kit/fixtures.ts";
 import type { Skill } from "./retrieval.ts";
 import { Discovery } from "./service.ts";
@@ -58,15 +58,15 @@ describe("discovery user journey", () => {
     const result = (await service.search({ query: "synthetic-private-query" }, skills)) as {
       requestId: string;
     };
-    expect(await service.handoff(result, skills)).toMatchObject({
+    expect(await service.handoff({ requestId: result.requestId }, skills)).toMatchObject({
       handoff: { skill: { key: "example/recap", digest: "digest-one", version: "1" } },
     });
     await service.feedback({ ...result, outcome: "helpful" });
-    await service.handoff(result, skills);
+    await service.handoff({ requestId: result.requestId }, skills);
     await expect(service.feedback({ ...result, outcome: "helpful" })).rejects.toThrow(
       "already recorded",
     );
-    const persisted = await readFile(join(env.AIREG_HOME, UI_DISCOVERY_FILE), "utf8");
+    const persisted = await readFile(join(env.AIREG_HOME, DISCOVERY_SETTINGS_FILE), "utf8");
     expect(persisted).not.toContain("synthetic-private-query");
     expect(persisted).not.toContain("synthetic-key");
     expect(persisted).not.toContain(skills[0]?.description);
@@ -77,7 +77,7 @@ describe("discovery user journey", () => {
       "feedback",
     ]);
     expect(JSON.stringify(send.mock.calls)).not.toContain("Excluded registry description");
-    expect((await stat(join(env.AIREG_HOME, UI_DISCOVERY_FILE))).mode & 0o777).toBe(0o600);
+    expect((await stat(join(env.AIREG_HOME, DISCOVERY_SETTINGS_FILE))).mode & 0o777).toBe(0o600);
     const restarted = new Discovery(env, send);
     expect(await restarted.status(skills)).toMatchObject({ connected: true, indexed: 1 });
     const callsBeforeRestartSearch = send.mock.calls.length;
@@ -137,7 +137,7 @@ describe("discovery user journey", () => {
       requestId: string;
     };
     expect(result).toMatchObject({ status: "none", selected: null });
-    await expect(service.handoff(result, skills)).rejects.toThrow("stale");
+    await expect(service.handoff({ requestId: result.requestId }, skills)).rejects.toThrow("stale");
     expect(await service.status(skills)).toMatchObject({ events: [] });
   });
   test("local recording controls work without a provider connection", async ({ tmp }) => {
@@ -162,7 +162,9 @@ describe("discovery user journey", () => {
       requestId: string;
     };
     await service.setup({ ...setup, registries: ["private"] }, skills);
-    await expect(service.handoff(result, skills)).rejects.toThrow("expired");
+    await expect(service.handoff({ requestId: result.requestId }, skills)).rejects.toThrow(
+      "expired",
+    );
     expect(await new Discovery(env, send).status(skills)).toMatchObject({
       indexed: 0,
       registries: ["private"],
@@ -223,5 +225,52 @@ describe("discovery user journey", () => {
     } finally {
       fail.mockRestore();
     }
+  });
+  test("separate clients share receipts, deduplication and connection revocation", async ({
+    tmp,
+  }) => {
+    const env = { AIREG_HOME: join(tmp, "home") };
+    const send = provider();
+    const first = new Discovery(env, send);
+    await first.setup(setup, skills);
+    await indexed(first);
+    const result = await first.search({ query: "recap notes" }, skills);
+    const second = new Discovery(env, send);
+    await second.handoff({ requestId: result.requestId }, skills);
+    await first.handoff({ requestId: result.requestId }, skills);
+    await second.feedback({ ...result, outcome: "helpful" });
+    await expect(first.feedback({ ...result, outcome: "helpful" })).rejects.toThrow(
+      "already recorded",
+    );
+    expect((await first.status(skills)).events.filter((e) => e.type === "handoff")).toHaveLength(1);
+    await second.disconnect();
+    const calls = send.mock.calls.length;
+    await expect(first.handoff({ requestId: result.requestId }, skills)).rejects.toThrow("expired");
+    await expect(first.build(skills)).rejects.toThrow("Connect your AI Studio key");
+    expect(send.mock.calls.length).toBe(calls);
+  });
+  test("separate clients cannot mutate settings during an active search", async ({ tmp }) => {
+    const env = { AIREG_HOME: join(tmp, "home") };
+    const send = provider();
+    const first = new Discovery(env, send);
+    await first.setup(setup, skills);
+    await indexed(first);
+    let finish: ((value: Response) => void) | undefined;
+    const blocked = new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+    send.mockImplementationOnce(() => blocked);
+    const searching = first.search({ query: "recap notes" }, skills);
+    const second = new Discovery(env, send);
+    await vi.waitFor(async () => expect((await second.status(skills)).busy).toBe(true));
+    try {
+      await expect(second.telemetry({ enabled: false })).rejects.toThrow(
+        "Another discovery operation",
+      );
+    } finally {
+      finish?.(Response.json({ embedding: { values: [1, 0] } }));
+      await searching;
+    }
+    expect((await second.status(skills)).busy).toBe(false);
   });
 });

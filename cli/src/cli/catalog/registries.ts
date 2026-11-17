@@ -64,8 +64,10 @@ interface Kept {
 export class Catalogs {
   readonly #kept = new Map<string, Kept>();
   readonly #context: CommandContext;
+  readonly #complete: boolean;
 
-  constructor(context: CommandContext) {
+  constructor(context: CommandContext, complete = false) {
+    this.#complete = complete;
     this.#context = context;
   }
 
@@ -78,7 +80,8 @@ export class Catalogs {
     }
     const kept = declared.map((entry) => this.#refresh(entry.registry, scope));
     const waiting = kept.flatMap((entry) => (entry.pending === undefined ? [] : [entry.pending]));
-    if (waiting.length > 0) {
+    if (this.#complete) await Promise.all(waiting);
+    else if (waiting.length > 0) {
       await Promise.race([
         Promise.all(waiting),
         new Promise((resolve) => setTimeout(resolve, WAIT_MS)),
