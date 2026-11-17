@@ -69,6 +69,7 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             <span>Artifacts</span>
           </button>
+          <button class="mode-btn" data-mode="discovery"><span aria-hidden="true">✦</span><span>Find skills</span></button>
           <button class="mode-btn" data-mode="sync">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
             <span>Jobs and runs</span>
@@ -178,6 +179,38 @@
       </aside>
 
       <!-- VIEW 1: ARTIFACTS VIEW (Default) -->
+      <section class="workspace-main-view discovery-view u1" id="viewDiscovery" aria-labelledby="discoveryTitle">
+        <div class="discovery-shell">
+          <header class="discovery-heading"><div><p class="discovery-eyebrow">GEMINI · PREVIEW</p><h1 id="discoveryTitle">Find the right skill</h1><p>Describe the work. Review a recommendation. Hand it to your agent.</p></div><span id="discoveryConnection" class="discovery-badge">Not connected</span></header>
+          <nav class="discovery-nav" aria-label="Skill discovery"><button type="button" data-discovery-panel="search" aria-pressed="true">Search</button><button type="button" data-discovery-panel="setup" aria-pressed="false">Setup</button><button type="button" data-discovery-panel="usage" aria-pressed="false">Usage</button></nav>
+          <p id="discoveryMessage" class="discovery-message" role="status" aria-live="polite"></p>
+          <section id="discoverySearchPanel" class="discovery-panel">
+            <div id="discoveryNext" class="discovery-callout"></div>
+            <form id="discoverySearchForm"><label for="discoveryQuery">What do you want to accomplish?</label><textarea id="discoveryQuery" rows="3" minlength="3" maxlength="2000" required placeholder="I need to turn discovery-call notes into a clear recap for my team."></textarea><div class="discovery-actions"><button class="discovery-primary" id="discoverySearchButton" type="submit" disabled>Find skills</button><span>Gemini embeddings + keyword search → Gemini Decisions</span></div></form>
+            <div id="discoveryResults" class="discovery-results"></div>
+          </section>
+          <section id="discoverySetupPanel" class="discovery-panel" hidden>
+            <h2>Connect through Google AI Studio</h2><p>Use a Gemini API key with access to both models. Your key stays on this machine in aireg’s protected credential store; it is never returned to this page.</p>
+            <button type="button" id="discoveryKeyLink" class="discovery-link">Open AI Studio to get a key ↗</button>
+            <form id="discoverySetupForm">
+              <label for="discoveryKey">Gemini API key</label><input id="discoveryKey" type="password" autocomplete="off" spellcheck="false" maxlength="512" placeholder="Paste your key; leave blank to keep a saved key">
+              <fieldset><legend>Registries to search</legend><p>Only names and descriptions from selected registries are shared with Google. Full skill files are excluded.</p><div id="discoveryRegistries" class="discovery-checks"></div></fieldset>
+              <label class="discovery-check"><input id="discoveryConsent" type="checkbox" required><span>I approve sending skill names and descriptions from these registries, and my search text, to Google for embeddings and decisions. Google’s API terms and charges apply.</span></label>
+              <label class="discovery-check"><input id="discoveryTelemetry" type="checkbox" checked><span>Keep local usage history (last 1,000 events). Events contain skill identifiers, versions and digests, never search text, skill content or API keys. Nothing is sent to an analytics service.</span></label>
+              <div class="discovery-actions"><button type="submit" class="discovery-primary">Test and save connection</button><button type="button" id="discoveryDisconnect">Disconnect</button></div>
+            </form>
+            <div class="discovery-index"><h2>Build your search index</h2><p>Embeddings are saved privately on this machine and reused after restarting. Refresh after catalog changes; only changed skills are embedded. Up to 500 skills.</p><p id="discoveryIndexStatus"></p><progress id="discoveryProgress" max="1" value="0" aria-label="Skills indexed"></progress><div class="discovery-actions"><button type="button" id="discoveryIndexButton" disabled>Build / refresh index</button><button type="button" id="discoveryStopButton" disabled>Stop indexing</button></div></div>
+          </section>
+          <section id="discoveryUsagePanel" class="discovery-panel" hidden>
+            <div class="discovery-heading"><div><h2>Usage on this machine</h2><p>Recommendations are observed. Feedback is self-reported. Harness execution is not connected yet.</p></div><button type="button" id="discoveryUsageRefresh">Refresh</button></div>
+            <div id="discoveryMetrics" class="discovery-metrics"></div>
+            <h3>Skills recommended</h3><div id="discoverySkillUsage"></div>
+            <h3>Recent activity</h3><div id="discoveryEvents" class="discovery-events"></div>
+            <div class="discovery-actions"><button type="button" id="discoveryRecording">Pause recording</button><button type="button" id="discoveryClear">Clear local history</button><span id="discoveryTelemetryState"></span></div>
+          </section>
+        </div>
+      </section>
+
       <div class="workspace-main-view" id="viewArtifacts">
         <!-- Pane 2: Artifacts List Stream (Middle) -->
         <section class="artifact-stream-pane">
@@ -226,6 +259,7 @@
                 <h1 class="insp-title" id="inspTitle"></h1>
               </div>
               <div class="insp-btn-group">
+                <button class="subtle-btn" id="skillScoreToggle" type="button" aria-expanded="false" aria-controls="skillScore" aria-haspopup="dialog" hidden>Score</button>
                 <button class="subtle-btn" id="copyCliBtn" title="Copy CLI inspect command">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                   <span>Copy CLI</span>
@@ -245,6 +279,8 @@
             <div class="insp-lead" id="inspDescription">
               Choice architecture, decision ergonomics, and AX as UX.
             </div>
+
+            <section id="skillScore" class="skill-score" role="dialog" aria-label="Skill assessment" popover="auto" hidden></section>
 
             <!-- Dual-Legibility Metadata Box -->
             <div class="metadata-provenance-box">

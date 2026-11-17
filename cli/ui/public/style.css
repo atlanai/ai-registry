@@ -2062,3 +2062,76 @@ button.nav-item {
 
 
 #retireTargetsList { white-space: pre-line; }
+
+.skill-score { margin: 16px 0 24px; padding: 20px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--card-bg); color: var(--ink-primary); }
+.skill-score[hidden] { display: none; }
+.score-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.score-heading h2 { margin: 0; font-size: 18px; }
+.skill-score p { margin: 8px 0 12px; font-size: 13px; line-height: 1.6; }
+.score-status { font-size: 12px; color: var(--ink-muted); }
+#skillScoreToggle[hidden] { display: none; }
+#skillScoreToggle[aria-expanded="true"] { background: var(--subtle-bg); border-color: var(--border-active); }
+#skillScoreToggle:focus-visible, .skill-score summary:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 3px; }
+.inspector-action-bar, .insp-btn-group, .score-heading { flex-wrap: wrap; }
+.score-next { padding: 12px; margin: 16px 0; background: #f1f5fa; border-radius: 8px; }
+.skill-score summary { cursor: pointer; padding: 10px 0; font-size: 13px; font-weight: 600; }
+.score-checks { list-style: none; padding: 0; }
+.score-check { padding: 12px 0; border-bottom: 1px solid #e4e8ef; }
+.score-check > div { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
+.score-fix { color: #725318; }
+.score-unmeasured { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; font-size: 12px; }
+.score-unmeasured span { border: 1px solid #d7dce4; border-radius: 5px; padding: 5px 8px; }
+.skill-score small { font-size: 11px; }
+.skill-score[popover] { position: fixed; inset: 150px 32px auto auto; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 180px); overflow-y: auto; margin: 0; box-shadow: var(--shadow-popover); }
+.skill-score[popover]::backdrop { background: transparent; }
+@media (max-width: 640px) { .skill-score[popover] { inset: 80px 16px auto; max-height: calc(100dvh - 100px); } }
+
+/* Skill discovery: a focused workflow alongside the existing catalog. */
+.discovery-view { overflow: auto; background: var(--canvas-bg); }
+.discovery-shell { width: min(100%, 1040px); margin: 0 auto; padding: 36px 40px 64px; }
+.discovery-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.discovery-heading h1 { font-size: 28px; letter-spacing: -.7px; font-weight: 600; margin-bottom: 8px; }
+.discovery-shell p { color: var(--ink-muted); margin: 8px 0 16px; line-height: 1.65; }
+.discovery-shell .discovery-eyebrow { font-size: 10px; letter-spacing: 1.4px; font-weight: 700; margin: 0 0 12px; }
+.discovery-badge { white-space: nowrap; padding: 5px 10px; border: 1px solid var(--border-subtle); border-radius: 30px; font-size: 11px; background: white; }
+.discovery-nav { display: flex; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding: 16px 0; margin-bottom: 16px; }
+.discovery-shell button { font: inherit; border: 1px solid var(--border-subtle); border-radius: 6px; background: white; padding: 8px 13px; color: var(--ink-primary); cursor: pointer; }
+.discovery-shell button:hover { background: var(--hover-bg); }
+.discovery-shell button:disabled { opacity: .5; cursor: not-allowed; }
+.discovery-shell button:focus-visible, .discovery-shell input:focus-visible, .discovery-shell textarea:focus-visible, .discovery-shell summary:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 3px; }
+.discovery-nav button[aria-pressed="true"], .discovery-shell .discovery-primary { color: white; background: var(--ink-primary); }
+.discovery-panel { padding-top: 8px; }
+.discovery-panel[hidden] { display: none; }
+.discovery-panel h2 { font-size: 19px; font-weight: 600; margin-bottom: 10px; }
+.discovery-panel h3 { font-size: 14px; margin: 28px 0 12px; }
+.discovery-panel label:not(.discovery-check) { display: block; font-weight: 600; margin: 20px 0 8px; }
+.discovery-shell textarea, .discovery-shell input[type="password"] { width: 100%; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 12px; background: white; color: var(--ink-primary); font: inherit; resize: vertical; }
+.discovery-shell textarea { min-height: 100px; }
+.discovery-shell fieldset { border: 0; border-top: 1px solid var(--border-subtle); padding: 18px 0 8px; margin-top: 28px; }
+.discovery-shell legend { padding-right: 10px; font-weight: 600; }
+.discovery-check { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0; max-width: 760px; }
+.discovery-check input { margin-top: 3px; flex-shrink: 0; accent-color: var(--ink-primary); }
+.discovery-checks { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 0 20px; }
+.discovery-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px 0; }
+.discovery-actions span, .discovery-meta { font-size: 11px; color: var(--ink-muted); }
+.discovery-message:empty { display: none; }
+.discovery-shell .discovery-message { background: var(--subtle-bg); border-radius: 6px; padding: 10px 14px; }
+.discovery-shell .discovery-message.is-error { background: #fff1f2; color: #9f1239; }
+.discovery-callout { padding: 14px 0; color: var(--ink-secondary); }
+.discovery-index { border-top: 1px solid var(--border-subtle); padding-top: 28px; margin-top: 28px; }
+.discovery-index progress { width: 100%; height: 6px; accent-color: var(--accent-blue); }
+.discovery-results { margin-top: 32px; }
+.discovery-recommendation { background: white; border: 1px solid var(--border-subtle); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+.discovery-candidates { list-style: none; padding: 0; }
+.discovery-candidates li { padding: 14px 0; border-bottom: 1px solid var(--border-hairline); overflow-wrap: anywhere; }
+.discovery-candidates span { display: block; font-size: 11px; color: var(--ink-muted); }
+.discovery-shell summary { cursor: pointer; padding: 12px 0; }
+.discovery-metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin: 24px 0; }
+.discovery-metrics div { padding: 16px; border: 1px solid var(--border-subtle); background: white; border-radius: 8px; }
+.discovery-metrics strong { display: block; font-size: 21px; font-weight: 600; }
+.discovery-metrics span { display: block; font-size: 11px; margin-top: 6px; color: var(--ink-muted); }
+.discovery-events { overflow: auto; }
+.discovery-events table { width: 100%; text-align: left; border-collapse: collapse; font-size: 12px; }
+.discovery-events caption { text-align: left; color: var(--ink-muted); padding-bottom: 12px; }
+.discovery-events th, .discovery-events td { padding: 12px 8px; border-bottom: 1px solid var(--border-subtle); overflow-wrap: anywhere; }
+@media (max-width: 900px) { .discovery-shell { padding: 24px 20px; } .discovery-metrics { grid-template-columns: repeat(2,1fr); } .discovery-heading { flex-direction: column; gap: 8px; } }

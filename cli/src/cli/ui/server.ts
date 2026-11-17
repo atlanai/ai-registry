@@ -8,10 +8,13 @@ import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { underHome } from "#cli/render/home.ts";
 import * as commands from "#core/console/actions.ts";
+import { Discovery } from "#core/discovery/service.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { scoreSkill } from "#core/score/skill.ts";
 import * as uiCommands from "./actions.ts";
 import { Catalogs } from "./catalogs.ts";
 import { type Ran, run } from "./child.ts";
+import { discoveryRoute } from "./discovery.ts";
 import { API_PREFIX, type Bound, refusal } from "./guard.ts";
 import { type KeptArtifact, PageReader, type PageState } from "./page-state.ts";
 
@@ -62,6 +65,7 @@ const HEADERS = {
 };
 
 interface Server {
+  discovery: Discovery;
   reader: PageReader;
   context: CommandContext;
   assets: Readonly<Record<string, Asset>>;
@@ -74,6 +78,7 @@ interface Server {
 export async function serve(options: ServeOptions): Promise<Serving> {
   const token = randomBytes(32).toString("base64url");
   const server: Server = {
+    discovery: new Discovery(),
     reader: new PageReader(options.context, new Catalogs(options.context)),
     context: options.context,
     assets: options.assets,
@@ -112,6 +117,7 @@ export async function serve(options: ServeOptions): Promise<Serving> {
     port,
     close: () =>
       new Promise<void>((resolve) => {
+        server.discovery.stop();
         http.close(() => resolve());
         http.closeAllConnections();
       }),
@@ -121,6 +127,12 @@ export async function serve(options: ServeOptions): Promise<Serving> {
 type Route = (request: IncomingMessage, url: URL, server: Server) => Promise<[number, object]>;
 
 const ROUTES: Readonly<Record<string, Route>> = {
+  "GET /api/discovery": (_request, _url, server) =>
+    discoveryRoute(server.discovery, server.reader, "status", {}),
+  "POST /api/discovery": async (request, _url, server) => {
+    const payload = await body(request);
+    return discoveryRoute(server.discovery, server.reader, String(payload.action), payload);
+  },
   "GET /api/artifacts": async (_request, url, server) => [
     200,
     artifactsOf(await server.reader.read(url.searchParams.get("fresh") === "1")),
@@ -246,6 +258,7 @@ async function fileOf(key: string | null, server: Server): Promise<[number, obje
         registry: artifact.registry,
         path,
         markdown,
+        score: artifact.kind === "skill" ? scoreSkill(markdown) : null,
       },
     },
   ];

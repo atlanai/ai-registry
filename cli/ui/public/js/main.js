@@ -24,6 +24,7 @@ import {
   updateCmdSelection,
   watchDialogs,
 } from "./dialogs.js";
+import { openDiscovery, wireDiscovery } from "./discovery.js";
 import {
   loadConsoleData,
   renderAuditDashboard,
@@ -45,6 +46,9 @@ export function switchMode(mode) {
     btn.classList.toggle("active", btn.getAttribute("data-mode") === mode);
   });
 
+  document.getElementById("viewDiscovery").style.display = mode === "discovery" ? "flex" : "none";
+  if (mode === "discovery") void openDiscovery();
+
   // Toggle views
   el.viewArtifacts.style.display = mode === "artifacts" ? "flex" : "none";
   el.viewSyncEngine.style.display = mode === "sync" ? "flex" : "none";
@@ -64,6 +68,7 @@ export function switchMode(mode) {
 
 // Event Handlers
 export function initEvents() {
+  wireDiscovery();
   wireModes();
   wireFilters();
   wireDialogs();

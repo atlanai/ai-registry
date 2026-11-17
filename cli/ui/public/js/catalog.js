@@ -1,6 +1,7 @@
 // The list of everything each registry publishes, the sidebar filters, and the inspector.
 import { api, cssToken, el, escapeHtml, hooks, sanitizeHtml, state } from "./core.js";
 import { renderMarkdown } from "./markdown.js";
+import { renderScore } from "./score.js";
 
 // Load Primary Artifacts
 export async function loadArtifacts() {
@@ -310,11 +311,13 @@ function showLinks(artifact) {
 
 /** The file a target loads, or the one its registry serves; the server finds it by key. */
 async function showFile(artifact) {
+  renderScore(null);
   el.inspMarkdown.innerHTML = `<div class="subtle-spinner u46"></div><p class="u47">Reading the file…</p>`;
   try {
     const res = await api(`/api/skill?key=${encodeURIComponent(artifact.key)}`);
     const json = await res.json();
     if (state.selectedKey !== artifact.key) return;
+    renderScore(json.ok ? json.data?.score : null);
     el.inspFilePath.textContent = json.ok && json.data ? json.data.path : "";
     el.inspMarkdown.innerHTML =
       json.ok && json.data

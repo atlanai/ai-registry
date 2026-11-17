@@ -33,6 +33,16 @@ describe("aireg ui", () => {
       expect(page.headers["x-frame-options"]).toBe("DENY");
 
       expect((await send(port, "/api/artifacts")).status).toBe(401);
+      expect((await send(port, "/api/discovery")).status).toBe(401);
+      expect(
+        (
+          await send(port, "/api/discovery", {
+            method: "POST",
+            headers: json(ui.token, "https://evil.example"),
+            body: JSON.stringify({ action: "setup", key: "synthetic-key", consent: true }),
+          })
+        ).status,
+      ).toBe(403);
       const auth = { authorization: `Bearer ${ui.token}` };
       expect(
         (await send(port, "/api/artifacts", { headers: { ...auth, host: "evil.example" } })).status,
@@ -87,6 +97,15 @@ describe("aireg ui", () => {
         { headers: auth },
       );
       expect(JSON.parse(installed.body).data.markdown).toContain("name: pr-review");
+      expect(JSON.parse(installed.body).data.score).toMatchObject({
+        status: "scored",
+        safety: "not-assessed",
+      });
+      const discovery = await send(port, "/api/discovery", { headers: auth });
+      expect(JSON.parse(discovery.body)).toMatchObject({
+        ok: true,
+        data: { connected: false, indexed: 0, events: [] },
+      });
       const served = await send(
         port,
         `/api/skill?key=${encodeURIComponent(byName.reviewer?.key ?? "")}`,
