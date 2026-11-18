@@ -67,8 +67,10 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 ## Discovery clients
 
 `core/discovery/` owns the optional Gemini workflow and shared operation dispatch.
-`cli/catalog/` reads the catalog independently of a browser; `cli/discovery/` projects
-its skills for discovery. Both `aireg discover` and the web UI use these modules.
+`cli/discovery/` reads only selected sources during indexing and resolves one skill
+at handoff, using existing registry adapters and local catalog reads. Search reads
+a private snapshot of metadata and vectors; usage reads local history. Neither
+operation loads registry catalogs. Both `aireg discover` and the web UI use these modules.
 Recommendation receipts and per-home leases coordinate separate CLI and UI processes.
 The UI owns HTTP envelopes and background scheduling, not discovery policy.
 

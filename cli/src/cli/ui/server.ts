@@ -128,10 +128,10 @@ type Route = (request: IncomingMessage, url: URL, server: Server) => Promise<[nu
 
 const ROUTES: Readonly<Record<string, Route>> = {
   "GET /api/discovery": (_request, _url, server) =>
-    discoveryRoute(server.discovery, server.reader, "status", {}),
+    discoveryRoute(server.discovery, server.context, "status", {}),
   "POST /api/discovery": async (request, _url, server) => {
     const payload = await body(request);
-    return discoveryRoute(server.discovery, server.reader, String(payload.action), payload);
+    return discoveryRoute(server.discovery, server.context, String(payload.action), payload);
   },
   "GET /api/artifacts": async (_request, url, server) => [
     200,

@@ -16,6 +16,8 @@
         "available",
         "eligible",
         "indexed",
+        "indexReady",
+        "indexedAt",
         "embeddingModel",
         "decisionModel",
         "job",
@@ -51,6 +53,19 @@
         },
         "indexed": {
           "type": "number"
+        },
+        "indexReady": {
+          "type": "boolean"
+        },
+        "indexedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "embeddingModel": {
           "type": "string"
@@ -163,6 +178,8 @@
         "available",
         "eligible",
         "indexed",
+        "indexReady",
+        "indexedAt",
         "embeddingModel",
         "decisionModel",
         "job",
@@ -198,6 +215,19 @@
         },
         "indexed": {
           "type": "number"
+        },
+        "indexReady": {
+          "type": "boolean"
+        },
+        "indexedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "embeddingModel": {
           "type": "string"

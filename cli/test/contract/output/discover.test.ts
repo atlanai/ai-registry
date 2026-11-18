@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Ajv2020, type SchemaObject } from "ajv/dist/2020.js";
@@ -95,6 +95,20 @@ test("a harness can set up, index, search, hand off, score and inspect usage wit
       })
     ).json(),
   ).toMatchObject({ data: { status: "scored", safety: "not-assessed" } });
+  // Removing a source must not block snapshot search or local telemetry. Handoff must fail.
+  await rename(folder, `${folder}-moved`);
+  const offline = await invoke(["discover", "search", "recap notes", "--json"], { node });
+  expect(offline.code).toBe(0);
+  const offlineId = offline.json<{ requestId: string }>().data?.requestId ?? "";
+  expect((await invoke(["discover", "usage", "--json"])).code).toBe(0);
+  expect((await invoke(["discover", "handoff", offlineId, "--json"])).code).not.toBe(0);
+  await rename(`${folder}-moved`, folder);
+  // A body-only edit (same name/description) must also reject the receipt.
+  await writeFile(
+    join(folder, "SKILL.md"),
+    "---\nname: recap\ndescription: Summarize meeting notes for the team.\n---\nChanged instructions.",
+  );
+  expect((await invoke(["discover", "handoff", offlineId, "--json"])).code).not.toBe(0);
   expect((await invoke(["discover", "telemetry", "off", "--json"])).code).toBe(0);
   expect((await invoke(["discover", "clear", "--json"])).code).toBe(0);
   expect((await invoke(["discover", "disconnect", "--json"])).code).toBe(0);

@@ -1,12 +1,12 @@
-import type { CatalogReader } from "#cli/catalog/state.ts";
-import { discoverySkills } from "#cli/discovery/catalog.ts";
+import type { CommandContext } from "#cli/commands/command.ts";
+import { discoveryCatalog } from "#cli/discovery/catalog.ts";
 import { discover } from "#core/discovery/actions.ts";
 import { type Discovery, safeError } from "#core/discovery/service.ts";
 
 /** HTTP only adapts the shared operation's envelope and schedules background indexing. */
 export async function discoveryRoute(
   service: Discovery,
-  reader: CatalogReader,
+  context: CommandContext,
   action: string,
   payload: Record<string, unknown>,
 ): Promise<[number, object]> {
@@ -15,7 +15,7 @@ export async function discoveryRoute(
       200,
       {
         ok: true,
-        data: await discover(service, action, payload, () => discoverySkills(reader), true),
+        data: await discover(service, action, payload, discoveryCatalog(context), true),
       },
     ];
   } catch (error) {

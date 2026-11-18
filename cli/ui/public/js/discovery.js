@@ -55,18 +55,17 @@ async function act(label, work) {
 }
 function renderStatus() {
   const s = snapshot;
-  const ready =
-    s.connected && s.eligible > 0 && s.indexed === s.eligible && !s.job.running && !s.busy;
+  const ready = s.connected && s.indexReady && !s.job.running && !s.busy;
   get("discoveryConnection").textContent = s.connected ? "Gemini connected" : "Setup needed";
   get("discoverySearchButton").disabled = running || !ready;
   get("discoveryStopButton").disabled = !s.job.running;
   get("discoveryIndexButton").disabled = running || !s.connected || s.job.running || s.busy;
   get("discoveryDisconnect").disabled = running || !s.connected || s.job.running || s.busy;
-  get("discoveryIndexStatus").textContent =
-    s.job.error ||
-    (s.job.running
-      ? `Indexing ${s.job.done} of ${s.job.total} skills…`
-      : `${s.indexed} of ${s.eligible} skills ready`);
+  let indexStatus = `${s.indexed} embeddings saved. Build / refresh the index to search.`;
+  if (s.indexReady)
+    indexStatus = `${s.indexed} skills indexed · Updated ${new Date(s.indexedAt).toLocaleString()}`;
+  if (s.job.running) indexStatus = `Indexing ${s.job.done} of ${s.job.total} skills…`;
+  get("discoveryIndexStatus").textContent = s.job.error || indexStatus;
   get("discoveryProgress").max = s.job.total || s.eligible || 1;
   get("discoveryProgress").value = s.job.running ? s.job.done : s.indexed;
   let next =

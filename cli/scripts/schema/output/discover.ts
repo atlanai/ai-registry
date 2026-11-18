@@ -54,6 +54,8 @@ const Status = Type.Object(
     available: Type.Array(Type.String()),
     eligible: Type.Number(),
     indexed: Type.Number(),
+    indexReady: Type.Boolean(),
+    indexedAt: Type.Union([Type.String(), Type.Null()]),
     embeddingModel: Type.String(),
     decisionModel: Type.String(),
     job: Type.Object(

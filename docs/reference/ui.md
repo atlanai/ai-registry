@@ -120,8 +120,9 @@ Neither number establishes safety or measured task performance.
 
 The handoff includes the selected skill's registry, namespace, name, version and
 digest when available. It is an experimental UI handoff, not a harness protocol:
-the receiving agent must resolve and inspect the skill before using it. A changed
-catalog invalidates the recommendation. There is no automatic execution or
+the receiving agent must resolve and inspect the skill before using it. Handoff checks only the selected skill at its source; a changed, missing or
+unavailable skill cannot be handed off. Search uses the saved snapshot, so refresh
+after catalog changes. There is no automatic execution or
 verified execution reporting in this preview.
 
 ### Data and local history
@@ -132,11 +133,11 @@ credentials, and telemetry are not sent. Descriptions and queries may themselves
 contain sensitive information; review the scope before consenting. Provider errors
 are summarized without reflecting response bodies.
 
-Under the aireg home, `ui-discovery-index.json` stores private fingerprints and
-vectors; `ui-discovery.json` stores selected registries and at most 1,000 local
+Under the aireg home, `ui-discovery-index.json` stores private skill metadata, content digests,
+vectors, snapshot readiness and update time; `ui-discovery.json` stores selected registries and at most 1,000 local
 events. The cache is tied to the embedding model and each skill's metadata and
-version. Refreshing embeds only changed entries. Corrupt or incompatible cache
-contents require rebuilding. Disconnect removes the saved Gemini key, approved
+version. Refreshing embeds only changed entries. Incomplete snapshots cannot be searched. Corrupt, incompatible or older vector-only
+indexes require a refresh. Search and usage never reload registry catalogs. Disconnect removes the saved Gemini key, approved
 scope and cached vectors; history remains until cleared.
 
 **Usage** distinguishes successful searches, recommendations, prepared handoffs

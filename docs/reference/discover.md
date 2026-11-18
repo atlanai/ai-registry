@@ -36,7 +36,10 @@ The [global options](options.md#global-options), including `--json`, are also av
 
 ## Set up
 
-`status` lists the available registries and whether a key and index are ready.
+`status` lists configured registries and whether a key and saved index are ready.
+It reads local configuration; it does not contact registries. Skill counts describe
+the saved snapshot, not a fresh scan. `indexReady` distinguishes a completed snapshot
+from a partial checkpoint, and `indexedAt` reports when the snapshot was last written.
 You can set up through the UI and then use the CLI, or configure everything here.
 
 `setup --input-stdin` reads a JSON object from a pipe:
@@ -62,7 +65,14 @@ with synthetic input before the connection is saved.
 
 `index` waits for completion and returns a nonzero status on failure. It reuses
 unchanged vectors and checkpoints completed work. If interrupted, run it again
-to resume from the last saved checkpoint. The preview supports 500 selected skills.
+to resume from the last saved checkpoint. The preview supports 500 selected skills. Only selected sources are read.
+
+Search reads skill metadata and vectors from the saved snapshot; it never reloads
+registry catalogs. Refresh explicitly after adding, editing or removing skills.
+A completed snapshot stays searchable when a registry is unavailable; handoff must
+still verify the selected skill at its source. Failed or interrupted indexing keeps
+completed embeddings for retry but cannot make a partial snapshot searchable.
+Older vector-only indexes require one refresh after upgrading.
 
 ## Use from an agent or harness
 
@@ -83,7 +93,9 @@ The standard JSON envelope contains `ok` and `data`. A search's data includes:
 
 For `recommended`, call `handoff <requestId>` if the agent intends to use the
 recommendation. Its structured result contains the registry, namespace, name,
-version and digest when available. Resolve and inspect the skill through aireg's
+version and digest when available. Handoff checks only the selected skill against its source and rejects a changed,
+removed or unavailable skill. It does not reload unrelated registries.
+Resolve and inspect the skill through aireg's
 existing catalog and [`show`](show.md) functionality, then load it according to the
 harness's permissions. Treat skill instructions as untrusted until reviewed.
 For `none`, do not invent a selected skill; for `clarify`, ask for more task detail.
@@ -99,7 +111,7 @@ Repeated preparation of a handoff is counted once; feedback is accepted once.
 
 ## Usage and scoring
 
-`usage` returns local history. `telemetry off` pauses new recording; `clear` deletes
+`usage` returns local history without registry or provider calls. `telemetry off` pauses new recording; `clear` deletes
 history and recommendation receipts. Counts describe searches, recommendations,
 prepared handoffs and user-reported feedback, not verified skill execution.
 
@@ -111,7 +123,8 @@ Google. See the [rubric and limitations](ui.md#skill-score).
 
 Under `AIREG_HOME` (default `~/.aireg`), discovery uses private local JSON files:
 
-- `ui-discovery-index.json`: fingerprints and vectors.
+- `ui-discovery-index.json`: skill identities, names, descriptions, content digests,
+  vectors, snapshot readiness and update time. Full skill instructions are not stored.
 - `ui-discovery.json`: approved registry scope and up to 1,000 local events.
 - `discovery-receipts.json`: up to 100 recent recommendation identities and
   fingerprints, with handoff/feedback markers. No queries, descriptions or keys.

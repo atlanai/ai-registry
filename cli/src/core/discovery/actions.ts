@@ -4,12 +4,18 @@ import type { DiscoveryStatus, Handoff, Message, Recommendation } from "./model.
 import type { Skill } from "./retrieval.ts";
 import type { Discovery } from "./service.ts";
 
+export interface DiscoveryCatalog {
+  available(): Promise<string[]>;
+  list(registries: string[]): Promise<Skill[]>;
+  resolve(skill: Skill): Promise<Skill | undefined>;
+}
+
 /** Shared operation dispatch; transports supply inputs and a catalog, never business rules. */
 export async function discover(
   service: Discovery,
   action: string,
   payload: Record<string, unknown>,
-  catalog: () => Promise<Skill[]>,
+  catalog: DiscoveryCatalog,
   background = false,
 ): Promise<DiscoveryStatus | Handoff | Message | Recommendation | SkillScore> {
   switch (action) {
@@ -28,16 +34,17 @@ export async function discover(
         throw new DiscoveryError("Supply markdown text to score.");
       return scoreSkill(payload.markdown);
     case "status":
+      return service.status(undefined, await catalog.available());
     case "usage":
-      return service.status(await catalog());
+      return service.status();
     case "setup":
-      return service.setup(payload, await catalog());
+      return service.setup(payload, await catalog.available());
     case "index":
-      return service.build(await catalog(), background);
+      return service.build((registries) => catalog.list(registries), background);
     case "search":
-      return service.search(payload, await catalog());
+      return service.search(payload);
     case "handoff":
-      return service.handoff(payload, await catalog());
+      return service.handoff(payload, (skill) => catalog.resolve(skill));
     default:
       throw new DiscoveryError("Unknown discovery action.");
   }

@@ -65,9 +65,11 @@ export class Catalogs {
   readonly #kept = new Map<string, Kept>();
   readonly #context: CommandContext;
   readonly #complete: boolean;
+  readonly #selected: readonly string[] | undefined;
 
-  constructor(context: CommandContext, complete = false) {
+  constructor(context: CommandContext, complete = false, selected?: readonly string[]) {
     this.#complete = complete;
+    this.#selected = selected;
     this.#context = context;
   }
 
@@ -78,6 +80,8 @@ export class Catalogs {
     } catch (error) {
       return { catalogs: [], problem: messageOf(error) };
     }
+    if (this.#selected)
+      declared = declared.filter((entry) => this.#selected?.includes(entry.registry));
     const kept = declared.map((entry) => this.#refresh(entry.registry, scope));
     const waiting = kept.flatMap((entry) => (entry.pending === undefined ? [] : [entry.pending]));
     if (this.#complete) await Promise.all(waiting);

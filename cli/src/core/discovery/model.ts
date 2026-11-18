@@ -25,6 +25,8 @@ export interface DiscoveryStatus {
   available: string[];
   eligible: number;
   indexed: number;
+  indexReady: boolean;
+  indexedAt: string | null;
   job: Job;
   embeddingModel: string;
   decisionModel: string;

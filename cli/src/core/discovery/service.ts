@@ -16,15 +16,15 @@ import {
   GEMINI_ORIGIN,
   Gemini,
 } from "./gemini.ts";
-import { DiscoveryIndex } from "./index.ts";
+import { DiscoveryIndex, type IndexedSkill } from "./index.ts";
 import type { DiscoveryStatus, Handoff, Job, Message, Recommendation } from "./model.ts";
 import { type Receipt, Receipts } from "./receipts.ts";
-import { description, fingerprint, type Indexed, retrieve, type Skill } from "./retrieval.ts";
+import { description, fingerprint, retrieve, type Skill } from "./retrieval.ts";
 import { DiscoveryStore, type UsageEvent } from "./store.ts";
 
 /** CLI and UI share the same state and serialize writes through a per-home lease. */
 export class Discovery {
-  private index = new Map<string, Indexed>();
+  private index = new Map<string, IndexedSkill>();
   private readonly receipts: Receipts;
   private busy = false;
   private telemetryWarning = "";
@@ -52,7 +52,7 @@ export class Discovery {
     return new Gemini(stored.credential.value, this.send);
   }
   private async loadIndex(skills: Skill[]): Promise<void> {
-    const cached = await this.cache.read();
+    const { entries: cached } = await this.cache.read();
     this.index = new Map(
       skills.flatMap((skill) => {
         const entry = cached.get(fingerprint(skill));
@@ -60,7 +60,7 @@ export class Discovery {
       }),
     );
   }
-  async status(skills: Skill[]): Promise<DiscoveryStatus> {
+  async status(skills?: Skill[], available?: string[]): Promise<DiscoveryStatus> {
     const holder = await readHolder(
       leaseDir(
         { scope: "user", lock: join(ensureHome(this.env), DISCOVERY_OPERATION_LOCK) },
@@ -72,10 +72,13 @@ export class Discovery {
       (holder.host === hostname()
         ? processAlive(holder.pid)
         : Date.now() - holder.acquiredAtMs < 10 * 60_000);
-    const cached = await this.cache.read();
+    const snapshot = await this.cache.read();
+    const cached = snapshot.entries;
     const saved = await this.store.read();
     const credential = await readCredential(GEMINI_ACCOUNT_ID, this.env);
-    const eligible = skills.filter((s) => saved.registries.includes(s.registry));
+    const eligible = (skills ?? [...cached.values()].map((entry) => entry.skill)).filter((s) =>
+      saved.registries.includes(s.registry),
+    );
     return {
       busy: this.busy || held,
       connected: credential?.origin === GEMINI_ORIGIN && credential.credential.type === "apiKey",
@@ -83,7 +86,9 @@ export class Discovery {
       telemetry: saved.telemetry,
       telemetryWarning: this.telemetryWarning,
       events: saved.events,
-      available: [...new Set(skills.map((s) => s.registry))].sort(),
+      available: available ?? [...new Set((skills ?? eligible).map((s) => s.registry))].sort(),
+      indexReady: snapshot.complete && eligible.length > 0,
+      indexedAt: snapshot.updatedAt,
       eligible: eligible.length,
       indexed: eligible.filter((s) => cached.has(fingerprint(s))).length,
       job: this.job,
@@ -91,14 +96,14 @@ export class Discovery {
       decisionModel: DECISION_MODEL,
     };
   }
-  async setup(payload: Record<string, unknown>, skills: Skill[]): Promise<Message> {
+  async setup(payload: Record<string, unknown>, available: string[]): Promise<Message> {
     return this.exclusive(async () => {
       const registries = payload.registries;
       if (
         payload.consent !== true ||
         !Array.isArray(registries) ||
         registries.length === 0 ||
-        !registries.every((r) => typeof r === "string" && skills.some((s) => s.registry === r))
+        !registries.every((r) => typeof r === "string" && available.includes(r))
       ) {
         throw new DiscoveryError("Choose at least one registry and approve the Google data flow.");
       }
@@ -122,7 +127,12 @@ export class Discovery {
         await client.test();
       }
       await this.store.settings([...new Set(registries as string[])], payload.telemetry !== false);
-      await this.loadIndex(skills.filter((s) => registries.includes(s.registry)));
+      const previous = await this.cache.read();
+      await this.loadIndex(
+        [...previous.entries.values()]
+          .map((entry) => entry.skill)
+          .filter((s) => registries.includes(s.registry)),
+      );
       await this.cache.save(this.index.values());
       await this.receipts.save([]);
       this.job = { running: false, done: 0, total: 0, error: "" };
@@ -143,7 +153,10 @@ export class Discovery {
       };
     });
   }
-  async build(skills: Skill[], background = false): Promise<Message> {
+  async build(
+    source: Skill[] | ((registries: string[]) => Promise<Skill[]>),
+    background = false,
+  ): Promise<Message> {
     let ready: (() => void) | undefined;
     const started = new Promise<void>((resolve) => {
       ready = resolve;
@@ -151,6 +164,7 @@ export class Discovery {
     const task = this.exclusive(async () => {
       const saved = await this.store.read();
       const client = await this.connect();
+      const skills = typeof source === "function" ? await source(saved.registries) : source;
       const eligible = skills.filter((s) => saved.registries.includes(s.registry));
       if (!eligible.length)
         throw new DiscoveryError(
@@ -192,6 +206,7 @@ export class Discovery {
   private async indexAll(skills: Skill[], client: Gemini): Promise<void> {
     let changed = 0;
     try {
+      await this.cache.save(this.index.values(), false);
       const keep = new Set(skills.map((s) => s.key));
       for (const key of this.index.keys()) if (!keep.has(key)) this.index.delete(key);
       for (const skill of skills) {
@@ -199,6 +214,7 @@ export class Discovery {
         const hash = fingerprint(skill);
         if (this.index.get(skill.key)?.fingerprint !== hash) {
           this.index.set(skill.key, {
+            skill,
             fingerprint: hash,
             vector: await client.embed(description(skill)),
           });
@@ -214,16 +230,21 @@ export class Discovery {
       this.job.error = safeError(error);
     } finally {
       try {
-        await this.cache.save(this.index.values());
+        await this.cache.save(
+          this.index.values(),
+          !this.job.error && !this.stopping && this.job.done === this.job.total,
+        );
       } catch (error) {
         this.job.error = safeError(error);
       }
       this.job.running = false;
     }
   }
-  async search(payload: Record<string, unknown>, skills: Skill[]): Promise<Recommendation> {
+  async search(payload: Record<string, unknown>): Promise<Recommendation> {
     return this.exclusive(async () => {
-      await this.loadIndex(skills);
+      const snapshot = await this.cache.read();
+      const skills = [...snapshot.entries.values()].map((entry) => entry.skill);
+      this.index = new Map([...snapshot.entries.values()].map((entry) => [entry.skill.key, entry]));
       const query = payload.query;
       if (typeof query !== "string" || query.trim().length < 3 || query.length > 2000) {
         throw new DiscoveryError("Describe your task in 3–2,000 characters.");
@@ -231,11 +252,12 @@ export class Discovery {
       const saved = await this.store.read();
       const eligible = skills.filter((s) => saved.registries.includes(s.registry));
       if (
+        !snapshot.complete ||
         !eligible.length ||
         eligible.some((s) => this.index.get(s.key)?.fingerprint !== fingerprint(s))
       ) {
         throw new DiscoveryError(
-          "Build or refresh the index before searching. The selected catalog has changed.",
+          "Build or refresh the index before searching. The saved index is missing or incomplete.",
         );
       }
       const requestId = randomUUID();
@@ -319,15 +341,23 @@ export class Discovery {
       }
     });
   }
-  async handoff(payload: Record<string, unknown>, skills: Skill[]): Promise<Handoff> {
+  async handoff(
+    payload: Record<string, unknown>,
+    resolve: (skill: Skill) => Promise<Skill | undefined>,
+  ): Promise<Handoff> {
     return this.exclusive(async () => {
       const result = await this.result(payload);
       const saved = await this.store.read();
       const skill = result.skill;
+      const indexed = (await this.cache.read()).entries.get(result.fingerprint)?.skill;
+      const current =
+        indexed && saved.registries.includes(indexed.registry) ? await resolve(indexed) : undefined;
       if (
         !skill ||
         !saved.registries.includes(skill.registry) ||
-        !skills.some((s) => s.key === skill.key && fingerprint(s) === result.fingerprint)
+        !current ||
+        current.key !== skill.key ||
+        fingerprint(current) !== result.fingerprint
       ) {
         throw new DiscoveryError(
           "This recommendation is stale. Search again before creating a handoff.",

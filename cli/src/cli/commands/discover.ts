@@ -1,9 +1,7 @@
 import { isRecord } from "#adapter/fields.ts";
-import { Catalogs } from "#cli/catalog/registries.ts";
-import { CatalogReader } from "#cli/catalog/state.ts";
 import type { DiscoverResult } from "#cli/commands/discover/result.ts";
 import { DISCOVER_COMMAND } from "#cli/commands/discover/spec.ts";
-import { discoverySkills } from "#cli/discovery/catalog.ts";
+import { discoveryCatalog } from "#cli/discovery/catalog.ts";
 import { parse } from "#cli/options/parse.ts";
 import { discover } from "#core/discovery/actions.ts";
 import { Discovery, safeError } from "#core/discovery/service.ts";
@@ -59,9 +57,8 @@ export const { run } = defineCommand({
           outcome: args[1],
           enabled: args[0] === "on",
         };
-    const reader = new CatalogReader(context, new Catalogs(context, true));
     try {
-      return await discover(new Discovery(), action, payload, () => discoverySkills(reader));
+      return await discover(new Discovery(), action, payload, discoveryCatalog(context));
     } catch (error) {
       throw new AiregError(safeError(error), { code: ErrorCode.Invalid });
     }
