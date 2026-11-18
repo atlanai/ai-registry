@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { expect } from "vitest";
 import { gitRegistry } from "#test/kit/builders/registry.ts";
 import { test } from "#test/kit/fixtures.ts";
@@ -35,5 +35,33 @@ test.skipIf(process.platform === "win32")(
     expect(existsSync(home.aireg)).toBe(false);
     expect(existsSync(home.scope)).toBe(false);
     expect(await readFile(join(home.dir, ".profile"), "utf8")).toBe("export EDITOR=vi\n");
+  },
+);
+
+test.skipIf(process.platform === "win32")(
+  "self uninstall leaves a folder of yours that replaced a link",
+  async ({ aireg, git, home, tmp }) => {
+    const repo = await gitRegistry(git, join(tmp, "kit"));
+    const stubs = join(tmp, "service-managers");
+    await mkdir(join(home.dir, ".claude"), { recursive: true });
+    await mkdir(stubs, { recursive: true });
+    for (const name of ["launchctl", "systemctl"]) {
+      await writeFile(join(stubs, name), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    }
+    const away = { cwd: home.dir, env: { PATH: `${stubs}:${process.env.PATH}` } };
+    const added = await aireg(["add", `file://${repo}@v1`, "--select", "lint", "-g"], away);
+    expect(added.code, added.stderr).toBe(0);
+    const folder = dirname(projected(home.dir, "lint"));
+    const mine = "---\nname: lint\ndescription: My own rules.\n---\n";
+    await unlink(folder);
+    await mkdir(folder);
+    await writeFile(join(folder, "SKILL.md"), mine);
+
+    const removed = await aireg(["self", "uninstall", "-y"], away);
+
+    expect(removed.code, removed.stderr).toBe(0);
+    expect(await readFile(join(folder, "SKILL.md"), "utf8")).toBe(mine);
+    expect(removed.stdout).toMatch(/Kept .*lint/);
+    expect(existsSync(home.scope)).toBe(false);
   },
 );

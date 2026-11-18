@@ -13,6 +13,7 @@ import { readManifest } from "#core/manifest/repository.ts";
 import { fetchFrom } from "#core/plan/acquire/sources.ts";
 import { apply } from "#core/plan/apply/apply.ts";
 import { recover } from "#core/plan/apply/journal.ts";
+import { guardsOf } from "#core/plan/apply/link.ts";
 import { build } from "#core/plan/build/build.ts";
 import type { Plan } from "#core/plan/model.ts";
 import { spawnDetached } from "#core/process.ts";
@@ -28,7 +29,10 @@ export interface Footprint {
   links: string[];
   startupFiles: string[];
   folders: string[];
-  /** Left in place: a CLI aireg did not install, or a folder that holds your home. */
+  /**
+   * Left in place: a CLI aireg did not install, a folder that holds your home, or a folder of
+   * yours where aireg's link was.
+   */
   kept: string[];
 }
 
@@ -36,11 +40,12 @@ export async function footprint(env: NodeJS.ProcessEnv = process.env): Promise<F
   const { folders: own, kept } = folders(env);
   const entry = runningEntry();
   if (entry !== undefined && !isWithin(toolHome(env), canonical(entry))) kept.push(entry);
+  const { plan, yours } = await teardownPlan(roots("user", homeDir(env), env), env);
   return {
-    links: linksOf(await teardownPlan(roots("user", homeDir(env), env), env), env),
+    links: linksOf(plan, env),
     startupFiles: await onPathIn(env),
     folders: own,
-    kept,
+    kept: [...kept, ...yours],
   };
 }
 
@@ -62,16 +67,31 @@ function linksOf(plan: Plan, env: NodeJS.ProcessEnv): string[] {
   );
 }
 
-/** With nothing declared every row is stale, so the planner unlinks all of them. */
-async function teardownPlan(scope: Roots, env: NodeJS.ProcessEnv): Promise<Plan> {
+/**
+ * With nothing declared every row is stale, so the planner unlinks all of them. A folder of yours
+ * that replaced a link stays where it is, since the backup `unlink` makes of it would be deleted
+ * with the scope's folder.
+ */
+async function teardownPlan(
+  scope: Roots,
+  env: NodeJS.ProcessEnv,
+): Promise<{ plan: Plan; yours: string[] }> {
   const manifest = await readManifest(scope.manifest);
-  return build(
+  const plan = await build(
     { ...manifest, artifacts: [], registries: dict() },
     await readLock(scope),
     [],
     { artifacts: dict() },
     { roots: scope, env, targets: [], targetTable: resolveTargets(env), force: false, copy: false },
   );
+  const guards = await guardsOf(plan, { roots: scope, env });
+  const yours = plan.actions.flatMap((action) =>
+    action.kind === "unlink" && guards.get(action.to) === "backup" ? [action.to] : [],
+  );
+  const actions = plan.actions.filter(
+    (action) => action.kind !== "unlink" || !yours.includes(action.to),
+  );
+  return { plan: { ...plan, actions }, yours };
 }
 
 /** Under the scope's lease, so no job writes beside it. */
@@ -80,7 +100,7 @@ export async function unlinkUserScope(env: NodeJS.ProcessEnv): Promise<string[]>
   return withLease(scope, { wait: true }, async () => {
     // A run that crashed may have linked paths the lock never recorded.
     await recover(scope, await readLock(scope), env);
-    const plan = await teardownPlan(scope, env);
+    const { plan } = await teardownPlan(scope, env);
     await apply({ plan, roots: scope, fetch: fetchFrom([]), env });
     return linksOf(plan, env);
   });
