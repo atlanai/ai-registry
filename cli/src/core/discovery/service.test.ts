@@ -378,3 +378,18 @@ test("a checkpoint write failure releases indexing state for retry", async ({ tm
   await service.build(skills);
   expect((await service.status()).indexReady).toBe(true);
 });
+
+test("refresh removes the final deleted skill rather than leaving an old recommendation searchable", async ({
+  tmp,
+}) => {
+  const service = new Discovery({ AIREG_HOME: tmp }, provider());
+  await service.setup(setup, available);
+  await service.build(skills);
+  const result = await service.search({ query: "recap notes" });
+  await service.build([]);
+  expect(await service.status()).toMatchObject({ indexed: 0, indexReady: false });
+  await expect(service.search({ query: "recap notes" })).rejects.toThrow("Build or refresh");
+  const check = vi.fn(resolve);
+  await expect(service.handoff(result, check)).rejects.toThrow("stale");
+  expect(check).not.toHaveBeenCalled();
+});

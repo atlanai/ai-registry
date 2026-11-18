@@ -166,10 +166,12 @@ export class Discovery {
       const client = await this.connect();
       const skills = typeof source === "function" ? await source(saved.registries) : source;
       const eligible = skills.filter((s) => saved.registries.includes(s.registry));
-      if (!eligible.length)
-        throw new DiscoveryError(
-          "No skills in the selected registries. Check the catalog and Setup.",
-        );
+      if (!eligible.length) {
+        this.index.clear();
+        await this.cache.save([], true);
+        this.job = { running: false, done: 0, total: 0, error: "" };
+        return { message: "The index is empty. Add skills to the selected sources, then refresh." };
+      }
       if (eligible.length > 500)
         throw new DiscoveryError(
           "This preview supports up to 500 skills. Select fewer registries.",

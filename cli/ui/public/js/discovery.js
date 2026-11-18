@@ -61,9 +61,9 @@ function renderStatus() {
   get("discoveryStopButton").disabled = !s.job.running;
   get("discoveryIndexButton").disabled = running || !s.connected || s.job.running || s.busy;
   get("discoveryDisconnect").disabled = running || !s.connected || s.job.running || s.busy;
-  let indexStatus = `${s.indexed} embeddings saved. Build / refresh the index to search.`;
+  let indexStatus = `Saved embeddings: ${s.indexed}. Build / refresh the index to search.`;
   if (s.indexReady)
-    indexStatus = `${s.indexed} skills indexed · Updated ${new Date(s.indexedAt).toLocaleString()}`;
+    indexStatus = `Indexed skills: ${s.indexed} · Updated ${new Date(s.indexedAt).toLocaleString()}`;
   if (s.job.running) indexStatus = `Indexing ${s.job.done} of ${s.job.total} skills…`;
   get("discoveryIndexStatus").textContent = s.job.error || indexStatus;
   get("discoveryProgress").max = s.job.total || s.eligible || 1;
