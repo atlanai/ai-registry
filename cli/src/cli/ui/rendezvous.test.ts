@@ -31,30 +31,33 @@ homeTest("launcher identity is reused and a corrupt key is refused", async ({ tm
   await expect(launcherKey(tmp)).rejects.toThrow("invalid");
 });
 
-homeTest("launcher refuses a public file swapped in after the pathname check", async ({ tmp }) => {
-  if (process.platform === "win32") return;
-  const path = join(tmp, UI_KEY_FILE);
-  const original = Buffer.alloc(32, 1);
-  await writeFile(path, original, { mode: 0o600 });
-  const lstat = fs.lstat;
-  // Reproduce a swap between the old pathname-based permission check and read.
-  const spy = vi
-    .spyOn(fs, "lstat")
-    .mockImplementation(async (...args: Parameters<typeof fs.lstat>) => {
-      const info = await lstat(...args);
-      if (args[0] === path) {
-        await rename(path, `${path}-original`);
-        await writeFile(path, Buffer.alloc(32, 2), { mode: 0o644 });
-        await chmod(path, 0o644);
-      }
-      return info;
-    });
-  try {
-    await expect(launcherKey(tmp)).rejects.toThrow("not private");
-  } finally {
-    spy.mockRestore();
-  }
-});
+homeTest(
+  "launcher reads the validated handle even when its pathname is replaced",
+  async ({ tmp }) => {
+    if (process.platform === "win32") return;
+    const path = join(tmp, UI_KEY_FILE);
+    const original = Buffer.alloc(32, 1);
+    await writeFile(path, original, { mode: 0o600 });
+    const lstat = fs.lstat;
+    // Reproduce a swap between the old pathname-based permission check and read.
+    const spy = vi
+      .spyOn(fs, "lstat")
+      .mockImplementation(async (...args: Parameters<typeof fs.lstat>) => {
+        const info = await lstat(...args);
+        if (args[0] === path) {
+          await rename(path, `${path}-original`);
+          await writeFile(path, Buffer.alloc(32, 2), { mode: 0o644 });
+          await chmod(path, 0o644);
+        }
+        return info;
+      });
+    try {
+      expect(await launcherKey(tmp)).toEqual(original);
+    } finally {
+      spy.mockRestore();
+    }
+  },
+);
 
 homeTest("launcher rejects a symlink or broadly readable key", async ({ tmp }) => {
   if (process.platform === "win32") return;

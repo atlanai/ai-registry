@@ -1,5 +1,4 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { constants } from "node:fs";
 import { lstat, open, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { UI_KEY_FILE } from "#core/product.ts";
@@ -12,13 +11,16 @@ export async function launcherKey(folder: string): Promise<Buffer> {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
-  if ((await lstat(path)).isSymbolicLink()) throw new Error("The UI launcher key is not private.");
   // Inspect and read the same open file; a pathname swap cannot bypass the checks.
-  const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  const handle = await open(path, "r");
   try {
     const info = await handle.stat();
+    const named = await lstat(path);
     if (
       !info.isFile() ||
+      named.isSymbolicLink() ||
+      named.dev !== info.dev ||
+      named.ino !== info.ino ||
       (process.platform !== "win32" &&
         (info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0))
     ) {
