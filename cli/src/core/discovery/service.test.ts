@@ -390,6 +390,6 @@ test("refresh removes the final deleted skill rather than leaving an old recomme
   expect(await service.status()).toMatchObject({ indexed: 0, indexReady: false });
   await expect(service.search({ query: "recap notes" })).rejects.toThrow("Build or refresh");
   const check = vi.fn(resolve);
-  await expect(service.handoff(result, check)).rejects.toThrow("stale");
+  await expect(service.handoff({ requestId: result.requestId }, check)).rejects.toThrow("stale");
   expect(check).not.toHaveBeenCalled();
 });
