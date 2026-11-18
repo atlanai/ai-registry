@@ -12,7 +12,7 @@ export async function launcherKey(folder: string): Promise<Buffer> {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
   // Inspect and read the same open file; a pathname swap cannot bypass the checks.
-  const handle = await open(path, "r");
+  const handle = await open(path, "r", 0o600);
   try {
     const info = await handle.stat();
     const named = await lstat(path);
