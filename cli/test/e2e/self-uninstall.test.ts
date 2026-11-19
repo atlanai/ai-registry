@@ -57,13 +57,17 @@ test.skipIf(process.platform === "win32")(
     await mkdir(folder);
     await writeFile(join(folder, "SKILL.md"), mine);
 
+    const planned = await aireg(["self", "uninstall", "--dry-run", "--json"], away);
+    expect(planned.code, planned.stderr).toBe(0);
+    const shown = relative(home.dir, folder);
+    const { data } = JSON.parse(planned.stdout);
+    expect(data.links.some((path: string) => path.endsWith(shown))).toBe(false);
+    expect(data.kept.some((path: string) => path.endsWith(shown))).toBe(true);
     const removed = await aireg(["self", "uninstall", "-y"], away);
 
     expect(removed.code, removed.stderr).toBe(0);
     expect(await readFile(join(folder, "SKILL.md"), "utf8")).toBe(mine);
-    expect(removed.stdout).toContain(
-      `Kept ~/${relative(home.dir, folder)}, since aireg did not put it there.`,
-    );
+    expect(removed.stdout).toContain(`Kept ~/${shown}, since aireg did not put it there.`);
     expect(existsSync(home.scope)).toBe(false);
   },
 );

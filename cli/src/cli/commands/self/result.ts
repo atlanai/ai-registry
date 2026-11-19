@@ -24,6 +24,9 @@ export interface SelfUninstall {
   links: string[];
   startupFiles: string[];
   folders: string[];
-  /** Left in place: a CLI aireg did not install, or a folder that holds your home. */
+  /**
+   * Left in place: a CLI aireg did not install, a folder that holds your home, or a folder of
+   * yours where aireg's link was.
+   */
   kept: string[];
 }
