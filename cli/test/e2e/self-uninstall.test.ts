@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { expect } from "vitest";
 import { gitRegistry } from "#test/kit/builders/registry.ts";
 import { test } from "#test/kit/fixtures.ts";
@@ -61,7 +61,9 @@ test.skipIf(process.platform === "win32")(
 
     expect(removed.code, removed.stderr).toBe(0);
     expect(await readFile(join(folder, "SKILL.md"), "utf8")).toBe(mine);
-    expect(removed.stdout).toMatch(/Kept .*lint/);
+    expect(removed.stdout).toContain(
+      `Kept ~/${relative(home.dir, folder)}, since aireg did not put it there.`,
+    );
     expect(existsSync(home.scope)).toBe(false);
   },
 );

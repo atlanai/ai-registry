@@ -69,8 +69,7 @@ function linksOf(plan: Plan, env: NodeJS.ProcessEnv): string[] {
 
 /**
  * With nothing declared every row is stale, so the planner unlinks all of them. A folder of yours
- * that replaced a link stays where it is, since the backup `unlink` makes of it would be deleted
- * with the scope's folder.
+ * that replaced a link stays put, since `unlink` would back it up into the folder uninstall deletes.
  */
 async function teardownPlan(
   scope: Roots,

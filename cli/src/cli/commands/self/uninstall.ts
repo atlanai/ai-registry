@@ -141,7 +141,7 @@ function report(printer: Printer, done: Found): void {
   }
   if (done.folders.length > 0) printer.success(`Deleted ${list(done.folders.map(underHome))}.`);
   for (const path of done.kept) {
-    printer.info(`Kept ${underHome(path)}, since aireg's installer did not put it there.`);
+    printer.info(`Kept ${underHome(path)}, since aireg did not put it there.`);
   }
   printer.success("Uninstalled aireg.");
   printer.info(
