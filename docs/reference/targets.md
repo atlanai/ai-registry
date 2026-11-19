@@ -67,7 +67,7 @@ With `GEMINI_CLI_HOME` set, Gemini CLI reads `.agents/skills` inside that folder
 
 Google Antigravity covers its App, IDE and CLI, which share `~/.gemini/config`. aireg writes its skills as copies, and its agents only in your user scope, since a project's `.agents/agents` holds other tools' agents.
 
-Hermes Agent reads a project's skills only at its repository root, once you run `hermes skills trust`, and your own skills only from `~/.hermes/skills`, not `~/.agents/skills`. It improves your own skills as it learns, which it can do only to real files, so aireg writes its skills as copies. aireg then leaves an improved skill as it is, through `aireg update` too, and `aireg status` shows it as edited. To keep the improvement, publish the copy by its path, such as `aireg publish ~/.hermes/skills/pr-review --to acme/engineering -g`, then run `aireg install -g --force` and `aireg update -g`. On Windows, where its folder is `%LOCALAPPDATA%\hermes`, set `HERMES_HOME`.
+Hermes Agent reads a project's skills only at its repository root, once you run `hermes skills trust`, and your own skills only from `~/.hermes/skills`, not `~/.agents/skills`. aireg links its skills, so they change only when their registry publishes a new version and `aireg update` takes it. Hermes improves the skills it finds in its own folders as it learns, but it does not find a linked one, so it leaves the skills aireg installs as published. To change one, publish a new version to its registry. On Windows, where its folder is `%LOCALAPPDATA%\hermes`, set `HERMES_HOME`.
 
 When a target's own folder is a shared folder's, as Antigravity's and Hermes Agent's `.agents/skills` is in a project, aireg writes that folder once for both, as copies if either takes copies.
 

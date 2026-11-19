@@ -17,12 +17,11 @@ export const hermesAgent = defineTarget({
   kinds: {
     // Its plugins are Python it runs, which a registry's plugin never is.
     plugin: { shape: "contents" },
-    // It improves a skill as it learns, but its tools cannot find one in a linked folder.
+    // Linked, so its tools, which cannot find a skill in a linked folder, never edit one.
     // It reads no key that keeps a skill for a person, so one that sets it is left out.
     skill: {
       shape: "directory",
       subdir: "skills",
-      place: "copy",
       keys: { "disable-model-invocation": false },
     },
   },

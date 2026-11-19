@@ -13,7 +13,6 @@
     "skill": {
       "shape": "directory",
       "subdir": "skills",
-      "place": "copy",
       "keys": { "disable-model-invocation": false }
     }
   },
