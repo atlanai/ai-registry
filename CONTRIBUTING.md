@@ -57,6 +57,8 @@ pnpm run verify       # the CLI checks CI runs
 
 The schemas in `cli/schema/` are generated. Edit the definitions under `cli/scripts/schema/`, then run `pnpm run schema`. A test fails if they drift.
 
+`cli/src/cli/ui/assets.ts` is generated from the page in `cli/ui/public/`. After changing the page, run `pnpm run ui`; `pnpm run verify` runs `pnpm run ui --check`, which fails on a stale module.
+
 `THIRD_PARTY_NOTICES.txt` is generated too. After changing production dependencies or the Bun version, run `pnpm run notices`. CI runs `pnpm run notices --check`, which fails on a stale file or a license outside the allowlist.
 
 Add a test that fails without your change and passes with it, written against the public interface.

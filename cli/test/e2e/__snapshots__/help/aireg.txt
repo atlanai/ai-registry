@@ -30,6 +30,7 @@ Install:
 
 Check:
   console   Open a full-screen view of installed artifacts, jobs and registries
+  ui        Browse your registries and what is installed, in your browser
   status    Check installed artifacts against the lockfile, and list the ones nothing manages
   list      List what is installed
   outdated  Check each registry for newer versions of what is installed

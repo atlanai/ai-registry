@@ -77,3 +77,9 @@ export const DAEMON_FLAG = "--internal-daemon";
 export const UPDATE_CHECK_FLAG = "--internal-update-check";
 export const REMOVE_AFTER_FLAG = "--internal-remove-after";
 export const TELEMETRY_FLAG = "--internal-telemetry";
+
+/** UI launcher defaults and private local rendezvous names; no installation behavior. */
+export const UI_DEFAULT_PORT = 3456;
+export const UI_RUNTIME_PREFIX = `${NAME}-ui`;
+export const UI_SOCKET_FILE = "launcher.sock";
+export const UI_KEY_FILE = "launcher.key";
