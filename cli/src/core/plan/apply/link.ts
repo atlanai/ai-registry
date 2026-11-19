@@ -27,6 +27,7 @@ import type {
   RunInputs,
   Unrendered,
 } from "./run.ts";
+import { nameTaken } from "./same-name.ts";
 
 /** Refuses the entire plan before journaling or starting any fetch. */
 export async function preflight(
@@ -114,6 +115,8 @@ export async function linkInto(run: Run, action: ActionOf<"link">): Promise<Link
     if (action.adopt === true) return adoptOrKeep(action);
     return { kept: { name: action.name, path: action.to } };
   }
+  const taken = await nameTaken(action);
+  if (taken !== undefined) return taken;
   // Assembled here, before the link that will read it.
   const plugin = await assemblePlugin(run.inputs, action, run.results.plugins.get(action.from));
   const linked = await placeLink(run.inputs, action, rendered, guard);

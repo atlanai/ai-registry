@@ -5,7 +5,9 @@ import type { Lock } from "#core/lock.ts";
 import { formatManifest } from "#core/manifest/format.ts";
 import { writeManifest } from "#core/manifest/repository.ts";
 import { guardsOf } from "#core/plan/apply/link.ts";
+import type { LinkGuard } from "#core/plan/apply/link-guard.ts";
 import type { ApplyResult } from "#core/plan/apply/run.ts";
+import { nameTaken } from "#core/plan/apply/same-name.ts";
 import type { Action, Plan } from "#core/plan/model.ts";
 import type { Roots, Scope } from "#core/store/paths.ts";
 import type { Targets } from "#core/target/contract.ts";
@@ -13,7 +15,7 @@ import type { Printer } from "#core/term/printer.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { type Loaded, read, withScope } from "#engine/scope/load.ts";
 import { commit, lockUnchanged, prepareWrite, restore } from "./commit.ts";
-import { appliedNotices, keptMessage, recoveredNotices, warn } from "./notices.ts";
+import { appliedNotices, keptMessage, reasonMessage, recoveredNotices, warn } from "./notices.ts";
 import { closeAll, plan } from "./plan.ts";
 import {
   keptLines,
@@ -144,11 +146,7 @@ async function write(
       const aside = new Set(
         [...guards].flatMap(([path, guard]) => (guard === "backup" ? [path] : [])),
       );
-      // Said before the run, so an agent can move a person's folder out of the way first.
-      for (const action of planned.actions) {
-        if (action.kind === "link" && guards.get(action.to) === "keep")
-          printer.warning(keptMessage(roots, action.name, action.to, "Would not"));
-      }
+      await warnKept(planned, guards, roots, printer);
       report.plan(planned, roots, aside, chosen);
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
       refuseUnlisted(planned.unlisted, printer, undefined);
@@ -193,5 +191,24 @@ async function write(
     return result(applied);
   } finally {
     await closeAll(acquired);
+  }
+}
+
+/** Said before the run, so an agent can move a person's folder out of the way first. */
+async function warnKept(
+  planned: Plan,
+  guards: Map<string, LinkGuard>,
+  roots: Roots,
+  printer: Printer,
+): Promise<void> {
+  for (const action of planned.actions) {
+    if (action.kind !== "link") continue;
+    if (guards.get(action.to) === "keep") {
+      printer.warning(keptMessage(roots, action.name, action.to, "Would not"));
+      continue;
+    }
+    const reason = (await nameTaken(action))?.kept?.reason;
+    if (reason !== undefined)
+      printer.warning(reasonMessage(roots, action.name, action.to, reason, "Would not"));
   }
 }

@@ -53,6 +53,11 @@
                 "copy"
               ]
             },
+            "nested": {
+              "description": "The target finds this kind at any depth below subdir and loads neither of two sharing a name.",
+              "const": true,
+              "type": "boolean"
+            },
             "entry": {
               "minLength": 1,
               "type": "string"

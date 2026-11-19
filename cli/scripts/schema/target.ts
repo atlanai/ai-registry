@@ -111,6 +111,12 @@ const KindMapping = tagged(
         subdir: Text,
         scope: Scope,
         place: Type.Optional(choice("link", "fan", "copy")),
+        nested: Type.Optional(
+          Type.Literal(true, {
+            description:
+              "The target finds this kind at any depth below subdir and loads neither of two sharing a name.",
+          }),
+        ),
         entry: Type.Optional(Text),
         manifest: Type.Optional(Type.Array(Manifest)),
         register: Type.Optional(Type.Array(ref("register"))),

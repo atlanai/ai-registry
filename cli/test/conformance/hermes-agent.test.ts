@@ -1,9 +1,8 @@
 import { conformance } from "#test/conformance/kit.ts";
 
 // `hermes skills list` prints each skill it loaded and where from, and needs no sign-in. A git
-// install's launcher finds its packages under the home it was installed into, so it will not start
-// with the sandbox's `HERMES_HOME`; run this with a PyPI install's `hermes`, or the install's own
-// dependency environment's, on PATH.
+// install's launcher prepares dependencies per home and won't start fast in the sandbox, and PyPI
+// stops at 0.19, so put a `hermes` on PATH that runs `python -m hermes_cli.main` from a checkout.
 const list = ["hermes", "skills", "list"];
 
 conformance({

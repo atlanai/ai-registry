@@ -43,6 +43,8 @@ export interface PlannedLink {
   entry?: string;
   /** Written as a real copy, for a target that rewrites or refuses links. */
   copy?: boolean;
+  /** Refused while the target already finds a skill of this name deeper in the folder. */
+  nested?: boolean;
   command?: string;
   document?: PluginDocument;
   part?: ArtifactKind;
@@ -351,6 +353,7 @@ function plannedLink(
     ...(mapping?.codec === undefined ? {} : { codec: mapping.codec }),
     ...(mapping?.entry === undefined ? {} : { entry: mapping.entry }),
     ...(mapping?.place === "copy" ? { copy: true } : {}),
+    ...(mapping?.nested === true ? { nested: true } : {}),
   };
 }
 

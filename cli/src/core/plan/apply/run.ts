@@ -83,6 +83,8 @@ export interface RunResults {
   copiedPlugins: Map<string, ActionOf<"link">>;
   /** Links not made, by `linkKey`; the lock leaves them out. */
   skipped: Set<string>;
+  /** What is in the way of a link not made, by `linkKey`, when it is not at the link's path. */
+  blockers: Map<string, string>;
   unstaged: Map<string, Unstaged>;
   performed: Performed;
   installed: Set<string>;
@@ -121,6 +123,7 @@ export function startRun(inputs: RunInputs, guards: Map<string, LinkGuard>): Run
       fanned: new Map(),
       copiedPlugins: new Map(),
       skipped: new Set(),
+      blockers: new Map(),
       unstaged: new Map(),
       performed: { stage: 0, clone: 0, link: 0, unlink: 0 },
       installed: new Set(),
@@ -171,6 +174,8 @@ export interface Linked {
   plugin?: PluginSource;
   backedUp?: BackedUp;
   kept?: Kept;
+  /** What is in the way of `kept`, when it is not at its path. */
+  blocker?: string;
   adopted?: Adopted;
   unrendered?: Unrendered;
 }
@@ -183,6 +188,7 @@ export function addLinked(results: RunResults, action: ActionOf<"link">, linked:
     results.guards.set(action.to, "replace");
   }
   if (linked.kept !== undefined) results.kept.push(linked.kept);
+  if (linked.blocker !== undefined) results.blockers.set(key, linked.blocker);
   if (linked.unrendered !== undefined) results.unrendered.push(linked.unrendered);
   const { made } = linked;
   if (made === undefined) {
