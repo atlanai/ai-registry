@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect } from "vitest";
@@ -357,6 +357,20 @@ describe("validateRoot against a base", () => {
     expect(problems).toContainEqual({
       path: `${LINT}/versions.json`,
       message: "is missing, but 1.1.0 was released",
+      fix: `git checkout ${base} -- ${LINT}; ${WITHDRAW}`,
+    });
+  });
+
+  test("refuses to move a released artifact to another namespace", async ({ root, git }) => {
+    const base = await released(root, git);
+    await mkdir(join(root, "artifacts/platform/skill"), { recursive: true });
+    await rename(join(root, LINT), join(root, "artifacts/platform/skill/lint"));
+    // Staged, so git pairs the old and new paths as a rename, as it does in a pull request.
+    await git(root, "add", "-A");
+
+    expect((await validateRoot(root, { base })).problems).toContainEqual({
+      path: `${LINT}/versions.json`,
+      message: "is missing, but 1.0.0 was released",
       fix: `git checkout ${base} -- ${LINT}; ${WITHDRAW}`,
     });
   });
