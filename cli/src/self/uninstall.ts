@@ -82,10 +82,7 @@ interface Teardown {
   fanned: string[];
 }
 
-/**
- * With nothing declared every row is stale, so the planner unlinks all of them. Nothing of yours
- * goes to `unlink`, which would back it up into the folder uninstall deletes.
- */
+/** Unlinks every row, stale with nothing declared, except yours: `unlink` backs up into the scope. */
 async function teardownPlan(scope: Roots, env: NodeJS.ProcessEnv): Promise<Teardown> {
   const manifest = await readManifest(scope.manifest);
   const plan = await build(

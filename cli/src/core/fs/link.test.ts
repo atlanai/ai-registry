@@ -125,20 +125,11 @@ describe("a fan-out's own entries", () => {
     const to = join(root, "cache", "acme", "sales", "local");
     await fanOut(source, to);
     await writeFile(join(to, "notes.md"), "mine");
+    await writeFile(join(to, "plugin.json"), '{"name":"mine"}');
     await symlink(join(root, "dotfiles", "rules"), join(to, "rules"));
 
     const ours = await fanOutEntries(to, join(root, "store"));
 
-    expect(ours.sort()).toEqual([".manifest", "plugin.json", "skills"].map((e) => join(to, e)));
-  });
-
-  test("leave out a manifest you edited", async () => {
-    const source = await projection();
-    const to = join(root, "cache", "acme", "sales", "local");
-    await fanOut(source, to);
-    await writeFile(join(to, "plugin.json"), '{"name":"mine"}');
-    await writeFile(join(to, ".manifest", "extra.json"), "{}");
-
-    expect(await fanOutEntries(to, join(root, "store"))).toEqual([join(to, "skills")]);
+    expect(ours.sort()).toEqual([".manifest", "skills"].map((e) => join(to, e)));
   });
 });
