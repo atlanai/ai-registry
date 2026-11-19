@@ -10,6 +10,9 @@ import {
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { ifPresent, ifReadable, isAbsent } from "#adapter/files.ts";
+import { isWithin } from "#adapter/paths.ts";
+import { digest } from "#core/fs/digest.ts";
+import { canonical } from "#core/fs/realpath.ts";
 import { copyInto, isDirectory, remove } from "#core/fs/tree.ts";
 import type { LinkMode } from "#core/lock.ts";
 
@@ -147,6 +150,38 @@ export interface LinkState {
   isLink: boolean;
   /** Absolute, resolved against the link's own directory. */
   target: string | undefined;
+}
+
+/** aireg's entries in a fan-out: links into `store`, and copies that still match their source. */
+export async function fanOutEntries(dir: string, store: string): Promise<string[]> {
+  const entries = (await ifPresent(readdir(dir))) ?? [];
+  const ours: string[] = [];
+  const copies: string[] = [];
+  let source: string | undefined;
+  for (const entry of entries) {
+    const at = join(dir, entry);
+    const raw = await readlink(at).catch(() => undefined);
+    if (raw === undefined) {
+      copies.push(entry);
+      continue;
+    }
+    const target = isAbsolute(raw) ? raw : resolve(dir, raw);
+    if (!isWithin(canonical(store), canonical(target))) continue;
+    source ??= dirname(target);
+    ours.push(at);
+  }
+  if (source === undefined) return ours;
+  for (const entry of copies) {
+    if (await sameCopy(join(source, entry), join(dir, entry))) ours.push(join(dir, entry));
+  }
+  return ours;
+}
+
+async function sameCopy(source: string, copy: string): Promise<boolean> {
+  const info = await ifPresent(lstat(copy));
+  if (info?.isDirectory() !== true) return sameFile(source, copy);
+  if (!(await isDirectory(source))) return false;
+  return (await digest(source)) === (await digest(copy));
 }
 
 /** Every link points at the same-named entry of one directory, as every copied manifest is. */

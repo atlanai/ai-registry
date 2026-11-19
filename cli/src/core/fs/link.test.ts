@@ -11,7 +11,7 @@ import {
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
-import { fanOut, inspect } from "./link.ts";
+import { fanOut, fanOutEntries, inspect } from "./link.ts";
 
 let root: string;
 
@@ -116,5 +116,29 @@ describe("fan-out links", () => {
     const empty = join(root, "empty");
     await mkdir(empty);
     expect((await inspect(empty)).isLink).toBe(false);
+  });
+});
+
+describe("a fan-out's own entries", () => {
+  test("are its links into the store and the copies that still match", async () => {
+    const source = await projection();
+    const to = join(root, "cache", "acme", "sales", "local");
+    await fanOut(source, to);
+    await writeFile(join(to, "notes.md"), "mine");
+    await symlink(join(root, "dotfiles", "rules"), join(to, "rules"));
+
+    const ours = await fanOutEntries(to, join(root, "store"));
+
+    expect(ours.sort()).toEqual([".manifest", "plugin.json", "skills"].map((e) => join(to, e)));
+  });
+
+  test("leave out a manifest you edited", async () => {
+    const source = await projection();
+    const to = join(root, "cache", "acme", "sales", "local");
+    await fanOut(source, to);
+    await writeFile(join(to, "plugin.json"), '{"name":"mine"}');
+    await writeFile(join(to, ".manifest", "extra.json"), "{}");
+
+    expect(await fanOutEntries(to, join(root, "store"))).toEqual([join(to, "skills")]);
   });
 });

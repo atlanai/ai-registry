@@ -1,10 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, rename } from "node:fs/promises";
+import { copyFile, lstat, mkdir, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { ifPresent } from "#adapter/files.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { dict } from "#core/fields.ts";
+import { fanOutEntries } from "#core/fs/link.ts";
 import { homeDir } from "#core/fs/path.ts";
 import { canonical } from "#core/fs/realpath.ts";
 import { withLease } from "#core/lease/lease.ts";
@@ -14,8 +16,10 @@ import { fetchFrom } from "#core/plan/acquire/sources.ts";
 import { apply } from "#core/plan/apply/apply.ts";
 import { recover } from "#core/plan/apply/journal.ts";
 import { guardsOf } from "#core/plan/apply/link.ts";
+import type { BackedUp } from "#core/plan/apply/run.ts";
 import { build } from "#core/plan/build/build.ts";
 import type { Plan } from "#core/plan/model.ts";
+import { removeContained } from "#core/plan/removable.ts";
 import { spawnDetached } from "#core/process.ts";
 import { NAME, REMOVE_AFTER_FLAG } from "#core/product.ts";
 import { runningEntry } from "#core/release/launch.ts";
@@ -29,24 +33,26 @@ export interface Footprint {
   links: string[];
   startupFiles: string[];
   folders: string[];
-  /**
-   * Left in place: a CLI aireg did not install, a folder that holds your home, or a folder of
-   * yours where aireg's link was.
-   */
+  /** Left in place, as the command's result describes `kept`. */
   kept: string[];
 }
 
 export async function footprint(env: NodeJS.ProcessEnv = process.env): Promise<Footprint> {
-  const { folders: own, kept } = folders(env);
+  const { links, yours } = await teardownPlan(roots("user", homeDir(env), env), env);
+  return {
+    links,
+    startupFiles: await onPathIn(env),
+    folders: folders(env).folders,
+    kept: [...untouched(env), ...yours],
+  };
+}
+
+/** Left whatever the teardown finds: a CLI aireg did not install, and a folder holding your home. */
+export function untouched(env: NodeJS.ProcessEnv = process.env): string[] {
+  const { kept } = folders(env);
   const entry = runningEntry();
   if (entry !== undefined && !isWithin(toolHome(env), canonical(entry))) kept.push(entry);
-  const { plan, yours } = await teardownPlan(roots("user", homeDir(env), env), env);
-  return {
-    links: linksOf(plan, env),
-    startupFiles: await onPathIn(env),
-    folders: own,
-    kept: [...kept, ...yours],
-  };
+  return kept;
 }
 
 /** aireg's two folders that exist; a moved home that holds the home directory itself is kept. */
@@ -67,14 +73,20 @@ function linksOf(plan: Plan, env: NodeJS.ProcessEnv): string[] {
   );
 }
 
+interface Teardown {
+  plan: Plan;
+  links: string[];
+  /** Folders of yours where aireg's link was, left whole. */
+  yours: string[];
+  /** Fan-outs you added to, which lose only aireg's entries. */
+  fanned: string[];
+}
+
 /**
- * With nothing declared every row is stale, so the planner unlinks all of them. A folder of yours
- * that replaced a link stays put, since `unlink` would back it up into the folder uninstall deletes.
+ * With nothing declared every row is stale, so the planner unlinks all of them. Nothing of yours
+ * goes to `unlink`, which would back it up into the folder uninstall deletes.
  */
-async function teardownPlan(
-  scope: Roots,
-  env: NodeJS.ProcessEnv,
-): Promise<{ plan: Plan; yours: string[] }> {
+async function teardownPlan(scope: Roots, env: NodeJS.ProcessEnv): Promise<Teardown> {
   const manifest = await readManifest(scope.manifest);
   const plan = await build(
     { ...manifest, artifacts: [], registries: dict() },
@@ -84,25 +96,60 @@ async function teardownPlan(
     { roots: scope, env, targets: [], targetTable: resolveTargets(env), force: false, copy: false },
   );
   const guards = await guardsOf(plan, { roots: scope, env });
-  const yours = plan.actions.flatMap((action) =>
-    action.kind === "unlink" && guards.get(action.to) === "backup" ? [action.to] : [],
+  const theirs = new Set(
+    plan.actions.flatMap((action) =>
+      action.kind === "unlink" && guards.get(action.to) === "backup" ? [action] : [],
+    ),
   );
-  const actions = plan.actions.filter(
-    (action) => action.kind !== "unlink" || !yours.includes(action.to),
+  const fanned = new Set(
+    [...theirs].flatMap((action) => (action.link?.mode === "fanout" ? [action.to] : [])),
   );
-  return { plan: { ...plan, actions }, yours };
+  const yours = new Set([...theirs].map((action) => action.to).filter((path) => !fanned.has(path)));
+  return {
+    plan: {
+      ...plan,
+      actions: plan.actions.filter((action) => action.kind !== "unlink" || !theirs.has(action)),
+    },
+    links: linksOf(plan, env).filter((path) => !yours.has(path)),
+    yours: [...yours],
+    fanned: [...fanned],
+  };
 }
 
 /** Under the scope's lease, so no job writes beside it. */
-export async function unlinkUserScope(env: NodeJS.ProcessEnv): Promise<string[]> {
+export async function unlinkUserScope(
+  env: NodeJS.ProcessEnv,
+): Promise<{ links: string[]; kept: string[] }> {
   const scope = roots("user", homeDir(env), env);
   return withLease(scope, { wait: true }, async () => {
     // A run that crashed may have linked paths the lock never recorded.
     await recover(scope, await readLock(scope), env);
-    const { plan } = await teardownPlan(scope, env);
-    await apply({ plan, roots: scope, fetch: fetchFrom([]), env });
-    return linksOf(plan, env);
+    const { plan, links, yours, fanned } = await teardownPlan(scope, env);
+    // Read while the store they mirror is still there; the teardown removes it.
+    const entries = (
+      await Promise.all(fanned.map((dir) => fanOutEntries(dir, dirname(scope.artifacts))))
+    ).flat();
+    const { backedUp } = await apply({ plan, roots: scope, fetch: fetchFrom([]), env });
+    for (const entry of entries) await removeContained(entry, scope, env);
+    const restored = new Set(await putBack(backedUp));
+    return {
+      links: links.filter((path) => !restored.has(path)),
+      kept: [...yours, ...restored],
+    };
   });
+}
+
+/** The scope's backups go with it, so what apply moved there since the plan was read goes back. */
+async function putBack(backedUp: readonly BackedUp[]): Promise<string[]> {
+  for (const { path, to } of backedUp) {
+    if ((await ifPresent(lstat(path))) !== undefined) {
+      throw new Error(`${path} was taken during the uninstall, so your copy stays in ${to}.`);
+    }
+    // Unlink prunes the parent it emptied.
+    await mkdir(dirname(path), { recursive: true });
+    await rename(to, path);
+  }
+  return backedUp.map(({ path }) => path);
 }
 
 /** Looked up again here, since the teardown itself may have written to either folder. */
