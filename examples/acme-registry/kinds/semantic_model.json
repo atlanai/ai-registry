@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kinds/semantic_model.json",
+  "title": "semantic_model",
+  "description": "One Apache Ossie semantic model: semantic_model.yaml or semantic_model.json, stored unchanged. spec contains the registry slug as name, the model's description when it has one, and the unchanged document in model, which must satisfy the Ossie schema for the version it declares.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "MUST equal metadata.name in the envelope. The model's own name stays in the document.",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "model": {
+      "type": "object",
+      "description": "The Apache Ossie document, verbatim.",
+      "properties": {
+        "version": {
+          "enum": [
+            "0.1.1",
+            "0.2.0.dev0"
+          ]
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": "0.1.1"
+              }
+            },
+            "required": [
+              "version"
+            ]
+          },
+          "then": {
+            "$ref": "vendor/ossie/0.1.1/osi-schema.json"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": "0.2.0.dev0"
+              }
+            },
+            "required": [
+              "version"
+            ]
+          },
+          "then": {
+            "$ref": "vendor/ossie/0.2.0.dev0/ossie-schema.json"
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "model"
+  ],
+  "additionalProperties": false,
+  "x-registry-schema-version": 1,
+  "x-registry-searchable": [
+    "/name",
+    "/description"
+  ],
+  "x-registry-embeddings": [
+    "/description"
+  ],
+  "x-registry-edges": [
+    {
+      "rel_type": "supersedes",
+      "to_kinds": [
+        "semantic_model"
+      ],
+      "cardinality": "one",
+      "direction": "outbound"
+    }
+  ],
+  "x-registry-files": {
+    "one_of": [
+      [
+        {
+          "path": "semantic_model.yaml",
+          "media_type": "application/yaml"
+        }
+      ],
+      [
+        {
+          "path": "semantic_model.json",
+          "media_type": "application/json"
+        }
+      ]
+    ],
+    "optional": [
+      {
+        "glob": "source/**"
+      }
+    ]
+  },
+  "x-registry-attachment": false,
+  "x-registry-gated": false
+}

@@ -13,7 +13,15 @@ import { findRegistry } from "#core/filespec/init.ts";
 import { type KindManifest, primaryFiles } from "#core/filespec/kind-manifests.ts";
 import { refuseRedirect, writeFresh } from "#core/fs/fresh.ts";
 import type { Printer } from "#core/term/printer.ts";
-import { askFields, nameOf, render, scaffold, settings } from "./fields.ts";
+import {
+  askFields,
+  nameOf,
+  render,
+  renderDocument,
+  scaffold,
+  settings,
+  starterModel,
+} from "./fields.ts";
 import { outsidePlace, registryPlace } from "./place.ts";
 
 export interface Created extends KindNew {
@@ -48,8 +56,11 @@ export async function init(
   const { name, at } = place;
   const shown = relative(context.cwd, at) || ".";
 
-  const { fields, todo } = scaffold(manifest, name, sets);
-  if (interactive(step) && !(await askFields(step, fields, todo))) {
+  // A semantic model's file is an Apache Ossie document, which no manifest field describes.
+  const starter = manifest.title === "semantic_model" ? starterModel(name) : undefined;
+  const { fields, todo } =
+    starter === undefined ? scaffold(manifest, name, sets) : { fields: {}, todo: starter.todo };
+  if (starter === undefined && interactive(step) && !(await askFields(step, fields, todo))) {
     cancel(step);
     return STREAMED;
   }
@@ -58,7 +69,9 @@ export async function init(
   for (const file of files) refuseRedirect(inRegistry ? root : context.cwd, join(at, file));
   await mkdir(at, { recursive: true });
   for (const [index, file] of files.entries()) {
-    await writeFresh(join(at, file), render(file, fields), {
+    const text =
+      starter === undefined ? render(file, fields) : renderDocument(file, starter.document);
+    await writeFresh(join(at, file), text, {
       shown: created[index] as string,
       hint: "Move it aside, or name a new artifact.",
     });

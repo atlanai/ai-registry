@@ -55,7 +55,8 @@
     {
       "rel_type": "depends_on",
       "to_kinds": [
-        "skill"
+        "skill",
+        "semantic_model"
       ],
       "cardinality": "many",
       "direction": "outbound"
