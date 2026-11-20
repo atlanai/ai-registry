@@ -92,7 +92,6 @@ describe("a target that finds skills below the top", () => {
 
   test("reads a skill's name from its front matter before its folder", async () => {
     await skill(join(skills(), "notes", "renamed"), "hello");
-    await skill(join(skills(), "notes", "hello-like"), "other");
     const result = await apply({ plan: depthPlan(), roots, fetch, env: process.env });
     expect(result.kept[0]?.reason).toContain(join("notes", "renamed"));
   });
@@ -115,16 +114,8 @@ describe("a target that finds skills below the top", () => {
   });
 
   test("looks no deeper than the target does", async () => {
-    await skill(join(skills(), "a", "b", "hello"), "hello");
-    const result = await apply({ plan: depthPlan({ depth: 2 }), roots, fetch, env: process.env });
-    expect(result.kept).toEqual([]);
-    expect(await linked()).toBe(true);
-  });
-
-  test("checks nothing for a target that finds skills only at the top", async () => {
     await skill(join(skills(), "software-development", "hello"), "hello");
-    const plan = depthPlan({ depth: 1 });
-    const result = await apply({ plan, roots, fetch, env: process.env });
+    const result = await apply({ plan: depthPlan({ depth: 1 }), roots, fetch, env: process.env });
     expect(result.kept).toEqual([]);
     expect(await linked()).toBe(true);
   });

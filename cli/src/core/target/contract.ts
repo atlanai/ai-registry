@@ -28,10 +28,7 @@ interface DirectoryMapping {
    * files, for one that rewrites or refuses links.
    */
   place?: "link" | "fan" | "copy" | undefined;
-  /**
-   * How many folders deep below `subdir` the target finds this kind; 1, the top, when unset. Past 1,
-   * aireg leaves out an artifact whose name a skill within that depth already has.
-   */
+  /** How many folders deep below `subdir` the target finds this kind; 1, the top, when unset. */
   depth?: number | undefined;
   /** For a file-shaped kind: the file's name inside its folder, written as a copy. */
   entry?: string | undefined;

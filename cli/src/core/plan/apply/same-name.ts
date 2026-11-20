@@ -8,10 +8,7 @@ import type { ActionOf, Linked } from "./run.ts";
 // Folders a target that walks its skills tree skips: tool state, caches and dependencies.
 const SKIPPED = new Set(["node_modules", "venv", "site-packages", "__pycache__"]);
 
-/**
- * Leaves out a new placement beside a skill of its name within the depth the target finds skills
- * at. One the lock already records keeps updating, since leaving it would orphan the link.
- */
+/** Leaves out a new skill whose name one within `depth` has; a recorded one keeps updating. */
 export async function nameTaken(action: ActionOf<"link">): Promise<Linked | undefined> {
   const depth = action.depth ?? 1;
   if (depth < 2 || action.recorded !== undefined) return undefined;
