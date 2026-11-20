@@ -69,7 +69,7 @@ After an update, `current` is the version now installed, the same as `latest`. `
 {"ok": true, "data": {"action": "uninstalled", "dryRun": false, "daemon": true, "autostart": false, "links": ["/home/me/.claude/skills/engineering"], "startupFiles": ["/home/me/.profile", "/home/me/.zshenv"], "folders": ["/home/me/.registry", "/home/me/.aireg"], "kept": []}}
 ```
 
-With `--dry-run`, `action` is `would-uninstall` and `dryRun` is `true`. `kept` lists what was left in place, such as a CLI the installer didn't put there.
+With `--dry-run`, `action` is `would-uninstall` and `dryRun` is `true`. `kept` lists what was left in place, such as a CLI the installer didn't put there, or a folder of yours that replaced one of aireg's links.
 
 ## Exit status
 

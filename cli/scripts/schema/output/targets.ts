@@ -122,6 +122,7 @@ const KindMapping = Type.Union(
         place: Type.Optional(
           Type.Union([Type.Literal("link"), Type.Literal("fan"), Type.Literal("copy")]),
         ),
+        depth: Type.Optional(Type.Integer({ minimum: 1 })),
         entry: Type.Optional(Type.String()),
         manifest: Type.Optional(
           Type.Array(

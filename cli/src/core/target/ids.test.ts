@@ -31,10 +31,11 @@ describe("resolveTargets", () => {
     expect(table["claude-code"]?.shared).toBe(false);
   });
 
-  test("files every built-in as a coding agent but the shared folder", () => {
+  test("files every built-in as a coding agent but a personal agent and the shared folder", () => {
     const table = resolveTargets(process.env);
     const others = Object.values(table).filter((target) => target.category !== "coding-agent");
     expect(others.map(({ name, category, shared }) => [name, category, shared])).toEqual([
+      ["hermes-agent", "personal-agent", false],
       ["universal", "shared-folder", true],
     ]);
   });

@@ -27,7 +27,15 @@ export async function baseDiff(root: string, base: string): Promise<BaseDiff> {
       hint: "Fetch it, or pass another `--base <ref>`.",
     });
   }
-  const diff = await gitIn(root, ["diff", "--name-only", commit, "--", ARTIFACTS_DIR]);
+  // A rename lists only its new path, so a released artifact moved away would go unseen.
+  const diff = await gitIn(root, [
+    "diff",
+    "--name-only",
+    "--no-renames",
+    commit,
+    "--",
+    ARTIFACTS_DIR,
+  ]);
   if (diff.code !== 0) {
     throw new AiregError(`Could not compare with ${quoted(base)}: ${sentence(diff.stderr)}`, {
       code: ErrorCode.NotFound,

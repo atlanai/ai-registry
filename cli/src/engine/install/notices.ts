@@ -52,13 +52,23 @@ function keptNotice(roots: Roots, kept: ApplyResult["kept"][number]): string {
   const shown = displayPath(roots, path);
   // Registration runs for removals too, so it names the file it left rather than an install.
   if (config === true) return `Left ${shown} as it is for ${name}: ${sanitizeText(reason)}.`;
-  return `Did not install ${name} at ${shown}: ${sanitizeText(reason)}.`;
+  return reasonMessage(roots, name, path, reason, "Did not");
 }
 
 function displayName(targetTable: Targets, name: string): string {
   const target = targetTable[name];
   if (target === undefined) return name;
   return target.shared ? target.projectRoot : target.displayName;
+}
+
+export function reasonMessage(
+  roots: Roots,
+  name: string,
+  path: string,
+  reason: string,
+  verb: string,
+): string {
+  return `${verb} install ${name} at ${displayPath(roots, path)}: ${sanitizeText(reason)}.`;
 }
 
 export function keptMessage(roots: Roots, name: string, path: string, verb: string): string {
