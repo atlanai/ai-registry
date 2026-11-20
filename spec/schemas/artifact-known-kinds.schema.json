@@ -4,14 +4,65 @@
   "title": "Artifact envelope with known kinds",
   "description": "Validation aid: the envelope schema plus, for the kinds this repository specifies, the kind manifest applied to spec. This is the writer's contract; a publishing server does the same for every kind it holds. Not for readers, which treat spec as opaque.",
   "allOf": [
-    { "$ref": "artifact.schema.json" },
     {
-      "if": { "properties": { "kind": { "const": "skill" } }, "required": ["kind"] },
-      "then": { "properties": { "spec": { "$ref": "kinds/skill.json" } } }
+      "$ref": "artifact.schema.json"
     },
     {
-      "if": { "properties": { "kind": { "const": "agent" } }, "required": ["kind"] },
-      "then": { "properties": { "spec": { "$ref": "kinds/agent.json" } } }
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "skill"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "spec": {
+            "$ref": "kinds/skill.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "agent"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "spec": {
+            "$ref": "kinds/agent.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "mcp_server"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "spec": {
+            "$ref": "kinds/mcp_server.json"
+          }
+        }
+      }
     }
   ]
 }

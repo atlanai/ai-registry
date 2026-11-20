@@ -30,6 +30,12 @@ export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
     extensions: [".md"],
     served: [AGENT_ENTRY, AGENT_CARD_ENTRY],
   },
+  mcp_server: {
+    dir: "mcp-servers",
+    shape: "directory",
+    extensions: [],
+    entry: "mcp.json",
+  },
 };
 
 /** Kinds the registry scanner walks; `plugin` is found by its manifest. */
