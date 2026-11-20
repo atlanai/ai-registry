@@ -42,6 +42,7 @@ Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agent
 | Grok Build | `grok` | `.grok/skills/` | `~/.grok/skills/` |
 | Pi | `pi` | `.agents/skills/` | `~/.agents/skills/` |
 | Google Antigravity | `antigravity` | `.agents/skills/` | `~/.gemini/config/skills/` |
+| Hermes Agent | `hermes-agent` | `.agents/skills/` | `~/.hermes/skills/` |
 | Shared `.agents` folder | `universal` | `.agents/skills/` | `~/.agents/skills/` |
 
 ### Agents
@@ -58,15 +59,17 @@ Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agent
 | Google Antigravity | `antigravity` | none | `~/.gemini/config/agents/` |
 | Shared `.agents` folder | `universal` | `.agents/agents/` | `~/.agents/agents/` |
 
-Pi has no agents, so aireg installs none for it.
+Pi and Hermes Agent have no agents, so aireg installs none for them.
 
-A user folder moves with its target's own variable: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, `GROK_HOME`, `PI_CODING_AGENT_DIR`, or `XDG_CONFIG_HOME` for OpenCode.
+A user folder moves with its target's own variable: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, `GROK_HOME`, `HERMES_HOME`, `PI_CODING_AGENT_DIR`, or `XDG_CONFIG_HOME` for OpenCode.
 
 With `GEMINI_CLI_HOME` set, Gemini CLI reads `.agents/skills` inside that folder, not the shared `~/.agents/skills`. aireg places Gemini CLI's own skills under the variable, but a skill you install for Gemini CLI together with a target that reads `~/.agents`, such as Codex, lands only in that shared folder, where Gemini CLI does not look. While the variable is set, install for Gemini CLI on its own: `aireg add -g <source> --for gemini-cli`.
 
 Google Antigravity covers its App, IDE and CLI, which share `~/.gemini/config`. aireg writes its skills as copies, and its agents only in your user scope, since a project's `.agents/agents` holds other tools' agents.
 
-When a target's own folder is a shared folder's, as Antigravity's `.agents/skills` is in a project, aireg writes that folder once for both, as copies if either takes copies.
+Hermes Agent loads a project's skills once you run `hermes skills trust`. aireg leaves out a skill whose name one of Hermes's bundled skills already has, such as `systematic-debugging`, since Hermes would then load neither. On Windows, or for a Hermes profile other than the default, set `HERMES_HOME` to the folder Hermes uses.
+
+When a target's own folder is a shared folder's, as Antigravity's and Hermes Agent's `.agents/skills` is in a project, aireg writes that folder once for both, as copies if either takes copies.
 
 The shared `.agents` folder is one several coding agents read, not a coding agent, so aireg never detects it and never installs into it by default.
 
@@ -97,7 +100,7 @@ An alias is a lowercase name that isn't another target's id or alias. A file can
 
 `profiles` finds the profiles of one installation, such as `{ "root": "~/.tool/profiles/{profile}" }`, where `{profile}` in the last segment names each one. Each profile folder found is a target of its own, `<id>:<profile>`, in your user scope only.
 
-A kind placed with `place: "copy"` is written as real files, for a target that edits or refuses links; an edit then shows in `aireg status`. A `codec` rewrites an agent in the target's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
+A kind placed with `place: "copy"` is written as real files, for a target that edits or refuses links; an edit then shows in `aireg status`. A directory kind's `depth` is how many folders deep the target finds it, 1 when unset; past 1, aireg leaves out an artifact whose name one within that depth already has. A `codec` rewrites an agent in the target's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
 
 A kind's `keys` say how the target takes a front-matter key it doesn't read as written, such as `disable-model-invocation`: a `.json` or `.yaml` file it reads instead, which aireg writes into a copy of the artifact, or `false`, which leaves out an artifact that sets the key rather than install it without that limit.
 

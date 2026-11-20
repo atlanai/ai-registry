@@ -111,6 +111,13 @@ const KindMapping = tagged(
         subdir: Text,
         scope: Scope,
         place: Type.Optional(choice("link", "fan", "copy")),
+        depth: Type.Optional(
+          Type.Integer({
+            minimum: 1,
+            description:
+              "How many folders deep below subdir the target finds this kind; 1, the top, when unset. Past 1, an artifact whose name a skill within that depth already has is left out.",
+          }),
+        ),
         entry: Type.Optional(Text),
         manifest: Type.Optional(Type.Array(Manifest)),
         register: Type.Optional(Type.Array(ref("register"))),

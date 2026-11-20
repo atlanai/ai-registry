@@ -335,6 +335,10 @@
                             }
                           ]
                         },
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
                         "entry": {
                           "type": "string"
                         },
@@ -788,6 +792,10 @@
                             }
                           ]
                         },
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
                         "entry": {
                           "type": "string"
                         },
@@ -1240,6 +1248,10 @@
                               "type": "string"
                             }
                           ]
+                        },
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "entry": {
                           "type": "string"
@@ -1921,6 +1933,10 @@
                             }
                           ]
                         },
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
                         "entry": {
                           "type": "string"
                         },
@@ -2374,6 +2390,10 @@
                             }
                           ]
                         },
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
                         "entry": {
                           "type": "string"
                         },
@@ -2826,6 +2846,10 @@
                               "type": "string"
                             }
                           ]
+                        },
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "entry": {
                           "type": "string"
