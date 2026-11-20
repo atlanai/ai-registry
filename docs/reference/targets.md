@@ -67,11 +67,7 @@ With `GEMINI_CLI_HOME` set, Gemini CLI reads `.agents/skills` inside that folder
 
 Google Antigravity covers its App, IDE and CLI, which share `~/.gemini/config`. aireg writes its skills as copies, and its agents only in your user scope, since a project's `.agents/agents` holds other tools' agents.
 
-Hermes Agent reads a project's skills only at its repository root, once you run `hermes skills trust`, and your own skills only from `~/.hermes/skills`, not `~/.agents/skills`. aireg links its skills, so they change only when their registry publishes a new version and `aireg update` takes it. Hermes improves the skills it finds in its own folders as it learns, but it does not find a linked one, so it leaves the skills aireg installs as published. To change one, publish a new version to its registry.
-
-Hermes keeps its bundled skills in category folders, such as `~/.hermes/skills/software-development/systematic-debugging`, and loads neither of two skills that share a name. aireg leaves out a skill whose name one there already has, with a warning that names it. A skill Hermes adds later under the same name, such as one a Hermes update bundles, hides both until you remove or rename one.
-
-aireg installs into the folder `HERMES_HOME` names, else `~/.hermes`. Hermes reads its active profile's folder instead once you run `hermes profile use <name>`, so install for that profile with `HERMES_HOME=~/.hermes/profiles/<name> aireg add -g …`. A desktop build that sets `HERMES_DATA_DIR_SUFFIX` keeps its folder elsewhere too. On Windows, where its folder is `%LOCALAPPDATA%\hermes`, set `HERMES_HOME`.
+Hermes Agent loads a project's skills once you run `hermes skills trust`. aireg leaves out a skill whose name one of Hermes's bundled skills already has, such as `systematic-debugging`, since Hermes would then load neither. On Windows, or for a Hermes profile other than the default, set `HERMES_HOME` to the folder Hermes uses.
 
 When a target's own folder is a shared folder's, as Antigravity's and Hermes Agent's `.agents/skills` is in a project, aireg writes that folder once for both, as copies if either takes copies.
 
@@ -104,7 +100,7 @@ An alias is a lowercase name that isn't another target's id or alias. A file can
 
 `profiles` finds the profiles of one installation, such as `{ "root": "~/.tool/profiles/{profile}" }`, where `{profile}` in the last segment names each one. Each profile folder found is a target of its own, `<id>:<profile>`, in your user scope only.
 
-A kind placed with `place: "copy"` is written as real files, for a target that edits or refuses links; an edit then shows in `aireg status`. A directory kind's `depth` says how many folders deep below its folder the target finds it, 1 (the top) when unset; past 1, aireg leaves out an artifact whose name a skill within that depth already has. A `codec` rewrites an agent in the target's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
+A kind placed with `place: "copy"` is written as real files, for a target that edits or refuses links; an edit then shows in `aireg status`. A directory kind's `depth` is how many folders deep the target finds it, 1 when unset; past 1, aireg leaves out an artifact whose name one within that depth already has. A `codec` rewrites an agent in the target's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
 
 A kind's `keys` say how the target takes a front-matter key it doesn't read as written, such as `disable-model-invocation`: a `.json` or `.yaml` file it reads instead, which aireg writes into a copy of the artifact, or `false`, which leaves out an artifact that sets the key rather than install it without that limit.
 
