@@ -110,8 +110,8 @@ export type Action =
       part?: ArtifactKind;
       /** Written as a real folder holding this file. */
       entry?: string;
-      /** Refused while the target already finds a skill of this name deeper in the folder. */
-      nested?: boolean;
+      /** How deep the target finds a skill; past 1, a name taken within that depth refuses it. */
+      depth?: number;
       /** The name the copy's front matter takes: it installs under a name not its own. */
       rename?: string;
     }

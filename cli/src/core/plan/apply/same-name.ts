@@ -7,29 +7,22 @@ import type { ActionOf, Linked } from "./run.ts";
 
 // Folders a target that walks its skills tree skips: tool state, caches and dependencies.
 const SKIPPED = new Set(["node_modules", "venv", "site-packages", "__pycache__"]);
-const DEPTH = 4;
 
 /**
- * Leaves out a new placement beside a skill of its name, which the target would then load neither
- * of. One the lock already records keeps updating, since leaving it would orphan the link.
+ * Leaves out a new placement beside a skill of its name within the depth the target finds skills
+ * at. One the lock already records keeps updating, since leaving it would orphan the link.
  */
 export async function nameTaken(action: ActionOf<"link">): Promise<Linked | undefined> {
-  if (action.nested !== true || action.recorded !== undefined) return undefined;
-  const blocker = await sameNameBelow(action.to);
+  const depth = action.depth ?? 1;
+  if (depth < 2 || action.recorded !== undefined) return undefined;
+  const blocker = await search(dirname(action.to), basename(action.to), action.to, depth);
   if (blocker === undefined) return undefined;
   const at = relative(dirname(action.to), blocker);
-  const reason = `a skill of the same name is at ${at}, and the target would load neither`;
+  const reason = `a skill of the same name is at ${at}, which the target finds too`;
   return { kept: { name: action.name, path: action.to, reason }, blocker };
 }
 
-/**
- * Another skill named like the one bound for `to`, anywhere below `to`'s folder. A skill's name is
- * its front matter's `name`, else its folder's.
- */
-function sameNameBelow(to: string): Promise<string | undefined> {
-  return search(dirname(to), basename(to), to, DEPTH);
-}
-
+/** A skill called `name`, by front matter else folder, up to `depth` folders below `dir`. */
 async function search(
   dir: string,
   name: string,

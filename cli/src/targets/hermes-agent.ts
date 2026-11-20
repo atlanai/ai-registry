@@ -19,11 +19,12 @@ export const hermesAgent = defineTarget({
     plugin: { shape: "contents" },
     // Linked, so its tools, which cannot find a skill in a linked folder, never edit one.
     // It reads no key that keeps a skill for a person, so one that sets it is left out.
-    // Its bundled skills sit in category folders, and a name in two loads from neither.
+    // It finds skills at any depth, its bundled ones in category folders, and loads neither of two
+    // sharing a name; 6 is as deep as other targets look.
     skill: {
       shape: "directory",
       subdir: "skills",
-      nested: true,
+      depth: 6,
       keys: { "disable-model-invocation": false },
     },
   },

@@ -7,7 +7,7 @@ interface ContentsMapping {
   extension?: undefined;
   scope?: undefined;
   place?: undefined;
-  nested?: undefined;
+  depth?: undefined;
   entry?: undefined;
   manifest?: undefined;
   register?: undefined;
@@ -28,8 +28,11 @@ interface DirectoryMapping {
    * files, for one that rewrites or refuses links.
    */
   place?: "link" | "fan" | "copy" | undefined;
-  /** It finds this kind at any depth below `subdir`, and loads neither of two sharing a name. */
-  nested?: true | undefined;
+  /**
+   * How many folders deep below `subdir` the target finds this kind; 1, the top, when unset. Past 1,
+   * aireg leaves out an artifact whose name a skill within that depth already has.
+   */
+  depth?: number | undefined;
   /** For a file-shaped kind: the file's name inside its folder, written as a copy. */
   entry?: string | undefined;
   /** A plugin directory's manifests: the plugin's own if it has one, else written if missing. */
@@ -57,7 +60,7 @@ interface FileMapping {
   scope?: "user" | undefined;
   /** `copy` writes a real file, for a target that rewrites or refuses links. */
   place?: "link" | "copy" | undefined;
-  nested?: undefined;
+  depth?: undefined;
   entry?: undefined;
   manifest?: undefined;
   register?: undefined;

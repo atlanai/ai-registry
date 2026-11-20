@@ -335,9 +335,9 @@
                             }
                           ]
                         },
-                        "nested": {
-                          "const": true,
-                          "type": "boolean"
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "entry": {
                           "type": "string"
@@ -792,9 +792,9 @@
                             }
                           ]
                         },
-                        "nested": {
-                          "const": true,
-                          "type": "boolean"
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "entry": {
                           "type": "string"
@@ -1249,9 +1249,9 @@
                             }
                           ]
                         },
-                        "nested": {
-                          "const": true,
-                          "type": "boolean"
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "entry": {
                           "type": "string"
@@ -1933,9 +1933,9 @@
                             }
                           ]
                         },
-                        "nested": {
-                          "const": true,
-                          "type": "boolean"
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "entry": {
                           "type": "string"
@@ -2390,9 +2390,9 @@
                             }
                           ]
                         },
-                        "nested": {
-                          "const": true,
-                          "type": "boolean"
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "entry": {
                           "type": "string"
@@ -2847,9 +2847,9 @@
                             }
                           ]
                         },
-                        "nested": {
-                          "const": true,
-                          "type": "boolean"
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "entry": {
                           "type": "string"

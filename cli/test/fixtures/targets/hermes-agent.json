@@ -13,7 +13,7 @@
     "skill": {
       "shape": "directory",
       "subdir": "skills",
-      "nested": true,
+      "depth": 6,
       "keys": { "disable-model-invocation": false }
     }
   },

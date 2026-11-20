@@ -33,7 +33,7 @@ async function skill(path: string, name: string): Promise<void> {
   await writeFile(join(path, "SKILL.md"), `---\nname: ${name}\ndescription: d\n---\n`);
 }
 
-function nestedPlan(options: { nested?: boolean; recorded?: LinkMode } = {}): Plan {
+function depthPlan(options: { depth?: number; recorded?: LinkMode } = {}): Plan {
   const lock = lockOf()
     .artifact("ws/hello", {
       registry: "mkt",
@@ -57,7 +57,7 @@ function nestedPlan(options: { nested?: boolean; recorded?: LinkMode } = {}): Pl
         from: store,
         to: dest(),
         copy: false,
-        ...(options.nested === false ? {} : { nested: true }),
+        depth: options.depth ?? 6,
         ...(options.recorded === undefined ? {} : { recorded: options.recorded }),
       },
       { kind: "record", lock },
@@ -69,10 +69,10 @@ async function linked(): Promise<boolean> {
   return (await lstat(dest()).catch(() => undefined))?.isSymbolicLink() === true;
 }
 
-describe("a target that finds skills at any depth", () => {
+describe("a target that finds skills below the top", () => {
   test("leaves out a skill whose name one in a category folder already has", async () => {
     await skill(join(skills(), "software-development", "hello"), "hello");
-    const plan = nestedPlan();
+    const plan = depthPlan();
     const result = await apply({ plan, roots, fetch, env: process.env });
     expect(await linked()).toBe(false);
     const record = plan.actions.find((action) => action.kind === "record");
@@ -85,7 +85,7 @@ describe("a target that finds skills at any depth", () => {
       {
         name: "ws/hello",
         path: dest(),
-        reason: `a skill of the same name is at ${join("software-development", "hello")}, and the target would load neither`,
+        reason: `a skill of the same name is at ${join("software-development", "hello")}, which the target finds too`,
       },
     ]);
   });
@@ -93,7 +93,7 @@ describe("a target that finds skills at any depth", () => {
   test("reads a skill's name from its front matter before its folder", async () => {
     await skill(join(skills(), "notes", "renamed"), "hello");
     await skill(join(skills(), "notes", "hello-like"), "other");
-    const result = await apply({ plan: nestedPlan(), roots, fetch, env: process.env });
+    const result = await apply({ plan: depthPlan(), roots, fetch, env: process.env });
     expect(result.kept[0]?.reason).toContain(join("notes", "renamed"));
   });
 
@@ -101,22 +101,29 @@ describe("a target that finds skills at any depth", () => {
     await skill(join(skills(), "devops", "deploy"), "deploy");
     await skill(join(skills(), ".hub", "hello"), "hello");
     await skill(join(skills(), "devops", "deploy", "hello"), "hello");
-    const result = await apply({ plan: nestedPlan(), roots, fetch, env: process.env });
+    const result = await apply({ plan: depthPlan(), roots, fetch, env: process.env });
     expect(result.kept).toEqual([]);
     expect(await linked()).toBe(true);
   });
 
   test("keeps updating a link the lock already records", async () => {
     await skill(join(skills(), "software-development", "hello"), "hello");
-    const plan = nestedPlan({ recorded: "symlink" });
+    const plan = depthPlan({ recorded: "symlink" });
     const result = await apply({ plan, roots, fetch, env: process.env });
+    expect(result.kept).toEqual([]);
+    expect(await linked()).toBe(true);
+  });
+
+  test("looks no deeper than the target does", async () => {
+    await skill(join(skills(), "a", "b", "hello"), "hello");
+    const result = await apply({ plan: depthPlan({ depth: 2 }), roots, fetch, env: process.env });
     expect(result.kept).toEqual([]);
     expect(await linked()).toBe(true);
   });
 
   test("checks nothing for a target that finds skills only at the top", async () => {
     await skill(join(skills(), "software-development", "hello"), "hello");
-    const plan = nestedPlan({ nested: false });
+    const plan = depthPlan({ depth: 1 });
     const result = await apply({ plan, roots, fetch, env: process.env });
     expect(result.kept).toEqual([]);
     expect(await linked()).toBe(true);

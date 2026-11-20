@@ -226,7 +226,7 @@ function linkAction(
     ...(link.keys === undefined ? {} : { keys: link.keys }),
     ...(link.part === undefined ? {} : { part: link.part }),
     ...(link.entry === undefined ? {} : { entry: link.entry }),
-    ...(link.nested === true ? { nested: true } : {}),
+    ...(link.depth === undefined ? {} : { depth: link.depth }),
     ...(how.rename === undefined ? {} : { rename: how.rename }),
     ...(how.recorded === undefined ? {} : { recorded: how.recorded }),
     ...(how.adopt && link.codec === undefined && link.entry === undefined && link.shared !== true

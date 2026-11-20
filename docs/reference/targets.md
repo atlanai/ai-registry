@@ -104,7 +104,7 @@ An alias is a lowercase name that isn't another target's id or alias. A file can
 
 `profiles` finds the profiles of one installation, such as `{ "root": "~/.tool/profiles/{profile}" }`, where `{profile}` in the last segment names each one. Each profile folder found is a target of its own, `<id>:<profile>`, in your user scope only.
 
-A kind placed with `place: "copy"` is written as real files, for a target that edits or refuses links; an edit then shows in `aireg status`. A directory kind with `nested: true` is one the target finds at any depth below its folder, loading neither of two that share a name, so aireg leaves out an artifact whose name a folder below already holds. A `codec` rewrites an agent in the target's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
+A kind placed with `place: "copy"` is written as real files, for a target that edits or refuses links; an edit then shows in `aireg status`. A directory kind's `depth` says how many folders deep below its folder the target finds it, 1 (the top) when unset; past 1, aireg leaves out an artifact whose name a skill within that depth already has. A `codec` rewrites an agent in the target's own format, and refuses to drop or change a key that limits the agent, such as `tools`.
 
 A kind's `keys` say how the target takes a front-matter key it doesn't read as written, such as `disable-model-invocation`: a `.json` or `.yaml` file it reads instead, which aireg writes into a copy of the artifact, or `false`, which leaves out an artifact that sets the key rather than install it without that limit.
 
