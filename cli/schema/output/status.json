@@ -12,6 +12,7 @@
         "artifacts",
         "shadowed",
         "unmanaged",
+        "duplicates",
         "dangling"
       ],
       "properties": {
@@ -214,6 +215,56 @@
                 "type": "array",
                 "items": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "duplicates": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "match",
+              "artifacts"
+            ],
+            "properties": {
+              "match": {
+                "description": "`identical`: the same files, line endings and SKILL.md's `name` aside. `name`: unmanaged skills of one name whose files differ.",
+                "anyOf": [
+                  {
+                    "const": "identical",
+                    "type": "string"
+                  },
+                  {
+                    "const": "name",
+                    "type": "string"
+                  }
+                ]
+              },
+              "artifacts": {
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "name",
+                    "path"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "description": "The real folder, never a link to it.",
+                      "type": "string"
+                    },
+                    "registry": {
+                      "description": "Set when installed: the registry it came from.",
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }

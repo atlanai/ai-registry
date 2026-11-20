@@ -61,6 +61,28 @@ const Unmanaged = Type.Object(
   { additionalProperties: false },
 );
 
+const Duplicate = Type.Object(
+  {
+    match: Type.Union([Type.Literal("identical"), Type.Literal("name")], {
+      description:
+        "`identical`: the same files, line endings and SKILL.md's `name` aside. `name`: unmanaged skills of one name whose files differ.",
+    }),
+    artifacts: Type.Array(
+      Type.Object(
+        {
+          name: Type.String(),
+          path: Type.String({ description: "The real folder, never a link to it." }),
+          registry: Type.Optional(
+            Type.String({ description: "Set when installed: the registry it came from." }),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
 const Dangling = Type.Object(
   { path: Type.String(), target: Type.String(), harness: Type.String() },
   {
@@ -78,6 +100,7 @@ const Status = matching<StatusResult>()(
         description: "Installed both here and in the user scope; always empty for -g.",
       }),
       unmanaged: Type.Array(Unmanaged),
+      duplicates: Type.Array(Duplicate),
       dangling: Type.Array(Dangling),
     },
     { additionalProperties: false },
