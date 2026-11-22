@@ -1,4 +1,4 @@
-import * as commands from "#core/console/actions.ts";
+import * as commands from "#core/child/commands.ts";
 import { publishable, selector } from "#core/console/artifacts.ts";
 import type { Line } from "#core/console/flatten.ts";
 import type { ArtifactRow, ConsoleState } from "#core/console/model.ts";

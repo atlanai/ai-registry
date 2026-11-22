@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { LAYOUT_IDS } from "#adapter/layouts/ids.ts";
 import type { AddResult } from "#cli/commands/add/result.ts";
+import { CARRIED } from "#core/plan/carries.ts";
 import { OUTCOME } from "./install.ts";
 import { matching, oneOf, outputDocument } from "./match.ts";
 
@@ -20,6 +21,20 @@ const Add = matching<AddResult>()(
       ...OUTCOME,
       jobId: Type.Optional(
         Type.String({ description: "The background job that keeps a user scope install current." }),
+      ),
+      untrusted: Type.Optional(
+        Type.Array(
+          Type.Object(
+            {
+              name: Type.String(),
+              carries: Type.Array(oneOf(CARRIED), {
+                description: "What it carries that a target runs as you.",
+              }),
+            },
+            { additionalProperties: false },
+          ),
+          { description: "Plugins left out until trusted with `--trust`." },
+        ),
       ),
     },
     { additionalProperties: false },

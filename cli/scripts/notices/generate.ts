@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { NAME } from "#core/product.ts";
 import { BUN_COMMIT, BUN_VERSION } from "#packaging/targets.ts";
 
@@ -20,6 +20,29 @@ const ALLOWED = new Set([
   "0BSD",
   "CC0-1.0",
 ]);
+
+/**
+ * Dev dependencies `vite build` bundles into ui/dist, which ships inside the CLI. Build tools
+ * (vite, its plugins, @tailwindcss/vite) are left out; tailwindcss is in, for the CSS it emits.
+ */
+const UI_BUNDLED = [
+  "@radix-ui/react-checkbox",
+  "@radix-ui/react-dialog",
+  "@radix-ui/react-dropdown-menu",
+  "@radix-ui/react-tabs",
+  "@radix-ui/react-tooltip",
+  "@tanstack/react-query",
+  "@tanstack/react-virtual",
+  "clsx",
+  "cmdk",
+  "lucide-react",
+  "react-dom",
+  "react-markdown",
+  "rehype-sanitize",
+  "remark-gfm",
+  "tailwind-merge",
+  "tailwindcss",
+];
 
 const RULE = "-".repeat(80);
 const LICENSE_FILE = /^(licen[cs]e|copying|notice)([.-].*)?$/i;
@@ -83,7 +106,38 @@ function readPackage(dir: string): Package {
   };
 }
 
-/** Every production package with JavaScript in it, once per version, in a stable order. */
+/** Where Node would find `name` from `dir`: the nearest node_modules up the tree. */
+function resolveFrom(dir: string, name: string): string | undefined {
+  for (let at = dir; ; at = dirname(at)) {
+    const candidate = join(at, "node_modules", name);
+    if (existsSync(join(candidate, "package.json"))) return realpathSync(candidate);
+    if (dirname(at) === at) return undefined;
+  }
+}
+
+/** The UI's bundled packages and their runtime dependencies, read from node_modules offline. */
+function uiBundledDirs(): string[] {
+  const seen = new Set<string>();
+  const visit = (dir: string) => {
+    if (seen.has(dir)) return;
+    seen.add(dir);
+    const { dependencies = {} } = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    for (const name of Object.keys(dependencies)) {
+      const found = resolveFrom(dir, name);
+      if (found !== undefined) visit(found);
+    }
+  };
+  for (const name of UI_BUNDLED) {
+    const found = resolveFrom(ROOT, name);
+    if (found === undefined) throw new Error(`${name} is not installed; run \`pnpm install\``);
+    visit(found);
+  }
+  return [...seen];
+}
+
+/** Every package that ships, with JavaScript in it, once per version, in a stable order. */
 function shippedPackages(): Package[] {
   const listed = JSON.parse(
     execFileSync("pnpm", ["licenses", "list", "--prod", "--json"], {
@@ -93,7 +147,7 @@ function shippedPackages(): Package[] {
     }),
   ) as Record<string, Listed[]>;
   const dirs = Object.values(listed).flatMap((entries) => entries.flatMap((entry) => entry.paths));
-  return [...new Set(dirs)]
+  return [...new Set([...dirs.map((dir) => realpathSync(dir)), ...uiBundledDirs()])]
     .filter(shipsJavaScript)
     .map(readPackage)
     .sort((a, b) => byte(a.name, b.name) || byte(a.version, b.version));

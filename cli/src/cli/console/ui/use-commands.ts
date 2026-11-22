@@ -1,6 +1,6 @@
 import { type Dispatch, useCallback, useEffect, useState } from "react";
 import { type Progress, progress } from "#cli/console/data/state.ts";
-import * as commands from "#core/console/actions.ts";
+import * as commands from "#core/child/commands.ts";
 import { changesSince, snapshot } from "#core/console/changes.ts";
 import type { HostCommandContext } from "#core/host/extend.ts";
 import type { UiAction } from "./reducer.ts";

@@ -25,6 +25,7 @@ const LOADERS: Readonly<Record<string, Command["load"]>> = {
   update: () => import("./update.ts"),
   show: () => import("./show.ts"),
   console: () => import("./console.ts"),
+  ui: () => import("./ui.ts"),
   status: () => import("./status.ts"),
   list: () => import("./list.ts"),
   outdated: () => import("./outdated.ts"),

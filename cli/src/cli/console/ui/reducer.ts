@@ -1,4 +1,4 @@
-import type { Command } from "#core/console/actions.ts";
+import type { Command } from "#core/child/commands.ts";
 import type { ArtifactRow } from "#core/console/model.ts";
 import { type PublishPlan, withLine } from "./overlays.ts";
 

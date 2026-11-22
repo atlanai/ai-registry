@@ -1,6 +1,6 @@
 import { type Key, useInput } from "ink";
 import type { Dispatch } from "react";
-import * as commands from "#core/console/actions.ts";
+import * as commands from "#core/child/commands.ts";
 import type { Tab } from "./chrome.ts";
 import { type GlobalCommand, globalCommandFor, moveDelta } from "./keymap.ts";
 import { importNow, planForRow, runPlan } from "./publish.ts";
