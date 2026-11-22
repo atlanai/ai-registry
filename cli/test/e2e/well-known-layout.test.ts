@@ -162,6 +162,33 @@ describe("a site's Agent Skills index", () => {
     });
   });
 
+  test("lists the rest of a site when one archive fails to load, but refuses to install it", async ({
+    aireg,
+    initialised,
+    project,
+    tmp,
+  }) => {
+    const root = await wellKnownSite(join(tmp, "site"), [
+      { name: "greet" },
+      { name: "fill", type: "archive", archive: tarGz([{ path: ".git/HEAD", body: "x" }]) },
+    ]);
+    await initialised(project);
+    await serving(root, async (url) => {
+      expect((await aireg(["registry", "add", url, "--as", "site"])).code).toBe(0);
+      const shown = await aireg(["registry", "show", "site"]);
+      expect(shown.code, shown.stderr).toBe(0);
+      expect(shown.stdout).toContain("greet");
+      expect(shown.stderr).toContain(
+        `Skipped "fill": fill's archive holds ".git/HEAD", which is not a path inside it.`,
+      );
+      const added = await aireg(["add", "site/localhost/fill", "-y"]);
+      expect(added.code).toBe(1);
+      expect(added.stderr).toContain(
+        `fill's archive holds ".git/HEAD", which is not a path inside it.`,
+      );
+    });
+  });
+
   test("points a site with no index at the git adapter, and refuses a version", async ({
     aireg,
     initialised,

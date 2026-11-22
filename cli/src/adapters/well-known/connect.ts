@@ -65,11 +65,26 @@ export async function connect(context: SourceContext): Promise<SourceHandle> {
       );
       held.clear();
       const artifacts: Artifact[] = [];
+      const failed: Error[] = [];
       for (const entry of entries) {
-        const files = await filesOf(context, entry);
+        const bytes = await bytesOf(context, entry);
+        let files: Files;
+        let artifact: Artifact;
+        try {
+          files = filesOf(entry, bytes);
+          artifact = artifactOf(entry, files, namespace);
+        } catch (error) {
+          // One broken skill must not hide the rest of the index; one asked for by name still fails.
+          if (want.some((item) => item.name === entry.name)) throw error;
+          failed.push(error as Error);
+          warnings.push(`Skipped ${quoted(entry.name)}: ${messageOf(error).replace(/\.$/, "")}.`);
+          continue;
+        }
         held.set(entry.name, new Map([...files].map(([path, file]) => [path, file.bytes])));
-        artifacts.push(artifactOf(entry, files, namespace));
+        artifacts.push(artifact);
       }
+      // With nothing left to list, the failure says more than an empty index would.
+      if (artifacts.length === 0 && failed.length > 0) throw failed[0];
       return {
         artifacts,
         registry: { name: namespace },
@@ -232,7 +247,7 @@ function entryOf(url: URL, item: Record<string, unknown>, warnings: string[]): E
 }
 
 // Bytes that do not hash to the digest the index gives never land; the whole read fails.
-async function filesOf(context: SourceContext, entry: Entry): Promise<Files> {
+async function bytesOf(context: SourceContext, entry: Entry): Promise<Uint8Array> {
   const limit = entry.type === "archive" ? MAX_ARCHIVE : MAX_SKILL;
   const { status, bytes } = await fetchBytes(context, entry.url, limit);
   if (status !== 200) throw fail("unavailable", `${entry.url.href} answered ${status}.`);
@@ -243,6 +258,10 @@ async function filesOf(context: SourceContext, entry: Entry): Promise<Files> {
       `${entry.name} at ${entry.url.href} hashes to ${digest}, not the ${entry.digest} the index gives, so nothing was installed from it.`,
     );
   }
+  return bytes;
+}
+
+function filesOf(entry: Entry, bytes: Uint8Array): Files {
   const files: Files = new Map();
   if (entry.type === "skill-md") {
     files.set(SKILL_ENTRY, { bytes, executable: false });

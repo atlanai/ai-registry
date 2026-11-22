@@ -67,27 +67,50 @@ export async function resolveFromRoot(
       );
     }
 
-    const versions = await readVersions(read, entry.namespace, entry.kind, entry.name);
-    const version = resolveVersion(versions, pinned);
-    const held: Withheld[] = [];
-    const served = await serve(read, { entry, version, asked, pinned }, held, options.blobUrl);
-
-    const reported =
-      served !== undefined || heldBack(version, pinned) ? version.version : undefined;
-    const top = newestListed(versions);
-    const { namespace, kind, name } = entry;
-    const newest: Newest | undefined =
-      reported === top ? undefined : { namespace, kind, name, version: top };
-    return { served, held, newest };
+    try {
+      return { ...(await readOne(read, { entry, asked, pinned }, options.blobUrl)), failed: [] };
+    } catch (error) {
+      // One broken artifact must not hide the rest of a listing; one asked for by name still fails.
+      if (asked || !(error instanceof SpecError) || error instanceof TamperedError) throw error;
+      const id = `${entry.namespace}/${entry.kind}/${entry.name}`;
+      return { served: undefined, held: [], newest: undefined, failed: [{ id, error }] };
+    }
   });
+  const failed = rows.flatMap((row) => row.failed);
+  // With nothing left to list, the failure says more than an empty registry would.
+  if (failed.length > 0 && failed.length === rows.length) throw failed[0]?.error;
   const withheld = rows.flatMap((row) => row.held);
   const newest = rows.flatMap((row) => (row.newest === undefined ? [] : [row.newest]));
+  const warnings = failed.map(({ id, error }) => skipped(id, error));
 
   return {
     artifacts: rows.flatMap((row) => (row.served === undefined ? [] : [row.served])),
     ...(withheld.length === 0 ? {} : { withheld }),
     ...(newest.length === 0 ? {} : { newest }),
+    ...(warnings.length === 0 ? {} : { warnings }),
   };
+}
+
+async function readOne(
+  read: ReadPath,
+  { entry, asked, pinned }: { entry: IndexRow; asked: boolean; pinned: string | undefined },
+  blobUrl: string,
+): Promise<{ served: Artifact | undefined; held: Withheld[]; newest: Newest | undefined }> {
+  const versions = await readVersions(read, entry.namespace, entry.kind, entry.name);
+  const version = resolveVersion(versions, pinned);
+  const held: Withheld[] = [];
+  const served = await serve(read, { entry, version, asked, pinned }, held, blobUrl);
+
+  const reported = served !== undefined || heldBack(version, pinned) ? version.version : undefined;
+  const top = newestListed(versions);
+  const { namespace, kind, name } = entry;
+  const newest: Newest | undefined =
+    reported === top ? undefined : { namespace, kind, name, version: top };
+  return { served, held, newest };
+}
+
+function skipped(id: string, error: Error): string {
+  return `Skipped ${quoted(id)}: ${error.message.replace(/\.$/, "")}.`;
 }
 
 const narrowness = (want: Want) =>
@@ -195,6 +218,9 @@ function heldBack(version: VersionRow, pinned: string | undefined): boolean {
   return status === "blocked" || (pinned === undefined && UNRELEASED.has(status));
 }
 
+/** A digest mismatch says the source was altered, so it fails the whole read. */
+class TamperedError extends SpecError {}
+
 /** Never rebuilt from parts, since that would let a rewrite pass the pinned digest. */
 async function readEnvelope(
   read: ReadPath,
@@ -242,7 +268,7 @@ async function readEnvelope(
   // Section 6: every mirror, CDN and host is untrusted, so the client checks the digest.
   const actual = contentDigest(envelope);
   if (actual !== expected) {
-    throw new SpecError(
+    throw new TamperedError(
       `${path} does not match its digest: versions.json says ${expected}, but it hashes to ${actual}.`,
       { path },
     );
