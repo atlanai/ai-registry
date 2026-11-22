@@ -1,0 +1,199 @@
+@import "tailwindcss";
+
+/* Tokens are the original page's CSS variables; light is the only theme it designed. */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Geist", system-ui,
+    sans-serif;
+  --font-mono: "SF Mono", "Geist Mono", "JetBrains Mono", Menlo, monospace;
+
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-subtle: #f1f5f9;
+  --color-ink: #0f172a;
+  --color-ink-hover: #1e293b;
+  --color-ink-2: #334155;
+  --color-muted: #556173;
+  --color-dim: #5f6b7c;
+  --color-faint: #cbd5e1;
+  --color-hairline: rgb(15 23 42 / 0.07);
+  --color-line: rgb(15 23 42 / 0.12);
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-pulse: #10b981;
+
+  --color-core-bg: #eff6ff;
+  --color-core-ink: #1d4ed8;
+  --color-core-line: #dbeafe;
+  --color-growth-bg: #ecfdf5;
+  --color-growth-ink: #047857;
+  --color-growth-line: #d1fae5;
+  --color-style-bg: #faf5ff;
+  --color-style-ink: #7e22ce;
+  --color-style-line: #f3e8ff;
+  --color-studio-bg: #fffbeb;
+  --color-studio-ink: #b45309;
+  --color-studio-line: #fef3c7;
+  --color-aireg-bg: #f0fdf4;
+  --color-aireg-ink: #15803d;
+  --color-aireg-line: #dcfce7;
+
+  --color-ok-bg: #ecfdf5;
+  --color-ok-ink: #047857;
+  --color-ok-line: #d1fae5;
+  --color-warn-bg: #fffbeb;
+  --color-warn-ink: #b45309;
+  --color-warn-line: #fef3c7;
+  --color-warn-strong: #92400e;
+  --color-warn-chip: #fef3c7;
+  --color-bad-bg: #fef2f2;
+  --color-bad-ink: #b91c1c;
+  --color-bad-line: #fecaca;
+  --color-bad-hover: #991b1b;
+  --color-link-bg: #eff6ff;
+  --color-link-ink: #1e40af;
+  --color-copy-bg: #fef3c7;
+  --color-copy-ink: #92400e;
+  --color-copy-line: #fde68a;
+
+  --color-dot-core: #3b82f6;
+  --color-dot-growth: #10b981;
+  --color-dot-style: #9333ea;
+  --color-dot-studio: #f59e0b;
+
+  --shadow-subtle: 0 1px 2px rgb(15 23 42 / 0.04);
+  --shadow-card: 0 1px 3px rgb(15 23 42 / 0.04), 0 4px 12px rgb(15 23 42 / 0.02);
+  --shadow-popover: 0 16px 36px -8px rgb(15 23 42 / 0.14), 0 0 1px rgb(15 23 42 / 0.15);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply overflow-hidden bg-canvas font-sans text-[13px] leading-normal text-ink antialiased;
+  color-scheme: light;
+  text-rendering: optimizeLegibility;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(15 23 42 / 0.12);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(15 23 42 / 0.22);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+input:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-6px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.animate-modal {
+  animation: modal-enter 0.15s var(--ease-out-expo);
+}
+
+.animate-fade-in {
+  animation: fade-in 0.12s ease-out;
+}
+
+/* The markdown reader, as the original styled `.markdown-content`. */
+.doc-article {
+  @apply text-[14px] leading-[1.7] text-ink;
+}
+.doc-article :where(h1, h2, h3, h4) {
+  @apply mt-7 mb-3 font-bold tracking-[-0.02em] text-ink first:mt-0;
+}
+.doc-article h1 {
+  @apply border-b border-hairline pb-2 text-[20px];
+}
+.doc-article h2 {
+  @apply text-[16px];
+}
+.doc-article h3 {
+  @apply text-[14px] font-semibold;
+}
+.doc-article p {
+  @apply mb-4 text-ink-2;
+}
+.doc-article :where(ul, ol) {
+  @apply mt-2.5 mb-4 ml-6 text-ink-2;
+}
+.doc-article ul {
+  @apply list-disc;
+}
+.doc-article ol {
+  @apply list-decimal;
+}
+.doc-article li {
+  @apply mb-1.5;
+}
+.doc-article a {
+  @apply text-accent underline underline-offset-2;
+}
+.doc-article code {
+  @apply rounded border border-hairline bg-subtle px-[5px] py-[1.5px] font-mono text-[12px] text-ink;
+}
+.doc-article pre {
+  @apply my-[18px] overflow-x-auto rounded-lg bg-ink px-[18px] py-4 text-canvas;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.08);
+}
+.doc-article pre code {
+  @apply border-0 bg-transparent p-0 text-[12px] leading-[1.6] text-canvas;
+}
+.doc-article blockquote {
+  @apply my-4 rounded-r-md border-l-[3px] border-ink bg-canvas px-4 py-2 text-ink-2 italic;
+}
+.doc-article table {
+  @apply my-[18px] w-full border-collapse text-[12.5px];
+}
+.doc-article :where(th, td) {
+  @apply border border-hairline px-3 py-2 text-left;
+}
+.doc-article th {
+  @apply bg-subtle font-semibold text-ink;
+}
+.doc-article hr {
+  @apply my-6 border-0 border-t border-hairline;
+}
+.doc-article li:has(> input[type="checkbox"]) {
+  @apply -ml-5 list-none;
+}
+.doc-article input[type="checkbox"] {
+  @apply mr-1.5 align-middle;
+}

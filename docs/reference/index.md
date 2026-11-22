@@ -51,6 +51,7 @@ aireg add <registry>/<namespace>[/<name>[@<version>]] [options]
 | Command | Description |
 |---|---|
 | [`aireg console`](console.md) | Open a full-screen view of installed artifacts, jobs and registries. |
+| [`aireg ui`](ui.md) | Browse your registries and what is installed, in your browser. |
 | [`aireg status`](status.md) | Check installed artifacts against the lockfile, and list the ones nothing manages. |
 | [`aireg list`](list.md) | List what is installed. |
 | [`aireg outdated`](outdated.md) | Check each registry for newer versions of what is installed. |

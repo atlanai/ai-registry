@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { messageOf } from "#adapter/errors.ts";
-import * as commands from "#core/console/actions.ts";
+import * as commands from "#core/child/commands.ts";
 import type { PanelNode, PanelView } from "#core/host/panel.ts";
 import { COLOR } from "#core/term/theme.ts";
 import { box, faint, text } from "./elements.ts";

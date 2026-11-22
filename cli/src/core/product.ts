@@ -77,3 +77,7 @@ export const DAEMON_FLAG = "--internal-daemon";
 export const UPDATE_CHECK_FLAG = "--internal-update-check";
 export const REMOVE_AFTER_FLAG = "--internal-remove-after";
 export const TELEMETRY_FLAG = "--internal-telemetry";
+
+export const UI_DEFAULT_PORT = 3456;
+/** Under aireg's home: one private file per running `aireg ui`, keyed by the folder it serves. */
+export const UI_RUNTIME_DIR = "ui";

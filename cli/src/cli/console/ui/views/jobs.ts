@@ -5,7 +5,7 @@ import { action, box, dim, faint, heading, plain, text } from "#cli/console/ui/e
 import { LAYOUT } from "#cli/console/ui/mouse.ts";
 import { defineView } from "#cli/console/ui/screen.ts";
 import { failureWords } from "#cli/render/run.ts";
-import * as commands from "#core/console/actions.ts";
+import * as commands from "#core/child/commands.ts";
 import type { ConsoleState, JobRow, RunRow } from "#core/console/model.ts";
 import { isFailed } from "#core/run/model.ts";
 import { ago, clock, interval, pad, truncate } from "#core/term/format.ts";

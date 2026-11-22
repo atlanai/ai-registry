@@ -10,7 +10,7 @@ Import across folders with the package's `#` names, such as `#core/errors.ts`, a
 
 ```
 main.ts             parses argv and runs one command; nothing imports it
-cli/                commands, prompts, rendering, the console UI and onboarding
+cli/                commands, prompts, rendering, the console UI, the `aireg ui` server and onboarding
 daemon/             the background service: JSON-RPC server, jobs, scheduler, run history
 self/  engine/      installing, updating and removing aireg itself; what the CLI and the daemon both run
 accounts/ adapters/ sign-in and the registries an account reaches; the built-in adapters, git/, local/ and well-known/
