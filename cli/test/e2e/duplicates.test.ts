@@ -87,11 +87,11 @@ describe("aireg status, for skills that are copies or share a name", () => {
     ]);
 
     const text = await aireg(["status", "-g"], { cwd: home.dir });
-    expect(text.stdout).toContain("6 duplicates");
-    expect(text.stdout).toMatch(
-      /identical\s+code-review\s+installed from team\n\s+pr-review\s+installed from acme/,
+    expect(text.stdout).toMatch(/pdf-tools +skill +\.agents +~\/\.agents\/skills\/pdf-tools/);
+    expect(text.stderr).toContain(
+      "code-review (installed from team) and pr-review (installed from acme) have the same files.",
     );
-    expect(text.stdout).toMatch(/same name\s+pdf-tools\s+~\/\.agents\/skills\/pdf-tools/);
+    expect(text.stderr).toMatch(/2 different pdf-tools skills: ~\/\.agents\/skills\/pdf-tools, /);
   });
 
   test("prints no duplicates section when every skill is its own", async ({ aireg, home }) => {
@@ -102,6 +102,6 @@ describe("aireg status, for skills that are copies or share a name", () => {
     const ran = await aireg(["status", "-g"], { cwd: home.dir });
     expect(ran.code, ran.stderr).toBe(0);
     expect(ran.stdout).toContain("2 unmanaged");
-    expect(ran.stdout).not.toContain("duplicate");
+    expect(ran.stderr).not.toContain("same files");
   });
 });

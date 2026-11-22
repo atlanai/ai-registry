@@ -71,10 +71,12 @@ export const { run } = defineCommand({
       report: true,
     });
     const dangling = await danglingLinks(roots, targetTable, names(targetTable), lock);
-    const loose = await Promise.all(found.local.map(unmanaged));
+    const loose = (await Promise.all(found.local.map(unmanaged))).flat();
     const copies = await duplicates(
       await installedSkills(lock, roots),
-      unmanagedSkills(found.local),
+      loose
+        .filter((item) => item.kind === "skill")
+        .map((item) => ({ name: item.name, path: canonical(item.path) })),
     );
     const rows = installed(lock, manifest, targetTable);
     if (worstState(statuses) !== "ok") context.exit = ExitCode.Changed;
@@ -173,16 +175,24 @@ async function shadowed(scope: string, cwd: string, lock: Lock): Promise<string[
     .sort();
 }
 
-/** One row per artifact: each target once, and the real folder rather than a link to it. */
-async function unmanaged(item: Candidate): Promise<Unmanaged> {
+/** A skill gets a row per real folder, so two of one name both show; an agent's formats stay one row. */
+async function unmanaged(item: Candidate): Promise<Unmanaged[]> {
   const found = [{ from: item.from, target: item.target }, ...item.elsewhere];
   const links = await Promise.all(found.map(({ from }) => isLink(from)));
-  return {
+  const folders = new Map<string, { path?: string; targets: string[] }>();
+  found.forEach(({ from, target }, at) => {
+    const folder = item.kind === "skill" ? canonical(from) : "";
+    const row = folders.get(folder) ?? { targets: [] };
+    if (!links[at]) row.path ??= from;
+    if (!row.targets.includes(target)) row.targets.push(target);
+    folders.set(folder, row);
+  });
+  return [...folders].map(([folder, row]) => ({
     name: item.name,
     kind: item.kind,
-    targets: [...new Set(found.map(({ target }) => target))],
-    path: (found[links.indexOf(false)] ?? item).from,
-  };
+    targets: row.targets,
+    path: row.path ?? (folder || item.from),
+  }));
 }
 
 async function isLink(path: string): Promise<boolean> {
@@ -207,18 +217,6 @@ async function installedSkills(lock: Lock, roots: Roots): Promise<Copy[]> {
       }),
   );
   return copies.flat();
-}
-
-/** Every real folder an unmanaged skill is in: a link of yours is the folder it points at. */
-function unmanagedSkills(found: readonly Candidate[]): Copy[] {
-  return found
-    .filter((item) => item.kind === "skill")
-    .flatMap((item) => {
-      const folders = new Set(
-        [item.from, ...item.elsewhere.map(({ from }) => from)].map(canonical),
-      );
-      return [...folders].map((path) => ({ name: item.name, path }));
-    });
 }
 
 function needsApproval(lock: Lock, roots: Roots, targetTable: Targets): Map<string, Approval[]> {
@@ -254,14 +252,7 @@ function shown(roots: { scope: string; base: string }, path: string): string {
     : underHome(path);
 }
 
-const MATCH: Record<Duplicate["match"], string> = { identical: "identical", name: "same name" };
-
-interface CopyRow {
-  match: string;
-  copy: Copy;
-}
-
-/** One row per copy, the match named on the first row of its group. */
+/** Warnings on rows the unmanaged table and the artifact table already list. */
 function printDuplicates(
   printer: Printer,
   roots: { scope: string; base: string },
@@ -269,24 +260,26 @@ function printDuplicates(
 ): void {
   if (found.length === 0) return;
   printer.info();
-  printer.info(printer.style.bold(plural(found.length, "duplicate")));
-  const rows: CopyRow[] = found.flatMap(({ match, artifacts }) =>
-    artifacts.map((copy, at) => ({ match: at === 0 ? MATCH[match] : "", copy })),
-  );
-  table(
-    printer,
-    [
-      { header: "match", value: (row: CopyRow) => row.match },
-      { header: "artifact", value: (row: CopyRow) => row.copy.name },
-      {
-        header: "where",
-        value: ({ copy }: CopyRow) =>
-          copy.registry === undefined ? shown(roots, copy.path) : `installed from ${copy.registry}`,
-      },
-    ],
-    rows,
-  );
-  printer.note("next", "rm -r <path> for a copy you do not need, or aireg remove <artifact>");
+  const where = (copy: Copy) =>
+    copy.registry === undefined
+      ? `${copy.name} (${shown(roots, copy.path)})`
+      : `${copy.name} (installed from ${copy.registry})`;
+  for (const { match, artifacts } of found) {
+    const [first, ...rest] = artifacts as [Copy, ...Copy[]];
+    printer.warning(
+      match === "identical"
+        ? `${[first, ...rest].map(where).join(rest.length === 1 ? " and " : ", ")} have the same files.`
+        : `${artifacts.length} different ${first.name} skills: ${artifacts.map((copy) => shown(roots, copy.path)).join(", ")}. Each target may load a different one.`,
+    );
+  }
+  const copies = found.flatMap(({ artifacts }) => artifacts);
+  const steps = [
+    copies.some((copy) => copy.registry === undefined) &&
+      "rm -r <path> for a copy of yours you do not need",
+    copies.some((copy) => copy.registry !== undefined) &&
+      "aireg remove <artifact> for an installed one",
+  ].filter((step) => step !== false);
+  printer.note("next", steps.join(", or "));
 }
 
 function printDangling(

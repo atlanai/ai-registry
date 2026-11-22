@@ -65,7 +65,7 @@ const Duplicate = Type.Object(
   {
     match: Type.Union([Type.Literal("identical"), Type.Literal("name")], {
       description:
-        "`identical`: the same files, line endings and SKILL.md's `name` aside. `name`: unmanaged skills of one name whose files differ.",
+        "`identical`: the same files, line endings in text files and SKILL.md's `name` aside. `name`: unmanaged skills of one name whose files differ.",
     }),
     artifacts: Type.Array(
       Type.Object(

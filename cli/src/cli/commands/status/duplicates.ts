@@ -1,12 +1,6 @@
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { CONCURRENCY, limiter } from "#adapter/concurrency.ts";
-import { ENVELOPE } from "#adapter/filespec/names.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { byCodeUnit } from "#adapter/text.ts";
-import { withName } from "#core/frontmatter.ts";
-import { authored } from "#core/fs/tree.ts";
+import { normalizedDigest } from "#core/fs/digest.ts";
 
 export interface Copy {
   name: string;
@@ -33,7 +27,7 @@ export async function duplicates(
   const all = [...installed, ...unmanaged];
   // Each key reads every file of a skill; hundreds at once would run out of descriptors.
   const bounded = limiter(CONCURRENCY);
-  const keys = await Promise.all(all.map((copy) => bounded(() => contentKey(copy.path))));
+  const keys = await Promise.all(all.map((copy) => bounded(() => normalizedDigest(copy.path))));
   const keyOf = new Map(all.map((copy, at) => [copy, keys[at]]));
   const identical = groupBy(all, (copy) => keyOf.get(copy) ?? copy.path);
   const named = groupBy(unmanaged, (copy) => copy.name).filter(
@@ -43,22 +37,6 @@ export async function duplicates(
     ...identical.map((artifacts) => ({ match: "identical" as const, artifacts })),
     ...named.map((artifacts) => ({ match: "name" as const, artifacts })),
   ];
-}
-
-/**
- * Each file's path, length and text, so two different folders never share a key. Line endings
- * and SKILL.md's `name` are left out, since a copy that differs only in those is still a copy.
- */
-async function contentKey(dir: string): Promise<string> {
-  const hash = createHash("sha256");
-  for (const file of (await authored(dir)).files) {
-    if (file.path === ENVELOPE) continue;
-    // Latin-1 reads each byte as one character, so any file reads the same way twice.
-    let text = (await readFile(join(dir, file.path), "latin1")).replaceAll("\r\n", "\n");
-    if (file.path === SKILL_ENTRY) text = withName(text, "");
-    hash.update(`${file.path}\0${text.length}\0`).update(text, "latin1");
-  }
-  return hash.digest("hex");
 }
 
 /** Groups of two or more, each sorted, in the order of their first copy. */

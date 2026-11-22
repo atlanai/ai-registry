@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -25,6 +25,28 @@ async function folder(
 }
 
 describe("duplicates", () => {
+  test.skipIf(process.platform === "win32")(
+    "keeps a binary file's bytes, its execute bit and links inside the folder",
+    async ({ tmp }) => {
+      const base = { "SKILL.md": skill("tool", EXTRACT) };
+      const lf = await folder(tmp, "a/tool", { ...base, "logo.bin": "\0a\nb" });
+      const crlf = await folder(tmp, "b/tool-crlf", { ...base, "logo.bin": "\0a\r\nb" });
+      const plain = await folder(tmp, "c/run", { ...base, "run.sh": "echo\n" });
+      const runnable = await folder(tmp, "d/run-x", { ...base, "run.sh": "echo\n" });
+      await chmod(join(runnable.path, "run.sh"), 0o755);
+      const linked = await folder(tmp, "e/linked", base);
+      await symlink(join(plain.path, "run.sh"), join(linked.path, "run.sh"));
+      const bare = await folder(tmp, "f/bare", base);
+
+      const found = await duplicates([], [lf, crlf, plain, runnable, linked, bare]);
+      expect(
+        found
+          .filter(({ match }) => match === "identical")
+          .flatMap(({ artifacts }) => artifacts.map(({ path }) => path)),
+      ).toEqual([]);
+    },
+  );
+
   test("groups copies whose files match, whatever their names and line endings", async ({
     tmp,
   }) => {
