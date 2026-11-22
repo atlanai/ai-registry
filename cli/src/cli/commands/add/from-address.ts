@@ -88,8 +88,9 @@ export async function addAddress(
       repinned = declare(manifest.artifacts, refs, narrowed, choices.copy, trust, (ref) =>
         reached(fresh.lock, ref).at(0),
       );
+      // A whole ref asks only for what the lock holds, so an unlocked member stays named.
       manifest.artifacts = manifest.artifacts.filter(
-        (ref) => !coveredByWhole(ref, manifest.artifacts),
+        (ref) => !coveredByWhole(ref, manifest.artifacts) || reached(fresh.lock, ref).length === 0,
       );
 
       // Other registries stay as locked, so one add does not re-plan the scope. Naming something
