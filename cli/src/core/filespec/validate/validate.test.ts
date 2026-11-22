@@ -100,6 +100,17 @@ const CASES: Case[] = [
     message: 'is named "other" in its front matter',
   },
   {
+    name: "front matter that does not parse",
+    edit: (root) =>
+      put(
+        root,
+        "artifacts/eng/skill/fmt/1.0.0/SKILL.md",
+        "---\nname: fmt\ndescription: Steps: read, then act.\n---\n",
+      ),
+    path: "artifacts/eng/skill/fmt/1.0.0",
+    message: "does not parse as YAML at line 3; quote a value that contains `: `",
+  },
+  {
     name: "a dependency the registry does not hold",
     build: (registry) =>
       registry.agent("eng/helper@1.0.0", {
