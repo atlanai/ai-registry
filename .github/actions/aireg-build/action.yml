@@ -43,8 +43,8 @@ runs:
         set -euo pipefail
         npm install --global --force corepack@0.36.0
         corepack enable pnpm
-        # Bun bundles src/main.ts itself, so only the packages the CLI runs with are needed.
-        pnpm install --frozen-lockfile --prod
+        # Not --prod: release:compile first builds the page with Vite, a dev dependency.
+        pnpm install --frozen-lockfile
         AIREG_RELEASE_KEYRING="$(printf '%s' "$TRUSTED_KEYS" | base64 | tr -d '\n')"
         export AIREG_RELEASE_KEYRING
         pnpm run release:compile

@@ -17,7 +17,7 @@ import { cancel, interaction, interactive } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
 import { confirm } from "#cli/prompt/select.ts";
 import { adapterFor, declaredLayout } from "#core/adapter/load.ts";
-import { open } from "#core/console/actions.ts";
+import { open } from "#core/child/commands.ts";
 import { type SignInPrompt, signInWithOAuth } from "#core/credentials/oauth.ts";
 import { isCI, registryToken, tokenVariable } from "#core/env.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";

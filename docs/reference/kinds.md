@@ -27,7 +27,7 @@ A skill gets a `SKILL.md`. An agent gets an `AGENT.md`, or an `agent-card.json` 
 
 Native `AGENT.md` front matter can include fields such as `tools`, `model` and tool-specific
 extensions. These fields are preserved. Skill front matter remains limited to the Agent Skills
-fields; skill names cannot contain consecutive hyphens, and `compatibility`, if present, must
+fields and Claude Code's `disable-model-invocation`; skill names cannot contain consecutive hyphens, and `compatibility`, if present, must
 contain 1–500 characters. Character limits count Unicode code points.
 
 Supporting README and JSON files are allowed, but never supply a built-in kind's identity or

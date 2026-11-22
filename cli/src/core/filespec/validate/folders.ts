@@ -16,6 +16,7 @@ import {
   type kindsOf,
   SPEC_TEXT,
   specOf,
+  specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
 import { authored, refusal } from "#core/fs/tree.ts";
@@ -33,7 +34,11 @@ export function versionProblems(
 ): string[] {
   const problems = fileProblems(manifest, present);
   const spec = specOf(manifest, contents, at.name);
-  if (spec === undefined) return [...problems, "has no front matter to read its fields from"];
+  if (spec === undefined) {
+    const why =
+      specParseProblem(manifest, contents) ?? "has no front matter to read its fields from";
+    return [...problems, why];
+  }
   problems.push(...check(manifest, spec), ...fractionProblems(spec));
   for (const field of placeholders(spec)) problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
   if (typeof spec.name === "string" && spec.name !== at.name) {

@@ -10,9 +10,21 @@
     "exports",
     "types"
   ],
-  "project": ["src/**/*.ts", "packaging/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
-  // generate.ts imports each command's output schema by reading the folder.
-  "entry": ["scripts/schema/output/*.ts"],
+  "project": [
+    "src/**/*.ts",
+    "packaging/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "ui/**/*.{ts,tsx,css}"
+  ],
+  // generate.ts imports each command's output schema by reading the folder; vite builds the page
+  // from ui/, which imports the UI protocol.
+  "entry": [
+    "scripts/schema/output/*.ts",
+    "src/cli/ui/protocol.ts",
+    "ui/src/main.tsx",
+    "ui/vite.config.ts"
+  ],
   // util-linux's, which a test runs to give aireg a terminal of its own.
   "ignoreBinaries": ["script"]
 }

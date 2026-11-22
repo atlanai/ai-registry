@@ -16,7 +16,13 @@ import { VERSION } from "#core/version.ts";
 import { autostartState, disableAutostart } from "#daemon/autostart/index.ts";
 import { probeDaemon, stopDaemon } from "#daemon/process/lifecycle.ts";
 import { removeFromPath } from "#self/shell-path.ts";
-import { deleteFolders, type Footprint, footprint, unlinkUserScope } from "#self/uninstall.ts";
+import {
+  deleteFolders,
+  type Footprint,
+  footprint,
+  unlinkUserScope,
+  untouched,
+} from "#self/uninstall.ts";
 
 interface Found extends Footprint {
   daemon: boolean;
@@ -75,15 +81,16 @@ export async function uninstall(
       hint: "Nothing was removed. Run `aireg daemon stop`, then `aireg self uninstall` again.",
     });
   }
-  let links: string[];
+  let teardown: { links: string[]; kept: string[] };
   try {
-    links = await unlinkUserScope(process.env);
+    teardown = await unlinkUserScope(process.env);
   } catch (error) {
     throw new AiregError(`Could not remove your user scope's links: ${messageOf(error)}`, {
       cause: error,
       hint: "Only the daemon was stopped. Fix the cause, then run `aireg self uninstall` again.",
     });
   }
+  const kept = [...untouched(), ...teardown.kept];
   const path = await removeFromPath();
   const folders = await deleteFolders();
   const failed = [...path.failed, ...folders.failed];
@@ -98,10 +105,10 @@ export async function uninstall(
     dryRun: false,
     daemon: found.daemon,
     autostart: found.autostart && stopped.autostart,
-    links,
+    links: teardown.links,
     startupFiles: path.removed,
     folders: folders.deleted,
-    kept: found.kept,
+    kept,
   };
 }
 
@@ -141,7 +148,7 @@ function report(printer: Printer, done: Found): void {
   }
   if (done.folders.length > 0) printer.success(`Deleted ${list(done.folders.map(underHome))}.`);
   for (const path of done.kept) {
-    printer.info(`Kept ${underHome(path)}, since aireg's installer did not put it there.`);
+    printer.info(`Kept ${underHome(path)}, since aireg did not put it there.`);
   }
   printer.success("Uninstalled aireg.");
   printer.info(

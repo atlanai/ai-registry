@@ -445,8 +445,16 @@ export async function readLock(roots: Pick<Roots, "scope" | "lock">): Promise<Lo
       hint: "Check that it is a file you can read.",
     });
   }
-  return canonicalTargets(parseLock(text, path, roots.scope));
+  const key = `${roots.scope}\0${path}`;
+  const kept = parsed.get(key);
+  if (kept?.text === text) return canonicalTargets(structuredClone(kept.lock));
+  const lock = parseLock(text, path, roots.scope);
+  parsed.set(key, { text, lock: structuredClone(lock) });
+  return canonicalTargets(lock);
 }
+
+/** The last parse per lock, reused while the text is unchanged; parsing YAML is the slow part. */
+const parsed = new Map<string, { text: string; lock: Lock }>();
 
 /** Each target by its canonical id, so a lock aireg 0.1 wrote reads as this one writes it. */
 function canonicalTargets(lock: Lock): Lock {

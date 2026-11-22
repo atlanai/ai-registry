@@ -1,0 +1,8 @@
+.hermes/
+.hermes/skills/
+.hermes/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint
+.hermes/skills/ship -> ../../.registry/artifacts/kit/kit/skills/ship
+project/
+project/.agents/
+project/.agents/skills/
+project/.agents/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint

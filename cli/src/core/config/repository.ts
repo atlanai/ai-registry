@@ -16,10 +16,18 @@ export function configPath(env: NodeJS.ProcessEnv = process.env): string {
   return join(toolHome(env), CONFIG_FILENAME);
 }
 
+/** The last parse per path, reused while the text is unchanged; parsing YAML is the slow part. */
+const parsed = new Map<string, { text: string; config: RegistryConfig }>();
+
 export async function readConfig(env: NodeJS.ProcessEnv = process.env): Promise<RegistryConfig> {
   const path = configPath(env);
   try {
-    return parseConfig(await readFile(path, "utf8"), path);
+    const text = await readFile(path, "utf8");
+    const kept = parsed.get(path);
+    if (kept?.text === text) return structuredClone(kept.config);
+    const config = parseConfig(text, path);
+    parsed.set(path, { text, config: structuredClone(config) });
+    return config;
   } catch (cause) {
     if (isMissing(cause)) return emptyRegistryConfig();
     throw cause;

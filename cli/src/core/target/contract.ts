@@ -7,6 +7,7 @@ interface ContentsMapping {
   extension?: undefined;
   scope?: undefined;
   place?: undefined;
+  depth?: undefined;
   entry?: undefined;
   manifest?: undefined;
   register?: undefined;
@@ -27,6 +28,8 @@ interface DirectoryMapping {
    * files, for one that rewrites or refuses links.
    */
   place?: "link" | "fan" | "copy" | undefined;
+  /** How many folders deep below `subdir` the target finds this kind; 1, the top, when unset. */
+  depth?: number | undefined;
   /** For a file-shaped kind: the file's name inside its folder, written as a copy. */
   entry?: string | undefined;
   /** A plugin directory's manifests: the plugin's own if it has one, else written if missing. */
@@ -54,6 +57,7 @@ interface FileMapping {
   scope?: "user" | undefined;
   /** `copy` writes a real file, for a target that rewrites or refuses links. */
   place?: "link" | "copy" | undefined;
+  depth?: undefined;
   entry?: undefined;
   manifest?: undefined;
   register?: undefined;

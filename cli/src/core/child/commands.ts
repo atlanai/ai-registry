@@ -69,13 +69,46 @@ export function retryRun(id: string): Command {
   return shown(argv);
 }
 
-export interface Running {
-  done: Promise<number>;
-  cancel(): void;
+export interface AddChoices {
+  /** Narrows a source of many artifacts to these names. */
+  select?: readonly string[];
+  /** Plugins the person read and chose to trust, by name. */
+  trust?: readonly string[];
+  /** Prints the plan as data and writes nothing; else installs, printing each step. */
+  dryRun: boolean;
 }
 
+/** Values ride in `--flag=value` form, so one such as `--all` stays a value. */
+export function add(address: string, choices: AddChoices, scope: Scope): Command {
+  const argv = ["add", ...scoped(scope)];
+  for (const name of choices.select ?? []) argv.push(`--select=${name}`);
+  for (const name of choices.trust ?? []) argv.push(`--trust=${name}`);
+  argv.push(...(choices.dryRun ? ["--dry-run", "--json"] : ["--yes"]), ...data([address]));
+  return shown(argv);
+}
+
+export function remove(names: readonly string[], scope: Scope): Command {
+  return shown(["remove", ...scoped(scope), "--yes", ...data(names)]);
+}
+
+export function doctor(): Command {
+  return shown(["doctor", "--json"]);
+}
+
+export interface Running {
+  done: Promise<number>;
+  /** SIGINT by default, which lets the child release its lease. */
+  cancel(signal?: NodeJS.Signals): void;
+}
+
+export type Stream = "stdout" | "stderr";
+
 /** Every write runs as a child CLI, which owns the lease; a writer here would take it twice. */
-export function start(command: Command, root: string, onLine: (line: string) => void): Running {
+export function start(
+  command: Command,
+  root: string,
+  onLine: (line: string, stream: Stream) => void,
+): Running {
   // The same launcher self-update uses: a standalone build is its own interpreter.
   const launch = launchArgv(runningEntry() ?? NAME, command.argv);
   // The console owns the terminal, so the child gets pipes and never stdin.
@@ -84,21 +117,23 @@ export function start(command: Command, root: string, onLine: (line: string) => 
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, NO_COLOR: "1" },
   });
-  for (const stream of [child.stdout, child.stderr]) {
-    if (stream === null) continue;
-    createInterface({ input: stream }).on("line", (line) => {
+  for (const [stream, input] of [
+    ["stdout", child.stdout],
+    ["stderr", child.stderr],
+  ] as const) {
+    createInterface({ input }).on("line", (line) => {
       const text = line.trimEnd();
-      if (text !== "") onLine(text);
+      if (text !== "") onLine(text, stream);
     });
   }
   const done = new Promise<number>((resolve) => {
     child.once("error", (error) => {
-      onLine(`Could not run ${launch.command}: ${error.message}`);
+      onLine(`Could not run ${launch.command}: ${error.message}`, "stderr");
       resolve(-1);
     });
     child.once("close", (code) => resolve(code ?? -1));
   });
-  return { done, cancel: () => child.kill("SIGINT") };
+  return { done, cancel: (signal = "SIGINT") => child.kill(signal) };
 }
 
 /**

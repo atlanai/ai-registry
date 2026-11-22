@@ -1,11 +1,13 @@
 import { createHash, type Hash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { EXECUTE_BITS } from "#adapter/files.ts";
 import { ENVELOPE } from "#adapter/filespec/names.ts";
+import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { setRecent } from "#adapter/lru.ts";
 import { hashStream, sha256 } from "#adapter/spec/canonical.ts";
+import { withName } from "#core/frontmatter.ts";
 import { authored, type FileRecord, isDirectory, walk } from "#core/fs/tree.ts";
 
 type Listed = Pick<FileRecord, "path" | "size" | "mtimeMs" | "ino" | "executable">;
@@ -18,7 +20,7 @@ interface Tree {
   folder: boolean;
 }
 
-type Encoding = "framed" | "unframed";
+type Encoding = "framed" | "unframed" | "normalized";
 
 /** What aireg 0.1 records for the files a framed digest describes, when this process knows it. */
 export function earlierDigest(framed: string): string | undefined {
@@ -95,7 +97,7 @@ async function encodedDigest(tree: Tree, encoding: Encoding): Promise<string> {
   const stamp = stampOf(tree.files);
   const known = KNOWN.get(tree.key);
   const held = known?.stamp === stamp ? known : { stamp };
-  const value = held[encoding] ?? (await (encoding === "framed" ? framed : unframed)(tree));
+  const value = held[encoding] ?? (await ENCODERS[encoding](tree));
   const newestMs = tree.files.reduce((newest, file) => Math.max(newest, file.mtimeMs), 0);
   if (Date.now() - newestMs >= RACY_MS) {
     setRecent(KNOWN, tree.key, { ...held, [encoding]: value }, KNOWN_LIMIT);
@@ -135,4 +137,40 @@ async function hashFile(hash: Hash, path: string): Promise<void> {
 export async function authoredDigest(path: string, recorded?: string): Promise<string> {
   if (!(await isDirectory(path))) return settle(await lone(path), recorded);
   return settle(folder(path, `${path}\0authored`, (await authored(path)).files), recorded);
+}
+
+const ENCODERS: Record<Encoding, (tree: Tree) => Promise<string>> = {
+  framed,
+  unframed,
+  normalized,
+};
+
+/**
+ * A skill folder as its reader sees it, so copies that differ only in line endings or the
+ * `name` in SKILL.md share a digest. Binary files keep their bytes.
+ */
+async function normalized(tree: Tree): Promise<string> {
+  const entries: [string, boolean, string][] = [];
+  for (const file of [...tree.files].sort(byPath)) {
+    const bytes = await readFile(join(tree.root, file.path));
+    let content: string | Buffer = bytes;
+    if (!bytes.includes(0)) {
+      const text = bytes.toString("latin1").replaceAll("\r\n", "\n");
+      content = file.path === SKILL_ENTRY ? withName(text, "") : text;
+    }
+    entries.push([
+      file.path,
+      file.executable,
+      sha256(typeof content === "string" ? Buffer.from(content, "latin1") : content),
+    ]);
+  }
+  return sha256(JSON.stringify(entries));
+}
+
+/** What `duplicates` compares: links and other irregular entries count by path and reason. */
+export async function normalizedDigest(path: string): Promise<string> {
+  const { files, irregular } = await authored(path);
+  const tree = folder(path, `${path}\0normalized`, files);
+  const links = irregular.map((entry) => `${entry.path}\0${entry.reason}`).sort();
+  return sha256(`${await encodedDigest(tree, "normalized")}\0${links.join("\n")}`);
 }

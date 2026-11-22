@@ -171,6 +171,15 @@ describe("consuming a registry like a package manager", () => {
     expect(manifest).not.toContain("acme/platform/skill/lint");
     // The namespace keeps taking what it publishes, minus what was removed.
     expect(manifest).toMatch(/exclude:\n\s+- skill\/lint/);
+    const readded = await aireg([
+      "add",
+      "acme/platform",
+      "--select",
+      "lint",
+      "--dry-run",
+      "--json",
+    ]);
+    expect(JSON.parse(readded.stdout).data.installed).toEqual(["platform/lint"]);
     const listed = (await aireg(["list"])).stdout;
     expect(listed).not.toContain("lint");
     expect(listed).toContain("changelog");

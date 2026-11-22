@@ -151,6 +151,51 @@
         "jobId": {
           "description": "The background job that keeps a user scope install current.",
           "type": "string"
+        },
+        "untrusted": {
+          "description": "Plugins left out until trusted with `--trust`.",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "carries"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "carries": {
+                "description": "What it carries that a target runs as you.",
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "const": "hooks",
+                      "type": "string"
+                    },
+                    {
+                      "const": "mcpServers",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lspServers",
+                      "type": "string"
+                    },
+                    {
+                      "const": "monitors",
+                      "type": "string"
+                    },
+                    {
+                      "const": "bin",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     }

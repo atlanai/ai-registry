@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { digest } from "#core/fs/digest.ts";
 import { link } from "#core/fs/link.ts";
+import { posixRelative } from "#core/fs/path.ts";
 import { type Lock, writeLock } from "#core/lock.ts";
 import { projectionsOf } from "#core/plan/projection.ts";
 import { assertRemovable } from "#core/plan/removable.ts";
@@ -65,7 +66,7 @@ function keepUnstaged(run: Run, lock: Lock): void {
 function patchRow(
   results: Pick<
     RunResults,
-    "digests" | "staged" | "kept" | "skipped" | "modes" | "pathModes" | "copies"
+    "digests" | "staged" | "kept" | "skipped" | "blockers" | "modes" | "pathModes" | "copies"
   >,
   base: string,
   name: string,
@@ -78,10 +79,16 @@ function patchRow(
   if (identity !== undefined) entry.content = identity;
   // Prune reads this list, so a link that was never made must not be
   // in it: the member it would have pointed at does not exist.
-  const blocked = entry.links.filter((item) =>
-    results.kept.some((held) => held.name === name && held.path === resolve(base, item.path)),
-  );
-  const held = [...(entry.blocked ?? []), ...blocked.map(({ target, path }) => ({ target, path }))];
+  const blocked = entry.links.flatMap((item) => {
+    const kept = results.kept.find(
+      (held) => held.name === name && held.path === resolve(base, item.path),
+    );
+    if (kept === undefined) return [];
+    const blocker = results.blockers.get(linkKey(name, resolve(base, item.path)));
+    const path = blocker === undefined ? item.path : posixRelative(base, blocker);
+    return [{ target: item.target, path }];
+  });
+  const held = [...(entry.blocked ?? []), ...blocked];
   entry.blocked = held.length === 0 ? undefined : held;
   entry.links = entry.links.filter(
     (item) => !results.skipped.has(linkKey(name, resolve(base, item.path))),

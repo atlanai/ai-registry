@@ -41,29 +41,15 @@ export async function collect(
   context: HostCommandContext,
   options: CollectOptions = {},
 ): Promise<ConsoleState> {
-  const problems: string[] = [];
-  const config = await readConfig();
-  const roots = rootsFor(config, context.cwd);
-  const manifest = await readManifest(roots.manifest).catch(() => undefined);
-  if (manifest === undefined) problems.push(`Cannot read ${roots.manifest}.`);
-  const resolved: Manifest = manifest ?? emptyManifest();
-
-  const targetTable = resolveTargets(process.env);
-  const lock = await readLock(roots).catch((error: Error) => {
-    problems.push(error.message);
-    return emptyLock();
-  });
-  const surveyed = await survey(lock, roots);
-  const statuses = status(lock, surveyed, roots);
+  const shared = await (options.shared ?? readShared(context));
+  const { config, roots, resolved, targetTable, lock, surveyed, statuses, accounts } = shared;
+  const problems = [...shared.problems];
 
   const store = await context.host.openRunStore();
   let runs: RunRecord[] = [];
   try {
     runs = store.list({ limit: RUN_HISTORY });
 
-    const accounts = await readAccounts(config, resolved, {
-      byAlias: countByAlias(lock),
-    });
     const chosen = pick(accounts, options.accountId);
     const account =
       chosen === undefined
@@ -199,7 +185,30 @@ function countByAlias(lock: Awaited<ReturnType<typeof readLock>>) {
 export interface CollectOptions {
   /** Defaults to the first configured account. */
   accountId?: string | undefined;
+  /** Reuse one read of disk across accounts; hashing every installed file is the slow part. */
+  shared?: Promise<Shared> | undefined;
 }
+
+/** What every account's view reads the same way: config, manifest, lock and the installed tree. */
+export async function readShared(context: HostCommandContext) {
+  const problems: string[] = [];
+  const config = await readConfig();
+  const roots = rootsFor(config, context.cwd);
+  const manifest = await readManifest(roots.manifest).catch(() => undefined);
+  if (manifest === undefined) problems.push(`Cannot read ${roots.manifest}.`);
+  const resolved: Manifest = manifest ?? emptyManifest();
+  const targetTable = resolveTargets(process.env);
+  const lock = await readLock(roots).catch((error: Error) => {
+    problems.push(error.message);
+    return emptyLock();
+  });
+  const surveyed = await survey(lock, roots);
+  const statuses = status(lock, surveyed, roots);
+  const accounts = await readAccounts(config, resolved, { byAlias: countByAlias(lock) });
+  return { problems, config, roots, resolved, targetTable, lock, surveyed, statuses, accounts };
+}
+
+type Shared = Awaited<ReturnType<typeof readShared>>;
 
 function pick(accounts: readonly AccountRow[], wanted: string | undefined): AccountRow | undefined {
   if (wanted === undefined) return accounts[0];

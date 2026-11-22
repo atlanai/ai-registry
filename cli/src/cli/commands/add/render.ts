@@ -57,6 +57,14 @@ export function addedData(
     dependencies: result.plan.neededBy,
     ...outcome(result, dryRun),
     ...(jobId === undefined ? {} : { jobId }),
+    ...(result.plan.untrusted.length === 0
+      ? {}
+      : {
+          untrusted: result.plan.untrusted.map(({ name, carries }) => ({
+            name,
+            carries: [...carries],
+          })),
+        }),
   };
 }
 

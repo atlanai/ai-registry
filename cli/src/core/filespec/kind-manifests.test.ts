@@ -148,6 +148,8 @@ describe("native kind contracts", async () => {
     expect(check(skill, { ...spec, description: "😀".repeat(1024) })).toEqual([]);
     expect(check(skill, { ...spec, description: "😀".repeat(1025) })).not.toEqual([]);
     expect(check(skill, { ...spec, custom: true })).not.toEqual([]);
+    expect(check(skill, { ...spec, "disable-model-invocation": true })).toEqual([]);
+    expect(check(skill, { ...spec, "disable-model-invocation": "yes" })).not.toEqual([]);
   });
 });
 

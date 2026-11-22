@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import { actionOf } from "#cli/commands/command.ts";
 import { builtin } from "#cli/commands/index.ts";
 import { parse, takeGlobals } from "#cli/options/parse.ts";
+import * as actions from "#core/child/commands.ts";
 import { isStepPolicy } from "#core/config/model.ts";
-import * as actions from "#core/console/actions.ts";
 
 /** Parsed as aireg parses it: the command, its action if any, then the options. */
 function accepted(argv: readonly string[]): void {

@@ -21,6 +21,7 @@ import {
   SPEC_TEXT,
   specFile,
   specOf,
+  specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
 import { fractionProblems } from "#core/filespec/validate/folders.ts";
@@ -160,7 +161,7 @@ async function incoming(
       .map((entry) => `${entry.path} ${refusal(entry)}`),
     ...fileProblems(manifest, new Set(entries.map((path) => stored.get(path) ?? path))),
     ...(spec === undefined
-      ? ["has no front matter"]
+      ? [specParseProblem(manifest, texts) ?? "has no front matter"]
       : [...check(manifest, spec), ...fractionProblems(spec)]),
   ];
   const fallback =

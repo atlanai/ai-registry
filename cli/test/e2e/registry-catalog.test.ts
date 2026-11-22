@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import { registry } from "#test/kit/builders/registry.ts";
 import { type Aireg, fileTest as test } from "#test/kit/fixtures.ts";
 
 let root: string;
@@ -193,5 +194,33 @@ describe("a change that edits a released version", () => {
     expect(fixed.code, fixed.stdout).toBe(0);
     expect(await readFile(skill("0.1.1"), "utf8")).toContain("stricter");
     expect(await readFile(skill("0.1.0"), "utf8")).not.toContain("stricter");
+  });
+});
+
+describe("a registry with one artifact that fails to load", () => {
+  test("lists the rest and names the one it skipped, but refuses to install it", async ({
+    aireg,
+  }) => {
+    const dir = join(root, "mixed");
+    await registry(dir).skill("notes/lint@1.0.0").skill("notes/quiet@0.1.0").write();
+    const envelope = join(dir, "artifacts", "notes", "skill", "quiet", "0.1.0", "artifact.json");
+    const document = JSON.parse(await readFile(envelope, "utf8"));
+    document.files.push({ ...document.files[0], path: ".git/HEAD" });
+    await writeFile(envelope, JSON.stringify(document));
+    const skipped =
+      'Skipped "notes/skill/quiet": `files[1]` in artifacts/notes/skill/quiet/0.1.0/artifact.json names ".git/HEAD", which is not a path inside the artifact.';
+
+    expect((await aireg(["registry", "add", dir, "--as", "mixed", "-g"])).code).toBe(0);
+    const shown = await aireg(["registry", "show", "mixed", "-g"]);
+    expect(shown.code, shown.stderr).toBe(0);
+    expect(shown.stdout).toContain("notes/lint");
+    expect(shown.stderr).toContain(skipped);
+    const found = await aireg(["search", "lint", "-g"]);
+    expect(found.code, found.stderr).toBe(0);
+    expect(found.stdout).toContain("notes/lint");
+
+    const added = await aireg(["add", "mixed/notes/quiet", "-g", "-y", "--no-auto-update"]);
+    expect(added.code).toBe(1);
+    expect(added.stderr).toContain('names ".git/HEAD", which is not a path inside the artifact.');
   });
 });

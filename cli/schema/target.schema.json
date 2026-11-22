@@ -53,6 +53,11 @@
                 "copy"
               ]
             },
+            "depth": {
+              "minimum": 1,
+              "description": "How many folders deep below subdir the target finds this kind; 1, the top, when unset. Past 1, an artifact whose name a skill within that depth already has is left out.",
+              "type": "integer"
+            },
             "entry": {
               "minLength": 1,
               "type": "string"
