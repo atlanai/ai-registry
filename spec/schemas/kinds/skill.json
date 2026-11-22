@@ -24,6 +24,10 @@
       "type": "string",
       "description": "Space-separated tool allowlist, as written in the front-matter."
     },
+    "disable-model-invocation": {
+      "type": "boolean",
+      "description": "Claude Code: true stops the model from invoking the skill on its own."
+    },
     "compatibility": {
       "type": "string",
       "maxLength": 500,
