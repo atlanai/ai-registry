@@ -1,3 +1,4 @@
+import { YAMLParseError } from "yaml";
 import { isRecord } from "#adapter/fields.ts";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { sanitizeText } from "#adapter/text.ts";
@@ -47,6 +48,22 @@ export function frontmatterRecord(text: string): Record<string, unknown> | undef
     return isRecord(doc) ? doc : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** Why a block that is present does not parse, naming its line in the file; else undefined. */
+export function frontmatterParseProblem(text: string): string | undefined {
+  const match = FENCE.exec(text);
+  if (match === null) return undefined;
+  try {
+    parseYaml(match[1] ?? "");
+    return undefined;
+  } catch (error) {
+    if (!(error instanceof YAMLParseError)) throw error;
+    // Line 1 is the opening fence.
+    const at = error.linePos === undefined ? "" : ` at line ${error.linePos[0].line + 1}`;
+    const hint = error.code === "BLOCK_AS_IMPLICIT_KEY" ? "; quote a value that contains `: `" : "";
+    return `has front matter that does not parse as YAML${at}${hint}`;
   }
 }
 

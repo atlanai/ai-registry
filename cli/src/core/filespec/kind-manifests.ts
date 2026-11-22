@@ -10,7 +10,7 @@ import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
-import { frontmatterRecord } from "#core/frontmatter.ts";
+import { frontmatterParseProblem, frontmatterRecord } from "#core/frontmatter.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { AGENT_CARD_ENTRY } from "#core/product.ts";
 import agent from "#schema/kinds/agent.json" with { type: "json" };
@@ -233,6 +233,15 @@ export function envelopeSpec(
     if (/\.(md|json)$/.test(path)) text.set(path, Buffer.from(bytes).toString("utf8"));
   }
   return specOf(manifest, text, name) ?? {};
+}
+
+/** Why the kind's Markdown carries no spec although its front matter is there. */
+export function specParseProblem(
+  manifest: KindManifest,
+  files: ReadonlyMap<string, string>,
+): string | undefined {
+  const markdown = specFile(manifest, files);
+  return markdown === undefined ? undefined : frontmatterParseProblem(files.get(markdown) ?? "");
 }
 
 export function specOf(

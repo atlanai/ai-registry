@@ -19,6 +19,7 @@ import {
   type KindManifest,
   specFile,
   specOf,
+  specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
 import { withName } from "#core/frontmatter.ts";
@@ -150,7 +151,9 @@ async function incoming(
       .filter((entry) => visible(entry.path))
       .map((entry) => `${entry.path} ${refusal(entry)}`),
     ...fileProblems(manifest, new Set(entries)),
-    ...(spec === undefined ? ["has no front matter"] : check(manifest, spec)),
+    ...(spec === undefined
+      ? [specParseProblem(manifest, texts) ?? "has no front matter"]
+      : check(manifest, spec)),
   ];
   const fallback =
     typeof spec?.name === "string"
