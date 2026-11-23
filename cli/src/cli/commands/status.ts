@@ -17,7 +17,7 @@ import { canonical } from "#core/fs/realpath.ts";
 import { exists } from "#core/fs/tree.ts";
 import { type Lock, readLock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
-import { type Unlocked, unlocked } from "#core/plan/acquire/lock-view.ts";
+import { type LockDrift, lockDrift } from "#core/plan/acquire/lock-view.ts";
 import { namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
 import { type ArtifactStatus, status, worstState } from "#core/plan/status.ts";
 import { survey } from "#core/plan/survey.ts";
@@ -57,7 +57,7 @@ interface Found {
   loose: Unmanaged[];
   copies: Duplicate[];
   dangling: DanglingLink[];
-  changed: Unlocked;
+  changed: LockDrift;
 }
 
 /**
@@ -88,7 +88,7 @@ export const { run } = defineCommand({
         .map((item) => ({ name: item.name, path: canonical(item.path) })),
     );
     const rows = installed(lock, manifest, targetTable);
-    const changed = unlocked(manifest, lock);
+    const changed = lockDrift(manifest, lock);
     if (worstState(statuses) !== "ok" || unsettled(changed)) context.exit = ExitCode.Changed;
     return {
       roots,
@@ -137,7 +137,7 @@ export const { run } = defineCommand({
         target: linksTo,
         harness: earlierId(targetTable, target),
       })),
-      manifest: found.changed,
+      lockfileMatchesManifest: !unsettled(found.changed),
     };
   },
   text(found, printer) {
@@ -182,17 +182,24 @@ export const { run } = defineCommand({
   },
 });
 
-const unsettled = ({ asked, unasked }: Unlocked) => asked.length > 0 || unasked.length > 0;
+const unsettled = ({ notLocked, extraneous }: LockDrift) =>
+  notLocked.length > 0 || extraneous.length > 0;
 
 /** Compares the two files only; `install --frozen` reports what an install would change. */
-function printManifestChanges(printer: Printer, scope: Scope, { asked, unasked }: Unlocked): void {
-  if (asked.length > 0) {
-    printer.warning(`The manifest asks for ${list(asked)}, which the lockfile does not record.`);
-  }
-  if (unasked.length > 0) {
-    const verb = unasked.length === 1 ? "asks" : "ask";
+function printManifestChanges(
+  printer: Printer,
+  scope: Scope,
+  { notLocked, extraneous }: LockDrift,
+): void {
+  if (notLocked.length > 0) {
     printer.warning(
-      `The lockfile records ${list(unasked)}, which the manifest no longer ${verb} for.`,
+      `The manifest asks for ${list(notLocked)}, which the lockfile does not record.`,
+    );
+  }
+  if (extraneous.length > 0) {
+    const verb = extraneous.length === 1 ? "asks" : "ask";
+    printer.warning(
+      `The lockfile records ${list(extraneous)}, which the manifest no longer ${verb} for.`,
     );
   }
   printer.hint(`Run \`aireg install${scopeFlag(scope)}\` to make the lockfile match the manifest.`);

@@ -140,16 +140,16 @@ function answersRef(ref: Ref, source: Acquired, held: boolean): boolean {
 }
 
 /** Where the manifest and the lock disagree, read from the two files alone. */
-export interface Unlocked {
+export interface LockDrift {
   /** Manifest entries the lock does not resolve, as written, such as one edited by hand. */
-  asked: string[];
+  notLocked: string[];
   /** Installed names that no manifest entry asks for, or needs through one that does. */
-  unasked: string[];
+  extraneous: string[];
 }
 
-export function unlocked(manifest: Manifest, lock: Lock): Unlocked {
+export function lockDrift(manifest: Manifest, lock: Lock): LockDrift {
   const view = lockView(lock);
-  const asked = manifest.artifacts
+  const notLocked = manifest.artifacts
     .filter((ref) => {
       const source = view.source(ref.registry);
       return source === undefined || !declares(manifest, source) || !answersRef(ref, source, true);
@@ -178,8 +178,8 @@ export function unlocked(manifest: Manifest, lock: Lock): Unlocked {
       queue.push(child);
     }
   }
-  const unasked = Object.keys(lock.artifacts)
+  const extraneous = Object.keys(lock.artifacts)
     .filter((name) => !wanted.has(name))
     .sort();
-  return { asked, unasked };
+  return { notLocked, extraneous };
 }

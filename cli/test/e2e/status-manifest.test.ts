@@ -46,10 +46,7 @@ describe("status after a hand edit to the manifest", () => {
     await writeFile(manifestPath(project), `${installed}  - acme/eng/skill/lint\n`);
     const status = await aireg(["status", "--json"]);
     expect(status.code).toBe(3);
-    expect(JSON.parse(status.stdout).data.manifest).toEqual({
-      asked: ["acme/eng/skill/lint"],
-      unasked: [],
-    });
+    expect(JSON.parse(status.stdout).data.lockfileMatchesManifest).toBe(false);
   });
 
   test("reports an installed artifact the manifest no longer asks for", async ({ project }) => {

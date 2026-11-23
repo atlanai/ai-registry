@@ -6,7 +6,7 @@ import { parseManifest } from "#core/manifest/parse.ts";
 import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { type AcquireOptions, acquire } from "./acquire.ts";
-import { answers, lockView, unlocked } from "./lock-view.ts";
+import { answers, lockDrift, lockView } from "./lock-view.ts";
 import { newlyYanked } from "./placement.ts";
 import { wanted } from "./request.ts";
 
@@ -306,13 +306,13 @@ describe("acquire", () => {
   });
 });
 
-describe("unlocked", () => {
+describe("lockDrift", () => {
   test("keeps an artifact needed through a dependency cycle", () => {
     const lock = locked({ c: "1.0.0", b: "1.0.0", d: "1.0.0", a: "1.0.0" });
     const row = (name: string) => lock.artifacts[`platform/${name}`] as LockArtifact;
     row("c").neededBy = ["platform/b", "platform/a"];
     row("b").neededBy = ["platform/c"];
     row("d").neededBy = ["platform/b"];
-    expect(unlocked(manifest(["acme/platform/skill/a@1.0.0"]), lock).unasked).toEqual([]);
+    expect(lockDrift(manifest(["acme/platform/skill/a@1.0.0"]), lock).extraneous).toEqual([]);
   });
 });
