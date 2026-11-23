@@ -58,10 +58,16 @@ export const { run } = defineCommand({
   async run(common, context): Promise<Found> {
     const { roots, manifest, targetTable, lock } = await load(common, context.cwd, "user");
 
-    const heads = new Map<string, Head>();
-    for (const alias of new Set(Object.values(lock.artifacts).map((entry) => entry.registry))) {
-      heads.set(alias, await head(alias, manifest, lock, roots.base));
-    }
+    // Each registry is read on its own and catches its own failure, so they are read
+    // together: the command takes as long as the slowest registry, not their sum.
+    const aliases = new Set(Object.values(lock.artifacts).map((entry) => entry.registry));
+    const heads = new Map(
+      await Promise.all(
+        [...aliases].map(
+          async (alias) => [alias, await head(alias, manifest, lock, roots.base)] as const,
+        ),
+      ),
+    );
 
     const rows: OutdatedArtifact[] = [];
     for (const name of Object.keys(lock.artifacts).sort()) {

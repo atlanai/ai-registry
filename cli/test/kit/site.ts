@@ -10,9 +10,12 @@ const SCHEMA = "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
 
 export async function serveFolder(
   root: string,
+  /** Runs before each request is answered, so a test can hold one back. */
+  before?: (path: string) => Promise<void>,
 ): Promise<{ url: string; close: () => Promise<void> }> {
   const server = createServer(async (request, response) => {
     const path = normalize(decodeURIComponent(new URL(request.url ?? "/", "http://x").pathname));
+    await before?.(path);
     try {
       const bytes = await readFile(join(root, path));
       response.writeHead(200);
