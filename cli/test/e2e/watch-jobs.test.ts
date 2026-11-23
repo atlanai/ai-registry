@@ -134,7 +134,7 @@ describe("a watch job over a namespace your user scope installs", () => {
   test("refuses to send a watched scope's folders somewhere else", async ({ aireg, home, tmp }) => {
     const { notes } = await watching({ aireg, home, tmp }, { published: false });
     const before = await jobs(aireg);
-    const drafts = join(home.dir, "drafts");
+    const drafts = join(home.dir, "drafts", "skills");
     await mkdir(drafts, { recursive: true });
     const moved = await aireg(["watch", "add", drafts, "--to", "demo/other", "-g"]);
     expect(moved.code).toBe(2);
