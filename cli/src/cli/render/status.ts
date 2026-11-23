@@ -125,7 +125,7 @@ export function renderStatus(
     );
   }
   if (attention === 0) {
-    printer.success("Everything matches the lockfile.");
+    if (chosen.settled !== false) printer.success("Everything matches the lockfile.");
     return;
   }
   if (attention < statuses.length) printer.info(printer.style.dim(`ok  ${STATE_MEANING.ok}`));
@@ -138,6 +138,8 @@ export function renderStatus(
 export interface Chosen {
   targetTable: Targets;
   for: (name: string) => readonly string[];
+  /** False when the manifest asks for other than the lockfile records, which the caller says. */
+  settled?: boolean;
 }
 
 function cell(printer: Printer, seen: LinkState | undefined): string {
