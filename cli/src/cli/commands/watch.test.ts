@@ -1,5 +1,6 @@
 import { join, sep } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
+import { quoted } from "#adapter/text.ts";
 import { emptyRegistryConfig, type Job, type Step } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { commandContext } from "#test/kit/command.ts";
@@ -79,7 +80,7 @@ describe("watch add", () => {
     "refuses a folder named %s, before the daemon starts",
     async (name) => {
       await expect(watch([], ["add", gone(name), "--to", "acme/eng", "-g"])).rejects.toMatchObject({
-        message: `aireg publishes only a folder named skills or agents, so a watch of "${gone(name)}" would publish nothing.`,
+        message: `aireg publishes only a folder named skills or agents, so a watch of ${quoted(gone(name))} would publish nothing.`,
         hint: expect.stringContaining("Watch the skills or agents folder inside it"),
       });
       expect(daemon.withDaemon).not.toHaveBeenCalled();
