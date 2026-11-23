@@ -75,16 +75,16 @@ const shape = (job: Job | undefined) =>
   job?.steps.map((item) => [item.kind, item.policy, item.needs, item.select.length]);
 
 describe("watch add", () => {
-  // A watch takes a folder's kind from its name, so any other name would publish nothing.
-  test("refuses a folder not named skills or agents, before the daemon starts", async () => {
-    await expect(
-      watch([], ["add", gone("my-skills"), "--to", "acme/eng", "-g"]),
-    ).rejects.toMatchObject({
-      message: `aireg publishes only a folder named skills or agents, so a watch of "${gone("my-skills")}" would publish nothing.`,
-      hint: expect.stringContaining("Watch the skills or agents folder inside it"),
-    });
-    expect(daemon.withDaemon).not.toHaveBeenCalled();
-  });
+  test.each(["my-skills", "plugins"])(
+    "refuses a folder named %s, before the daemon starts",
+    async (name) => {
+      await expect(watch([], ["add", gone(name), "--to", "acme/eng", "-g"])).rejects.toMatchObject({
+        message: `aireg publishes only a folder named skills or agents, so a watch of "${gone(name)}" would publish nothing.`,
+        hint: expect.stringContaining("Watch the skills or agents folder inside it"),
+      });
+      expect(daemon.withDaemon).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("watch remove", () => {

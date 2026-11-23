@@ -99,8 +99,11 @@ export function originsOf(own: Own, cwd: string): { to: string; from: string[] }
       hint: "Name where to publish: `aireg job add --watch <folder> --to <registry>/<namespace>`.",
     });
   }
-  // A watch reads a folder's kind from its name, so any other name would publish nothing.
-  const unnamed = watched.filter((folder) => kindOfDir(typedFolder(folder, cwd)) === undefined);
+  // A watch reads a folder's kind from its name, and publishes only skills and agents.
+  const unnamed = watched.filter((folder) => {
+    const kind = kindOfDir(typedFolder(folder, cwd));
+    return kind !== "skill" && kind !== "agent";
+  });
   if (unnamed.length > 0) {
     const them = unnamed.length === 1 ? "it" : "them";
     throw new AiregError(
