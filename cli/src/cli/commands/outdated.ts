@@ -9,6 +9,7 @@ import { connectSource, resolveArtifacts } from "#core/adapter/connect.ts";
 import { declaredLayout } from "#core/adapter/load.ts";
 import { expandLocation } from "#core/adapter/location.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
+import { type Withheld, withheldAt, withheldMessage } from "#core/catalog/withheld.ts";
 import { olderThan } from "#core/engines.ts";
 import { ExitCode } from "#core/errors.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
@@ -32,6 +33,8 @@ interface Head {
   /** By address: an id carries its version, so it never matches across a bump. */
   byAddress: Map<string, Upstream>;
   entries: readonly Entry[];
+  /** What the registry reached but would not serve by status, such as a blocked version. */
+  withheld: readonly Withheld[];
   why: string | undefined;
 }
 
@@ -46,6 +49,8 @@ interface Found {
   scope: Scope;
   lock: Lock;
   rows: OutdatedArtifact[];
+  /** Rows the registry withholds every version of, by installed name, for the text to name. */
+  withheld: Map<string, Withheld>;
 }
 
 export const { run } = defineCommand({
@@ -73,6 +78,7 @@ export const { run } = defineCommand({
           heads.get(entry.registry) ?? {
             byAddress: new Map(),
             entries: [],
+            withheld: [],
             why: "its registry could not be read",
           },
           pinOf(manifest, entry),
@@ -81,14 +87,21 @@ export const { run } = defineCommand({
       );
     }
     rows.push(...additions(manifest, lock, heads));
+    const withheld = new Map<string, Withheld>();
+    for (const entry of rows) {
+      const row = lock.artifacts[entry.name];
+      const held = row === undefined ? undefined : heads.get(row.registry)?.withheld;
+      const at = row === undefined ? undefined : withheldAt(held, withheldKey(row));
+      if (at !== undefined && entry.unchecked === withheldMessage(at)) withheld.set(entry.name, at);
+    }
 
     if (rows.some((entry) => (entry.moved && entry.pinned === undefined) || entry.unchecked)) {
       context.exit = ExitCode.Changed;
     }
-    return { scope: roots.scope, lock, rows };
+    return { scope: roots.scope, lock, rows, withheld };
   },
   data: ({ scope, rows }): OutdatedResult => ({ scope, artifacts: rows }),
-  text({ scope, lock, rows }, printer) {
+  text({ scope, lock, rows, withheld }, printer) {
     if (rows.length === 0) {
       printer.info(printer.style.dim(`Nothing is installed in ${scopeName(scope)}.`));
       return;
@@ -105,15 +118,26 @@ export const { run } = defineCommand({
     const named = (entry: OutdatedArtifact) =>
       shown.get(entry.name) ?? (taken.get(leaf(entry.name)) === 1 ? leaf(entry.name) : entry.name);
     for (const entry of rows) {
+      const held = withheld.get(entry.name);
       if (entry.unpublished === true) {
         printer.info(style.dim(`${named(entry)} is not published yet.`));
+      } else if (held !== undefined) {
+        printer.warning(`${withheldMessage(held)}, and its registry serves no other version.`);
+        printer.hint(`Run \`aireg remove ${named(entry)}${scopeFlag(scope)}\` to take it out.`);
       } else if (entry.unchecked !== undefined) {
         printer.warning(`Could not check ${named(entry)}: ${sentence(entry.unchecked)}`);
       }
     }
+    // Not newer, so not listed; but `update` moves to it, as after the installed one is yanked.
+    const back = rows.filter(rollsBack);
+    for (const entry of back) {
+      printer.warning(
+        `Registry ${entry.registry} no longer serves ${named(entry)} ${entry.current}, so \`aireg update${scopeFlag(scope)}\` rolls it back to ${entry.latest}.`,
+      );
+    }
     const moved = rows.filter((entry) => entry.unchecked === undefined && entry.moved);
     if (moved.length === 0) {
-      if (rows.every((entry) => entry.unchecked === undefined)) {
+      if (back.length === 0 && rows.every((entry) => entry.unchecked === undefined)) {
         printer.success("Everything is up to date.");
       }
       return;
@@ -141,10 +165,27 @@ export const { run } = defineCommand({
   },
 });
 
+const withheldKey = (row: LockArtifact) => ({
+  name: row.name,
+  group: row.namespace,
+  kind: row.kind,
+});
+
+function rollsBack(entry: OutdatedArtifact): boolean {
+  return (
+    entry.unchecked === undefined &&
+    !entry.moved &&
+    entry.added !== true &&
+    entry.pinned === undefined &&
+    entry.watched === undefined &&
+    olderThan(entry.latest, entry.current)
+  );
+}
+
 async function head(alias: string, manifest: Manifest, lock: Lock, base: string): Promise<Head> {
   const declared = manifest.registries[alias];
   if (declared === undefined) {
-    return { byAddress: new Map(), entries: [], why: "it is no longer declared" };
+    return { byAddress: new Map(), entries: [], withheld: [], why: "it is no longer declared" };
   }
 
   const location = expandLocation(declared.location, base);
@@ -181,13 +222,14 @@ async function head(alias: string, manifest: Manifest, lock: Lock, base: string)
           ]),
         ),
         entries: listing.catalog.entries,
+        withheld: listing.catalog.withheld ?? [],
         why: undefined,
       };
     } finally {
       await open.handle.close();
     }
   } catch (error) {
-    return { byAddress: new Map(), entries: [], why: messageOf(error) };
+    return { byAddress: new Map(), entries: [], withheld: [], why: messageOf(error) };
   }
 }
 
@@ -234,12 +276,13 @@ function row(
     };
   }
   if (upstream === undefined) {
+    const held = withheldAt(found.withheld, withheldKey(entry));
     return {
       ...base,
       current: "",
       latest: "",
       moved: false,
-      unchecked: "the registry no longer publishes it",
+      unchecked: held === undefined ? "the registry no longer publishes it" : withheldMessage(held),
     };
   }
 
