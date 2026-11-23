@@ -12,8 +12,8 @@ export interface StatusResult {
   /** Skills that are copies of each other, then unmanaged skills that share a name. */
   duplicates: Duplicate[];
   dangling: DanglingEntry[];
-  /** False after a hand edit to the manifest that `aireg install` has not locked yet. */
-  lockfileMatchesManifest: boolean;
+  /** Where the lockfile disagrees with the manifest, as after a hand edit to the manifest. */
+  lockfile: { notLocked: string[]; extraneous: string[] };
 }
 
 interface StatusArtifact {

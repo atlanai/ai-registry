@@ -23,7 +23,7 @@ The table shows each artifact's kind, version and registry, then a column per ta
 
 Lines under the table explain each `-` and, when something needs attention, what `ok` means.
 
-`status` also compares the manifest with the lockfile, as after a hand edit to `.registry/manifest.yml`. It warns about each manifest entry the lockfile does not record, such as a changed pin, a new entry or a registry at another address, and each installed artifact no entry asks for any more. Run [`aireg install`](install.md) to make the lockfile match. This check reads only the two files. It does not compare target lists, so `aireg install --frozen` can still find a change that `status` does not.
+`status` also warns when the lockfile no longer matches the manifest, as after a hand edit to `.registry/manifest.yml`; run [`aireg install`](install.md) to update it. It compares only the two files, so `aireg install --frozen` can still find a change `status` does not.
 
 `status` ends with what to run next. Run [`aireg install`](install.md) to restore missing or replaced artifacts, which first moves a file or folder of yours that replaced a link to `.registry/backups/`, and [`aireg sync`](sync.md) to compare an edit with the registry.
 
@@ -51,11 +51,11 @@ In a project, `status` also warns about an artifact installed in both the projec
   "unmanaged": [{"name": "lint", "kind": "skill", "targets": ["claude-code"], "harnesses": ["claude"], "path": "/home/me/project/.claude/skills/lint"}],
   "duplicates": [{"match": "identical", "artifacts": [{"name": "pr-check", "path": "/home/me/project/.claude/skills/pr-check"}, {"name": "pr-review", "path": "/home/me/project/.registry/artifacts/acme/engineering/skills/pr-review", "registry": "acme"}]}],
   "dangling": [{"path": "/home/me/project/.claude/agents/old.md", "target": "/home/me/agents/old.md", "harness": "claude"}],
-  "lockfileMatchesManifest": false
+  "lockfile": {"notLocked": ["acme/engineering/skill/lint"], "extraneous": []}
 }}
 ```
 
-In JSON, `targets` is keyed by target id, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. Each `duplicates` group has a `match`, `identical` for copies or `name` for unmanaged skills that share a name, and its `artifacts`, each with the real folder as `path` and, when installed, its `registry`. `dangling` gives each dangling link's `path`, what it links to as written (`target`), and the target folder it is in (`harness`, by the id aireg 0.1 used). `lockfileMatchesManifest` is `false` when the manifest and the lockfile disagree, as the warnings above describe. `needsApproval` lists each target that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
+In JSON, `targets` is keyed by target id, and a value is `linked`, `missing`, `replaced` or `foreign`. `state` uses `dangling` for what the table calls `replaced`. An artifact that isn't `ok` also has a `detail` saying why, starting with the folder. `shadowed` names the artifacts installed both here and in your user scope, which the warning above is about; it is always empty for `-g`. Each `duplicates` group has a `match`, `identical` for copies or `name` for unmanaged skills that share a name, and its `artifacts`, each with the real folder as `path` and, when installed, its `registry`. `dangling` gives each dangling link's `path`, what it links to as written (`target`), and the target folder it is in (`harness`, by the id aireg 0.1 used). `lockfile` lists where it disagrees with the manifest: `notLocked` holds each manifest entry the lockfile does not record, as written, and `extraneous` each installed artifact no entry asks for any more. `needsApproval` lists each target that loads the artifact only after a [trust step](targets.md#trust-and-reload-steps), with the command to run; aireg never runs it.
 
 Each field that names a target is also printed under the name aireg 0.1 gave it, with the id that version knows, for scripts written against it: `harnesses` beside `targets`, and `harness` beside `target`, such as `claude` for `claude-code`. A `dangling` entry keeps exactly the shape aireg 0.1 printed. Read `targets` and `target`; the earlier names are kept for compatibility and will be removed in a later release.
 

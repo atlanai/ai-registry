@@ -24,12 +24,6 @@ test.beforeAll(async ({ aireg: run, tmp, project }) => {
 
 // `install --frozen` fails on each of these, so `status` must not report the project as in order.
 describe("status after a hand edit to the manifest", () => {
-  test("matches the lockfile before the edit", async () => {
-    const status = await aireg(["status"]);
-    expect(status.code, status.stderr).toBe(0);
-    expect(status.stdout).toContain("Everything matches the lockfile.");
-  });
-
   test("reports a pin the lockfile does not record", async ({ project }) => {
     await writeFile(manifestPath(project), installed.replace("@0.1.0", "@0.1.1"));
     const status = await aireg(["status"]);
@@ -46,7 +40,10 @@ describe("status after a hand edit to the manifest", () => {
     await writeFile(manifestPath(project), `${installed}  - acme/eng/skill/lint\n`);
     const status = await aireg(["status", "--json"]);
     expect(status.code).toBe(3);
-    expect(JSON.parse(status.stdout).data.lockfileMatchesManifest).toBe(false);
+    expect(JSON.parse(status.stdout).data.lockfile).toEqual({
+      notLocked: ["acme/eng/skill/lint"],
+      extraneous: [],
+    });
   });
 
   test("reports an installed artifact the manifest no longer asks for", async ({ project }) => {
@@ -63,7 +60,9 @@ describe("status after a hand edit to the manifest", () => {
 
   test("matches again once the manifest is back", async ({ project }) => {
     await writeFile(manifestPath(project), installed);
-    expect((await aireg(["status"])).code).toBe(0);
+    const status = await aireg(["status"]);
+    expect(status.code, status.stderr).toBe(0);
+    expect(status.stdout).toContain("Everything matches the lockfile.");
     expect((await aireg(["install", "--frozen"])).code).toBe(0);
   });
 });

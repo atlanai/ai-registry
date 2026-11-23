@@ -14,7 +14,7 @@
         "unmanaged",
         "duplicates",
         "dangling",
-        "lockfileMatchesManifest"
+        "lockfile"
       ],
       "properties": {
         "scope": {
@@ -295,9 +295,30 @@
             }
           }
         },
-        "lockfileMatchesManifest": {
-          "description": "False when the manifest asks for other than the lockfile records; `aireg install` settles it.",
-          "type": "boolean"
+        "lockfile": {
+          "additionalProperties": false,
+          "description": "Where the lockfile disagrees with the manifest; `aireg install` settles it.",
+          "type": "object",
+          "required": [
+            "notLocked",
+            "extraneous"
+          ],
+          "properties": {
+            "notLocked": {
+              "description": "Manifest entries the lockfile does not record, as written.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "extraneous": {
+              "description": "Installed artifacts no manifest entry asks for any more.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }

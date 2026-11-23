@@ -137,7 +137,7 @@ export const { run } = defineCommand({
         target: linksTo,
         harness: earlierId(targetTable, target),
       })),
-      lockfileMatchesManifest: !unsettled(found.changed),
+      lockfile: found.changed,
     };
   },
   text(found, printer) {
