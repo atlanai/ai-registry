@@ -64,8 +64,8 @@ export interface RunRequest {
   adding?: ReadonlySet<string>;
   /** Names whose identical copy on disk this run takes over in place. */
   adopt?: ReadonlySet<string>;
-  /** The address this run declares its registry from, which a hint repeats once it is undone. */
-  declaredFrom?: string | undefined;
+  /** The address and source flags this run declares its registry from, which a hint repeats once it is undone. */
+  declaredFrom?: readonly string[] | undefined;
 }
 
 export interface PlanReport {

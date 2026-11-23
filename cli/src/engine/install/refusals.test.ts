@@ -15,8 +15,19 @@ describe("trustHint", () => {
   });
 
   test("repeats the address typed when no registry stayed declared, quoted for the shell", () => {
-    expect(trustHint([hooked], { scope: "project", address: "../my kits" })).toBe(
+    expect(trustHint([hooked], { scope: "project", address: ["../my kits"] })).toBe(
       "Read what it runs, then run `aireg add '../my kits' -s kit --trust kit`.",
+    );
+  });
+
+  test("carries the source flags typed, so it reads what was reviewed", () => {
+    expect(
+      trustHint([hooked], {
+        scope: "user",
+        address: ["../kits", "--ref", "v1 beta", "--as", "mine"],
+      }),
+    ).toBe(
+      "Read what it runs, then run `aireg add ../kits --ref 'v1 beta' --as mine -s kit --trust kit -g`.",
     );
   });
 });

@@ -148,10 +148,10 @@ export function untrustedLine(untrusted: readonly Untrusted[]): string {
   return `${names}, which ${untrusted.length === 1 ? "carries" : "carry"} ${describeCarried(carries)}`;
 }
 
-/** Where to add it again: the address typed when the run did not keep its registry declared. */
 export interface TrustRetry {
   scope: Scope;
-  address?: string | undefined;
+  /** The address and source flags typed, when the run did not keep its registry declared. */
+  address?: readonly string[] | undefined;
 }
 
 export function trustHint(untrusted: readonly Untrusted[], retry: TrustRetry): string {
@@ -160,7 +160,7 @@ export function trustHint(untrusted: readonly Untrusted[], retry: TrustRetry): s
     const from =
       retry.address === undefined
         ? `${registry}/${name}`
-        : `${shellWord(retry.address)} -s ${name}`;
+        : `${retry.address.map(shellWord).join(" ")} -s ${name}`;
     return `\`aireg add ${from} --trust ${name}${scope}\``;
   });
   return `Read what ${untrusted.length === 1 ? "it runs" : "they run"}, then run ${list(commands)}.`;
