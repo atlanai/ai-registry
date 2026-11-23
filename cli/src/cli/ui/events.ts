@@ -52,11 +52,17 @@ export class Events {
     for (const client of this.#clients) client.write(frame);
   }
 
-  /** Folders whose files the page shows; one that does not exist yet is skipped. */
-  watch(folders: readonly string[]): void {
-    for (const folder of new Set(folders)) {
+  /** Nothing is read while no page is open. */
+  get watched(): boolean {
+    return this.#clients.size > 0;
+  }
+
+  /** Folders to watch, limited to `names` when given; a missing one is skipped. */
+  watch(folders: readonly { folder: string; names?: readonly string[] }[]): void {
+    for (const { folder, names } of folders) {
       try {
         const watcher = watch(folder, { persistent: false }, (_event, name) => {
+          if (names !== undefined && (name === null || !names.includes(name))) return;
           // Reading the run store touches its journal; that alone would read again forever.
           if (name === null || !/-(shm|wal|journal)$/.test(name)) this.changed();
         });
@@ -92,6 +98,7 @@ export class Events {
   }
 
   async #refresh(): Promise<void> {
+    if (!this.watched) return;
     try {
       const view = viewOf(await this.#reader.read(true));
       // A registry still answering is not on disk to watch, so read again until it has.

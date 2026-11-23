@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { messageOf } from "#adapter/errors.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { configPath } from "#core/config/repository.ts";
@@ -141,7 +141,15 @@ async function watchState(reader: PageReader, events: Events): Promise<void> {
   try {
     const { root } = await reader.read();
     const scope = roots(scopeFor(root), root);
-    events.watch([dirname(scope.lock), dirname(configPath()), stateDir()]);
+    // The home folder also holds credentials and caches that reads rewrite.
+    const files = new Map<string, string[]>();
+    for (const file of [scope.lock, scope.manifest, configPath()]) {
+      files.set(dirname(file), [...(files.get(dirname(file)) ?? []), basename(file)]);
+    }
+    events.watch([
+      ...[...files].map(([folder, names]) => ({ folder, names })),
+      { folder: stateDir() },
+    ]);
   } catch (error) {
     console.error(`aireg ui: live updates are off: ${messageOf(error)}`);
   }
