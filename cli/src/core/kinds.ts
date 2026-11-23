@@ -35,6 +35,15 @@ export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
 /** Kinds the registry scanner walks; `plugin` is found by its manifest. */
 export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter((kind) => kind !== "plugin");
 
+/** The kind a folder of artifacts holds, read from its name, such as `skills`. */
+export function kindOfDir(dir: string): ArtifactKind | undefined {
+  const leaf = basename(dir);
+  for (const [kind, spec] of Object.entries(KIND_SPECS)) {
+    if (spec.dir === leaf) return kind as ArtifactKind;
+  }
+  return undefined;
+}
+
 export function kindDir(kind: ArtifactKind): string {
   return KIND_SPECS[kind].dir;
 }
