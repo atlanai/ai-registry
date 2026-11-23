@@ -11,9 +11,11 @@ const test = base.extend("initialised", { scope: "file" }, ({ fileTmp }) =>
 /**
  * Holds each registry's first request until another registry asks too, or until
  * `waitMs` passes. Reading the registries one at a time never overlaps, so the
- * second request only arrives after the first was let go.
+ * second request only arrives after the first was let go. A parallel read lets the
+ * hold go as soon as the second request arrives, so `waitMs` is only the margin a
+ * slow machine gets, and only a failing run waits it out.
  */
-function overlapGate(prefixes: readonly string[], waitMs = 2_000) {
+function overlapGate(prefixes: readonly string[], waitMs = 10_000) {
   let armed = false;
   let overlapped = false;
   const seen = new Set<string>();
