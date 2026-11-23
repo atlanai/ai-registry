@@ -45,11 +45,16 @@ interface Upstream {
   namespace: string | undefined;
 }
 
+interface Checked {
+  artifact: OutdatedArtifact;
+  withheld?: Withheld | undefined;
+}
+
 interface Found {
   scope: Scope;
   lock: Lock;
   rows: OutdatedArtifact[];
-  /** Rows the registry withholds every version of, by installed name, for the text to name. */
+  /** Rows the registry withholds every version of, by installed name. */
   withheld: Map<string, Withheld>;
 }
 
@@ -69,31 +74,25 @@ export const { run } = defineCommand({
     }
 
     const rows: OutdatedArtifact[] = [];
+    const withheld = new Map<string, Withheld>();
     for (const name of Object.keys(lock.artifacts).sort()) {
       const entry = lock.artifacts[name] as LockArtifact;
-      rows.push(
-        row(
-          name,
-          entry,
-          heads.get(entry.registry) ?? {
-            byAddress: new Map(),
-            entries: [],
-            withheld: [],
-            why: "its registry could not be read",
-          },
-          pinOf(manifest, entry),
-          targetTable,
-        ),
+      const checked = row(
+        name,
+        entry,
+        heads.get(entry.registry) ?? {
+          byAddress: new Map(),
+          entries: [],
+          withheld: [],
+          why: "its registry could not be read",
+        },
+        pinOf(manifest, entry),
+        targetTable,
       );
+      rows.push(checked.artifact);
+      if (checked.withheld !== undefined) withheld.set(name, checked.withheld);
     }
     rows.push(...additions(manifest, lock, heads));
-    const withheld = new Map<string, Withheld>();
-    for (const entry of rows) {
-      const row = lock.artifacts[entry.name];
-      const held = row === undefined ? undefined : heads.get(row.registry)?.withheld;
-      const at = row === undefined ? undefined : withheldAt(held, withheldKey(row));
-      if (at !== undefined && entry.unchecked === withheldMessage(at)) withheld.set(entry.name, at);
-    }
 
     if (rows.some((entry) => (entry.moved && entry.pinned === undefined) || entry.unchecked)) {
       context.exit = ExitCode.Changed;
@@ -252,7 +251,7 @@ function row(
   found: Head,
   pinned: string | undefined,
   targetTable: Targets,
-): OutdatedArtifact {
+): Checked {
   const watched = watchedFrom(entry, targetTable);
   const base = {
     name,
@@ -261,28 +260,34 @@ function row(
     ...(watched === undefined ? {} : { watched }),
   };
   if (found.why !== undefined) {
-    return { ...base, current: "", latest: "", moved: false, unchecked: found.why };
+    return { artifact: { ...base, current: "", latest: "", moved: false, unchecked: found.why } };
   }
 
   const address = listedAt(entry, found.entries);
   const upstream = address === undefined ? undefined : found.byAddress.get(address);
   if (upstream === undefined && entry.origin !== undefined && entry.address === undefined) {
     return {
-      ...base,
-      current: "",
-      latest: "",
-      moved: false,
-      unpublished: true,
+      artifact: {
+        ...base,
+        current: "",
+        latest: "",
+        moved: false,
+        unpublished: true,
+      },
     };
   }
   if (upstream === undefined) {
     const held = withheldAt(found.withheld, withheldKey(entry));
     return {
-      ...base,
-      current: "",
-      latest: "",
-      moved: false,
-      unchecked: held === undefined ? "the registry no longer publishes it" : withheldMessage(held),
+      artifact: {
+        ...base,
+        current: "",
+        latest: "",
+        moved: false,
+        unchecked:
+          held === undefined ? "the registry no longer publishes it" : withheldMessage(held),
+      },
+      withheld: held,
     };
   }
 
@@ -291,11 +296,13 @@ function row(
   // A row of yours whose publish the lock has not recorded yet.
   if (entry.address === undefined) {
     return {
-      ...base,
-      current: "",
-      latest,
-      moved: false,
-      unchecked: "it is published, but the lockfile has not recorded which version yet",
+      artifact: {
+        ...base,
+        current: "",
+        latest,
+        moved: false,
+        unchecked: "it is published, but the lockfile has not recorded which version yet",
+      },
     };
   }
 
@@ -309,13 +316,15 @@ function row(
 
   // `current` mirrors `latest`: the version when there is one, the content digest otherwise.
   return {
-    ...base,
-    current: entry.version ?? (entry.content === undefined ? "?" : abbreviate(entry.content)),
-    latest,
-    moved,
-    ...(upstream.contentId === undefined && upstream.version === undefined
-      ? { unchecked: "it publishes neither a content digest nor a version" }
-      : {}),
+    artifact: {
+      ...base,
+      current: entry.version ?? (entry.content === undefined ? "?" : abbreviate(entry.content)),
+      latest,
+      moved,
+      ...(upstream.contentId === undefined && upstream.version === undefined
+        ? { unchecked: "it publishes neither a content digest nor a version" }
+        : {}),
+    },
   };
 }
 
