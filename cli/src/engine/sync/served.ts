@@ -23,6 +23,23 @@ export function moved(
   );
 }
 
+/**
+ * The version upstream serves when it is at or above the one just sent, which still waits in
+ * a git checkout: a teammate pushed it first, so installing it would overwrite the edit.
+ */
+export function serves(
+  found: Scan,
+  entry: LockArtifact | undefined,
+  sent: string,
+): string | undefined {
+  const now = entry === undefined ? undefined : head(found, entry)?.version;
+  return now === undefined || now === sent || older(sent, now) ? now : undefined;
+}
+
+export function clashNote(row: string, served: string): string {
+  return `The registry already serves ${row} ${served} from someone else, so the copy here was left as it is and still reads as edited. Publish it again as a version above ${served}.`;
+}
+
 function head(found: Scan, entry: LockArtifact): Placement | undefined {
   const acquired = found.acquired.find((item) => item.alias === entry.registry);
   const at = acquired === undefined ? undefined : listedAt(entry, acquired.catalog.entries);
