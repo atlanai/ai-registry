@@ -43,6 +43,7 @@ Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agent
 | Pi | `pi` | `.agents/skills/` | `~/.agents/skills/` |
 | Google Antigravity | `antigravity` | `.agents/skills/` | `~/.gemini/config/skills/` |
 | Hermes Agent | `hermes-agent` | `.agents/skills/` | `~/.hermes/skills/` |
+| Windsurf | `windsurf` | `.windsurf/skills/` | `~/.codeium/windsurf/skills/` |
 | Shared `.agents` folder | `universal` | `.agents/skills/` | `~/.agents/skills/` |
 
 ### Agents
@@ -59,7 +60,7 @@ Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agent
 | Google Antigravity | `antigravity` | none | `~/.gemini/config/agents/` |
 | Shared `.agents` folder | `universal` | `.agents/agents/` | `~/.agents/agents/` |
 
-Pi and Hermes Agent have no agents, so aireg installs none for them.
+Pi, Hermes Agent and Windsurf have no agents, so aireg installs none for them.
 
 A user folder moves with its target's own variable: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, `GROK_HOME`, `HERMES_HOME`, `PI_CODING_AGENT_DIR`, or `XDG_CONFIG_HOME` for OpenCode.
 

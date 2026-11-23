@@ -56,6 +56,14 @@ describe("placementFor", () => {
     expect(place("agent", ["hermes-agent"])).toEqual({ targets: [], unreadable: ["hermes-agent"] });
   });
 
+  test("places Windsurf skills in its own folder unless sharing with another target", () => {
+    expect(place("skill", ["windsurf"]).targets).toEqual(["windsurf"]);
+    expect(place("skill", ["windsurf"], "user").targets).toEqual(["windsurf"]);
+    expect(place("skill", ["windsurf", "codex"]).targets).toEqual(["universal"]);
+    expect(place("skill", ["windsurf", "codex"], "user").targets).toEqual(["universal"]);
+    expect(place("agent", ["windsurf"])).toEqual({ targets: [], unreadable: ["windsurf"] });
+  });
+
   test("ignores names it does not know and repeats it was given", () => {
     expect(place("skill", ["claude-code", "claude-code", "missing"]).targets).toEqual([
       "claude-code",

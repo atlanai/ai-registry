@@ -9,6 +9,7 @@ import { hermesAgent } from "./hermes-agent.ts";
 import { opencode } from "./opencode.ts";
 import { pi } from "./pi.ts";
 import { universal } from "./universal.ts";
+import { windsurf } from "./windsurf.ts";
 
 /** Every target aireg installs into; the order is the order defaults are listed in. */
 export const BUILTIN_TARGETS = [
@@ -22,5 +23,6 @@ export const BUILTIN_TARGETS = [
   pi,
   antigravity,
   hermesAgent,
+  windsurf,
   universal,
 ] as const;
