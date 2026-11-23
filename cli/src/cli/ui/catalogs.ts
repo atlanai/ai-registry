@@ -20,10 +20,10 @@ export interface Catalog {
   loading: boolean;
 }
 
-/** Remote catalogs are costly to list, so one is read again only after this, or on request. */
+/** Listing a remote registry is costly, so it is reused this long. */
 const FRESH_MS = 10 * 60_000;
 const RETRY_MS = 5 * 60_000;
-/** A slow registry holds up no other, and many never fetch at once. */
+/** Registries listed at once. */
 const MOST_AT_ONCE = 2;
 
 const common = (scope: Scope): CommonOptions => ({
@@ -67,7 +67,6 @@ const WAIT_MS = 200;
 export class Catalogs {
   readonly #kept = new Map<string, Kept>();
   readonly #context: CommandContext;
-  /** Reads running now; many declared registries never all fetch at once. */
   #running = 0;
   readonly #waiting: (() => void)[] = [];
   /** Called when a catalog read ends, so the page learns at once instead of waiting. */

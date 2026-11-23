@@ -141,7 +141,7 @@ async function watchState(reader: PageReader, events: Events): Promise<void> {
   try {
     const { root } = await reader.read();
     const scope = roots(scopeFor(root), root);
-    // Named files only: the home folder also holds credentials and caches that reads rewrite.
+    // The home folder also holds credentials and caches that reads rewrite.
     const files = new Map<string, string[]>();
     for (const file of [scope.lock, scope.manifest, configPath()]) {
       files.set(dirname(file), [...(files.get(dirname(file)) ?? []), basename(file)]);

@@ -52,15 +52,12 @@ export class Events {
     for (const client of this.#clients) client.write(frame);
   }
 
-  /** True while a page is open; with none, nothing is read. */
+  /** Nothing is read while no page is open. */
   get watched(): boolean {
     return this.#clients.size > 0;
   }
 
-  /**
-   * Folders whose files the page shows, each with the names that matter in it (all when
-   * omitted); one that does not exist yet is skipped.
-   */
+  /** Folders to watch, limited to `names` when given; a missing one is skipped. */
   watch(folders: readonly { folder: string; names?: readonly string[] }[]): void {
     for (const { folder, names } of folders) {
       try {
