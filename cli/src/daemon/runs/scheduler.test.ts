@@ -30,11 +30,43 @@ function config(jobs: Job[], paused = false): RegistryConfig {
   };
 }
 
-function storeReturning(runs: Record<string, RunRecord[]>): RunStore {
+function storeReturning(
+  runs: Record<string, RunRecord[]>,
+  active: readonly RunRecord[] = [],
+): RunStore {
   return {
-    list: ({ jobId }: { jobId?: string }) => (jobId === undefined ? [] : (runs[jobId] ?? [])),
+    list: ({ jobId, state }: { jobId?: string; state?: string }) => {
+      if (jobId !== undefined) return runs[jobId] ?? [];
+      return active.filter((run) => run.state === state);
+    },
     forgetJobs: () => 0,
   } as unknown as RunStore;
+}
+
+/** A run still going, of another job, started by `trigger`. */
+function activeRun(index: number, trigger: RunRecord["trigger"]): RunRecord {
+  return { id: `run_${index}`, jobId: `other_${index}`, trigger, state: "running" } as RunRecord;
+}
+
+/** The job's one earlier run, finished at `finishedAtMs`. */
+function finishedRun(jobId: string, finishedAtMs: number): RunRecord {
+  return {
+    id: `run_${jobId}`,
+    jobId,
+    accountId: "acc_demo",
+    configRevision: 0,
+    mode: "sync",
+    trigger: "schedule",
+    state: "succeeded",
+    step: undefined,
+    requestedAtMs: finishedAtMs,
+    startedAtMs: finishedAtMs,
+    deadlineAtMs: finishedAtMs,
+    finishedAtMs,
+    counts: EMPTY_RUN_COUNTS,
+    errorCode: undefined,
+    retryable: false,
+  };
 }
 
 describe("JobScheduler", () => {
@@ -79,6 +111,41 @@ describe("JobScheduler", () => {
     await new JobScheduler(storeReturning({}), runner).tick();
 
     expect(started).toEqual(["watch_b"]);
+  });
+
+  test("holds a due job back while four scheduled runs are going", async ({ home }) => {
+    await writeConfig(config([job("watch_a", home.aireg)]), 0);
+    const start = vi.fn(async () => ({}) as RunRecord);
+    const busy = [0, 1, 2, 3].map((index) => activeRun(index, "schedule"));
+
+    await new JobScheduler(storeReturning({}, busy), { start } as unknown as SyncRunner).tick();
+
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  test("does not hold a job back for runs a person started", async ({ home }) => {
+    await writeConfig(config([job("watch_a", home.aireg)]), 0);
+    const start = vi.fn(async () => ({}) as RunRecord);
+    const busy = [0, 1, 2, 3].map((index) => activeRun(index, "manual"));
+
+    await new JobScheduler(storeReturning({}, busy), { start } as unknown as SyncRunner).tick();
+
+    expect(start.mock.calls).toEqual([["watch_a", "sync", "startup"]]);
+  });
+
+  test("starts the job that has waited longest first", async ({ home }) => {
+    await writeConfig(config([job("watch_recent", home.aireg), job("watch_late", home.aireg)]), 0);
+    const start = vi.fn(async () => ({}) as RunRecord);
+    // Both are past their 300 s interval; watch_late by an hour more.
+    const now = Date.now();
+    const store = storeReturning({
+      watch_recent: [finishedRun("watch_recent", now - 301_000)],
+      watch_late: [finishedRun("watch_late", now - 301_000 - 3_600_000)],
+    });
+
+    await new JobScheduler(store, { start } as unknown as SyncRunner).tick();
+
+    expect(start.mock.calls).toEqual([["watch_late", "sync", "schedule"]]);
   });
 
   test("backs a failing job off instead of retrying it every tick", async ({ home }) => {
