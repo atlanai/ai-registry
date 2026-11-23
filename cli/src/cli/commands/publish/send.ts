@@ -31,7 +31,8 @@ export async function sendTo(
         : `${alias} keeps no change message, so -m was not used.`,
     );
   }
-  let message = options.message ?? subjectOf(items);
+  const composed = subjectOf(items);
+  let message = options.message ?? composed;
   if (options.asked) {
     const typed = await text(
       {
@@ -45,10 +46,12 @@ export async function sendTo(
     if (canceled(typed)) return "canceled";
     message = typed;
   }
+  // Enter on the proposal is not a message of the person's own, so a source may still use its own.
+  const messageGiven = options.message !== undefined || message !== composed;
   const published = await handle
     .publish?.(
       items.map((item) => item.input),
-      { message, review: true },
+      { message, messageGiven, review: true },
     )
     .catch((error: unknown) => {
       throw heldUnlisted(error, alias, items);

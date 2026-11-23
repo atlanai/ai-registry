@@ -252,6 +252,12 @@ export interface PublishInput {
 export interface PublishOptions {
   /** Why the change was made, where the source records that. */
   message?: string | undefined;
+  /**
+   * Whether a person gave `message`, with `-m` or by changing what aireg proposed at the prompt.
+   * False when aireg composed it from the names and versions, which a source may replace with
+   * its own account of the change. An older host leaves it out.
+   */
+  messageGiven?: boolean | undefined;
   /** A person is publishing by hand: leave the change for review, where the source has a way to. */
   review?: boolean | undefined;
   /** Report each refused change in `refused` and carry on, keeping the ones that landed. */
