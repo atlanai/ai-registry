@@ -215,8 +215,8 @@ describe("a plugin marketplace", () => {
     expect(refused.stderr).toContain(`\`${hint}\``);
     expect(await read(manifestPath(project))).not.toContain("hooked-dev");
 
-    // The hint, run as printed.
-    const trusted = await aireg([...hint.split(" ").slice(1), "-y"]);
+    // The hint, run as a shell would split it.
+    const trusted = await aireg(["add", root, "-s", "hook-kit", "--trust", "hook-kit", "-y"]);
     expect(trusted.code, trusted.stderr).toBe(0);
     expect(await locked(project)).toEqual(["hook-kit"]);
   });
