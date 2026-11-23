@@ -102,6 +102,20 @@ const Status = matching<StatusResult>()(
       unmanaged: Type.Array(Unmanaged),
       duplicates: Type.Array(Duplicate),
       dangling: Type.Array(Dangling),
+      manifest: Type.Object(
+        {
+          asked: Type.Array(Type.String(), {
+            description: "Manifest entries the lockfile does not record, as written.",
+          }),
+          unasked: Type.Array(Type.String(), {
+            description: "Installed artifacts no manifest entry asks for.",
+          }),
+        },
+        {
+          additionalProperties: false,
+          description: "Where the manifest and the lockfile disagree; `aireg install` settles it.",
+        },
+      ),
     },
     { additionalProperties: false },
   ),

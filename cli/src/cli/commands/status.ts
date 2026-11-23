@@ -3,7 +3,7 @@ import { relative } from "node:path";
 import { ifPresent } from "#adapter/files.ts";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
-import { plural } from "#adapter/text.ts";
+import { list, plural } from "#adapter/text.ts";
 import { type Copy, type Duplicate, duplicates } from "#cli/commands/status/duplicates.ts";
 import type { Approval, StatusResult } from "#cli/commands/status/result.ts";
 import { STATUS_COMMAND } from "#cli/commands/status/spec.ts";
@@ -17,10 +17,18 @@ import { canonical } from "#core/fs/realpath.ts";
 import { exists } from "#core/fs/tree.ts";
 import { type Lock, readLock } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
+import { type Unlocked, unlocked } from "#core/plan/acquire/lock-view.ts";
 import { namespaceOf, pluginLinkAt } from "#core/plan/projection.ts";
 import { type ArtifactStatus, status, worstState } from "#core/plan/status.ts";
 import { survey } from "#core/plan/survey.ts";
-import { artifactPath, copyLeaf, roots as makeRoots, type Roots } from "#core/store/paths.ts";
+import {
+  artifactPath,
+  copyLeaf,
+  roots as makeRoots,
+  type Roots,
+  type Scope,
+  scopeFlag,
+} from "#core/store/paths.ts";
 import { type Candidate, candidates, type DanglingLink, danglingLinks } from "#core/sync/adopt.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { byEarlierIds, earlierId, names } from "#core/target/ids.ts";
@@ -49,6 +57,7 @@ interface Found {
   loose: Unmanaged[];
   copies: Duplicate[];
   dangling: DanglingLink[];
+  changed: Unlocked;
 }
 
 /**
@@ -79,8 +88,21 @@ export const { run } = defineCommand({
         .map((item) => ({ name: item.name, path: canonical(item.path) })),
     );
     const rows = installed(lock, manifest, targetTable);
-    if (worstState(statuses) !== "ok") context.exit = ExitCode.Changed;
-    return { roots, manifest, lock, targetTable, statuses, rows, clashes, loose, copies, dangling };
+    const changed = unlocked(manifest, lock);
+    if (worstState(statuses) !== "ok" || unsettled(changed)) context.exit = ExitCode.Changed;
+    return {
+      roots,
+      manifest,
+      lock,
+      targetTable,
+      statuses,
+      rows,
+      clashes,
+      loose,
+      copies,
+      dangling,
+      changed,
+    };
   },
   data(found): StatusResult {
     const { roots, lock, targetTable, rows } = found;
@@ -115,18 +137,22 @@ export const { run } = defineCommand({
         target: linksTo,
         harness: earlierId(targetTable, target),
       })),
+      manifest: found.changed,
     };
   },
   text(found, printer) {
     const { roots, manifest, lock, targetTable, loose } = found;
     const scope = scopeTargets(manifest, targetTable);
+    const settled = !unsettled(found.changed);
     renderStatus(printer, found.statuses, found.rows, roots.scope, {
       targetTable,
       for: (name) => {
         const entry = lock.artifacts[name];
         return entry === undefined ? scope : chosenFor(manifest, scope, entry);
       },
+      settled,
     });
+    if (!settled) printManifestChanges(printer, roots.scope, found.changed);
     for (const name of found.clashes) {
       printer.warning(
         `${name} is also installed in your user scope, and your target decides which one it loads.`,
@@ -155,6 +181,22 @@ export const { run } = defineCommand({
     printDangling(printer, roots, targetTable, found.dangling);
   },
 });
+
+const unsettled = ({ asked, unasked }: Unlocked) => asked.length > 0 || unasked.length > 0;
+
+/** Read from the two files alone: what an install would change is for `install --frozen` to say. */
+function printManifestChanges(printer: Printer, scope: Scope, { asked, unasked }: Unlocked): void {
+  if (asked.length > 0) {
+    printer.warning(`The manifest asks for ${list(asked)}, which the lockfile does not record.`);
+  }
+  if (unasked.length > 0) {
+    const verb = unasked.length === 1 ? "asks" : "ask";
+    printer.warning(
+      `The lockfile records ${list(unasked)}, which the manifest no longer ${verb} for.`,
+    );
+  }
+  printer.hint(`Run \`aireg install${scopeFlag(scope)}\` to make the lockfile match the manifest.`);
+}
 
 /**
  * Installed at both scopes, so the target loads it twice or picks by its own order.

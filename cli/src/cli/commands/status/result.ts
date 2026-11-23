@@ -12,6 +12,8 @@ export interface StatusResult {
   /** Skills that are copies of each other, then unmanaged skills that share a name. */
   duplicates: Duplicate[];
   dangling: DanglingEntry[];
+  /** Where the manifest and the lockfile disagree, as after a hand edit to the manifest. */
+  manifest: { asked: string[]; unasked: string[] };
 }
 
 interface StatusArtifact {

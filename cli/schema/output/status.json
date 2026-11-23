@@ -13,7 +13,8 @@
         "shadowed",
         "unmanaged",
         "duplicates",
-        "dangling"
+        "dangling",
+        "manifest"
       ],
       "properties": {
         "scope": {
@@ -289,6 +290,31 @@
                 "type": "string"
               },
               "harness": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "manifest": {
+          "additionalProperties": false,
+          "description": "Where the manifest and the lockfile disagree; `aireg install` settles it.",
+          "type": "object",
+          "required": [
+            "asked",
+            "unasked"
+          ],
+          "properties": {
+            "asked": {
+              "description": "Manifest entries the lockfile does not record, as written.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unasked": {
+              "description": "Installed artifacts no manifest entry asks for.",
+              "type": "array",
+              "items": {
                 "type": "string"
               }
             }
