@@ -22,7 +22,7 @@ test.beforeAll(async ({ aireg: run, tmp, project }) => {
   installed = await readFile(manifestPath(project), "utf8");
 });
 
-// `install --frozen` fails on each of these, so `status` must not call the project in order.
+// `install --frozen` fails on each of these, so `status` must not report the project as in order.
 describe("status after a hand edit to the manifest", () => {
   test("matches the lockfile before the edit", async () => {
     const status = await aireg(["status"]);

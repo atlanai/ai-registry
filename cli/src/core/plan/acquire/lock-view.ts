@@ -155,23 +155,31 @@ export function unlocked(manifest: Manifest, lock: Lock): Unlocked {
       return source === undefined || !declares(manifest, source) || !answersRef(ref, source, true);
     })
     .map(formatRef);
-  const wanted = new Map<string, boolean>();
-  const wants = (name: string): boolean => {
-    const known = wanted.get(name);
-    if (known !== undefined) return known;
-    // Set first, so a cycle of `neededBy` ends here.
-    wanted.set(name, false);
-    const row = lock.artifacts[name];
-    const want =
-      row !== undefined &&
-      (row.origin !== undefined ||
-        (manifest.registries[row.registry] !== undefined &&
-          (asksFor(manifest, row) || (row.neededBy ?? []).some(wants))));
-    wanted.set(name, want);
-    return want;
-  };
+  // Walk down from what the manifest asks for, so a cycle of `neededBy` cannot hide a row.
+  const needs = new Map<string, string[]>();
+  for (const [name, row] of Object.entries(lock.artifacts)) {
+    for (const parent of row.neededBy ?? [])
+      needs.set(parent, [...(needs.get(parent) ?? []), name]);
+  }
+  const declared = (name: string) =>
+    manifest.registries[lock.artifacts[name]?.registry ?? ""] !== undefined;
+  const wanted = new Set(
+    Object.entries(lock.artifacts)
+      .filter(
+        ([name, row]) => row.origin !== undefined || (declared(name) && asksFor(manifest, row)),
+      )
+      .map(([name]) => name),
+  );
+  const queue = [...wanted];
+  for (let name = queue.pop(); name !== undefined; name = queue.pop()) {
+    for (const child of needs.get(name) ?? []) {
+      if (wanted.has(child) || !declared(child)) continue;
+      wanted.add(child);
+      queue.push(child);
+    }
+  }
   const unasked = Object.keys(lock.artifacts)
-    .filter((name) => !wants(name))
+    .filter((name) => !wanted.has(name))
     .sort();
   return { asked, unasked };
 }

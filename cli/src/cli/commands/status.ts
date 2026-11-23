@@ -184,7 +184,7 @@ export const { run } = defineCommand({
 
 const unsettled = ({ asked, unasked }: Unlocked) => asked.length > 0 || unasked.length > 0;
 
-/** Read from the two files alone: what an install would change is for `install --frozen` to say. */
+/** Compares the two files only; `install --frozen` reports what an install would change. */
 function printManifestChanges(printer: Printer, scope: Scope, { asked, unasked }: Unlocked): void {
   if (asked.length > 0) {
     printer.warning(`The manifest asks for ${list(asked)}, which the lockfile does not record.`);
