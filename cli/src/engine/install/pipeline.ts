@@ -25,10 +25,12 @@ import {
   refuseLockChange,
   refuseManifestChange,
   refusePlan,
+  refuseRewritten,
   refuseUnlisted,
   refuseUnstaged,
   refuseUntrusted,
   refuseWithheld,
+  rewrittenNotices,
   trustHint,
   untrustedLine,
 } from "./refusals.ts";
@@ -150,6 +152,7 @@ async function write(
       report.plan(planned, roots, aside, chosen);
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
       refuseUnlisted(planned.unlisted, printer, undefined);
+      warn(printer, rewrittenNotices(planned));
       if (planned.untrusted.length > 0) {
         printer.warning(`Would not install ${untrustedLine(planned.untrusted)} that run as you.`);
         printer.hint(trustHint(planned.untrusted));
@@ -187,6 +190,7 @@ async function write(
     refuseUnstaged(applied.unstaged, landed, printer);
     refuseWithheld(planned, printer, request.moving);
     refuseUnlisted(planned.unlisted, printer, request.moving);
+    refuseRewritten(planned);
     refuseUntrusted(planned.untrusted);
     return result(applied);
   } finally {
