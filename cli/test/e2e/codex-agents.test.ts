@@ -12,7 +12,6 @@ const AGENT = [
   "---",
   "name: reviewer",
   "description: Reviews pull requests.",
-  "tools: Read, Grep",
   "model: sonnet",
   "color: cyan",
   "---",
@@ -29,6 +28,17 @@ const TOML = [
   "",
 ].join("\n");
 
+const LIMITED = [
+  "---",
+  "name: auditor",
+  "description: Reads code and never edits it.",
+  "tools: Read, Grep",
+  "---",
+  "",
+  "Audit the change.",
+  "",
+].join("\n");
+
 const toml = () => join(project, ".codex", "agents", "reviewer.toml");
 
 test.beforeAll(async ({ aireg: run, tmp, project: dir, home: { dir: homeDir } }) => {
@@ -36,6 +46,7 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir, home: { dir: homeDir } })
   const market = join(tmp, "market");
   await registry(market, { name: "acme", slug: "acme" })
     .agent("eng/reviewer@1.0.0", { files: { "AGENT.md": AGENT } })
+    .agent("eng/auditor@1.0.0", { files: { "AGENT.md": LIMITED } })
     .write();
   await mkdir(join(project, ".claude"), { recursive: true });
   expect((await aireg(["init", "-y", "--for", "claude-code,codex"])).code).toBe(0);
@@ -79,5 +90,15 @@ describe("an agent installed for Codex", () => {
       (await aireg(["add", "acme/eng/agent/reviewer", "-g", "-y", "--for", "codex"])).code,
     ).toBe(0);
     expect(await readFile(join(home, ".codex", "agents", "reviewer.toml"), "utf8")).toBe(TOML);
+  });
+
+  test("is left out when it sets a key Codex cannot read that limits it", async () => {
+    const added = await aireg(["add", "acme/eng/agent/auditor", "-y"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect(added.stderr).toContain(
+      "Did not install auditor for Codex: it sets tools, which this target cannot read.",
+    );
+    await expect(lstat(join(project, ".codex", "agents", "auditor.toml"))).rejects.toThrow();
+    expect(await readFile(join(project, ".claude", "agents", "auditor.md"), "utf8")).toBe(LIMITED);
   });
 });

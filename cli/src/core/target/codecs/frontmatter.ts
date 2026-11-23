@@ -25,7 +25,13 @@ export function frontmatterStrict(
  * Keys the agents' own docs name as limiting an agent, which no codec drops or changes; a
  * definition's `restrictions` add more.
  */
-const RESTRICTIONS = ["tools", "allowed-tools", "disallowedTools", "permissionMode", "permission"];
+export const RESTRICTIONS = [
+  "tools",
+  "allowed-tools",
+  "disallowedTools",
+  "permissionMode",
+  "permission",
+];
 
 const restricting = (own: readonly string[]) => [...RESTRICTIONS, ...own];
 

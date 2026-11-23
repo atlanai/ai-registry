@@ -76,11 +76,11 @@ export interface Render {
 }
 
 /**
- * A built-in rewrite chosen by id, so a definition never carries code. Strict and set codecs
- * never drop or change a key that limits an agent, `restrictions` included.
+ * A built-in rewrite chosen by id, so a definition never carries code. No codec drops or changes
+ * a key that limits an agent; strict and set codecs also refuse for their `restrictions`.
  */
 export type Codec =
-  /** The front-matter `fields`, each required, and the Markdown body under `body`; nothing else. */
+  /** The front-matter `fields`, each required, and the body under `body`; refuses to drop a limit. */
   | { id: "frontmatter-toml"; fields: string[]; body: string }
   /** Only the front-matter keys in `keep`; dropping a key that limits the agent is refused. */
   | { id: "frontmatter-strict"; keep: string[]; restrictions?: string[] | undefined }
