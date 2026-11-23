@@ -132,17 +132,21 @@ async function publish(
     if (sending === undefined) return report(planned, new Map(), outcome);
 
     const results = new Map<string, PublishResult | undefined>();
+    const pushes: string[] = [];
     for (const alias of new Set(sending.map((entry) => entry.alias))) {
       const items = sending.filter((entry) => entry.alias === alias).map(({ item }) => item);
       const sent = await sendTo(printer, step, alias, items, await open(alias), {
         message: own.message,
         asked: await asks(alias),
         checkout: alias === checkout?.registry ? checkout.at : undefined,
+        pushes,
       });
       if (sent === "canceled") return canceled(printer);
       results.set(alias, sent);
     }
-    await follow(context, loaded, common, sending, unpushed(checkout, known));
+    const clashed = await follow(context, loaded, common, sending, unpushed(checkout, known));
+    // A version someone else already serves makes git reject the push.
+    if (!clashed) for (const push of pushes) printer.note("next", push);
     // A registry folder is not your user scope; an installed copy it sent from is.
     if (
       !isLocalPath(own.to ?? target ?? "") ||

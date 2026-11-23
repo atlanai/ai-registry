@@ -24,7 +24,7 @@ export async function follow(
   sent: readonly { alias: string; item: Planned }[],
   /** A git checkout sent into, whose new versions reach no one until git pushes them. */
   checkout?: { registry: string; location: string },
-) {
+): Promise<boolean> {
   const rows = new Map<string, { version: string; unpushed: boolean }>();
   for (const { alias, item } of sent) {
     const row = item.work.row;
@@ -38,21 +38,22 @@ export async function follow(
     if (pinned === undefined) rows.set(row, { version: item.version, unpushed });
     else context.printer.hint(pinnedNote(row, pinned, item.version));
   }
-  if (rows.size === 0) return;
+  if (rows.size === 0) return false;
+  let clash = false;
   await withScope(loaded.roots, async (fresh) => {
     const found = await scan(fresh, common, {
       credentials: await credentialsForManifest(fresh.manifest.registries, context.cwd),
     });
     try {
       // Served already while ours waits in the checkout: a teammate pushed it first.
-      const clashed = new Set(
-        [...rows]
-          .filter(
-            ([row, sent]) =>
-              sent.unpushed && serves(found, fresh.lock.artifacts[row], sent.version),
-          )
-          .map(([row]) => row),
-      );
+      const clashed = new Map<string, string>();
+      for (const [row, sent] of rows) {
+        const taken = sent.unpushed
+          ? serves(found, fresh.lock.artifacts[row], sent.version)
+          : undefined;
+        if (taken !== undefined) clashed.set(row, taken);
+      }
+      clash = clashed.size > 0;
       const served = new Set(
         [...rows]
           .filter(
@@ -64,8 +65,9 @@ export async function follow(
       for (const [row, { version }] of rows) {
         const entry = fresh.lock.artifacts[row];
         if (served.has(row) || entry === undefined) continue;
-        if (clashed.has(row)) {
-          context.printer.warning(clashNote(row, version));
+        const taken = clashed.get(row);
+        if (taken !== undefined) {
+          context.printer.warning(clashNote(row, taken));
           continue;
         }
         // What was sent is what is on disk, so the copy stops reading as an edit.
@@ -90,6 +92,7 @@ export async function follow(
       await closeScan(found);
     }
   });
+  return clash;
 }
 
 /** The project installs this row from the checkout itself, so what was sent is already served. */

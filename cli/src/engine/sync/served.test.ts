@@ -69,13 +69,14 @@ describe("moved", () => {
 
 describe("serves", () => {
   // Sent into a clone, so upstream holding the version means a teammate pushed it first.
-  test("is true when upstream serves the version, whatever its content", () => {
-    expect(serves(serving([at("sha256:theirs", "4")]), row, "4")).toBe(true);
+  test("names what upstream serves at or above the version sent, whatever its content", () => {
+    expect(serves(serving([at("sha256:theirs", "4")]), row, "4")).toBe("4");
+    expect(serves(serving([at("sha256:theirs", "0.1.2")]), row, "0.1.1")).toBe("0.1.2");
   });
 
-  test("is false when upstream serves another version, or nothing", () => {
-    expect(serves(serving([at("sha256:before", "3")]), row, "4")).toBe(false);
-    expect(serves(serving([]), row, "4")).toBe(false);
-    expect(serves(serving([at("sha256:theirs", "4")]), undefined, "4")).toBe(false);
+  test("is undefined when upstream serves an older version, or nothing", () => {
+    expect(serves(serving([at("sha256:before", "3")]), row, "4")).toBeUndefined();
+    expect(serves(serving([]), row, "4")).toBeUndefined();
+    expect(serves(serving([at("sha256:theirs", "4")]), undefined, "4")).toBeUndefined();
   });
 });

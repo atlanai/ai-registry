@@ -132,43 +132,49 @@ describe("publishing from a project", () => {
     expect(sent.stderr).toMatch(/serves seed 1\.0\.1, not the 1\.0\.2 you published/);
   });
 
-  test("keeps a copy whose version a teammate published first, instead of installing theirs", async ({
-    aireg,
-    git,
-  }) => {
-    const scratch = join(root, "race");
-    const mp = join(root, "race-repo");
-    const clone = join(root, "race-clone");
-    const seed = registry(mp).skill("acme/seed@1.0.0", { body: "body\n" });
-    await seed.write();
-    await git.init(mp);
-    await git.commit(mp, "initial");
-    await git(root, "clone", "-q", mp, clone);
-    await mkdir(join(scratch, ".claude"), { recursive: true });
-    await writeManifestIn(
-      scratch,
-      `registries:\n  kit:\n    source: file://${mp}\nartifacts:\n  - kit/acme/skill/seed`,
-    );
-    expect((await aireg(["install"], { cwd: scratch })).code).toBe(0);
-    // A teammate releases 1.0.1 after the clone was made; the clone has not pulled it.
-    await seed.skill("acme/seed@1.0.1", { body: "theirs\n" }).write();
-    await git.commit(mp, "seed 1.0.1");
-    const copy = join(scratch, ".claude", "skills", "seed", "SKILL.md");
-    await appendFile(copy, "Mine.\n");
+  test.for([
+    ["race", ["1.0.1"]],
+    ["race-two", ["1.0.1", "1.0.2"]],
+  ] as const)(
+    "keeps a copy whose version a teammate published first, instead of installing theirs (%s)",
+    async ([name, theirs], { aireg, git }) => {
+      const scratch = join(root, name);
+      const mp = join(root, `${name}-repo`);
+      const clone = join(root, `${name}-clone`);
+      const seed = registry(mp).skill("acme/seed@1.0.0", { body: "body\n" });
+      await seed.write();
+      await git.init(mp);
+      await git.commit(mp, "initial");
+      await git(root, "clone", "-q", mp, clone);
+      await mkdir(join(scratch, ".claude"), { recursive: true });
+      await writeManifestIn(
+        scratch,
+        `registries:\n  kit:\n    source: file://${mp}\nartifacts:\n  - kit/acme/skill/seed`,
+      );
+      expect((await aireg(["install"], { cwd: scratch })).code).toBe(0);
+      // A teammate releases after the clone was made; the clone has not pulled it.
+      for (const version of theirs) {
+        await seed.skill(`acme/seed@${version}`, { body: "theirs\n" }).write();
+        await git.commit(mp, `seed ${version}`);
+      }
+      const copy = join(scratch, ".claude", "skills", "seed", "SKILL.md");
+      await appendFile(copy, "Mine.\n");
 
-    const sent = await aireg(["publish", "seed", "--to", join(clone, "acme"), "--yes"], {
-      cwd: scratch,
-    });
-    expect(sent.code, sent.stderr).toBe(0);
-    expect(await readFile(copy, "utf8")).toContain("Mine.");
-    expect(await readFile(copy, "utf8")).not.toContain("theirs");
-    expect(sent.stderr).toContain("The registry already serves a different seed 1.0.1");
-    const status = await aireg(["status"], { cwd: scratch });
-    expect(status.stdout).toMatch(/seed .* edited/);
-    const updated = await aireg(["update", "-y"], { cwd: scratch });
-    expect(updated.code, updated.stderr).toBe(0);
-    expect(await readFile(copy, "utf8")).toContain("Mine.");
-  });
+      const sent = await aireg(["publish", "seed", "--to", join(clone, "acme"), "--yes"], {
+        cwd: scratch,
+      });
+      expect(sent.code, sent.stderr).toBe(0);
+      expect(await readFile(copy, "utf8")).toContain("Mine.");
+      expect(await readFile(copy, "utf8")).not.toContain("theirs");
+      expect(sent.stderr).toContain(`The registry already serves seed ${theirs.at(-1)}`);
+      expect(`${sent.stdout}${sent.stderr}`).not.toContain("git push");
+      const status = await aireg(["status"], { cwd: scratch });
+      expect(status.stdout).toMatch(/seed .* edited/);
+      const updated = await aireg(["update", "-y"], { cwd: scratch });
+      expect(updated.code, updated.stderr).toBe(0);
+      expect(await readFile(copy, "utf8")).toContain("Mine.");
+    },
+  );
 
   // Last, because the namespace default it sets is your own and every publish after reads it.
   test("refuses new work with no destination or an undeclared one, and takes your default namespace", async ({

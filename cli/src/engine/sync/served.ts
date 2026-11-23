@@ -23,13 +23,21 @@ export function moved(
   );
 }
 
-/** Upstream serves this version, though what was just sent still waits in a git checkout. */
-export function serves(found: Scan, entry: LockArtifact | undefined, version: string): boolean {
-  return entry !== undefined && head(found, entry)?.version === version;
+/**
+ * The version upstream serves when it is at or above the one just sent, which still waits in
+ * a git checkout: a teammate pushed it first, so installing it would overwrite the edit.
+ */
+export function serves(
+  found: Scan,
+  entry: LockArtifact | undefined,
+  sent: string,
+): string | undefined {
+  const now = entry === undefined ? undefined : head(found, entry)?.version;
+  return now === undefined || now === sent || older(sent, now) ? now : undefined;
 }
 
-export function clashNote(row: string, version: string): string {
-  return `The registry already serves a different ${row} ${version}, so the copy here was left as it is and still reads as edited. Publish it again as a newer version.`;
+export function clashNote(row: string, served: string): string {
+  return `The registry already serves ${row} ${served} from someone else, so the copy here was left as it is and still reads as edited. Publish it again as a version above ${served}.`;
 }
 
 function head(found: Scan, entry: LockArtifact): Placement | undefined {
