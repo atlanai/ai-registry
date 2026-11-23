@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Placement } from "#core/plan/model.ts";
 import type { Scan } from "./scan.ts";
-import { moved } from "./served.ts";
+import { moved, serves } from "./served.ts";
 
 const row = {
   registry: "team",
@@ -64,5 +64,18 @@ describe("moved", () => {
     const listed = [{ kind: "skill", name: "probe", group: "team", path: row.address }];
     expect(moved(serving([at("sha256:after", "4")], listed), yours)).toBe(true);
     expect(moved(serving([at("sha256:after", "4")]), yours)).toBe(false);
+  });
+});
+
+describe("serves", () => {
+  // Sent into a clone, so upstream holding the version means a teammate pushed it first.
+  test("is true when upstream serves the version, whatever its content", () => {
+    expect(serves(serving([at("sha256:theirs", "4")]), row, "4")).toBe(true);
+  });
+
+  test("is false when upstream serves another version, or nothing", () => {
+    expect(serves(serving([at("sha256:before", "3")]), row, "4")).toBe(false);
+    expect(serves(serving([]), row, "4")).toBe(false);
+    expect(serves(serving([at("sha256:theirs", "4")]), undefined, "4")).toBe(false);
   });
 });

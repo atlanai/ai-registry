@@ -142,12 +142,7 @@ async function publish(
       if (sent === "canceled") return canceled(printer);
       results.set(alias, sent);
     }
-    await follow(
-      context,
-      loaded,
-      common,
-      sending.map(({ item }) => item),
-    );
+    await follow(context, loaded, common, sending, unpushed(checkout, known));
     // A registry folder is not your user scope; an installed copy it sent from is.
     if (
       !isLocalPath(own.to ?? target ?? "") ||
@@ -159,6 +154,16 @@ async function publish(
   } finally {
     await close();
   }
+}
+
+/** The git checkout a publish wrote into, whose new versions reach no one until git pushes them. */
+function unpushed(
+  checkout: { registry: string } | undefined,
+  known: Record<string, RegistrySource>,
+): { registry: string; location: string } | undefined {
+  const into = checkout === undefined ? undefined : known[checkout.registry];
+  if (checkout === undefined || into === undefined) return undefined;
+  return { registry: checkout.registry, location: into.location };
 }
 
 /** A canceled run leaves nothing to report, so `--json` prints no data for it. */

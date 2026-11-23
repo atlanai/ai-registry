@@ -23,6 +23,15 @@ export function moved(
   );
 }
 
+/** Upstream serves this version, though what was just sent still waits in a git checkout. */
+export function serves(found: Scan, entry: LockArtifact | undefined, version: string): boolean {
+  return entry !== undefined && head(found, entry)?.version === version;
+}
+
+export function clashNote(row: string, version: string): string {
+  return `The registry already serves a different ${row} ${version}, so the copy here was left as it is and still reads as edited. Publish it again as a newer version.`;
+}
+
 function head(found: Scan, entry: LockArtifact): Placement | undefined {
   const acquired = found.acquired.find((item) => item.alias === entry.registry);
   const at = acquired === undefined ? undefined : listedAt(entry, acquired.catalog.entries);

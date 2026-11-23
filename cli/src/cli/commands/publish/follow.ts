@@ -1,7 +1,9 @@
 import { resolve } from "node:path";
 import { credentialsForManifest } from "#accounts/credentials.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
+import { expandLocation } from "#core/adapter/location.ts";
 import { digest } from "#core/fs/digest.ts";
+import { canonical } from "#core/fs/realpath.ts";
 import { writeLock } from "#core/lock.ts";
 import { pinOf } from "#core/manifest/match.ts";
 import type { CommonOptions } from "#engine/options.ts";
@@ -9,7 +11,7 @@ import type { Planned } from "#engine/publish/target.ts";
 import { type Loaded, withScope } from "#engine/scope/load.ts";
 import { applyLocal } from "#engine/sync/local.ts";
 import { closeScan, scan } from "#engine/sync/scan.ts";
-import { moved, pinnedNote, unservedNote } from "#engine/sync/served.ts";
+import { clashNote, moved, pinnedNote, serves, unservedNote } from "#engine/sync/served.ts";
 
 /**
  * A published copy holds exactly what landed, so its row is restated from the source.
@@ -19,15 +21,21 @@ export async function follow(
   context: CommandContext,
   loaded: Loaded,
   common: CommonOptions,
-  sent: readonly Planned[],
+  sent: readonly { alias: string; item: Planned }[],
+  /** A git checkout sent into, whose new versions reach no one until git pushes them. */
+  checkout?: { registry: string; location: string },
 ) {
-  const rows = new Map<string, string>();
-  for (const item of sent) {
+  const rows = new Map<string, { version: string; unpushed: boolean }>();
+  for (const { alias, item } of sent) {
     const row = item.work.row;
     const entry = row === undefined ? undefined : loaded.lock.artifacts[row];
     if (row === undefined || entry === undefined) continue;
     const pinned = pinOf(loaded.manifest, entry);
-    if (pinned === undefined) rows.set(row, item.version);
+    const unpushed =
+      checkout !== undefined &&
+      alias === checkout.registry &&
+      !installsFrom(loaded, entry.registry, checkout.location);
+    if (pinned === undefined) rows.set(row, { version: item.version, unpushed });
     else context.printer.hint(pinnedNote(row, pinned, item.version));
   }
   if (rows.size === 0) return;
@@ -36,14 +44,30 @@ export async function follow(
       credentials: await credentialsForManifest(fresh.manifest.registries, context.cwd),
     });
     try {
-      const served = new Set(
+      // Served already while ours waits in the checkout: a teammate pushed it first.
+      const clashed = new Set(
         [...rows]
-          .filter(([row, version]) => moved(found, fresh.lock.artifacts[row], version))
+          .filter(
+            ([row, sent]) =>
+              sent.unpushed && serves(found, fresh.lock.artifacts[row], sent.version),
+          )
           .map(([row]) => row),
       );
-      for (const [row, version] of rows) {
+      const served = new Set(
+        [...rows]
+          .filter(
+            ([row, sent]) =>
+              !clashed.has(row) && moved(found, fresh.lock.artifacts[row], sent.version),
+          )
+          .map(([row]) => row),
+      );
+      for (const [row, { version }] of rows) {
         const entry = fresh.lock.artifacts[row];
         if (served.has(row) || entry === undefined) continue;
+        if (clashed.has(row)) {
+          context.printer.warning(clashNote(row, version));
+          continue;
+        }
         // What was sent is what is on disk, so the copy stops reading as an edit.
         entry.digest = await digest(resolve(fresh.roots.base, entry.path));
         const note = unservedNote(found, entry, row, version);
@@ -51,7 +75,7 @@ export async function follow(
         else context.printer.hint(note.message);
       }
       if (served.size > 0) {
-        const sentAs = new Map([...served].map((row) => [row, rows.get(row)]));
+        const sentAs = new Map([...served].map((row) => [row, rows.get(row)?.version]));
         await applyLocal({
           loaded: fresh,
           common,
@@ -66,4 +90,13 @@ export async function follow(
       await closeScan(found);
     }
   });
+}
+
+/** The project installs this row from the checkout itself, so what was sent is already served. */
+function installsFrom(loaded: Loaded, alias: string, location: string): boolean {
+  const declared = loaded.manifest.registries[alias];
+  return (
+    declared !== undefined &&
+    canonical(expandLocation(declared.location, loaded.roots.base)) === canonical(location)
+  );
 }
