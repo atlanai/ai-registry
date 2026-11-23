@@ -102,6 +102,7 @@ export async function addAddress(
         adding: new Set(
           refs.map(parseRef).flatMap((ref) => (ref.name === undefined ? [] : [formatAddress(ref)])),
         ),
+        declaredFrom: introduced ? input : undefined,
       };
     },
     approve: async (plan, { targets, targetTable }) => {

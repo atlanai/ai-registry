@@ -190,6 +190,36 @@ describe("a plugin marketplace", () => {
     expect((await aireg(["install"])).code).toBe(0);
   });
 
+  // Its one plugin refused, the add leaves no registry declared, so the hint names the address.
+  test("names the address in its trust hint when the refusal leaves no registry declared", async ({
+    aireg,
+    initialised,
+    project,
+    tmp,
+  }) => {
+    await initialised(project);
+    const root = await skillsFolder(join(tmp, "hooked"))
+      .json(".claude-plugin/marketplace.json", {
+        name: "hooked-dev",
+        owner: { name: "Acme" },
+        plugins: [{ name: "hook-kit", source: "./" }],
+      })
+      .json(".claude-plugin/plugin.json", { name: "hook-kit", version: "1.0.0" })
+      .skill("skills/tdd")
+      .json("hooks/hooks.json", { hooks: {} })
+      .write();
+    const refused = await aireg(["add", root, "--all", "-y"]);
+    expect(refused.code).toBe(2);
+    const hint = `aireg add ${root} -s hook-kit --trust hook-kit`;
+    expect(refused.stderr).toContain(`\`${hint}\``);
+    expect(await read(manifestPath(project))).not.toContain("hooked-dev");
+
+    // The hint, run as printed.
+    const trusted = await aireg([...hint.split(" ").slice(1), "-y"]);
+    expect(trusted.code, trusted.stderr).toBe(0);
+    expect(await locked(project)).toEqual(["hook-kit"]);
+  });
+
   // util-linux's `script` runs aireg on a terminal of its own; other systems' `script` differs.
   test.runIf(process.platform === "linux")(
     "asks on a terminal before a plugin the address names exactly",

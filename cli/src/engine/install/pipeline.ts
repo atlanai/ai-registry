@@ -64,6 +64,8 @@ export interface RunRequest {
   adding?: ReadonlySet<string>;
   /** Names whose identical copy on disk this run takes over in place. */
   adopt?: ReadonlySet<string>;
+  /** The address this run declares its registry from, which a hint repeats once it is undone. */
+  declaredFrom?: string | undefined;
 }
 
 export interface PlanReport {
@@ -155,7 +157,9 @@ async function write(
       warn(printer, rewrittenNotices(planned));
       if (planned.untrusted.length > 0) {
         printer.warning(`Would not install ${untrustedLine(planned.untrusted)} that run as you.`);
-        printer.hint(trustHint(planned.untrusted));
+        printer.hint(
+          trustHint(planned.untrusted, { scope: roots.scope, address: request.declaredFrom }),
+        );
       }
       return result(undefined);
     }
@@ -185,13 +189,17 @@ async function write(
 
     const landed = applied.installed.length > 0;
     // An edit none of whose artifacts landed must not leave the manifest asking for them.
-    if (edited && !landed && (applied.unstaged.length > 0 || planned.untrusted.length > 0))
-      await restore(roots.manifest, before, written);
+    const undone =
+      edited && !landed && (applied.unstaged.length > 0 || planned.untrusted.length > 0);
+    if (undone) await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
     refuseWithheld(planned, printer, request.moving);
     refuseUnlisted(planned.unlisted, printer, request.moving);
     refuseRewritten(planned);
-    refuseUntrusted(planned.untrusted);
+    refuseUntrusted(planned.untrusted, {
+      scope: roots.scope,
+      address: undone ? request.declaredFrom : undefined,
+    });
     return result(applied);
   } finally {
     await closeAll(acquired);

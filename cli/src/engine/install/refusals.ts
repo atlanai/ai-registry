@@ -13,6 +13,8 @@ import type { Acquired, Kept, Plan } from "#core/plan/model.ts";
 import { recordOf } from "#core/plan/model.ts";
 import type { Untrusted } from "#core/plan/select.ts";
 import { type Unlisted, unlistedMessage } from "#core/plan/unlisted.ts";
+import type { Scope } from "#core/store/paths.ts";
+import { shellWord } from "#core/term/format.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { VERSION } from "#core/version.ts";
 import type { Loaded } from "#engine/scope/load.ts";
@@ -146,10 +148,21 @@ export function untrustedLine(untrusted: readonly Untrusted[]): string {
   return `${names}, which ${untrusted.length === 1 ? "carries" : "carry"} ${describeCarried(carries)}`;
 }
 
-export function trustHint(untrusted: readonly Untrusted[]): string {
-  const commands = untrusted.map(
-    ({ registry, name }) => `\`aireg add ${registry}/${name} --trust ${name}\``,
-  );
+/** Where to add it again: the address typed when the run did not keep its registry declared. */
+export interface TrustRetry {
+  scope: Scope;
+  address?: string | undefined;
+}
+
+export function trustHint(untrusted: readonly Untrusted[], retry: TrustRetry): string {
+  const scope = retry.scope === "user" ? " -g" : "";
+  const commands = untrusted.map(({ registry, name }) => {
+    const from =
+      retry.address === undefined
+        ? `${registry}/${name}`
+        : `${shellWord(retry.address)} -s ${name}`;
+    return `\`aireg add ${from} --trust ${name}${scope}\``;
+  });
   return `Read what ${untrusted.length === 1 ? "it runs" : "they run"}, then run ${list(commands)}.`;
 }
 
@@ -157,11 +170,11 @@ export function trustHint(untrusted: readonly Untrusted[]): string {
  * A plugin from a non-registry source carrying what a target runs as you installs only once
  * trusted by name; one left out fails the run after the rest is in.
  */
-export function refuseUntrusted(untrusted: readonly Untrusted[]): void {
+export function refuseUntrusted(untrusted: readonly Untrusted[], retry: TrustRetry): void {
   if (untrusted.length === 0) return;
   throw new AiregError(`Did not install ${untrustedLine(untrusted)} that run as you.`, {
     code: ErrorCode.Usage,
-    hint: trustHint(untrusted),
+    hint: trustHint(untrusted, retry),
   });
 }
 
