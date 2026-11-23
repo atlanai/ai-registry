@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
+import { shellWord } from "#core/term/format.ts";
 import { marketplace, skillsFolder } from "#test/kit/builders/layouts.ts";
 import { type Aireg, test as base, fileTest } from "#test/kit/fixtures.ts";
 import { BIN } from "#test/kit/run.ts";
@@ -210,7 +211,7 @@ describe("a plugin marketplace", () => {
       .write();
     const refused = await aireg(["add", root, "--all", "-y"]);
     expect(refused.code).toBe(2);
-    const hint = `aireg add ${root} -s hook-kit --trust hook-kit`;
+    const hint = `aireg add ${shellWord(root)} -s hook-kit --trust hook-kit`;
     expect(refused.stderr).toContain(`\`${hint}\``);
     expect(await read(manifestPath(project))).not.toContain("hooked-dev");
 
