@@ -16,7 +16,7 @@ import { type Unlisted, unlistedMessage } from "#core/plan/unlisted.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { VERSION } from "#core/version.ts";
 import type { Loaded } from "#engine/scope/load.ts";
-import { unstagedNotices, warn } from "./notices.ts";
+import { type ApplyNotice, unstagedNotices, warn } from "./notices.ts";
 
 /** Skipping what the command named would report success for an install that never happened. */
 export function refuseClash(plan: Plan, adding: ReadonlySet<string> | undefined): void {
@@ -168,7 +168,6 @@ export function refuseUntrusted(untrusted: readonly Untrusted[]): void {
 /** Checked before a single byte is written. */
 export function refusePlan(plan: Plan, acquired: readonly Acquired[], lock: Lock): void {
   refuseIncompatible(plan);
-  refuseRewritten(plan);
   refuseYanked(acquired, lock);
   refuseConflicts(plan);
 }
@@ -182,18 +181,32 @@ function refuseIncompatible(plan: Plan): void {
   });
 }
 
-function refuseRewritten(plan: Plan): void {
-  if (plan.rewritten.length === 0) return;
+const REWRITTEN_HINT =
+  "Ask the registry's owner to publish the change as a new version; a released version never changes, so this may be tampering.";
+
+/** The plan keeps each rewritten artifact as locked, so the rest still installs. */
+export function rewrittenNotices(plan: Plan): ApplyNotice[] {
+  if (plan.rewritten.length === 0) return [];
   const changed = plan.rewritten.map(
     (item) => `${quoted(item.name)} ${item.version} (locked ${item.locked}, now ${item.served})`,
   );
-  throw new AiregError(
-    `The registry serves different content for ${list(changed)}, so nothing was installed.`,
+  const them = plan.rewritten.length === 1 ? "it" : "them";
+  return [
     {
-      code: ErrorCode.Integrity,
-      hint: "Ask the registry's owner to publish the change as a new version; a released version never changes, so this may be tampering.",
+      message: `The registry serves different content for ${list(changed)}, so ${them} stayed as locked.`,
+      hint: REWRITTEN_HINT,
     },
-  );
+  ];
+}
+
+/** Fails the run after the rest installed, so a person still sees the integrity problem. */
+export function refuseRewritten(plan: Plan): void {
+  const [notice] = rewrittenNotices(plan);
+  if (notice === undefined) return;
+  throw new AiregError(notice.message, {
+    code: ErrorCode.Integrity,
+    hint: `${REWRITTEN_HINT} Everything else installed.`,
+  });
 }
 
 /** A lock that holds a yanked version keeps it; nothing new may pin one. */

@@ -41,12 +41,14 @@ async function publish(
 const installed = (name = "lint") =>
   readFile(join(project, ".claude", "skills", name, "SKILL.md"), "utf8");
 const manifest = () => readFile(manifestPath(project), "utf8");
-const lockedVersion = async (name = "lint"): Promise<string | undefined> => {
+const lockedRow = async (name: string) => {
   const lock = parse(await readFile(lockPath(project), "utf8")) as {
-    artifacts: Record<string, { version?: string }>;
+    artifacts: Record<string, { version?: string; content?: string }>;
   };
-  return lock.artifacts[name]?.version;
+  return lock.artifacts[name];
 };
+const lockedVersion = async (name = "lint") => (await lockedRow(name))?.version;
+const lockedContent = async (name = "lint") => (await lockedRow(name))?.content;
 /** A checkout that commits the lock but not what it installs, as CI sees it. */
 const withoutCopies = async () => {
   await rm(join(project, ".registry", "artifacts"), { recursive: true, force: true });
@@ -194,15 +196,17 @@ describe("installing from the lock", () => {
     expect(await lockedVersion("format")).toBe("5.0.0");
   });
 
-  test("refuses other bytes under a version the lock holds, and installs nothing", async () => {
+  test("keeps other bytes under a version the lock holds as locked, and installs the rest", async () => {
     const versions = ["1.0.0", "1.1.0", "2.0.0", "3.0.0", "4.0.0", "5.0.0", "6.0.0"];
-    const before = await readFile(lockPath(project), "utf8");
+    const locked = await lockedContent();
     await publish(versions, { rewrite: "6.0.0" });
-    await withoutCopies();
-    const install = await aireg(["install", "-y"]);
-    expect(install.code).toBe(1);
-    expect(install.stderr).toContain("may be tampering");
-    expect(await readFile(lockPath(project), "utf8")).toBe(before);
+    const update = await aireg(["update", "-y"]);
+    expect(update.code).toBe(1);
+    expect(update.stderr).toContain('different content for "lint" 6.0.0');
+    expect(update.stderr).toContain("may be tampering");
+    expect(await lockedVersion("format")).toBe("6.0.0");
+    expect(await installed()).not.toContain("rewritten");
+    expect(await lockedContent()).toBe(locked);
     await publish(versions);
   });
 
