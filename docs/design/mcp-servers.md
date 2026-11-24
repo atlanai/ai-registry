@@ -62,7 +62,7 @@ So the registry stores what the publisher wrote, and restricting a server is par
 
 ### Versions
 
-`metadata.version` is the artifact's version and `spec.server.version` the server's. They should be equal: the artifact holds nothing but the server's own file, so a new artifact version is a new server version.
+`metadata.version` is the artifact's version and `spec.server.version` the server's. They should be equal: the artifact holds nothing but the server's own file, so a new artifact version is a new server version. `bump` copies the previous version's files and never edits `server.json`; replace it with the publisher's new file, or import that with `new --from`.
 
 ### Validation
 
@@ -112,7 +112,7 @@ A tool filter is not a sandbox. The server still holds its credentials, a new se
 A project's `with` uses these names. One name applies to every input declared under it, in every package and remote. A client resolves each non-secret input it needs from, in order:
 
 1. its fixed `value` in `server.json`;
-2. a value the project supplies (`with: { tenant: acme }`, or `--set tenant=acme`);
+2. a value the project supplies (`with: { tenant: acme }`, or `--set tenant=acme`), which must be one of the input's `choices` when it has them;
 3. its `default`.
 
 A required input still without a value leaves the server out, with the reason. A secret takes its value only from the environment, even when `server.json` gives it a `value` or `default`: it becomes a reference to an environment variable, in the agent's own syntax.
