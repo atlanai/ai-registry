@@ -37,24 +37,27 @@ export async function sendTo(
         : `${alias} keeps no change message, so -m was not used.`,
     );
   }
-  let message = options.message ?? subjectOf(items);
+  const composed = subjectOf(items);
+  let written = options.message?.trim() || undefined;
   if (options.asked) {
     const typed = await text(
       {
         message: "What changed?",
         style: printer.errStyle,
-        initial: message,
+        initial: written ?? composed,
         hint: "Type what changed, or press Enter to use this message.",
       },
       step.io,
     );
     if (canceled(typed)) return "canceled";
-    message = typed;
+    written = typed.trim() === composed ? undefined : typed.trim() || undefined;
   }
+  const message = written ?? composed;
+  // Only a person's own words reach the source; a composed subject would read as their account of the change.
   const published = await handle
     .publish?.(
       items.map((item) => item.input),
-      { message, review: true },
+      { ...(written === undefined ? {} : { message: written }), review: true },
     )
     .catch((error: unknown) => {
       throw heldUnlisted(error, alias, items);
