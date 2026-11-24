@@ -67,20 +67,13 @@ export async function addAddress(
 
   // Trust is asked on a terminal however exactly the address says what to install: naming a
   // plugin is not agreeing to what it runs. Only `--yes` or no terminal leaves it to `--trust`.
-  const trust = await trustFor(
-    step,
-    source,
-    chosenEntries(choices.select, entries),
-    own.trust ?? [],
-    loaded.manifest.artifacts.flatMap((ref) => (ref.registry === alias ? (ref.trust ?? []) : [])),
-  );
-
-  const refs = requestedRefs(resolved, input, alias, within, choices.select);
   const chosen = chosenEntries(choices.select, entries);
-  if (!(await confirmServers(step, source, chosen, refs, common.yes))) {
-    cancel(step);
-    return undefined;
-  }
+  const trusted = loaded.manifest.artifacts.flatMap((ref) =>
+    ref.registry === alias ? (ref.trust ?? []) : [],
+  );
+  const trust = await trustFor(step, source, chosen, own.trust ?? [], trusted);
+  const refs = requestedRefs(resolved, input, alias, within, choices.select);
+  if (!(await confirmServers(step, source, chosen, refs, common.yes))) return undefined;
 
   let approved = true;
   let introduced = false;

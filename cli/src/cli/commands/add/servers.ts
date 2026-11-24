@@ -1,5 +1,5 @@
 import { list, plural, quoted } from "#adapter/text.ts";
-import { type Interaction, interactive } from "#cli/prompt/interaction.ts";
+import { cancel, type Interaction, interactive } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
 import { confirm } from "#cli/prompt/select.ts";
 import { describeServer, serverOf } from "#cli/render/server.ts";
@@ -10,7 +10,7 @@ import type { Probed } from "#engine/address/probe.ts";
 
 /**
  * A whole namespace or registry takes its MCP servers only once a person saw how each starts,
- * since a target runs it as them; `--yes` agrees without asking.
+ * since a target runs it as them; `--yes` agrees without asking. A no is reported here.
  */
 export async function confirmServers(
   step: Interaction,
@@ -44,5 +44,7 @@ export async function confirmServers(
     },
     step.io,
   );
-  return !canceled(answer) && answer;
+  const agreed = !canceled(answer) && answer;
+  if (!agreed) cancel(step);
+  return agreed;
 }
