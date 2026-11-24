@@ -383,7 +383,7 @@ A reader MUST ignore attributes it does not understand.
 
 A run carries no content. A client MUST NOT send prompts, model output, file paths, project or repository names, host names or the artifact's own content, and MUST NOT derive a run id or a pseudonym in a way that reveals any of them.
 
-A client MUST NOT send runs until the person it runs for has turned sharing on for that registry. It MAY count runs on the person's own machine without asking.
+A client MUST NOT send runs until the person it runs for has turned sharing on for that registry, and MUST NOT send a run that happened before then. Their agreement covers the `otlp`, `reporter` and `time_precision` the registry named at the time: when the registry changes any of them, a client MUST ask again before it sends more. It MAY count runs on the person's own machine without asking.
 
 With `reporter: pseudonym`, a client names the person by a stable identifier that does not reveal who they are. With `reporter: name`, it uses a name the person chose. A reporter MUST NOT be an email address.
 
