@@ -5,6 +5,7 @@ import { isRecord } from "#adapter/fields.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { ARTIFACTS_DIR, ENVELOPE } from "#adapter/filespec/names.ts";
+import { MCP_SERVER_ENTRY } from "#adapter/kinds.ts";
 import { list, sanitizeName } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { STREAMED } from "#cli/commands/define.ts";
@@ -21,6 +22,7 @@ import {
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
+import { mcpPolicyProblems } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { withName } from "#core/frontmatter.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
@@ -146,14 +148,20 @@ async function incoming(
     texts.set(path, await readFile(join(dir, path), "utf8"));
   }
   const spec = specOf(manifest, texts, named);
+  const server = manifest.title === "mcp_server";
+  const missing = fileProblems(manifest, new Set(entries));
+  const unread =
+    specParseProblem(manifest, texts) ??
+    (server ? `has no ${MCP_SERVER_ENTRY}` : "has no front matter");
+  const unreadable = missing.includes(unread) ? [] : [unread];
   const problems = [
     ...found.irregular
       .filter((entry) => visible(entry.path))
       .map((entry) => `${entry.path} ${refusal(entry)}`),
-    ...fileProblems(manifest, new Set(entries)),
+    ...missing,
     ...(spec === undefined
-      ? [specParseProblem(manifest, texts) ?? "has no front matter"]
-      : check(manifest, spec)),
+      ? unreadable
+      : [...check(manifest, spec), ...(server ? mcpPolicyProblems(spec) : [])]),
   ];
   const fallback =
     typeof spec?.name === "string"

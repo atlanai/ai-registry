@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix, sep } from "node:path";
 import { Ajv2020, type SchemaObject } from "ajv/dist/2020.js";
+import draft07 from "ajv/dist/refs/json-schema-draft-07.json" with { type: "json" };
 import { describe, expect, test } from "vitest";
 import { buildEnvelope } from "#adapter/index.ts";
 
@@ -12,12 +13,23 @@ function ajv(): Ajv2020 {
   // The schemas declare `format` keywords ajv carries no validator for;
   // the shapes, not the string formats, are what is asserted.
   const compiler = new Ajv2020({ allErrors: true, strict: false, validateFormats: false });
+  // The MCP Registry's `server.json` schema is draft-07 (`kinds/vendor/mcp/README.md`).
+  compiler.addMetaSchema(draft07);
+  const parse = (path: string): SchemaObject =>
+    JSON.parse(readFileSync(join(SCHEMAS, path), "utf8")) as SchemaObject;
   const load = (path: string): void => {
-    compiler.addSchema(JSON.parse(readFileSync(join(SCHEMAS, path), "utf8")) as SchemaObject);
+    compiler.addSchema(parse(path));
   };
   // Each file carries its own relative `$id`, which is what the cross-refs use.
   for (const name of readdirSync(SCHEMAS).filter((n) => n.endsWith(".schema.json"))) load(name);
-  for (const name of readdirSync(join(SCHEMAS, "kinds"))) load(join("kinds", name));
+  const kinds = readdirSync(join(SCHEMAS, "kinds"), { recursive: true, encoding: "utf8" })
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => posix.join("kinds", ...name.split(sep)));
+  for (const path of kinds) {
+    // Another project's schema keeps that project's `$id`, so it is reached by its path here.
+    if (path.includes("/vendor/")) compiler.addSchema(parse(path), path);
+    else load(path);
+  }
   return compiler;
 }
 
@@ -29,6 +41,14 @@ function check(compiler: Ajv2020, schema: string, document: unknown): string[] {
 }
 
 const read = (name: string): unknown => JSON.parse(readFileSync(join(FIXTURE, name), "utf8"));
+
+const MCP_SERVER = join(
+  import.meta.dirname,
+  ..."../../../examples/acme-registry/artifacts/engineering/mcp_server/issue-tracker/1.2.0".split(
+    "/",
+  ),
+  "artifact.json",
+);
 
 // Read in place from the spec, so they stay honest about the registries this client reads.
 describe("the file spec schemas", () => {
@@ -58,5 +78,40 @@ describe("the file spec schemas", () => {
       "/metadata must have required property 'namespace'",
       "/metadata must have required property 'version'",
     ]);
+  });
+});
+
+interface McpEnvelope {
+  spec: { server: Record<string, unknown>; policy: { tools: Record<string, unknown> } };
+}
+
+describe("the mcp_server kind", () => {
+  const compiler = ajv();
+  const envelope = (): McpEnvelope => JSON.parse(readFileSync(MCP_SERVER, "utf8")) as McpEnvelope;
+
+  test("accepts the example server, its server.json checked by the MCP Registry schema", () => {
+    expect(check(compiler, "artifact-known-kinds.schema.json", envelope())).toEqual([]);
+    const renamed = envelope();
+    renamed.spec.server.name = "issue-tracker";
+    expect(check(compiler, "artifact-known-kinds.schema.json", renamed)).toContain(
+      '/spec/server/name must match pattern "^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$"',
+    );
+  });
+
+  test("takes only the server.json schema versions it vendors", () => {
+    const future = envelope();
+    future.spec.server.$schema =
+      "https://static.modelcontextprotocol.io/schemas/2099-01-01/server.schema.json";
+    expect(check(compiler, "artifact-known-kinds.schema.json", future)).toContain(
+      "/spec/server/$schema must be equal to one of the allowed values",
+    );
+  });
+
+  test("closes the policy, so a field it does not define is refused", () => {
+    const approving = envelope();
+    approving.spec.policy.tools.autoApprove = ["search_issues"];
+    expect(check(compiler, "artifact-known-kinds.schema.json", approving)).toContain(
+      "/spec/policy/tools must NOT have additional properties",
+    );
   });
 });

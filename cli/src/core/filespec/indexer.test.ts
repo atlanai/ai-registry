@@ -206,13 +206,45 @@ describe("indexRoot", () => {
     expect(row).not.toHaveProperty("catalog_digest");
   });
 
+  test("reads an MCP server's spec from its files, not from a copied artifact.json", async () => {
+    const server = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker");
+    await cp(join(server, "1.2.0"), join(server, "1.3.0"), { recursive: true });
+    const policy = JSON.parse(await readFile(join(server, "1.3.0", "policy.json"), "utf8"));
+    policy.tools.deny = ["delete_issue", "close_issue"];
+    await writeFile(join(server, "1.3.0", "policy.json"), JSON.stringify(policy));
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    const envelope = JSON.parse(await readFile(join(server, "1.3.0", "artifact.json"), "utf8"));
+    expect(envelope.spec.policy.tools.deny).toEqual(["delete_issue", "close_issue"]);
+  });
+
+  test("indexes an MCP server whose artifact.json holds a null spec", async () => {
+    const version = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker", "1.3.0");
+    const from = join(dirname(version), "1.2.0");
+    await mkdir(version, { recursive: true });
+    for (const file of ["server.json", "policy.json"]) {
+      await cp(join(from, file), join(version, file));
+    }
+    await writeFile(join(version, "artifact.json"), JSON.stringify({ spec: null }));
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    const envelope = JSON.parse(await readFile(join(version, "artifact.json"), "utf8"));
+    expect(envelope.metadata.display_name).toBe("Issue tracker");
+    expect(envelope.spec.server.name).toBe("com.example/issue-tracker");
+  });
+
   test("drops the row of an artifact whose folder was deleted", async () => {
     await rm(join(root, "artifacts", "engineering", "agent", "reviewer"), { recursive: true });
 
     await indexRoot(root, "2026-10-08T00:00:00Z");
 
     const index = JSON.parse(await readFile(join(root, "index.json"), "utf8"));
-    expect(index.entries.map((entry: { name: string }) => entry.name)).toEqual(["pr-review"]);
+    expect(index.entries.map((entry: { name: string }) => entry.name)).toEqual([
+      "issue-tracker",
+      "pr-review",
+    ]);
     expect(index.generated_at).toBe("2026-10-08T00:00:00Z");
   });
 });

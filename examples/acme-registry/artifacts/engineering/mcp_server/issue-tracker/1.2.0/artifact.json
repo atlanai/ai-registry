@@ -1,0 +1,119 @@
+{
+  "apiVersion": "aireg.sh/v1",
+  "kind": "mcp_server",
+  "metadata": {
+    "name": "issue-tracker",
+    "namespace": "engineering",
+    "version": "1.2.0",
+    "description": "Search, read and update issues in the team's issue tracker.",
+    "display_name": "Issue tracker",
+    "digest": "sha256:01dce6620a7b48a1fc91a1c4961e33de1c0e5bd6a3b019cf36fd0f165f578434"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "digest": "sha256:11eab24af002cf5ee4f376ed476fd0ff501c3a85d8935129f852d4b382a81fe1",
+      "size": 525,
+      "media_type": "text/markdown",
+      "urls": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "policy.json",
+      "digest": "sha256:ac5712716dd826ace2a6a80546a49e0681d939c83b3cef7cfda1822f71edcee3",
+      "size": 206,
+      "media_type": "application/json",
+      "urls": [
+        "policy.json"
+      ]
+    },
+    {
+      "path": "server.json",
+      "digest": "sha256:36ad2a03fdbc7579d19a37136a4534cbdb52e68a2fac55d737b17b97622138dd",
+      "size": 1504,
+      "media_type": "application/json",
+      "urls": [
+        "server.json"
+      ]
+    }
+  ],
+  "spec": {
+    "name": "issue-tracker",
+    "description": "Search, read and update issues in the team's issue tracker.",
+    "server": {
+      "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+      "name": "com.example/issue-tracker",
+      "title": "Issue tracker",
+      "description": "Search, read and update issues in the team's issue tracker.",
+      "version": "1.2.0",
+      "repository": {
+        "url": "https://github.com/example/issue-tracker-mcp",
+        "source": "github"
+      },
+      "packages": [
+        {
+          "registryType": "npm",
+          "identifier": "@example/issue-tracker-mcp",
+          "version": "1.2.0",
+          "transport": {
+            "type": "stdio"
+          },
+          "environmentVariables": [
+            {
+              "name": "ISSUES_URL",
+              "description": "Base URL of the issue tracker",
+              "isRequired": true
+            },
+            {
+              "name": "ISSUES_TOKEN",
+              "description": "API token with read and write scope",
+              "isRequired": true,
+              "isSecret": true
+            }
+          ]
+        }
+      ],
+      "remotes": [
+        {
+          "type": "streamable-http",
+          "url": "https://{tenant}.issues.example.com/mcp",
+          "variables": {
+            "tenant": {
+              "description": "Your tracker workspace",
+              "isRequired": true
+            }
+          },
+          "headers": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {token}",
+              "variables": {
+                "token": {
+                  "description": "API token with read and write scope",
+                  "isRequired": true,
+                  "isSecret": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "policy": {
+      "tools": {
+        "deny": [
+          "delete_issue"
+        ]
+      },
+      "timeouts": {
+        "startup_ms": 20000,
+        "tool_ms": 60000
+      },
+      "inputs": {
+        "ISSUES_URL": "https://issues.acme.example",
+        "tenant": "acme"
+      }
+    }
+  }
+}

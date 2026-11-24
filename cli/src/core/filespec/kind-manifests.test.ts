@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import mcpServer from "#schema/kinds/mcp_server.json" with { type: "json" };
 import { test } from "#test/kit/fixtures.ts";
 import {
   envelopeSpec,
@@ -196,5 +197,51 @@ describe("a kind manifest a registry serves", () => {
         message: 'lists "../note", which is not a kind name, so it is not used',
       },
     ]);
+  });
+});
+
+describe("an MCP server's spec", () => {
+  const manifests = { mcp_server: mcpServer as unknown as KindManifest };
+  const server = {
+    $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    name: "com.example/issue-tracker",
+    description: "Track issues.",
+    version: "1.2.0",
+  };
+  const policy = { tools: { deny: ["delete_issue"] } };
+  const readme = text("---\nname: wrong\ndescription: Wrong.\n---\n# Issues\n");
+
+  test("wraps server.json and policy.json, and never reads the README", () => {
+    const files = new Map([
+      ["README.md", readme],
+      ["policy.json", text(JSON.stringify(policy))],
+      ["server.json", text(JSON.stringify(server))],
+    ]);
+    expect(envelopeSpec("mcp_server", files, manifests, "issues")).toEqual({
+      name: "issues",
+      description: "Track issues.",
+      server,
+      policy,
+    });
+  });
+
+  test("names it after the server when no folder gives the slug, and has no policy alone", () => {
+    const files = new Map([["server.json", text(JSON.stringify(server))]]);
+    expect(envelopeSpec("mcp_server", files, manifests)).toEqual({
+      name: "issue-tracker",
+      description: "Track issues.",
+      server,
+    });
+  });
+
+  test("carries no spec when either file does not parse, so the policy is never dropped", () => {
+    const broken = new Map([
+      ["server.json", text(JSON.stringify(server))],
+      ["policy.json", text("{")],
+    ]);
+    expect(envelopeSpec("mcp_server", broken, manifests)).toEqual({});
+    expect(envelopeSpec("mcp_server", new Map([["server.json", text("{")]]), manifests)).toEqual(
+      {},
+    );
   });
 });

@@ -3,7 +3,7 @@
   "format_version": 1,
   "name": "acme",
   "slug": "acme",
-  "description": "Worked example of a file-spec root. Two kinds, one namespace, one blob.",
+  "description": "Worked example of a file-spec root. Three kinds, one namespace, one blob.",
   "capabilities": [
     "files"
   ],
@@ -19,6 +19,10 @@
     {
       "name": "agent",
       "manifest_url": "kinds/agent.json"
+    },
+    {
+      "name": "mcp_server",
+      "manifest_url": "kinds/mcp_server.json"
     }
   ],
   "generated_at": "2026-09-03T08:05:00Z"

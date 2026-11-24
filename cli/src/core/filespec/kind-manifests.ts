@@ -5,7 +5,7 @@ import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { isKindSegment, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_POLICY_FILE, MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -214,6 +214,8 @@ export function specFile(
 ): string | undefined {
   if (manifest.title === "skill") return files.has(SKILL_ENTRY) ? SKILL_ENTRY : undefined;
   if (manifest.title === "agent") return files.has(AGENT_ENTRY) ? AGENT_ENTRY : undefined;
+  // An MCP server's README is documentation; its spec comes from its JSON files.
+  if (manifest.title === "mcp_server") return undefined;
   return [...primaryFiles(manifest), ...files.keys()].find(
     (path) => path.endsWith(".md") && files.has(path),
   );
@@ -240,6 +242,12 @@ export function specParseProblem(
   manifest: KindManifest,
   files: ReadonlyMap<string, string>,
 ): string | undefined {
+  if (manifest.title === "mcp_server") {
+    const unparsed = [MCP_SERVER_ENTRY, MCP_POLICY_FILE].find(
+      (path) => files.has(path) && parsedJson(files.get(path) ?? "") === undefined,
+    );
+    return unparsed === undefined ? undefined : `has a ${unparsed} that is not valid JSON`;
+  }
   const markdown = specFile(manifest, files);
   return markdown === undefined ? undefined : frontmatterParseProblem(files.get(markdown) ?? "");
 }
@@ -252,6 +260,7 @@ export function specOf(
   const markdown = specFile(manifest, files);
   if (markdown !== undefined) return frontmatterRecord(files.get(markdown) ?? "");
   if (manifest.title === "skill") return undefined;
+  if (manifest.title === "mcp_server") return mcpServerSpec(files, name);
   let json: string | undefined;
   if (manifest.title !== "agent") json = [...files.keys()].find((path) => path.endsWith(".json"));
   else if (files.has(AGENT_CARD_ENTRY)) json = AGENT_CARD_ENTRY;
@@ -276,4 +285,39 @@ export function specOf(
     else if (typeof lifted.name === "string") lifted.name = sanitizeName(lifted.name);
   }
   return { ...lifted, card };
+}
+
+/**
+ * An MCP server's `server.json` in `server` and its `policy.json` in `policy`, each verbatim, with
+ * the slug and the server's description lifted beside them (`kinds/mcp_server.json`). None when
+ * either file does not parse, so a broken policy is reported rather than dropped.
+ */
+function mcpServerSpec(
+  files: ReadonlyMap<string, string>,
+  name: string | undefined,
+): Record<string, unknown> | undefined {
+  const text = files.get(MCP_SERVER_ENTRY);
+  if (text === undefined) return undefined;
+  const server = parsedJson(text);
+  if (server === undefined) return undefined;
+  const policyText = files.get(MCP_POLICY_FILE);
+  const policy = policyText === undefined ? undefined : parsedJson(policyText);
+  if (policyText !== undefined && policy === undefined) return undefined;
+  const spec: Record<string, unknown> = {};
+  // The reverse-DNS name stays in the document; the slug is its part after the slash.
+  const own = isRecord(server) && typeof server.name === "string" ? server.name : undefined;
+  const slug = name ?? (own === undefined ? undefined : sanitizeName(own.split("/").pop() ?? own));
+  if (slug !== undefined) spec.name = slug;
+  if (isRecord(server) && server.description !== undefined) spec.description = server.description;
+  spec.server = server;
+  if (policy !== undefined) spec.policy = policy;
+  return spec;
+}
+
+function parsedJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
 }

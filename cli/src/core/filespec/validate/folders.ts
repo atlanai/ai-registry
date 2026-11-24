@@ -6,6 +6,7 @@ import { rootReader } from "#adapter/filespec/folder.ts";
 import { ENVELOPE } from "#adapter/filespec/names.ts";
 import { isRemote, locatorOf } from "#adapter/filespec/resolve.ts";
 import { contentDigest, type Envelope } from "#adapter/index.ts";
+import { MCP_SERVER_ENTRY } from "#adapter/kinds.ts";
 import { collidingPaths, isSafePath } from "#adapter/paths.ts";
 import { compareVersion, parseVersion } from "#adapter/semver.ts";
 import { list, quoted } from "#adapter/text.ts";
@@ -17,6 +18,7 @@ import {
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
+import { mcpPolicyProblems } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { authored, refusal } from "#core/fs/tree.ts";
 import { type Problem, textAt, unparsed } from "./read.ts";
@@ -32,14 +34,19 @@ export function versionProblems(
   contents: ReadonlyMap<string, string>,
 ): string[] {
   const problems = fileProblems(manifest, present);
+  const server = manifest.title === "mcp_server";
   const spec = specOf(manifest, contents, at.name);
   if (spec === undefined) {
     const why =
-      specParseProblem(manifest, contents) ?? "has no front matter to read its fields from";
-    return [...problems, why];
+      specParseProblem(manifest, contents) ??
+      (server ? `has no ${MCP_SERVER_ENTRY}` : "has no front matter to read its fields from");
+    return problems.includes(why) ? problems : [...problems, why];
   }
   problems.push(...check(manifest, spec));
-  for (const field of placeholders(spec)) problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
+  if (server) problems.push(...mcpPolicyProblems(spec));
+  // An MCP server's `description` is a copy of `server.description`, which is reported instead.
+  const own = server ? { ...spec, description: undefined } : spec;
+  for (const field of placeholders(own)) problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
   if (typeof spec.name === "string" && spec.name !== at.name) {
     problems.push(`is named ${quoted(spec.name)} in its front matter but sits in ${at.name}/`);
   }

@@ -11,9 +11,11 @@ import { cancel, interaction, interactive } from "#cli/prompt/interaction.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { findRegistry } from "#core/filespec/init.ts";
 import { type KindManifest, primaryFiles } from "#core/filespec/kind-manifests.ts";
+import { serverSkeleton } from "#core/filespec/mcp-server.ts";
 import { refuseRedirect, writeFresh } from "#core/fs/fresh.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { askFields, nameOf, render, scaffold, settings } from "./fields.ts";
+import { PLACEHOLDER } from "./files.ts";
 import { outsidePlace, registryPlace } from "./place.ts";
 
 export interface Created extends KindNew {
@@ -48,7 +50,13 @@ export async function init(
   const { name, at } = place;
   const shown = relative(context.cwd, at) || ".";
 
-  const { fields, todo } = scaffold(manifest, name, sets);
+  const server = manifest.title === "mcp_server";
+  // An MCP server's file is the publisher's `server.json`, whose name is reverse-DNS, not the slug.
+  const { fields, todo } = scaffold(server ? serverSkeleton(manifest) : manifest, name, sets);
+  if (server && !sets.some(([path]) => path.join(".") === "name")) {
+    fields.name = PLACEHOLDER;
+    todo.unshift("name");
+  }
   if (interactive(step) && !(await askFields(step, fields, todo))) {
     cancel(step);
     return STREAMED;

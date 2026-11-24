@@ -5,6 +5,7 @@ import {
   type SchemaObject,
   type ValidateFunction,
 } from "ajv/dist/2020.js";
+import draft07 from "ajv/dist/refs/json-schema-draft-07.json" with { type: "json" };
 import { RE2JS, RE2JSSyntaxException } from "re2js";
 import { messageOf } from "#adapter/errors.ts";
 import { isRecord } from "#adapter/fields.ts";
@@ -83,12 +84,17 @@ export async function prepareManifest(
 
 function compiler(): Ajv2020 {
   // Extensions are annotations. Validation must never rewrite the native document.
-  return new Ajv2020({
+  const ajv = new Ajv2020({
     allErrors: true,
     strict: false,
     validateFormats: false,
     code: { regExp: re2 },
   });
+  // A kind can refer to another project's draft-07 schema, such as the MCP Registry's
+  // `server.json` schema. Ajv applies 2020-12 semantics to it, which `tools/check_schemas.py`
+  // keeps equivalent by refusing the draft-07 keywords whose meaning changed.
+  ajv.addMetaSchema(draft07);
+  return ajv;
 }
 
 /** Problems with a value, without coercion, default insertion, or removal of fields. */
