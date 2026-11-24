@@ -56,6 +56,9 @@ Every page below was read on 2026-11-06. Hermes Agent's documentation is the Mar
 | Reload: the next message names a new skill; `/reload-skills` refreshes slash commands | `website/docs/user-guide/features/skills.md:184-192` | "your next message to the agent carries a short note naming the new skills … `/reload-skills` is not needed for this, it still refreshes the `/skill-name` slash commands." | docs | confirmed |
 | Version command `hermes --version` | install | Printed `Hermes Agent v0.23.0 (2026.9.24) · stable · local 2bd378ed1b8d`. | 0.23.0 | confirmed |
 | `hermes skills list` lists every skill loaded, with where it came from, and needs no sign-in | install | A table of `Name`, `Category`, `Source` (`local` or `project`), `Trust` and `Status`, from a sandbox with no credentials. | 0.23.0 | confirmed: the L2 probe |
+| MCP servers in `~/.hermes/config.yaml` under `mcp_servers.<name>`; no project file, so project scope is left out | https://hermes-agent.nousresearch.com/docs, read 2026-11-24 | Vendor documentation, as summarized on that date | - | documented, not run |
+| `command`, `args`, `env`, `url`, `headers`, with `${VAR}` placeholders | https://hermes-agent.nousresearch.com/docs, read 2026-11-24 | Vendor documentation, as summarized on that date | - | documented, not run |
+| `tools.include` and `tools.exclude`, the include list winning | https://hermes-agent.nousresearch.com/docs, read 2026-11-24 | Vendor documentation, as summarized on that date | - | documented, not run |
 
 Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 

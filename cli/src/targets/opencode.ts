@@ -23,6 +23,21 @@ export const opencode = defineTarget({
       extension: ".md",
       codec: { id: "frontmatter-strict", keep: ["description"] },
     },
+    mcp_server: {
+      shape: "config",
+      file: "opencode.json",
+      anchor: "project",
+      format: "json",
+      at: ["mcp", "servers", "{name}"],
+      codec: {
+        id: "mcp-json",
+        secret: { prefix: "{env:", suffix: "}" },
+        type: { stdio: "local", "streamable-http": "remote" },
+        command: "array",
+        env: "environment",
+      },
+      transports: ["stdio", "streamable-http"],
+    },
   },
   verified: { command: ["opencode", "--version"], range: "1.19.0" },
 });

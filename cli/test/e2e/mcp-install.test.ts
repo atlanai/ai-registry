@@ -104,3 +104,82 @@ test("adds a namespace's MCP servers only with --yes when it cannot ask", async 
   expect(added.code).toBe(0);
   expect(added.stderr).toContain('it needs "tenant", which nothing sets');
 });
+
+test("installs an MCP server for every project target that loads one, and removes it", async ({
+  aireg,
+  git,
+  tmp,
+}) => {
+  const project = join(tmp, "every-project");
+  const registry = join(tmp, "every");
+  await cp(ACME, registry, { recursive: true });
+  await mkdir(join(project, ".registry"), { recursive: true });
+  await git.init(project);
+  await writeFile(
+    join(project, ".registry", "manifest.yml"),
+    [
+      "targets: [claude-code, github-copilot, codex, cursor, gemini-cli, opencode, grok, pi, antigravity]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "",
+    ].join("\n"),
+  );
+  const mine: Record<string, string> = {
+    ".gemini/settings.json": '{\n  "theme": "dark"\n}\n',
+    ".codex/config.toml": 'model = "o4"\n',
+  };
+  for (const [file, text] of Object.entries(mine)) {
+    await mkdir(join(project, file, ".."), { recursive: true });
+    await writeFile(join(project, file), text);
+  }
+  const read = async (file: string) => readFile(join(project, file), "utf8");
+
+  const installed = await aireg(["install"], { cwd: project });
+  expect(installed.code, installed.stderr).toBe(0);
+  expect(installed.stderr).toContain(
+    "Did not install issue-tracker for Google Antigravity: it needs a secret",
+  );
+  const token = "ISSUES_TOKEN";
+  const args = ["-y", "@example/issue-tracker-mcp@1.2.0"];
+  const url = "https://issues.example.test";
+  const shared = { command: "npx", args, env: { ISSUES_URL: url, [token]: `\${${token}}` } };
+  expect(JSON.parse(await read(".mcp.json")).mcpServers["issue-tracker"]).toEqual(shared);
+  expect(JSON.parse(await read(".cursor/mcp.json")).mcpServers["issue-tracker"]).toEqual({
+    type: "stdio",
+    ...shared,
+    env: { ISSUES_URL: url, [token]: `\${env:${token}}` },
+  });
+  expect(JSON.parse(await read(".gemini/settings.json"))).toEqual({
+    theme: "dark",
+    mcpServers: { "issue-tracker": shared },
+  });
+  expect(JSON.parse(await read(".pi/mcp.json")).mcpServers["issue-tracker"]).toEqual(shared);
+  expect(JSON.parse(await read("opencode.json")).mcp.servers["issue-tracker"]).toEqual({
+    type: "local",
+    command: ["npx", ...args],
+    environment: { ISSUES_URL: url, [token]: `{env:${token}}` },
+  });
+  const codex = await read(".codex/config.toml");
+  expect(codex).toContain('model = "o4"');
+  expect(codex).toContain(`env_vars = ["${token}"]`);
+  expect(await read(".grok/config.toml")).toContain(`${token} = "\${${token}}"`);
+
+  const status = await aireg(["status"], { cwd: project });
+  expect(status.code, status.stdout).toBe(0);
+
+  // Claude Code and Copilot share the entry, so dropping one target leaves it for the other.
+  const manifest = join(project, ".registry", "manifest.yml");
+  await writeFile(manifest, (await readFile(manifest, "utf8")).replace("claude-code, ", ""));
+  expect((await aireg(["install"], { cwd: project })).code).toBe(0);
+  expect(JSON.parse(await read(".mcp.json")).mcpServers["issue-tracker"]).toEqual(shared);
+
+  expect((await aireg(["remove", "issue-tracker", "-y"], { cwd: project })).code).toBe(0);
+  for (const [file, text] of Object.entries(mine)) expect(await read(file)).toBe(text);
+  for (const file of [".mcp.json", ".cursor/mcp.json", ".pi/mcp.json", "opencode.json"]) {
+    expect(existsSync(join(project, file)), file).toBe(false);
+  }
+  expect(existsSync(join(project, ".grok", "config.toml"))).toBe(false);
+});

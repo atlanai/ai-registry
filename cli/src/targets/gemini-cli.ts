@@ -38,6 +38,20 @@ export const geminiCli = defineTarget({
         ],
       },
     },
+    // It expands a variable only in `env`.
+    mcp_server: {
+      shape: "config",
+      file: "settings.json",
+      format: "json",
+      at: ["mcpServers", "{name}"],
+      codec: {
+        id: "mcp-json",
+        secret: { prefix: "${", suffix: "}", in: ["env"] },
+        url: { "streamable-http": "httpUrl" },
+        tools: { allow: ["includeTools"], deny: ["excludeTools"] },
+      },
+      transports: ["stdio", "streamable-http", "sse"],
+    },
   },
   verified: { command: ["gemini", "--version"], range: "0.63.0" },
   // It loads a project's skills and agents only in a folder you trusted.

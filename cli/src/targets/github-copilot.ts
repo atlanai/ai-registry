@@ -20,6 +20,22 @@ export const githubCopilot = defineTarget({
     plugin: { shape: "contents" },
     skill: { shape: "directory", subdir: "skills" },
     agent: { shape: "file", subdir: "agents", extension: ".agent.md" },
+    // The project file is Claude Code's `.mcp.json` too, so an entry adds no field Claude's lacks.
+    mcp_server: {
+      shape: "config",
+      file: ".mcp.json",
+      anchor: "project",
+      userFile: "mcp-config.json",
+      format: "json",
+      at: ["mcpServers", "{name}"],
+      codec: {
+        id: "mcp-json",
+        secret: { prefix: "${", suffix: "}" },
+        type: { "streamable-http": "http", sse: "sse" },
+        tools: { allow: ["tools"] },
+      },
+      transports: ["stdio", "streamable-http", "sse"],
+    },
   },
   verified: { command: ["copilot", "--version"], range: "1.0.96" },
   reload:

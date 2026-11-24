@@ -13,6 +13,15 @@ export const pi = defineTarget({
     // Its packages carry extensions, which are code it runs, so a plugin lands as its parts.
     plugin: { shape: "contents" },
     skill: { shape: "directory", subdir: "skills" },
+    // It expands a variable only in `env` and `headers`, and refuses an SSE server.
+    mcp_server: {
+      shape: "config",
+      file: "mcp.json",
+      format: "json",
+      at: ["mcpServers", "{name}"],
+      codec: { id: "mcp-json", secret: { prefix: "${", suffix: "}", in: ["env", "headers"] } },
+      transports: ["stdio", "streamable-http"],
+    },
   },
   verified: { command: ["pi", "--version"], range: "1.4.0" },
   trust: { skill: { run: "/trust", scope: "project" } },

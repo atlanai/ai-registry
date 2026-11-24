@@ -51,6 +51,10 @@ This target is Google Antigravity's App, its standalone IDE and its CLI (`agy`),
 | Reload after a change | https://antigravity.google/docs/skills.md; https://antigravity.google/docs/cli/reference.md | "When you start a conversation, the agent sees a list of available skills with their names and descriptions." and "**`/skills`** … Browse loaded local and global Agent Skills. Run `/skills reload` to reload skills from disk." | docs | confirmed |
 | Version command | https://antigravity.google/docs/getting-started.md; install | "Open a terminal window and verify the installation: `agy --version`", which printed `1.4.5`; no page names one for the App or the IDE. | 1.4.5 | confirmed: `verified` names the CLI |
 | Plugin at `.agents/plugins/<name>/plugin.json`, `~/.gemini/config/plugins/<name>/plugin.json` | https://antigravity.google/docs/plugins.md | "**Workspace level**: Place your plugin folder in `.agents/plugins/` at the root of your workspace." and "**Global level**: Place your plugin folder in `~/.gemini/config/plugins/`." | docs | confirmed, not used (see Left out) |
+| MCP servers in `.agents/mcp_config.json` and `~/.gemini/config/mcp_config.json` under `mcpServers` | https://antigravity.google/docs/mcp.md, read 2026-11-24 | Vendor documentation, as summarized on that date | - | documented, not run |
+| A local server as `command`, `args`, `env`; a remote as `serverUrl`, `headers`, streamable HTTP only | https://antigravity.google/docs/mcp.md, read 2026-11-24 | Vendor documentation, as summarized on that date | - | documented, not run |
+| No documented secret syntax, so a server that needs a secret is left out | https://antigravity.google/docs/mcp.md, read 2026-11-24 | Vendor documentation, as summarized on that date | - | documented, not run |
+| `enabledTools` and `disabledTools` | https://antigravity.google/docs/mcp.md, read 2026-11-24 | Vendor documentation, as summarized on that date | - | documented, not run |
 
 Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 
