@@ -2,12 +2,22 @@ import { isRecord } from "#adapter/fields.ts";
 import { MCP_POLICY_META } from "#adapter/kinds.ts";
 import { list, quoted } from "#adapter/text.ts";
 import type { KindManifest, SchemaNode } from "./kind-manifests.ts";
+import { check } from "./schema.ts";
 
 /** What a policy may say about one input `server.json` declares under a name. */
 interface Declared {
   secret: boolean;
   fixed: boolean;
   choices?: readonly string[];
+}
+
+/** Every problem with an MCP server's spec, naming policy fields as `policy.json` spells them. */
+export function mcpServerProblems(manifest: KindManifest, spec: Record<string, unknown>): string[] {
+  const inEnvelope = `\`_meta.${MCP_POLICY_META}`;
+  return [
+    ...check(manifest, spec).map((problem) => problem.replaceAll(inEnvelope, "`policy")),
+    ...mcpPolicyProblems(spec),
+  ];
 }
 
 /**
@@ -40,14 +50,11 @@ export function mcpPolicyProblems(spec: Record<string, unknown>): string[] {
       }
     }
   }
-  return problems;
+  // A server published to several package registries declares the same input in each.
+  return [...new Set(problems)];
 }
 
-/**
- * Every input `server.json` declares, by the name its URL templates resolve: environment
- * variables, headers and named arguments by `name`, positional arguments by `valueHint`, and
- * template variables by their key. One name can be declared in several packages and remotes.
- */
+/** Inputs by the name a policy uses: `name`, a positional's `valueHint`, or a `variables` key. */
 function declaredInputs(server: unknown): Map<string, Declared[]> {
   const found = new Map<string, Declared[]>();
   const add = (name: unknown, input: Record<string, unknown>): void => {

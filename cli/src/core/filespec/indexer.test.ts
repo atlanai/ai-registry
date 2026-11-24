@@ -222,6 +222,20 @@ describe("indexRoot", () => {
     ]);
   });
 
+  test("drops a copied display name when the new server.json has no title", async () => {
+    const server = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker");
+    await cp(join(server, "1.2.0"), join(server, "1.3.0"), { recursive: true });
+    const { title: _title, ...document } = JSON.parse(
+      await readFile(join(server, "1.3.0", "server.json"), "utf8"),
+    );
+    await writeFile(join(server, "1.3.0", "server.json"), JSON.stringify(document));
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    const envelope = JSON.parse(await readFile(join(server, "1.3.0", "artifact.json"), "utf8"));
+    expect(envelope.metadata).not.toHaveProperty("display_name");
+  });
+
   test("indexes an MCP server whose artifact.json holds a null spec", async () => {
     const version = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker", "1.3.0");
     const from = join(dirname(version), "1.2.0");

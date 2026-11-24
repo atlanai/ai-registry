@@ -85,6 +85,21 @@ describe("mcpPolicyProblems", () => {
     ]);
   });
 
+  test("reports an input declared in several packages once", () => {
+    const region = { type: "named", name: "--region", choices: ["eu", "us"] };
+    const twice = {
+      packages: ["npm", "pypi"].map((registryType) => ({
+        registryType,
+        packageArguments: [region],
+      })),
+    };
+    const policy = { inputs: { "--region": "apac" } };
+
+    expect(mcpPolicyProblems({ server: twice, _meta: { "sh.aireg/policy": policy } })).toEqual([
+      '`policy.inputs.--region` "apac" is not one of its choices, "eu" or "us"',
+    ]);
+  });
+
   test("has nothing to say without a policy that fixes inputs", () => {
     expect(mcpPolicyProblems({ server })).toEqual([]);
     expect(

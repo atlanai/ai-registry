@@ -29,7 +29,9 @@ describe("an MCP server in a registry that lists the kind", () => {
       description: "TODO",
       version: "0.1.0",
     });
-    expect((await aireg(["registry", "index"], { cwd: root })).code).not.toBe(0);
+    const index = await aireg(["registry", "index"], { cwd: root });
+    expect(index.code).not.toBe(0);
+    expect(index.stderr).toContain("`server.name` is still TODO");
   });
 
   test("indexes it once filled in, and bumps it without editing server.json", async ({ aireg }) => {
@@ -44,6 +46,9 @@ describe("an MCP server in a registry that lists the kind", () => {
     expect((await aireg(["registry", "index"], { cwd: root })).code).toBe(0);
     expect((await aireg(["registry", "validate"], { cwd: root })).code).toBe(0);
 
+    expect(await readFile(folder("0.2.0", "server.json"))).toEqual(
+      await readFile(folder("0.1.0", "server.json")),
+    );
     const envelope = await json(folder("0.2.0", "artifact.json"));
     expect(envelope.metadata.version).toBe("0.2.0");
     expect(envelope.spec).toEqual({ name: "weather", description: "Forecasts.", server: filled });
@@ -61,7 +66,7 @@ describe("an MCP server's catalog entry and import", () => {
   }) => {
     const bump = ["mcp_server", "bump", "issue-tracker", "minor", "--namespace", "engineering"];
     expect((await aireg(bump, { cwd: root })).code).toBe(0);
-    await writeFile(next("issue-tracker.md"), "---\ndescription: From Markdown.\n---\n");
+    await writeFile(next("README.md"), "---\nname: other\ndescription: From Markdown.\n---\n");
     expect((await aireg(["registry", "index"], { cwd: root })).code).toBe(0);
 
     const envelope = JSON.parse(await readFile(next("artifact.json"), "utf8"));
@@ -72,6 +77,24 @@ describe("an MCP server's catalog entry and import", () => {
     const index = JSON.parse(await readFile(join(root, "index.json"), "utf8"));
     const entry = index.entries.find((row: { name: string }) => row.name === "issue-tracker");
     expect(entry.description).toBe("Search, read and update issues in the team's issue tracker.");
+  });
+
+  test("imports a README as it is, without reading front matter from it", async ({
+    aireg,
+    tmp,
+  }) => {
+    const source = join(tmp, "with-readme");
+    await mkdir(source, { recursive: true });
+    await cp(issues("server.json"), join(source, "server.json"));
+    const readme = "---\nname: other\n---\n# Issues\n";
+    await writeFile(join(source, "README.md"), readme);
+    const engineering = join(root, "artifacts", "engineering");
+
+    const args = ["mcp_server", "new", "--from", source, "--name", "imported", "-y"];
+    expect((await aireg(args, { cwd: engineering })).code).toBe(0);
+
+    const copied = join(engineering, "mcp_server", "imported", "0.1.0", "README.md");
+    expect(await readFile(copied, "utf8")).toBe(readme);
   });
 
   test("refuses to import a policy that gives a secret a value", async ({ aireg, tmp }) => {

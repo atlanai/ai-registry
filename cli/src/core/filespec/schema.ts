@@ -90,9 +90,8 @@ function compiler(): Ajv2020 {
     validateFormats: false,
     code: { regExp: re2 },
   });
-  // A kind can refer to another project's draft-07 schema, such as the MCP Registry's
-  // `server.json` schema. Ajv applies 2020-12 semantics to it, which `tools/check_schemas.py`
-  // keeps equivalent by refusing the draft-07 keywords whose meaning changed.
+  // The vendored MCP server.json schema is draft-07; Ajv reads it as 2020-12, and
+  // tools/check_schemas.py refuses the keywords whose meaning differs between the two.
   ajv.addMetaSchema(draft07);
   return ajv;
 }

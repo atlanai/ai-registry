@@ -29,10 +29,7 @@ export const SCHEMA_DIR = join(import.meta.dirname, "..", "..", "schema");
 /** Owned by the spec; bundled as copies, since a package cannot import outside itself. */
 const SPEC_KINDS = join(import.meta.dirname, "..", "..", "..", "spec", "schemas", "kinds");
 
-/**
- * Each kind manifest's path under `schema/`, with the spec's bytes it must hold, and with it
- * every schema a manifest refers to, such as Apache Ossie's under `kinds/vendor/`.
- */
+/** Each kind manifest's path under `schema/` with the spec's bytes, vendored schemas included. */
 export function kindCopies(): Record<string, string> {
   return {
     "kind-manifest.schema.json": readFileSync(

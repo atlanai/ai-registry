@@ -22,7 +22,7 @@ import {
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
-import { mcpPolicyProblems } from "#core/filespec/mcp-server.ts";
+import { mcpServerProblems } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { withName } from "#core/frontmatter.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
@@ -150,18 +150,19 @@ async function incoming(
   const spec = specOf(manifest, texts, named);
   const server = manifest.title === "mcp_server";
   const missing = fileProblems(manifest, new Set(entries));
-  const unread =
-    specParseProblem(manifest, texts) ??
-    (server ? `has no ${MCP_SERVER_ENTRY}` : "has no front matter");
-  const unreadable = missing.includes(unread) ? [] : [unread];
+  let checked: string[] = [];
+  if (spec !== undefined) {
+    checked = server ? mcpServerProblems(manifest, spec) : check(manifest, spec);
+  } else if (!server || entries.includes(MCP_SERVER_ENTRY)) {
+    // fileProblems already reports a missing server.json.
+    checked = [specParseProblem(manifest, texts) ?? "has no front matter"];
+  }
   const problems = [
     ...found.irregular
       .filter((entry) => visible(entry.path))
       .map((entry) => `${entry.path} ${refusal(entry)}`),
     ...missing,
-    ...(spec === undefined
-      ? unreadable
-      : [...check(manifest, spec), ...(server ? mcpPolicyProblems(spec) : [])]),
+    ...checked,
   ];
   const fallback =
     typeof spec?.name === "string"

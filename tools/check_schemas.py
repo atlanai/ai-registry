@@ -14,10 +14,8 @@ succeeds, so this script is usable wherever tools/check.py is. CI passes
 --require-jsonschema, which makes a missing `jsonschema` an error instead.
 
 $ids here are relative paths, not URLs, so schemas are preloaded into a resolver
-keyed by path rather than fetched. See spec/schemas/README.md. A schema under a
-vendor/ folder is another project's file, copied byte for byte: it keeps its own
-$id and $schema, its sha256 must be listed in its vendor folder's README.md, and a
-draft-07 copy must not use the keywords whose meaning changed in 2020-12.
+keyed by path rather than fetched. See spec/schemas/README.md. A schema under
+vendor/ is another project's file; see check_vendored.
 """
 from __future__ import annotations
 

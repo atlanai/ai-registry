@@ -1,5 +1,5 @@
 import { join, posix } from "node:path";
-import { isRecord } from "#adapter/fields.ts";
+import { isRecord, textOf } from "#adapter/fields.ts";
 import { hashRegular, readRegular } from "#adapter/files.ts";
 import {
   DEFAULT_BLOB_URL,
@@ -282,20 +282,18 @@ async function envelopeOf(
     | undefined;
   const onDisk = new Set(records.map((record) => record.path));
   files.push(...(await blobFiles(root, folder, existing, onDisk, blobUrl)));
-  const { digest: _digest, ...kept } = existing?.metadata ?? {};
-  // An MCP server's spec wraps its server.json and policy.json, so it is always read from them:
-  // a copied artifact.json must not carry an older policy into a new version.
+  const { digest: _digest, display_name: keptName, ...kept } = existing?.metadata ?? {};
   const mcp = kinds[folder.kind]?.title === "mcp_server";
   const spec =
     mcp || existing?.spec === undefined
       ? envelopeSpec(folder.kind, bytes, kinds, folder.name)
       : (existing.spec as Record<string, unknown>);
-  // An MCP server's Markdown is documentation; its catalog text is the server's own.
-  const server = mcp ? serverCatalog(spec) : undefined;
-  const description = server
-    ? (server.description ?? kept.description)
+  const server = mcp && isRecord(spec.server) ? spec.server : undefined;
+  const description = mcp
+    ? textOf(spec.description)
     : (ownDescription(bytes, folder.name) ?? kept.description);
-  const displayName = server?.title ?? kept.display_name;
+  // A copied artifact.json must not carry an older server's title into a new version.
+  const displayName = mcp ? textOf(server?.title) : keptName;
   return buildEnvelope({
     kind: folder.kind as ArtifactKind,
     metadata: {
@@ -419,17 +417,4 @@ async function withoutDeleted(
     if (await exists(join(root, ...path.split(posix.sep)))) kept.push(row);
   }
   return kept.length === entries.length ? index : { ...index, generated_at: at, entries: kept };
-}
-
-/** The description and title an MCP server's `server.json` gives, within the envelope's limits. */
-function serverCatalog(spec: Record<string, unknown>): { description?: string; title?: string } {
-  const out: { description?: string; title?: string } = {};
-  if (typeof spec.description === "string" && spec.description.length <= 4000) {
-    out.description = spec.description;
-  }
-  const server = spec.server;
-  if (isRecord(server) && typeof server.title === "string" && server.title.length <= 200) {
-    out.title = server.title;
-  }
-  return out;
 }

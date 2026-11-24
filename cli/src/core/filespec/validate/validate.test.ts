@@ -313,6 +313,17 @@ describe("validateRoot on an MCP server", () => {
     );
   });
 
+  test("names a policy field as policy.json spells it, not by its place in the envelope", async ({
+    root,
+  }) => {
+    await cp(ACME, root, { recursive: true });
+    await edit<{ tools: { deny: string[] } }>(root, "policy.json", (policy) => {
+      policy.tools.deny = [];
+    });
+
+    expect(await messages(root)).toContain("`policy.tools.deny` must NOT have fewer than 1 items");
+  });
+
   test("names the JSON file that does not parse", async ({ root }) => {
     await cp(ACME, root, { recursive: true });
     await writeFile(join(root, VERSION, "policy.json"), "{");

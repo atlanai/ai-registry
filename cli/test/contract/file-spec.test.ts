@@ -84,7 +84,7 @@ describe("the file spec schemas", () => {
 interface McpEnvelope {
   spec: {
     server: Record<string, unknown>;
-    _meta: Record<string, { tools: Record<string, unknown> }>;
+    _meta: Record<string, unknown> & { "sh.aireg/policy": { tools: Record<string, unknown> } };
   };
 }
 
@@ -112,8 +112,7 @@ describe("the mcp_server kind", () => {
 
   test("closes the policy, so a field it does not define is refused", () => {
     const approving = envelope();
-    const policy = approving.spec._meta["sh.aireg/policy"];
-    if (policy !== undefined) policy.tools.autoApprove = ["search_issues"];
+    approving.spec._meta["sh.aireg/policy"].tools.autoApprove = ["search_issues"];
     expect(check(compiler, "artifact-known-kinds.schema.json", approving)).toContain(
       "/spec/_meta/sh.aireg~1policy/tools must NOT have additional properties",
     );

@@ -287,11 +287,7 @@ export function specOf(
   return { ...lifted, card };
 }
 
-/**
- * An MCP server's `server.json` in `server` and its `policy.json` in `_meta` under `sh.aireg/policy`, each verbatim, with
- * the slug and the server's description lifted beside them (`kinds/mcp_server.json`). None when
- * either file does not parse, so a broken policy is reported rather than dropped.
- */
+/** None when either file does not parse, so a broken policy is reported rather than dropped. */
 function mcpServerSpec(
   files: ReadonlyMap<string, string>,
   name: string | undefined,
@@ -304,7 +300,6 @@ function mcpServerSpec(
   const policy = policyText === undefined ? undefined : parsedJson(policyText);
   if (policyText !== undefined && policy === undefined) return undefined;
   const spec: Record<string, unknown> = {};
-  // The reverse-DNS name stays in the document; the slug is its part after the slash.
   const own = isRecord(server) && typeof server.name === "string" ? server.name : undefined;
   const slug = name ?? (own === undefined ? undefined : sanitizeName(own.split("/").pop() ?? own));
   if (slug !== undefined) spec.name = slug;
