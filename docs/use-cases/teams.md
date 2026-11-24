@@ -4,7 +4,7 @@ For any company where people share skills and agents across teams: engineering t
 
 ## What changes
 
-Once many people and agents use a skill, and it keeps changing, four jobs follow.
+Once many people and agents use a skill, and it keeps changing, five jobs follow.
 
 | Job to be done | Experience today | With an agent registry |
 |---|---|---|
@@ -12,6 +12,7 @@ Once many people and agents use a skill, and it keeps changing, four jobs follow
 | Ship a fix everywhere | You fix a skill, then chase people across teams to copy it in, and some never do | You publish the fix once, and every project picks it up on its next update |
 | Control what agents follow | Anyone can change instructions that every agent then follows, and a bad edit reaches everyone before anyone notices | A teammate reviews every change first, and each project stays on the last good version until it chooses to update |
 | Know what an agent ran | When an agent gets something wrong, you can't tell which version of a skill it was following | You can look up the exact version every project used, and CI tells you when a project changes |
+| See which skills people use | Once a skill is shared, nobody can tell who runs it, how often or which version, so unused skills pile up and old versions linger | Each run reaches the observability tool your team already runs, counted per skill and version, for every teammate who agrees to share |
 
 ## How it works
 
@@ -149,6 +150,28 @@ aireg daemon autostart on
 After installing, confirm every intended target uses the registry-managed skills and resolve any skipped or blocked placements; a successful command alone does not establish this. Do not publish an old local copy just to clear a collision.
 
 `-g` installs into your user scope instead of the current project, so every project on your machine gets the skills. Installing `acme/engineering` takes every skill in the namespace, including ones added later. The CLI's background job checks for new versions every 15 minutes, and `aireg daemon autostart on` starts it when you log in.
+
+### 8. See which skills people run
+
+Name an OpenTelemetry endpoint in the registry's `registry.json`, and each teammate's aireg can send it a span every time a skill or agent from the registry runs. The endpoint is whatever your team runs to store traces: an OpenTelemetry Collector, or a tool such as Arize Phoenix, Langfuse or Grafana that accepts the OpenTelemetry Protocol. The registry itself stores nothing.
+
+```json
+{
+  "kind": "registry",
+  "format_version": 1,
+  "name": "acme",
+  "usage": { "otlp": "https://otel.acme.example" }
+}
+```
+
+Merge the change like any other. A teammate then sees the registry ask for usage when they add it, and agrees with one command:
+
+```bash
+aireg usage share acme
+aireg usage
+```
+
+Nothing is sent before they agree. Each run sends the version that ran, the coding agent, when it ran and a pseudonym, never a prompt, an answer or a file path. An endpoint that needs a key reads it from `AIREG_USAGE_HEADERS_<NAME>`, such as `AIREG_USAGE_HEADERS_ACME`, on each teammate's machine; the key never goes in `registry.json`, which everyone can read. In your tool, look for spans named `registry.artifact.run` and group them by `registry.artifact.ref` to see runs per skill and version. [`aireg usage`](../reference/usage.md) has the details, and section 14 of the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) defines what is sent.
 
 ## Beyond engineering
 
