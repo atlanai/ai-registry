@@ -1,0 +1,14 @@
+{
+  "kind": "registry",
+  "format_version": 1,
+  "name": "acme",
+  "slug": "acme",
+  "description": "A registry document that asks clients to send runs of its artifacts to an OpenTelemetry endpoint (file spec section 14).",
+  "url": "https://registry.acme.example",
+  "capabilities": ["files"],
+  "usage": {
+    "otlp": "https://otel.acme.example",
+    "reporter": "pseudonym",
+    "time_precision": "hour"
+  }
+}

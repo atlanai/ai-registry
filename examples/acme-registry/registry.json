@@ -21,8 +21,5 @@
       "manifest_url": "kinds/agent.json"
     }
   ],
-  "usage": {
-    "otlp": "http://localhost:4318"
-  },
   "generated_at": "2026-09-03T08:05:00Z"
 }

@@ -340,7 +340,7 @@ The `usage` object in `registry.json` (section 3.1) says where runs are sent.
 | `reporter` | no | how a person is named in what is sent: `pseudonym` (default) or `name`; see 14.4 |
 | `time_precision` | no | how precisely a run's time is sent: `second`, `hour` (default) or `day` |
 
-A client sends runs to `{otlp}/v1/traces`, encoded as OTLP JSON or protobuf. When the endpoint needs a credential, the person supplies it to their client. A `registry.json` never carries one, because everyone who can read the registry can read it.
+[`examples/usage-registry.json`](../examples/usage-registry.json) is a `registry.json` that asks for usage. A client sends runs to `{otlp}/v1/traces`, encoded as OTLP JSON or protobuf. When the endpoint needs a credential, the person supplies it to their client. A `registry.json` never carries one, because everyone who can read the registry can read it.
 
 ### 14.2 What a run is
 

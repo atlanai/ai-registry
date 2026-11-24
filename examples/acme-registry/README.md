@@ -28,10 +28,6 @@ A client resolving `engineering/skill/pr-review`:
 
 The agent's envelope names the skill in `relationships[]`, so installing the agent pulls the skill the same way.
 
-## Usage
-
-`registry.json` names `http://localhost:4318` as its usage endpoint ([file spec](../../spec/file-spec.md) section 14). That is the default port of an OpenTelemetry Collector running on the same machine. A client that a person has allowed to share usage sends each run of a skill or agent from this root there as a span, with the version's ref and digest, the coding agent that ran it and a pseudonym for the person. The registry stores nothing itself.
-
 ## Checking it
 
 ```
