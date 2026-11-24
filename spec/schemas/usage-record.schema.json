@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "usage-record.schema.json",
+  "title": "Usage file line",
+  "description": "One line of a usage file: an OTLP JSON LogsData object, as the OpenTelemetry Protocol file exporter writes it. A log record whose eventName is registry.artifact.run is a run. File spec section 14.3.",
+  "type": "object",
+  "properties": {
+    "resourceLogs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/resourceLogs" }
+    }
+  },
+  "required": ["resourceLogs"],
+  "$defs": {
+    "resourceLogs": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "type": "object",
+          "properties": {
+            "attributes": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/attribute" },
+              "contains": {
+                "properties": { "key": { "const": "registry.usage.reporter" } },
+                "required": ["key"]
+              }
+            }
+          },
+          "required": ["attributes"]
+        },
+        "scopeLogs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scopeLogs" }
+        }
+      },
+      "required": ["resource", "scopeLogs"]
+    },
+    "scopeLogs": {
+      "type": "object",
+      "properties": {
+        "scope": { "type": "object" },
+        "logRecords": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/logRecord" }
+        }
+      },
+      "required": ["logRecords"]
+    },
+    "logRecord": {
+      "type": "object",
+      "properties": {
+        "timeUnixNano": {
+          "type": "string",
+          "pattern": "^[0-9]{1,20}$",
+          "description": "When the run started, in nanoseconds since the Unix epoch, rounded down to the location's time_precision. OTLP JSON writes 64-bit integers as strings."
+        },
+        "eventName": { "type": "string" },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attribute" }
+        }
+      },
+      "if": {
+        "properties": { "eventName": { "const": "registry.artifact.run" } },
+        "required": ["eventName"]
+      },
+      "then": {
+        "required": ["timeUnixNano", "attributes"],
+        "properties": {
+          "attributes": {
+            "allOf": [
+              { "contains": { "properties": { "key": { "const": "registry.artifact.ref" } }, "required": ["key"] } },
+              { "contains": { "properties": { "key": { "const": "registry.run.id" } }, "required": ["key"] } }
+            ]
+          }
+        }
+      }
+    },
+    "attribute": {
+      "type": "object",
+      "description": "An OTLP key-value pair. The keys file spec section 14.3 names have the value shapes below; a reader ignores other keys.",
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "value": { "type": "object" }
+      },
+      "required": ["key", "value"],
+      "allOf": [
+        {
+          "if": { "properties": { "key": { "const": "registry.usage.reporter" } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/reporter" } } }
+        },
+        {
+          "if": { "properties": { "key": { "const": "registry.artifact.ref" } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/string_of_ref" } } }
+        },
+        {
+          "if": { "properties": { "key": { "const": "registry.artifact.digest" } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/string_of_digest" } } }
+        },
+        {
+          "if": { "properties": { "key": { "const": "registry.artifact.modified" } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/bool" } } }
+        },
+        {
+          "if": { "properties": { "key": { "const": "registry.run.id" } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/run_id" } } }
+        },
+        {
+          "if": { "properties": { "key": { "const": "registry.run.trigger" } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/trigger" } } }
+        },
+        {
+          "if": { "properties": { "key": { "const": "registry.target" } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/target" } } }
+        }
+      ]
+    },
+    "reporter": {
+      "type": "object",
+      "properties": { "stringValue": { "$ref": "common.schema.json#/$defs/namespace" } },
+      "required": ["stringValue"]
+    },
+    "string_of_ref": {
+      "type": "object",
+      "properties": { "stringValue": { "$ref": "common.schema.json#/$defs/ref" } },
+      "required": ["stringValue"]
+    },
+    "string_of_digest": {
+      "type": "object",
+      "properties": { "stringValue": { "$ref": "common.schema.json#/$defs/digest" } },
+      "required": ["stringValue"]
+    },
+    "bool": {
+      "type": "object",
+      "properties": { "boolValue": { "type": "boolean" } },
+      "required": ["boolValue"]
+    },
+    "run_id": {
+      "type": "object",
+      "properties": { "stringValue": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" } },
+      "required": ["stringValue"]
+    },
+    "trigger": {
+      "type": "object",
+      "properties": { "stringValue": { "enum": ["person", "model", "artifact", "unknown"] } },
+      "required": ["stringValue"]
+    },
+    "target": {
+      "type": "object",
+      "properties": { "stringValue": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" } },
+      "required": ["stringValue"]
+    }
+  }
+}

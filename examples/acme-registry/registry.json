@@ -21,5 +21,10 @@
       "manifest_url": "kinds/agent.json"
     }
   ],
+  "usage": {
+    "files": "usage",
+    "reporter": "pseudonym",
+    "time_precision": "hour"
+  },
   "generated_at": "2026-09-03T08:05:00Z"
 }

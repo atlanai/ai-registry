@@ -12,6 +12,8 @@ artifacts/engineering/agent/reviewer/versions.json
 artifacts/engineering/agent/reviewer/0.3.0/          depends_on engineering/skill/pr-review@1.2.0
 blobs/sha256/28eb…fc0c                               the rubric bytes
 kinds/skill.json, kinds/agent.json                   the manifests registry.json advertises
+usage/2026-09-02/r-4f2a9c1e.jsonl                    one reporter's runs that day
+usage/index.json                                     every usage file with its size and digest
 ```
 
 Two identifiers are at work and they are not the same one. The root belongs to the `acme` organization, which is `slug` in `registry.json` and never appears in a path. `engineering` is a namespace inside that root: a team workspace, one of several the organization could hold. A registry with a single team is tempted to give both the same name; this example keeps them distinct so the layout still reads correctly when a second namespace arrives.
@@ -27,6 +29,15 @@ A client resolving `engineering/skill/pr-review`:
 3. Fetch `SKILL.md` and `references/checklist.md` from the version directory, and `assets/rubric.json` from `blobs/sha256/<digest>` because its descriptor has no `urls`. Verify each against its digest and size.
 
 The agent's envelope names the skill in `relationships[]`, so installing the agent pulls the skill the same way.
+
+## Usage
+
+`registry.json` sends usage to `usage/` in this root ([file spec](../../spec/file-spec.md) section 14). Two people, named by pseudonyms, ran skills on 2 and 3 September:
+
+- `r-4f2a9c1e` ran `pr-review@1.2.0` three times and the `reviewer` agent once, in Claude Code.
+- `r-b71e03d5` ran the deprecated `pr-review@1.1.0` twice in Codex, then `pr-review@1.2.0` once in Claude Code.
+
+Each line of a usage file is one OpenTelemetry log record. A reader counts 7 runs: 4 of `pr-review@1.2.0`, 2 of `pr-review@1.1.0` and 1 of `reviewer@0.3.0`.
 
 ## Checking it
 

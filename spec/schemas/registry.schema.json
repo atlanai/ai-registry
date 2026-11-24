@@ -54,6 +54,34 @@
       }
     },
     "generated_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "usage": {
+      "type": "object",
+      "description": "Where usage of this root's artifacts is written and read. Optional; a root without it is complete. File spec section 14.1.",
+      "properties": {
+        "files": {
+          "type": "string",
+          "format": "uri-reference",
+          "minLength": 1,
+          "description": "The usage location: a directory, git repository or HTTPS location holding usage files. A relative reference resolves against the root and must stay inside it."
+        },
+        "otlp": {
+          "type": "string",
+          "format": "uri",
+          "description": "An OpenTelemetry Protocol over HTTP endpoint, without the /v1/logs path. A client that shares usage may also send each run here."
+        },
+        "reporter": {
+          "enum": ["pseudonym", "name"],
+          "default": "pseudonym",
+          "description": "How a person is named in usage files. File spec section 14.4."
+        },
+        "time_precision": {
+          "enum": ["second", "hour", "day"],
+          "default": "hour",
+          "description": "How precisely a run's time is written."
+        }
+      },
+      "anyOf": [{ "required": ["files"] }, { "required": ["otlp"] }]
+    },
     "api_version": {
       "type": "string",
       "const": "v1",

@@ -15,7 +15,9 @@ CHECK = ROOT / "tools" / "check.py"
 SKILL = Path("artifacts", "engineering", "skill", "pr-review")
 
 
-class CheckFixTests(unittest.TestCase):
+class RegistryCopy(unittest.TestCase):
+    """A fresh copy of the acme example for each test."""
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -31,6 +33,8 @@ class CheckFixTests(unittest.TestCase):
             text=True, capture_output=True,
         )
 
+
+class CheckFixTests(RegistryCopy):
     def link(self, relative):
         """Move a registry file or folder outside and leave a symlink in its place."""
         source = self.registry / relative
@@ -91,6 +95,77 @@ class CheckFixTests(unittest.TestCase):
     def test_linked_artifacts_folder_is_not_read_or_rewritten(self):
         artifacts = self.link("artifacts")
         self.assert_refused(artifacts / "engineering" / "skill" / "pr-review" / "versions.json")
+
+
+USAGE_FILE = Path("usage", "2026-09-02", "r-4f2a9c1e.jsonl")
+
+
+class UsageTests(RegistryCopy):
+    """File spec section 14: a usage location inside the root."""
+
+    def first_run(self):
+        line = (self.registry / USAGE_FILE).read_text(encoding="utf-8").splitlines()[0]
+        return json.loads(line)
+
+    def write_run(self, edit):
+        """Replace the usage file with its first line, edited."""
+        document = self.first_run()
+        edit(document["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0])
+        (self.registry / USAGE_FILE).write_text(json.dumps(document) + "\n", encoding="utf-8")
+        (self.registry / "usage" / "index.json").unlink()
+
+    def assert_error(self, text):
+        result = self.check()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(text, result.stdout)
+
+    def test_example_usage_passes(self):
+        result = self.check()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_run_of_an_unlisted_version_is_refused(self):
+        def edit(record):
+            record["attributes"][0]["value"]["stringValue"] = "engineering/skill/pr-review@9.9.9"
+        self.write_run(edit)
+        self.assert_error("is not a version this root lists")
+
+    def test_run_with_wrong_digest_is_refused(self):
+        def edit(record):
+            record["attributes"][1]["value"]["stringValue"] = "sha256:" + "0" * 64
+        self.write_run(edit)
+        self.assert_error("is not engineering/skill/pr-review@1.2.0's content digest")
+
+    def test_run_carrying_content_is_refused(self):
+        def edit(record):
+            record["attributes"].append({"key": "gen_ai.input.messages", "value": {"stringValue": "a prompt"}})
+        self.write_run(edit)
+        self.assert_error("may not carry gen_ai.input.messages")
+
+    def test_run_more_precise_than_the_location_allows_is_refused(self):
+        def edit(record):
+            record["timeUnixNano"] = str(int(record["timeUnixNano"]) + 61 * 10**9)
+        self.write_run(edit)
+        self.assert_error("more precise than the location's time_precision")
+
+    def test_run_outside_the_files_day_is_refused(self):
+        def edit(record):
+            record["timeUnixNano"] = str(int(record["timeUnixNano"]) + 86400 * 10**9)
+        self.write_run(edit)
+        self.assert_error("outside the file's day")
+
+    def test_reporter_must_match_the_file_name(self):
+        path = self.registry / USAGE_FILE
+        path.rename(path.with_name("r-00000000.jsonl"))
+        (self.registry / "usage" / "index.json").unlink()
+        self.assert_error("must be 'r-00000000', the file's reporter")
+
+    def test_stale_usage_index_is_refused_and_fix_rewrites_it(self):
+        path = self.registry / USAGE_FILE
+        path.write_bytes(path.read_bytes() + b"\n")
+        self.assert_error("usage/index.json: does not list every usage file")
+        result = self.check("--fix")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.check().returncode, 0)
 
 
 if __name__ == "__main__":

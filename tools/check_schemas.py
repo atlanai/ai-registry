@@ -8,7 +8,7 @@ parses, declares 2020-12, has a unique $id, and every $ref resolves to a file
 and a JSON Pointer that exist. That catches the likely failure, a typo'd $ref.
 
 The instance tier validates each example registry's documents (every
-examples/*/registry.json root) against their schemas, asserting `format` where
+examples/*/registry.json root), and each line of their usage files, against their schemas, asserting `format` where
 the validator has a checker for it, and needs `jsonschema`. Without it the tier reports itself skipped and the run still
 succeeds, so this script is usable wherever tools/check.py is. CI passes
 --require-jsonschema, which makes a missing `jsonschema` an error instead.
@@ -139,7 +139,21 @@ def instances() -> list[tuple[Path, list[str]]]:
             pairs.append((envelope, ["artifact.schema.json", "artifact-known-kinds.schema.json"]))
         for manifest in sorted((example / "kinds").glob("*.json")):
             pairs.append((manifest, ["kind-manifest.schema.json"]))
+        usage_index = example / "usage" / "index.json"
+        if usage_index.is_file():
+            pairs.append((usage_index, ["usage-index.schema.json"]))
     return pairs
+
+
+def usage_lines() -> list[tuple[Path, int, str]]:
+    """Every line of every example usage file; each is validated as its own document."""
+    out = []
+    for example in EXAMPLES:
+        for path in sorted((example / "usage").glob("*/*.jsonl")):
+            for n, line in enumerate(path.read_text().splitlines(), 1):
+                if line.strip():
+                    out.append((path, n, line))
+    return out
 
 
 def check_instances(loaded: dict[str, dict], rep: Report, required: bool) -> bool:
@@ -177,6 +191,20 @@ def check_instances(loaded: dict[str, dict], rep: Report, required: bool) -> boo
                 where = "/".join(str(p) for p in err.path) or "(root)"
                 rep.error(f"{path.relative_to(REPO)} against {key}: at {where}: {err.message}")
             checked += 1
+
+    line_validator = Draft202012Validator(
+        loaded["usage-record.schema.json"], registry=registry, format_checker=Draft202012Validator.FORMAT_CHECKER
+    )
+    for path, n, line in usage_lines():
+        try:
+            instance = json.loads(line)
+        except json.JSONDecodeError as exc:
+            rep.error(f"{path.relative_to(REPO)}:{n}: not JSON: {exc}")
+            continue
+        for err in sorted(line_validator.iter_errors(instance), key=lambda e: list(e.path)):
+            where = "/".join(str(p) for p in err.path) or "(root)"
+            rep.error(f"{path.relative_to(REPO)}:{n} against usage-record.schema.json: at {where}: {err.message}")
+        checked += 1
 
     # Each kind manifest must also be a valid 2020-12 schema in its own right.
     for manifest in sorted((SCHEMA_DIR / "kinds").glob("*.json")):

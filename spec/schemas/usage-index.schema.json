@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "usage-index.schema.json",
+  "title": "Usage index",
+  "description": "The index.json at a usage location: every usage file with its size and digest. Required on an HTTPS location, which cannot be listed; optional on a directory or git location. File spec section 14.3.",
+  "type": "object",
+  "properties": {
+    "format_version": { "$ref": "common.schema.json#/$defs/format_version" },
+    "generated_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "The file's path relative to the usage location: <YYYY-MM-DD>/<reporter>.jsonl.",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}/[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?\\.jsonl$"
+          },
+          "size": { "type": "integer", "minimum": 0 },
+          "digest": { "$ref": "common.schema.json#/$defs/digest" }
+        },
+        "required": ["path", "size", "digest"]
+      }
+    }
+  },
+  "required": ["format_version", "generated_at", "files"]
+}
