@@ -1,5 +1,5 @@
 import { readFile, rm } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { messageOf } from "#adapter/errors.ts";
 import { assertUnredirected } from "#adapter/files.ts";
@@ -7,7 +7,8 @@ import { MCP_SERVER_ENTRY } from "#adapter/kinds.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError } from "#core/errors.ts";
 import { rewriteAtomic } from "#core/fs/atomic.ts";
-import { posixRelative, readTextIfPresent } from "#core/fs/path.ts";
+import { isStrictlyWithin, posixRelative, readTextIfPresent } from "#core/fs/path.ts";
+import { pruneEmptyParent } from "#core/fs/tree.ts";
 import type { LockEntry } from "#core/lock.ts";
 import type { McpEntry } from "#core/mcp/model.ts";
 import { chooseOption, resolveServer } from "#core/mcp/resolve.ts";
@@ -178,7 +179,7 @@ export async function unconfigure(run: Run, action: ActionOf<"unconfigure">): Pr
     if (left.length === list.length) return { written: false };
     if (left.length === 0) dropEmpty(doc, receipt.at);
     else doc.setList(receipt.at, left);
-    await settle(to, doc);
+    await settle(to, doc, run.inputs.roots.base);
     return { written: true };
   }
   const current = doc.table(receipt.at);
@@ -188,14 +189,15 @@ export async function unconfigure(run: Run, action: ActionOf<"unconfigure">): Pr
     return { written: false, kept: { name, path: to, config: true, reason } };
   }
   dropEmpty(doc, receipt.at);
-  await settle(to, doc);
+  await settle(to, doc, run.inputs.roots.base);
   return { written: true };
 }
 
-/** A file left empty was aireg's alone, so it goes. */
-async function settle(to: string, doc: ConfigDocument): Promise<void> {
-  if (isDeepStrictEqual(doc.value(), {})) await rm(to, { force: true });
-  else await rewriteAtomic(to, doc.render());
+/** A file left empty was aireg's alone, so it goes, with the folders it leaves empty below `base`. */
+async function settle(to: string, doc: ConfigDocument, base: string): Promise<void> {
+  if (!isDeepStrictEqual(doc.value(), {})) return rewriteAtomic(to, doc.render());
+  await rm(to, { force: true });
+  if (isStrictlyWithin(base, dirname(to))) await pruneEmptyParent(to, base);
 }
 
 async function readServer(dir: string): Promise<unknown> {

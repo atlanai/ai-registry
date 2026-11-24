@@ -175,12 +175,14 @@ test("installs an MCP server for every project target that loads one, and remove
   const manifest = join(project, ".registry", "manifest.yml");
   await writeFile(manifest, (await readFile(manifest, "utf8")).replace("claude-code, ", ""));
   expect((await aireg(["install"], { cwd: project })).code).toBe(0);
-  expect(JSON.parse(await read(".mcp.json")).mcpServers["issue-tracker"]).toEqual(shared);
+  expect(JSON.parse(await read(".mcp.json")).mcpServers["issue-tracker"]).toEqual(typed);
 
   expect((await aireg(["remove", "issue-tracker", "-y"], { cwd: project })).code).toBe(0);
   for (const [file, text] of Object.entries(mine)) expect(await read(file)).toBe(text);
   for (const file of [".mcp.json", ".cursor/mcp.json", ".pi/mcp.json", "opencode.json"]) {
     expect(existsSync(join(project, file)), file).toBe(false);
   }
-  expect(existsSync(join(project, ".grok", "config.toml"))).toBe(false);
+  for (const folder of [".cursor", ".grok", ".pi"]) {
+    expect(existsSync(join(project, folder)), folder).toBe(false);
+  }
 });
