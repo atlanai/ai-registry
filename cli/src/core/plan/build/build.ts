@@ -22,6 +22,7 @@ import {
   keep,
   namespaceWants,
 } from "./carry.ts";
+import { planConfigs } from "./configs.ts";
 import { placeLinks, updateLinks, wantedLinks } from "./links.ts";
 import { keepUnmovedRevisions, lockRow, rewrittenFrom } from "./lock-row.ts";
 import { carriedOut, renamesFor } from "./rename.ts";
@@ -209,7 +210,9 @@ function planItem(item: Selected, build: BuildState): void {
   if (!updateLinks({ item, links, previous, state, restage }, build)) {
     build.unchanged.push(item.name);
   }
+  const entries = planConfigs(item, copy, previous, build);
   build.next.artifacts[item.name] = {
+    ...(entries.length === 0 ? {} : { entries }),
     ...lockRow({
       item,
       links,

@@ -169,6 +169,31 @@ const KindMapping = tagged(
       },
       { additionalProperties: false },
     ),
+    Type.Object(
+      {
+        shape: Type.Literal("config"),
+        file: Text,
+        format: choice("json", "toml", "yaml"),
+        at: Type.Array(Text, { minItems: 1 }),
+        anchor: Type.Optional(choice("root", "project")),
+        scope: Type.Optional(choice("user", "project")),
+        codec: Type.Object(
+          {
+            id: Type.Literal("mcp-json"),
+            secret: Type.Object(
+              { prefix: Type.String(), suffix: Type.String() },
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+        transports: Type.Array(choice("stdio", "streamable-http", "sse"), { minItems: 1 }),
+      },
+      {
+        additionalProperties: false,
+        description: "An entry in a config file the target reads, such as an MCP server's.",
+      },
+    ),
   ],
   "Where one kind lands inside the target's folder.",
 );

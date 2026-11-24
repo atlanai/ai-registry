@@ -12,6 +12,7 @@ import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { assertManagedPath } from "#core/store/managed-paths.ts";
 import { PROJECTIONS_DIR, type Roots } from "#core/store/paths.ts";
 import { assemble } from "./assemble.ts";
+import { configure, unconfigure } from "./configure.ts";
 import { journal } from "./journal.ts";
 import { linkInto, preflight, unlink } from "./link.ts";
 import { record } from "./record.ts";
@@ -19,6 +20,7 @@ import { applyRegistrations } from "./registrations.ts";
 import {
   type ApplyResult,
   addCloned,
+  addConfigured,
   addLinked,
   addRecorded,
   addStaging,
@@ -30,7 +32,7 @@ import {
 import { cloneInto, prefetch, stage } from "./stage.ts";
 
 const linked = (lock: Lock | undefined, name: string): number =>
-  lock?.artifacts[name]?.links.length ?? 0;
+  (lock?.artifacts[name]?.links.length ?? 0) + (lock?.artifacts[name]?.entries?.length ?? 0);
 
 export interface ApplyOptions {
   plan: Plan;
@@ -64,7 +66,7 @@ export async function apply({
       leaseCheckedAt = Date.now();
     }
     onStep?.(action);
-    if (action.kind !== "record")
+    if (action.kind !== "record" && action.kind !== "configure" && action.kind !== "unconfigure")
       await assertManagedPath(action.to, roots, { leaf: action.kind !== "unlink", env });
     await applyAction(run, action);
   }
@@ -110,6 +112,10 @@ async function applyAction(run: Run, action: Action): Promise<void> {
       return addLinked(results, action, await linkInto(run, action));
     case "unlink":
       return addUnlinked(results, await unlink(run, action));
+    case "configure":
+      return addConfigured(results, action, await configure(run, action));
+    case "unconfigure":
+      return addConfigured(results, action, await unconfigure(run, action));
     case "record":
       return addRecorded(results, await record(run, action));
   }

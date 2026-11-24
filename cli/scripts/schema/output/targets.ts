@@ -166,6 +166,30 @@ const KindMapping = Type.Union(
       },
       { additionalProperties: false },
     ),
+    Type.Object(
+      {
+        shape: Type.Literal("config"),
+        file: Type.String(),
+        format: Type.Union([Type.Literal("json"), Type.Literal("toml"), Type.Literal("yaml")]),
+        at: Texts,
+        anchor: Type.Optional(Type.Union([Type.Literal("root"), Type.Literal("project")])),
+        scope: Type.Optional(Type.Union([Type.Literal("user"), Type.Literal("project")])),
+        codec: Type.Object(
+          {
+            id: Type.Literal("mcp-json"),
+            secret: Type.Object(
+              { prefix: Type.String(), suffix: Type.String() },
+              { additionalProperties: false },
+            ),
+          },
+          { additionalProperties: false },
+        ),
+        transports: Type.Array(
+          Type.Union([Type.Literal("stdio"), Type.Literal("streamable-http"), Type.Literal("sse")]),
+        ),
+      },
+      { additionalProperties: false },
+    ),
   ],
   { description: "Where one kind lands inside the target's folder." },
 );
@@ -176,6 +200,7 @@ const PerKind = <T extends TSchema>(schema: T) =>
       plugin: Type.Optional(schema),
       skill: Type.Optional(schema),
       agent: Type.Optional(schema),
+      mcp_server: Type.Optional(schema),
     },
     { additionalProperties: false },
   );

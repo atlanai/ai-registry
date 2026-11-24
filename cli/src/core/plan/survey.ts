@@ -4,9 +4,15 @@ import { dict } from "#core/fields.ts";
 import { digest } from "#core/fs/digest.ts";
 import { inspect } from "#core/fs/link.ts";
 import { exists } from "#core/fs/tree.ts";
-import type { LinkMode, Lock, LockArtifact } from "#core/lock.ts";
+import type { LinkMode, Lock, LockArtifact, LockEntry } from "#core/lock.ts";
 import type { Roots } from "#core/store/paths.ts";
 import { artifactPath, copyLeaf } from "#core/store/paths.ts";
+import { currentEntryDigest } from "#core/target/register/entry.ts";
+
+/** How a survey keys a config entry the lockfile records. */
+export function receiptKey(receipt: LockEntry): string {
+  return [receipt.target, receipt.file, ...receipt.at].join("\0");
+}
 
 /** The only reader of installed state, so `build` and `status` stay pure. */
 export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
@@ -46,10 +52,16 @@ export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
         );
         const present = await exists(copy);
 
+        const entries: Record<string, string | undefined> = {};
+        for (const receipt of entry.entries ?? []) {
+          const file = resolve(roots.base, receipt.file);
+          entries[receiptKey(receipt)] = await currentEntryDigest(file, receipt.format, receipt.at);
+        }
         artifacts[name] = {
           staged: present,
           digest: present ? await digest(copy, entry.digest) : undefined,
           links,
+          ...(entry.entries === undefined ? {} : { entries }),
         };
       }),
     ),
@@ -73,6 +85,8 @@ export interface ArtifactSurvey {
       digest?: string | undefined;
     }
   >;
+  /** Each config entry's digest now, by `receiptKey`; undefined when it is gone. */
+  entries?: Record<string, string | undefined>;
 }
 
 export interface Survey {

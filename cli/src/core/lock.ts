@@ -18,7 +18,12 @@ import { AiregError, ErrorCode } from "./errors.ts";
 import { dict, textMapOf, withoutUndefined } from "./fields.ts";
 import { parseYaml } from "./yaml.ts";
 
-export const LOCK_VERSION = 1;
+export const LOCK_VERSION = 2;
+
+/** Version 1 has no config entries, so it reads as 2 unchanged, and one without them is still 1. */
+const READS = [1, LOCK_VERSION];
+
+const FORMATS = ["json", "toml", "yaml"] as const;
 
 /** `fanout` is a real directory of links, for a target that will not follow a linked one. */
 export const LINK_MODES = ["symlink", "junction", "copy", "fanout"] as const;
@@ -65,7 +70,9 @@ export function parseLock(text: string, path = "The lockfile", scope: Scope = "p
       { hint: "Run `aireg self update`." },
     );
   }
-  if (root.version !== LOCK_VERSION) throw unreadable(path, "has no lockfile version aireg reads");
+  if (!READS.includes(root.version as number)) {
+    throw unreadable(path, "has no lockfile version aireg reads");
+  }
 
   const lock = emptyLock();
   const registries = section(root.registries, path, "registries");
@@ -107,6 +114,17 @@ interface LockLink {
   digest?: string | undefined;
 }
 
+/** A config entry aireg wrote, such as an MCP server's, so only one still as written is removed. */
+export interface LockEntry {
+  target: string;
+  /** Relative to the scope base. */
+  file: string;
+  format: (typeof FORMATS)[number];
+  at: string[];
+  /** sha256 of the entry as written. */
+  digest: string;
+}
+
 /** Set when a folder here supplied the bytes: it makes a row yours, and `publish` sends only those. */
 interface LockOrigin {
   target: string;
@@ -142,6 +160,8 @@ export interface LockArtifact {
   origin: LockOrigin | undefined;
   /** Prune consults only this list, so a file we never wrote is never removed. */
   links: LockLink[];
+  /** Config entries written for it, which remove takes back only while unedited. */
+  entries?: LockEntry[] | undefined;
   /** Installed names whose `depends_on` edges name this version. Absent when nothing needs it. */
   neededBy?: string[] | undefined;
   /**
@@ -197,8 +217,10 @@ function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
   if (path === undefined) return undefined;
   const links = parseLinks(entry.links, scope);
   const origin = parseOrigin(entry.origin, scope);
+  const entries = parseEntries(entry.entries, scope);
   // An origin makes a row yours, so one that cannot be read must not pass for none.
-  if (links === undefined || (entry.origin != null && origin === undefined)) return undefined;
+  if (links === undefined || entries === undefined) return undefined;
+  if (entry.origin != null && origin === undefined) return undefined;
   return {
     registry,
     id: textOf(entry.id),
@@ -214,6 +236,7 @@ function parseArtifact(entry: unknown, scope: Scope): LockArtifact | undefined {
     digest: digestOf(entry) ?? "",
     origin,
     links,
+    ...(entries.length === 0 ? {} : { entries }),
     neededBy: parseNames(entry.needed_by),
     blocked: parseBlocked(entry.blocked, scope),
   };
@@ -260,6 +283,26 @@ function digestOf(row: Record<string, unknown>): string | undefined {
   if (framed === undefined || earlier === undefined) return earlier ?? framed;
   rememberEarlier(framed, earlier);
   return framed;
+}
+
+/** Undefined when any entry is unreadable: remove reads only these. */
+function parseEntries(raw: unknown, scope: Scope): LockEntry[] | undefined {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) return undefined;
+  const entries: LockEntry[] = [];
+  for (const item of raw) {
+    if (!isRecord(item)) return undefined;
+    const target = textOf(item.target);
+    const file = scopePathOf(item.file, scope);
+    const format = textOf(item.format);
+    const digest = textOf(item.digest);
+    const at = Array.isArray(item.at) ? item.at.filter((key) => typeof key === "string") : [];
+    if (target === undefined || file === undefined || digest === undefined) return undefined;
+    if (!(FORMATS as readonly string[]).includes(format ?? "")) return undefined;
+    if (at.length === 0 || at.length !== (item.at as unknown[]).length) return undefined;
+    entries.push({ target, file, format: format as LockEntry["format"], at, digest });
+  }
+  return entries;
 }
 
 function isLinkMode(value: string): value is LinkMode {
@@ -373,6 +416,11 @@ function artifactDoc(artifact: LockArtifact, table: Targets): Record<string, unk
         mode: link.mode,
         ...digestDoc(link.mode === "copy" ? link.digest : undefined),
       })),
+    entries: artifact.entries?.length
+      ? [...artifact.entries]
+          .sort((a, b) => `${a.target}\0${a.file}`.localeCompare(`${b.target}\0${b.file}`))
+          .map((item) => ({ ...item }))
+      : undefined,
     needed_by: artifact.neededBy?.length ? [...artifact.neededBy].sort() : undefined,
     blocked: artifact.blocked?.length
       ? [...artifact.blocked]
@@ -415,10 +463,17 @@ export function formatLock(lock: Lock): string {
   );
 
   const body = stringify(
-    { version: LOCK_VERSION, registries, artifacts },
+    { version: versionFor(lock), registries, artifacts },
     { indent: 2, defaultStringType: "PLAIN", lineWidth: 0 },
   );
   return `# Generated by aireg. Do not edit.\n${body}`;
+}
+
+/** The oldest version that holds it, so an earlier aireg reads a lock with no config entries. */
+function versionFor(lock: Lock): number {
+  return Object.values(lock.artifacts).some((row) => (row.entries?.length ?? 0) > 0)
+    ? LOCK_VERSION
+    : 1;
 }
 
 /** Atomic, so a killed write leaves the old lock or the new one; the caller holds the scope's lease. */
@@ -464,6 +519,7 @@ function canonicalTargets(lock: Lock): Lock {
       ...row.links,
       ...(row.blocked ?? []),
       ...(row.origin ? [row.origin] : []),
+      ...(row.entries ?? []),
     ]) {
       item.target = canonicalId(table, item.target);
     }

@@ -35,6 +35,8 @@ const VERB: Record<Shown["kind"], string> = {
   clone: "copy",
   link: "install",
   unlink: "uninstall",
+  configure: "configure",
+  unconfigure: "unconfigure",
 };
 
 export function whoNeeds(by: readonly string[]): string {
@@ -57,11 +59,15 @@ export function summarize(
     new Set(shown.flatMap((action) => (kinds.includes(action.kind) ? [action.name] : [])));
   const held = applied.lock?.artifacts;
   // A namespace installs through one link, so the lock, not the link, says where each one went.
-  const targetsOf = (name: string) =>
-    held?.[name]?.links.map((item) => item.target) ??
-    shown.flatMap((action) =>
-      action.kind === "link" && action.name === name ? [action.target] : [],
+  const targetsOf = (name: string) => {
+    const row = held?.[name];
+    if (row !== undefined) return [...row.links, ...(row.entries ?? [])].map((item) => item.target);
+    return shown.flatMap((action) =>
+      (action.kind === "link" || action.kind === "configure") && action.name === name
+        ? [action.target]
+        : [],
     );
+  };
   // Named as they were chosen: one folder can serve several tools.
   const toolsOf = (name: string, folders = targetsOf(name)): string[] => {
     const kind = held?.[name]?.kind ?? before.artifacts[name]?.kind;
@@ -74,7 +80,7 @@ export function summarize(
       ),
     );
   const installed = applied.added.filter((name) => targetsOf(name).length > 0);
-  const changed = [...touched("clone", "link", "unlink")].filter(
+  const changed = [...touched("clone", "link", "unlink", "configure", "unconfigure")].filter(
     (name) => !applied.added.includes(name) && !applied.removed.includes(name),
   );
   const lines = Object.values(applied.performed).some((count) => count > 0)
@@ -253,7 +259,8 @@ export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "targetTable" 
 };
 
 function targetOf(action: Shown): string | undefined {
-  if (action.kind === "link") return action.target;
+  if (action.kind === "link" || action.kind === "configure") return action.target;
+  if (action.kind === "unconfigure") return action.target;
   return action.kind === "unlink" ? action.link?.target : undefined;
 }
 

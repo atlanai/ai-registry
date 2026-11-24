@@ -91,7 +91,45 @@ export type Codec =
       restrictions?: string[] | undefined;
     };
 
-export type KindMapping = ContentsMapping | DirectoryMapping | FileMapping;
+/**
+ * An entry in a config file the target reads, such as an MCP server's, written from what the
+ * artifact resolves to by `codec`; nothing is placed in a folder.
+ */
+interface ConfigMapping {
+  shape: "config";
+  /** Relative to the target root, or to the project with `anchor: "project"`; takes `{name}`. */
+  file: string;
+  format: "json" | "toml" | "yaml";
+  /** Key path to the entry; takes `{name}`. */
+  at: string[];
+  /** `project` for a file in the project's own folder, such as `.mcp.json`. */
+  anchor?: "root" | "project" | undefined;
+  /** Written at this scope alone, when the file is only read there. */
+  scope?: "user" | "project" | undefined;
+  codec: ConfigCodec;
+  /** How the target can reach a server; an artifact that offers none of them is left out. */
+  transports: McpTransport[];
+  subdir?: undefined;
+  extension?: undefined;
+  place?: undefined;
+  depth?: undefined;
+  entry?: undefined;
+  manifest?: undefined;
+  register?: undefined;
+  keys?: undefined;
+  render?: undefined;
+}
+
+export type McpTransport = "stdio" | "streamable-http" | "sse";
+
+/** Renders a resolved MCP server as the target's own entry; a secret as `${VAR}` and the like. */
+export type ConfigCodec = {
+  id: "mcp-json";
+  /** Around a secret's variable name, such as `${` and `}`. */
+  secret: { prefix: string; suffix: string };
+};
+
+export type KindMapping = ContentsMapping | DirectoryMapping | FileMapping | ConfigMapping;
 
 interface ManifestEntry {
   /** Relative to the plugin directory. */

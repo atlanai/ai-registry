@@ -48,6 +48,9 @@ Every page below was read on 2026-10-19, and the plugin loading and security pag
 | A plugin change needs `/reload-plugins` | https://code.claude.com/docs/en/plugins/loading | "Changes to settings or to disk don't reach this layer until you run `/reload-plugins` or start a new session." | 2.1.296 | confirmed; not a `reload` entry, see Left out |
 | `verified.command`: `claude --version` | Install | `2.1.296 (Claude Code)` | 2.1.296 | confirmed |
 | A plugin's commands load from its folder | https://code.claude.com/docs/en/plugins-reference; `claude plugin details toolkit` for a plugin holding `commands/deploy.md` and `skills/ship/` | "Commands \| `commands/` \| Flat Markdown command files." Output: `Skills (2)  deploy, ship` | 2.1.296 | confirmed: Claude Code takes the whole plugin, so its commands are not written as skills |
+| A project's MCP servers in `.mcp.json` at the project root, under `mcpServers.<name>` | https://code.claude.com/docs/en/mcp, read on 2026-11-24 | "Project-scoped servers enable team collaboration by storing configurations in a `.mcp.json` file at your project's root directory." | 2.1.296 | documented, not run |
+| A secret written as `${VAR}`, expanded when the server starts | Same page | "You can reference an environment variable in a server's `command`, `args`, `env`, `url`, or `headers` value ... `${VAR}`: expands to the value of environment variable `VAR`" | 2.1.296 | documented, not run |
+| A local server as `command`, `args` and `env`; a remote as `type` `http` or `sse` with `url` and `headers` | Same page | "Claude Code reads an entry with no `type` as a stdio server."; `"type": "http", "url": "https://example.com/mcp"` | 2.1.296 | documented, not run |
 
 Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 

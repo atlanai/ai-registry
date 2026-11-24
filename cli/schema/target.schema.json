@@ -200,6 +200,101 @@
               }
             }
           }
+        },
+        {
+          "additionalProperties": false,
+          "description": "An entry in a config file the target reads, such as an MCP server's.",
+          "type": "object",
+          "required": [
+            "shape",
+            "file",
+            "format",
+            "at",
+            "codec",
+            "transports"
+          ],
+          "properties": {
+            "shape": {
+              "const": "config",
+              "type": "string"
+            },
+            "file": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "json",
+                "toml",
+                "yaml"
+              ]
+            },
+            "at": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "anchor": {
+              "type": "string",
+              "enum": [
+                "root",
+                "project"
+              ]
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "user",
+                "project"
+              ]
+            },
+            "codec": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "secret"
+              ],
+              "properties": {
+                "id": {
+                  "const": "mcp-json",
+                  "type": "string"
+                },
+                "secret": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "prefix",
+                    "suffix"
+                  ],
+                  "properties": {
+                    "prefix": {
+                      "type": "string"
+                    },
+                    "suffix": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "transports": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "stdio",
+                  "streamable-http",
+                  "sse"
+                ]
+              }
+            }
+          }
         }
       ],
       "description": "Where one kind lands inside the target's folder."
