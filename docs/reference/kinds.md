@@ -56,7 +56,7 @@ The `mcp_server` kind's command is `aireg mcp`, with the same actions; no other 
 - `new --from` takes a folder that holds a `server.json`, and checks it against the MCP Registry's schema before copying.
 - `bump` copies the folder and never edits `server.json`. Replace it with the publisher's new file, whose `version` should match the new one.
 
-`aireg add` installs an MCP server as an entry in each target's config; today that is Claude Code, in the project's `.mcp.json`. Installing never starts the server. A secret is written as a reference to an environment variable, such as `${ISSUES_TOKEN}`, never as its value. `aireg show` prints the command or URL a server starts with and the variables it reads. Adding a whole namespace or registry lists its servers and asks first; without a terminal it needs `--yes`.
+`aireg add` installs an MCP server as an entry in each target's config. Installing never starts the server. A secret is written as a reference to an environment variable, such as `${ISSUES_TOKEN}`, never as its value. `aireg show` prints the command or URL a server starts with and the variables it reads. Adding a whole namespace or registry lists its servers and asks first; without a terminal it needs `--yes`.
 
 A manifest entry that names one server can set:
 
@@ -67,6 +67,21 @@ artifacts:
     env: { ISSUES_TOKEN: ACME_ISSUES_TOKEN }           # read a secret from another variable
     tools: { deny: [delete_issue] }                    # for targets that can narrow tools
 ```
+
+| Target | This project | Your user scope |
+|---|---|---|
+| Claude Code | `.mcp.json` | left out: Claude Code rewrites `~/.claude.json`; use `claude mcp add-json` |
+| GitHub Copilot | `.mcp.json`, shared with Claude Code | `~/.copilot/mcp-config.json` |
+| Codex | `.codex/config.toml` | `~/.codex/config.toml` |
+| Cursor | `.cursor/mcp.json` | `~/.cursor/mcp.json` |
+| Gemini CLI | `.gemini/settings.json` | `~/.gemini/settings.json` |
+| OpenCode | `opencode.json` | `~/.config/opencode/opencode.json` |
+| Grok Build | `.grok/config.toml` | `~/.grok/config.toml` |
+| Pi | `.pi/mcp.json` | `~/.pi/agent/mcp.json` |
+| Google Antigravity | `.agents/mcp_config.json` | `~/.gemini/config/mcp_config.json` |
+| Hermes Agent | left out | `~/.hermes/config.yaml` |
+
+The shared `.agents` folder has no MCP file. A target is left out for a server, with the reason printed, when it cannot express it: a transport it does not load, a secret where it reads none (Codex reads a secret only as a whole variable, Gemini CLI only in `env`, Pi only in `env` and headers, Antigravity nowhere), or `tools` it cannot apply. Codex, Copilot, Gemini CLI, Antigravity and Hermes Agent take the tool lists; Claude Code takes `deny` as `permissions.deny` rules in `.claude/settings.json` and is left out for `allow`; the others are left out when `tools` is set. When Claude Code and Copilot would write different `.mcp.json` entries, the first target listed gets it. A config file aireg cannot parse, such as JSON with comments, is left as it is.
 
 An entry edited after it was installed is kept, and `aireg status` reports it; one aireg did not write under the same name is left alone, so install the server under another name with `as`.
 
