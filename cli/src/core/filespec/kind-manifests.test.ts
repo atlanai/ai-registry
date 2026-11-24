@@ -208,24 +208,21 @@ describe("an MCP server's spec", () => {
     description: "Track issues.",
     version: "1.2.0",
   };
-  const policy = { tools: { deny: ["delete_issue"] } };
   const readme = text("---\nname: wrong\ndescription: Wrong.\n---\n# Issues\n");
 
-  test("wraps server.json and policy.json, and never reads the README", () => {
+  test("wraps server.json, and never reads the README", () => {
     const files = new Map([
       ["README.md", readme],
-      ["policy.json", text(JSON.stringify(policy))],
       ["server.json", text(JSON.stringify(server))],
     ]);
     expect(envelopeSpec("mcp_server", files, manifests, "issues")).toEqual({
       name: "issues",
       description: "Track issues.",
       server,
-      _meta: { "sh.aireg/policy": policy },
     });
   });
 
-  test("names it after the server when no folder gives the slug, and has no policy alone", () => {
+  test("names it after the server when no folder gives the slug", () => {
     const files = new Map([["server.json", text(JSON.stringify(server))]]);
     expect(envelopeSpec("mcp_server", files, manifests)).toEqual({
       name: "issue-tracker",
@@ -234,12 +231,7 @@ describe("an MCP server's spec", () => {
     });
   });
 
-  test("carries no spec when either file does not parse, so the policy is never dropped", () => {
-    const broken = new Map([
-      ["server.json", text(JSON.stringify(server))],
-      ["policy.json", text("{")],
-    ]);
-    expect(envelopeSpec("mcp_server", broken, manifests)).toEqual({});
+  test("carries no spec when server.json does not parse", () => {
     expect(envelopeSpec("mcp_server", new Map([["server.json", text("{")]]), manifests)).toEqual(
       {},
     );

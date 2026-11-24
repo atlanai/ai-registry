@@ -192,54 +192,22 @@ file patterns in a kind manifest are non-exhaustive conventions.
 
 An MCP server carries one `server.json` in the format the
 [MCP Registry](https://github.com/modelcontextprotocol/registry) defines, exactly as its
-publisher wrote it, and MAY carry a `policy.json`. Its envelope wraps the parsed `server.json` in
-`spec.server` and the parsed `policy.json` in `spec._meta["sh.aireg/policy"]`, each otherwise
-unchanged, copies the
-server's `description` to `spec.description`, and uses the registry slug for `spec.name`. The
-server's own reverse-DNS `name` remains in `spec.server` and need not resemble the slug.
-`spec.server` MUST name in `$schema` a `server.json` schema version the kind manifest lists, as the
-MCP Registry requires of what it publishes, and MUST satisfy that schema. Those schemas are copied unchanged into
-[`schemas/kinds/vendor/mcp/`](schemas/kinds/vendor/mcp/README.md), so a writer validates a server
-without fetching anything. A `server.json` that holds a non-integer number, which its `_meta`
-permits, cannot be published as it stands, since section 4.2 forbids one in an envelope.
+publisher wrote it. Its envelope wraps the parsed `server.json`, otherwise unchanged, in
+`spec.server`, copies the server's `description` to `spec.description`, and uses the registry slug
+for `spec.name`. The server's own reverse-DNS `name` remains in `spec.server` and need not resemble
+the slug. `spec.server` MUST name in `$schema` a `server.json` schema version the kind manifest
+lists, as the MCP Registry requires of what it publishes, and MUST satisfy that schema. Those
+schemas are copied unchanged into [`schemas/kinds/vendor/mcp/`](schemas/kinds/vendor/mcp/README.md),
+so a writer validates a server without fetching anything. A `server.json` that holds a non-integer
+number, which its `_meta` permits, cannot be published as it stands, since section 4.2 forbids one
+in an envelope.
 
-`metadata.version` is the version of the artifact, and `spec.server.version` the version of the
-server it describes; they SHOULD be equal, and MAY differ, as when a registry changes only the
-policy of a server it republishes. Registry content MUST NOT be written into `server.json`,
-including its `_meta`, so a republished server stays byte-identical to its publisher's. It goes in
-`spec._meta` beside `spec.server`, under reverse-DNS keys, as the MCP Registry API returns its own
-metadata in a `_meta` beside each `server`. `sh.aireg/policy` is the only key defined.
-
-`policy.json` holds what the registry decides about installing the server, with these meanings:
-
-- `tools.allow` and `tools.deny` name tools by their exact MCP name. A client exposes a tool only
-  when `allow` is absent or names it, and `deny` does not name it. A list of tools an agent runs
-  without asking restricts nothing, so a client MUST NOT render either list as one.
-- `tools.enforcement`, `required` when absent, decides what happens where a coding agent cannot
-  apply the filter. Under `required` a client MUST NOT install the server for that agent. Under
-  `best_effort` it MAY, and then MUST say which tools stay exposed.
-- `timeouts.startup_ms` and `timeouts.tool_ms` are limits a client passes to an agent that
-  supports them, rounding up to the agent's unit.
-- `inputs` fixes the value of inputs `server.json` declares, keyed by an environment variable's or
-  header's `name`, a named argument's `name`, a positional argument's `valueHint`, or the key of a
-  remote's or an input's `variables`. A key applies to every input declared under it, in every
-  package and remote. It MUST NOT name an input marked `isSecret` or one with a fixed `value`, and
-  a value MUST be one of the input's `choices` when it has them.
-
-A client that installs an MCP server resolves each non-secret input it needs from, in order, its
-fixed `value` in `server.json`, `policy.inputs`, a value the person installing supplied (where
-and how is up to the client), and its
-`default`. A required input still without a value leaves the server out for every agent, with
-the reason. An input or template variable marked `isSecret` takes its value only from the
-environment, even when `server.json` gives it a `value` or `default`: a client MUST NOT write a
-secret's value into any file, alone or expanded into a template such as `Bearer {token}`, and
-instead writes a reference
-to an environment variable in the agent's own syntax, and leaves the server out for an agent that
-has no syntax for that reference where it is needed. A client MUST NOT start a server, or run
-its package, as part of installing it, and SHOULD show the full command or URL, and the
-variables it reads, before it writes anything. The digest pins `server.json` and `policy.json`,
-not the packages, images or remotes they name: a package's dependencies resolve when it starts,
-and an OCI identifier without `@sha256:` names a tag that can move.
+A registry MUST NOT change `server.json`, including its `_meta`, so a republished server stays
+byte-identical to its publisher's. `metadata.version` SHOULD equal `spec.server.version`. The
+digest pins `server.json`, not the packages, images or remotes it names: a package's dependencies
+resolve when it starts, and an OCI identifier without `@sha256:` names a tag that can move. Which
+tools to expose, timeouts, and input values are decided where the server is installed, not in the
+registry.
 
 ### 3.5 Native files
 

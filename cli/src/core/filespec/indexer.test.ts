@@ -209,17 +209,15 @@ describe("indexRoot", () => {
   test("reads an MCP server's spec from its files, not from a copied artifact.json", async () => {
     const server = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker");
     await cp(join(server, "1.2.0"), join(server, "1.3.0"), { recursive: true });
-    const policy = JSON.parse(await readFile(join(server, "1.3.0", "policy.json"), "utf8"));
-    policy.tools.deny = ["delete_issue", "close_issue"];
-    await writeFile(join(server, "1.3.0", "policy.json"), JSON.stringify(policy));
+    const document = JSON.parse(await readFile(join(server, "1.3.0", "server.json"), "utf8"));
+    document.description = "Search and close issues.";
+    await writeFile(join(server, "1.3.0", "server.json"), JSON.stringify(document));
 
     await indexRoot(root, "2026-10-08T00:00:00Z");
 
     const envelope = JSON.parse(await readFile(join(server, "1.3.0", "artifact.json"), "utf8"));
-    expect(envelope.spec._meta["sh.aireg/policy"].tools.deny).toEqual([
-      "delete_issue",
-      "close_issue",
-    ]);
+    expect(envelope.spec.server.description).toBe("Search and close issues.");
+    expect(envelope.metadata.description).toBe("Search and close issues.");
   });
 
   test("drops a copied display name when the new server.json has no title", async () => {
@@ -240,9 +238,7 @@ describe("indexRoot", () => {
     const version = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker", "1.3.0");
     const from = join(dirname(version), "1.2.0");
     await mkdir(version, { recursive: true });
-    for (const file of ["server.json", "policy.json"]) {
-      await cp(join(from, file), join(version, file));
-    }
+    await cp(join(from, "server.json"), join(version, "server.json"));
     await writeFile(join(version, "artifact.json"), JSON.stringify({ spec: null }));
 
     await indexRoot(root, "2026-10-08T00:00:00Z");

@@ -22,7 +22,6 @@ import {
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
-import { mcpServerProblems } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { withName } from "#core/frontmatter.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
@@ -152,7 +151,7 @@ async function incoming(
   const missing = fileProblems(manifest, new Set(entries));
   let checked: string[] = [];
   if (spec !== undefined) {
-    checked = server ? mcpServerProblems(manifest, spec) : check(manifest, spec);
+    checked = check(manifest, spec);
   } else if (!server || entries.includes(MCP_SERVER_ENTRY)) {
     // fileProblems already reports a missing server.json.
     checked = [specParseProblem(manifest, texts) ?? "has no front matter"];

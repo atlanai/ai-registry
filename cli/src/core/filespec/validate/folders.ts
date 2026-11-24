@@ -18,7 +18,6 @@ import {
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
-import { mcpServerProblems } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { authored, refusal } from "#core/fs/tree.ts";
 import { type Problem, textAt, unparsed } from "./read.ts";
@@ -43,7 +42,7 @@ export function versionProblems(
       specParseProblem(manifest, contents) ?? "has no front matter to read its fields from";
     return [...problems, why];
   }
-  problems.push(...(server ? mcpServerProblems(manifest, spec) : check(manifest, spec)));
+  problems.push(...check(manifest, spec));
   // An MCP server's `description` is a copy of `server.description`, which is reported instead.
   const own = server ? { ...spec, description: undefined } : spec;
   for (const field of placeholders(own)) problems.push(`\`${field}\` is still ${PLACEHOLDER}`);

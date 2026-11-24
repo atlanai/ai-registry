@@ -10,7 +10,7 @@ A registry publishes the MCP servers its users may run, and a client installs ea
 | Principle | What it means |
 |---|---|
 | Use the standard | A server is described by the MCP Registry's `server.json`, the format the official MCP Registry and the registries built on its API publish. The registry adds nothing to that file. |
-| Curate beside it, not inside it | What a registry decides, such as which tools to hide, lives in `policy.json` next to the publisher's file. |
+| Restrict where it is installed | Which tools to expose, timeouts and input values are set by whoever installs the server, as every coding agent and gateway already does. |
 | A server is its command | Agents and admin policies identify a server by its launch command or URL. Names are labels. |
 | Secrets are references | A client writes `${ISSUES_TOKEN}` in each agent's syntax and never sees the value. |
 | Nothing runs on install | The full command is shown first, and again when it changes. Installing never starts a server. |
@@ -19,26 +19,24 @@ A registry publishes the MCP servers its users may run, and a client installs ea
 
 ## The kind
 
-A version folder holds the publisher's `server.json`, byte for byte, and optionally a `policy.json` and a `README.md`:
+A version folder holds the publisher's `server.json`, byte for byte, and optionally a `README.md`:
 
 ```text
 artifacts/engineering/mcp_server/issue-tracker/
   versions.json
   1.2.0/
     server.json      # the publisher's, unchanged
-    policy.json      # the registry's, optional
     README.md        # optional, documentation only
     artifact.json    # generated
 ```
 
-The envelope's `spec` wraps both files, parsed and otherwise unchanged:
+The envelope's `spec` wraps `server.json`, parsed and otherwise unchanged:
 
 ```json
 {
   "name": "issue-tracker",
   "description": "Search, read and update issues in the team's issue tracker.",
-  "server": { "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json", "name": "com.example/issue-tracker", "…": "…" },
-  "_meta": { "sh.aireg/policy": { "tools": { "deny": ["delete_issue"] }, "…": "…" } }
+  "server": { "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json", "name": "com.example/issue-tracker", "…": "…" }
 }
 ```
 
@@ -52,24 +50,19 @@ It says where to get a server from a package registry at an exact version, or wh
 
 The agent kind embeds an A2A card in `spec.card`, and the semantic model kind proposed in [#232](https://github.com/atlanai/ai-registry/pull/232) embeds its document in `spec.model`. `server.json` follows the same rule, so search, `show` and validation read one document. The cost is a second copy of a file of about a kilobyte. The same rule brings the same limit: section 4.2 forbids non-integer numbers in an envelope, and `_meta` → `io.modelcontextprotocol.registry/publisher-provided` allows any JSON. A `server.json` with `"qualityScore": 4.5` in it cannot be published until it changes. Whatever the project settles for embedding applies to both kinds.
 
-### Why policy is a separate file
+### Why the registry adds no policy
 
-A team that republishes a vendor's server and hides one tool should not have to edit the vendor's file. If the policy lived in `server.json`'s `_meta`:
+A registry could attach its own decisions to a republished server, such as a tool filter, timeouts or fixed input values. This design does not, because nothing else in the ecosystem puts them in a registry entry:
 
-- the file would no longer be the publisher's, so a reviewer could not compare it with the MCP Registry's copy;
-- a new deny list would need a new version, and the copied file would carry the old `version`, so every bump would have to edit the publisher's file.
+- The MCP Registry adds only lifecycle data, such as `status` and `publishedAt`, in a `_meta` beside each `server`, and subregistries add annotations such as ratings and scan results. Neither defines tool filters or input values.
+- Every coding agent keeps tool filters and timeouts in its own configuration: Codex `enabled_tools` and `disabled_tools`, Gemini CLI `includeTools` and `excludeTools`, OpenCode `tools`, Claude Code permission rules. No client reads them from a registry entry.
+- Organizations restrict MCP at two levels: which servers are allowed, through managed settings in Claude Code, Codex, VS Code and Copilot, where registry membership can act as the allowlist; and which tools, through gateways such as Docker's MCP gateway, ToolHive and Kong.
 
-So `policy.json` holds the registry's decisions, and `server.json` holds none. This is how other projects that curate servers keep their own data. The MCP Registry API returns registry metadata in a `_meta` beside `server`, under keys such as `io.modelcontextprotocol.registry/official`, and drops anything but the publisher's key from the server's own `_meta`. ToolHive keeps tool filters in an `MCPToolConfig` that an `MCPServer` references, after removing the inline field. Docker's gateway keeps tool allowlists in profiles, not in catalog entries.
-
-### Why `_meta` and `sh.aireg/policy`
-
-The envelope takes the shape of an MCP Registry API response, `server` with a `_meta` beside it, so a client that reads that API reads this without a new concept. The key follows MCP's rule for `_meta` keys: a reverse-DNS prefix, a slash and a name. `sh.aireg` is the reverse of `aireg.sh`, the domain in `apiVersion`, and stays clear of the `modelcontextprotocol` and `mcp` labels MCP reserves. `spec._meta` accepts only the keys the kind manifest defines, so a new kind of registry data is a spec change rather than a field any writer can add.
+So the registry stores what the publisher wrote, and restricting a server is part of installing it; see [Restricting a server](#restricting-a-server).
 
 ### Versions
 
-`metadata.version` is the artifact's version and `spec.server.version` the server's, as a Helm chart's `version` is separate from its `appVersion`. They should be equal, and may differ when only the policy changes: a registry that tightens the deny list of server `1.2.0` publishes `1.2.1`. A client should display both numbers.
-
-Semver build metadata, such as `1.2.0+acme.1`, looks like a way to keep the numbers aligned, and the version grammar accepts it. It does not work: semver precedence ignores build metadata, so `1.2.0+acme.1` and `1.2.0+acme.2` are equal, and section 3.3 cannot say which is `latest`.
+`metadata.version` is the artifact's version and `spec.server.version` the server's. They should be equal: the artifact holds nothing but the server's own file, so a new artifact version is a new server version.
 
 ### Validation
 
@@ -77,27 +70,29 @@ Semver build metadata, such as `1.2.0+acme.1`, looks like a way to keep the numb
 
 The MCP schema is JSON Schema draft-07. A 2020-12 validator such as Python's `jsonschema` applies a resource by its own `$schema`. Ajv cannot mix dialects, so aireg registers the draft-07 meta-schema and applies 2020-12 semantics, which give the same answers for every keyword the 2025-12-11 schema uses. `tools/check_schemas.py` fails on a vendored draft-07 copy that uses a keyword whose meaning changed.
 
-The rule the schemas cannot state, that `policy.inputs` names an input `server.json` declares, gives no value to a secret or to an input with a fixed `value`, and keeps to its `choices`, is checked by `aireg registry validate` and by `new --from`.
+## Restricting a server
 
-## Policy
+!!! warning "Proposal"
+    Nothing in this section is implemented.
 
-```json
-{
-  "tools": { "deny": ["delete_issue"], "enforcement": "required" },
-  "timeouts": { "startup_ms": 20000, "tool_ms": 60000 },
-  "inputs": { "ISSUES_URL": "https://issues.acme.example", "tenant": "acme" }
-}
+A project that installs a server can narrow it in its manifest, next to the server's entry:
+
+```yaml
+mcp_servers:
+  issue-tracker:
+    tools: { deny: [delete_issue] }
+    timeouts: { startup_ms: 20000, tool_ms: 60000 }
+    with: { tenant: acme }
 ```
 
 | Field | Meaning |
 |---|---|
 | `tools.allow` | Only these tools, by exact MCP tool name. Absent means every tool not denied. |
 | `tools.deny` | Never these tools. Deny wins over allow. |
-| `tools.enforcement` | `required`, the default, installs the server only for agents that can apply the filter. `best_effort` installs it elsewhere too, and says which tools stay exposed. |
 | `timeouts.startup_ms`, `timeouts.tool_ms` | Passed to agents that support them, rounded up to the agent's unit. |
-| `inputs` | Values the registry fixes for non-secret inputs, keyed as described under [Inputs](#inputs). |
+| `with` | Values for non-secret inputs, keyed as described under [Inputs](#inputs). |
 
-Each field already exists in production tools: Codex has `enabled_tools`, `disabled_tools` and both timeouts; Gemini CLI has `includeTools`, `excludeTools` and `timeout`; ToolHive and Docker's MCP gateway filter tools. Auto-approval and trust are deliberately absent: approving tool calls without asking is a decision for each organization's agent policy, not for a registry entry.
+Each field maps to what agents already support: Codex has `enabled_tools`, `disabled_tools` and both timeouts; Gemini CLI has `includeTools`, `excludeTools` and `timeout`. Auto-approval is deliberately absent: approving tool calls without asking is a decision for each organization's agent policy.
 
 A tool filter is not a sandbox. The server still holds its credentials, a new server version can add or rename tools, and an agent can be configured around the filter. Use it to keep tools out of the way, and use the credential's scope to limit what the server can do.
 
@@ -114,12 +109,11 @@ A tool filter is not a sandbox. The server still holds its credentials, a new se
 | Remote URL variable | `remotes[].variables` | its key, such as `tenant` in `https://{tenant}.issues.example.com/mcp` |
 | Template variable | any input's `variables` | its key, such as `token` in `Bearer {token}` |
 
-`policy.inputs` uses these names. One name applies to every input declared under it, in every package and remote. A client resolves each non-secret input it needs from, in order:
+A project's `with` uses these names. One name applies to every input declared under it, in every package and remote. A client resolves each non-secret input it needs from, in order:
 
 1. its fixed `value` in `server.json`;
-2. `policy.inputs`;
-3. a value the person installing supplies, kept in the project's manifest (for example `with: { tenant: acme }`, or `--set tenant=acme`);
-4. its `default`.
+2. a value the project supplies (`with: { tenant: acme }`, or `--set tenant=acme`);
+3. its `default`.
 
 A required input still without a value leaves the server out, with the reason. A secret takes its value only from the environment, even when `server.json` gives it a `value` or `default`: it becomes a reference to an environment variable, in the agent's own syntax.
 
@@ -160,7 +154,7 @@ Cells marked *verify* must be settled by a real install before that agent is sup
 
 Transport names differ too: `server.json` says `streamable-http`, Claude Code writes `http`, Gemini CLI `httpUrl`, OpenCode `remote`, and Codex infers it from `url`.
 
-**Tool filters in Claude Code.** `permissions.allow` means "run without asking", not "only these". Rendering `allow: ["search_issues"]` as `mcp__issues__search_issues` would auto-approve that tool and leave every other one available, the opposite of the intent. Allow-only would need every other tool denied by name, which needs the server's tool list, and install never starts the server to get it. So Claude Code cannot apply `tools.allow`: under `enforcement: required` the server is left out for Claude Code, and under `best_effort` it is installed with a warning that every tool stays available. `tools.deny` renders as `permissions.deny`, and those rules get receipts like any other entry.
+**Tool filters in Claude Code.** `permissions.allow` means "run without asking", not "only these". Rendering `allow: ["search_issues"]` as `mcp__issues__search_issues` would auto-approve that tool and leave every other one available, the opposite of the intent. Allow-only would need every other tool denied by name, which needs the server's tool list, and install never starts the server to get it. So Claude Code cannot apply `tools.allow`: the server is left out for Claude Code unless the project accepts, with a warning, that every tool stays available. `tools.deny` renders as `permissions.deny`, and those rules get receipts like any other entry.
 
 **A file shared by several agents.** Claude Code and Copilot CLI both read `.mcp.json` → `mcpServers.<alias>`. The client renders the entry once per agent and compares them. When they agree, it writes one entry with one receipt that lists every agent it serves. When they differ, for example because Copilot's `tools` filter sits inside the entry, it installs for the agents whose entry matches the first listed agent's, leaves the others out, and reports the install as `partial`.
 
@@ -176,7 +170,7 @@ The lockfile records a receipt for every entry the client writes: the file, the 
 | An identical entry it does not own | Records a receipt | adopted |
 | A different entry it does not own | Writes nothing, exits non-zero, suggests another alias | conflict |
 | An owned entry someone edited | Keeps the edit, warns; `install --force` restores it | kept |
-| An agent cannot express a secret, input or required filter | Leaves that agent out, installs the rest | partial |
+| An agent cannot express a secret, input or tool filter | Leaves that agent out, installs the rest | partial |
 | Remove | Deletes only entries that still match their receipts | removed |
 
 Fields that only the agent sets, such as an approval flag, are kept. Adding `entries` to the lockfile changes its format, so the lockfile's format version must change with it: an older aireg that rewrites the lockfile would otherwise drop the receipts it does not know.
@@ -185,11 +179,11 @@ Claude Code keeps user-scope servers in `~/.claude.json`, which it rewrites whil
 
 ### Consent
 
-`show` and `add` print the command or URL and the variables it reads. An update that changes the command, arguments, transport, URL, environment or policy asks again; a background sync only reports it. This follows the MCP security best practices, which ask for the untruncated command and explicit approval.
+`show` and `add` print the command or URL and the variables it reads. An update that changes the command, arguments, transport, URL, environment or tool filter asks again; a background sync only reports it. This follows the MCP security best practices, which ask for the untruncated command and explicit approval.
 
 ### What is pinned
 
-The digest in the lockfile pins `server.json` and `policy.json`. It does not pin what they point to, and the client says so:
+The digest in the lockfile pins `server.json`. It does not pin what they point to, and the client says so:
 
 - `npx -y @example/issue-tracker-mcp@1.2.0` pins the top-level package only. Its dependencies resolve when the agent starts it. `pypi` with `uvx` behaves the same.
 - `fileSha256` is optional except for MCPB. When it is present, the agent or launcher must check it; aireg never downloads the package.
@@ -198,6 +192,7 @@ The digest in the lockfile pins `server.json` and `policy.json`. It does not pin
 
 ## Not in this version
 
+- **Registry-side curation,** such as a registry shipping a server with a tool already hidden. No MCP registry or client supports it today; if one is needed, it would be a separate layer the installing client applies, as Codex's marketplace applies its entries' `policy`.
 - **Policy export:** turning approved servers into each agent's allowlist, such as Claude Code's managed `allowedMcpServers`, Codex `requirements.toml`, and VS Code and Copilot policies.
 - **A Registry API view:** serving a read-only MCP Registry `v0.1` API, so VS Code and Copilot can browse a registry.
 - **MCPB bundles.**

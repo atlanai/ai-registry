@@ -302,33 +302,11 @@ describe("validateRoot on an MCP server", () => {
     expect(await messages(root)).toContain('`server` must match "then" schema');
   });
 
-  test("refuses a policy that gives a secret a value", async ({ root }) => {
-    await cp(ACME, root, { recursive: true });
-    await edit<{ inputs: Record<string, string> }>(root, "policy.json", (policy) => {
-      policy.inputs.ISSUES_TOKEN = "hunter2";
-    });
-
-    expect(await messages(root)).toContain(
-      "`policy.inputs.ISSUES_TOKEN` is a secret in server.json, so the policy cannot give it a value",
-    );
-  });
-
-  test("names a policy field as policy.json spells it, not by its place in the envelope", async ({
-    root,
-  }) => {
-    await cp(ACME, root, { recursive: true });
-    await edit<{ tools: { deny: string[] } }>(root, "policy.json", (policy) => {
-      policy.tools.deny = [];
-    });
-
-    expect(await messages(root)).toContain("`policy.tools.deny` must NOT have fewer than 1 items");
-  });
-
   test("names the JSON file that does not parse", async ({ root }) => {
     await cp(ACME, root, { recursive: true });
-    await writeFile(join(root, VERSION, "policy.json"), "{");
+    await writeFile(join(root, VERSION, "server.json"), "{");
 
-    expect(await messages(root)).toContain("has a policy.json that is not valid JSON");
+    expect(await messages(root)).toContain("has a server.json that is not valid JSON");
   });
 
   test("says once that server.json is missing, and nothing of front matter", async ({ root }) => {

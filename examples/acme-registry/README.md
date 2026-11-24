@@ -11,7 +11,7 @@ artifacts/engineering/skill/pr-review/1.2.0/         active; adds references/che
 artifacts/engineering/agent/reviewer/versions.json
 artifacts/engineering/agent/reviewer/0.3.0/          depends_on engineering/skill/pr-review@1.2.0
 artifacts/engineering/mcp_server/issue-tracker/versions.json
-artifacts/engineering/mcp_server/issue-tracker/1.2.0/ the publisher's server.json, unchanged, and this registry's policy.json
+artifacts/engineering/mcp_server/issue-tracker/1.2.0/ the publisher's server.json, unchanged
 blobs/sha256/28eb…fc0c                               the rubric bytes
 kinds/skill.json, kinds/agent.json, kinds/mcp_server.json
                                                      the manifests registry.json advertises

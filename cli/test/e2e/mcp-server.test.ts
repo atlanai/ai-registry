@@ -97,27 +97,29 @@ describe("an MCP server's catalog entry and import", () => {
     expect(await readFile(copied, "utf8")).toBe(readme);
   });
 
-  test("refuses to import a policy that gives a secret a value", async ({ aireg, tmp }) => {
-    const source = join(tmp, "imported");
+  test("refuses to import a server.json the MCP Registry schema rejects", async ({
+    aireg,
+    tmp,
+  }) => {
+    const source = join(tmp, "unnamed");
     await mkdir(source, { recursive: true });
-    await cp(issues("server.json"), join(source, "server.json"));
-    const policy = { inputs: { ISSUES_TOKEN: "hunter2" } };
-    await writeFile(join(source, "policy.json"), JSON.stringify(policy));
+    const server = JSON.parse(await readFile(issues("server.json"), "utf8"));
+    await writeFile(join(source, "server.json"), JSON.stringify({ ...server, name: "issues" }));
     const engineering = join(root, "artifacts", "engineering");
 
     const result = await aireg(["mcp_server", "new", "--from", source, "-y"], { cwd: engineering });
 
     expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain("`policy.inputs.ISSUES_TOKEN` is a secret in server.json");
+    expect(result.stderr).toContain("`server.name`");
   });
 
   test("refuses to import a folder without server.json, without asking for front matter", async ({
     aireg,
     tmp,
   }) => {
-    const source = join(tmp, "policy-only");
+    const source = join(tmp, "readme-only");
     await mkdir(source, { recursive: true });
-    await cp(issues("policy.json"), join(source, "policy.json"));
+    await writeFile(join(source, "README.md"), "# Issues\n");
     const engineering = join(root, "artifacts", "engineering");
 
     const result = await aireg(["mcp_server", "new", "--from", source, "-y"], { cwd: engineering });

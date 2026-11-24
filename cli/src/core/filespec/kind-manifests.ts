@@ -5,7 +5,7 @@ import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { isKindSegment, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
-import { MCP_POLICY_FILE, MCP_POLICY_META, MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -243,10 +243,10 @@ export function specParseProblem(
   files: ReadonlyMap<string, string>,
 ): string | undefined {
   if (manifest.title === "mcp_server") {
-    const unparsed = [MCP_SERVER_ENTRY, MCP_POLICY_FILE].find(
-      (path) => files.has(path) && parsedJson(files.get(path) ?? "") === undefined,
-    );
-    return unparsed === undefined ? undefined : `has a ${unparsed} that is not valid JSON`;
+    const text = files.get(MCP_SERVER_ENTRY);
+    return text !== undefined && parsedJson(text) === undefined
+      ? `has a ${MCP_SERVER_ENTRY} that is not valid JSON`
+      : undefined;
   }
   const markdown = specFile(manifest, files);
   return markdown === undefined ? undefined : frontmatterParseProblem(files.get(markdown) ?? "");
@@ -287,7 +287,6 @@ export function specOf(
   return { ...lifted, card };
 }
 
-/** None when either file does not parse, so a broken policy is reported rather than dropped. */
 function mcpServerSpec(
   files: ReadonlyMap<string, string>,
   name: string | undefined,
@@ -296,16 +295,12 @@ function mcpServerSpec(
   if (text === undefined) return undefined;
   const server = parsedJson(text);
   if (server === undefined) return undefined;
-  const policyText = files.get(MCP_POLICY_FILE);
-  const policy = policyText === undefined ? undefined : parsedJson(policyText);
-  if (policyText !== undefined && policy === undefined) return undefined;
   const spec: Record<string, unknown> = {};
   const own = isRecord(server) && typeof server.name === "string" ? server.name : undefined;
   const slug = name ?? (own === undefined ? undefined : sanitizeName(own.split("/").pop() ?? own));
   if (slug !== undefined) spec.name = slug;
   if (isRecord(server) && server.description !== undefined) spec.description = server.description;
   spec.server = server;
-  if (policy !== undefined) spec._meta = { [MCP_POLICY_META]: policy };
   return spec;
 }
 
