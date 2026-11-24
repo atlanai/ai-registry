@@ -16,8 +16,8 @@ test("writes a local server's command, and a secret as a reference to its variab
     ),
   ).toEqual({
     command: "npx",
-    args: ["-y", "srv@1.0.0", "--token=${TOKEN}"],
-    env: { URL: "https://x.test", KEY: "${KEY}" },
+    args: ["-y", "srv@1.0.0", `--token=\${TOKEN}`],
+    env: { URL: "https://x.test", KEY: `\${KEY}` },
   });
 });
 
@@ -29,7 +29,7 @@ test("writes a remote as http or sse, with its headers", () => {
   expect(mcpJson({ transport: "streamable-http", ...remote }, secret)).toEqual({
     type: "http",
     url: "https://x.test/mcp",
-    headers: { Authorization: "Bearer ${T}" },
+    headers: { Authorization: `Bearer \${T}` },
   });
   expect(mcpJson({ transport: "sse", url: "u", headers: {} }, secret)).toEqual({
     type: "sse",
