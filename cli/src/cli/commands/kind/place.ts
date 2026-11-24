@@ -12,6 +12,7 @@ import { cancel, type Interaction, interaction, interactive } from "#cli/prompt/
 import { canceled } from "#cli/prompt/model.ts";
 import { select } from "#cli/prompt/select.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
+import { kindCommand } from "#core/kinds.ts";
 import { askName, nameOf, valid } from "./fields.ts";
 
 /** The namespace named, the one you are in, or one picked; undefined when the pick is canceled. */
@@ -95,7 +96,7 @@ export async function registryPlace({
   if (existsSync(home)) {
     throw new AiregError(`${namespace}/${kind}/${name} already exists.`, {
       code: ErrorCode.Conflict,
-      hint: `Start its next version with \`aireg ${kind} bump ${name}\`.`,
+      hint: `Start its next version with \`aireg ${kindCommand(kind)} bump ${name}\`.`,
     });
   }
   return { name, at: join(home, "0.1.0") };
@@ -115,7 +116,7 @@ export function outsidePlace(
     if (existsSync(join(at, file)))
       throw new AiregError(`${join(shown, file)} already exists.`, {
         code: ErrorCode.Conflict,
-        hint: `Run it in an empty folder, or name a new one: \`aireg ${kind} new <name>\`.`,
+        hint: `Run it in an empty folder, or name a new one: \`aireg ${kindCommand(kind)} new <name>\`.`,
       });
   }
   return { name, at };
@@ -146,7 +147,7 @@ export async function locate(
       `No ${kind} named ${quoted(name)}${wanted === undefined ? "" : ` in ${wanted}`}.`,
       {
         code: ErrorCode.NotFound,
-        hint: `Create it with \`aireg ${kind} new ${name}${flag}\`.`,
+        hint: `Create it with \`aireg ${kindCommand(kind)} new ${name}${flag}\`.`,
       },
     );
   }

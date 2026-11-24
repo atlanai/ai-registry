@@ -182,3 +182,33 @@ describe("writes stay inside the registry", () => {
     expect(await readFile(join(lint, "0.1.1"), "utf8")).toBe("keep");
   });
 });
+
+describe("the mcp_server kind's command", () => {
+  test("is mcp, and mcp_server names no command", async ({ tmp }) => {
+    const command = await lookup("mcp", tmp);
+    expect(command?.summary).toBe("Create an mcp_server, or start its next version");
+    expect(command?.usage).toEqual(["aireg mcp <action> [options]"]);
+    expect(await lookup("mcp_server", tmp)).toBeUndefined();
+  });
+
+  test("names mcp in what it asks for", async ({ tmp }) => {
+    const { run } = await ((await lookup("mcp", tmp))?.load() ?? Promise.reject());
+    await expect(run(context(tmp, ["bump"]))).rejects.toMatchObject({
+      code: ErrorCode.Usage,
+      hint: expect.stringContaining("`aireg mcp bump <name>"),
+    });
+  });
+
+  test("hides a registry's own kind named mcp, which the mcp_server kind reserves", async ({
+    tmp,
+  }) => {
+    const manifest = { title: "mcp", "x-registry-files": { required: [{ path: "a.md" }] } };
+    await mkdir(join(tmp, "kinds"));
+    await writeFile(join(tmp, "kinds", "mcp.json"), JSON.stringify(manifest));
+    await writeFile(
+      join(tmp, "registry.json"),
+      JSON.stringify({ kinds: [{ name: "mcp", manifest_url: "kinds/mcp.json" }] }),
+    );
+    expect(await lookup("mcp", tmp)).toBeUndefined();
+  });
+});

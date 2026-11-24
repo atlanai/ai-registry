@@ -50,7 +50,7 @@ The normal artifact-name and collision checks apply.
 
 ### MCP servers
 
-In a registry that lists the `mcp_server` kind and serves its manifest, `aireg mcp_server` takes the same actions. A version holds the publisher's MCP Registry [`server.json`](https://github.com/modelcontextprotocol/registry), unchanged, and an optional `README.md` that is only documentation. The catalog's description and display name come from `server.json`.
+The `mcp_server` kind's command is `aireg mcp`, with the same actions; no other kind can be named `mcp`. A version holds the publisher's MCP Registry [`server.json`](https://github.com/modelcontextprotocol/registry), unchanged, and an optional `README.md` that is only documentation. The catalog's description and display name come from `server.json`.
 
 - `new` writes a `server.json` with the fields it requires, under the newest schema version the kind takes.
 - `new --from` takes a folder that holds a `server.json`, and checks it against the MCP Registry's schema before copying.

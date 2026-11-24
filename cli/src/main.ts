@@ -82,15 +82,17 @@ async function unknownKind(name: string, action: string): Promise<AiregError> {
       hint: `Fix ${left.path}, then run \`aireg registry validate\`.`,
     });
   }
+  const { kindCommand } = await import("#core/kinds.ts");
   const kinds = Object.keys(await kindsOf(root));
-  const near = closest(name, kinds);
+  const commands = kinds.map(kindCommand);
+  const near = kinds.includes(name) ? kindCommand(name) : closest(name, commands);
   return new AiregError(
     `No kind named ${quoted(name)}${root === undefined ? "" : " in this registry"}.`,
     {
       code: ErrorCode.Usage,
       hint: didYouMean(
         near === undefined ? undefined : `aireg ${near} ${action}`,
-        `Use ${list(kinds, "or")}.`,
+        `Use ${list(commands, "or")}.`,
       ),
     },
   );

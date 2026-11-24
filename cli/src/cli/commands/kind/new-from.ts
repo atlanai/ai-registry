@@ -27,6 +27,7 @@ import { withName } from "#core/frontmatter.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
 import { expandUserPath } from "#core/fs/path.ts";
 import { authored, type Irregular, refusal } from "#core/fs/tree.ts";
+import { kindCommand } from "#core/kinds.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { nameOf } from "./fields.ts";
 import { FRESH } from "./files.ts";
@@ -56,7 +57,7 @@ export async function newFrom(
     throw needsInput(
       `${kind} new --from`,
       "a folder",
-      `Name the folder: \`aireg ${kind} new --from <path>\`.`,
+      `Name the folder: \`aireg ${kindCommand(kind)} new --from <path>\`.`,
     );
   }
   if (own.name !== undefined && paths.length > 1) {
@@ -86,7 +87,7 @@ export async function newFrom(
     if (existsSync(join(root, ARTIFACTS_DIR, namespace, kind, item.name))) {
       throw new AiregError(`${namespace}/${kind}/${item.name} already exists.`, {
         code: ErrorCode.Conflict,
-        hint: `Start its next version with \`aireg ${kind} bump ${item.name}\`.`,
+        hint: `Start its next version with \`aireg ${kindCommand(kind)} bump ${item.name}\`.`,
       });
     }
   }
@@ -131,7 +132,7 @@ async function incoming(
   if (!existsSync(source)) {
     throw new AiregError(`Nothing exists at ${input}.`, {
       code: ErrorCode.NotFound,
-      hint: `Name an existing ${kind} folder or file: \`aireg ${kind} new --from <path>\`.`,
+      hint: `Name an existing ${kind} folder or file: \`aireg ${kindCommand(kind)} new --from <path>\`.`,
     });
   }
   const isDirectory = (await stat(source)).isDirectory();
@@ -171,7 +172,7 @@ async function incoming(
   if (problems.length > 0) {
     throw new AiregError(`${input} is not a valid ${kind}: ${problems.join("; ")}.`, {
       code: ErrorCode.Invalid,
-      hint: `Fix it where it is, then run \`aireg ${kind} new --from ${input}\` again.`,
+      hint: `Fix it where it is, then run \`aireg ${kindCommand(kind)} new --from ${input}\` again.`,
     });
   }
   const file = specFile(manifest, texts);

@@ -46,9 +46,17 @@ export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter(
   (kind) => kind !== "plugin" && kind !== "mcp_server",
 );
 
+/** Commands named otherwise than their kind, which no other kind or command may take. */
+export const KIND_COMMANDS: Readonly<Record<string, string>> = { mcp_server: "mcp" };
+
+/** The command `aireg <command>` a kind runs as. */
+export function kindCommand(kind: string): string {
+  return Object.hasOwn(KIND_COMMANDS, kind) ? (KIND_COMMANDS[kind] as string) : kind;
+}
+
 /** The kind with its article, as a sentence names it. */
-export function aKind(kind: ArtifactKind): string {
-  return `${kind === "agent" || kind === "mcp_server" ? "an" : "a"} ${kind}`;
+export function aKind(kind: string): string {
+  return `${/^[aeiou]/.test(kind) || kind === "mcp_server" ? "an" : "a"} ${kind}`;
 }
 
 /** The kind a folder of artifacts holds, read from its name, such as `skills`. */
