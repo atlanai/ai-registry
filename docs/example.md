@@ -2,7 +2,7 @@
 
 This page walks through the example that the repository ships, [`examples/acme-registry`](https://github.com/atlanai/ai-registry/tree/main/examples/acme-registry), along with what happens within the registry during core tasks, including adding a skill, installing the skill across coding agents, and updating a skill.
 
-acme-registry is a complete root that follows the specification. It contains three kinds, `skill`, `agent` and `mcp_server`, with their manifests under `kinds/`, and one namespace, `engineering`. The engineering namespace contains three artifacts: a `pr-review` skill, a `reviewer` agent, and an `issue-tracker` MCP server, which aireg validates but does not install yet ([MCP servers](design/mcp-servers.md)). The figure shows the first two:
+acme-registry is a complete root that follows the specification. It contains three kinds, `skill`, `agent` and `mcp_server`, with their manifests under `kinds/`, and one namespace, `engineering`. The engineering namespace contains three artifacts: a `pr-review` skill, a `reviewer` agent, and an `issue-tracker` MCP server, which aireg validates but does not install yet ([MCP servers](reference/kinds.md#mcp-servers)). The figure shows the first two:
 
 <figure markdown="span">
   ![The acme root: registry.json, index.json, the engineering namespace with the reviewer agent and the pr-review skill down to versions.json and the 1.2.0 folder, the blob store, and the kinds directory](assets/acme-layout.svg)
