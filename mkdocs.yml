@@ -65,3 +65,5 @@ nav:
       - "Example: acme-registry": example.md
   - Reference:
       - CLI reference: reference/index.md
+  - Design:
+      - MCP servers: design/mcp-servers.md
