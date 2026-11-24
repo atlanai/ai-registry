@@ -61,6 +61,12 @@ describe("resolveServer", () => {
     ]);
   });
 
+  test("shows a required input nothing sets as a placeholder, when asked", () => {
+    const { options } = resolveServer(ISSUE_TRACKER, { placeholders: true });
+    expect(options[0]?.entry).toMatchObject({ url: "https://<tenant>.issues.example.com/mcp" });
+    expect(options[1]?.entry).toMatchObject({ env: { ISSUES_URL: "<ISSUES_URL>" } });
+  });
+
   test("renames a secret's variable, and never takes a secret's value from with", () => {
     const { options } = resolveServer(ISSUE_TRACKER, {
       with: { tenant: "acme", ISSUES_URL: "u", ISSUES_TOKEN: "leaked" },
@@ -164,4 +170,10 @@ describe("chooseOption", () => {
       "its server.json names no package or remote",
     );
   });
+});
+
+test("chooseOption names every reason when nothing can run", () => {
+  expect(chooseOption(resolveServer(ISSUE_TRACKER), ["stdio", "sse", "streamable-http"])).toBe(
+    'it needs "tenant", which nothing sets; give it under `with`; it needs "ISSUES_URL", which nothing sets; give it under `with`',
+  );
 });

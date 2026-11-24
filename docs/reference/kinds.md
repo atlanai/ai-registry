@@ -56,7 +56,19 @@ The `mcp_server` kind's command is `aireg mcp`, with the same actions; no other 
 - `new --from` takes a folder that holds a `server.json`, and checks it against the MCP Registry's schema before copying.
 - `bump` copies the folder and never edits `server.json`. Replace it with the publisher's new file, whose `version` should match the new one.
 
-aireg does not install MCP servers into coding agents yet. `add` and `show` treat `mcp_server` as a kind they don't know, so a ref to one finds nothing, and adding a namespace skips it.
+`aireg add` installs an MCP server as an entry in each target's config; today that is Claude Code, in the project's `.mcp.json`. Installing never starts the server. A secret is written as a reference to an environment variable, such as `${ISSUES_TOKEN}`, never as its value. `aireg show` prints the command or URL a server starts with and the variables it reads. Adding a whole namespace or registry lists its servers and asks first; without a terminal it needs `--yes`.
+
+A manifest entry that names one server can set:
+
+```yaml
+artifacts:
+  - ref: acme/engineering/issue-tracker
+    with: { ISSUES_URL: https://issues.example.com }   # input values, never secrets
+    env: { ISSUES_TOKEN: ACME_ISSUES_TOKEN }           # read a secret from another variable
+    tools: { deny: [delete_issue] }                    # for targets that can narrow tools
+```
+
+An entry edited after it was installed is kept, and `aireg status` reports it; one aireg did not write under the same name is left alone, so install the server under another name with `as`.
 
 ### Dependencies
 

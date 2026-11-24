@@ -21,6 +21,7 @@ import { declare, narrowedTargets, type Repin, recordRegistry } from "./declare.
 import { type Kept, keepCurrent } from "./keep-current.ts";
 import type { Parsed } from "./options.ts";
 import { type Added, addedData } from "./render.ts";
+import { confirmServers } from "./servers.ts";
 
 // Without these the hint would read another commit, path or alias than the one just reviewed.
 function sourceWords(own: Parsed["own"]): string[] {
@@ -75,6 +76,11 @@ export async function addAddress(
   );
 
   const refs = requestedRefs(resolved, input, alias, within, choices.select);
+  const chosen = chosenEntries(choices.select, entries);
+  if (!(await confirmServers(step, source, chosen, refs, common.yes))) {
+    cancel(step);
+    return undefined;
+  }
 
   let approved = true;
   let introduced = false;

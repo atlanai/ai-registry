@@ -35,6 +35,8 @@ export interface McpOption {
 export interface McpSettings {
   with?: Readonly<Record<string, string | readonly string[]>> | undefined;
   env?: Readonly<Record<string, string>> | undefined;
+  /** Writes a required input nothing sets as `<name>`, for showing the server, never installing it. */
+  placeholders?: boolean | undefined;
 }
 
 /** Every way the server can run here, remotes first, and why the others cannot. */

@@ -54,7 +54,9 @@ export function chooseOption(
     const offered = [...new Set(resolved.options.map((option) => option.entry.transport))];
     return `it runs over ${offered.join(" or ")}, which this target does not load`;
   }
-  return resolved.leftOut[0] ?? "its server.json names no package or remote";
+  return resolved.leftOut.length > 0
+    ? resolved.leftOut.join("; ")
+    : "its server.json names no package or remote";
 }
 
 function remoteEntry(remote: Json, settings: McpSettings): McpOption | string {
@@ -147,6 +149,7 @@ function input(item: Json, key: string, context: Context, given?: string): Value
   const value = supplied ?? text(item.default);
   if (value === undefined) {
     if (item.isRequired === true) {
+      if (context.settings.placeholders === true) return `<${key}>`;
       throw new Missing(`it needs ${quoted(key)}, which nothing sets; give it under \`with\``);
     }
     return undefined;

@@ -1,11 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { ifPresent } from "#adapter/files.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { list, quoted, sanitizeBlock, sanitizeName } from "#adapter/text.ts";
 import type { ShowResult } from "#cli/commands/show/result.ts";
 import { SHOW_COMMAND } from "#cli/commands/show/spec.ts";
 import { needsInput, parse } from "#cli/options/parse.ts";
+import { describeServer, serverOf } from "#cli/render/server.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { expandUserPath, isMissing } from "#core/fs/path.ts";
 import { isDirectory } from "#core/fs/tree.ts";
@@ -101,7 +102,8 @@ export const { run } = defineCommand({
     }
 
     const path = await source.stage(entry);
-    const file = (await isDirectory(path)) ? await markdownIn(path) : path;
+    const server = entry.kind === "mcp_server" ? await serverOf(path) : undefined;
+    const file = await fileToShow(path, server !== undefined);
     const body = file === undefined ? undefined : await ifPresent(readFile(file, "utf8"));
     if (body === undefined) {
       throw new AiregError(`Cannot read ${entry.path}.`, {
@@ -117,6 +119,7 @@ export const { run } = defineCommand({
         ...(version === undefined ? {} : { version }),
         body,
         carries: await carries(path),
+        ...(server === undefined ? {} : { server }),
       },
       name: entry.name,
     };
@@ -124,6 +127,7 @@ export const { run } = defineCommand({
   data: (result) => result.data,
   text({ data, name }, printer) {
     print(printer, data.body);
+    if ("server" in data && data.server !== undefined) describeServer(printer, data.server);
     disclose(printer, name, data.carries);
   },
 });
@@ -145,6 +149,12 @@ async function showFolder(cwd: string, input: string): Promise<Shown> {
     });
   }
   return { data: { path: file, body, carries: await carries(path) }, name: basename(path) };
+}
+
+/** An MCP server without a README shows its server.json. */
+async function fileToShow(path: string, server: boolean): Promise<string | undefined> {
+  if (!(await isDirectory(path))) return path;
+  return (await markdownIn(path)) ?? (server ? join(path, MCP_SERVER_ENTRY) : undefined);
 }
 
 async function markdownIn(dir: string): Promise<string | undefined> {
