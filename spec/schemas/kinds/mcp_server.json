@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kinds/mcp_server.json",
+  "title": "mcp_server",
+  "description": "One MCP server, described by the MCP Registry's server.json and stored unchanged. spec contains the registry slug as name, the server's description, the unchanged server.json in server, and, when the version carries policy.json, the registry's install policy in policy. server must satisfy the server.json schema its $schema names.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "MUST equal metadata.name in the envelope. The server's own reverse-DNS name stays in server.name.",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$"
+    },
+    "description": {
+      "type": "string",
+      "description": "A copy of server.description.",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "server": {
+      "type": "object",
+      "description": "The MCP Registry server.json, verbatim.",
+      "properties": {
+        "$schema": {
+          "enum": [
+            "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
+          ]
+        }
+      },
+      "required": [
+        "$schema"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "$schema": {
+                "const": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
+              }
+            },
+            "required": [
+              "$schema"
+            ]
+          },
+          "then": {
+            "$ref": "vendor/mcp/2025-12-11/server.schema.json"
+          }
+        }
+      ]
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "server"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "policy": {
+      "type": "object",
+      "description": "policy.json: what the registry decides about installing the server, kept apart from the publisher's server.json.",
+      "properties": {
+        "tools": {
+          "type": "object",
+          "description": "Which of the server's tools a client exposes, by exact tool name. A tool named in deny is never exposed, even when allow names it too.",
+          "properties": {
+            "allow": {
+              "description": "Only these tools. Absent means every tool not denied.",
+              "$ref": "#/$defs/toolNames"
+            },
+            "deny": {
+              "description": "Never these tools.",
+              "$ref": "#/$defs/toolNames"
+            },
+            "enforcement": {
+              "description": "required: a client installs the server only for a coding agent that can apply this filter. best_effort: a client also installs it where the filter cannot be applied, and warns which tools stay exposed there. Absent means required.",
+              "enum": [
+                "required",
+                "best_effort"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "timeouts": {
+          "type": "object",
+          "description": "Limits a client passes to a coding agent that supports them, in milliseconds.",
+          "properties": {
+            "startup_ms": {
+              "description": "How long the agent waits for the server to start and answer initialize.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600000
+            },
+            "tool_ms": {
+              "description": "How long the agent waits for one tool call.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400000
+            }
+          },
+          "additionalProperties": false
+        },
+        "inputs": {
+          "type": "object",
+          "description": "Values the registry fixes for inputs server.json declares, keyed by an environment variable's or header's name, a named argument's name, a positional argument's valueHint, or the key of a remote's or an input's variables. A key applies to every input declared under it. A value is a string, as server.json's own value and default are. An input marked isSecret, or one with a fixed value, MUST NOT be named here.",
+          "propertyNames": {
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolNames": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "An MCP tool name as the server lists it.",
+        "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "x-registry-schema-version": 1,
+  "x-registry-searchable": [
+    "/name",
+    "/description",
+    "/server/name",
+    "/server/title"
+  ],
+  "x-registry-embeddings": [
+    "/description"
+  ],
+  "x-registry-edges": [
+    {
+      "rel_type": "supersedes",
+      "to_kinds": [
+        "mcp_server"
+      ],
+      "cardinality": "one",
+      "direction": "outbound"
+    }
+  ],
+  "x-registry-files": {
+    "required": [
+      {
+        "path": "server.json",
+        "media_type": "application/json"
+      }
+    ],
+    "optional": [
+      {
+        "path": "policy.json",
+        "media_type": "application/json"
+      },
+      {
+        "path": "README.md",
+        "media_type": "text/markdown"
+      }
+    ]
+  },
+  "x-registry-attachment": false,
+  "x-registry-gated": false
+}
