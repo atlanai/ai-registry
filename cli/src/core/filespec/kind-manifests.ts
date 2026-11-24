@@ -14,6 +14,7 @@ import { frontmatterParseProblem, frontmatterRecord } from "#core/frontmatter.ts
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { AGENT_CARD_ENTRY } from "#core/product.ts";
 import agent from "#schema/kinds/agent.json" with { type: "json" };
+import mcpServer from "#schema/kinds/mcp_server.json" with { type: "json" };
 import skill from "#schema/kinds/skill.json" with { type: "json" };
 
 import { prepareManifest } from "./schema.ts";
@@ -51,6 +52,7 @@ export interface KindManifest extends SchemaNode {
 const BUNDLED: Readonly<Record<string, KindManifest>> = dict([
   ["skill", skill as KindManifest],
   ["agent", agent as KindManifest],
+  ["mcp_server", mcpServer as KindManifest],
 ]);
 
 type Served = { manifest: KindManifest } | { problem: string };

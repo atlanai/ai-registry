@@ -4,7 +4,7 @@ import { DISPOSITIONS } from "#core/sync/model.ts";
 import { SYNC_OPERATIONS } from "#core/sync/policy.ts";
 
 /** History is a cache, so any other layout is rebuilt. */
-export const RUN_SCHEMA_VERSION = 1;
+export const RUN_SCHEMA_VERSION = 2;
 
 export const RUN_HISTORY_PER_JOB = 200;
 

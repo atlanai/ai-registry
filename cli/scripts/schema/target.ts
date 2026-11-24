@@ -179,6 +179,7 @@ const PerKind = <T extends TSchema>(schema: T) =>
       plugin: Type.Optional(schema),
       skill: Type.Optional(schema),
       agent: Type.Optional(schema),
+      mcp_server: Type.Optional(schema),
     },
     { additionalProperties: false },
   );

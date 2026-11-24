@@ -305,6 +305,33 @@ describe("failed transactions", () => {
 });
 
 describe("schema versions", () => {
+  test("stores an event for an MCP server, a kind added after the first layout", async () => {
+    const store = await SqliteRunStore.open(":memory:");
+    onTestFinished(() => store.close());
+    store.create({
+      id: "run_1",
+      jobId: "job_1",
+      accountId: "acc_1",
+      configRevision: 1,
+      mode: "sync",
+      trigger: "manual",
+      requestedAtMs: 100,
+      deadlineAtMs: 1_000,
+    });
+    store.start("run_1", "resolving", 110);
+    store.progress("run_1", "pull", {
+      occurredAtMs: 111,
+      eventType: RunEventType.ItemSettled,
+      step: "pull",
+      artifact: "issue-tracker",
+      kind: "mcp_server",
+      operation: "pull",
+      outcome: "changed",
+    });
+    expect(store.events("run_1").at(-1)?.kind).toBe("mcp_server");
+    expect(RUN_SCHEMA_VERSION).toBe(2);
+  });
+
   test("creates only the tables it drops, so an adapter owns its own", () => {
     const created = [...RUN_SCHEMA.matchAll(/CREATE TABLE\s+(\w+)/g)].map((m) => m[1]);
     expect([...created].sort()).toEqual([...RUN_TABLES].sort());

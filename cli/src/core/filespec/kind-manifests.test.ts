@@ -237,3 +237,22 @@ describe("an MCP server's spec", () => {
     );
   });
 });
+
+describe("the bundled mcp_server kind", () => {
+  test("is a kind a registry that lists none still has", async () => {
+    expect(Object.keys(await kindsOf(undefined))).toContain("mcp_server");
+  });
+
+  test("checks server.json against the vendored schema without a registry", async () => {
+    const manifest = (await kindsOf(undefined)).mcp_server as KindManifest;
+    const server = {
+      $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+      name: "com.example/issue-tracker",
+      description: "Track issues.",
+      version: "1.2.0",
+    };
+    const spec = { name: "issue-tracker", description: "Track issues.", server };
+    expect(check(manifest, spec)).toEqual([]);
+    expect(check(manifest, { ...spec, server: { ...server, name: "no slash" } })).not.toEqual([]);
+  });
+});

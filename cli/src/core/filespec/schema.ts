@@ -13,6 +13,9 @@ import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { quoted } from "#adapter/text.ts";
 import manifestSchema from "#schema/kind-manifest.schema.json" with { type: "json" };
+import mcpServerJson from "#schema/kinds/vendor/mcp/2025-12-11/server.schema.json" with {
+  type: "json",
+};
 
 /** Validators follow the lifetime of the manifest objects loaded for an operation. */
 const compiled = new WeakMap<object, ValidateFunction>();
@@ -93,6 +96,8 @@ function compiler(): Ajv2020 {
   // The vendored MCP server.json schema is draft-07; Ajv reads it as 2020-12, and
   // tools/check_schemas.py refuses the keywords whose meaning differs between the two.
   ajv.addMetaSchema(draft07);
+  // Keyed where the bundled mcp_server kind's relative `$ref` resolves, so it needs no registry.
+  ajv.addSchema(mcpServerJson, "kinds/vendor/mcp/2025-12-11/server.schema.json");
   return ajv;
 }
 

@@ -78,7 +78,7 @@ describe("aireg ui", () => {
       expect(byName["pr-review"]).toMatchObject({ registry: "acme", state: "ok" });
       expect(byName.reviewer).toMatchObject({ registry: "acme", state: "available" });
       expect(state?.registries).toEqual([
-        expect.objectContaining({ name: "acme", count: 2, installed: 1 }),
+        expect.objectContaining({ name: "acme", count: 3, installed: 1 }),
       ]);
       // No row says where it is on disk beyond what a person reads under `~`.
       expect(JSON.stringify(state)).not.toContain(home.dir);

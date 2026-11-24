@@ -1,6 +1,6 @@
 import { basename, extname, join } from "node:path";
 import { type ArtifactKind, KINDS } from "#adapter/index.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { AGENT_CARD_ENTRY } from "./product.ts";
 
 export interface KindSpec {
@@ -30,10 +30,26 @@ export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
     extensions: [".md"],
     served: [AGENT_ENTRY, AGENT_CARD_ENTRY],
   },
+  mcp_server: {
+    dir: "mcp_servers",
+    shape: "directory",
+    extensions: [],
+    entry: MCP_SERVER_ENTRY,
+  },
 };
 
-/** Kinds the registry scanner walks; `plugin` is found by its manifest. */
-export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter((kind) => kind !== "plugin");
+/**
+ * Kinds the registry scanner walks; `plugin` is found by its manifest, and an MCP server is
+ * written into a target's config, never placed as a folder there.
+ */
+export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter(
+  (kind) => kind !== "plugin" && kind !== "mcp_server",
+);
+
+/** The kind with its article, as a sentence names it. */
+export function aKind(kind: ArtifactKind): string {
+  return `${kind === "agent" || kind === "mcp_server" ? "an" : "a"} ${kind}`;
+}
 
 /** The kind a folder of artifacts holds, read from its name, such as `skills`. */
 export function kindOfDir(dir: string): ArtifactKind | undefined {

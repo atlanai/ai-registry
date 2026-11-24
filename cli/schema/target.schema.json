@@ -581,6 +581,13 @@
             "minLength": 1,
             "type": "string"
           }
+        },
+        "mcp_server": {
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          }
         }
       }
     },
@@ -595,6 +602,9 @@
           "$ref": "#/$defs/kind"
         },
         "agent": {
+          "$ref": "#/$defs/kind"
+        },
+        "mcp_server": {
           "$ref": "#/$defs/kind"
         }
       }
@@ -675,6 +685,27 @@
           }
         },
         "agent": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "run"
+          ],
+          "properties": {
+            "run": {
+              "minLength": 1,
+              "description": "Printed, never run.",
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "project",
+                "user"
+              ]
+            }
+          }
+        },
+        "mcp_server": {
           "additionalProperties": false,
           "type": "object",
           "required": [
