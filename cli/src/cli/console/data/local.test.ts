@@ -29,6 +29,7 @@ function targetTable(): Targets {
       verified: undefined,
       trust: {},
       reload: undefined,
+      sessions: undefined,
       origin: "built-in",
     },
   };

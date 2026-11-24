@@ -24,6 +24,7 @@ import { TARGETS_COMMAND } from "#cli/commands/targets/spec.ts";
 import { UI_COMMAND } from "#cli/commands/ui/spec.ts";
 import { UNLOCK_COMMAND } from "#cli/commands/unlock/spec.ts";
 import { UPDATE_COMMAND } from "#cli/commands/update/spec.ts";
+import { USAGE_COMMAND } from "#cli/commands/usage/spec.ts";
 import { WATCH_COMMAND } from "#cli/commands/watch/spec.ts";
 import type { Printer } from "#core/term/printer.ts";
 import type { CommandSpec } from "./command.ts";
@@ -44,6 +45,7 @@ export const BUILTIN_SPECS: readonly CommandSpec[] = [
   STATUS_COMMAND,
   LIST_COMMAND,
   OUTDATED_COMMAND,
+  USAGE_COMMAND,
   TARGETS_COMMAND,
   SYNC_COMMAND,
   PUBLISH_COMMAND,

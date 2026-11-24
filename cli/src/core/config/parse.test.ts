@@ -189,3 +189,60 @@ describe("parseConfig", () => {
     );
   });
 });
+
+describe("usage consent", () => {
+  const terms = "reporter: pseudonym, precision: hour, since: 2026-11-24T09:00:00.000Z";
+  const usage = `${HEAD}jobs: []
+usage:
+  - registry: sha256:abc
+    alias: acme
+    otlp: https://otel.acme.example
+    reporter: pseudonym
+    precision: hour
+    since: 2026-11-24T09:00:00.000Z
+  - { registry: "sha256:def", alias: tools, otlp: "http://localhost:4318", reporter: name, precision: day, since: "2026-11-25T01:00:00.000Z", as: jo }
+`;
+
+  test("reads each registry a person agreed to send runs to, and writes it back as read", () => {
+    const parsed = parseConfig(usage);
+    expect(parsed.usage).toEqual([
+      {
+        registry: "sha256:abc",
+        alias: "acme",
+        otlp: "https://otel.acme.example",
+        reporter: "pseudonym",
+        precision: "hour",
+        since: "2026-11-24T09:00:00.000Z",
+      },
+      {
+        registry: "sha256:def",
+        alias: "tools",
+        otlp: "http://localhost:4318",
+        reporter: "name",
+        precision: "day",
+        since: "2026-11-25T01:00:00.000Z",
+        as: "jo",
+      },
+    ]);
+    expect(parseConfig(formatConfig(parsed)).usage).toEqual(parsed.usage);
+  });
+
+  test("writes no usage key for someone who shares with no registry", () => {
+    const parsed = parseConfig(`${HEAD}jobs: []\n`);
+    expect(parsed.usage).toEqual([]);
+    expect(formatConfig(parsed)).not.toContain("usage");
+  });
+
+  test("refuses two entries for one registry, unknown fields and terms it cannot read", () => {
+    const entry = (registry: string, extra = "") =>
+      `  - { registry: ${registry}, alias: a, otlp: "https://x", ${terms}${extra} }\n`;
+    expect(() => parseConfig(`${HEAD}jobs: []\nusage:\n${entry("r")}${entry("r")}`)).toThrow(
+      "Two usage entries are for the same registry.",
+    );
+    expect(() => parseConfig(`${HEAD}jobs: []\nusage:\n${entry("r", ", email: e")}`)).toThrow(
+      /email/,
+    );
+    const late = `${HEAD}jobs: []\nusage:\n  - { registry: r, alias: a, otlp: "https://x", reporter: pseudonym, precision: hour, since: soon }\n`;
+    expect(() => parseConfig(late)).toThrow(/since/);
+  });
+});

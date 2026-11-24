@@ -158,6 +158,25 @@ export function isNamespaceAddress(value: string): boolean {
   return parts.length === 2 && parts.every(isNamespace);
 }
 
+/**
+ * Consent to send runs of one registry's artifacts to the endpoint it named when the person
+ * agreed. A registry that names another endpoint later gets nothing until they agree again.
+ */
+export interface UsageShare {
+  /** The registry's source key, as the lockfile records it. */
+  registry: string;
+  /** Its alias when sharing was turned on; what messages call it. */
+  alias: string;
+  otlp: string;
+  /** How the registry asked for runs to be written when the person agreed; a change asks again. */
+  reporter: "pseudonym" | "name";
+  precision: "second" | "hour" | "day";
+  /** When they agreed, ISO 8601. No run from before it is ever sent. */
+  since: string;
+  /** The name the person chose, for a registry that asks for names. */
+  as?: string | undefined;
+}
+
 export interface RegistryConfig {
   schemaVersion: typeof CONFIG_SCHEMA_VERSION;
   revision: number;
@@ -171,6 +190,8 @@ export interface RegistryConfig {
   jobs: readonly Job[];
   /** Trusted pipeline hooks. Loaded from this file only, never from a project manifest. */
   hooks: readonly PipelineHook[];
+  /** Registries whose usage endpoint this person agreed to send runs to. */
+  usage: readonly UsageShare[];
 }
 
 export const DEFAULT_INTERVAL_SECONDS = 900;
@@ -188,5 +209,6 @@ export function emptyRegistryConfig(): RegistryConfig {
     accounts: [],
     jobs: [],
     hooks: [],
+    usage: [],
   };
 }

@@ -1,0 +1,10 @@
+Count the runs of what you installed, on this machine
+
+Usage: aireg usage [show] [--days <n>]
+
+Options:
+      --days <n>  How many days back to count, 30 by default
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/usage/

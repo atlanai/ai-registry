@@ -50,6 +50,8 @@ Every page below was read on 2026-10-19, and the plugin loading and security pag
 | A plugin's commands load from its folder | https://code.claude.com/docs/en/plugins-reference; `claude plugin details toolkit` for a plugin holding `commands/deploy.md` and `skills/ship/` | "Commands \| `commands/` \| Flat Markdown command files." Output: `Skills (2)  deploy, ship` | 2.1.296 | confirmed: Claude Code takes the whole plugin, so its commands are not written as skills |
 
 Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
+| Each session is a JSON Lines file under `projects/` in the user root, which `aireg usage` reads (`sessions`) | Real use of Claude Code 2.1.321 on macOS, 2026-11-24 | `~/.claude/projects/<folder named for the session's directory>/<session id>.jsonl`, one JSON record per line | 2.1.321 | confirmed; the format is not documented |
+| A loaded skill is a meta user message that opens with `Base directory for this skill: <folder>`, with `promptId` naming the turn | Same use: a skill the model invoked, and `/hello-registry` typed by a person | `{"type":"user","isMeta":true,"promptId":"…","sessionId":"…","cwd":"…","timestamp":"…","sourceToolUseID":"toolu_…","message":{"content":[{"type":"text","text":"Base directory for this skill: /…/skills/voice"}]}}`; the typed command's message has no `sourceToolUseID` | 2.1.321 | confirmed; the format is not documented |
 
 ## L2 probes
 
@@ -88,3 +90,4 @@ The target's own commands that list what aireg placed, and what each printed. `c
 - **`reload`.** It is printed after every change to a target, but Claude Code picks up skill and agent changes on its own, and only a plugin change needs `/reload-plugins`.
 - **`CLAUDE_CODE`** as a caller variable: Claude Code 2.1.296 does not set it.
 - **A shared copy for `.claude/skills` and `.agents/skills`.** When both get a skill, aireg already links both folders to the one copy in the scope's `.registry/`, so there is one copy on disk, and Claude Code loads the linked folder and loads the skill once. With `--copy`, each folder gets its own real copy, as that option asks.
+- **Agents in `aireg usage`.** A session names the agent it hands work to only by its name, not the folder it was read from, so runs of agents are not counted yet.

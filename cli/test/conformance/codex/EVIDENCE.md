@@ -56,6 +56,8 @@ Documentation was read at <https://developers.openai.com/codex> on 2026-10-19. S
 | Codex reads `agents/openai.yaml`, not `disable-model-invocation`, to keep a skill from running on its own | <https://learn.chatgpt.com/docs/build-skills>, where <https://developers.openai.com/codex/skills> now leads, read 2026-10-20; `aireg add <skills folder> --all --for codex`, its `release` skill setting `disable-model-invocation: true`, then `codex debug prompt-input` | "When `false`, Codex won’t implicitly invoke the skill based on user prompt"; the page names no `disable-model-invocation`. Output: `.agents/skills/release/` is a copy holding `agents/openai.yaml`, and the skills offered list `notes` but not `release` | 0.162.1 | confirmed: `keys` writes `agents/openai.yaml` with `policy: allow_implicit_invocation: false` |
 
 Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
+| Each session is a JSON Lines rollout under `sessions/` in the user root, which `aireg usage` reads (`sessions`) | Real use of Codex 0.162.1 on macOS, 2026-11-23 | `~/.codex/sessions/2026/11/23/rollout-2026-11-23T09-33-49-<id>.jsonl`, starting with a `session_meta` record carrying `"cli_version":"0.162.1"`, the session `id` and its `cwd` | 0.162.1 | confirmed; the format is not documented |
+| Codex reads a skill by running a command on its `SKILL.md`; `task_started` and `turn_context` records name the turn | Same use | `{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"sed -n '1,220p' /…/.agents/skills/<name>/SKILL.md\",\"workdir\":\"…\"}"}}`; `{"type":"event_msg","payload":{"type":"task_started","turn_attribution":{"turn_id":"…"}}}` | 0.162.1 | confirmed; the format is not documented |
 
 ## L2 probes
 
@@ -96,3 +98,4 @@ After `aireg remove ns/lint` in each scope, both `codex debug prompt-input` prob
 - **`policy` and `category` in the marketplace entry.** Codex loads the plugin without them, and no value for `category` follows from what aireg installs.
 - **`reload`.** Codex needs a new session for a new plugin or agent, but sees skill changes on its own; a target's `reload` is printed after every change.
 - **Agent probes in `codex.test.ts`.** No Codex command lists agents without a model session.
+- **A skill Codex puts in context without running a command.** Codex's `skill.injected` metric counts these; no rollout we read shows how one is recorded, so `aireg usage` counts only a skill read by a command.

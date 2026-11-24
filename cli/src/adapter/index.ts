@@ -19,6 +19,7 @@ export {
   type PublishResult,
   type Readiness,
   type RegistryIdentity,
+  type RegistryUsage,
   type Resolution,
   type ResolvedSource,
   type ResolveOptions,

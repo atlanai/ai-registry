@@ -17,6 +17,9 @@ aireg keeps three folders apart: its own, and one for each scope it installs int
   adapters/                signed adapters, one folder per id and version
   targets/                 target files of your own, <id>.json; harnesses/, the earlier name, is still read
   state/                   background service: run history (aireg.db), pid file, and on Windows the pipe's name
+  usage/                   aireg usage, owner-only: the runs it counted (runs.jsonl), how far it read each
+                           session record (cursors.json), the registries runs came from (registries.json),
+                           how many runs each shared endpoint has (sent.json), and the pseudonym key
   run/                     the service's socket, when no folder under /tmp is this user's alone
   logs/                    aireg.log, daemon.log
   leases/                  which process is writing to your user scope

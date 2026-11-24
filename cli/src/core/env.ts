@@ -78,6 +78,16 @@ export function inGitHubActions(env: NodeJS.ProcessEnv = process.env): boolean {
 const TOKEN_PREFIX = `${NAME.toUpperCase()}_TOKEN_`;
 
 /** `AIREG_TOKEN_<ALIAS>`: one registry's token, so one machine can hold several. */
+/**
+ * `AIREG_USAGE_HEADERS_<NAME>`: headers for the usage endpoint of the registry `alias` names, so a
+ * key set for one registry's endpoint never reaches another's.
+ */
+export function usageHeadersVariable(alias: string): string {
+  return `${USAGE_HEADERS_PREFIX}${alias.toUpperCase().replaceAll(/[^A-Z0-9]/g, "_")}`;
+}
+
+const USAGE_HEADERS_PREFIX = `${NAME.toUpperCase()}_USAGE_HEADERS_`;
+
 export function tokenVariable(alias: string): string {
   return `${TOKEN_PREFIX}${alias.toUpperCase().replaceAll(/[^A-Z0-9]/g, "_")}`;
 }

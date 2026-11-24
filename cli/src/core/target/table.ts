@@ -61,6 +61,7 @@ function toTarget(
     verified: definition.verified === undefined ? undefined : structuredClone(definition.verified),
     trust: { ...definition.trust },
     reload: definition.reload,
+    sessions: definition.sessions === undefined ? undefined : { ...definition.sessions },
     origin,
   };
 }

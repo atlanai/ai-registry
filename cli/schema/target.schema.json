@@ -729,6 +729,29 @@
     "reload": {
       "minLength": 1,
       "type": "string"
+    },
+    "sessions": {
+      "additionalProperties": false,
+      "description": "Where the target records each session, for `aireg usage`.",
+      "type": "object",
+      "required": [
+        "path",
+        "format"
+      ],
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "description": "Under the user root: a folder searched for .jsonl files at any depth.",
+          "type": "string"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "claude-code-transcript",
+            "codex-rollout"
+          ]
+        }
+      }
     }
   }
 }

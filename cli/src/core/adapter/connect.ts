@@ -20,6 +20,7 @@ import { collidingPaths } from "#adapter/paths.ts";
 import { isDigest, isVersion } from "#adapter/spec/ref.ts";
 import { ENVELOPE_API_VERSION } from "#adapter/spec/types.ts";
 import { quoted, sanitizeName, sanitizeText } from "#adapter/text.ts";
+import { usageOf } from "#adapter/usage.ts";
 import type { Catalog, Entry } from "#core/catalog/catalog.ts";
 import { emptyCatalog, finalize, merge } from "#core/catalog/catalog.ts";
 import { newestFrom, withheldFrom } from "#core/catalog/withheld.ts";
@@ -293,9 +294,14 @@ function identity(raw: RegistryIdentity | undefined): RegistryIdentity | undefin
     typeof value === "string" && value.trim() !== "" ? sanitizeText(value) : undefined;
   const slug = text(raw.slug);
   const description = text(raw.description);
+  const url = typeof raw.url === "string" && /^https?:\/\//.test(raw.url) ? raw.url : undefined;
+  // Checked as registry.json's own block is, since a third-party adapter supplies this one.
+  const usage = usageOf(raw.usage);
   return {
     name: sanitizeText(raw.name),
     ...(slug === undefined ? {} : { slug }),
     ...(description === undefined ? {} : { description }),
+    ...(url === undefined ? {} : { url }),
+    ...(usage === undefined ? {} : { usage }),
   };
 }

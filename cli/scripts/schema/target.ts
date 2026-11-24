@@ -1,5 +1,9 @@
 import { type TObject, type TSchema, Type } from "@sinclair/typebox";
-import { TARGET_CATEGORIES, type ConfigValue as Value } from "#core/target/contract.ts";
+import {
+  SESSION_FORMATS,
+  TARGET_CATEGORIES,
+  type ConfigValue as Value,
+} from "#core/target/contract.ts";
 
 const PROGRAM = "^[A-Za-z0-9][A-Za-z0-9._+-]*$";
 const VARIABLE = "^[A-Za-z_][A-Za-z0-9_]*$";
@@ -289,6 +293,21 @@ export const Target = Type.Object(
       Profiles("The earlier name of `profiles`, still read; use `profiles`.", true),
     ),
     reload: Type.Optional(Text),
+    sessions: Type.Optional(
+      Type.Object(
+        {
+          path: Type.String({
+            minLength: 1,
+            description: "Under the user root: a folder searched for .jsonl files at any depth.",
+          }),
+          format: choice(...SESSION_FORMATS),
+        },
+        {
+          additionalProperties: false,
+          description: "Where the target records each session, for `aireg usage`.",
+        },
+      ),
+    ),
   },
   {
     $schema: "https://json-schema.org/draft/2020-12/schema",

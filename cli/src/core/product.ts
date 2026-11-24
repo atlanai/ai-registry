@@ -30,6 +30,19 @@ export const TELEMETRY_ID_FILE = "telemetry-id";
 export const TELEMETRY_NOTICE_FILE = "telemetry-notice";
 export const TELEMETRY_PATH = "/t";
 
+/** Under aireg's home: the runs `aireg usage` counted on this machine, and how far it has read. */
+export const USAGE_DIR = "usage";
+/** One counted run per line; nothing of any conversation. */
+export const USAGE_RUNS_FILE = "runs.jsonl";
+/** How far each session record has been read, so a run is counted once. */
+export const USAGE_CURSORS_FILE = "cursors.json";
+/** How many runs each shared registry's endpoint has taken. */
+export const USAGE_SENT_FILE = "sent.json";
+/** The registries runs came from, so a run can be sent after its project is gone. */
+export const USAGE_REGISTRIES_FILE = "registries.json";
+/** The key pseudonyms are derived with; owner-only, and never sent. */
+export const USAGE_KEY_FILE = "pseudonym-key";
+
 /** The CLI's executable on disk; Windows finds a program by its extension. */
 export function executableFile(platform: NodeJS.Platform = process.platform): string {
   return platform === "win32" ? `${NAME}.exe` : NAME;

@@ -1,0 +1,17 @@
+Count runs of installed skills and agents, and share them with registries
+
+Usage: aireg usage [<action>] [options]
+
+Actions:
+  show   Count the runs of what you installed, on this machine
+  share  Send runs of a registry's artifacts to the usage endpoint it names
+  send   Count new runs and send them now, which the background service also does
+
+Examples:
+  $ aireg usage             see which installed skills ran in the last 30 days
+  $ aireg usage share acme  send runs of acme's skills to the endpoint it names
+
+Learn more:
+  Run `aireg usage <action> --help` for an action's options.
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/usage/

@@ -27,6 +27,7 @@ function config(jobs: Job[], paused = false): RegistryConfig {
     accounts: [{ id: "acc_demo", registry: "personal" }],
     jobs,
     hooks: [],
+    usage: [],
   };
 }
 

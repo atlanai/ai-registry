@@ -41,6 +41,7 @@ function target(register: RegisterEntry[], place?: "copy", scope?: "user"): Targ
     verified: undefined,
     trust: {},
     reload: undefined,
+    sessions: undefined,
     origin: "built-in",
   };
   return { tool };
