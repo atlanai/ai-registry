@@ -125,12 +125,12 @@ describe("arrays and nested tables", () => {
       'command = "npx"',
       "",
       "[mcp_servers.srv.env]",
-      'KEY = "${KEY}"',
+      'KEY = "secret-ref"',
       "",
     ].join("\n");
     expect(readTable(text, ["mcp_servers", "srv"])).toEqual({
       command: "npx",
-      env: { KEY: "${KEY}" },
+      env: { KEY: "secret-ref" },
     });
     expect(setKeys(text, ["mcp_servers", "srv"], { command: "uvx" })).toContain('command = "uvx"');
     expect(dropTable(text, ["mcp_servers", "srv"])).toBe("# mine\n[other]\na = 1\n");
