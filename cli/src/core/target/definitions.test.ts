@@ -159,7 +159,7 @@ describe("a config entry mapping", () => {
   });
 
   test.each([
-    ["another kind", { skill: config }, /only an mcp_server/],
+    ["another kind", { skill: config }, /only an MCP server/],
     [
       "a file outside its root",
       { mcp_server: { ...config, file: "../x.json" } },

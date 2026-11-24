@@ -56,7 +56,8 @@ export function kindCommand(kind: string): string {
 
 /** The kind with its article, as a sentence names it. */
 export function aKind(kind: string): string {
-  return `${/^[aeiou]/.test(kind) || kind === "mcp_server" ? "an" : "a"} ${kind}`;
+  if (kind === "mcp_server") return "an MCP server";
+  return `${/^[aeiou]/.test(kind) ? "an" : "a"} ${kind}`;
 }
 
 /** The kind a folder of artifacts holds, read from its name, such as `skills`. */

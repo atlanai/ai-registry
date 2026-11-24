@@ -47,7 +47,7 @@ Share:
             new  bump
   agent     Create an agent, or start its next version
             new  bump
-  mcp       Create an mcp_server, or start its next version
+  mcp       Create an MCP server, or start its next version
             new  bump
 
 Automate:

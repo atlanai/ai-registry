@@ -56,7 +56,7 @@ describe("mcp_server", () => {
   });
 
   test("takes an before it, as agent does", () => {
-    expect(aKind("mcp_server")).toBe("an mcp_server");
+    expect(aKind("mcp_server")).toBe("an MCP server");
     expect(aKind("agent")).toBe("an agent");
     expect(aKind("skill")).toBe("a skill");
   });

@@ -186,7 +186,7 @@ describe("writes stay inside the registry", () => {
 describe("the mcp_server kind's command", () => {
   test("is mcp, and mcp_server names no command", async ({ tmp }) => {
     const command = await lookup("mcp", tmp);
-    expect(command?.summary).toBe("Create an mcp_server, or start its next version");
+    expect(command?.summary).toBe("Create an MCP server, or start its next version");
     expect(command?.usage).toEqual(["aireg mcp <action> [options]"]);
     expect(await lookup("mcp_server", tmp)).toBeUndefined();
   });

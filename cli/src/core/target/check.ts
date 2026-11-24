@@ -163,7 +163,7 @@ function configProblems(
   report: Report,
 ) {
   if (kind !== "mcp_server")
-    report(`kinds.${kind}: only an mcp_server is written as a config entry.`);
+    report(`kinds.${kind}: only an MCP server is written as a config entry.`);
   pathProblem(mapping.file, ["name"], report);
   if (mapping.at.length === 0) report(`kinds.${kind}: at names no key.`);
   for (const key of mapping.at) templateProblems(key, ["name"], report);
