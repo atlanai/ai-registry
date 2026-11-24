@@ -97,75 +97,48 @@ class CheckFixTests(RegistryCopy):
         self.assert_refused(artifacts / "engineering" / "skill" / "pr-review" / "versions.json")
 
 
-USAGE_FILE = Path("usage", "2026-09-02", "r-4f2a9c1e.jsonl")
-
-
 class UsageTests(RegistryCopy):
-    """File spec section 14: a usage location inside the root."""
+    """File spec section 14.1: the usage block in registry.json."""
 
-    def first_run(self):
-        line = (self.registry / USAGE_FILE).read_text(encoding="utf-8").splitlines()[0]
-        return json.loads(line)
-
-    def write_run(self, edit):
-        """Replace the usage file with its first line, edited."""
-        document = self.first_run()
-        edit(document["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0])
-        (self.registry / USAGE_FILE).write_text(json.dumps(document) + "\n", encoding="utf-8")
-        (self.registry / "usage" / "index.json").unlink()
+    def set_usage(self, usage):
+        path = self.registry / "registry.json"
+        document = json.loads(path.read_text(encoding="utf-8"))
+        document["usage"] = usage
+        path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
     def assert_error(self, text):
         result = self.check()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn(text, result.stdout)
 
-    def test_example_usage_passes(self):
+    def test_https_and_loopback_endpoints_pass(self):
+        for otlp in ("https://otel.example.com", "http://localhost:4318", "http://127.0.0.1:6006", "http://[::1]:4318/"):
+            self.set_usage({"otlp": otlp, "reporter": "name", "time_precision": "second"})
+            result = self.check()
+            self.assertEqual(result.returncode, 0, otlp + result.stdout + result.stderr)
+
+    def test_plain_http_to_another_host_is_refused(self):
+        self.set_usage({"otlp": "http://otel.example.com"})
+        self.assert_error("must be https, or http to a loopback host")
+
+    def test_a_host_that_only_starts_like_localhost_is_refused(self):
+        self.set_usage({"otlp": "http://localhost.example.com"})
+        self.assert_error("must be https, or http to a loopback host")
+
+    def test_endpoint_is_required(self):
+        self.set_usage({"reporter": "pseudonym"})
+        self.assert_error("usage.otlp is required")
+
+    def test_traces_path_is_refused(self):
+        self.set_usage({"otlp": "https://otel.example.com/v1/traces"})
+        self.assert_error("a client adds /v1/traces")
+
+    def test_unknown_reporter_and_precision_are_refused(self):
+        self.set_usage({"otlp": "https://otel.example.com", "reporter": "email", "time_precision": "minute"})
         result = self.check()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_run_of_an_unlisted_version_is_refused(self):
-        def edit(record):
-            record["attributes"][0]["value"]["stringValue"] = "engineering/skill/pr-review@9.9.9"
-        self.write_run(edit)
-        self.assert_error("is not a version this root lists")
-
-    def test_run_with_wrong_digest_is_refused(self):
-        def edit(record):
-            record["attributes"][1]["value"]["stringValue"] = "sha256:" + "0" * 64
-        self.write_run(edit)
-        self.assert_error("is not engineering/skill/pr-review@1.2.0's content digest")
-
-    def test_run_carrying_content_is_refused(self):
-        def edit(record):
-            record["attributes"].append({"key": "gen_ai.input.messages", "value": {"stringValue": "a prompt"}})
-        self.write_run(edit)
-        self.assert_error("may not carry gen_ai.input.messages")
-
-    def test_run_more_precise_than_the_location_allows_is_refused(self):
-        def edit(record):
-            record["timeUnixNano"] = str(int(record["timeUnixNano"]) + 61 * 10**9)
-        self.write_run(edit)
-        self.assert_error("more precise than the location's time_precision")
-
-    def test_run_outside_the_files_day_is_refused(self):
-        def edit(record):
-            record["timeUnixNano"] = str(int(record["timeUnixNano"]) + 86400 * 10**9)
-        self.write_run(edit)
-        self.assert_error("outside the file's day")
-
-    def test_reporter_must_match_the_file_name(self):
-        path = self.registry / USAGE_FILE
-        path.rename(path.with_name("r-00000000.jsonl"))
-        (self.registry / "usage" / "index.json").unlink()
-        self.assert_error("must be 'r-00000000', the file's reporter")
-
-    def test_stale_usage_index_is_refused_and_fix_rewrites_it(self):
-        path = self.registry / USAGE_FILE
-        path.write_bytes(path.read_bytes() + b"\n")
-        self.assert_error("usage/index.json: does not list every usage file")
-        result = self.check("--fix")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.check().returncode, 0)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("is not pseudonym or name", result.stdout)
+        self.assertIn("is not second, hour or day", result.stdout)
 
 
 if __name__ == "__main__":

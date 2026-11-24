@@ -4,8 +4,8 @@
 Standard library only. Verifies path grammar and file paths, every file digest
 and size, the content digest and catalog digest of every version, that latest
 is the newest active release, that versions.json and index.json agree,
-that every relationship resolves, and, when registry.json names a usage
-location inside the root, that every usage file follows section 14.
+that every relationship resolves, and that a usage endpoint, when
+registry.json names one, uses a scheme a client may send to.
 
     python3 tools/check.py examples/acme-registry
     python3 tools/check.py examples/acme-registry --print-digests
@@ -25,7 +25,6 @@ import json
 import re
 import sys
 import unicodedata
-from datetime import datetime, timezone
 from pathlib import Path
 
 NAMESPACE_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$")
@@ -284,6 +283,7 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
         blob_template = "://"  # nothing is read through it
 
     check_kind_manifests(root, registry, rep)
+    check_usage(registry, rep)
 
     index = None
     if inside(root, root / "index.json"):
@@ -299,7 +299,6 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
             index_entries[key] = e
 
     known_versions: set[str] = set()
-    published: dict[str, str | None] = {}
     seen_keys: set[tuple[str, str, str]] = set()
     pending_refs: list[tuple[str, str]] = []
 
@@ -365,7 +364,6 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
                     rep.error(f"{label}@{v}: directory missing")
                 continue
             known_versions.add(f"{label}@{v}")
-            published[f"{label}@{v}"] = entry.get("digest")
             env = load_json(vdir / "artifact.json", rep)
             if env is None:
                 continue
@@ -504,178 +502,30 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
         index["entries"].sort(key=lambda e: (e["namespace"], e["kind"], e["name"]))
         write_json(root, root / "index.json", index, rep)
 
-    check_usage(root, registry, published, rep, fix, partial)
 
 
-USAGE_DAY_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
-RUN_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
-TARGET_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
-RUN_EVENT = "registry.artifact.run"
-# Section 14.3: the only attributes a run may carry in a usage file.
-RUN_ATTRIBUTES = {
-    "registry.artifact.ref", "registry.artifact.digest", "registry.artifact.modified",
-    "registry.run.id", "registry.run.trigger", "registry.target",
-}
-TRIGGERS = {"person", "model", "artifact", "unknown"}
-PRECISION_NS = {"second": 10**9, "hour": 3600 * 10**9, "day": 86400 * 10**9}
-USAGE_FILE_CAP = 64 * 1024 * 1024
+LOOPBACK_HTTP_RE = re.compile(r"^http://(localhost|127\.[0-9.]+|\[::1\])(:[0-9]+)?(/|$)")
 
 
-def _attrs(items, where: str, rep: Report) -> dict:
-    out: dict = {}
-    for item in items if isinstance(items, list) else []:
-        if not isinstance(item, dict) or not isinstance(item.get("key"), str) or not isinstance(item.get("value"), dict):
-            rep.error(f"{where}: attribute {item!r} is not an OTLP key-value pair")
-            continue
-        if item["key"] in out:
-            rep.error(f"{where}: attribute {item['key']} appears twice")
-        out[item["key"]] = item["value"]
-    return out
-
-
-def check_usage(root: Path, registry: dict, published: dict, rep: Report, fix: bool, partial: bool) -> None:
-    """Section 14: the usage block, and a usage location inside the root."""
+def check_usage(registry: dict, rep: Report) -> None:
+    """Section 14.1: where clients send runs. Section 11: which schemes they may use."""
     usage = registry.get("usage")
     if usage is None:
         return
-    if not isinstance(usage, dict) or not ({"files", "otlp"} & set(usage)):
-        rep.error("registry.json: usage must be an object with files, otlp, or both")
+    if not isinstance(usage, dict):
+        rep.error("registry.json: usage must be an object")
         return
     otlp = usage.get("otlp")
-    if otlp is not None and not (isinstance(otlp, str) and (otlp.startswith("https://") or re.match(r"^http://(localhost|127\.|\[::1\])", otlp))):
+    if not isinstance(otlp, str) or not otlp:
+        rep.error("registry.json: usage.otlp is required: the OpenTelemetry endpoint clients send runs to")
+    elif not (otlp.startswith("https://") or LOOPBACK_HTTP_RE.match(otlp)):
         rep.error(f"registry.json: usage.otlp {otlp!r} must be https, or http to a loopback host")
-    precision = usage.get("time_precision", "hour")
-    if precision not in PRECISION_NS:
-        rep.error(f"registry.json: usage.time_precision {precision!r} is not second, hour or day")
-        precision = "second"
-    files = usage.get("files")
-    if files is None:
-        return
-    if not isinstance(files, str) or not files:
-        rep.error("registry.json: usage.files must be a non-empty string")
-        return
-    if "://" in files:
-        rep.warn(f"registry.json: usage.files {files!r} is outside the root; not checked offline")
-        return
-    if not safe_path(files.rstrip("/")):
-        rep.error("registry.json: a relative usage.files must stay inside the root")
-        return
-    location = root / files.rstrip("/")
-    if not inside(root, location):
-        rep.error(f"{files}: is a symlink or sits under one; not read")
-        return
-    if not location.is_dir():
-        rep.warn(f"{files}: no usage location yet; nothing has been reported")
-        return
-
-    found: dict[str, bytes] = {}
-    run_ids: dict[str, str] = {}
-    for day_dir in sorted(location.iterdir()):
-        if day_dir.name == "index.json" and day_dir.is_file():
-            continue
-        rel_day = f"{files.rstrip('/')}/{day_dir.name}"
-        m = USAGE_DAY_RE.match(day_dir.name)
-        if not day_dir.is_dir() or not m:
-            rep.error(f"{rel_day}: a usage location holds only index.json and YYYY-MM-DD folders")
-            continue
-        try:
-            day_start = datetime(int(m[1]), int(m[2]), int(m[3]), tzinfo=timezone.utc)
-        except ValueError:
-            rep.error(f"{rel_day}: is not a calendar date")
-            continue
-        start_ns = int(day_start.timestamp()) * 10**9
-        for f in sorted(day_dir.iterdir()):
-            rel_file = f"{rel_day}/{f.name}"
-            reporter = f.name[: -len(".jsonl")] if f.name.endswith(".jsonl") else None
-            if not f.is_file() or reporter is None or not NAMESPACE_RE.match(reporter):
-                rep.error(f"{rel_file}: a day folder holds only <reporter>.jsonl files, with the reporter in namespace grammar")
-                continue
-            if not inside(root, f):
-                rep.error(f"{rel_file}: is a symlink; not read")
-                continue
-            if f.stat().st_size > USAGE_FILE_CAP:
-                rep.error(f"{rel_file}: larger than {USAGE_FILE_CAP} bytes; not read")
-                continue
-            data = f.read_bytes()
-            found[f"{day_dir.name}/{f.name}"] = data
-            for n, line in enumerate(data.decode("utf-8", errors="replace").splitlines(), 1):
-                where = f"{rel_file}:{n}"
-                if not line.strip():
-                    continue
-                try:
-                    doc = json.loads(line)
-                except json.JSONDecodeError as exc:
-                    rep.error(f"{where}: not JSON: {exc.msg}")
-                    continue
-                resource_logs = doc.get("resourceLogs") if isinstance(doc, dict) else None
-                if not isinstance(resource_logs, list) or not resource_logs:
-                    rep.error(f"{where}: not an OTLP JSON LogsData object")
-                    continue
-                for rl in resource_logs:
-                    res = _attrs((rl.get("resource") or {}).get("attributes"), where, rep)
-                    if res.get("registry.usage.reporter", {}).get("stringValue") != reporter:
-                        rep.error(f"{where}: resource registry.usage.reporter must be {reporter!r}, the file's reporter")
-                    for sl in rl.get("scopeLogs") or []:
-                        for rec in sl.get("logRecords") or []:
-                            if rec.get("eventName") != RUN_EVENT:
-                                continue
-                            check_run(rec, where, start_ns, PRECISION_NS[precision], published, run_ids, rep, partial)
-
-    index_path = location / "index.json"
-    if index_path.is_file() or fix:
-        listed = []
-        for path, data in sorted(found.items()):
-            listed.append({"path": path, "size": len(data), "digest": digest_of(data)})
-        index = load_json(index_path, rep) if index_path.is_file() else None
-        if fix:
-            generated = (index or {}).get("generated_at") or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            if index is None or index.get("files") != listed:
-                write_json(root, index_path, {"format_version": 1, "generated_at": generated, "files": listed}, rep)
-        elif index is not None:
-            if index.get("files") != listed:
-                rep.error(f"{files}/index.json: does not list every usage file with its size and digest")
-
-
-def check_run(rec: dict, where: str, start_ns: int, step: int, published: dict, run_ids: dict, rep: Report, partial: bool) -> None:
-    attrs = _attrs(rec.get("attributes"), where, rep)
-    for key in sorted(set(attrs) - RUN_ATTRIBUTES):
-        rep.error(f"{where}: a run in a usage file may not carry {key}")
-    ref = attrs.get("registry.artifact.ref", {}).get("stringValue")
-    if not isinstance(ref, str) or not REF_RE.match(ref):
-        rep.error(f"{where}: registry.artifact.ref {ref!r} is not a valid ref")
-        ref = None
-    elif ref not in published:
-        if partial:
-            rep.warn(f"{where}: {ref} is not present locally (partial copy)")
-        else:
-            rep.error(f"{where}: {ref} is not a version this root lists")
-    digest = attrs.get("registry.artifact.digest", {}).get("stringValue")
-    if digest is not None and ref in published and digest != published[ref]:
-        rep.error(f"{where}: registry.artifact.digest is not {ref}'s content digest")
-    if "registry.artifact.modified" in attrs and not isinstance(attrs["registry.artifact.modified"].get("boolValue"), bool):
-        rep.error(f"{where}: registry.artifact.modified must be a boolValue")
-    run_id = attrs.get("registry.run.id", {}).get("stringValue")
-    if not isinstance(run_id, str) or not RUN_ID_RE.match(run_id):
-        rep.error(f"{where}: registry.run.id {run_id!r} is missing or malformed")
-    elif run_id in run_ids:
-        rep.warn(f"{where}: run {run_id} was already reported at {run_ids[run_id]}; a reader counts it once")
-    else:
-        run_ids[run_id] = where
-    trigger = attrs.get("registry.run.trigger", {}).get("stringValue")
-    if "registry.run.trigger" in attrs and trigger not in TRIGGERS:
-        rep.error(f"{where}: registry.run.trigger {trigger!r} is not person, model, artifact or unknown")
-    target = attrs.get("registry.target", {}).get("stringValue")
-    if "registry.target" in attrs and not (isinstance(target, str) and TARGET_RE.match(target)):
-        rep.error(f"{where}: registry.target {target!r} is malformed")
-    raw = rec.get("timeUnixNano")
-    if not isinstance(raw, str) or not raw.isdigit():
-        rep.error(f"{where}: timeUnixNano must be a string of digits")
-        return
-    ns = int(raw)
-    if not start_ns <= ns < start_ns + 86400 * 10**9:
-        rep.error(f"{where}: timeUnixNano falls outside the file's day")
-    elif ns % step:
-        rep.error(f"{where}: timeUnixNano is more precise than the location's time_precision")
+    elif otlp.rstrip("/").endswith("/v1/traces"):
+        rep.error("registry.json: usage.otlp is the endpoint's base URL; a client adds /v1/traces")
+    if usage.get("reporter", "pseudonym") not in ("pseudonym", "name"):
+        rep.error(f"registry.json: usage.reporter {usage.get('reporter')!r} is not pseudonym or name")
+    if usage.get("time_precision", "hour") not in ("second", "hour", "day"):
+        rep.error(f"registry.json: usage.time_precision {usage.get('time_precision')!r} is not second, hour or day")
 
 
 def main() -> int:

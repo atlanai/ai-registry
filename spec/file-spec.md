@@ -41,7 +41,7 @@ blobs/
     <64 hex>                                 # large or shared content; descriptors without urls resolve here
 ```
 
-Four root entries have meaning in format 1: `registry.json`, `index.json`, `artifacts/`, and `blobs/`. A reader MUST ignore any other root entry (`README.md`, `.nojekyll`, `.git`, a future document). A root MAY also hold its usage files in a folder that `registry.json` names (section 14); a reader that does not read usage ignores that folder like any other entry. Because artifacts are mounted under `artifacts/`, no namespace name is reserved.
+Four root entries have meaning in format 1: `registry.json`, `index.json`, `artifacts/`, and `blobs/`. A reader MUST ignore any other root entry (`README.md`, `.nojekyll`, `.git`, a future document). Because artifacts are mounted under `artifacts/`, no namespace name is reserved.
 
 The example at [`examples/acme-registry`](../examples/acme-registry) is a complete registry in this layout.
 
@@ -117,7 +117,7 @@ The discovery document at the root. Schema: [`schemas/registry.schema.json`](sch
 | `blob_url` | no | URI template containing `{digest}`; default `blobs/sha256/{digest}` |
 | `kinds[]` | no | `{name, manifest_url}` per kind held. `manifest_url` is a URI reference; a relative one resolves against the root, so a root MAY serve its own manifests. The manifest format is open; the one this repository uses is [`schemas/kind-manifest.schema.json`](schemas/kind-manifest.schema.json) |
 | `generated_at` | no | when the indexer last ran |
-| `usage` | no | where usage of this root's artifacts is written and read: `{files?, otlp?, reporter?, time_precision?}`; see section 14 |
+| `usage` | no | where clients send runs of this root's artifacts: `{otlp, reporter?, time_precision?}`; see section 14 |
 | `api_version` | no | kept for a future server; a file root omits it |
 
 ### 3.2 `index.json`
@@ -309,13 +309,13 @@ These rules bound what a client fetches, sends, and writes.
 - **Sizes and time.** A client MUST stop reading a file once it has received more bytes than the descriptor's `size`, and MUST verify the size and the digest before it uses the file. It SHOULD cap the size of each JSON document it parses, and give up on a request that takes too long rather than wait indefinitely.
 - **Paths.** A client writes a file only at a path section 2.3 allows, inside the folder it installs into, and MUST NOT follow a symbolic link it finds there.
 - **Cycles.** `depends_on` edges can form a cycle. A client resolves each ref once, so a cycle ends where it began.
-- **Usage.** A `usage.files` or `usage.otlp` location follows the scheme rules above. A client sends a stored credential to it only under the credentials rule, and sends nothing to it before the person has turned sharing on (section 14.4). A reader caps the size of each usage file it reads, as for any other document.
+- **Usage.** A `usage.otlp` endpoint follows the scheme rules above. A client sends a credential to it only under the credentials rule, and sends nothing to it before the person has turned sharing on (section 14.4).
 
 aireg reads directory and git roots, not HTTPS roots. It applies the path, reference, and cycle rules to both and verifies every file's size and digest before using it. It refuses plain `http://` except to a loopback host, sends a stored credential only to the origin it was issued for and a token from the environment only to the registry of that name, and bounds each git operation with a timeout.
 
 ## 12. Conformance
 
-A root conforms when its documents satisfy the schemas and the requirements this document places on roots. A client conforms when it meets the requirements this document places on readers, including sections 3.3, 4, and 11, and, when it reads or writes usage, section 14. [`tools/check.py`](../tools/check.py) is the reference checker for roots, and checks a usage location inside the root; no conformance suite exists yet for clients.
+A root conforms when its documents satisfy the schemas and the requirements this document places on roots. A client conforms when it meets the requirements this document places on readers, including sections 3.3, 4, and 11, and, when it reports usage, section 14. [`tools/check.py`](../tools/check.py) is the reference checker for roots; no conformance suite exists yet for clients.
 
 ## 13. Versioning
 
@@ -326,45 +326,37 @@ A breaking change MUST come with a version bump:
 
 ## 14. Usage
 
-Usage records how often each artifact version a registry lists is run, by which program, and who ran it. It is optional. A root that declares no usage is complete, and a client that does not read usage ignores everything in this section.
+Usage records how often each artifact version a registry lists is run, by which program, and for whom. It is optional. A root that declares no usage is complete, and a client that does not report usage ignores this section.
 
-Usage is not part of the registry's documents. No digest covers it, no version changes when it changes, and writing it is not publishing: rule 6 and section 9 do not apply to it. A root only says where its usage goes.
-
-The records are OpenTelemetry log records, so any tool that reads OpenTelemetry can read them, and a client that already exports OpenTelemetry can send the same records to a backend.
+A registry does not store usage. Its `registry.json` names an OpenTelemetry endpoint, and a client sends each run there as a span once the person it runs for has turned sharing on. The endpoint is whatever the registry's owner runs to store and query traces: an OpenTelemetry Collector, or an observability backend that accepts the OpenTelemetry Protocol. Usage is not part of the registry's documents. No digest covers it, and no version changes when it changes.
 
 ### 14.1 Where usage goes
 
-The `usage` object in `registry.json` (section 3.1) names the locations. It carries at least one of `files` and `otlp`.
+The `usage` object in `registry.json` (section 3.1) says where runs are sent.
 
 | Field | Required | Meaning |
 |---|---|---|
-| `files` | no | the usage location: a URI reference to a directory, a git repository or an HTTPS location that holds usage files in the layout of 14.3. A relative reference resolves against the root and MUST stay inside it. Clients write runs here, and readers read them here. |
-| `otlp` | no | an OpenTelemetry Protocol over HTTP endpoint, without the `/v1/logs` path. A client that shares usage MAY also send each run here. |
-| `reporter` | no | how a person is named in the files: `pseudonym` (default) or `name`; see 14.4 |
-| `time_precision` | no | how precisely a run's time is written: `second`, `hour` (default) or `day` |
+| `otlp` | yes | the base URL of an OpenTelemetry Protocol over HTTP endpoint, without the `/v1/traces` path |
+| `reporter` | no | how a person is named in what is sent: `pseudonym` (default) or `name`; see 14.4 |
+| `time_precision` | no | how precisely a run's time is sent: `second`, `hour` (default) or `day` |
 
-A location MAY be another repository or host than the root's. A team that wants its usage history apart from its artifact history, or that lets more people write usage than publish artifacts, names a separate location.
+A client sends runs to `{otlp}/v1/traces`, encoded as OTLP JSON or protobuf. When the endpoint needs a credential, the person supplies it to their client. A `registry.json` never carries one, because everyone who can read the registry can read it.
 
 ### 14.2 What a run is
 
-A **run** is one use of one artifact version by a program, such as a coding agent loading a skill into a conversation. A run is counted at most once per turn, where a turn is one request to the program and everything it does to answer it. A client that sees the same artifact loaded twice in one turn records one run.
+A **run** is one use of one artifact version by a program, such as a coding agent loading a skill into a conversation. A run is counted at most once per turn, where a turn is one request to the program and everything it does to answer it. A client that sees the same artifact loaded twice in one turn reports one run.
 
-A client records a run only for an artifact version it installed from this root, and only once it can name the version's ref (section 2.2). How a client notices a run depends on the program and is not defined here.
+A client reports a run only for an artifact version it installed from this root, and only once it can name the version's ref (section 2.2). How a client notices a run depends on the program and is not defined here.
 
-### 14.3 Layout
+### 14.3 The run span
 
-```
-<files>/
-  index.json                                 # optional: every usage file with its size and digest
-  <YYYY-MM-DD>/                              # the UTC day the runs happened
-    <reporter>.jsonl                         # one reporter's runs that day
-```
+A client sends each run as one span:
 
-Each reporter writes only its own file, so two writers never change the same file. A day folder name is a valid calendar date. A reporter name follows the namespace grammar of section 2.1.
+- `name` is `registry.artifact.run`, and `kind` is internal.
+- `startTimeUnixNano` and `endTimeUnixNano` are both when the run started, rounded down to the `time_precision`. A run is an event; how long the program spent on the artifact is not reported.
+- The span is the root of its own trace.
 
-A usage file is a JSON Lines file in the format of the OpenTelemetry Protocol file exporter: each line is an OTLP JSON `LogsData` object, and every log record in it is a run. A writer appends lines and never rewrites an earlier line. Schema for one line: [`schemas/usage-record.schema.json`](schemas/usage-record.schema.json).
-
-A run's log record has `eventName` `registry.artifact.run`, `timeUnixNano` set to when the run started, rounded down to the location's `time_precision` and inside the file's day, and these attributes:
+The span carries these attributes, and no others:
 
 | Attribute | Required | Value |
 |---|---|---|
@@ -375,24 +367,28 @@ A run's log record has `eventName` `registry.artifact.run`, `timeUnixNano` set t
 | `registry.run.trigger` | no | what started the run: `person`, `model`, `artifact` (another artifact called it) or `unknown` |
 | `registry.target` | SHOULD | the program that ran it, such as `claude-code` or `codex`. This document does not fix the list. |
 
-The resource of each `LogsData` carries `registry.usage.reporter`, equal to the file's reporter name, and SHOULD carry `service.name` naming the client that wrote it.
+The span's resource carries these attributes, and no others besides the `telemetry.sdk.*` attributes an OpenTelemetry SDK adds:
 
-A writer MUST NOT add other attributes to a run in a usage file. A reader MUST ignore attributes, log records and lines it does not understand (rule 4).
+| Attribute | Required | Value |
+|---|---|---|
+| `registry.usage.reporter` | yes | the person, named as 14.4 says, in the namespace grammar of section 2.1 |
+| `registry.name` | yes | the registry's `name` from `registry.json` |
+| `registry.url` | no | the registry's `url`, when `registry.json` has one |
+| `service.name` | SHOULD | the client that sent the run, such as `aireg` |
+| `service.version` | no | that client's version |
 
-An HTTPS location cannot be listed, so it MUST serve `index.json`: an object with `format_version`, `generated_at` and `files[]`, each `{path, size, digest}` with `path` relative to the location. A directory or git location MAY carry one. When present it MUST list every usage file, and each size and digest MUST match the file. Schema: [`schemas/usage-index.schema.json`](schemas/usage-index.schema.json).
+A reader MUST ignore attributes it does not understand.
 
 ### 14.4 Privacy
 
-A usage file holds no content. A writer MUST NOT put prompts, model output, file paths, project or repository names, host names or the artifact's own content in a usage file, and MUST NOT derive a run id in a way that reveals any of them.
+A run carries no content. A client MUST NOT send prompts, model output, file paths, project or repository names, host names or the artifact's own content, and MUST NOT derive a run id or a pseudonym in a way that reveals any of them.
 
-A client MUST NOT write runs to a location other people can read, or send them to `otlp`, until the person it runs for has turned sharing on. It MAY count runs on the person's own machine without asking.
+A client MUST NOT send runs until the person it runs for has turned sharing on for that registry. It MAY count runs on the person's own machine without asking.
 
-With `reporter: pseudonym`, a client names the person by a stable identifier that does not reveal who they are. With `reporter: name`, it uses a name the person chose. A reporter name MUST NOT be an email address.
+With `reporter: pseudonym`, a client names the person by a stable identifier that does not reveal who they are. With `reporter: name`, it uses a name the person chose. A reporter MUST NOT be an email address.
 
 ### 14.5 Reading usage
 
-A reader counts runs by distinct `registry.run.id` across every usage file it reads, so a run sent twice counts once. It SHOULD show runs per artifact version, per reporter and per target, and over a period such as the last 30 days. A reader MAY show a run of a version the root no longer lists, and SHOULD say that it is not listed.
+A reader counts runs by distinct `registry.run.id`, so a run sent twice counts once. It SHOULD be able to show runs per artifact version, per reporter and per target, over a period such as the last 30 days. Where a reader gets the spans from is the endpoint's concern, not this document's.
 
-Usage is reported, not proven. Anyone who can write to the location can add runs, so a reader MUST NOT treat a count as authenticated.
-
-Summary files that hold counts instead of runs, for locations too large to read run by run, are open.
+Usage is reported, not proven. Anyone who can send to the endpoint can add runs, so a reader MUST NOT treat a count as authenticated.

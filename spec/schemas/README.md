@@ -14,8 +14,6 @@ themselves and [file-spec.md](../file-spec.md) are the contract.
 | [artifact-known-kinds.schema.json](artifact-known-kinds.schema.json) | the same envelope with the kind manifests applied to `spec` | §3.4 |
 | [file-descriptor.schema.json](file-descriptor.schema.json) | one `files[]` entry | §2.3, §3.5, §4.1 |
 | [relationship.schema.json](relationship.schema.json) | one `relationships[]` edge | §3.4, §4.3, §6 |
-| [usage-record.schema.json](usage-record.schema.json) | one line of a usage file, `<usage>/<YYYY-MM-DD>/<reporter>.jsonl` | §14.3 |
-| [usage-index.schema.json](usage-index.schema.json) | `index.json` at a usage location | §14.3 |
 | [host.schema.json](host.schema.json) | the host document at `/.well-known/registry.json` | §8 |
 | [kind-manifest.schema.json](kind-manifest.schema.json) | what `kinds[].manifest_url` points at | §3.1 |
 | [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json) | the `spec` of those kinds | §3.4 |
@@ -50,9 +48,6 @@ live in file-spec.md and are enforced by [`tools/check.py`](../../tools/check.py
 - `files[]` digests and sizes matching the bytes, and the path rules of §2.3. Most of those are also
   in `file-descriptor.schema.json` as a lookahead pattern, which RE2-based validators reject; the
   HFS+ code points and case-insensitive collisions are not.
-- A usage location inside the root (§14): day folders and reporter files, each run's ref listed by the
-  root and its digest matching, no attributes beyond §14.3, times inside the file's day and no more
-  precise than `time_precision`, and a usage `index.json` that lists every file.
 - `registry.json` advertising `files`. The schema does not require it: §3.1 states what a file root
   advertises rather than mandating it, and encoding it here would tighten the specification.
 
