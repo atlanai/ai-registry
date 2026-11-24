@@ -48,7 +48,7 @@ const server = {
 };
 
 const problems = (inputs: Record<string, string>) =>
-  mcpPolicyProblems({ server, policy: { inputs } });
+  mcpPolicyProblems({ server, _meta: { "sh.aireg/policy": { inputs } } });
 
 describe("mcpPolicyProblems", () => {
   test("accepts values for declared inputs, found by the names URL templates use", () => {
@@ -87,6 +87,8 @@ describe("mcpPolicyProblems", () => {
 
   test("has nothing to say without a policy that fixes inputs", () => {
     expect(mcpPolicyProblems({ server })).toEqual([]);
-    expect(mcpPolicyProblems({ server, policy: { tools: { deny: ["x"] } } })).toEqual([]);
+    expect(
+      mcpPolicyProblems({ server, _meta: { "sh.aireg/policy": { tools: { deny: ["x"] } } } }),
+    ).toEqual([]);
   });
 });

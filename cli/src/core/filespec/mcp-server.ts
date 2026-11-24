@@ -1,4 +1,5 @@
 import { isRecord } from "#adapter/fields.ts";
+import { MCP_POLICY_META } from "#adapter/kinds.ts";
 import { list, quoted } from "#adapter/text.ts";
 import type { KindManifest, SchemaNode } from "./kind-manifests.ts";
 
@@ -15,7 +16,8 @@ interface Declared {
  * publisher, and is one of its choices when it has them (file spec section 3.4).
  */
 export function mcpPolicyProblems(spec: Record<string, unknown>): string[] {
-  const { server, policy } = spec;
+  const { server, _meta: meta } = spec;
+  const policy = isRecord(meta) ? meta[MCP_POLICY_META] : undefined;
   if (!isRecord(policy) || !isRecord(policy.inputs)) return [];
   const declared = declaredInputs(server);
   const problems: string[] = [];

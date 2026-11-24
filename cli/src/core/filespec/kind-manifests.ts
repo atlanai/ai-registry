@@ -5,7 +5,7 @@ import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { isKindSegment, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
-import { MCP_POLICY_FILE, MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_POLICY_FILE, MCP_POLICY_META, MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -288,7 +288,7 @@ export function specOf(
 }
 
 /**
- * An MCP server's `server.json` in `server` and its `policy.json` in `policy`, each verbatim, with
+ * An MCP server's `server.json` in `server` and its `policy.json` in `_meta` under `sh.aireg/policy`, each verbatim, with
  * the slug and the server's description lifted beside them (`kinds/mcp_server.json`). None when
  * either file does not parse, so a broken policy is reported rather than dropped.
  */
@@ -310,7 +310,7 @@ function mcpServerSpec(
   if (slug !== undefined) spec.name = slug;
   if (isRecord(server) && server.description !== undefined) spec.description = server.description;
   spec.server = server;
-  if (policy !== undefined) spec.policy = policy;
+  if (policy !== undefined) spec._meta = { [MCP_POLICY_META]: policy };
   return spec;
 }
 

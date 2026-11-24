@@ -221,7 +221,7 @@ describe("an MCP server's spec", () => {
       name: "issues",
       description: "Track issues.",
       server,
-      policy,
+      _meta: { "sh.aireg/policy": policy },
     });
   });
 

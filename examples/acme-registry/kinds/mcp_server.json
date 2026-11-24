@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "kinds/mcp_server.json",
   "title": "mcp_server",
-  "description": "One MCP server, described by the MCP Registry's server.json and stored unchanged. spec contains the registry slug as name, the server's description, the unchanged server.json in server, and, when the version carries policy.json, the registry's install policy in policy. server must satisfy the server.json schema its $schema names.",
+  "description": "One MCP server, described by the MCP Registry's server.json and stored unchanged. spec contains the registry slug as name, the server's description, the unchanged server.json in server, and, when the version carries policy.json, the registry's install policy in _meta under sh.aireg/policy. server must satisfy the server.json schema its $schema names.",
   "type": "object",
   "properties": {
     "name": {
@@ -47,8 +47,16 @@
         }
       ]
     },
-    "policy": {
-      "$ref": "#/$defs/policy"
+    "_meta": {
+      "type": "object",
+      "description": "What this registry adds beside the publisher's server.json, under reverse-DNS keys as in the MCP Registry API's response _meta. Present only when the version carries policy.json.",
+      "properties": {
+        "sh.aireg/policy": {
+          "$ref": "#/$defs/policy"
+        }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
     }
   },
   "required": [

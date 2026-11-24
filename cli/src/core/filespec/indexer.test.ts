@@ -216,7 +216,10 @@ describe("indexRoot", () => {
     await indexRoot(root, "2026-10-08T00:00:00Z");
 
     const envelope = JSON.parse(await readFile(join(server, "1.3.0", "artifact.json"), "utf8"));
-    expect(envelope.spec.policy.tools.deny).toEqual(["delete_issue", "close_issue"]);
+    expect(envelope.spec._meta["sh.aireg/policy"].tools.deny).toEqual([
+      "delete_issue",
+      "close_issue",
+    ]);
   });
 
   test("indexes an MCP server whose artifact.json holds a null spec", async () => {

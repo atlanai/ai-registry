@@ -193,7 +193,8 @@ file patterns in a kind manifest are non-exhaustive conventions.
 An MCP server carries one `server.json` in the format the
 [MCP Registry](https://github.com/modelcontextprotocol/registry) defines, exactly as its
 publisher wrote it, and MAY carry a `policy.json`. Its envelope wraps the parsed `server.json` in
-`spec.server` and the parsed `policy.json` in `spec.policy`, each otherwise unchanged, copies the
+`spec.server` and the parsed `policy.json` in `spec._meta["sh.aireg/policy"]`, each otherwise
+unchanged, copies the
 server's `description` to `spec.description`, and uses the registry slug for `spec.name`. The
 server's own reverse-DNS `name` remains in `spec.server` and need not resemble the slug.
 `spec.server` MUST name in `$schema` a `server.json` schema version the kind manifest lists, as the
@@ -205,7 +206,9 @@ permits, cannot be published as it stands, since section 4.2 forbids one in an e
 `metadata.version` is the version of the artifact, and `spec.server.version` the version of the
 server it describes; they SHOULD be equal, and MAY differ, as when a registry changes only the
 policy of a server it republishes. Registry content MUST NOT be written into `server.json`,
-including its `_meta`, so a republished server stays byte-identical to its publisher's.
+including its `_meta`, so a republished server stays byte-identical to its publisher's. It goes in
+`spec._meta` beside `spec.server`, under reverse-DNS keys, as the MCP Registry API returns its own
+metadata in a `_meta` beside each `server`. `sh.aireg/policy` is the only key defined.
 
 `policy.json` holds what the registry decides about installing the server, with these meanings:
 

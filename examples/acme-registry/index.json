@@ -19,10 +19,10 @@
       "kind": "mcp_server",
       "name": "issue-tracker",
       "latest": "1.2.0",
-      "digest": "sha256:01dce6620a7b48a1fc91a1c4961e33de1c0e5bd6a3b019cf36fd0f165f578434",
+      "digest": "sha256:efbb85919e3c91ad622bd276d511f33240fb9f7ddf100b78ef3b5702d04ed357",
       "status": "active",
       "description": "Search, read and update issues in the team's issue tracker.",
-      "catalog_digest": "sha256:e0b11f9f84ffe2ba8d5e37a57a0bf0b770af45a01bd8744048e6a91d4d37cca2",
+      "catalog_digest": "sha256:036ac0347c2d49e89db044c8c5dedeacc6bb8fb4036ce035a0e76a67b8d647e8",
       "updated_at": "2026-11-24T11:40:43.090Z"
     },
     {

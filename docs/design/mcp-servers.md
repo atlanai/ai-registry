@@ -38,7 +38,7 @@ The envelope's `spec` wraps both files, parsed and otherwise unchanged:
   "name": "issue-tracker",
   "description": "Search, read and update issues in the team's issue tracker.",
   "server": { "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json", "name": "com.example/issue-tracker", "…": "…" },
-  "policy": { "tools": { "deny": ["delete_issue"] }, "…": "…" }
+  "_meta": { "sh.aireg/policy": { "tools": { "deny": ["delete_issue"] }, "…": "…" } }
 }
 ```
 
@@ -59,7 +59,11 @@ A team that republishes a vendor's server and hides one tool should not have to 
 - the file would no longer be the publisher's, so a reviewer could not compare it with the MCP Registry's copy;
 - a new deny list would need a new version, and the copied file would carry the old `version`, so every bump would have to edit the publisher's file.
 
-So `policy.json` holds the registry's decisions, and `server.json` holds none.
+So `policy.json` holds the registry's decisions, and `server.json` holds none. This is how other projects that curate servers keep their own data. The MCP Registry API returns registry metadata in a `_meta` beside `server`, under keys such as `io.modelcontextprotocol.registry/official`, and drops anything but the publisher's key from the server's own `_meta`. ToolHive keeps tool filters in an `MCPToolConfig` that an `MCPServer` references, after removing the inline field. Docker's gateway keeps tool allowlists in profiles, not in catalog entries.
+
+### Why `_meta` and `sh.aireg/policy`
+
+The envelope takes the shape of an MCP Registry API response, `server` with a `_meta` beside it, so a client that reads that API reads this without a new concept. The key follows MCP's rule for `_meta` keys: a reverse-DNS prefix, a slash and a name. `sh.aireg` is the reverse of `aireg.sh`, the domain in `apiVersion`, and stays clear of the `modelcontextprotocol` and `mcp` labels MCP reserves. `spec._meta` accepts only the keys the kind manifest defines, so a new kind of registry data is a spec change rather than a field any writer can add.
 
 ### Versions
 
