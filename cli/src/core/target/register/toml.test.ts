@@ -33,14 +33,14 @@ describe("TOML tables", () => {
     expect(readTable(text, MARKETPLACE)).toEqual({ source: "x" });
   });
 
-  test("reads what a person set, including values it would never write", () => {
+  test("reads what a person set, including a one-line array", () => {
     const text = `[marketplaces.acme-prod]\nlast_updated = "2026-01-01T00:00:00Z"\nsource_type = "git"\nsource = "https://example.com/acme.git" # theirs\nretries = 3\nlist = [1]\n`;
     expect(readTable(text, MARKETPLACE)).toEqual({
       last_updated: "2026-01-01T00:00:00Z",
       source_type: "git",
       source: "https://example.com/acme.git",
       retries: 3,
-      list: null,
+      list: [1],
     });
     expect(readTable(text, ["marketplaces", "other"])).toBeUndefined();
   });
@@ -102,5 +102,37 @@ describe("TOML tables", () => {
     expect(unsetKeys(start, PLUGIN, ["note"])).toBe(
       `${HEADING}\nargs = [\n  [1, 2],\n]\nenabled = false\n\n[other]\nx = 1\n`,
     );
+  });
+});
+
+describe("arrays and nested tables", () => {
+  test("writes and reads back a one-line array", () => {
+    const text = setKeys("", ["mcp_servers", "srv"], { command: "npx", args: ["-y", "a, b", 1] });
+    expect(text).toBe('[mcp_servers.srv]\ncommand = "npx"\nargs = ["-y", "a, b", 1]\n');
+    expect(readTable(text, ["mcp_servers", "srv"])).toEqual({
+      command: "npx",
+      args: ["-y", "a, b", 1],
+    });
+  });
+
+  test("reads a table with the tables under it, and drops them all together", () => {
+    const text = [
+      "# mine",
+      "[other]",
+      "a = 1",
+      "",
+      "[mcp_servers.srv]",
+      'command = "npx"',
+      "",
+      "[mcp_servers.srv.env]",
+      'KEY = "${KEY}"',
+      "",
+    ].join("\n");
+    expect(readTable(text, ["mcp_servers", "srv"])).toEqual({
+      command: "npx",
+      env: { KEY: "${KEY}" },
+    });
+    expect(setKeys(text, ["mcp_servers", "srv"], { command: "uvx" })).toContain('command = "uvx"');
+    expect(dropTable(text, ["mcp_servers", "srv"])).toBe("# mine\n[other]\na = 1\n");
   });
 });
