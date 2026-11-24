@@ -77,7 +77,7 @@ Each version in `versions.json` has a status, which you change by hand and then 
 | `--namespace <namespace>` | The namespace in the registry, in lowercase letters, digits and hyphens. |
 | `--set <key>=<value>` | A field to fill in. Use dots for nested fields, such as `--set metadata.category=engineering`. Repeat it for more than one. |
 | `--file <file>` | For a kind that offers more than one layout, the file to create, such as `agent-card.json` for an agent. |
-| `--from <path>` | An existing skill folder or agent file to copy in. Repeat it, or list more paths after it. |
+| `--from <path>` | An existing artifact folder or file to copy in. Repeat it, or list more paths after it. |
 | `--name <name>` | With `--from`, the name to give the one artifact copied in. |
 | `-y`, `--yes` | Don't ask for the namespace, the name or the fields. |
 

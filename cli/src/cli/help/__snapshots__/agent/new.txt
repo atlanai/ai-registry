@@ -7,7 +7,7 @@ Options:
       --namespace <namespace>  The namespace in the registry
       --set <key>=<value>      A field to fill in, with dots for nested ones (repeatable)
       --file <file>            For a kind with more than one layout, the file to create
-      --from <path>            An existing skill folder or agent file to copy in (repeatable)
+      --from <path>            An existing artifact folder or file to copy in (repeatable)
       --name <name>            With --from, a new name for the artifact copied in
 
 Learn more:
