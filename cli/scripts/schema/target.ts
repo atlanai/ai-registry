@@ -177,15 +177,67 @@ const KindMapping = tagged(
         at: Type.Array(Text, { minItems: 1 }),
         anchor: Type.Optional(choice("root", "project")),
         scope: Type.Optional(choice("user", "project")),
-        codec: Type.Object(
-          {
-            id: Type.Literal("mcp-json"),
-            secret: Type.Object(
-              { prefix: Type.String(), suffix: Type.String() },
-              { additionalProperties: false },
-            ),
-          },
-          { additionalProperties: false },
+        userFile: Type.Optional(Type.String({ minLength: 1 })),
+        codec: Type.Union([
+          Type.Object(
+            {
+              id: Type.Literal("mcp-json"),
+              secret: Type.Optional(
+                Type.Object(
+                  {
+                    prefix: Type.String(),
+                    suffix: Type.String(),
+                    in: Type.Optional(
+                      Type.Array(choice("command", "args", "env", "url", "headers")),
+                    ),
+                  },
+                  { additionalProperties: false },
+                ),
+              ),
+              type: Type.Optional(
+                Type.Object(
+                  {
+                    stdio: Type.Optional(Type.String()),
+                    "streamable-http": Type.Optional(Type.String()),
+                    sse: Type.Optional(Type.String()),
+                  },
+                  { additionalProperties: false },
+                ),
+              ),
+              url: Type.Optional(
+                Type.Object(
+                  {
+                    "streamable-http": Type.Optional(Type.String()),
+                    sse: Type.Optional(Type.String()),
+                  },
+                  { additionalProperties: false },
+                ),
+              ),
+              command: Type.Optional(Type.Literal("array")),
+              env: Type.Optional(Type.String({ minLength: 1 })),
+              tools: Type.Optional(
+                Type.Object(
+                  {
+                    allow: Type.Optional(Type.Array(Type.String(), { minItems: 1 })),
+                    deny: Type.Optional(Type.Array(Type.String(), { minItems: 1 })),
+                  },
+                  { additionalProperties: false },
+                ),
+              ),
+            },
+            { additionalProperties: false },
+          ),
+          Type.Object({ id: Type.Literal("mcp-codex") }, { additionalProperties: false }),
+        ]),
+        deny: Type.Optional(
+          Type.Object(
+            {
+              file: Type.String({ minLength: 1 }),
+              at: Type.Array(Type.String(), { minItems: 1 }),
+              item: Type.String({ minLength: 1 }),
+            },
+            { additionalProperties: false },
+          ),
         ),
         transports: Type.Array(choice("stdio", "streamable-http", "sse"), { minItems: 1 }),
       },

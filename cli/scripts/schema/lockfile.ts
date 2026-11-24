@@ -100,6 +100,11 @@ const Entry = Type.Object(
     format: Type.Union([Type.Literal("json"), Type.Literal("toml"), Type.Literal("yaml")]),
     at: Type.Array(Type.String(), { minItems: 1, description: "Key path to the entry." }),
     digest: Type.String({ minLength: 1, description: "sha256 of the entry as written." }),
+    items: Type.Optional(
+      Type.Array(Type.String(), {
+        description: "Items aireg added to the list at `at`, when it wrote no table there.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );

@@ -20,8 +20,13 @@
       "file": ".mcp.json",
       "format": "json",
       "at": ["mcpServers", "{name}"],
-      "codec": { "id": "mcp-json", "secret": { "prefix": "${", "suffix": "}" } },
-      "transports": ["stdio", "streamable-http", "sse"]
+      "codec": {
+        "id": "mcp-json",
+        "secret": { "prefix": "${", "suffix": "}" },
+        "type": { "streamable-http": "http", "sse": "sse" }
+      },
+      "transports": ["stdio", "streamable-http", "sse"],
+      "deny": { "file": "settings.json", "at": ["permissions", "deny"], "item": "mcp__{name}__{tool}" }
     }
   },
   "trust": { "plugin": { "run": "claude", "scope": "project" } },

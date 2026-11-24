@@ -27,8 +27,14 @@ export const claudeCode = defineTarget({
       file: ".mcp.json",
       format: "json",
       at: ["mcpServers", "{name}"],
-      codec: { id: "mcp-json", secret: { prefix: "${", suffix: "}" } },
+      codec: {
+        id: "mcp-json",
+        secret: { prefix: "${", suffix: "}" },
+        type: { "streamable-http": "http", sse: "sse" },
+      },
       transports: ["stdio", "streamable-http", "sse"],
+      // `permissions.allow` approves a tool rather than limiting the server, so only a deny applies.
+      deny: { file: "settings.json", at: ["permissions", "deny"], item: "mcp__{name}__{tool}" },
     },
   },
   // A project's plugins load only once Claude Code trusts the project; skills and agents need no step.

@@ -123,6 +123,8 @@ export interface LockEntry {
   at: string[];
   /** sha256 of the entry as written. */
   digest: string;
+  /** Set when aireg added these items to the list at `at`, rather than writing a table. */
+  items?: string[] | undefined;
 }
 
 /** Set when a folder here supplied the bytes: it makes a row yours, and `publish` sends only those. */
@@ -300,7 +302,18 @@ function parseEntries(raw: unknown, scope: Scope): LockEntry[] | undefined {
     if (target === undefined || file === undefined || digest === undefined) return undefined;
     if (!(FORMATS as readonly string[]).includes(format ?? "")) return undefined;
     if (at.length === 0 || at.length !== (item.at as unknown[]).length) return undefined;
-    entries.push({ target, file, format: format as LockEntry["format"], at, digest });
+    const items = Array.isArray(item.items)
+      ? item.items.filter((x) => typeof x === "string")
+      : undefined;
+    if (items !== undefined && items.length !== (item.items as unknown[]).length) return undefined;
+    entries.push({
+      target,
+      file,
+      format: format as LockEntry["format"],
+      at,
+      digest,
+      ...(items === undefined ? {} : { items }),
+    });
   }
   return entries;
 }

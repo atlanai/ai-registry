@@ -51,6 +51,8 @@ Every page below was read on 2026-10-19, and the plugin loading and security pag
 | A project's MCP servers in `.mcp.json` at the project root, under `mcpServers.<name>` | https://code.claude.com/docs/en/mcp, read on 2026-11-24 | "Project-scoped servers enable team collaboration by storing configurations in a `.mcp.json` file at your project's root directory." | 2.1.296 | documented, not run |
 | A secret written as `${VAR}`, expanded when the server starts | Same page | "You can reference an environment variable in a server's `command`, `args`, `env`, `url`, or `headers` value ... `${VAR}`: expands to the value of environment variable `VAR`" | 2.1.296 | documented, not run |
 | A local server as `command`, `args` and `env`; a remote as `type` `http` or `sse` with `url` and `headers` | Same page | "Claude Code reads an entry with no `type` as a stdio server."; `"type": "http", "url": "https://example.com/mcp"` | 2.1.296 | documented, not run |
+| A denied tool as `mcp__<server>__<tool>` in `permissions.deny` of `.claude/settings.json`; an allow list is not applied, since `permissions.allow` approves tools rather than limiting them, so the server is left out | https://code.claude.com/docs/en/permissions, read 2026-11-24 | Vendor documentation, as summarized on that date | 2.1.296 | documented, not run |
+| User scope left out: `~/.claude.json` is rewritten by Claude Code while it runs; use `claude mcp add-json` | https://code.claude.com/docs/en/mcp, read 2026-11-24 | Vendor documentation, as summarized on that date | 2.1.296 | documented, not run |
 
 Result is `confirmed`, `wrong` (with what is right) or `undocumented`.
 

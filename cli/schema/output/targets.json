@@ -804,33 +804,161 @@
                             }
                           ]
                         },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
                         "codec": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "secret"
-                          ],
-                          "properties": {
-                            "id": {
-                              "const": "mcp-json",
-                              "type": "string"
-                            },
-                            "secret": {
+                          "anyOf": [
+                            {
                               "additionalProperties": false,
                               "type": "object",
                               "required": [
-                                "prefix",
-                                "suffix"
+                                "id"
                               ],
                               "properties": {
-                                "prefix": {
+                                "id": {
+                                  "const": "mcp-json",
                                   "type": "string"
                                 },
-                                "suffix": {
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
                                   "type": "string"
                                 }
                               }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
                             }
                           }
                         },
@@ -1377,33 +1505,161 @@
                             }
                           ]
                         },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
                         "codec": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "secret"
-                          ],
-                          "properties": {
-                            "id": {
-                              "const": "mcp-json",
-                              "type": "string"
-                            },
-                            "secret": {
+                          "anyOf": [
+                            {
                               "additionalProperties": false,
                               "type": "object",
                               "required": [
-                                "prefix",
-                                "suffix"
+                                "id"
                               ],
                               "properties": {
-                                "prefix": {
+                                "id": {
+                                  "const": "mcp-json",
                                   "type": "string"
                                 },
-                                "suffix": {
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
                                   "type": "string"
                                 }
                               }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
                             }
                           }
                         },
@@ -1950,33 +2206,161 @@
                             }
                           ]
                         },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
                         "codec": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "secret"
-                          ],
-                          "properties": {
-                            "id": {
-                              "const": "mcp-json",
-                              "type": "string"
-                            },
-                            "secret": {
+                          "anyOf": [
+                            {
                               "additionalProperties": false,
                               "type": "object",
                               "required": [
-                                "prefix",
-                                "suffix"
+                                "id"
                               ],
                               "properties": {
-                                "prefix": {
+                                "id": {
+                                  "const": "mcp-json",
                                   "type": "string"
                                 },
-                                "suffix": {
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
                                   "type": "string"
                                 }
                               }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
                             }
                           }
                         },
@@ -2523,33 +2907,161 @@
                             }
                           ]
                         },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
                         "codec": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "secret"
-                          ],
-                          "properties": {
-                            "id": {
-                              "const": "mcp-json",
-                              "type": "string"
-                            },
-                            "secret": {
+                          "anyOf": [
+                            {
                               "additionalProperties": false,
                               "type": "object",
                               "required": [
-                                "prefix",
-                                "suffix"
+                                "id"
                               ],
                               "properties": {
-                                "prefix": {
+                                "id": {
+                                  "const": "mcp-json",
                                   "type": "string"
                                 },
-                                "suffix": {
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
                                   "type": "string"
                                 }
                               }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
                             }
                           }
                         },
@@ -3354,33 +3866,161 @@
                             }
                           ]
                         },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
                         "codec": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "secret"
-                          ],
-                          "properties": {
-                            "id": {
-                              "const": "mcp-json",
-                              "type": "string"
-                            },
-                            "secret": {
+                          "anyOf": [
+                            {
                               "additionalProperties": false,
                               "type": "object",
                               "required": [
-                                "prefix",
-                                "suffix"
+                                "id"
                               ],
                               "properties": {
-                                "prefix": {
+                                "id": {
+                                  "const": "mcp-json",
                                   "type": "string"
                                 },
-                                "suffix": {
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
                                   "type": "string"
                                 }
                               }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
                             }
                           }
                         },
@@ -3927,33 +4567,161 @@
                             }
                           ]
                         },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
                         "codec": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "secret"
-                          ],
-                          "properties": {
-                            "id": {
-                              "const": "mcp-json",
-                              "type": "string"
-                            },
-                            "secret": {
+                          "anyOf": [
+                            {
                               "additionalProperties": false,
                               "type": "object",
                               "required": [
-                                "prefix",
-                                "suffix"
+                                "id"
                               ],
                               "properties": {
-                                "prefix": {
+                                "id": {
+                                  "const": "mcp-json",
                                   "type": "string"
                                 },
-                                "suffix": {
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
                                   "type": "string"
                                 }
                               }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
                             }
                           }
                         },
@@ -4500,33 +5268,161 @@
                             }
                           ]
                         },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
                         "codec": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "secret"
-                          ],
-                          "properties": {
-                            "id": {
-                              "const": "mcp-json",
-                              "type": "string"
-                            },
-                            "secret": {
+                          "anyOf": [
+                            {
                               "additionalProperties": false,
                               "type": "object",
                               "required": [
-                                "prefix",
-                                "suffix"
+                                "id"
                               ],
                               "properties": {
-                                "prefix": {
+                                "id": {
+                                  "const": "mcp-json",
                                   "type": "string"
                                 },
-                                "suffix": {
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
                                   "type": "string"
                                 }
                               }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
                             }
                           }
                         },
@@ -5073,33 +5969,161 @@
                             }
                           ]
                         },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
                         "codec": {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "secret"
-                          ],
-                          "properties": {
-                            "id": {
-                              "const": "mcp-json",
-                              "type": "string"
-                            },
-                            "secret": {
+                          "anyOf": [
+                            {
                               "additionalProperties": false,
                               "type": "object",
                               "required": [
-                                "prefix",
-                                "suffix"
+                                "id"
                               ],
                               "properties": {
-                                "prefix": {
+                                "id": {
+                                  "const": "mcp-json",
                                   "type": "string"
                                 },
-                                "suffix": {
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
                                   "type": "string"
                                 }
                               }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
                             }
                           }
                         },

@@ -26,7 +26,10 @@ async function setup(tmp: string) {
   const from = join(tmp, "copy");
   await mkdir(from, { recursive: true });
   await writeFile(join(from, "server.json"), JSON.stringify(SERVER));
-  const run = { inputs: { roots: roots("project", tmp) } } as unknown as Run;
+  const run = {
+    inputs: { roots: roots("project", tmp) },
+    results: { claims: new Map() },
+  } as unknown as Run;
   const to = join(tmp, ".mcp.json");
   const action = (extra: Partial<ActionOf<"configure">> = {}): ActionOf<"configure"> => ({
     kind: "configure",
@@ -90,6 +93,73 @@ describe("configure", () => {
     const done = await configure(run, action({ mapping: remoteOnly }));
     expect(done.unrendered?.reason).toContain("does not load");
   });
+});
+
+describe("an entry two targets read", () => {
+  test("is written once when they agree, and left to the first when they differ", async ({
+    tmp,
+  }) => {
+    const { run, action, json } = await setup(tmp);
+    expect((await configure(run, action())).written).toBe(true);
+    const same = await configure(run, action({ target: "github-copilot" }));
+    expect(same).toMatchObject({ written: false, receipt: { target: "github-copilot" } });
+    const narrowed = await configure(
+      run,
+      action({
+        target: "github-copilot",
+        mapping: {
+          ...mapping,
+          codec: {
+            id: "mcp-json",
+            secret: { prefix: "${", suffix: "}" },
+            tools: { allow: ["tools"] },
+          },
+        },
+        server: { tools: { allow: ["a"] } },
+      }),
+    );
+    expect(narrowed.unrendered?.reason).toContain("claude-code");
+    expect(Object.keys((await json()).mcpServers.srv)).not.toContain("tools");
+  });
+});
+
+describe("denied tools", () => {
+  test("go beside a person's own rules, and only aireg's are taken back", async ({ tmp }) => {
+    const { run, action } = await setup(tmp);
+    const settings = join(tmp, ".claude", "settings.json");
+    await mkdir(join(tmp, ".claude"));
+    await writeFile(settings, JSON.stringify({ permissions: { deny: ["Bash(rm:*)"] } }));
+    const at = ["permissions", "deny"];
+    const done = await configure(
+      run,
+      action({
+        server: { tools: { deny: ["drop"] } },
+        deny: { to: settings, at, items: ["mcp__srv__drop"] },
+      }),
+    );
+    expect(done.denied).toMatchObject({ file: ".claude/settings.json", items: ["mcp__srv__drop"] });
+    const read = async () => JSON.parse(await readFile(settings, "utf8"));
+    expect((await read()).permissions.deny).toEqual(["Bash(rm:*)", "mcp__srv__drop"]);
+    const receipt = done.denied;
+    if (receipt === undefined) throw new Error("no receipt");
+    const take = { kind: "unconfigure" as const, name: "srv", target: "claude-code" };
+    await unconfigure(run, { ...take, to: settings, format: "json", receipt });
+    expect(await read()).toEqual({ permissions: { deny: ["Bash(rm:*)"] } });
+  });
+
+  test("allowing only some tools leaves Claude Code out", async ({ tmp }) => {
+    const { run, action } = await setup(tmp);
+    const done = await configure(run, action({ server: { tools: { allow: ["a"] } } }));
+    expect(done.unrendered?.reason).toContain("allows only some tools");
+  });
+});
+
+test("leaves a file it cannot parse, such as JSON with comments", async ({ tmp }) => {
+  const { run, to, action } = await setup(tmp);
+  await writeFile(to, '// mine\n{ "mcpServers": {} }\n');
+  const done = await configure(run, action());
+  expect(done.unrendered?.reason).toContain("comments");
+  expect(await readFile(to, "utf8")).toContain("// mine");
 });
 
 describe("unconfigure", () => {

@@ -25,6 +25,9 @@ export function planConfigs(
   const kept: LockEntry[] = [];
   for (const want of wanted) {
     const receipt = held.find((entry) => sameEntry(entry, want));
+    const deny = want.deny;
+    const denyReceipt =
+      deny === undefined ? undefined : held.find((entry) => sameEntry(entry, { ...want, ...deny }));
     build.actions.push({
       kind: "configure",
       name: item.name,
@@ -34,20 +37,32 @@ export function planConfigs(
       mapping: want.mapping,
       from: copy,
       server:
-        item.server === undefined ? undefined : { with: item.server.with, env: item.server.env },
+        item.server === undefined
+          ? undefined
+          : { with: item.server.with, env: item.server.env, tools: item.server.tools },
       ...(receipt === undefined ? {} : { receipt }),
+      ...(deny === undefined
+        ? {}
+        : {
+            deny: {
+              to: resolve(build.options.roots.base, deny.file),
+              at: deny.at,
+              items: deny.items,
+              ...(denyReceipt === undefined ? {} : { receipt: denyReceipt }),
+            },
+          }),
       ...(build.options.force ? { force: true as const } : {}),
     });
     if (receipt !== undefined) kept.push(receipt);
+    if (denyReceipt !== undefined) kept.push(denyReceipt);
   }
   for (const entry of held) {
-    if (!wanted.some((want) => sameEntry(entry, want))) unconfigure(build, item.name, entry);
-  }
-  if (item.server?.tools !== undefined && wanted.length > 0) {
-    build.warnings.push({
-      name: item.name,
-      message: `No target here can narrow an MCP server's tools, so \`tools\` of ${item.name} is not applied.`,
-    });
+    if (kept.includes(entry)) continue;
+    // Another target still writes the same entry, such as a shared `.mcp.json`; it stays.
+    const shared = wanted.some(
+      (want) => want.file === entry.file && isDeepStrictEqual(want.at, entry.at),
+    );
+    if (!shared) unconfigure(build, item.name, entry);
   }
   return kept;
 }
@@ -71,6 +86,8 @@ interface Wanted {
   file: string;
   at: string[];
   mapping: ConfigMapping;
+  /** Denied tools written as items of a list in another file. */
+  deny?: { file: string; at: string[]; items: string[] };
 }
 
 function configsFor(item: Selected, build: BuildState): Wanted[] {
@@ -85,20 +102,32 @@ function configsFor(item: Selected, build: BuildState): Wanted[] {
     if (target === undefined || mapping?.shape !== "config") continue;
     if (mapping.scope !== undefined && mapping.scope !== roots.scope) continue;
     const vars = { name: item.name };
-    const base = mapping.anchor === "project" ? roots.cwd : targetRoot(target, where);
-    const path = expand(mapping.file, vars);
+    const root = targetRoot(target, where);
+    const user = roots.scope === "user";
+    const base = mapping.anchor === "project" && !user ? roots.cwd : root;
+    const path = expand(user ? (mapping.userFile ?? mapping.file) : mapping.file, vars);
     if (isAbsolute(path)) continue;
+    const deny = item.server?.tools?.deny ?? [];
     wanted.push({
       target: name,
       file: posixRelative(roots.base, join(base, path)),
       at: mapping.at.map((key) => expand(key, vars)),
       mapping,
+      ...(mapping.deny === undefined || deny.length === 0
+        ? {}
+        : {
+            deny: {
+              file: posixRelative(roots.base, join(root, expand(mapping.deny.file, vars))),
+              at: mapping.deny.at,
+              items: deny.map((tool) => expand(mapping.deny?.item ?? "", { ...vars, tool })),
+            },
+          }),
     });
   }
   return wanted;
 }
 
-function sameEntry(entry: LockEntry, want: Wanted): boolean {
+function sameEntry(entry: LockEntry, want: Pick<Wanted, "target" | "file" | "at">): boolean {
   return (
     entry.target === want.target && entry.file === want.file && isDeepStrictEqual(entry.at, want.at)
   );

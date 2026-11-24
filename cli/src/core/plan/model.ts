@@ -135,9 +135,11 @@ export type Action =
       mapping: Extract<KindMapping, { shape: "config" }>;
       /** This scope's copy, which holds `server.json`. */
       from: string;
-      server: Pick<Ref, "with" | "env"> | undefined;
+      server: Pick<Ref, "with" | "env" | "tools"> | undefined;
       /** What the lockfile says aireg wrote there before. */
       receipt?: LockEntry;
+      /** Denied tools added as items of a list in another file, for a target whose entry cannot. */
+      deny?: { to: string; at: string[]; items: string[]; receipt?: LockEntry };
       /** Replaces our entry even when it was edited. */
       force?: true;
     }

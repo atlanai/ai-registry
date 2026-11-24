@@ -168,6 +168,11 @@ function configProblems(
   if (mapping.at.length === 0) report(`kinds.${kind}: at names no key.`);
   for (const key of mapping.at) templateProblems(key, ["name"], report);
   if (mapping.transports.length === 0) report(`kinds.${kind}: transports names none.`);
+  if (mapping.userFile !== undefined) pathProblem(mapping.userFile, ["name"], report);
+  if (mapping.deny !== undefined) {
+    pathProblem(mapping.deny.file, ["name"], report);
+    templateProblems(mapping.deny.item, ["name", "tool"], report);
+  }
 }
 
 function tomlCodec(mapping: KindMapping) {

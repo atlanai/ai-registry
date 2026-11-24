@@ -13,14 +13,26 @@ export async function currentEntryDigest(
   file: string,
   format: "json" | "toml" | "yaml",
   at: readonly string[],
+  items?: readonly string[],
 ): Promise<string | undefined> {
   const text = await readTextIfPresent(file);
   if (text === undefined) return undefined;
   try {
-    const table = openDocument(format, text, {}, file).table(at);
+    const doc = openDocument(format, text, {}, file);
+    if (items !== undefined) return itemsDigest(items, doc.list(at) ?? []);
+    const table = doc.table(at);
     return table === undefined ? undefined : entryDigest(table);
   } catch {
     // A file that no longer parses holds no entry aireg can recognize as its own.
     return undefined;
   }
+}
+
+/** The digest of those of `items` that `list` holds, in their order; undefined when none are. */
+export function itemsDigest(
+  items: readonly string[],
+  list: readonly unknown[],
+): string | undefined {
+  const present = items.filter((item) => list.includes(item));
+  return present.length === 0 ? undefined : entryDigest({ items: present });
 }

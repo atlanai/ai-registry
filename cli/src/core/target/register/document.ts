@@ -206,6 +206,8 @@ export function yamlDocument(text: string | undefined, start: Table, file: strin
       for (const key of keys) doc.deleteIn([...at, key]);
     },
     drop: (at) => {
+      // The YAML library refuses to delete below a mapping that is not there.
+      if (at.length > 1 && table(at.slice(0, -1)) === undefined) return;
       doc.deleteIn(at);
     },
     list: (at) => {

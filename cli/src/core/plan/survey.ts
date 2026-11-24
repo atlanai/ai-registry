@@ -55,7 +55,12 @@ export async function survey(lock: Lock, roots: Roots): Promise<Survey> {
         const entries: Record<string, string | undefined> = {};
         for (const receipt of entry.entries ?? []) {
           const file = resolve(roots.base, receipt.file);
-          entries[receiptKey(receipt)] = await currentEntryDigest(file, receipt.format, receipt.at);
+          entries[receiptKey(receipt)] = await currentEntryDigest(
+            file,
+            receipt.format,
+            receipt.at,
+            receipt.items,
+          );
         }
         artifacts[name] = {
           staged: present,

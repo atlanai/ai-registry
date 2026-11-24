@@ -338,6 +338,13 @@
                     "minLength": 1,
                     "description": "sha256 of the entry as written.",
                     "type": "string"
+                  },
+                  "items": {
+                    "description": "Items aireg added to the list at `at`, when it wrote no table there.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 }
               }

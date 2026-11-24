@@ -97,6 +97,8 @@ export interface RunResults {
   projections: ReadonlySet<string> | undefined;
   /** By installed name, the config entries this run leaves aireg's. */
   receipts: Map<string, LockEntry[]>;
+  /** Config entries this run wrote or confirmed, by file and key path, and for which target. */
+  claims: Map<string, { target: string; digest: string }>;
 }
 
 export interface Run {
@@ -137,6 +139,7 @@ export function startRun(inputs: RunInputs, guards: Map<string, LinkGuard>): Run
       recorded: undefined,
       projections: undefined,
       receipts: new Map(),
+      claims: new Map(),
     },
   };
 }
@@ -226,6 +229,7 @@ export function addConfigured(
   if (action.kind === "unconfigure") return;
   const receipts = results.receipts.get(action.name) ?? [];
   if (done.receipt !== undefined) receipts.push(done.receipt);
+  if (done.denied !== undefined) receipts.push(done.denied);
   results.receipts.set(action.name, receipts);
   if (done.written) results.installed.add(action.name);
 }
