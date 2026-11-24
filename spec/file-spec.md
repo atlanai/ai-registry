@@ -227,7 +227,8 @@ metadata in a `_meta` beside each `server`. `sh.aireg/policy` is the only key de
   a value MUST be one of the input's `choices` when it has them.
 
 A client that installs an MCP server resolves each non-secret input it needs from, in order, its
-fixed `value` in `server.json`, `policy.inputs`, a value the person installing supplied, and its
+fixed `value` in `server.json`, `policy.inputs`, a value the person installing supplied (where
+and how is up to the client), and its
 `default`. A required input still without a value leaves the server out for every agent, with
 the reason. An input or template variable marked `isSecret` takes its value only from the
 environment, even when `server.json` gives it a `value` or `default`: a client MUST NOT write a
@@ -236,7 +237,9 @@ instead writes a reference
 to an environment variable in the agent's own syntax, and leaves the server out for an agent that
 has no syntax for that reference where it is needed. A client MUST NOT start a server, or run
 its package, as part of installing it, and SHOULD show the full command or URL, and the
-variables it reads, before it writes anything.
+variables it reads, before it writes anything. The digest pins `server.json` and `policy.json`,
+not the packages, images or remotes they name: a package's dependencies resolve when it starts,
+and an OCI identifier without `@sha256:` names a tag that can move.
 
 ### 3.5 Native files
 

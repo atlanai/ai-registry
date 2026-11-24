@@ -3,7 +3,7 @@
 A registry publishes the MCP servers its users may run, and a client installs each one into every coding agent's own configuration, with secrets as references and without touching entries it did not write.
 
 !!! note "Status"
-    The `mcp_server` kind is a draft in the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md), section 3.4. aireg does not bundle the kind yet: a registry gets it by listing `mcp_server` in `registry.json` and serving `kinds/mcp_server.json` with `kinds/vendor/mcp/` beside it, copied from the spec, as [acme-registry](https://github.com/atlanai/ai-registry/tree/main/examples/acme-registry) does. There, `aireg mcp_server new`, `bump`, `registry index` and `registry validate` work. aireg does not install, update or remove MCP servers in coding agents: everything under [Installing](#installing) is a proposal.
+    The `mcp_server` kind is a draft in the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md), section 3.4. aireg does not bundle the kind yet: a registry gets it by listing `mcp_server` in `registry.json` and serving `kinds/mcp_server.json` with `kinds/vendor/mcp/` beside it, copied from the spec, as [acme-registry](https://github.com/atlanai/ai-registry/tree/main/examples/acme-registry) does. There, `aireg mcp_server new`, `bump`, `registry index` and `registry validate` work. aireg does not install, update or remove MCP servers in coding agents: `add` and `show` treat `mcp_server` as a kind they do not know, so a ref to one finds nothing and adding a namespace skips it (file spec section 5, rule 4). Everything under [Installing](#installing) is a proposal.
 
 ## Principles
 
@@ -67,7 +67,7 @@ The envelope takes the shape of an MCP Registry API response, `server` with a `_
 
 ### Versions
 
-`metadata.version` is the artifact's version and `spec.server.version` the server's, as a Helm chart's `version` is separate from its `appVersion`. They should be equal, and may differ when only the policy changes: a registry that tightens the deny list of server `1.2.0` publishes `1.2.1`, and `show` displays both numbers.
+`metadata.version` is the artifact's version and `spec.server.version` the server's, as a Helm chart's `version` is separate from its `appVersion`. They should be equal, and may differ when only the policy changes: a registry that tightens the deny list of server `1.2.0` publishes `1.2.1`. A client should display both numbers.
 
 Semver build metadata, such as `1.2.0+acme.1`, looks like a way to keep the numbers aligned, and the version grammar accepts it. It does not work: semver precedence ignores build metadata, so `1.2.0+acme.1` and `1.2.0+acme.2` are equal, and section 3.3 cannot say which is `latest`.
 
@@ -95,7 +95,7 @@ The rule the schemas cannot state, that `policy.inputs` names an input `server.j
 | `tools.deny` | Never these tools. Deny wins over allow. |
 | `tools.enforcement` | `required`, the default, installs the server only for agents that can apply the filter. `best_effort` installs it elsewhere too, and says which tools stay exposed. |
 | `timeouts.startup_ms`, `timeouts.tool_ms` | Passed to agents that support them, rounded up to the agent's unit. |
-| `inputs` | Values the registry fixes for non-secret inputs, by the name `server.json` resolves URL templates by. |
+| `inputs` | Values the registry fixes for non-secret inputs, keyed as described under [Inputs](#inputs). |
 
 Each field already exists in production tools: Codex has `enabled_tools`, `disabled_tools` and both timeouts; Gemini CLI has `includeTools`, `excludeTools` and `timeout`; ToolHive and Docker's MCP gateway filter tools. Auto-approval and trust are deliberately absent: approving tool calls without asking is a decision for each organization's agent policy, not for a registry entry.
 
@@ -156,6 +156,7 @@ Cells marked *verify* must be settled by a real install before that agent is sup
 | Gemini CLI | `.gemini/settings.json` | `mcpServers` | `$VAR` in `env`, *verify* | `includeTools`, `excludeTools` |
 | Copilot CLI | `.mcp.json`, shared, *verify* | `mcpServers` | *verify* | `tools` |
 | OpenCode | `opencode.json` | `mcp` | `{env:VAR}`; an unset variable becomes empty | `tools` map |
+| Grok Build | `.mcp.json`, shared, *verify* | `mcpServers` | *verify* | *verify* |
 
 Transport names differ too: `server.json` says `streamable-http`, Claude Code writes `http`, Gemini CLI `httpUrl`, OpenCode `remote`, and Codex infers it from `url`.
 
