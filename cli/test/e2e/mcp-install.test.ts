@@ -39,6 +39,7 @@ test("installs an MCP server into Claude Code's .mcp.json, sees an edit, and rem
   expect(written.mcpServers).toEqual({
     mine: { command: "mine" },
     "issue-tracker": {
+      type: "stdio",
       command: "npx",
       args: ["-y", "@example/issue-tracker-mcp@1.2.0"],
       env: { ISSUES_URL: "https://issues.example.test", ISSUES_TOKEN: `\${ISSUES_TOKEN}` },
@@ -146,10 +147,10 @@ test("installs an MCP server for every project target that loads one, and remove
   const args = ["-y", "@example/issue-tracker-mcp@1.2.0"];
   const url = "https://issues.example.test";
   const shared = { command: "npx", args, env: { ISSUES_URL: url, [token]: `\${${token}}` } };
-  expect(JSON.parse(await read(".mcp.json")).mcpServers["issue-tracker"]).toEqual(shared);
+  const typed = { type: "stdio", ...shared };
+  expect(JSON.parse(await read(".mcp.json")).mcpServers["issue-tracker"]).toEqual(typed);
   expect(JSON.parse(await read(".cursor/mcp.json")).mcpServers["issue-tracker"]).toEqual({
-    type: "stdio",
-    ...shared,
+    ...typed,
     env: { ISSUES_URL: url, [token]: `\${env:${token}}` },
   });
   expect(JSON.parse(await read(".gemini/settings.json"))).toEqual({

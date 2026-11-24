@@ -30,7 +30,7 @@ export const claudeCode = defineTarget({
       codec: {
         id: "mcp-json",
         secret: { prefix: "${", suffix: "}" },
-        type: { "streamable-http": "http", sse: "sse" },
+        type: { stdio: "stdio", "streamable-http": "http", sse: "sse" },
       },
       transports: ["stdio", "streamable-http", "sse"],
       // `permissions.allow` approves a tool rather than limiting the server, so only a deny applies.

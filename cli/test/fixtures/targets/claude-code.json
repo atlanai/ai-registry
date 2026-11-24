@@ -23,7 +23,7 @@
       "codec": {
         "id": "mcp-json",
         "secret": { "prefix": "${", "suffix": "}" },
-        "type": { "streamable-http": "http", "sse": "sse" }
+        "type": { "stdio": "stdio", "streamable-http": "http", "sse": "sse" }
       },
       "transports": ["stdio", "streamable-http", "sse"],
       "deny": { "file": "settings.json", "at": ["permissions", "deny"], "item": "mcp__{name}__{tool}" }

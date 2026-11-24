@@ -58,7 +58,12 @@ describe("configure", () => {
     expect(await json()).toEqual({
       mcpServers: {
         mine: { command: "x" },
-        srv: { command: "npx", args: ["-y", "srv@1.0.0"], env: { TOKEN: `\${TOKEN}` } },
+        srv: {
+          type: "stdio",
+          command: "npx",
+          args: ["-y", "srv@1.0.0"],
+          env: { TOKEN: `\${TOKEN}` },
+        },
       },
     });
     const { receipt } = done;

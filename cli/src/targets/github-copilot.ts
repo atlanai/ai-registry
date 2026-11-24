@@ -31,7 +31,7 @@ export const githubCopilot = defineTarget({
       codec: {
         id: "mcp-json",
         secret: { prefix: "${", suffix: "}" },
-        type: { "streamable-http": "http", sse: "sse" },
+        type: { stdio: "stdio", "streamable-http": "http", sse: "sse" },
         tools: { allow: ["tools"] },
       },
       transports: ["stdio", "streamable-http", "sse"],
