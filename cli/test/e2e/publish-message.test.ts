@@ -5,8 +5,6 @@ import { test as base } from "#test/kit/fixtures.ts";
 import { writeManifestIn } from "#test/kit/scope.ts";
 import { skillBody } from "#test/kit/spec-root.ts";
 
-// A source that records messages hears whether a person wrote the one it gets, so it can keep its
-// own account of the change over the subject aireg composes from names and versions.
 const test = base.extend("recording", async ({ home: { dir: home }, project }) => {
   const adapter = join(home, "messages.mjs");
   const sent = join(home, "sent.jsonl");
@@ -24,8 +22,8 @@ const test = base.extend("recording", async ({ home: { dir: home }, project }) =
       "  connect: async () => ({",
       "    resolve: async () => ({ artifacts: [] }),",
       "    fetch: async () => new Uint8Array(),",
-      "    publish: async (inputs, { message, messageGiven }) => {",
-      `      appendFileSync(${JSON.stringify(sent)}, JSON.stringify({ message, messageGiven }) + '\\n');`,
+      "    publish: async (inputs, { message }) => {",
+      `      appendFileSync(${JSON.stringify(sent)}, JSON.stringify({ message }) + '\\n');`,
       "      return {};",
       "    },",
       "    close: async () => {},",
@@ -64,17 +62,15 @@ async function sentOptions(sent: string): Promise<unknown[]> {
 }
 
 describe("the message a publish hands its source", () => {
-  test("is marked as given when it came from -m", async ({ aireg, recording: sent }) => {
+  test("is the one given with -m", async ({ aireg, recording: sent }) => {
     const published = await aireg(["publish", "--yes", "-m", "Tightens the checklist."]);
     expect(published.code, published.stderr).toBe(0);
-    expect(await sentOptions(sent)).toEqual([
-      { message: "Tightens the checklist.", messageGiven: true },
-    ]);
+    expect(await sentOptions(sent)).toEqual([{ message: "Tightens the checklist." }]);
   });
 
-  test("is marked as composed when aireg wrote it", async ({ aireg, recording: sent }) => {
+  test("is left out when nobody wrote one", async ({ aireg, recording: sent }) => {
     const published = await aireg(["publish", "--yes"]);
     expect(published.code, published.stderr).toBe(0);
-    expect(await sentOptions(sent)).toEqual([{ message: "add review 0.1.0", messageGiven: false }]);
+    expect(await sentOptions(sent)).toEqual([{}]);
   });
 });

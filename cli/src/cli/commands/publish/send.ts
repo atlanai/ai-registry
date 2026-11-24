@@ -32,26 +32,26 @@ export async function sendTo(
     );
   }
   const composed = subjectOf(items);
-  let message = options.message ?? composed;
+  let written = options.message?.trim() || undefined;
   if (options.asked) {
     const typed = await text(
       {
         message: "What changed?",
         style: printer.errStyle,
-        initial: message,
+        initial: written ?? composed,
         hint: "Type what changed, or press Enter to use this message.",
       },
       step.io,
     );
     if (canceled(typed)) return "canceled";
-    message = typed;
+    written = typed.trim() === composed ? undefined : typed.trim() || undefined;
   }
-  // Enter on the proposal is not a message of the person's own, so a source may still use its own.
-  const messageGiven = options.message !== undefined || message !== composed;
+  const message = written ?? composed;
+  // Only a person's own words reach the source; a composed subject would read as their account of the change.
   const published = await handle
     .publish?.(
       items.map((item) => item.input),
-      { message, messageGiven, review: true },
+      { ...(written === undefined ? {} : { message: written }), review: true },
     )
     .catch((error: unknown) => {
       throw heldUnlisted(error, alias, items);
