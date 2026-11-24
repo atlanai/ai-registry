@@ -94,6 +94,9 @@ export const ARTIFACT_KEYS = [
   LEGACY_TARGETS_KEY,
   "copy",
   "trust",
+  "with",
+  "env",
+  "tools",
 ] as const;
 
 export function emptyManifest(): Manifest {

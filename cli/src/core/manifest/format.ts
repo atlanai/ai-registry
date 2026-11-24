@@ -47,6 +47,9 @@ export function manifestData(manifest: Manifest): Record<string, unknown> {
       targets: ref.targets,
       copy: ref.copy === true ? true : undefined,
       trust: ref.trust?.length ? [...ref.trust].sort() : undefined,
+      with: ref.with,
+      env: ref.env,
+      tools: ref.tools,
     });
     return Object.keys(written).length === 1 ? formatRef(ref) : written;
   });
