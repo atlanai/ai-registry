@@ -6,6 +6,7 @@ import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { ARTIFACTS_DIR, ENVELOPE } from "#adapter/filespec/names.ts";
 import { MCP_SERVER_ENTRY } from "#adapter/kinds.ts";
+import { isVersion } from "#adapter/spec/ref.ts";
 import { list, sanitizeName } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { STREAMED } from "#cli/commands/define.ts";
@@ -38,8 +39,12 @@ interface Incoming {
   dir: string;
   entries: string[];
   name: string;
+  /** The first version: an MCP server keeps its own, so the two stay equal. */
+  version: string;
   front: { file: string; name: string } | undefined;
 }
+
+const FIRST_VERSION = "0.1.0";
 
 export interface Copied extends KindNewFrom {
   shown: { name: string; at: string }[];
@@ -83,7 +88,7 @@ export async function newFrom(
   const namespace = await namespaceFor(root, context.cwd, own, context, yes);
   if (namespace === undefined) return STREAMED;
   for (const item of found) {
-    refuseRedirect(root, join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0"));
+    refuseRedirect(root, join(root, ARTIFACTS_DIR, namespace, kind, item.name, item.version));
     if (existsSync(join(root, ARTIFACTS_DIR, namespace, kind, item.name))) {
       throw new AiregError(`${namespace}/${kind}/${item.name} already exists.`, {
         code: ErrorCode.Conflict,
@@ -94,7 +99,7 @@ export async function newFrom(
 
   const copied: { name: string; at: string }[] = [];
   for (const item of found) {
-    const at = join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0");
+    const at = join(root, ARTIFACTS_DIR, namespace, kind, item.name, item.version);
     await mkdir(at, { recursive: true });
     for (const path of item.entries) {
       await cp(join(item.dir, path), join(at, path), FRESH);
@@ -178,7 +183,9 @@ async function incoming(
   const file = specFile(manifest, texts);
   const front =
     file !== undefined && typeof spec?.name === "string" ? { file, name: spec.name } : undefined;
-  return { input, dir, entries, name, front };
+  const own = isRecord(spec?.server) ? spec.server.version : undefined;
+  const version = typeof own === "string" && isVersion(own) ? own : FIRST_VERSION;
+  return { input, dir, entries, name, version, front };
 }
 
 /** One file named by `--from`, refused as a link the way a folder's entries are. */

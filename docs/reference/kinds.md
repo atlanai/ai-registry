@@ -53,7 +53,7 @@ The normal artifact-name and collision checks apply.
 The `mcp_server` kind's command is `aireg mcp`, with the same actions; no other kind can be named `mcp`. A version holds the publisher's MCP Registry [`server.json`](https://github.com/modelcontextprotocol/registry), unchanged, and an optional `README.md` that is only documentation. The catalog's description and display name come from `server.json`.
 
 - `new` writes a `server.json` with the fields it requires, under the newest schema version the kind takes.
-- `new --from` takes a folder that holds a `server.json`, and checks it against the MCP Registry's schema before copying.
+- `new --from` takes a folder that holds a `server.json`, checks it against the MCP Registry's schema, and copies it in at the server's own `version`.
 - `bump` copies the folder and never edits `server.json`. Replace it with the publisher's new file, whose `version` should match the new one.
 
 `aireg add` installs an MCP server as an entry in each target's config. Installing never starts the server. A secret is written as a reference to an environment variable, such as `${ISSUES_TOKEN}`, never as its value. `aireg show` prints the command or URL a server starts with and the variables it reads. Adding a whole namespace or registry lists its servers and asks first; without a terminal it needs `--yes`.
