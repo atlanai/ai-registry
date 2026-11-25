@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { LockArtifact } from "#core/lock.ts";
 import type { Placement } from "#core/plan/model.ts";
 import type { Scan } from "./scan.ts";
-import { moved } from "./served.ts";
+import { moved, serves } from "./served.ts";
 
 const row = {
   registry: "team",
@@ -64,5 +64,19 @@ describe("moved", () => {
     const listed = [{ kind: "skill", name: "probe", group: "team", path: row.address }];
     expect(moved(serving([at("sha256:after", "4")], listed), yours)).toBe(true);
     expect(moved(serving([at("sha256:after", "4")]), yours)).toBe(false);
+  });
+});
+
+describe("serves", () => {
+  // Sent into a clone, so upstream holding the version means a teammate pushed it first.
+  test("names what upstream serves at or above the version sent, whatever its content", () => {
+    expect(serves(serving([at("sha256:theirs", "4")]), row, "4")).toBe("4");
+    expect(serves(serving([at("sha256:theirs", "0.1.2")]), row, "0.1.1")).toBe("0.1.2");
+  });
+
+  test("is undefined when upstream serves an older version, or nothing", () => {
+    expect(serves(serving([at("sha256:before", "3")]), row, "4")).toBeUndefined();
+    expect(serves(serving([]), row, "4")).toBeUndefined();
+    expect(serves(serving([at("sha256:theirs", "4")]), undefined, "4")).toBeUndefined();
   });
 });

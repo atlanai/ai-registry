@@ -1,10 +1,14 @@
 import { frontmatterRecord, markdownBody } from "#core/frontmatter.ts";
 import { multilineQuote, quote } from "#core/target/register/toml.ts";
+import { RESTRICTIONS } from "./frontmatter.ts";
 import type { Rendered } from "./index.ts";
 
 export function frontmatterToml(source: string, fields: readonly string[], body: string): Rendered {
   const record = frontmatterRecord(source);
   if (record === undefined) return { problem: "it has no front matter" };
+  // Dropped, it would let the agent do what its author ruled out.
+  const limit = RESTRICTIONS.find((key) => record[key] !== undefined && !fields.includes(key));
+  if (limit !== undefined) return { problem: `it sets ${limit}, which this target cannot read` };
   const lines: string[] = [];
   for (const field of fields) {
     const value = record[field];

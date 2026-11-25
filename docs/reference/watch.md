@@ -20,7 +20,7 @@ A watch belongs to a scope: a project, or with `-g` your user scope. It is part 
 
 ## aireg watch add
 
-Publishes each `<folder>` to `--to` whenever it changes. The registry must already be declared in the scope; see [`aireg registry add`](registry.md#aireg-registry-add). A git registry is refused, since aireg doesn't push to git.
+Publishes each `<folder>` to `--to` whenever it changes. aireg reads what a folder holds from its name, so the folder must be named `skills` or `agents`, such as `~/.claude/skills`; a folder with any other name is refused. The registry must already be declared in the scope; see [`aireg registry add`](registry.md#aireg-registry-add). A git registry is refused, since aireg doesn't push to git.
 
 A scope's watched folders all publish to one place. A folder for another `<registry>/<namespace>` is refused, naming where the scope already publishes; to move them, remove those watches first.
 
@@ -57,7 +57,7 @@ Lists every watched folder on this machine: the folder, where it publishes, the 
 
 - `0`: success.
 - `1`: the registry isn't declared, or the daemon didn't start.
-- `2`: the action is unknown, no folder was named, `--to` is missing or isn't `<registry>/<namespace>`, `--to` names a registry that takes no publishes or isn't where the scope already publishes, or `remove` names a folder the scope doesn't publish.
+- `2`: the action is unknown, no folder was named, a folder isn't named `skills` or `agents`, `--to` is missing or isn't `<registry>/<namespace>`, `--to` names a registry that takes no publishes or isn't where the scope already publishes, or `remove` names a folder the scope doesn't publish.
 - `4`: the registry needs a sign-in and there is no account signed in to it; run `aireg auth login <registry>` first.
 
 ## Examples

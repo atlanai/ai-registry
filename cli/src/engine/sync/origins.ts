@@ -10,7 +10,7 @@ import { authoredDigest } from "#core/fs/digest.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { canonical, canonicalAsync } from "#core/fs/realpath.ts";
 import { authoredArtifact, copyAuthored, exists, type Irregular, refusal } from "#core/fs/tree.ts";
-import { KIND_SPECS } from "#core/kinds.ts";
+import { KIND_SPECS, kindOfDir } from "#core/kinds.ts";
 import { type Lock, type LockArtifact, readLock, writeLock } from "#core/lock.ts";
 import { listedAt } from "#core/plan/acquire/sources.ts";
 import { removeContained } from "#core/plan/removable.ts";
@@ -126,14 +126,6 @@ async function found(step: Step, selector: Selector): Promise<Origin[]> {
 function destination(step: Step): { registry: string; namespace: string } {
   const [registry = "", namespace = ""] = (step.to ?? "").split("/");
   return { registry, namespace };
-}
-
-function kindOfDir(dir: string): ArtifactKind | undefined {
-  const leaf = basename(dir);
-  for (const [kind, spec] of Object.entries(KIND_SPECS)) {
-    if (spec.dir === leaf) return kind as ArtifactKind;
-  }
-  return undefined;
 }
 
 /** For the record only, not for behavior. */

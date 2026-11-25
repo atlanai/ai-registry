@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, vi } from "vitest";
 import { type Artifact, buildEnvelope } from "#adapter/index.ts";
-import type { Lock } from "#core/lock.ts";
+import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { parseManifest } from "#core/manifest/parse.ts";
 import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { type AcquireOptions, acquire } from "./acquire.ts";
-import { answers, lockView } from "./lock-view.ts";
+import { answers, lockDrift, lockView } from "./lock-view.ts";
 import { newlyYanked } from "./placement.ts";
 import { wanted } from "./request.ts";
 
@@ -303,5 +303,16 @@ describe("acquire", () => {
 
     expect(onBytes).toHaveBeenCalledWith(42);
     expect(onDownload).toHaveBeenCalledWith(artifact, 42);
+  });
+});
+
+describe("lockDrift", () => {
+  test("keeps an artifact needed through a dependency cycle", () => {
+    const lock = locked({ c: "1.0.0", b: "1.0.0", d: "1.0.0", a: "1.0.0" });
+    const row = (name: string) => lock.artifacts[`platform/${name}`] as LockArtifact;
+    row("c").neededBy = ["platform/b", "platform/a"];
+    row("b").neededBy = ["platform/c"];
+    row("d").neededBy = ["platform/b"];
+    expect(lockDrift(manifest(["acme/platform/skill/a@1.0.0"]), lock).extraneous).toEqual([]);
   });
 });

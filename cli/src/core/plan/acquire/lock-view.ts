@@ -2,11 +2,12 @@ import { isLayoutId } from "#adapter/layouts/ids.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import type { Entry } from "#core/catalog/catalog.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
+import { asksFor } from "#core/manifest/match.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import type { Need } from "#core/plan/depends.ts";
 import type { Acquired, Placement } from "#core/plan/model.ts";
 import { candidates } from "#core/plan/select.ts";
-import type { Ref } from "#core/ref.ts";
+import { formatRef, type Ref } from "#core/ref.ts";
 
 /** A lock as plans read it: rows grouped by registry once, each registry's view built once. */
 export interface LockView {
@@ -113,23 +114,72 @@ export function reached(lock: Lock, ref: Ref): string[] {
  * still declares it. With `held`, a reference whose every match is excluded asks for nothing.
  */
 export function answers(manifest: Manifest, source: Acquired, held = false): boolean {
-  const declared = manifest.registries[source.alias];
-  if (
-    declared === undefined ||
-    declared.location !== source.origin.declared ||
-    (declared.adapter !== undefined && declared.adapter !== source.origin.adapter) ||
-    JSON.stringify(declared.config) !== JSON.stringify(source.origin.config)
-  ) {
-    return false;
-  }
+  if (!declares(manifest, source)) return false;
   return manifest.artifacts
     .filter((ref) => ref.registry === source.alias)
-    .every((ref) => {
-      const found = candidates(ref, source);
-      if (found.length === 0) return held && ref.exclude !== undefined;
-      return (
-        ref.version === undefined ||
-        found.every((entry) => source.placements.get(entry.path)?.version === ref.version)
-      );
-    });
+    .every((ref) => answersRef(ref, source, held));
+}
+
+function declares(manifest: Manifest, source: Acquired): boolean {
+  const declared = manifest.registries[source.alias];
+  return (
+    declared !== undefined &&
+    declared.location === source.origin.declared &&
+    (declared.adapter === undefined || declared.adapter === source.origin.adapter) &&
+    JSON.stringify(declared.config) === JSON.stringify(source.origin.config)
+  );
+}
+
+function answersRef(ref: Ref, source: Acquired, held: boolean): boolean {
+  const found = candidates(ref, source);
+  if (found.length === 0) return held && ref.exclude !== undefined;
+  return (
+    ref.version === undefined ||
+    found.every((entry) => source.placements.get(entry.path)?.version === ref.version)
+  );
+}
+
+/** Where the manifest and the lock disagree, read from the two files alone. */
+export interface LockDrift {
+  /** Manifest entries the lock does not resolve, as written, such as one edited by hand. */
+  notLocked: string[];
+  /** Installed names that no manifest entry asks for, or needs through one that does. */
+  extraneous: string[];
+}
+
+export function lockDrift(manifest: Manifest, lock: Lock): LockDrift {
+  const view = lockView(lock);
+  const notLocked = manifest.artifacts
+    .filter((ref) => {
+      const source = view.source(ref.registry);
+      return source === undefined || !declares(manifest, source) || !answersRef(ref, source, true);
+    })
+    .map(formatRef);
+  // Walk down from what the manifest asks for, so a cycle of `neededBy` cannot hide a row.
+  const needs = new Map<string, string[]>();
+  for (const [name, row] of Object.entries(lock.artifacts)) {
+    for (const parent of row.neededBy ?? [])
+      needs.set(parent, [...(needs.get(parent) ?? []), name]);
+  }
+  const declared = (name: string) =>
+    manifest.registries[lock.artifacts[name]?.registry ?? ""] !== undefined;
+  const wanted = new Set(
+    Object.entries(lock.artifacts)
+      .filter(
+        ([name, row]) => row.origin !== undefined || (declared(name) && asksFor(manifest, row)),
+      )
+      .map(([name]) => name),
+  );
+  const queue = [...wanted];
+  for (let name = queue.pop(); name !== undefined; name = queue.pop()) {
+    for (const child of needs.get(name) ?? []) {
+      if (wanted.has(child) || !declared(child)) continue;
+      wanted.add(child);
+      queue.push(child);
+    }
+  }
+  const extraneous = Object.keys(lock.artifacts)
+    .filter((name) => !wanted.has(name))
+    .sort();
+  return { notLocked, extraneous };
 }

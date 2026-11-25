@@ -22,6 +22,17 @@ import { type Kept, keepCurrent } from "./keep-current.ts";
 import type { Parsed } from "./options.ts";
 import { type Added, addedData } from "./render.ts";
 
+// Without these the hint would read another commit, path or alias than the one just reviewed.
+function sourceWords(own: Parsed["own"]): string[] {
+  const words: string[] = [];
+  for (const flag of ["ref", "path", "layout", "adapter", "as"] as const) {
+    const value = own[flag];
+    if (typeof value === "string") words.push(`--${flag}`, value);
+  }
+  for (const value of own.config ?? []) words.push("--config", value);
+  return words;
+}
+
 /** Undefined when the person canceled, which is already reported. */
 export async function addAddress(
   context: CommandContext,
@@ -102,6 +113,7 @@ export async function addAddress(
         adding: new Set(
           refs.map(parseRef).flatMap((ref) => (ref.name === undefined ? [] : [formatAddress(ref)])),
         ),
+        declaredFrom: introduced ? [input, ...sourceWords(own)] : undefined,
       };
     },
     approve: async (plan, { targets, targetTable }) => {
