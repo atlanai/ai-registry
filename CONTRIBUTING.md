@@ -76,7 +76,7 @@ python3 tools/check_schemas.py                   # check spec/schemas/ and valid
 python3 -m unittest discover -s tools -p test_check.py   # regression tests for check.py
 ```
 
-All of these use only the standard library, but `check_schemas.py` validates the examples only when `jsonschema` is installed. Install the pinned version with `python3 -m pip install -r tools/requirements.txt`; CI passes `--require-jsonschema`, so a missing `jsonschema` fails there instead of skipping. Run them when you change the specification, the schemas, an example, or `check.py`.
+All of these use only the standard library, but `check_schemas.py` validates the examples only when `jsonschema` is installed, and their YAML native files only when PyYAML is. Install the pinned versions with `python3 -m pip install -r tools/requirements.txt`; CI passes `--require-jsonschema`, so a missing module fails there instead of skipping. Run them when you change the specification, the schemas, an example, or `check.py`.
 
 ### Documentation
 

@@ -9,9 +9,11 @@ and a JSON Pointer that exist. That catches the likely failure, a typo'd $ref.
 
 The instance tier validates each example registry's documents (every
 examples/*/registry.json root) against their schemas, asserting `format` where
-the validator has a checker for it, and needs `jsonschema`. Without it the tier reports itself skipped and the run still
-succeeds, so this script is usable wherever tools/check.py is. CI passes
---require-jsonschema, which makes a missing `jsonschema` an error instead.
+the validator has a checker for it, and needs `jsonschema`. It also validates each
+native file a kind manifest's file rule gives a `schema`, which for YAML needs PyYAML.
+Without either module its part reports itself skipped and the run still succeeds, so
+this script is usable wherever tools/check.py is. CI passes --require-jsonschema,
+which makes a missing module an error instead.
 
 $ids here are relative paths, not URLs, so schemas are preloaded into a resolver
 keyed by path rather than fetched. See spec/schemas/README.md.
@@ -186,6 +188,8 @@ def check_instances(loaded: dict[str, dict], rep: Report, required: bool) -> boo
                 rep.error(f"{path.relative_to(REPO)} against {key}: at {where}: {err.message}")
             checked += 1
 
+    checked += check_native_files(loaded, registry, rep, required)
+
     # Each kind manifest must also be a valid 2020-12 schema in its own right.
     for manifest in sorted((SCHEMA_DIR / "kinds").glob("*.json")):
         try:
@@ -196,6 +200,84 @@ def check_instances(loaded: dict[str, dict], rep: Report, required: bool) -> boo
 
     print(f"ran {checked} validations")
     return True
+
+
+def shown(path: Path) -> str:
+    return str(path.relative_to(REPO)) if path.is_relative_to(REPO) else str(path)
+
+
+def file_rules(manifest: dict) -> list[dict]:
+    files = manifest.get("x-registry-files", {})
+    sets = [files.get("required", []), files.get("optional", []), *files.get("one_of", [])]
+    return [rule for rule in (r for group in sets for r in group) if isinstance(rule, dict)]
+
+
+def yaml_loader():
+    """PyYAML's safe loader without YAML 1.1 timestamps, so a date stays text as in YAML 1.2."""
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+
+    Loader.yaml_implicit_resolvers = {
+        first: [(tag, regex) for tag, regex in resolvers if tag != "tag:yaml.org,2002:timestamp"]
+        for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+    }
+    return lambda text: yaml.load(text, Loader=Loader)  # noqa: S506 - a SafeLoader subclass
+
+
+def check_native_files(loaded: dict[str, dict], registry, rep: Report, required: bool) -> int:
+    """Validate each native file a kind manifest gives a schema, parsed by its extension."""
+    from jsonschema import Draft202012Validator
+
+    try:
+        load_yaml = yaml_loader()
+    except ImportError:
+        load_yaml = None
+        if required:
+            rep.error("PyYAML is not installed, and --require-jsonschema needs it for YAML native files "
+                      "(pip install -r tools/requirements.txt)")
+        else:
+            rep.note("PyYAML is not installed; YAML native files are not validated "
+                     "(pip install -r tools/requirements.txt)")
+
+    checked = 0
+    for example in EXAMPLES:
+        for envelope in sorted((example / "artifacts").rglob("artifact.json")):
+            try:
+                kind = json.loads(envelope.read_text()).get("kind")
+            except (OSError, json.JSONDecodeError):
+                continue  # the envelope check above reports it
+            manifest = loaded.get(f"kinds/{kind}.json")
+            if manifest is None:
+                continue
+            for rule in file_rules(manifest):
+                if "schema" not in rule or "path" not in rule:
+                    continue
+                native = envelope.parent / rule["path"]
+                if not native.is_file():
+                    continue
+                is_yaml = native.suffix in (".yaml", ".yml")
+                if is_yaml and load_yaml is None:
+                    continue
+                try:
+                    text = native.read_text()
+                    document = load_yaml(text) if is_yaml else json.loads(text)
+                except Exception as exc:  # noqa: BLE001 - a parse error, surfaced verbatim
+                    rep.error(f"{shown(native)}: does not parse: {exc}")
+                    continue
+                # Scoped to the manifest, so its #/$defs and relative refs resolve as they would there.
+                schema = {**rule["schema"], "$id": manifest["$id"],
+                          "$defs": {**manifest.get("$defs", {}), **rule["schema"].get("$defs", {})}}
+                validator = Draft202012Validator(schema, registry=registry)
+                for err in sorted(validator.iter_errors(document), key=lambda e: list(e.path)):
+                    where = "/".join(str(p) for p in err.path) or "(root)"
+                    # jsonschema quotes the whole failing value, which for a list of models is the file.
+                    message = err.message if len(err.message) <= 200 else f"fails {err.validator}: {err.validator_value!r}"
+                    rep.error(f"{shown(native)} against {manifest['$id']} {rule['path']}: "
+                              f"at {where}: {message}")
+                checked += 1
+    return checked
 
 
 def main() -> int:
