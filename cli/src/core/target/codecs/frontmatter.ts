@@ -27,6 +27,8 @@ export function frontmatterStrict(
  */
 const RESTRICTIONS = ["tools", "allowed-tools", "disallowedTools", "permissionMode", "permission"];
 
+export { RESTRICTIONS };
+
 const restricting = (own: readonly string[]) => [...RESTRICTIONS, ...own];
 
 /** Edited as a document, so the comments and key order a person wrote survive. */

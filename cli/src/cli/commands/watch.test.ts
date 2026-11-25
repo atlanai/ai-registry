@@ -1,5 +1,6 @@
 import { join, sep } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
+import { quoted } from "#adapter/text.ts";
 import { emptyRegistryConfig, type Job, type Step } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
 import { commandContext } from "#test/kit/command.ts";
@@ -73,6 +74,19 @@ async function watch(jobs: Job[], argv: string[]): Promise<Job | undefined> {
 
 const shape = (job: Job | undefined) =>
   job?.steps.map((item) => [item.kind, item.policy, item.needs, item.select.length]);
+
+describe("watch add", () => {
+  test.each(["my-skills", "plugins"])(
+    "refuses a folder named %s, before the daemon starts",
+    async (name) => {
+      await expect(watch([], ["add", gone(name), "--to", "acme/eng", "-g"])).rejects.toMatchObject({
+        message: `aireg publishes only a folder named skills or agents, so a watch of ${quoted(gone(name))} would publish nothing.`,
+        hint: expect.stringContaining("Watch the skills or agents folder inside it"),
+      });
+      expect(daemon.withDaemon).not.toHaveBeenCalled();
+    },
+  );
+});
 
 describe("watch remove", () => {
   test("keeps the rest of the job while another folder is still watched", async () => {

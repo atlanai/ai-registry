@@ -12,7 +12,6 @@ const AGENT = [
   "---",
   "name: reviewer",
   "description: Reviews pull requests.",
-  "tools: Read, Grep",
   "model: sonnet",
   "color: cyan",
   "---",
@@ -29,6 +28,17 @@ const TOML = [
   "",
 ].join("\n");
 
+const LIMITED = [
+  "---",
+  "name: auditor",
+  "description: Reads code and never edits it.",
+  "tools: Read, Grep",
+  "---",
+  "",
+  "Audit the change.",
+  "",
+].join("\n");
+
 const toml = () => join(project, ".codex", "agents", "reviewer.toml");
 
 test.beforeAll(async ({ aireg: run, tmp, project: dir, home: { dir: homeDir } }) => {
@@ -36,6 +46,7 @@ test.beforeAll(async ({ aireg: run, tmp, project: dir, home: { dir: homeDir } })
   const market = join(tmp, "market");
   await registry(market, { name: "acme", slug: "acme" })
     .agent("eng/reviewer@1.0.0", { files: { "AGENT.md": AGENT } })
+    .agent("eng/auditor@1.0.0", { files: { "AGENT.md": LIMITED } })
     .write();
   await mkdir(join(project, ".claude"), { recursive: true });
   expect((await aireg(["init", "-y", "--for", "claude-code,codex"])).code).toBe(0);
@@ -79,5 +90,44 @@ describe("an agent installed for Codex", () => {
       (await aireg(["add", "acme/eng/agent/reviewer", "-g", "-y", "--for", "codex"])).code,
     ).toBe(0);
     expect(await readFile(join(home, ".codex", "agents", "reviewer.toml"), "utf8")).toBe(TOML);
+  });
+
+  test("is left out when it sets a key Codex cannot read that limits it", async () => {
+    const added = await aireg(["add", "acme/eng/agent/auditor", "-y"]);
+    expect(added.code, added.stderr).toBe(0);
+    expect(added.stderr).toContain(
+      "Did not install auditor for Codex: it sets tools, which this target cannot read.",
+    );
+    await expect(lstat(join(project, ".codex", "agents", "auditor.toml"))).rejects.toThrow();
+    expect(await readFile(join(project, ".claude", "agents", "auditor.md"), "utf8")).toBe(LIMITED);
+  });
+
+  test("is removed from Codex when an update gives it such a key", async ({ tmp }) => {
+    const market = join(tmp, "limits");
+    const narrowed = LIMITED.replace("auditor", "narrowed");
+    const publish = (versions: Record<string, string>) => {
+      const built = registry(market, { name: "limits", slug: "limits" });
+      for (const [version, text] of Object.entries(versions))
+        built.agent(`eng/narrowed@${version}`, { files: { "AGENT.md": text } });
+      return built.write();
+    };
+    const plain = narrowed.replace("tools: Read, Grep\n", "");
+    await publish({ "1.0.0": plain });
+    expect((await aireg(["registry", "add", market, "--as", "limits"])).code).toBe(0);
+    expect((await aireg(["add", "limits/eng/agent/narrowed", "-y"])).code).toBe(0);
+    const written = join(project, ".codex", "agents", "narrowed.toml");
+    expect((await lstat(written)).isFile()).toBe(true);
+
+    await publish({ "1.0.0": plain, "1.1.0": narrowed });
+    const updated = await aireg(["update", "-y"]);
+    expect(updated.code, updated.stderr).toBe(0);
+    expect(updated.stderr).toContain("Did not install narrowed for Codex: it sets tools");
+    expect(`${updated.stdout}${updated.stderr}`).not.toMatch(/(Restored|Updated) .*Codex/);
+    await expect(lstat(written)).rejects.toThrow();
+    expect(await readFile(join(project, ".claude", "agents", "narrowed.md"), "utf8")).toBe(
+      narrowed,
+    );
+    const status = await aireg(["status"]);
+    expect(status.code, status.stdout).toBe(0);
   });
 });

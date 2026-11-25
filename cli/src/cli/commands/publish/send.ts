@@ -21,7 +21,13 @@ export async function sendTo(
   alias: string,
   items: Planned[],
   opened: Published,
-  options: { message: string | undefined; asked: boolean; checkout: string | undefined },
+  options: {
+    message: string | undefined;
+    asked: boolean;
+    checkout: string | undefined;
+    /** Collects the push for a checkout, printed once publish knows git would take it. */
+    pushes: string[];
+  },
 ): Promise<PublishResult | undefined | "canceled"> {
   const { adapter, handle } = opened.source;
   if (options.message !== undefined && adapter.capabilities.messages !== true) {
@@ -31,24 +37,27 @@ export async function sendTo(
         : `${alias} keeps no change message, so -m was not used.`,
     );
   }
-  let message = options.message ?? subjectOf(items);
+  const composed = subjectOf(items);
+  let written = options.message?.trim() || undefined;
   if (options.asked) {
     const typed = await text(
       {
         message: "What changed?",
         style: printer.errStyle,
-        initial: message,
+        initial: written ?? composed,
         hint: "Type what changed, or press Enter to use this message.",
       },
       step.io,
     );
     if (canceled(typed)) return "canceled";
-    message = typed;
+    written = typed.trim() === composed ? undefined : typed.trim() || undefined;
   }
+  const message = written ?? composed;
+  // Only a person's own words reach the source; a composed subject would read as their account of the change.
   const published = await handle
     .publish?.(
       items.map((item) => item.input),
-      { message, review: true },
+      { ...(written === undefined ? {} : { message: written }), review: true },
     )
     .catch((error: unknown) => {
       throw heldUnlisted(error, alias, items);
@@ -60,8 +69,7 @@ export async function sendTo(
   const what = items.length === 1 ? items[0]?.work.name : plural(items.length, "artifact");
   printer.success(published?.summary ?? `Published ${what} to ${alias}.`);
   for (const note of published?.notes ?? []) printer.info(`  ${note}`);
-  if (options.checkout !== undefined)
-    printer.note("next", commitAndPush(message, options.checkout));
+  if (options.checkout !== undefined) options.pushes.push(commitAndPush(message, options.checkout));
   else if (published?.summary === undefined) {
     printer.note(
       "when",

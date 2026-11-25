@@ -13,7 +13,7 @@ const agent = (front: string, body: string) => `---\n${front}\n---\n${body}`;
 describe("frontmatter-toml", () => {
   test("keeps the fields it names and the body, and leaves out any other front matter", () => {
     const source = agent(
-      "name: reviewer\ndescription: Reviews code.\ntools: Read, Grep\nmodel: sonnet\ncolor: cyan",
+      "name: reviewer\ndescription: Reviews code.\nmodel: sonnet\ncolor: cyan",
       "\n# Reviewer\n\nReview the diff.\n",
     );
     expect(applyCodec(AGENT, source)).toEqual({
@@ -46,6 +46,25 @@ describe("frontmatter-toml", () => {
     const out = applyCodec(AGENT, agent("name: r\ndescription: |\n  Two\n  lines", "Go."));
     expect(out).toMatchObject({
       text: expect.stringContaining('description = "Two\\nlines\\n"\n'),
+    });
+  });
+
+  test.each([
+    ["tools", "tools: Read, Grep"],
+    ["disallowedTools", "disallowedTools: Edit"],
+    ["permissionMode", "permissionMode: plan"],
+  ])("refuses to drop %s, rather than widen what the agent may do", (key, line) => {
+    const source = agent(`name: reviewer\ndescription: Reviews code.\n${line}`, "Review.");
+    expect(applyCodec(AGENT, source)).toEqual({
+      problem: `it sets ${key}, which this target cannot read`,
+    });
+  });
+
+  test("keeps a limiting key it names as a field", () => {
+    const codec: Codec = { ...AGENT, fields: ["name", "description", "tools"] };
+    const source = agent("name: r\ndescription: d\ntools: Read", "Go.");
+    expect(applyCodec(codec, source)).toMatchObject({
+      text: expect.stringContaining('tools = "Read"\n'),
     });
   });
 

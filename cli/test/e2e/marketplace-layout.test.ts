@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
+import { shellWord } from "#core/term/format.ts";
 import { marketplace, skillsFolder } from "#test/kit/builders/layouts.ts";
 import { type Aireg, test as base, fileTest } from "#test/kit/fixtures.ts";
 import { BIN } from "#test/kit/run.ts";
@@ -188,6 +189,36 @@ describe("a plugin marketplace", () => {
     expect(await locked(project)).toEqual(["deploy-kit", "docs-kit"]);
     expect(await read(manifestPath(project))).toContain("trust:\n      - deploy-kit");
     expect((await aireg(["install"])).code).toBe(0);
+  });
+
+  // Its one plugin refused, the add leaves no registry declared, so the hint names the address.
+  test("names the address in its trust hint when the refusal leaves no registry declared", async ({
+    aireg,
+    initialised,
+    project,
+    tmp,
+  }) => {
+    await initialised(project);
+    const root = await skillsFolder(join(tmp, "hooked"))
+      .json(".claude-plugin/marketplace.json", {
+        name: "hooked-dev",
+        owner: { name: "Acme" },
+        plugins: [{ name: "hook-kit", source: "./" }],
+      })
+      .json(".claude-plugin/plugin.json", { name: "hook-kit", version: "1.0.0" })
+      .skill("skills/tdd")
+      .json("hooks/hooks.json", { hooks: {} })
+      .write();
+    const refused = await aireg(["add", root, "--all", "-y"]);
+    expect(refused.code).toBe(2);
+    const hint = `aireg add ${shellWord(root)} -s hook-kit --trust hook-kit`;
+    expect(refused.stderr).toContain(`\`${hint}\``);
+    expect(await read(manifestPath(project))).not.toContain("hooked-dev");
+
+    // The hint, run as a shell would split it.
+    const trusted = await aireg(["add", root, "-s", "hook-kit", "--trust", "hook-kit", "-y"]);
+    expect(trusted.code, trusted.stderr).toBe(0);
+    expect(await locked(project)).toEqual(["hook-kit"]);
   });
 
   // util-linux's `script` runs aireg on a terminal of its own; other systems' `script` differs.

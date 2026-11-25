@@ -1,4 +1,4 @@
-import { plural } from "#adapter/text.ts";
+import { plural, quoted } from "#adapter/text.ts";
 import { action } from "#cli/commands/define.ts";
 import { typedFolder } from "#cli/commands/job/find.ts";
 import type { JobList } from "#cli/commands/job/result.ts";
@@ -8,6 +8,7 @@ import type { Job } from "#core/config/model.ts";
 import { readConfig } from "#core/config/repository.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { stepContribution } from "#core/host/load.ts";
+import { kindOfDir } from "#core/kinds.ts";
 import { shortDuration } from "#core/term/format.ts";
 import { table } from "#core/term/table.ts";
 import type { Own } from "./options.ts";
@@ -97,6 +98,21 @@ export function originsOf(own: Own, cwd: string): { to: string; from: string[] }
       code: ErrorCode.Usage,
       hint: "Name where to publish: `aireg job add --watch <folder> --to <registry>/<namespace>`.",
     });
+  }
+  // A watch reads a folder's kind from its name, and publishes only skills and agents.
+  const unnamed = watched.filter((folder) => {
+    const kind = kindOfDir(typedFolder(folder, cwd));
+    return kind !== "skill" && kind !== "agent";
+  });
+  if (unnamed.length > 0) {
+    const them = unnamed.length === 1 ? "it" : "them";
+    throw new AiregError(
+      `aireg publishes only a folder named skills or agents, so a watch of ${unnamed.map(quoted).join(", ")} would publish nothing.`,
+      {
+        code: ErrorCode.Usage,
+        hint: `Watch the skills or agents folder inside ${them}, such as \`~/.claude/skills\`, or rename ${them}.`,
+      },
+    );
   }
   return { to: own.to, from: watched.map((folder) => typedFolder(folder, cwd)) };
 }

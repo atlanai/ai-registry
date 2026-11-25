@@ -16,7 +16,7 @@ import {
   recoveredNotices,
   unstagedNotices,
 } from "#engine/install/notices.ts";
-import { refuseBlocked, refusePlan } from "#engine/install/refusals.ts";
+import { refuseBlocked, refusePlan, rewrittenNotices } from "#engine/install/refusals.ts";
 import { selectTargets } from "#engine/install/targets.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/scope/load.ts";
@@ -91,7 +91,7 @@ export async function applyLocal({
     if (name === undefined || !recording.has(name) || published.has(name)) continue;
     notices.push({ message, ...(hint === undefined ? {} : { hint }) });
   }
-  notices.push(...followed.notices);
+  notices.push(...followed.notices, ...rewrittenNotices(plan));
   notices.push(
     ...appliedNotices(loaded.roots, result, loaded.targetTable),
     ...unstagedNotices(result.unstaged),

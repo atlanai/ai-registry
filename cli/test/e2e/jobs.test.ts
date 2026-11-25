@@ -137,7 +137,7 @@ describe("removing a registry", () => {
   test("keeps a registry a watch job publishes to", async ({ aireg, home, tmp }) => {
     const reg = join(tmp, "reg");
     await registry(reg, { name: "demo", slug: "demo" }).skill("personal/hello@0.1.0").write();
-    const mine = join(home.dir, "mine");
+    const mine = join(home.dir, "mine", "skills");
     await mkdir(join(mine, "notes"), { recursive: true });
     await writeFile(join(mine, "notes", "SKILL.md"), "---\nname: notes\ndescription: N.\n---\n");
     expect((await aireg(["registry", "add", reg, "-g"])).code).toBe(0);
@@ -150,7 +150,7 @@ describe("removing a registry", () => {
       "Job job_skills_demo uses registry demo to publish your folders.",
     );
     // Written as the person reads it, and runnable as printed.
-    expect(refused.stderr).toContain("aireg watch remove ~/mine -g");
+    expect(refused.stderr).toContain("aireg watch remove ~/mine/skills -g");
     expect(await jobIds(aireg, tmp)).toEqual(["job_skills_demo"]);
     expect(await readFile(join(home.scope, "manifest.yml"), "utf8")).toContain("demo:");
   });

@@ -268,11 +268,12 @@ async function writeRendered(
   action: ActionOf<"link">,
   rendered: Rendered | undefined,
 ): Promise<LinkMode | Unrendered> {
+  // A copy written before a change it cannot carry must not stay loaded.
+  await remove(action.to);
   if (rendered === undefined || "problem" in rendered) {
     const reason = rendered?.problem ?? "its file could not be read";
     return { name: action.name, target: action.target, reason };
   }
-  await remove(action.to);
   await mkdir(dirname(writtenFile(action)), { recursive: true });
   await writeAtomic(writtenFile(action), rendered.text);
   return "copy";

@@ -10,7 +10,10 @@ test("prints one document for folders that two jobs watched", async ({ aireg, ho
     expect(made.code, made.stderr).toBe(0);
     expect((await aireg(["registry", "add", join(tmp, name), "-g"])).code).toBe(0);
   }
-  const folders = { team: join(home.dir, "team-skills"), other: join(home.dir, "other-skills") };
+  const folders = {
+    team: join(home.dir, "team", "skills"),
+    other: join(home.dir, "other", "skills"),
+  };
   for (const [registry, folder] of Object.entries(folders)) {
     await mkdir(join(folder, "notes"), { recursive: true });
     await writeFile(join(folder, "notes", "SKILL.md"), skillBody("notes"));

@@ -20,9 +20,11 @@ export interface Catalog {
   loading: boolean;
 }
 
-/** A catalog is read again after this, and one that failed no sooner than this. */
-const FRESH_MS = 30_000;
-const RETRY_MS = 60_000;
+/** Listing a remote registry is costly, so it is reused this long. */
+const FRESH_MS = 10 * 60_000;
+const RETRY_MS = 5 * 60_000;
+/** Registries listed at once. */
+const MOST_AT_ONCE = 2;
 
 const common = (scope: Scope): CommonOptions => ({
   scope,
@@ -65,6 +67,8 @@ const WAIT_MS = 200;
 export class Catalogs {
   readonly #kept = new Map<string, Kept>();
   readonly #context: CommandContext;
+  #running = 0;
+  readonly #waiting: (() => void)[] = [];
   /** Called when a catalog read ends, so the page learns at once instead of waiting. */
   onRead: () => void = () => {};
 
@@ -103,6 +107,17 @@ export class Catalogs {
     };
   }
 
+  async #limited<T>(read: () => Promise<T>): Promise<T> {
+    if (this.#running >= MOST_AT_ONCE) await new Promise<void>((go) => this.#waiting.push(go));
+    this.#running += 1;
+    try {
+      return await read();
+    } finally {
+      this.#running -= 1;
+      this.#waiting.shift()?.();
+    }
+  }
+
   #refresh(name: string, scope: Scope): Kept {
     const id = `${scope}\u0000${name}`;
     const kept = this.#kept.get(id) ?? { read: undefined, atMs: 0, pending: undefined };
@@ -110,8 +125,7 @@ export class Catalogs {
     const age = Date.now() - kept.atMs;
     const due = kept.read === undefined || age > ("error" in kept.read ? RETRY_MS : FRESH_MS);
     if (due && kept.pending === undefined) {
-      kept.pending = show
-        .run(options(name, scope), this.#context)
+      kept.pending = this.#limited(() => show.run(options(name, scope), this.#context))
         // A failure anywhere, reading or unwrapping, ends the read and says why.
         .then((shown): Kept["read"] => ({ entries: returned(shown).entries }))
         .catch((error: unknown) => ({ error: messageOf(error) }))

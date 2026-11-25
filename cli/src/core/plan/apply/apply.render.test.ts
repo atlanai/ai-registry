@@ -9,8 +9,7 @@ import { emptyPlan } from "#test/kit/builders/plan.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { apply } from "./apply.ts";
 
-const AGENT =
-  "---\nname: reviewer\ndescription: Reviews.\ntools: Read\nmodel: sonnet\n---\nReview it.\n";
+const AGENT = "---\nname: reviewer\ndescription: Reviews.\nmodel: sonnet\n---\nReview it.\n";
 const TOML =
   'name = "reviewer"\ndescription = "Reviews."\ndeveloper_instructions = """\nReview it."""\n';
 const CODEC = {
