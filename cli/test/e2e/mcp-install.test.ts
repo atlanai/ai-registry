@@ -141,7 +141,7 @@ test("installs an MCP server for every project target that loads one, and remove
   const installed = await aireg(["install"], { cwd: project });
   expect(installed.code, installed.stderr).toBe(0);
   expect(installed.stderr).toContain(
-    "Did not install issue-tracker for Google Antigravity: it needs a secret",
+    "Did not install issue-tracker for Google Antigravity: it reads MCP servers only from your user scope",
   );
   const token = "ISSUES_TOKEN";
   const args = ["-y", "@example/issue-tracker-mcp@1.2.0"];

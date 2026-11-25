@@ -100,7 +100,17 @@ function configsFor(item: Selected, build: BuildState): Wanted[] {
     const target = targetTable[name];
     const mapping = target?.kinds.mcp_server;
     if (target === undefined || mapping?.shape !== "config") continue;
-    if (mapping.scope !== undefined && mapping.scope !== roots.scope) continue;
+    if (mapping.scope !== undefined && mapping.scope !== roots.scope) {
+      const reason =
+        mapping.scope === "user"
+          ? "it reads MCP servers only from your user scope, so add it with `--user`"
+          : "it has no user file aireg can write, so add it to a project instead";
+      build.warnings.push({
+        name: item.name,
+        message: `Did not install ${item.name} for ${target.displayName}: ${reason}.`,
+      });
+      continue;
+    }
     const vars = { name: item.name };
     const root = targetRoot(target, where);
     const user = roots.scope === "user";

@@ -31,6 +31,8 @@ export const antigravity = defineTarget({
     // It documents no way to read a secret, so a server that needs one is left out.
     mcp_server: {
       shape: "config",
+      // Its CLI reads MCP servers only from the user's file, not a project's `.agents/`.
+      scope: "user",
       file: "mcp_config.json",
       format: "json",
       at: ["mcpServers", "{name}"],
