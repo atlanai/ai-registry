@@ -38,7 +38,7 @@ export const geminiCli = defineTarget({
         ],
       },
     },
-    // It expands a variable only in `env`.
+    // It expands a variable only in `env` and `headers`, and reads a bare `url` as streamable HTTP.
     mcp_server: {
       shape: "config",
       file: "settings.json",
@@ -46,7 +46,8 @@ export const geminiCli = defineTarget({
       at: ["mcpServers", "{name}"],
       codec: {
         id: "mcp-json",
-        secret: { prefix: "${", suffix: "}", in: ["env"] },
+        secret: { prefix: "${", suffix: "}", in: ["env", "headers"] },
+        type: { sse: "sse" },
         url: { "streamable-http": "httpUrl" },
         tools: { allow: ["includeTools"], deny: ["excludeTools"] },
       },
