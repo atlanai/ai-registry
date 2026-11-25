@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "kinds/semantic_model.json",
   "title": "semantic_model",
-  "description": "One Apache Ossie semantic model: semantic_model.yaml or semantic_model.json, stored unchanged. spec contains the registry slug as name, the model's description when it has one, and the unchanged document in model, which must satisfy the Ossie schema for the version it declares.",
+  "description": "One Apache Ossie semantic model: semantic_model.yaml or semantic_model.json, stored unchanged and validated against $defs.document. spec contains the registry slug as name and the model's description when it has one.",
   "type": "object",
   "properties": {
     "name": {
@@ -14,58 +14,10 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 4000
-    },
-    "model": {
-      "type": "object",
-      "description": "The Apache Ossie document, verbatim.",
-      "properties": {
-        "version": {
-          "enum": [
-            "0.1.1",
-            "0.2.0.dev0"
-          ]
-        }
-      },
-      "required": [
-        "version"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "version": {
-                "const": "0.1.1"
-              }
-            },
-            "required": [
-              "version"
-            ]
-          },
-          "then": {
-            "$ref": "vendor/ossie/0.1.1/osi-schema.json"
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "version": {
-                "const": "0.2.0.dev0"
-              }
-            },
-            "required": [
-              "version"
-            ]
-          },
-          "then": {
-            "$ref": "vendor/ossie/0.2.0.dev0/ossie-schema.json"
-          }
-        }
-      ]
     }
   },
   "required": [
-    "name",
-    "model"
+    "name"
   ],
   "additionalProperties": false,
   "x-registry-schema-version": 1,
@@ -91,13 +43,19 @@
       [
         {
           "path": "semantic_model.yaml",
-          "media_type": "application/yaml"
+          "media_type": "application/yaml",
+          "schema": {
+            "$ref": "#/$defs/document"
+          }
         }
       ],
       [
         {
           "path": "semantic_model.json",
-          "media_type": "application/json"
+          "media_type": "application/json",
+          "schema": {
+            "$ref": "#/$defs/document"
+          }
         }
       ]
     ],
@@ -108,5 +66,59 @@
     ]
   },
   "x-registry-attachment": false,
-  "x-registry-gated": false
+  "x-registry-gated": false,
+  "$defs": {
+    "document": {
+      "type": "object",
+      "description": "An Apache Ossie document, which must satisfy the Ossie schema for the version it declares. A 0.1.1 document lists one model, as 0.2 holds one.",
+      "properties": {
+        "version": {
+          "enum": [
+            "0.1.1",
+            "0.2.0.dev0"
+          ]
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": "0.1.1"
+              }
+            },
+            "required": [
+              "version"
+            ]
+          },
+          "then": {
+            "$ref": "vendor/ossie/0.1.1/osi-schema.json",
+            "properties": {
+              "semantic_model": {
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": "0.2.0.dev0"
+              }
+            },
+            "required": [
+              "version"
+            ]
+          },
+          "then": {
+            "$ref": "vendor/ossie/0.2.0.dev0/ossie-schema.json"
+          }
+        }
+      ]
+    }
+  }
 }

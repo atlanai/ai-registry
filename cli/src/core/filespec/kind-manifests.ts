@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import type { SchemaObject } from "ajv/dist/2020.js";
 import { messageOf } from "#adapter/errors.ts";
 import { isRecord } from "#adapter/fields.ts";
 import { readJson, SpecError } from "#adapter/filespec/documents.ts";
@@ -18,7 +19,7 @@ import agent from "#schema/kinds/agent.json" with { type: "json" };
 import semanticModel from "#schema/kinds/semantic_model.json" with { type: "json" };
 import skill from "#schema/kinds/skill.json" with { type: "json" };
 
-import { prepareManifest } from "./schema.ts";
+import { fileRules, fileSchema, prepareManifest } from "./schema.ts";
 
 /** Files that can hold a kind's `spec` or a description, so the only ones read as text. */
 export const SPEC_TEXT = /\.(md|json|ya?ml)$/;
@@ -46,6 +47,7 @@ interface FileRule {
   path?: string;
   glob?: string;
   media_type?: string;
+  schema?: boolean | Record<string, unknown>;
 }
 
 export interface KindManifest extends SchemaNode {
@@ -136,15 +138,9 @@ async function served(root: string, url: string): Promise<Served> {
 }
 
 function filePaths(files: unknown): unknown[] {
-  if (!isRecord(files)) return [];
-  const rules = [
-    files.required,
-    files.optional,
-    ...(Array.isArray(files.one_of) ? files.one_of : []),
-  ];
-  return rules
-    .flatMap((set) => (Array.isArray(set) ? set : []))
-    .flatMap((rule) => (isRecord(rule) && "path" in rule ? [rule.path] : []));
+  return fileRules({ "x-registry-files": files }).flatMap((rule) =>
+    "path" in rule ? [rule.path] : [],
+  );
 }
 
 export async function manifestProblems(root: string): Promise<{ path: string; message: string }[]> {
@@ -277,8 +273,7 @@ export function specOf(
   if (entry === undefined) return undefined;
   let document: unknown;
   try {
-    const source = files.get(entry) ?? "";
-    document = YAML.test(entry) ? parseYaml(source) : (JSON.parse(source) as unknown);
+    document = parseDocument(entry, files.get(entry) ?? "");
   } catch {
     // A document that does not parse carries no spec, as Markdown with no front matter carries none.
     return undefined;
@@ -298,7 +293,36 @@ export function specOf(
   // The registry slug is the name; the document keeps its own, which need not be a slug.
   if (name !== undefined) lifted.name = name;
   else if (typeof lifted.name === "string") lifted.name = sanitizeName(lifted.name);
+  // A file the manifest gives a schema is validated as a file, so the file is the only copy.
+  if (schemaFiles(manifest).some((file) => file.path === entry)) return lifted;
   return { ...lifted, [documentKey(manifest)]: document };
+}
+
+/** A kind's JSON or YAML document, by its extension; throws when it does not parse. */
+export function parseDocument(path: string, text: string): unknown {
+  return YAML.test(path) ? parseYaml(text) : (JSON.parse(text) as unknown);
+}
+
+/** Each file a manifest names by path with a `schema`, and that schema scoped to the manifest. */
+export function schemaFiles(manifest: KindManifest): { path: string; schema: SchemaObject }[] {
+  const raw = manifest as unknown as Record<string, unknown>;
+  return fileRules(raw).flatMap((rule) => {
+    const schema = fileSchema(raw, rule);
+    return typeof rule.path === "string" && schema !== undefined
+      ? [{ path: rule.path, schema }]
+      : [];
+  });
+}
+
+/**
+ * Apache Ossie 0.1.1 lists models where 0.2 holds one, and an artifact is one model. The schema
+ * refuses a longer list too; this says what to do about it.
+ */
+export function listedModelsProblem(manifest: KindManifest, document: unknown): string | undefined {
+  if (manifest.title !== "semantic_model" || !isRecord(document)) return undefined;
+  const models = document.semantic_model;
+  if (!Array.isArray(models) || models.length <= 1) return undefined;
+  return `lists ${models.length} models under \`semantic_model\`, and an artifact holds one: split it into one artifact per model`;
 }
 
 /**
@@ -333,7 +357,7 @@ function listedDescription(document: unknown): string | undefined {
 
 /**
  * Where `spec` holds a kind's document: the one object property its manifest declares, so
- * `card` for an agent and `model` for a semantic model. `card` when a manifest declares none.
+ * `card` for an agent. `card` when a manifest declares none.
  */
 function documentKey(manifest: KindManifest): string {
   const objects = Object.entries(manifest.properties ?? {}).filter(

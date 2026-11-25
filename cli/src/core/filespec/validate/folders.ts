@@ -1,4 +1,5 @@
 import { join, posix } from "node:path";
+import { messageOf } from "#adapter/errors.ts";
 import { isRecord } from "#adapter/fields.ts";
 import { hashRegular } from "#adapter/files.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
@@ -14,7 +15,10 @@ import {
   fileProblems,
   type KindManifest,
   type kindsOf,
+  listedModelsProblem,
+  parseDocument,
   SPEC_TEXT,
+  schemaFiles,
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
@@ -33,8 +37,11 @@ export function versionProblems(
   contents: ReadonlyMap<string, string>,
 ): string[] {
   const problems = fileProblems(manifest, present);
+  const documents = documentProblems(manifest, contents);
+  problems.push(...documents);
   const spec = specOf(manifest, contents, at.name);
   if (spec === undefined) {
+    if (documents.length > 0) return problems;
     const why =
       specParseProblem(manifest, contents) ?? "has no front matter to read its fields from";
     return [...problems, why];
@@ -63,9 +70,31 @@ export function fractionProblems(value: unknown, at = ""): string[] {
   );
 }
 
+/** Each file its manifest gives a `schema`, parsed and checked against it, named in every problem. */
+export function documentProblems(
+  manifest: KindManifest,
+  files: ReadonlyMap<string, string>,
+): string[] {
+  return schemaFiles(manifest).flatMap(({ path, schema }) => {
+    const text = files.get(path);
+    if (text === undefined) return [];
+    let document: unknown;
+    try {
+      document = parseDocument(path, text);
+    } catch (error) {
+      return [`${path} does not parse: ${messageOf(error)}`];
+    }
+    const listed = listedModelsProblem(manifest, document);
+    const problems = listed === undefined ? check(schema, document, "the document") : [listed];
+    for (const field of placeholders(document))
+      problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
+    return problems.map((problem) => `${path}: ${problem}`);
+  });
+}
+
 function placeholders(value: unknown, at = ""): string[] {
   if (value === PLACEHOLDER) return [at];
-  // A document a kind wraps, such as a semantic model, holds its fields in lists too.
+  // A kind's document, such as a semantic model, holds its fields in lists too.
   if (!isRecord(value) && !Array.isArray(value)) return [];
   return Object.entries(value).flatMap(([key, item]) =>
     placeholders(item, at === "" ? key : `${at}.${key}`),

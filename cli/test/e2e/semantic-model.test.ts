@@ -43,7 +43,7 @@ describe("a data team publishes a semantic model once", () => {
     ]);
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain("is not a valid semantic_model");
-    expect(refused.stderr).toContain("`model.datasets` is required");
+    expect(refused.stderr).toContain("semantic_model.yaml: `datasets` is required");
     expect(existsSync(join(registry, "artifacts", "analytics", "semantic_model"))).toBe(false);
   });
 
@@ -64,46 +64,55 @@ describe("a data team publishes a semantic model once", () => {
     );
   });
 
-  test("indexes it with the whole model in the envelope, under the registry's slug", async () => {
+  test("refuses a 0.1.1 file that lists two models, and says to split it", async ({ tmp }) => {
+    const one = (name: string) =>
+      `  - name: ${name}\n    description: ${name}.\n    datasets: [{ name: t, source: db.t }]\n`;
+    const two = join(tmp, "shop.yaml");
+    await writeFile(two, `version: "0.1.1"\nsemantic_model:\n${one("sales")}${one("customers")}`);
+    const refused = await inRegistry([
+      "semantic_model",
+      "new",
+      "--from",
+      two,
+      "--name",
+      "shop",
+      "--namespace",
+      "analytics",
+    ]);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("lists 2 models under `semantic_model`");
+    expect(refused.stderr).toContain("split it into one artifact per model");
+  });
+
+  test("indexes it with the model only in its file, under the registry's slug", async () => {
     const indexed = await inRegistry(["registry", "index"]);
     expect(indexed.code, indexed.stderr).toBe(0);
     expect(indexed.stdout).toContain("analytics/semantic_model/retail  0.1.0");
     const envelope = await json(model("0.1.0", "artifact.json"));
     expect(envelope.kind).toBe("semantic_model");
-    expect(envelope.spec.name).toBe("retail");
-    expect(envelope.spec.model.name).toBe("tpcds_retail_model");
-    expect(envelope.spec.model.metrics).toHaveLength(8);
+    expect(envelope.spec).toEqual({
+      name: "retail",
+      description: "TPC-DS retail semantic model for sales and customer analytics",
+    });
     expect(envelope.metadata.description).toBe(envelope.spec.description);
     expect((await inRegistry(["registry", "validate"])).code).toBe(0);
     await git.init(registry);
     await git.commit(registry, "release retail 0.1.0");
   });
 
-  test("names the field when a model holds a number an envelope cannot", async () => {
+  test("indexes a model that holds a decimal, which stays in the file", async () => {
     expect(
       (await inRegistry(["semantic_model", "bump", "retail", "--namespace", "analytics"])).code,
     ).toBe(0);
-    // Ossie lets `ai_context` be a free-form object, the one place its schema allows a number.
-    const edited = (await readFile(model("0.1.1"), "utf8")).replace(
-      /\nai_context:\n {2}instructions: [^\n]*\n/,
-      "\nai_context:\n  threshold: 0.85\n",
-    );
+    // Ossie lets `ai_context` be a free-form object, so an exported model can carry any number.
+    const edited = (await readFile(model("0.1.1"), "utf8"))
+      .replace(/\nai_context:\n {2}instructions: [^\n]*\n/, "\nai_context:\n  threshold: 0.85\n")
+      .replace("TPC-DS retail semantic model", "TPC-DS retail model, with returns");
     expect(edited).toContain("threshold: 0.85");
     await writeFile(model("0.1.1"), edited);
-    const refused = await inRegistry(["registry", "index"]);
-    expect(refused.code).toBe(1);
-    expect(refused.stderr).toContain("0.1.1: `model.ai_context.threshold` is 0.85");
-    // Put right, so the versions below are the only ones the registry has.
-    await cp(model("0.1.0"), model("0.1.1"));
-    await writeFile(
-      model("0.1.1"),
-      (await readFile(model("0.1.1"), "utf8")).replace(
-        "TPC-DS retail semantic model",
-        "TPC-DS retail model, with returns",
-      ),
-    );
     const indexed = await inRegistry(["registry", "index"]);
     expect(indexed.code, indexed.stderr).toBe(0);
+    expect(await readFile(model("0.1.1"), "utf8")).toBe(edited);
   });
 });
 
@@ -196,7 +205,7 @@ describe("a registry that serves its own semantic_model manifest", () => {
         { cwd: served },
       );
     expect((await from("invalid-flights-ontology.yaml", "flights")).stderr).toContain(
-      "`model.datasets` is required",
+      "semantic_model.yaml: `datasets` is required",
     );
     const released = await from("tpcds_semantic_model.v0.1.1.yaml", "retail");
     expect(released.code, released.stderr).toBe(0);

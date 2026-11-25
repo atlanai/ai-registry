@@ -59,12 +59,14 @@ aireg registry index
 
 ```console
 $ aireg semantic_model new --from models/flights-ontology.yaml --name flights --namespace analytics
-error: models/flights-ontology.yaml is not a valid semantic_model: `model.datasets` is required; `model.requires` is not a field this kind takes; `model.ontology` is not a field this kind takes; `model.ontology_mappings` is not a field this kind takes.
+error: models/flights-ontology.yaml is not a valid semantic_model: semantic_model.yaml: `datasets` is required; semantic_model.yaml: `requires` is not a field this kind takes; semantic_model.yaml: `ontology` is not a field this kind takes; semantic_model.yaml: `ontology_mappings` is not a field this kind takes.
   code: invalid
 hint: Fix it where it is, then run `aireg semantic_model new --from models/flights-ontology.yaml` again.
 ```
 
-The registry folder supplies the slug in the envelope's `spec.name`, as it does for an agent card. The model keeps its own `name`, which need not be a slug. `spec.model` holds the whole document and `spec.description` copies its description. A model that holds a number with a decimal point can't be indexed, because the file spec allows only integers in an envelope: write the value as a string.
+A 0.1.1 file that lists more than one model under `semantic_model` is refused too: split it into one artifact per model, as 0.2 holds one.
+
+The registry folder supplies the slug in the envelope's `spec.name`, as it does for an agent card. The model keeps its own `name`, which need not be a slug. `spec.description` copies its description. The file is the only copy of the model, so the envelope doesn't repeat it and any number the model holds is kept as written.
 
 Without `--from`, `new` writes a starter model in Ossie 0.1.1 with `TODO` where the description and the first dataset go.
 

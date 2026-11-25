@@ -31,7 +31,7 @@ A client resolving `engineering/skill/pr-review`:
 
 The agent's envelope names the skill in `relationships[]`, so installing the agent pulls the skill the same way.
 
-The semantic model resolves the same way and ends at one file, `semantic_model.yaml`. Its envelope carries the whole model in `spec.model`, so a reader that only wants the metric definitions stops at step 2.
+The semantic model resolves the same way and ends at one file, `semantic_model.yaml`. Its envelope carries only the model's name and description, so a reader that wants the metric definitions fetches the file.
 
 ## Checking it
 

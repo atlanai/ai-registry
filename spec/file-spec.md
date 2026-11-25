@@ -191,16 +191,21 @@ exactly one of these native entry files. Other supporting files are permitted; t
 file patterns in a kind manifest are non-exhaustive conventions.
 
 A semantic model carries one [Apache Ossie](https://github.com/apache/ossie) document, as
-`semantic_model.yaml` or `semantic_model.json`, and MUST carry exactly one of the two. It wraps
-that document, parsed and otherwise unchanged, in `spec.model`, and uses the registry slug for
-`spec.name`. The model's own `name` remains in the document and need not equal the slug.
-`spec.description` copies the model's description when it has one: the root `description`, or
-that of the one model a 0.1.1 document lists. `spec.model` MUST satisfy the Ossie schema for the
-`version` it declares. Those schemas are copied unchanged into
-[`schemas/kinds/vendor/ossie/`](schemas/kinds/vendor/ossie/README.md), so a writer validates a
-model without fetching anything. A model whose document holds a non-integer number cannot be
-published as it stands, since section 4.2 forbids one in an envelope. The files a model was
-converted from MAY sit beside it under `source/`.
+`semantic_model.yaml` or `semantic_model.json`, and MUST carry exactly one of the two. The file is
+the only copy of the model: `spec` holds the registry slug as `spec.name` and, when the model has
+one, its description as `spec.description`, from the root `description` or from the model a 0.1.1
+document lists. The model's own `name` remains in the document and need not equal the slug. The
+document MUST satisfy the Ossie schema for the `version` it declares, and a 0.1.1 document MUST
+list exactly one model, so that one artifact is one model as in 0.2. Those schemas are copied
+unchanged into [`schemas/kinds/vendor/ossie/`](schemas/kinds/vendor/ossie/README.md), so a writer
+validates a model without fetching anything. The files a model was converted from MAY sit beside
+it under `source/`.
+
+A kind manifest's file rule MAY carry a `schema`: a JSON Schema that the file at its `path`, parsed
+as JSON or YAML by its extension, MUST satisfy. Its references resolve against the manifest, so
+`{"$ref": "#/$defs/document"}` names a definition there. A writer validates the file against it
+when it validates `spec`, and refuses the version when the file fails. The file is hashed as bytes
+and never copied into the envelope, so section 4.2's integer rule does not apply to it.
 
 ### 3.5 Native files
 

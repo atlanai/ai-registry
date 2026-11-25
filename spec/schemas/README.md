@@ -65,8 +65,9 @@ the CLI. Validation does not coerce values, insert defaults or remove fields.
 
 For built-in kinds, extraction reads only `SKILL.md`, `AGENT.md`, `agent-card.json`,
 `semantic_model.yaml` or `semantic_model.json`. An agent must carry exactly one of its two entry
-files, and so must a semantic model. A semantic model's manifest refers to the Apache Ossie
-schemas under `kinds/vendor/ossie/`, so validating its `spec` validates the model. A registry that
+files, and so must a semantic model. A file rule's `schema` is checked against that file, parsed
+as JSON or YAML, with references resolved against the manifest. The semantic model's rules point
+at its `$defs.document`, which refers to the Apache Ossie schemas under `kinds/vendor/ossie/`. A registry that
 serves its own `kinds/semantic_model.json` serves those schemas beside it; aireg bundles both for
 a registry that lists no kinds. Optional file patterns are non-exhaustive
 conventions; other supporting files are permitted and never replace the native entry.
@@ -92,5 +93,6 @@ python3 tools/check_schemas.py
 
 Structural checks need only the standard library. Instance validation, over every example
 registry under `examples/`, additionally needs
-`jsonschema` (`python3 -m pip install -r tools/requirements.txt`); without it that tier reports
+`jsonschema`, and `PyYAML` for the native files a file rule's `schema` covers
+(`python3 -m pip install -r tools/requirements.txt`); without them that tier reports
 itself skipped rather than failing.

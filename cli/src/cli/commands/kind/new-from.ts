@@ -24,7 +24,7 @@ import {
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
-import { fractionProblems } from "#core/filespec/validate/folders.ts";
+import { documentProblems, fractionProblems } from "#core/filespec/validate/folders.ts";
 import { withName } from "#core/frontmatter.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
 import { expandUserPath } from "#core/fs/path.ts";
@@ -155,14 +155,17 @@ async function incoming(
     texts.set(stored.get(path) ?? path, await readFile(join(dir, path), "utf8"));
   }
   const spec = specOf(manifest, texts, named);
+  const documents = documentProblems(manifest, texts);
   const problems = [
     ...found.irregular
       .filter((entry) => visible(entry.path))
       .map((entry) => `${entry.path} ${refusal(entry)}`),
     ...fileProblems(manifest, new Set(entries.map((path) => stored.get(path) ?? path))),
-    ...(spec === undefined
+    ...documents,
+    ...(spec === undefined ? [] : [...check(manifest, spec), ...fractionProblems(spec)]),
+    ...(spec === undefined && documents.length === 0
       ? [specParseProblem(manifest, texts) ?? "has no front matter"]
-      : [...check(manifest, spec), ...fractionProblems(spec)]),
+      : []),
   ];
   const fallback =
     typeof spec?.name === "string"

@@ -4,13 +4,10 @@ import { fractionProblems, versionProblems } from "./folders.ts";
 
 describe("fractionProblems", () => {
   test("names each number an envelope cannot hold, by its field", () => {
-    const spec = {
-      name: "retail",
-      model: { ai_context: { threshold: 0.85 }, datasets: [{ name: "sales", rows: 1e21 }] },
-    };
+    const spec = { name: "review", metadata: { threshold: 0.85, limits: [{ rows: 1e21 }] } };
     expect(fractionProblems(spec)).toEqual([
-      "`model.ai_context.threshold` is 0.85, and an envelope takes whole numbers only: write it as a string",
-      "`model.datasets.0.rows` is 1e+21, and an envelope takes whole numbers only: write it as a string",
+      "`metadata.threshold` is 0.85, and an envelope takes whole numbers only: write it as a string",
+      "`metadata.limits.0.rows` is 1e+21, and an envelope takes whole numbers only: write it as a string",
     ]);
   });
 
@@ -34,7 +31,26 @@ describe("versionProblems for a semantic model", async () => {
   test("finds a placeholder left inside a list", () => {
     const model =
       "version: 0.2.0.dev0\nname: Retail\ndatasets:\n  - name: TODO\n    source: db.sales\n";
-    expect(problems(model)).toEqual(["`model.datasets.0.name` is still TODO"]);
+    expect(problems(model)).toEqual(["semantic_model.yaml: `datasets.0.name` is still TODO"]);
+  });
+
+  test("passes a decimal, which the file keeps and the envelope never holds", () => {
+    const model =
+      "version: 0.2.0.dev0\nname: Retail\nai_context:\n  threshold: 0.85\ndatasets:\n  - name: sales\n    source: db.sales\n";
+    expect(problems(model)).toEqual([]);
+  });
+
+  test("refuses a 0.1.1 file that lists several models, and says to split it", () => {
+    const one = (name: string) =>
+      `  - name: ${name}\n    datasets:\n      - name: t\n        source: db.t\n`;
+    const model = `version: "0.1.1"\nsemantic_model:\n${one("sales")}${one("customers")}`;
+    expect(problems(model)).toEqual([
+      "semantic_model.yaml: lists 2 models under `semantic_model`, and an artifact holds one: split it into one artifact per model",
+    ]);
+  });
+
+  test("names the file that does not parse", () => {
+    expect(problems("version: [\n")[0]).toMatch(/^semantic_model\.yaml does not parse: /);
   });
 
   test("asks for exactly one of the two files", () => {

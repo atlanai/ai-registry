@@ -6,11 +6,11 @@
   "versions": [
     {
       "version": "1.0.0",
-      "digest": "sha256:f5db94c8b68951a315299e00254e248d13dd1e537b5e887573fac37db78c5e78",
+      "digest": "sha256:d1a7bd9a9faef92b1932f9dbcf3408b5fe13c8f77f230ef75953e741a17b7d71",
       "published_at": "2026-11-11T15:17:49.846Z",
       "status": "active",
       "yanked": false,
-      "catalog_digest": "sha256:df01f16e624020b39e106b7b645c2371c122bc6c3ef8a7487789ed43b1dea2f2"
+      "catalog_digest": "sha256:0607508aad1014f715d96fb9006f8908ff1fb6361e0cd5ac363fc067743a477a"
     }
   ]
 }

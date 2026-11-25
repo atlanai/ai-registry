@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
-import { isRecord } from "#adapter/fields.ts";
+import { documentProblems } from "#core/filespec/validate/folders.ts";
 import { test } from "#test/kit/fixtures.ts";
 import {
   entryName,
@@ -269,6 +269,8 @@ describe("a semantic model", () => {
     (await kindsOf(undefined)).semantic_model as KindManifest;
   const specFrom = (source: Uint8Array, entry = "semantic_model.yaml") =>
     envelopeSpec("semantic_model", new Map([[entry, source]]), undefined, "retail");
+  const problemsOf = async (source: Uint8Array, entry = "semantic_model.yaml") =>
+    documentProblems(await manifest(), new Map([[entry, Buffer.from(source).toString("utf8")]]));
 
   test("is a kind every registry holds, beside skill and agent", async () => {
     expect(Object.keys(await kindsOf(undefined))).toEqual(["skill", "agent", "semantic_model"]);
@@ -282,44 +284,51 @@ describe("a semantic model", () => {
       "TPC-DS retail semantic model for sales and customer analytics",
     ],
   ] as const)(
-    "wraps Apache Ossie's own example %s and finds it valid",
+    "lifts the name and description of Apache Ossie's own example %s and finds it valid",
     async ([file, description]) => {
       const spec = specFrom(await ossie(file));
-      expect(spec.name).toBe("retail");
-      expect(spec.description).toBe(description);
-      expect(isRecord(spec.model)).toBe(true);
+      expect(spec).toEqual({
+        name: "retail",
+        ...(description === undefined ? {} : { description }),
+      });
       expect(check(await manifest(), spec)).toEqual([]);
+      expect(await problemsOf(await ossie(file))).toEqual([]);
     },
   );
 
-  test("keeps the model's own name in the document, under the registry's slug", async () => {
-    const spec = specFrom(await ossie("tpcds_semantic_model.yaml"));
-    expect((spec.model as { name: string }).name).toBe("tpcds_retail_model");
-  });
-
-  test("reads a model saved as JSON", async () => {
+  test("keeps the model only in its file, so the envelope never repeats it", async () => {
     const model = { version: "0.2.0.dev0", name: "Retail", datasets: [{ name: "s", source: "t" }] };
     const spec = specFrom(text(JSON.stringify(model)), "semantic_model.json");
-    expect(spec).toEqual({ name: "retail", model });
-    expect(check(await manifest(), spec)).toEqual([]);
+    expect(spec).toEqual({ name: "retail" });
+    expect(check(await manifest(), { ...spec, model })).toEqual([
+      "`model` is not a field this kind takes",
+    ]);
   });
 
   test("reads its own file, not a document kept under source/", async () => {
     const files = new Map([
-      ["source/semantic_models.yml", text("semantic_models:\n  - name: orders\n")],
-      ["semantic_model.yaml", await ossie("flights.semantic_model.yaml")],
+      ["source/semantic_models.yml", "semantic_models:\n  - name: orders\n"],
+      [
+        "semantic_model.yaml",
+        "version: 0.2.0.dev0\nname: x\ndescription: Flights.\ndatasets:\n  - name: f\n    source: db.f\n",
+      ],
     ]);
-    const spec = envelopeSpec("semantic_model", files, undefined, "flights");
-    expect((spec.model as { version: string }).version).toBe("0.2.0.dev0");
+    const spec = envelopeSpec(
+      "semantic_model",
+      new Map([...files].map(([path, body]) => [path, text(body)])),
+      undefined,
+      "flights",
+    );
+    expect(spec.description).toBe("Flights.");
+    expect(documentProblems(await manifest(), files)).toEqual([]);
   });
 
-  test("refuses a file that is not a semantic model, with the fields that are wrong", async () => {
-    const spec = specFrom(await ossie("invalid-flights-ontology.yaml"));
-    expect(check(await manifest(), spec)).toEqual([
-      "`model.datasets` is required",
-      "`model.requires` is not a field this kind takes",
-      "`model.ontology` is not a field this kind takes",
-      "`model.ontology_mappings` is not a field this kind takes",
+  test("refuses a file that is not a semantic model, naming the file and the fields", async () => {
+    expect(await problemsOf(await ossie("invalid-flights-ontology.yaml"))).toEqual([
+      "semantic_model.yaml: `datasets` is required",
+      "semantic_model.yaml: `requires` is not a field this kind takes",
+      "semantic_model.yaml: `ontology` is not a field this kind takes",
+      "semantic_model.yaml: `ontology_mappings` is not a field this kind takes",
     ]);
   });
 
@@ -327,21 +336,23 @@ describe("a semantic model", () => {
     const source = Buffer.from(await ossie("tpcds_semantic_model.v0.1.1.yaml"))
       .toString("utf8")
       .replace('version: "0.1.1"', 'version: "0.2.0.dev0"');
-    const problems = check(await manifest(), specFrom(text(source)));
-    expect(problems).toContain("`model.name` is required");
-    expect(problems).toContain("`model.semantic_model` is not a field this kind takes");
+    const problems = await problemsOf(text(source));
+    expect(problems).toContain("semantic_model.yaml: `name` is required");
+    expect(problems).toContain(
+      "semantic_model.yaml: `semantic_model` is not a field this kind takes",
+    );
   });
 
   test("refuses a version of Ossie it has no schema for, and a model that declares none", async () => {
     const dataset = { name: "s", source: "t" };
     const newer = { version: "0.3.0", name: "Retail", datasets: [dataset] };
-    expect(
-      check(await manifest(), specFrom(text(JSON.stringify(newer)), "semantic_model.json")),
-    ).toEqual(["`model.version` must be equal to one of the allowed values"]);
+    expect(await problemsOf(text(JSON.stringify(newer)), "semantic_model.json")).toEqual([
+      "semantic_model.json: `version` must be equal to one of the allowed values",
+    ]);
     const none = { name: "Retail", datasets: [dataset] };
-    expect(
-      check(await manifest(), specFrom(text(JSON.stringify(none)), "semantic_model.json")),
-    ).toEqual(["`model.version` is required"]);
+    expect(await problemsOf(text(JSON.stringify(none)), "semantic_model.json")).toEqual([
+      "semantic_model.json: `version` is required",
+    ]);
   });
 
   test("stores a lone model under the kind's file name, whatever it was called", async () => {
