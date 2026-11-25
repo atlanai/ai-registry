@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 import { readCodexRollout } from "./codex.ts";
 
@@ -54,7 +54,7 @@ describe("readCodexRollout", () => {
       {},
     );
     expect(loads.map((load) => load.path)).toEqual([
-      "/work/app/.agents/skills/a",
+      resolve("/work/app", ".agents/skills/a"),
       join(homedir(), ".agents/skills/b"),
     ]);
   });

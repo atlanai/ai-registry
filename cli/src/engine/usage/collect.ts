@@ -1,5 +1,5 @@
 import { type Dirent, readdirSync } from "node:fs";
-import { open, stat } from "node:fs/promises";
+import { type FileHandle, open } from "node:fs/promises";
 import { join } from "node:path";
 import type { Target } from "#core/target/contract.ts";
 import { userTargetRoot } from "#core/target/roots.ts";
@@ -97,24 +97,25 @@ async function readNew(
 ): Promise<Load[]> {
   const format = target.sessions?.format;
   if (format === undefined) return [];
-  let info: Awaited<ReturnType<typeof stat>>;
+  let handle: FileHandle;
   try {
-    info = await stat(file);
+    handle = await open(file, "r");
   } catch {
     return [];
   }
-  const held = cursors[file];
-  // A record nobody read and nobody touched in a month is history this machine never counted.
-  if (held === undefined && now - info.mtimeMs > BACKFILL_DAYS * 86_400_000) {
-    cursors[file] = { offset: info.size, inode: info.ino, state: {} };
-    return [];
-  }
-  // Another file under the name, or shorter than where reading stopped: read from the start.
-  const same = held !== undefined && held.inode === info.ino && held.offset <= info.size;
-  let cursor = same ? held : { offset: 0, inode: info.ino, state: {} };
   const loads: Load[] = [];
-  const handle = await open(file, "r");
   try {
+    // Sized from the open file, so what is read is what was measured.
+    const info = await handle.stat();
+    const held = cursors[file];
+    // A record nobody read and nobody touched in a month is history this machine never counted.
+    if (held === undefined && now - info.mtimeMs > BACKFILL_DAYS * 86_400_000) {
+      cursors[file] = { offset: info.size, inode: info.ino, state: {} };
+      return [];
+    }
+    // Another file under the name, or shorter than where reading stopped: read from the start.
+    const same = held !== undefined && held.inode === info.ino && held.offset <= info.size;
+    let cursor = same ? held : { offset: 0, inode: info.ino, state: {} };
     let carry = Buffer.alloc(0);
     let position = cursor.offset;
     while (position < info.size) {
@@ -137,9 +138,9 @@ async function readNew(
       // Only complete lines count as read; a line still being written is read next time.
       cursor = { offset: position - carry.length, inode: info.ino, state: chunk.state };
     }
+    cursors[file] = cursor;
   } finally {
     await handle.close();
   }
-  cursors[file] = cursor;
   return loads;
 }
