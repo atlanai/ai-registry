@@ -186,3 +186,73 @@ test("installs an MCP server for every project target that loads one, and remove
     expect(existsSync(join(project, folder)), folder).toBe(false);
   }
 });
+
+test("leaves a shared .mcp.json entry out for every target when one cannot apply its tool filter", async ({
+  aireg,
+  git,
+  tmp,
+}) => {
+  const project = join(tmp, "filtered");
+  const registry = join(tmp, "filtered-acme");
+  await cp(ACME, registry, { recursive: true });
+  await mkdir(join(project, ".registry"), { recursive: true });
+  await git.init(project);
+  const manifest = join(project, ".registry", "manifest.yml");
+  const write = (tools: string) =>
+    writeFile(
+      manifest,
+      [
+        "targets: [claude-code, github-copilot]",
+        "registries:",
+        `  acme: ${registry}`,
+        "artifacts:",
+        "  - ref: acme/engineering/issue-tracker",
+        "    with: { ISSUES_URL: https://issues.example.test }",
+        `    tools: ${tools}`,
+        "",
+      ].join("\n"),
+    );
+  const mcp = join(project, ".mcp.json");
+  const settings = join(project, ".claude", "settings.json");
+  const lock = join(project, ".registry", "manifest.lock.yml");
+
+  await write("{ allow: [echo, get-sum] }");
+  const allowed = await aireg(["install"], { cwd: project });
+  expect(allowed.stderr).toContain(
+    "Did not install issue-tracker for Claude Code: it allows only some tools, which this target cannot.",
+  );
+  expect(allowed.stderr).toContain(
+    "Did not install issue-tracker for GitHub Copilot: .mcp.json is shared with Claude Code, which cannot apply its tool filter.",
+  );
+  expect(existsSync(mcp)).toBe(false);
+
+  await write("{ deny: [echo] }");
+  const both = await aireg(["install"], { cwd: project });
+  expect(both.stderr).toContain(
+    "Did not install issue-tracker for Claude Code: .mcp.json is shared with GitHub Copilot, which cannot apply its tool filter.",
+  );
+  expect(existsSync(mcp)).toBe(false);
+  expect(existsSync(settings)).toBe(false);
+
+  // Claude Code applies a deny in its settings, so on its own it writes the shared entry.
+  const alone = (await readFile(manifest, "utf8")).replace(
+    "claude-code, github-copilot",
+    "claude-code",
+  );
+  await writeFile(manifest, alone);
+  const denied = await aireg(["install"], { cwd: project });
+  expect(denied.code, denied.stderr).toBe(0);
+  expect(JSON.parse(await readFile(mcp, "utf8")).mcpServers["issue-tracker"]).toBeDefined();
+  expect(JSON.parse(await readFile(settings, "utf8")).permissions.deny).toEqual([
+    "mcp__issue-tracker__echo",
+  ]);
+
+  await write("{ allow: [echo] }");
+  const switched = await aireg(["install"], { cwd: project });
+  expect(switched.stderr).not.toContain("did not write");
+  expect(existsSync(mcp)).toBe(false);
+  expect(await readFile(lock, "utf8")).not.toContain("file: .mcp.json");
+  expect(await readFile(lock, "utf8")).not.toContain("settings.json");
+  const status = JSON.parse((await aireg(["status", "--json"], { cwd: project })).stdout);
+  expect(status.data.artifacts[0].targets).toEqual({});
+});

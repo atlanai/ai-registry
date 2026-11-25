@@ -24,7 +24,7 @@ export function planConfigs(
   const wanted = item.kind === "mcp_server" ? configsFor(item, build) : [];
   const kept: LockEntry[] = [];
   for (const want of wanted) {
-    const receipt = held.find((entry) => sameEntry(entry, want));
+    const receipt = receiptFor(held, want);
     const deny = want.deny;
     const denyReceipt =
       deny === undefined ? undefined : held.find((entry) => sameEntry(entry, { ...want, ...deny }));
@@ -53,8 +53,7 @@ export function planConfigs(
           }),
       ...(build.options.force ? { force: true as const } : {}),
     });
-    if (receipt !== undefined) kept.push(receipt);
-    if (denyReceipt !== undefined) kept.push(denyReceipt);
+    kept.push(...[receipt, denyReceipt].filter((entry) => entry !== undefined));
   }
   for (const entry of held) {
     if (kept.includes(entry)) continue;
@@ -64,7 +63,8 @@ export function planConfigs(
     );
     if (!shared) unconfigure(build, item.name, entry);
   }
-  return kept;
+  // Targets sharing one entry hold the same receipt for it.
+  return [...new Set(kept)];
 }
 
 export function unconfigure(build: BuildState, name: string, receipt: LockEntry): void {
@@ -135,6 +135,16 @@ function configsFor(item: Selected, build: BuildState): Wanted[] {
     });
   }
   return wanted;
+}
+
+/** An entry another target's receipt names in a shared file is still the one aireg wrote. */
+function receiptFor(held: readonly LockEntry[], want: Wanted): LockEntry | undefined {
+  return (
+    held.find((entry) => sameEntry(entry, want)) ??
+    held.find(
+      (entry) => entry.items === undefined && sameEntry(entry, { ...want, target: entry.target }),
+    )
+  );
 }
 
 function sameEntry(entry: LockEntry, want: Pick<Wanted, "target" | "file" | "at">): boolean {

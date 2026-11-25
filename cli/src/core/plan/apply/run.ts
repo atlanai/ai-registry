@@ -35,7 +35,13 @@ export interface ApplyResult {
   /** Plugins this run installed or updated that carry something a target starts on its own. */
   carried: { name: string; carries: Carried[] }[];
   /** Rendered placements skipped because the artifact could not fill one. */
-  unrendered: { name: string; target: string; reason: string }[];
+  unrendered: {
+    name: string;
+    target: string;
+    reason: string;
+    /** Left out because another target reading the same entry, `with`, could not take it. */
+    shared?: { file: string; with: string };
+  }[];
 }
 
 export type ActionOf<K extends Action["kind"]> = Extract<Action, { kind: K }>;
@@ -97,8 +103,8 @@ export interface RunResults {
   projections: ReadonlySet<string> | undefined;
   /** By installed name, the config entries this run leaves aireg's. */
   receipts: Map<string, LockEntry[]>;
-  /** Config entries this run wrote or confirmed, by file and key path, and for which target. */
-  claims: Map<string, { target: string; digest: string }>;
+  /** Configure actions by the file and key path they write, and the targets each leaves out. */
+  shared: Map<string, { group: ActionOf<"configure">[]; out?: Map<string, Unrendered> }>;
 }
 
 export interface Run {
@@ -139,7 +145,7 @@ export function startRun(inputs: RunInputs, guards: Map<string, LinkGuard>): Run
       recorded: undefined,
       projections: undefined,
       receipts: new Map(),
-      claims: new Map(),
+      shared: new Map(),
     },
   };
 }

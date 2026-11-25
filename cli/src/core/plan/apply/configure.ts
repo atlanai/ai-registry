@@ -12,13 +12,14 @@ import { pruneEmptyParent } from "#core/fs/tree.ts";
 import type { LockEntry } from "#core/lock.ts";
 import type { McpEntry } from "#core/mcp/model.ts";
 import { chooseOption, resolveServer } from "#core/mcp/resolve.ts";
+import type { Action } from "#core/plan/model.ts";
 import { mcpCodex } from "#core/target/codecs/mcp-codex.ts";
 import { mcpJson } from "#core/target/codecs/mcp-json.ts";
 import type { ConfigCodec, ConfigValue, ToolFilter } from "#core/target/contract.ts";
 import type { ConfigDocument } from "#core/target/register/document.ts";
 import { entryDigest, itemsDigest } from "#core/target/register/entry.ts";
 import { openDocument } from "#core/target/register/register.ts";
-import type { ActionOf, Run } from "./run.ts";
+import type { ActionOf, Run, Unrendered } from "./run.ts";
 
 type Kept = { name: string; path: string; reason?: string; config?: true };
 
@@ -29,17 +30,16 @@ export interface Configured {
   denied?: LockEntry;
   written: boolean;
   kept?: Kept;
-  unrendered?: { name: string; target: string; reason: string };
+  unrendered?: Unrendered;
 }
 
 /** Writes the target's entry, never over one a person edited or one that is not aireg's. */
 export async function configure(run: Run, action: ActionOf<"configure">): Promise<Configured> {
   const { name, target, to, at, mapping, receipt } = action;
-  const server = await readServer(action.from);
-  const value = render(server, action);
-  if (typeof value === "string") {
-    return { written: false, unrendered: { name, target, reason: value }, ...keptReceipt(receipt) };
-  }
+  const value = render(await readServer(action.from), action);
+  if (typeof value === "string") return leaveOut(run, action, { name, target, reason: value });
+  const shared = await leftOutOfShared(run, action);
+  if (shared !== undefined) return leaveOut(run, action, shared);
   await guard(run, to);
   const doc = readable(mapping.format, await readTextIfPresent(to), to);
   if (typeof doc === "string") {
@@ -49,8 +49,6 @@ export async function configure(run: Run, action: ActionOf<"configure">): Promis
   const digest = digestOf(value);
   const file = posixRelative(run.inputs.roots.base, to);
   const made: LockEntry = { target, file, format: mapping.format, at, digest };
-  const shared = sharedEntry(run, action, file, digest);
-  if (shared !== undefined) return { written: false, ...shared };
   if (current !== undefined && digestOf(current) === digest) {
     return { written: false, receipt: made, ...(await denyList(run, action)) };
   }
@@ -122,28 +120,89 @@ function encode(
   }
 }
 
+/** Groups the entries several targets read, settled once their content is staged. */
+export function shareEntries(run: Run, actions: readonly Action[]): void {
+  for (const action of actions) {
+    if (action.kind !== "configure") continue;
+    const key = entryKey(action);
+    const held = run.results.shared.get(key);
+    if (held === undefined) run.results.shared.set(key, { group: [action] });
+    else held.group.push(action);
+  }
+}
+
+const cannot = ({ filtered }: { filtered: boolean }): string =>
+  filtered ? "cannot apply its tool filter" : "cannot install it";
+
+const entryKey = (action: ActionOf<"configure">): string => [action.to, ...action.at].join("\0");
+
 /**
- * Two targets can read one entry, such as `.mcp.json`'s: the first this run writes it, and a
- * later one that needs it different is left out rather than overwriting it.
+ * Targets that read one entry, such as `.mcp.json`'s, get it only when each writes it the same:
+ * otherwise one would load the server without the tool filter another needs.
  */
-function sharedEntry(
+async function leftOutOfShared(
   run: Run,
   action: ActionOf<"configure">,
-  file: string,
-  digest: string,
-): Pick<Configured, "receipt" | "unrendered"> | undefined {
-  const key = [file, ...action.at].join("\0");
-  const claimed = run.results.claims.get(key);
-  if (claimed === undefined || claimed.target === action.target) {
-    run.results.claims.set(key, { target: action.target, digest });
-    return undefined;
+): Promise<Unrendered | undefined> {
+  const held = run.results.shared.get(entryKey(action));
+  if (held === undefined) return undefined;
+  held.out ??= await settleShared(run, held.group);
+  return held.out.get(action.target);
+}
+
+async function settleShared(
+  run: Run,
+  group: readonly ActionOf<"configure">[],
+): Promise<Map<string, Unrendered>> {
+  const out = new Map<string, Unrendered>();
+  if (new Set(group.map((action) => action.target)).size < 2) return out;
+  const rendered = await Promise.all(
+    group.map(async (action) => {
+      const server = await readServer(action.from);
+      const value = render(server, action);
+      const unfiltered = { ...action, server: { ...action.server, tools: undefined } };
+      const filtered = typeof value === "string" && typeof render(server, unfiltered) !== "string";
+      return { action, digest: typeof value === "string" ? undefined : digestOf(value), filtered };
+    }),
+  );
+  for (const { action, digest } of rendered) {
+    if (digest === undefined) continue;
+    const other = rendered.find((them) => them.digest !== digest);
+    if (other === undefined) continue;
+    const reason = other.digest !== undefined ? "needs a different entry for it" : cannot(other);
+    const file = posixRelative(run.inputs.roots.base, action.to);
+    out.set(action.target, {
+      name: action.name,
+      target: action.target,
+      reason,
+      shared: { file, with: other.action.target },
+    });
   }
-  const { name, target, mapping, at } = action;
-  if (claimed.digest === digest) {
-    return { receipt: { target, file, format: mapping.format, at, digest } };
+  return out;
+}
+
+/** A target left out loses the entry aireg wrote for it, so a stale one never loads unfiltered. */
+async function leaveOut(
+  run: Run,
+  action: ActionOf<"configure">,
+  unrendered: Unrendered,
+): Promise<Configured> {
+  const { name, target, to, mapping, receipt, deny } = action;
+  const force = action.force === true ? { force: true as const } : {};
+  const take = { kind: "unconfigure" as const, name, target, ...force };
+  let kept: Configured["kept"];
+  try {
+    if (receipt !== undefined) {
+      ({ kept } = await unconfigure(run, { ...take, to, format: mapping.format, receipt }));
+    }
+    if (deny?.receipt !== undefined) {
+      await unconfigure(run, { ...take, to: deny.to, format: "json", receipt: deny.receipt });
+    }
+  } catch (error) {
+    if (!(error instanceof AiregError)) throw error;
+    return { written: false, unrendered, ...keptReceipt(receipt) };
   }
-  const reason = `${file} holds the entry ${claimed.target} needs for it, which differs`;
-  return { unrendered: { name, target, reason } };
+  return { written: false, unrendered, ...(kept === undefined ? {} : { kept }) };
 }
 
 /** Adds each denied tool to the target's list, beside any a person wrote. */

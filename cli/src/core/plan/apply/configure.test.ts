@@ -3,8 +3,9 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { roots } from "#core/store/paths.ts";
 import { claudeCode } from "#targets/claude-code.ts";
+import { githubCopilot } from "#targets/github-copilot.ts";
 import { test } from "#test/kit/fixtures.ts";
-import { configure, unconfigure } from "./configure.ts";
+import { configure, shareEntries, unconfigure } from "./configure.ts";
 import type { ActionOf, Run } from "./run.ts";
 
 const mapping = claudeCode.kinds.mcp_server as ActionOf<"configure">["mapping"];
@@ -28,7 +29,7 @@ async function setup(tmp: string) {
   await writeFile(join(from, "server.json"), JSON.stringify(SERVER));
   const run = {
     inputs: { roots: roots("project", tmp) },
-    results: { claims: new Map() },
+    results: { shared: new Map() },
   } as unknown as Run;
   const to = join(tmp, ".mcp.json");
   const action = (extra: Partial<ActionOf<"configure">> = {}): ActionOf<"configure"> => ({
@@ -101,30 +102,91 @@ describe("configure", () => {
 });
 
 describe("an entry two targets read", () => {
-  test("is written once when they agree, and left to the first when they differ", async ({
+  const copilot = githubCopilot.kinds.mcp_server as ActionOf<"configure">["mapping"];
+
+  async function both(tmp: string, tools: { allow?: string[]; deny?: string[] } | undefined) {
+    const kit = await setup(tmp);
+    const settings = join(tmp, ".claude", "settings.json");
+    const deny = tools?.deny?.map((tool) => `mcp__srv__${tool}`);
+    const claude = (extra: Partial<ActionOf<"configure">> = {}) =>
+      kit.action({
+        server: { tools },
+        ...(deny === undefined
+          ? {}
+          : { deny: { to: settings, at: ["permissions", "deny"], items: deny } }),
+        ...extra,
+      });
+    const other = (extra: Partial<ActionOf<"configure">> = {}) =>
+      kit.action({ target: "github-copilot", mapping: copilot, server: { tools }, ...extra });
+    return { ...kit, settings, claude, other };
+  }
+
+  test("is written once, with a receipt for each, when they agree", async ({ tmp }) => {
+    const { run, claude, other } = await both(tmp, undefined);
+    shareEntries(run, [claude(), other()]);
+    expect((await configure(run, claude())).written).toBe(true);
+    const same = await configure(run, other());
+    expect(same).toMatchObject({ written: false, receipt: { target: "github-copilot" } });
+  });
+
+  test("is left out for both when one cannot apply an allow list", async ({ tmp }) => {
+    const { run, to, claude, other } = await both(tmp, { allow: ["echo"] });
+    shareEntries(run, [claude(), other()]);
+    const left = await configure(run, claude());
+    expect(left.unrendered?.reason).toContain("allows only some tools");
+    const shared = await configure(run, other());
+    expect(shared).toMatchObject({
+      written: false,
+      unrendered: {
+        reason: "cannot apply its tool filter",
+        shared: { file: ".mcp.json", with: "claude-code" },
+      },
+    });
+    expect(shared.receipt).toBeUndefined();
+    await expect(readFile(to, "utf8")).rejects.toThrow();
+  });
+
+  test("is left out for both when one cannot apply a deny list another applies elsewhere", async ({
     tmp,
   }) => {
-    const { run, action, json } = await setup(tmp);
-    expect((await configure(run, action())).written).toBe(true);
-    const same = await configure(run, action({ target: "github-copilot" }));
-    expect(same).toMatchObject({ written: false, receipt: { target: "github-copilot" } });
-    const narrowed = await configure(
-      run,
-      action({
-        target: "github-copilot",
-        mapping: {
-          ...mapping,
-          codec: {
-            id: "mcp-json",
-            secret: { prefix: "${", suffix: "}" },
-            tools: { allow: ["tools"] },
-          },
-        },
-        server: { tools: { allow: ["a"] } },
-      }),
-    );
-    expect(narrowed.unrendered?.reason).toContain("claude-code");
-    expect(Object.keys((await json()).mcpServers.srv)).not.toContain("tools");
+    const { run, to, settings, claude, other } = await both(tmp, { deny: ["echo"] });
+    shareEntries(run, [claude(), other()]);
+    const shared = await configure(run, claude());
+    expect(shared.unrendered).toMatchObject({
+      reason: "cannot apply its tool filter",
+      shared: { with: "github-copilot" },
+    });
+    expect(shared.denied).toBeUndefined();
+    expect((await configure(run, other())).unrendered?.reason).toContain("denies some tools");
+    await expect(readFile(to, "utf8")).rejects.toThrow();
+    await expect(readFile(settings, "utf8")).rejects.toThrow();
+  });
+
+  test("written for one, is taken back with its receipts once the filter changes", async ({
+    tmp,
+  }) => {
+    const before = await both(tmp, { deny: ["echo"] });
+    const first = await configure(before.run, before.claude());
+    expect(first.written).toBe(true);
+    const { receipt, denied } = first;
+    if (receipt === undefined || denied === undefined) throw new Error("no receipt");
+
+    const after = await both(tmp, { allow: ["echo"] });
+    const deny = { to: after.settings, at: ["permissions", "deny"], items: [], receipt: denied };
+    const claude = after.claude({ receipt, deny });
+    // The planner hands Copilot the entry Claude Code's receipt names in the shared file.
+    const other = after.other({ receipt });
+    shareEntries(after.run, [claude, other]);
+    const left = await configure(after.run, claude);
+    const shared = await configure(after.run, other);
+    for (const done of [left, shared]) {
+      expect(done.receipt).toBeUndefined();
+      expect(done.denied).toBeUndefined();
+      expect(done.kept).toBeUndefined();
+    }
+    expect(shared.unrendered?.shared?.with).toBe("claude-code");
+    await expect(readFile(after.to, "utf8")).rejects.toThrow();
+    await expect(readFile(after.settings, "utf8")).rejects.toThrow();
   });
 });
 

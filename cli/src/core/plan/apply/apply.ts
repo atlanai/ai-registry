@@ -12,7 +12,7 @@ import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { assertManagedPath } from "#core/store/managed-paths.ts";
 import { PROJECTIONS_DIR, type Roots } from "#core/store/paths.ts";
 import { assemble } from "./assemble.ts";
-import { configure, unconfigure } from "./configure.ts";
+import { configure, shareEntries, unconfigure } from "./configure.ts";
 import { journal } from "./journal.ts";
 import { linkInto, preflight, unlink } from "./link.ts";
 import { record } from "./record.ts";
@@ -57,6 +57,7 @@ export async function apply({
     { roots, env, ahead: prefetch(plan, fetch), before, stamp: () => (stamp ??= backupStamp()) },
     guards,
   );
+  shareEntries(run, plan.actions);
 
   let leaseCheckedAt = 0;
   for (const action of plan.actions) {
