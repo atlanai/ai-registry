@@ -12,7 +12,8 @@ export interface Frontmatter {
   engine: string | undefined;
 }
 
-const FENCE = /^---\r?\n([\s\S]*?)\r?\n---\r?(?:\n|$)/;
+/** A byte order mark may come first, as Windows PowerShell 5.1 and some editors write UTF-8. */
+const FENCE = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?(?:\n|$)/;
 
 /** Section 3.4's limit. An envelope keeps the whole description; a reader shortens it to print. */
 const DESCRIPTION_LIMIT = 4000;
