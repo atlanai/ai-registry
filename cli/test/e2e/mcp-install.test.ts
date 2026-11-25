@@ -158,7 +158,7 @@ test("installs an MCP server for every project target that loads one, and remove
     mcpServers: { "issue-tracker": shared },
   });
   expect(JSON.parse(await read(".pi/mcp.json")).mcpServers["issue-tracker"]).toEqual(shared);
-  expect(JSON.parse(await read("opencode.json")).mcp.servers["issue-tracker"]).toEqual({
+  expect(JSON.parse(await read("opencode.json")).mcp["issue-tracker"]).toEqual({
     type: "local",
     command: ["npx", ...args],
     environment: { ISSUES_URL: url, [token]: `{env:${token}}` },

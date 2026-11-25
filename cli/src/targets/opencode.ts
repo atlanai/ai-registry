@@ -28,7 +28,7 @@ export const opencode = defineTarget({
       file: "opencode.json",
       anchor: "project",
       format: "json",
-      at: ["mcp", "servers", "{name}"],
+      at: ["mcp", "{name}"],
       codec: {
         id: "mcp-json",
         secret: { prefix: "{env:", suffix: "}" },
