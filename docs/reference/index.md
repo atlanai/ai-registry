@@ -80,6 +80,7 @@ aireg add <registry>/<namespace>[/<name>[@<version>]] [options]
 | [`aireg config`](config.md) | Read and write aireg's own settings. |
 | [`aireg doctor`](doctor.md) | Check that this machine can install artifacts. |
 | [`aireg unlock`](unlock.md) | Show or clear a stuck write lock. |
+| [`aireg backup`](backup.md) | See or restore files of yours that aireg moved aside. |
 | [`aireg logs`](logs.md) | Read aireg's diagnostic logs. |
 | [`aireg adapter`](adapter.md) | Install an adapter, or write a new one. |
 | [`aireg self`](self.md) | Update aireg, or uninstall it. |

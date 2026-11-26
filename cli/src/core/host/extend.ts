@@ -23,12 +23,23 @@ export interface HostCommandContext {
   exit?: number;
 }
 
+/** An action of an adapter's command; a bare name is one with no summary. */
+export interface ActionContribution {
+  name: string;
+  /** One line, shown beside it in `aireg <command> --help`. */
+  summary?: string;
+  /** Still runs, but help and `--map` leave it out. */
+  hidden?: boolean;
+}
+
 export interface CommandContribution {
   name: string;
   aliases?: readonly string[];
+  /** Names it still answers to that help and `--map` never list. */
+  hiddenAliases?: readonly string[];
   summary: string;
   group: string;
-  actions?: readonly string[];
+  actions?: readonly (string | ActionContribution)[];
   usage?: readonly string[];
   /** For help and `--map` only; the command still parses its own argv. */
   options?: readonly OptionSpec[];

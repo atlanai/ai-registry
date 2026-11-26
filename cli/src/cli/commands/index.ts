@@ -1,6 +1,6 @@
 import { quoted } from "#adapter/text.ts";
 import { NAMESPACE } from "#cli/options/flags.ts";
-import type { CommandContribution, OptionSpec } from "#core/host/extend.ts";
+import type { ActionContribution, CommandContribution, OptionSpec } from "#core/host/extend.ts";
 import { contributedCommands } from "#core/host/load.ts";
 import { aKind, kindCommand } from "#core/kinds.ts";
 import type { Printer } from "#core/term/printer.ts";
@@ -13,7 +13,7 @@ import {
   printHidden,
   RESERVED,
 } from "./builtins.ts";
-import { type Command, GROUPS, type Group } from "./command.ts";
+import { type ActionSpec, type Command, GROUPS, type Group } from "./command.ts";
 
 /** Loaded only when that command runs. */
 const LOADERS: Readonly<Record<string, Command["load"]>> = {
@@ -40,6 +40,7 @@ const LOADERS: Readonly<Record<string, Command["load"]>> = {
   config: () => import("./config.ts"),
   doctor: () => import("./doctor.ts"),
   unlock: () => import("./unlock.ts"),
+  backup: () => import("./backup.ts"),
   adapter: () => import("./adapter.ts"),
   logs: () => import("./logs.ts"),
   self: () => import("./self.ts"),
@@ -80,7 +81,7 @@ async function table(cwd: string): Promise<{ commands: Command[]; hidden: Hidden
   }
   const taken = new Set([
     ...BUILTIN_NAMES,
-    ...commands.flatMap((c) => [c.name, ...(c.aliases ?? [])]),
+    ...commands.flatMap((c) => [c.name, ...(c.aliases ?? []), ...(c.formerly ?? [])]),
   ]);
   for (const { kind, command } of await kindCommands(cwd)) {
     if (RESERVED.has(kind) || taken.has(command.name)) hidden.push(hiddenKind(kind));
@@ -93,6 +94,7 @@ function fromContribution(command: CommandContribution): Command {
   return {
     name: command.name,
     ...(command.aliases === undefined ? {} : { aliases: [...command.aliases] }),
+    ...(command.hiddenAliases === undefined ? {} : { formerly: [...command.hiddenAliases] }),
     summary: command.summary,
     group: asGroup(command.group),
     usage: command.usage ?? [
@@ -101,10 +103,17 @@ function fromContribution(command: CommandContribution): Command {
     ...(command.examples === undefined ? {} : { examples: command.examples }),
     ...(command.docs === undefined ? {} : { docs: command.docs }),
     ...(command.options === undefined ? {} : { options: command.options }),
-    ...(command.actions === undefined
-      ? {}
-      : { actions: command.actions.map((name) => ({ name })) }),
+    ...(command.actions === undefined ? {} : { actions: command.actions.map(actionOf) }),
     load: command.load,
+  };
+}
+
+function actionOf(action: string | ActionContribution): ActionSpec {
+  if (typeof action === "string") return { name: action };
+  return {
+    name: action.name,
+    ...(action.summary === undefined ? {} : { summary: action.summary }),
+    ...(action.hidden === true ? { hidden: true } : {}),
   };
 }
 
@@ -195,7 +204,7 @@ export async function lookup(name: string, cwd = process.cwd()): Promise<Command
   const own = lookupBuiltin(name);
   if (own !== undefined) return own;
   return (await allCommands(cwd)).find(
-    (c) => c.name === name || c.aliases?.includes(name) === true,
+    (c) => c.name === name || c.aliases?.includes(name) === true || c.formerly?.includes(name),
   );
 }
 

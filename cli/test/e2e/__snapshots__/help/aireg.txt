@@ -63,6 +63,8 @@ Maintain:
                   list  get  set  unset  path
   doctor          Check that this machine can install artifacts
   unlock          Show or clear a stuck write lock
+  backup          See or restore files of yours that aireg moved aside
+                  list  restore
   adapter         Install an adapter, or write a new one
                   install  list  remove  init
   logs            Read aireg's diagnostic logs

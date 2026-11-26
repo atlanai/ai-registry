@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
+import { digest } from "#core/fs/digest.ts";
 import { inspect } from "#core/fs/link.ts";
 import { canonical } from "#core/fs/realpath.ts";
 import type { LinkMode } from "#core/lock.ts";
@@ -23,6 +24,8 @@ export async function guardLink(
   recorded: LinkMode | undefined,
   { roots, env }: GuardScope,
   rendered?: { file: string; text: string },
+  /** A copy's digest as aireg wrote it: one edited since is backed up, not overwritten. */
+  written?: string,
 ): Promise<LinkGuard> {
   const state = await inspect(to);
   if (!state.exists) return "replace";
@@ -31,6 +34,9 @@ export async function guardLink(
     state.isLink && state.target !== undefined
       ? isWithin(canonical(dirname(roots.artifacts)), canonical(state.target))
       : recorded === "copy";
+  if (ours && written !== undefined && !state.isLink) {
+    return (await digest(to, written)) === written ? "replace" : "backup";
+  }
   if (ours) return "replace";
   // A file already holding what would be written is ours to take on.
   if (rendered !== undefined && !state.isLink && (await holdsOnly(to, rendered))) return "replace";
