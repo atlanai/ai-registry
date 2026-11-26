@@ -15,6 +15,8 @@ export default defineConfig({
     "react",
     "react/jsx-runtime",
     "react-devtools-core",
+    // Bundled as data: an external JSON import would need import attributes at run time.
+    "ajv/dist/refs/json-schema-draft-07.json",
   ],
   splitting: true,
   treeshake: true,

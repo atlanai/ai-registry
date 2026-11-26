@@ -124,7 +124,7 @@ const KIND_NEW: readonly OptionSpec[] = [
     flag: "--from",
     value: "<path>",
     multiple: true,
-    describe: "An existing skill folder or agent file to copy in (repeatable)",
+    describe: "An existing artifact folder or file to copy in (repeatable)",
   },
   {
     flag: "--name",

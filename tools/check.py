@@ -258,6 +258,17 @@ def check_kind_manifests(root: Path, registry: dict, rep: Report) -> None:
         reference = reference_dir / local.name
         if reference.is_file() and local.read_bytes() != reference.read_bytes():
             rep.error(f"{url}: differs from spec/schemas/kinds/{local.name}; the root's copy has drifted")
+    # Another project's schemas a manifest refers to, served beside it under vendor/.
+    vendored = root / "kinds" / "vendor"
+    if vendored.is_dir() and inside(root, vendored):
+        for local in sorted(path for path in vendored.rglob("*") if path.is_file()):
+            relative = local.relative_to(root / "kinds").as_posix()
+            if not inside(root, local):
+                rep.error(f"kinds/{relative}: is a symlink or sits under one; not read")
+                continue
+            reference = reference_dir / relative
+            if reference.is_file() and local.read_bytes() != reference.read_bytes():
+                rep.error(f"kinds/{relative}: differs from spec/schemas/kinds/{relative}; the root's copy has drifted")
 
 
 def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, partial: bool = False) -> None:

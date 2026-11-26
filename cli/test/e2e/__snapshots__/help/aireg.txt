@@ -49,6 +49,8 @@ Share:
                   new  bump
   semantic_model  Create a semantic_model, or start its next version
                   new  bump
+  mcp_server      Create a mcp_server, or start its next version
+                  new  bump
 
 Automate:
   job             Manage background jobs and read their runs

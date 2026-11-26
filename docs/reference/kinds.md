@@ -1,6 +1,6 @@
-# aireg skill, aireg agent and aireg semantic_model
+# aireg skill, aireg agent, aireg semantic_model and aireg mcp_server
 
-Create a skill, an agent or a semantic model, or start its next version.
+Create a skill, an agent, a semantic model or an MCP server, or start its next version.
 
 ## Synopsis
 
@@ -10,11 +10,11 @@ aireg skill new --from <path>... [--name <name>] [--namespace <namespace>] [-y]
 aireg skill bump <name> [patch | minor | major | <version>] [--namespace <namespace>]
 ```
 
-`aireg agent` and `aireg semantic_model` take the same actions.
+`aireg agent`, `aireg semantic_model` and `aireg mcp_server` take the same actions.
 
 ## Description
 
-aireg has one command for each kind of artifact. `skill`, `agent` and `semantic_model` are always there. In a registry whose `registry.json` lists its kinds, the commands are those kinds instead. A kind named like one of aireg's own commands, such as `status`, gets no command of its own, and aireg warns about it.
+aireg has one command for each kind of artifact. `skill`, `agent`, `semantic_model` and `mcp_server` are always there. In a registry whose `registry.json` lists its kinds, the commands are those kinds instead. A kind named like one of aireg's own commands, such as `status`, gets no command of its own, and aireg warns about it.
 
 ### new
 
@@ -84,6 +84,16 @@ Point your project's agent instructions at that path. Its first folder is the al
 
 `bump` starts an artifact's next version by copying its newest version folder, such as `1.2.0` to `1.3.0` for `minor`. Edit the copy, then run [`aireg registry index`](registry.md#aireg-registry-index) to release it. It defaults to `patch`.
 
+### MCP servers
+
+`aireg mcp_server` takes the same actions. A version holds the publisher's MCP Registry [`server.json`](https://github.com/modelcontextprotocol/registry), unchanged, and an optional `README.md` that is only documentation. `new --from`, `registry index` and `registry validate` check `server.json` against the MCP Registry's schema for the `$schema` it names. The envelope's `spec` holds only the slug and the description; the catalog's display name is the server's `title`.
+
+- `new` writes a `server.json` with the fields it requires, under the newest schema version the kind takes, at version 0.1.0, or at the version `--set version=` gives.
+- `new --from` takes a folder or a lone `server.json`, and starts the artifact at the server's own `version`. A server whose version isn't a semantic version starts at 0.1.0, with a warning.
+- `bump` copies the folder and never edits `server.json`. Replace it with the publisher's new file, or set its `version` to the new one: `registry validate` refuses a `server.json` whose semantic version differs from its folder's.
+
+aireg does not install MCP servers into coding agents yet. `add` and `show` treat `mcp_server` as a kind they don't know, so a ref to one finds nothing, and adding a namespace skips it.
+
 ### Dependencies
 
 An artifact names what has to be installed with it as `depends_on` relationships in its version's `artifact.json`, each a `<namespace>/<kind>/<name>@<version>` in the same registry, as the [file spec](https://github.com/atlanai/ai-registry/blob/main/spec/file-spec.md) describes. Write the file in the new version folder before [`aireg registry index`](registry.md#aireg-registry-index), which keeps what it says:
@@ -113,7 +123,7 @@ Each version in `versions.json` has a status, which you change by hand and then 
 | `--namespace <namespace>` | The namespace in the registry, in lowercase letters, digits and hyphens. |
 | `--set <key>=<value>` | A field to fill in. Use dots for nested fields, such as `--set metadata.category=engineering`. Repeat it for more than one. |
 | `--file <file>` | For a kind that offers more than one layout, the file to create, such as `agent-card.json` for an agent. |
-| `--from <path>` | An existing skill folder or agent file to copy in. Repeat it, or list more paths after it. |
+| `--from <path>` | An existing artifact folder or file to copy in. Repeat it, or list more paths after it. |
 | `--name <name>` | With `--from`, the name to give the one artifact copied in. |
 | `-y`, `--yes` | Don't ask for the namespace, the name or the fields. |
 

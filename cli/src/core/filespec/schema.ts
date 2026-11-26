@@ -5,6 +5,7 @@ import {
   type SchemaObject,
   type ValidateFunction,
 } from "ajv/dist/2020.js";
+import draft07 from "ajv/dist/refs/json-schema-draft-07.json" with { type: "json" };
 import { RE2JS, RE2JSSyntaxException } from "re2js";
 import { messageOf } from "#adapter/errors.ts";
 import { isRecord } from "#adapter/fields.ts";
@@ -12,6 +13,9 @@ import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { quoted } from "#adapter/text.ts";
 import manifestSchema from "#schema/kind-manifest.schema.json" with { type: "json" };
+import mcp20251211 from "#schema/kinds/vendor/mcp/2025-12-11/server.schema.json" with {
+  type: "json",
+};
 import ossie011 from "#schema/kinds/vendor/ossie/0.1.1/osi-schema.json" with { type: "json" };
 import ossie020 from "#schema/kinds/vendor/ossie/0.2.0.dev0/ossie-schema.json" with {
   type: "json",
@@ -23,6 +27,7 @@ import ossie020 from "#schema/kinds/vendor/ossie/0.2.0.dev0/ossie-schema.json" w
  * from there.
  */
 const BUNDLED_REFS: Readonly<Record<string, SchemaObject>> = {
+  "kinds/vendor/mcp/2025-12-11/server.schema.json": mcp20251211,
   "kinds/vendor/ossie/0.1.1/osi-schema.json": ossie011,
   "kinds/vendor/ossie/0.2.0.dev0/ossie-schema.json": ossie020,
 };
@@ -145,12 +150,16 @@ export function fileSchema(
 
 function compiler(): Ajv2020 {
   // Extensions are annotations. Validation must never rewrite the native document.
-  return new Ajv2020({
+  const ajv = new Ajv2020({
     allErrors: true,
     strict: false,
     validateFormats: false,
     code: { regExp: re2 },
   });
+  // The vendored MCP server.json schema is draft-07; Ajv reads it as 2020-12, and
+  // tools/check_schemas.py refuses the keywords whose meaning differs between the two.
+  ajv.addMetaSchema(draft07);
+  return ajv;
 }
 
 /** Problems with a value, without coercion, default insertion, or removal of fields. */
@@ -172,7 +181,8 @@ export function check(schema: SchemaObject, value: unknown, whole = "the front m
   if (validate(value)) return [];
   // A failed `if`/`then` repeats, as "must match then schema", what the branch's own errors say.
   const errors = (validate.errors ?? []).filter((error) => error.keyword !== "if");
-  return errors.map((error) => message(error, value, whole));
+  // Each `anyOf` branch reports the same field again, so a message is said once.
+  return [...new Set(errors.map((error) => message(error, value, whole)))];
 }
 
 function message(error: ErrorObject, value: unknown, whole: string): string {

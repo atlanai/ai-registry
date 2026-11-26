@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kinds/mcp_server.json",
+  "title": "mcp_server",
+  "description": "One MCP server, as the MCP Registry's server.json, stored unchanged and validated as that file. spec holds the registry slug as name and the server's description.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "MUST equal metadata.name in the envelope. The server's own reverse-DNS name stays in server.json.",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$"
+    },
+    "description": {
+      "type": "string",
+      "description": "The server's description, from server.json.",
+      "minLength": 1,
+      "maxLength": 4000
+    }
+  },
+  "required": [
+    "name",
+    "description"
+  ],
+  "additionalProperties": false,
+  "x-registry-schema-version": 1,
+  "x-registry-searchable": [
+    "/name",
+    "/description"
+  ],
+  "x-registry-embeddings": [
+    "/description"
+  ],
+  "x-registry-edges": [
+    {
+      "rel_type": "supersedes",
+      "to_kinds": [
+        "mcp_server"
+      ],
+      "cardinality": "one",
+      "direction": "outbound"
+    }
+  ],
+  "x-registry-files": {
+    "required": [
+      {
+        "path": "server.json",
+        "media_type": "application/json",
+        "schema": {
+          "$ref": "#/$defs/document"
+        }
+      }
+    ],
+    "optional": [
+      {
+        "path": "README.md",
+        "media_type": "text/markdown"
+      }
+    ]
+  },
+  "x-registry-attachment": false,
+  "x-registry-gated": false,
+  "$defs": {
+    "document": {
+      "type": "object",
+      "description": "An MCP Registry server.json, which must satisfy the server.json schema its $schema names.",
+      "properties": {
+        "$schema": {
+          "enum": [
+            "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
+          ]
+        }
+      },
+      "required": [
+        "$schema"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "$schema": {
+                "const": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
+              }
+            },
+            "required": [
+              "$schema"
+            ]
+          },
+          "then": {
+            "$ref": "vendor/mcp/2025-12-11/server.schema.json"
+          }
+        }
+      ]
+    }
+  }
+}

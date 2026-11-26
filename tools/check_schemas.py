@@ -16,11 +16,13 @@ this script is usable wherever tools/check.py is. CI passes --require-jsonschema
 which makes a missing module an error instead.
 
 $ids here are relative paths, not URLs, so schemas are preloaded into a resolver
-keyed by path rather than fetched. See spec/schemas/README.md.
+keyed by path rather than fetched. See spec/schemas/README.md. A schema under
+vendor/ is another project's file; see check_vendored.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -29,6 +31,7 @@ REPO = Path(__file__).resolve().parent.parent
 SCHEMA_DIR = REPO / "spec" / "schemas"
 EXAMPLES = sorted(path.parent for path in (REPO / "examples").glob("*/registry.json"))
 DIALECT = "https://json-schema.org/draft/2020-12/schema"
+DRAFT_07 = "http://json-schema.org/draft-07/schema#"
 
 
 class Report:
@@ -56,6 +59,71 @@ def rel(path: Path) -> str:
 def is_vendored(key: str) -> bool:
     """A schema copied unchanged from another project, under a vendor/ folder."""
     return "vendor" in Path(key).parts
+
+
+def vendor_readme(path: Path) -> Path | None:
+    """The README.md of the vendor folder a vendored schema sits under, if there is one."""
+    for parent in path.parents:
+        if parent.parent.name == "vendor":
+            readme = parent / "README.md"
+            return readme if readme.is_file() else None
+    return None
+
+
+# Keywords beside $ref that only annotate. Anything else, including $id, which in 2020-12
+# moves the base the $ref resolves against, makes draft-07 and 2020-12 disagree.
+ANNOTATIONS = {"$ref", "$schema", "$comment", "title", "description", "default",
+               "examples", "example", "definitions", "$defs", "deprecated", "readOnly", "writeOnly"}
+# Keywords whose value is a map of names to subschemas: every value is walked, whatever its name.
+SCHEMA_MAPS = {"properties", "patternProperties", "definitions", "$defs"}
+# Keywords whose value is data, not a schema.
+DATA = {"enum", "const", "default", "examples", "example"}
+
+
+def draft07_differences(node, trail: str = "$"):
+    """Places where a draft-07 schema would validate differently under 2020-12 semantics.
+
+    A validator that cannot mix dialects, such as Ajv, applies a vendored draft-07 schema
+    with 2020-12 semantics, so a copy is accepted only while that gives the same answer.
+    """
+    if isinstance(node, list):
+        for i, value in enumerate(node):
+            yield from draft07_differences(value, f"{trail}[{i}]")
+        return
+    if not isinstance(node, dict):
+        return
+    if isinstance(node.get("items"), list):
+        yield f"{trail}.items is an array"
+    for keyword in ("additionalItems", "dependencies"):
+        if keyword in node:
+            yield f"{trail} uses {keyword}"
+    if "$ref" in node and trail != "$" and set(node) - ANNOTATIONS:
+        yield f"{trail} has keywords beside $ref: {sorted(set(node) - ANNOTATIONS)}"
+    for key, value in node.items():
+        if key in DATA:
+            continue
+        if key in SCHEMA_MAPS and isinstance(value, dict):
+            for name, schema in value.items():
+                yield from draft07_differences(schema, f"{trail}.{key}.{name}")
+        else:
+            yield from draft07_differences(value, f"{trail}.{key}")
+
+
+def check_vendored(key: str, path: Path, doc: dict, rep: Report) -> None:
+    readme = vendor_readme(path)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if readme is None:
+        rep.error(f"{key}: vendored, but its vendor folder has no README.md recording its source")
+    elif digest not in readme.read_text():
+        rep.error(f"{key}: sha256 {digest} is not the one {rel(readme)} records; "
+                  "copy the file unchanged from its source, or update the README")
+    if doc.get("$schema") == DRAFT_07:
+        for difference in draft07_differences(doc):
+            rep.error(f"{key}: {difference}, which 2020-12 validates differently")
+    elif doc.get("$schema") != DIALECT:
+        rep.error(f"{key}: $schema is {doc.get('$schema')!r}, expected {DIALECT} or {DRAFT_07}")
+    if not isinstance(doc.get("$id"), str) or "://" not in doc["$id"]:
+        rep.error(f"{key}: a vendored schema keeps its project's absolute $id")
 
 
 def resolve_pointer(doc, pointer: str):
@@ -95,12 +163,12 @@ def check_structure(rep: Report) -> dict[str, dict]:
 
     seen: dict[str, str] = {}
     for key, doc in loaded.items():
+        if is_vendored(key):
+            check_vendored(key, SCHEMA_DIR / key, doc, rep)
+            continue
         if doc.get("$schema") != DIALECT:
             rep.error(f"{key}: $schema is {doc.get('$schema')!r}, expected {DIALECT}")
         ident = doc.get("$id")
-        if is_vendored(key):
-            # Another project's schema, byte for byte: its $id is that project's, not a path here.
-            continue
         if ident is None:
             rep.error(f"{key}: no $id")
         elif ident != key:
@@ -167,10 +235,14 @@ def check_instances(loaded: dict[str, dict], rep: Report, required: bool) -> boo
                      "(pip install -r tools/requirements.txt). Structural checks above still ran.")
         return False
 
-    registry = Registry().with_resources(
+    resources = [
         (key, Resource.from_contents(doc, default_specification=DRAFT202012))
         for key, doc in loaded.items()
-    )
+    ]
+    # A vendored schema's own references resolve against its own absolute $id.
+    resources += [(resource.id(), resource) for key, resource in resources
+                  if is_vendored(key) and resource.id() is not None]
+    registry = Registry().with_resources(resources)
 
     checked = 0
     for path, schema_keys in instances():

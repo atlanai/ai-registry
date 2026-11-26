@@ -1,0 +1,36 @@
+{
+  "apiVersion": "aireg.sh/v1",
+  "kind": "mcp_server",
+  "metadata": {
+    "name": "issue-tracker",
+    "namespace": "engineering",
+    "version": "1.2.0",
+    "description": "Search, read and update issues in the team's issue tracker.",
+    "display_name": "Issue tracker",
+    "digest": "sha256:37c125eaa95c3c5b54cdc0819e79e981c7298dcf0ab44ceff6be5011d5828e10"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "digest": "sha256:5f0ad95a640a6cd8d277c51ac069874b0eccf66ce1738c99c95da2b7fe7897d3",
+      "size": 361,
+      "media_type": "text/markdown",
+      "urls": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "server.json",
+      "digest": "sha256:36ad2a03fdbc7579d19a37136a4534cbdb52e68a2fac55d737b17b97622138dd",
+      "size": 1504,
+      "media_type": "application/json",
+      "urls": [
+        "server.json"
+      ]
+    }
+  ],
+  "spec": {
+    "name": "issue-tracker",
+    "description": "Search, read and update issues in the team's issue tracker."
+  }
+}
