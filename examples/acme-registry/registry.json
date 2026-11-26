@@ -21,6 +21,10 @@
       "manifest_url": "kinds/agent.json"
     },
     {
+      "name": "semantic_model",
+      "manifest_url": "kinds/semantic_model.json"
+    },
+    {
       "name": "mcp_server",
       "manifest_url": "kinds/mcp_server.json"
     }

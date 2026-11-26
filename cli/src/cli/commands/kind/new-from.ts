@@ -5,8 +5,8 @@ import { isRecord } from "#adapter/fields.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { ARTIFACTS_DIR, ENVELOPE } from "#adapter/filespec/names.ts";
-import { MCP_SERVER_ENTRY } from "#adapter/kinds.ts";
-import { list, sanitizeName } from "#adapter/text.ts";
+import { isVersion } from "#adapter/spec/ref.ts";
+import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { STREAMED } from "#cli/commands/define.ts";
 import type { KindNewFrom } from "#cli/commands/kind/result.ts";
@@ -16,13 +16,18 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { inBlobStore } from "#core/filespec/indexer.ts";
 import { requireRegistry } from "#core/filespec/init.ts";
 import {
+  entryName,
   fileProblems,
   type KindManifest,
+  SPEC_TEXT,
+  schemaFiles,
+  serverVersion,
   specFile,
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
 import { check } from "#core/filespec/schema.ts";
+import { documentProblems, fractionProblems } from "#core/filespec/validate/folders.ts";
 import { withName } from "#core/frontmatter.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
 import { expandUserPath } from "#core/fs/path.ts";
@@ -35,13 +40,21 @@ import { namespaceFor } from "./place.ts";
 interface Incoming {
   input: string;
   dir: string;
+  /** Each file to copy, and the path it takes in the version folder when that differs. */
   entries: string[];
+  stored: ReadonlyMap<string, string>;
   name: string;
+  /** The first version: an MCP server keeps its own, so the two stay equal. */
+  version: string;
+  /** Why a server's own version was not taken. */
+  versionNote: string | undefined;
   front: { file: string; name: string } | undefined;
 }
 
+const FIRST_VERSION = "0.1.0";
+
 export interface Copied extends KindNewFrom {
-  shown: { name: string; at: string }[];
+  shown: { name: string; at: string; note: string | undefined }[];
 }
 
 export async function newFrom(
@@ -82,21 +95,21 @@ export async function newFrom(
   const namespace = await namespaceFor(root, context.cwd, own, context, yes);
   if (namespace === undefined) return STREAMED;
   for (const item of found) {
-    refuseRedirect(root, join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0"));
+    refuseRedirect(root, join(root, ARTIFACTS_DIR, namespace, kind, item.name, item.version));
     if (existsSync(join(root, ARTIFACTS_DIR, namespace, kind, item.name))) {
       throw new AiregError(`${namespace}/${kind}/${item.name} already exists.`, {
         code: ErrorCode.Conflict,
-        hint: `Start its next version with \`aireg ${kind} bump ${item.name}\`.`,
+        hint: `If it is the same ${kind}, start its next version with \`aireg ${kind} bump ${item.name}\`. If not, choose another name with \`--name\`.`,
       });
     }
   }
 
-  const copied: { name: string; at: string }[] = [];
+  const copied: { name: string; at: string; note: string | undefined }[] = [];
   for (const item of found) {
-    const at = join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0");
+    const at = join(root, ARTIFACTS_DIR, namespace, kind, item.name, item.version);
     await mkdir(at, { recursive: true });
     for (const path of item.entries) {
-      await cp(join(item.dir, path), join(at, path), FRESH);
+      await cp(join(item.dir, path), join(at, item.stored.get(path) ?? path), FRESH);
     }
     await rm(join(at, ENVELOPE), { force: true });
     // Rename in the front matter too, since index checks the folder against it.
@@ -104,19 +117,26 @@ export async function newFrom(
       const file = join(at, item.front.file);
       await writeFile(file, withName(await readFile(file, "utf8"), item.name), "utf8");
     }
-    copied.push({ name: item.name, at });
+    copied.push({ name: item.name, at, note: item.versionNote });
   }
 
   return {
     kind,
     namespace,
     created: copied.map((item) => ({ name: item.name, at: relative(root, item.at) })),
-    shown: copied.map((item) => ({ name: item.name, at: relative(context.cwd, item.at) || "." })),
+    shown: copied.map((item) => ({
+      name: item.name,
+      at: relative(context.cwd, item.at) || ".",
+      note: item.note,
+    })),
   };
 }
 
 export function printCopied(result: Copied, printer: Printer): void {
-  for (const item of result.shown) printer.success(`Copied ${item.name} into ${item.at}/.`);
+  for (const item of result.shown) {
+    printer.success(`Copied ${item.name} into ${item.at}/.`);
+    if (item.note !== undefined) printer.warning(item.note);
+  }
   printer.note("next", "aireg registry index");
 }
 
@@ -142,26 +162,27 @@ async function incoming(
     ? found.files.map((record) => record.path).filter(visible)
     : [basename(source)];
 
+  // A lone document, such as a semantic model saved as `retail.yaml`, takes the kind's file name.
+  const stored = new Map(
+    isDirectory ? [] : entries.map((path) => [path, entryName(manifest, path)] as const),
+  );
   const texts = new Map<string, string>();
-  for (const path of entries.filter((item) => /\.(md|json)$/.test(item))) {
-    texts.set(path, await readFile(join(dir, path), "utf8"));
+  for (const path of entries.filter((item) => SPEC_TEXT.test(item))) {
+    texts.set(stored.get(path) ?? path, await readFile(join(dir, path), "utf8"));
   }
   const spec = specOf(manifest, texts, named);
-  const server = manifest.title === "mcp_server";
-  const missing = fileProblems(manifest, new Set(entries));
-  let checked: string[] = [];
-  if (spec !== undefined) {
-    checked = check(manifest, spec);
-  } else if (!server || entries.includes(MCP_SERVER_ENTRY)) {
-    // fileProblems already reports a missing server.json.
-    checked = [specParseProblem(manifest, texts) ?? "has no front matter"];
-  }
+  const documents = documentProblems(manifest, texts);
   const problems = [
     ...found.irregular
       .filter((entry) => visible(entry.path))
       .map((entry) => `${entry.path} ${refusal(entry)}`),
-    ...missing,
-    ...checked,
+    ...fileProblems(manifest, new Set(entries.map((path) => stored.get(path) ?? path))),
+    ...documents,
+    ...(spec === undefined ? [] : [...check(manifest, spec), ...fractionProblems(spec)]),
+    // A kind whose spec comes from a validated file has no front matter; fileProblems says it's missing.
+    ...(spec === undefined && documents.length === 0 && schemaFiles(manifest).length === 0
+      ? [specParseProblem(manifest, texts) ?? "has no front matter"]
+      : []),
   ];
   const fallback =
     typeof spec?.name === "string"
@@ -177,7 +198,13 @@ async function incoming(
   const file = specFile(manifest, texts);
   const front =
     file !== undefined && typeof spec?.name === "string" ? { file, name: spec.name } : undefined;
-  return { input, dir, entries, name, front };
+  const own = serverVersion(manifest, texts);
+  const version = own !== undefined && isVersion(own) ? own : FIRST_VERSION;
+  const versionNote =
+    own === undefined || version === own
+      ? undefined
+      : `Its version ${quoted(own)} is not a semantic version, so the artifact starts at ${FIRST_VERSION}.`;
+  return { input, dir, entries, stored, name, version, versionNote, front };
 }
 
 /** One file named by `--from`, refused as a link the way a folder's entries are. */

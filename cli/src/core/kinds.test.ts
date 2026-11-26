@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { KINDS } from "#adapter/kinds.ts";
-import { KIND_SPECS, kindDir, stagedLeaf } from "./kinds.ts";
+import { isStoreOnly, KIND_SPECS, kindDir, stagedLeaf } from "./kinds.ts";
 
 describe("KIND_SPECS", () => {
   test("gives every kind a distinct directory", () => {
@@ -13,6 +13,25 @@ describe("KIND_SPECS", () => {
       const spec = KIND_SPECS[kind];
       expect(spec.extensions.length > 0, kind).toBe(spec.shape === "file");
     }
+  });
+});
+
+describe("a semantic model", () => {
+  test("is kept as the scope's own copy, a directory no target links to", () => {
+    expect(KINDS).toContain("semantic_model");
+    expect(KIND_SPECS.semantic_model).toEqual({
+      dir: "semantic_models",
+      shape: "directory",
+      extensions: [],
+      storeOnly: true,
+    });
+    expect(isStoreOnly("semantic_model")).toBe(true);
+    expect(KINDS.filter(isStoreOnly)).toEqual(["semantic_model"]);
+    expect(isStoreOnly(undefined)).toBe(false);
+  });
+
+  test("is staged under its name, with the files beside its model", () => {
+    expect(stagedLeaf("semantic_model", "retail", "semantic_models/retail")).toBe("retail");
   });
 });
 

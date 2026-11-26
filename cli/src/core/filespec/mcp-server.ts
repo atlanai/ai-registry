@@ -1,11 +1,14 @@
+import { isRecord, textOf } from "#adapter/fields.ts";
+import { MCP_SERVER_ENTRY } from "#adapter/kinds.ts";
 import type { KindManifest, SchemaNode } from "./kind-manifests.ts";
 
 /**
  * What `new` fills in for an MCP server: the fields `server.json` requires, under the newest
- * schema version the kind takes, rather than the envelope's `spec`, which wraps the file.
+ * schema version the kind takes, rather than the envelope's `spec`, which lifts two of them.
  */
 export function serverSkeleton(manifest: KindManifest): SchemaNode {
-  const versions = manifest.properties?.server?.properties?.$schema?.enum;
+  const versions = (manifest.$defs as Record<string, SchemaNode> | undefined)?.document?.properties
+    ?.$schema?.enum;
   const newest = Array.isArray(versions)
     ? versions
         .filter((url): url is string => typeof url === "string")
@@ -22,4 +25,16 @@ export function serverSkeleton(manifest: KindManifest): SchemaNode {
       version: { type: "string", default: "0.1.0" },
     },
   };
+}
+
+/** The server's `title`, which a catalog shows as its display name. */
+export function serverTitle(files: ReadonlyMap<string, Uint8Array>): string | undefined {
+  const bytes = files.get(MCP_SERVER_ENTRY);
+  if (bytes === undefined) return undefined;
+  try {
+    const server = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    return isRecord(server) ? textOf(server.title) : undefined;
+  } catch {
+    return undefined;
+  }
 }

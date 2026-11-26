@@ -47,7 +47,6 @@ const MCP_SERVER = join(
   ..."../../../examples/acme-registry/artifacts/engineering/mcp_server/issue-tracker/1.2.0".split(
     "/",
   ),
-  "artifact.json",
 );
 
 // Read in place from the spec, so they stay honest about the registries this client reads.
@@ -81,39 +80,35 @@ describe("the file spec schemas", () => {
   });
 });
 
-interface McpEnvelope {
-  spec: {
-    server: Record<string, unknown>;
-    [field: string]: unknown;
-  };
-}
-
 describe("the mcp_server kind", () => {
   const compiler = ajv();
-  const envelope = (): McpEnvelope => JSON.parse(readFileSync(MCP_SERVER, "utf8")) as McpEnvelope;
+  const DOCUMENT = "kinds/mcp_server.json#/$defs/document";
+  const read = (file: string): Record<string, unknown> =>
+    JSON.parse(readFileSync(join(MCP_SERVER, file), "utf8")) as Record<string, unknown>;
 
   test("accepts the example server, its server.json checked by the MCP Registry schema", () => {
-    expect(check(compiler, "artifact-known-kinds.schema.json", envelope())).toEqual([]);
-    const renamed = envelope();
-    renamed.spec.server.name = "issue-tracker";
-    expect(check(compiler, "artifact-known-kinds.schema.json", renamed)).toContain(
-      '/spec/server/name must match pattern "^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$"',
+    expect(check(compiler, "artifact-known-kinds.schema.json", read("artifact.json"))).toEqual([]);
+    expect(check(compiler, DOCUMENT, read("server.json"))).toEqual([]);
+    const renamed = { ...read("server.json"), name: "issue-tracker" };
+    expect(check(compiler, DOCUMENT, renamed)).toContain(
+      '/name must match pattern "^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$"',
     );
   });
 
   test("takes only the server.json schema versions it vendors", () => {
-    const future = envelope();
-    future.spec.server.$schema =
-      "https://static.modelcontextprotocol.io/schemas/2099-01-01/server.schema.json";
-    expect(check(compiler, "artifact-known-kinds.schema.json", future)).toContain(
-      "/spec/server/$schema must be equal to one of the allowed values",
+    const future = {
+      ...read("server.json"),
+      $schema: "https://static.modelcontextprotocol.io/schemas/2099-01-01/server.schema.json",
+    };
+    expect(check(compiler, DOCUMENT, future)).toContain(
+      "/$schema must be equal to one of the allowed values",
     );
   });
 
-  test("adds nothing beside the publisher's server.json", () => {
-    const curated = envelope();
-    curated.spec.policy = { tools: { deny: ["delete_issue"] } };
-    expect(check(compiler, "artifact-known-kinds.schema.json", curated)).toContain(
+  test("holds only the slug and description in spec, never a copy of server.json", () => {
+    const envelope = read("artifact.json") as { spec: Record<string, unknown> };
+    envelope.spec.server = read("server.json");
+    expect(check(compiler, "artifact-known-kinds.schema.json", envelope)).toContain(
       "/spec must NOT have additional properties",
     );
   });

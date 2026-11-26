@@ -1,6 +1,6 @@
-# aireg skill and aireg agent
+# aireg skill, aireg agent, aireg semantic_model and aireg mcp_server
 
-Create a skill or an agent, or start its next version.
+Create a skill, an agent, a semantic model or an MCP server, or start its next version.
 
 ## Synopsis
 
@@ -10,11 +10,11 @@ aireg skill new --from <path>... [--name <name>] [--namespace <namespace>] [-y]
 aireg skill bump <name> [patch | minor | major | <version>] [--namespace <namespace>]
 ```
 
-`aireg agent` takes the same actions.
+`aireg agent`, `aireg semantic_model` and `aireg mcp_server` take the same actions.
 
 ## Description
 
-aireg has one command for each kind of artifact. `skill` and `agent` are always there. In a registry whose `registry.json` lists its kinds, the commands are those kinds instead. A kind named like one of aireg's own commands, such as `status`, gets no command of its own, and aireg warns about it.
+aireg has one command for each kind of artifact. `skill`, `agent`, `semantic_model` and `mcp_server` are always there. In a registry whose `registry.json` lists its kinds, the commands are those kinds instead. A kind named like one of aireg's own commands, such as `status`, gets no command of its own, and aireg warns about it.
 
 ### new
 
@@ -44,17 +44,53 @@ For a card named `Recipe Agent`, import derives the registry slug `recipe-agent`
 `--name recipe-helper` to choose a different slug. Both choices leave the card bytes unchanged.
 The normal artifact-name and collision checks apply.
 
+### Semantic models
+
+A semantic model is one [Apache Ossie](https://github.com/apache/ossie) document: a team's datasets, fields, relationships and metric definitions, with instructions for agents. Its version folder holds `semantic_model.yaml` or `semantic_model.json`, exactly one of them, and the files it was converted from can sit beside it under `source/`.
+
+To publish a model you already have, copy it in with `new --from`. It takes the file under any name and stores it under the kind's:
+
+```bash
+aireg semantic_model new --from models/retail.yaml --name retail --namespace analytics
+aireg registry index
+```
+
+`new --from`, [`aireg registry index`](registry.md#aireg-registry-index) and [`aireg registry validate`](registry.md#aireg-registry-validate) each check the document against the Ossie schema for the `version` it declares, `0.1.1` or `0.2.0.dev0`, and refuse a document that fails. The schemas are part of aireg, so the check reads nothing from the network. A file that isn't a semantic model, such as an Ossie ontology document, is refused with the fields that are wrong:
+
+```console
+$ aireg semantic_model new --from models/flights-ontology.yaml --name flights --namespace analytics
+error: models/flights-ontology.yaml is not a valid semantic_model: semantic_model.yaml: `datasets` is required; semantic_model.yaml: `requires` is not a field this kind takes; semantic_model.yaml: `ontology` is not a field this kind takes; semantic_model.yaml: `ontology_mappings` is not a field this kind takes.
+  code: invalid
+hint: Fix it where it is, then run `aireg semantic_model new --from models/flights-ontology.yaml` again.
+```
+
+A 0.1.1 file that lists more than one model under `semantic_model` is refused too: split it into one artifact per model, as 0.2 holds one.
+
+The registry folder supplies the slug in the envelope's `spec.name`, as it does for an agent card. The model keeps its own `name`, which need not be a slug. `spec.description` copies its description. The file is the only copy of the model, so the envelope doesn't repeat it and any number the model holds is kept as written.
+
+Without `--from`, `new` writes a starter model in Ossie 0.1.1 with `TODO` where the description and the first dataset go.
+
+No coding agent has a folder for semantic models, so [`aireg add`](add.md) keeps a model in the scope's own folder and links it nowhere:
+
+```console
+$ aireg add acme/analytics/semantic_model/retail
+✓ Installed retail.
+  at     .registry/artifacts/acme/analytics/semantic_models/retail
+```
+
+Point your project's agent instructions at that path. Its first folder is the alias this project gave the registry, so a published skill can't rely on it. [`aireg update`](update.md) replaces the file with the newest version, and `@1.0.0` pins one, as for any artifact. [`aireg publish`](publish.md) doesn't take a new semantic model from a path: add it to the registry's folder with `new --from`. It does send an edited installed copy back as a new version, after the same check, and refuses one that is no longer a valid model.
+
 ### bump
 
 `bump` starts an artifact's next version by copying its newest version folder, such as `1.2.0` to `1.3.0` for `minor`. Edit the copy, then run [`aireg registry index`](registry.md#aireg-registry-index) to release it. It defaults to `patch`.
 
 ### MCP servers
 
-In a registry that lists the `mcp_server` kind and serves its manifest, `aireg mcp_server` takes the same actions. A version holds the publisher's MCP Registry [`server.json`](https://github.com/modelcontextprotocol/registry), unchanged, and an optional `README.md` that is only documentation. The catalog's description and display name come from `server.json`.
+`aireg mcp_server` takes the same actions. A version holds the publisher's MCP Registry [`server.json`](https://github.com/modelcontextprotocol/registry), unchanged, and an optional `README.md` that is only documentation. `new --from`, `registry index` and `registry validate` check `server.json` against the MCP Registry's schema for the `$schema` it names. The envelope's `spec` holds only the slug and the description; the catalog's display name is the server's `title`.
 
-- `new` writes a `server.json` with the fields it requires, under the newest schema version the kind takes.
-- `new --from` takes a folder that holds a `server.json`, and checks it against the MCP Registry's schema before copying.
-- `bump` copies the folder and never edits `server.json`. Replace it with the publisher's new file, whose `version` should match the new one.
+- `new` writes a `server.json` with the fields it requires, under the newest schema version the kind takes, at version 0.1.0, or at the version `--set version=` gives.
+- `new --from` takes a folder or a lone `server.json`, and starts the artifact at the server's own `version`. A server whose version isn't a semantic version starts at 0.1.0, with a warning.
+- `bump` copies the folder and never edits `server.json`. Replace it with the publisher's new file, or set its `version` to the new one: `registry validate` refuses a `server.json` whose semantic version differs from its folder's.
 
 aireg does not install MCP servers into coding agents yet. `add` and `show` treat `mcp_server` as a kind they don't know, so a ref to one finds nothing, and adding a namespace skips it.
 
@@ -102,7 +138,7 @@ Each version in `versions.json` has a status, which you change by hand and then 
 ## Exit status
 
 - `0`: created or copied, or canceled at a question.
-- `1`: the artifact or version already exists, a path is missing or isn't a valid skill or agent, or there is no version to start from.
+- `1`: the artifact or version already exists, a path is missing or isn't a valid skill, agent or semantic model, or there is no version to start from.
 - `2`: the action, namespace, name or version isn't valid, a namespace or, in a registry, a name is missing and aireg can't ask, or `--from` or `bump` is run outside a registry.
 
 ## Examples

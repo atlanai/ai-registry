@@ -2,7 +2,7 @@ import { type ArtifactKind, KINDS } from "#adapter/kinds.ts";
 import { list, plural } from "#adapter/text.ts";
 import { loadedBy, skipLine, toolName, unhandled } from "#cli/render/tools.ts";
 import type { Lock } from "#core/lock.ts";
-import type { Plan } from "#core/plan/model.ts";
+import { type Plan, storeOnlyNames } from "#core/plan/model.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { readsFor } from "#core/target/placement.ts";
 import { tableLines } from "#core/term/table.ts";
@@ -250,6 +250,11 @@ function skipped(
 
 /** Chosen targets the plan places nothing in, so the review can warn before it applies. */
 export function unreached(plan: Plan, targets: readonly string[], targetTable?: Targets): string[] {
+  // A plan of semantic models alone places nothing in any target, and is not meant to.
+  const record = plan.actions.find((action) => action.kind === "record");
+  const storeOnly = storeOnlyNames(record?.lock);
+  const placed = plan.actions.flatMap((action) => (action.kind === "record" ? [] : [action.name]));
+  if (placed.length > 0 && placed.every((name) => storeOnly.has(name))) return [];
   const reached = new Set<string>();
   for (const action of plan.actions) {
     if (action.kind === "link") reached.add(action.target);

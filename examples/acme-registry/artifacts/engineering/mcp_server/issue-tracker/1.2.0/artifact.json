@@ -7,7 +7,7 @@
     "version": "1.2.0",
     "description": "Search, read and update issues in the team's issue tracker.",
     "display_name": "Issue tracker",
-    "digest": "sha256:d05c43b52f0371b731b417c152a2329267f8f27e7390cc6056750d11c9fdc7a0"
+    "digest": "sha256:37c125eaa95c3c5b54cdc0819e79e981c7298dcf0ab44ceff6be5011d5828e10"
   },
   "files": [
     {
@@ -31,65 +31,6 @@
   ],
   "spec": {
     "name": "issue-tracker",
-    "description": "Search, read and update issues in the team's issue tracker.",
-    "server": {
-      "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-      "name": "com.example/issue-tracker",
-      "title": "Issue tracker",
-      "description": "Search, read and update issues in the team's issue tracker.",
-      "version": "1.2.0",
-      "repository": {
-        "url": "https://github.com/example/issue-tracker-mcp",
-        "source": "github"
-      },
-      "packages": [
-        {
-          "registryType": "npm",
-          "identifier": "@example/issue-tracker-mcp",
-          "version": "1.2.0",
-          "transport": {
-            "type": "stdio"
-          },
-          "environmentVariables": [
-            {
-              "name": "ISSUES_URL",
-              "description": "Base URL of the issue tracker",
-              "isRequired": true
-            },
-            {
-              "name": "ISSUES_TOKEN",
-              "description": "API token with read and write scope",
-              "isRequired": true,
-              "isSecret": true
-            }
-          ]
-        }
-      ],
-      "remotes": [
-        {
-          "type": "streamable-http",
-          "url": "https://{tenant}.issues.example.com/mcp",
-          "variables": {
-            "tenant": {
-              "description": "Your tracker workspace",
-              "isRequired": true
-            }
-          },
-          "headers": [
-            {
-              "name": "Authorization",
-              "value": "Bearer {token}",
-              "variables": {
-                "token": {
-                  "description": "API token with read and write scope",
-                  "isRequired": true,
-                  "isSecret": true
-                }
-              }
-            }
-          ]
-        }
-      ]
-    }
+    "description": "Search, read and update issues in the team's issue tracker."
   }
 }

@@ -159,6 +159,13 @@
         },
         "media_type": {
           "type": "string"
+        },
+        "schema": {
+          "type": [
+            "object",
+            "boolean"
+          ],
+          "description": "A JSON Schema the file, parsed as JSON or YAML by its extension, MUST satisfy. Its references resolve against this manifest, so {\"$ref\": \"#/$defs/<name>\"} names a definition here."
         }
       },
       "oneOf": [
@@ -173,7 +180,12 @@
           ]
         }
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "dependentRequired": {
+        "schema": [
+          "path"
+        ]
+      }
     }
   }
 }

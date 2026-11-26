@@ -1,0 +1,26 @@
+{
+  "apiVersion": "aireg.sh/v1",
+  "kind": "semantic_model",
+  "metadata": {
+    "name": "review-metrics",
+    "namespace": "engineering",
+    "version": "1.0.0",
+    "description": "Pull request review activity, with the definitions of review time and review load that the engineering dashboards use.",
+    "digest": "sha256:d1a7bd9a9faef92b1932f9dbcf3408b5fe13c8f77f230ef75953e741a17b7d71"
+  },
+  "files": [
+    {
+      "path": "semantic_model.yaml",
+      "digest": "sha256:ed2cc1d0874397964fdc05317d0277745739a8d6e14c1ecfbe26149944a2b377",
+      "size": 3424,
+      "media_type": "application/yaml",
+      "urls": [
+        "semantic_model.yaml"
+      ]
+    }
+  ],
+  "spec": {
+    "description": "Pull request review activity, with the definitions of review time and review load that the engineering dashboards use.",
+    "name": "review-metrics"
+  }
+}

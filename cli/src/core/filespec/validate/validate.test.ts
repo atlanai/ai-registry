@@ -299,14 +299,18 @@ describe("validateRoot on an MCP server", () => {
       server.packages[0].transport = { type: "carrier-pigeon" };
     });
 
-    expect(await messages(root)).toContain('`server` must match "then" schema');
+    const found = await messages(root);
+    const invalid =
+      "server.json: `packages.0.transport.type` must be equal to one of the allowed values";
+    expect(found.filter((message) => message === invalid)).toHaveLength(1);
   });
 
   test("names the JSON file that does not parse", async ({ root }) => {
     await cp(ACME, root, { recursive: true });
     await writeFile(join(root, VERSION, "server.json"), "{");
 
-    expect(await messages(root)).toContain("has a server.json that is not valid JSON");
+    const found = await messages(root);
+    expect(found.some((message) => message.startsWith("server.json does not parse:"))).toBe(true);
   });
 
   test("says once that server.json is missing, and nothing of front matter", async ({ root }) => {
@@ -325,8 +329,19 @@ describe("validateRoot on an MCP server", () => {
     });
 
     const found = await messages(root);
-    expect(found).toContain("`server.description` is still TODO");
+    expect(found).toContain("server.json: `description` is still TODO");
     expect(found).not.toContain("`description` is still TODO");
+  });
+
+  test("refuses an artifact.json whose spec its server.json does not give", async ({ root }) => {
+    await cp(ACME, root, { recursive: true });
+    await edit<{ spec: { description: string } }>(root, "artifact.json", (envelope) => {
+      envelope.spec.description = "Something else.";
+    });
+
+    expect(await messages(root)).toContain(
+      "has a `spec` that its files do not give; run `aireg registry index` to write it again",
+    );
   });
 });
 
