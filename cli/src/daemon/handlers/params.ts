@@ -3,7 +3,11 @@ import { type Fields, isRecord } from "#adapter/fields.ts";
 import type { Credential } from "#adapter/index.ts";
 import { quoted } from "#adapter/text.ts";
 import { type Job, STEP_POLICIES } from "#core/config/model.ts";
-import { MINIMUM_INTERVAL_SECONDS, parseJob } from "#core/config/parse-job.ts";
+import {
+  MAXIMUM_INTERVAL_SECONDS,
+  MINIMUM_INTERVAL_SECONDS,
+  parseJob,
+} from "#core/config/parse-job.ts";
 import { readers } from "#core/fields.ts";
 import { MAX_PAGE_SIZE } from "#core/run/store.ts";
 import { SCOPES, type Scope } from "#core/store/paths.ts";
@@ -79,13 +83,10 @@ export function oauthTokens(entry: Fields, key: string): Credential {
   };
 }
 
-const MAXIMUM_INTERVAL_SECONDS = 24 * 60 * 60;
-
 export function intervalSeconds(entry: Fields, key: string, fallback: number) {
   return entry[key] === undefined ? fallback : interval(integer(entry, key));
 }
 
-/** A day at most: a job left longer reads as one that stopped. */
 function interval(seconds: number): number {
   if (seconds < MINIMUM_INTERVAL_SECONDS || seconds > MAXIMUM_INTERVAL_SECONDS) {
     throw invalidParams(

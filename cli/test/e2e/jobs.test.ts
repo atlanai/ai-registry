@@ -253,3 +253,23 @@ describe("a job whose selector names a target by its aireg 0.1 id", () => {
     expect(written).toContain("enabled: false");
   }, 60_000);
 });
+
+describe("job exit status", () => {
+  test("an interval outside 60 to 86400 seconds is a usage error", async ({ aireg, tmp }) => {
+    const market = join(tmp, "market");
+    await registry(market, { name: "acme", slug: "acme" }).skill("p/lint@1.0.0").write();
+    expect((await aireg(["init", "-y", "--for", "claude-code"])).code).toBe(0);
+    expect((await aireg(["registry", "add", market, "--as", "acme"])).code).toBe(0);
+
+    const low = await aireg(["job", "add", "--registry", "acme", "--interval", "59"]);
+    expect(low.code, low.stderr).toBe(2);
+    const high = await aireg(["job", "add", "--registry", "acme", "--interval", "86401"]);
+    expect(high.code, high.stderr).toBe(2);
+  });
+
+  test("runs of a job that does not exist fail", async ({ aireg }) => {
+    const ran = await aireg(["job", "runs", "--job", "no-such-job"]);
+    expect(ran.code, ran.stdout).toBe(1);
+    expect(ran.stderr).toContain('No job named "no-such-job".');
+  });
+});

@@ -32,6 +32,7 @@ describe("a job command that fails validation", () => {
     ["add"],
     ["add", "--registry", "undeclared"],
     ["add", "--registry", "undeclared", "--interval", "5"],
+    ["add", "--registry", "undeclared", "--interval", "86401"],
     ["enable", "zz-nope"],
     ["disable", "zz-nope"],
     ["remove", "zz-nope"],
@@ -41,6 +42,7 @@ describe("a job command that fails validation", () => {
     ["retry", "zz-nope"],
     ["cancel", "zz-nope"],
     ["runs", "zz-nope"],
+    ["runs", "--job", "zz-nope"],
   ];
 
   test("does not start the daemon", async () => {
@@ -57,7 +59,7 @@ describe("job add --interval", () => {
     async (value) => {
       await expect(
         run(context(["add", "--registry", "undeclared", "--interval", value])),
-      ).rejects.toThrow(/--interval takes a whole number of at least 60, not/);
+      ).rejects.toThrow(/--interval takes a whole number from 60 to 86400, not/);
     },
   );
 });
