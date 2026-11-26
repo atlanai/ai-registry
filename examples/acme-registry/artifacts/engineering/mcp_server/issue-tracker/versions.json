@@ -9,7 +9,8 @@
       "digest": "sha256:37c125eaa95c3c5b54cdc0819e79e981c7298dcf0ab44ceff6be5011d5828e10",
       "published_at": "2026-11-26T18:45:54.201Z",
       "status": "active",
-      "yanked": false
+      "yanked": false,
+      "catalog_digest": "sha256:8991a84ab10683efceb3ac70332577a80d48cfb6ffd57bcf81b5a3e6943c8780"
     }
   ]
 }
