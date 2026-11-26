@@ -140,3 +140,25 @@ pr-review 1.2.0 in <org>/ai-registry is flagging false positives in generated co
 3. `aireg registry index`, `aireg registry validate` and a commit. Ask before you push and
    open the pull request.
 4. Once it merges, in each project: `aireg outdated`, then `aireg update`.
+
+### 10. See how often the team's skills run
+
+```text
+I want to see which skills from <org>/ai-registry people actually run, and which versions. We have <an OpenTelemetry endpoint, or none yet>.
+```
+
+1. Ask where runs should go, unless the user said. Any endpoint that takes OpenTelemetry traces
+   over HTTP works: the team's OpenTelemetry Collector, or a tool such as Arize Phoenix or
+   Langfuse. With none, offer to run Arize Phoenix locally to try it, and ask before you start
+   anything. Its endpoint is `http://localhost:6006`.
+2. In an up-to-date clone of the registry, on a new branch, add
+   `"usage": {"otlp": "<endpoint>"}` to `registry.json`, with the base URL and no `/v1/traces`.
+   Add `"reporter": "name"` only if the user wants names rather than pseudonyms. Run
+   `aireg registry validate`, commit, and ask before you push and open the pull request.
+3. Once it merges, each teammate runs `aireg usage share <registry>`. It sends nothing until
+   they do. If the endpoint needs a key, tell the user to set `AIREG_USAGE_HEADERS_<NAME>` on
+   each machine, such as `AIREG_USAGE_HEADERS_ACME=Authorization=Basic%20<token>`. Never ask
+   for its value or put it in the registry.
+4. `aireg usage` shows the runs counted on this machine, and `aireg usage send` sends them now
+   rather than at the daemon's next run. In the endpoint's tool, runs are spans named
+   `registry.artifact.run`, with the version in `registry.artifact.ref`.

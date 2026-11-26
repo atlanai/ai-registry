@@ -79,7 +79,7 @@ links each coding agent reads, and `.codex/agents/reviewer.toml` the agent as Co
 
 If the user's first message already said what they want, do that now. Otherwise ask, and
 offer the use cases in [references/use-cases.md](references/use-cases.md) that fit them: 1
-to 3 for one person's coding agents, 4 and 5 for sharing a registry, 6 to 9 for a team.
+to 3 for one person's coding agents, 4 and 5 for sharing a registry, 6 to 10 for a team.
 Each one gives its steps.
 
 For anything else, follow the `aireg-new` skill to set up a registry, the `aireg-add` skill
