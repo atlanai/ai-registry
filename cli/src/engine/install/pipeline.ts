@@ -153,7 +153,7 @@ async function write(
       await warnKept(planned, guards, roots, printer);
       report.plan(planned, roots, aside, chosen);
       for (const line of keptLines(planned.withheld)) printer.warning(`${line}.`);
-      refuseUnlisted(planned.unlisted, printer, undefined);
+      refuseUnlisted(planned.unlisted, printer, undefined, roots.scope);
       warn(printer, rewrittenNotices(planned));
       if (planned.untrusted.length > 0) {
         printer.warning(`Would not install ${untrustedLine(planned.untrusted)} that run as you.`);
@@ -193,8 +193,8 @@ async function write(
       edited && !landed && (applied.unstaged.length > 0 || planned.untrusted.length > 0);
     if (undone) await restore(roots.manifest, before, written);
     refuseUnstaged(applied.unstaged, landed, printer);
-    refuseWithheld(planned, printer, request.moving);
-    refuseUnlisted(planned.unlisted, printer, request.moving);
+    refuseWithheld(planned, printer, request.moving, roots.scope);
+    refuseUnlisted(planned.unlisted, printer, request.moving, roots.scope);
     refuseRewritten(planned);
     refuseUntrusted(planned.untrusted, {
       scope: roots.scope,

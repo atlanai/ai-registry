@@ -18,7 +18,7 @@ import { isStepPolicy, STEP_POLICIES } from "#core/config/model.ts";
 import { registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { unknownRegistry } from "#core/manifest/errors.ts";
-import { type Roots, scopeName } from "#core/store/paths.ts";
+import { type Roots, scopeFlag, scopeName } from "#core/store/paths.ts";
 import { type Candidate, displayPath } from "#core/sync/adopt.ts";
 import { type SyncItem, UNSETTLED } from "#core/sync/model.ts";
 import { POLICY_AXES, type PolicyAxis, type SyncPolicy } from "#core/sync/policy.ts";
@@ -237,9 +237,11 @@ async function nextSteps(
 ): Promise<string[]> {
   const { items, local, publisher } = found;
   const next: string[] = [];
+  const flag = scopeFlag(loaded.roots.scope);
   const has = (...dispositions: string[]) =>
     items.some((item) => dispositions.includes(item.disposition));
-  if (has("pull", "pull-delete")) next.push("Run `aireg sync` to take the registry's changes.");
+  if (has("pull", "pull-delete"))
+    next.push(`Run \`aireg sync${flag}\` to take the registry's changes.`);
   const conflict = items.find((item) => item.disposition === "conflict");
   if (conflict !== undefined) {
     const names = items.map((item) => item.name);
@@ -253,7 +255,7 @@ async function nextSteps(
         return alias === undefined ? item.name : `${alias}/${item.name}`;
       })
       .join(" ");
-    next.push(`Run \`aireg add ${names}\` to install them from their registry.`);
+    next.push(`Run \`aireg add ${names}${flag}\` to install them from their registry.`);
   }
   return next;
 }

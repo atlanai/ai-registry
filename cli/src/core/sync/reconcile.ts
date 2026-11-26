@@ -11,7 +11,7 @@ import { closure } from "#core/plan/depends.ts";
 import type { Acquired, Fetch, Selected } from "#core/plan/model.ts";
 import { select, type Untrusted } from "#core/plan/select.ts";
 import { type Unlisted, unlistedReason, unlistedRows } from "#core/plan/unlisted.ts";
-import { artifactPath, copyLeaf, type Roots } from "#core/store/paths.ts";
+import { artifactPath, copyLeaf, type Roots, type Scope, scopeFlag } from "#core/store/paths.ts";
 import { abbreviate } from "#core/term/printer.ts";
 import { classify } from "./classify.ts";
 import type { Digests, SyncItem } from "./model.ts";
@@ -22,7 +22,7 @@ export async function reconcile(
   manifest: Manifest,
   lock: Lock,
   acquired: readonly Acquired[],
-  roots: Pick<Roots, "artifacts">,
+  roots: Pick<Roots, "artifacts" | "scope">,
 ): Promise<SyncItem[]> {
   // Dependencies of declared artifacts are tracked too, though the manifest names none.
   const needs = closure(select({ manifest, lock, acquired }).selected, acquired);
@@ -65,8 +65,8 @@ export async function reconcile(
     const watch = watchOf(previous, item);
     const held =
       item === undefined
-        ? heldBack(name, previous, acquired, unlisted, untrusted)
-        : carriesMoved(item, previous);
+        ? heldBack(name, previous, acquired, { unlisted, untrusted, scope: roots.scope })
+        : carriesMoved(item, previous, roots.scope);
     if (held !== undefined) {
       items.push({
         name,
@@ -128,20 +128,26 @@ function heldBack(
   name: string,
   previous: LockArtifact | undefined,
   acquired: readonly Acquired[],
-  unlisted: ReadonlyMap<string, Unlisted>,
-  untrusted: readonly Untrusted[],
+  held: {
+    unlisted: ReadonlyMap<string, Unlisted>;
+    untrusted: readonly Untrusted[];
+    scope: Scope;
+  },
 ): string | undefined {
+  const { unlisted, untrusted, scope } = held;
   const distrusted = untrusted.find(
     (item) => item.registry === previous?.registry && item.name === previous?.name,
   );
   if (distrusted !== undefined) {
     const { registry, name: plugin, carries } = distrusted;
-    return `it now carries ${describeCarried(carries)}, which no entry trusts; run \`aireg add ${registry}/${plugin} --trust ${plugin}\` to take it`;
+    return `it now carries ${describeCarried(carries)}, which no entry trusts; run \`aireg add ${registry}/${plugin} --trust ${plugin}${scopeFlag(scope)}\` to take it`;
   }
   const withheld = withheldRow(previous, acquired);
   const gone = unlisted.get(name);
   const why = withheldReason(withheld, gone);
-  return why === undefined ? undefined : `${why}; run \`aireg remove ${name}\` to take it out`;
+  return why === undefined
+    ? undefined
+    : `${why}; run \`aireg remove ${name}${scopeFlag(scope)}\` to take it out`;
 }
 
 function withheldReason(
@@ -163,13 +169,17 @@ function withheldRow(
 }
 
 /** A plugin version that changes what runs as you waits for a person, even when trusted. */
-function carriesMoved(item: Selected, previous: LockArtifact | undefined): string | undefined {
+function carriesMoved(
+  item: Selected,
+  previous: LockArtifact | undefined,
+  scope: Scope,
+): string | undefined {
   const fingerprint = item.plugin?.fingerprint;
   if (previous === undefined || fingerprint === undefined || fingerprint === previous.carried) {
     return undefined;
   }
   const carries = describeCarried(item.plugin?.carries ?? []);
-  return `its new version adds or changes the ${carries} it runs; run \`aireg update ${item.name}\` to take it`;
+  return `its new version adds or changes the ${carries} it runs; run \`aireg update ${item.name}${scopeFlag(scope)}\` to take it`;
 }
 
 /** No manifest declares a row from your folder, so its published copy is found by address. */
