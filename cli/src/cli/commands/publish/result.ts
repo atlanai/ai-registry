@@ -16,6 +16,8 @@ interface PublishedArtifact {
   belowLatest: boolean;
   published: boolean;
   dependsOn: { to: string }[];
+  /** The registry's newest version, when its status holds it back, such as `blocked` or `pending_review`. */
+  withheld?: { version: string; status: string; reason?: string };
   /** An agent's files, when it has more than its entry. */
   files?: string[];
   filesChanged?: Changes["files"];

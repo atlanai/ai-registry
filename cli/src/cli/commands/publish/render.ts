@@ -34,11 +34,25 @@ export function report(
       belowLatest: item.belowLatest,
       published: !item.same && results.has(alias) && result?.unchanged !== true,
       dependsOn: (item.input.relationships ?? []).map(({ to }) => ({ to })),
+      ...withheldOf(item),
       ...filesOf(item),
       ...changesJson(item.changes),
     };
   });
   return { dryRun, target, artifacts, skipped: [...skipped] };
+}
+
+/** A registry that holds its newest version back, as a blocked one, says so apart from absence. */
+function withheldOf(item: Planned): Pick<PublishReport["artifacts"][number], "withheld"> {
+  const held = item.withheld;
+  if (held === undefined) return {};
+  return {
+    withheld: {
+      version: held.version,
+      status: held.status,
+      ...(held.reason === undefined ? {} : { reason: held.reason }),
+    },
+  };
 }
 
 function filesOf(item: Planned): { files?: string[] } {

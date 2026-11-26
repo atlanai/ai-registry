@@ -83,6 +83,15 @@ describe("an export's own version", () => {
 
   test("goes past a blocked newest version once it fixes none, and says which", async () => {
     await fixAt(undefined);
+    const shown = await send("--dry-run", "--json");
+    expect(shown.code, shown.stderr).toBe(0);
+    expect(JSON.parse(shown.stdout).data.artifacts).toEqual([
+      expect.objectContaining({
+        from: "0.2.0",
+        version: "0.2.1",
+        withheld: { version: "0.2.0", status: "blocked", reason: "leaks tokens" },
+      }),
+    ]);
     const sent = await send("--json");
     expect(sent.code, sent.stderr).toBe(0);
     expect(JSON.parse(sent.stdout).data.artifacts).toEqual([
@@ -99,9 +108,9 @@ describe("an export's own version", () => {
     );
     const sent = await send("--json");
     expect(sent.code, sent.stderr).toBe(0);
-    expect(JSON.parse(sent.stdout).data.artifacts).toEqual([
-      expect.objectContaining({ from: "0.2.1", version: "0.1.5", belowLatest: true }),
-    ]);
+    const [below] = JSON.parse(sent.stdout).data.artifacts;
+    expect(below).toMatchObject({ from: "0.2.1", version: "0.1.5", belowLatest: true });
+    expect(below).not.toHaveProperty("withheld");
     expect(await written()).toEqual(["0.1.5", "0.2.0", "0.2.1"]);
   });
 
