@@ -169,6 +169,19 @@ describe("a project installs the model and takes its new versions", () => {
     expect(lock).toContain("version: 0.1.1");
   });
 
+  test("refuses to publish an edited copy that is no longer a semantic model", async () => {
+    const installed = join(project, INSTALLED, "semantic_model.yaml");
+    const before = await readFile(installed, "utf8");
+    // No `datasets`: sent as it is, the registry could index nothing until it was removed.
+    await writeFile(installed, 'version: "0.2.0.dev0"\nname: m\nai_context: { threshold: 0.85 }\n');
+    const refused = await aireg(["publish", "-y"]);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("would not pass `aireg registry validate`");
+    expect(refused.stderr).toContain("semantic_model.yaml: `datasets` is required");
+    expect((await inRegistry(["registry", "validate"])).code).toBe(0);
+    await writeFile(installed, before);
+  });
+
   test("removes the file and its lockfile row", async () => {
     const removed = await aireg(["remove", "retail", "-y"]);
     expect(removed.code, removed.stderr).toBe(0);

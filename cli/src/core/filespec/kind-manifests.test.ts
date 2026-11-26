@@ -355,6 +355,14 @@ describe("a semantic model", () => {
     ]);
   });
 
+  test("cuts a description past the manifest's limit in spec, and still finds the model valid", async () => {
+    const long = "a".repeat(4001);
+    const model = `version: 0.2.0.dev0\nname: Retail\ndescription: ${long}\ndatasets:\n  - name: s\n    source: t\n`;
+    const spec = specFrom(text(model));
+    expect((spec.description as string).length).toBe(4000);
+    expect(check(await manifest(), spec)).toEqual([]);
+  });
+
   test("stores a lone model under the kind's file name, whatever it was called", async () => {
     expect(entryName(await manifest(), "retail.yml")).toBe("semantic_model.yaml");
     expect(entryName(await manifest(), "retail.json")).toBe("semantic_model.json");

@@ -49,6 +49,12 @@ describe("versionProblems for a semantic model", async () => {
     ]);
   });
 
+  test("refuses a 0.1.1 file that lists no model", () => {
+    expect(problems('version: "0.1.1"\nsemantic_model: []\n')).toEqual([
+      "semantic_model.yaml: lists no model under `semantic_model`, and an artifact holds one",
+    ]);
+  });
+
   test("names the file that does not parse", () => {
     expect(problems("version: [\n")[0]).toMatch(/^semantic_model\.yaml does not parse: /);
   });

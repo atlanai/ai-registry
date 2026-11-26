@@ -78,7 +78,7 @@ $ aireg add acme/analytics/semantic_model/retail
   at     .registry/artifacts/acme/analytics/semantic_models/retail
 ```
 
-Point a skill or an agent at that path. [`aireg update`](update.md) replaces the file with the newest version, and `@1.0.0` pins one, as for any artifact. [`aireg publish`](publish.md) doesn't take a semantic model: add it to the registry's folder with `new --from`.
+Point a skill or an agent at that path. [`aireg update`](update.md) replaces the file with the newest version, and `@1.0.0` pins one, as for any artifact. [`aireg publish`](publish.md) doesn't take a new semantic model from a path: add it to the registry's folder with `new --from`. It does send an edited installed copy back as a new version, after the same check, and refuses one that is no longer a valid model.
 
 ### bump
 

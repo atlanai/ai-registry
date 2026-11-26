@@ -98,6 +98,7 @@
             "$ref": "vendor/ossie/0.1.1/osi-schema.json",
             "properties": {
               "semantic_model": {
+                "minItems": 1,
                 "maxItems": 1
               }
             }

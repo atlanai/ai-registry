@@ -11,7 +11,11 @@ import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
-import { frontmatterParseProblem, frontmatterRecord } from "#core/frontmatter.ts";
+import {
+  DESCRIPTION_LIMIT,
+  frontmatterParseProblem,
+  frontmatterRecord,
+} from "#core/frontmatter.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { AGENT_CARD_ENTRY } from "#core/product.ts";
 import { parseYaml } from "#core/yaml.ts";
@@ -286,8 +290,8 @@ export function specOf(
       if (value !== undefined) lifted[field] = value;
     }
   }
-  if (lifted.description === undefined && manifest.title === "semantic_model") {
-    const description = listedDescription(document);
+  if (manifest.title === "semantic_model") {
+    const description = modelDescription(lifted.description, document);
     if (description !== undefined) lifted.description = description;
   }
   // The registry slug is the name; the document keeps its own, which need not be a slug.
@@ -315,13 +319,26 @@ export function schemaFiles(manifest: KindManifest): { path: string; schema: Sch
 }
 
 /**
+ * A semantic model's description as `spec` holds it: the document's own, or that of the one model
+ * a 0.1.1 document lists. The copy is for search, so one past the manifest's limit is cut, not
+ * refused: the model is valid Ossie, and its file keeps every character.
+ */
+function modelDescription(own: unknown, document: unknown): unknown {
+  const description = own ?? listedDescription(document);
+  if (typeof description !== "string") return description;
+  return [...description].slice(0, DESCRIPTION_LIMIT).join("");
+}
+
+/**
  * Apache Ossie 0.1.1 lists models where 0.2 holds one, and an artifact is one model. The schema
  * refuses a longer list too; this says what to do about it.
  */
 export function listedModelsProblem(manifest: KindManifest, document: unknown): string | undefined {
   if (manifest.title !== "semantic_model" || !isRecord(document)) return undefined;
   const models = document.semantic_model;
-  if (!Array.isArray(models) || models.length <= 1) return undefined;
+  if (!Array.isArray(models) || models.length === 1) return undefined;
+  if (models.length === 0)
+    return "lists no model under `semantic_model`, and an artifact holds one";
   return `lists ${models.length} models under \`semantic_model\`, and an artifact holds one: split it into one artifact per model`;
 }
 

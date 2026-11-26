@@ -13,7 +13,7 @@ here is edited, so each file keeps the `$id` its project gave it.
 converter in apache/ossie-converters writes it. Replace it with 0.2.0 when Ossie releases that.
 
 To add a version, copy its schema into a folder named after the version, add a row here, and add
-the version to `model.version` and to `model.allOf` in `semantic_model.json`.
+the version to `version` and to `allOf` under `$defs.document` in `semantic_model.json`.
 
 Apache Ossie (incubating). Copyright 2026 The Apache Software Foundation. This product includes
 software developed at The Apache Software Foundation (http://www.apache.org/).
