@@ -8,7 +8,7 @@ import { SKILL_ENTRY } from "#adapter/kinds.ts";
 import { setRecent } from "#adapter/lru.ts";
 import { hashStream, sha256 } from "#adapter/spec/canonical.ts";
 import { withName } from "#core/frontmatter.ts";
-import { authored, type FileRecord, isDirectory, walk } from "#core/fs/tree.ts";
+import { authored, contents, type FileRecord, isDirectory } from "#core/fs/tree.ts";
 
 type Listed = Pick<FileRecord, "path" | "size" | "mtimeMs" | "ino" | "executable">;
 
@@ -61,9 +61,14 @@ function remember(framed: string, earlier: string): void {
   setRecent(EARLIER, framed, earlier, KNOWN_LIMIT);
 }
 
-/** Whether a placed copy was edited: returns `recorded` while the copy still matches it. */
+/**
+ * Whether a placed copy was edited: returns `recorded` while the copy still matches it. Litter
+ * such as `.DS_Store` is never content, so a file manager opening the folder is no edit.
+ */
 export async function digest(path: string, recorded?: string): Promise<string> {
-  const tree = (await isDirectory(path)) ? folder(path, path, await walk(path)) : await lone(path);
+  const tree = (await isDirectory(path))
+    ? folder(path, path, await contents(path))
+    : await lone(path);
   return settle(tree, recorded);
 }
 

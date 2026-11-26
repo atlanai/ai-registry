@@ -90,7 +90,12 @@ export function refusal(entry: Irregular): string {
 
 /** Sorted, so two walks of the same tree always produce the same list. */
 export async function walk(root: string): Promise<FileRecord[]> {
-  return (await scan(root, false)).files;
+  return (await scan(root, "every")).files;
+}
+
+/** Every regular file but litter: what a copy holds, as a digest compares it. */
+export async function contents(root: string): Promise<FileRecord[]> {
+  return (await scan(root, "contents")).files;
 }
 
 export interface Irregular {
@@ -98,9 +103,12 @@ export interface Irregular {
   reason: "is a symlink" | "is not a regular file" | "may hold credentials";
 }
 
+/** `every` file; the `contents`, skipping litter; or what is `authored`, refusing credentials too. */
+type Reading = "every" | "contents" | "authored";
+
 async function scan(
   root: string,
-  authored: boolean,
+  reading: Reading,
 ): Promise<{ files: FileRecord[]; irregular: Irregular[] }> {
   const files: FileRecord[] = [];
   const irregular: Irregular[] = [];
@@ -109,13 +117,13 @@ async function scan(
   async function visit(dir: string): Promise<void> {
     const items = await readdir(dir, { withFileTypes: true });
     for (const item of items.sort((a, b) => a.name.localeCompare(b.name))) {
-      if (authored && isLitter(item.name)) continue;
+      if (reading !== "every" && isLitter(item.name)) continue;
       const full = join(dir, item.name);
       if (item.isDirectory()) {
         await visit(full);
         continue;
       }
-      if (authored && item.isFile() && maySecret(item.name)) {
+      if (reading === "authored" && item.isFile() && maySecret(item.name)) {
         irregular.push({ path: pathOf(full), reason: "may hold credentials" });
         continue;
       }
@@ -155,7 +163,7 @@ function maySecret(name: string): boolean {
 
 /** Regular files minus litter, plus every link, special file or likely credential to refuse. */
 export function authored(root: string): Promise<{ files: FileRecord[]; irregular: Irregular[] }> {
-  return scan(root, true);
+  return scan(root, "authored");
 }
 
 /** A folder or one file (`path: ""`), refused the same way when it is itself a link. */
@@ -163,7 +171,7 @@ export async function authoredArtifact(
   source: string,
 ): Promise<{ files: FileRecord[]; irregular: Irregular[] }> {
   const info = await lstat(source);
-  if (info.isDirectory()) return scan(source, true);
+  if (info.isDirectory()) return scan(source, "authored");
   const refuse = (reason: Irregular["reason"]) => ({
     files: [],
     irregular: [{ path: "", reason }],

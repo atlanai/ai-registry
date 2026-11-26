@@ -27,6 +27,20 @@ test("sees an edit to a copy it digested before, even one of the same size", asy
   expect(await digest(copy)).not.toBe(before);
 });
 
+test("reads OS litter in a copy as no edit, and any other new file as one", async ({ tmp }) => {
+  const copy = await tree(join(tmp, "copy"), { "SKILL.md": "hello\n" });
+  const before = await digest(copy);
+
+  await writeFile(join(copy, ".DS_Store"), "finder");
+  await writeFile(join(copy, "._SKILL.md"), "resource fork");
+  await mkdir(join(copy, ".git"));
+  await writeFile(join(copy, ".git", "HEAD"), "ref: refs/heads/main\n");
+  expect(await digest(copy)).toBe(before);
+
+  await writeFile(join(copy, "notes.md"), "mine\n");
+  expect(await digest(copy)).not.toBe(before);
+});
+
 test("tells apart two trees whose files run together into the same bytes", async ({ tmp }) => {
   const one = await tree(join(tmp, "one"), { "a.md": "x b.md 0 y" });
   const two = await tree(join(tmp, "two"), { "a.md": "x", "b.md": "y" });
