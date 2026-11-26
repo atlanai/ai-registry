@@ -54,6 +54,8 @@ export interface Probed {
   /** Whether the alias is the registry's own name or derived from the address. */
   named: "registry" | "address";
   label: string | undefined;
+  /** The OpenTelemetry endpoint the registry asks for runs at, when it asks (file spec 14). */
+  usage?: string | undefined;
   location: string;
   declared: RegistrySource;
   catalog: Catalog;
@@ -444,6 +446,7 @@ export async function probe({
     alias: declaredAlias ?? own ?? alias,
     named: declaredAlias === undefined && own !== undefined ? "registry" : "address",
     label: labelOf(listing.registry, declaredAlias ?? own ?? alias),
+    usage: listing.registry?.usage?.otlp,
     location,
     declared: { location, adapter, config: recorded },
     catalog: listing.catalog,

@@ -8,6 +8,8 @@ export const claudeCode = defineTarget({
   default: true,
   importable: true,
   roots: { project: ".claude", user: { default: "~/.claude", env: "CLAUDE_CONFIG_DIR" } },
+  // One transcript per session under projects/, with each skill it loaded and why.
+  sessions: { path: "projects", format: "claude-code-transcript" },
   detect: { env: ["CLAUDE_CONFIG_DIR"], binary: ["claude"], caller: ["CLAUDECODE"] },
   kinds: {
     // `plugins/` is Claude's own store and is never scanned; a plugin manifest

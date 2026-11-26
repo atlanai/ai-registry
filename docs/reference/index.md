@@ -55,6 +55,7 @@ aireg add <registry>/<namespace>[/<name>[@<version>]] [options]
 | [`aireg status`](status.md) | Check installed artifacts against the lockfile, and list the ones nothing manages. |
 | [`aireg list`](list.md) | List what is installed. |
 | [`aireg outdated`](outdated.md) | Check each registry for newer versions of what is installed. |
+| [`aireg usage`](usage.md) | Count runs of installed skills and agents, and share them with registries. |
 | [`aireg targets`](targets.md) | List the targets aireg can install into, and which this machine has. |
 
 ### Share

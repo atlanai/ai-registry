@@ -216,6 +216,15 @@ const resolved = {
     ),
   ),
   reload: Type.Optional(Type.String()),
+  sessions: Type.Optional(
+    Type.Object(
+      { path: Type.String(), format: Type.String() },
+      {
+        additionalProperties: false,
+        description: "Where the target records each session, for `aireg usage`.",
+      },
+    ),
+  ),
   origin: Origin,
 };
 

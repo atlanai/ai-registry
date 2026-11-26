@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/usage.json",
+  "title": "aireg usage --json",
+  "description": "The `data` each `aireg usage` action prints under --json, by action.",
+  "$defs": {
+    "show": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "days",
+        "artifacts",
+        "sharing"
+      ],
+      "properties": {
+        "days": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "registry",
+              "ref",
+              "runs",
+              "byYou",
+              "targets",
+              "last"
+            ],
+            "properties": {
+              "registry": {
+                "type": "string"
+              },
+              "ref": {
+                "description": "`<namespace>/<kind>/<name>@<version>`.",
+                "type": "string"
+              },
+              "runs": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "byYou": {
+                "minimum": 0,
+                "description": "Runs you started yourself.",
+                "type": "integer"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "last": {
+                "description": "When it last ran, ISO 8601.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "sharing": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "registry",
+              "otlp",
+              "as"
+            ],
+            "properties": {
+              "registry": {
+                "description": "The registry's alias.",
+                "type": "string"
+              },
+              "otlp": {
+                "description": "The OpenTelemetry endpoint runs are sent to.",
+                "type": "string"
+              },
+              "as": {
+                "description": "The name you chose; `null` when the registry gets a pseudonym.",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "share": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "registry",
+            "otlp",
+            "sharing",
+            "reporter",
+            "as"
+          ],
+          "properties": {
+            "registry": {
+              "type": "string"
+            },
+            "otlp": {
+              "type": "string"
+            },
+            "sharing": {
+              "description": "`false` once sharing is turned off.",
+              "type": "boolean"
+            },
+            "reporter": {
+              "anyOf": [
+                {
+                  "const": "pseudonym",
+                  "type": "string"
+                },
+                {
+                  "const": "name",
+                  "type": "string"
+                }
+              ]
+            },
+            "as": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "sharing"
+          ],
+          "properties": {
+            "sharing": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "registry",
+                  "otlp",
+                  "as"
+                ],
+                "properties": {
+                  "registry": {
+                    "description": "The registry's alias.",
+                    "type": "string"
+                  },
+                  "otlp": {
+                    "description": "The OpenTelemetry endpoint runs are sent to.",
+                    "type": "string"
+                  },
+                  "as": {
+                    "description": "The name you chose; `null` when the registry gets a pseudonym.",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "send": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "registries"
+      ],
+      "properties": {
+        "registries": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "registry",
+              "otlp",
+              "sent",
+              "pending",
+              "stopped"
+            ],
+            "properties": {
+              "registry": {
+                "type": "string"
+              },
+              "otlp": {
+                "type": "string"
+              },
+              "sent": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "pending": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "stopped": {
+                "description": "Why nothing more was sent; `null` when everything went.",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

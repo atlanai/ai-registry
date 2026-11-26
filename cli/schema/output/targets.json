@@ -1787,6 +1787,23 @@
             "reload": {
               "type": "string"
             },
+            "sessions": {
+              "additionalProperties": false,
+              "description": "Where the target records each session, for `aireg usage`.",
+              "type": "object",
+              "required": [
+                "path",
+                "format"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": "string"
+                }
+              }
+            },
             "origin": {
               "description": "`built-in`, or the path of the file that defines it.",
               "type": "string"
@@ -3384,6 +3401,23 @@
             },
             "reload": {
               "type": "string"
+            },
+            "sessions": {
+              "additionalProperties": false,
+              "description": "Where the target records each session, for `aireg usage`.",
+              "type": "object",
+              "required": [
+                "path",
+                "format"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": "string"
+                }
+              }
             },
             "origin": {
               "description": "`built-in`, or the path of the file that defines it.",

@@ -1,10 +1,11 @@
-import type { RegistryIdentity } from "../contract.ts";
+import type { RegistryIdentity, RegistryUsage } from "../contract.ts";
 import { type Fields, isRecord, textOf } from "../fields.ts";
 import { type ArtifactKind, isKind } from "../kinds.ts";
 import { compareVersion, parseVersion, type Version } from "../semver.ts";
 import { isVersion } from "../spec/ref.ts";
 import { SUPPORTED_FORMAT } from "../spec/types.ts";
 import { list, quoted } from "../text.ts";
+import { usageOf } from "../usage.ts";
 import { INDEX_DOCUMENT, REGISTRY_DOCUMENT, versionsPath } from "./names.ts";
 
 /** Absent is `undefined`; unreadable throws. */
@@ -65,6 +66,8 @@ export interface RegistryDocument {
   /** `blobs/sha256/{digest}` unless the root says otherwise. */
   blobUrl: string;
   kinds: readonly string[];
+  /** Absent when the root asks for no usage, or asks for it in a way no client may follow. */
+  usage: RegistryUsage | undefined;
 }
 
 export interface IndexRow {
@@ -100,6 +103,8 @@ export function identityOf(registry: RegistryDocument): RegistryIdentity {
     name: registry.name,
     ...(registry.slug === undefined ? {} : { slug: registry.slug }),
     ...(registry.description === undefined ? {} : { description: registry.description }),
+    ...(registry.url === undefined ? {} : { url: registry.url }),
+    ...(registry.usage === undefined ? {} : { usage: registry.usage }),
   };
 }
 
@@ -148,6 +153,7 @@ export async function readRegistry(read: ReadPath): Promise<RegistryDocument> {
     capabilities,
     blobUrl: textOf(entry.blob_url) ?? DEFAULT_BLOB_URL,
     kinds,
+    usage: usageOf(entry.usage),
   };
 }
 

@@ -50,6 +50,18 @@ export interface RegistryIdentity {
   /** Its name as one path segment, where it has one. */
   slug?: string | undefined;
   description?: string | undefined;
+  /** The canonical root it names, where it names one. */
+  url?: string | undefined;
+  /** Where clients send runs of its artifacts, when it asks for usage (file spec section 14). */
+  usage?: RegistryUsage | undefined;
+}
+
+/** A registry's `usage` block: an OpenTelemetry endpoint, and how runs sent there are written. */
+export interface RegistryUsage {
+  /** The OTLP over HTTP base URL, without `/v1/traces`: https, or http to a loopback host. */
+  otlp: string;
+  reporter: "pseudonym" | "name";
+  timePrecision: "second" | "hour" | "day";
 }
 
 export interface Resolution {

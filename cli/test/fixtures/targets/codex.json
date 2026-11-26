@@ -8,6 +8,7 @@
       "env": "CODEX_HOME"
     }
   },
+  "sessions": { "path": "sessions", "format": "codex-rollout" },
   "detect": {
     "env": [
       "CODEX_HOME"

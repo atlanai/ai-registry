@@ -16,6 +16,7 @@ import {
   type RegistryConfig,
   type Selector,
   type Step,
+  type UsageShare,
 } from "./model.ts";
 import { parseAccount } from "./parse-account.ts";
 import { earlierIds, parseJob } from "./parse-job.ts";
@@ -54,6 +55,7 @@ function parseDocument(document: unknown): RegistryConfig {
       "accounts",
       "jobs",
       "hooks",
+      "usage",
     ],
     "",
   );
@@ -80,6 +82,11 @@ function parseDocument(document: unknown): RegistryConfig {
     jobs.map(({ id }) => id),
     "Two jobs have the same id.",
   );
+  const usage = parseUsage(root.usage);
+  unique(
+    usage.map(({ registry }) => registry),
+    "Two usage entries are for the same registry.",
+  );
   const hooks = parseHooks(root.hooks);
   unique(
     hooks.map(({ id }) => id),
@@ -100,6 +107,7 @@ function parseDocument(document: unknown): RegistryConfig {
     accounts,
     jobs,
     hooks,
+    usage,
   };
 }
 
@@ -149,6 +157,37 @@ function parseHooks(value: unknown): PipelineHook[] {
   });
 }
 
+function parseUsage(value: unknown): UsageShare[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new ConfigError("`usage` must be a list.");
+  return value.map((item, index) => {
+    const where = `usage[${index}]`;
+    const entry = record(item, where);
+    onlyKnown(entry, ["registry", "alias", "otlp", "reporter", "precision", "since", "as"], where);
+    const reporter = text(entry, "reporter", where);
+    const precision = text(entry, "precision", where);
+    const since = text(entry, "since", where);
+    if (reporter !== "pseudonym" && reporter !== "name") {
+      throw new ConfigError(`\`${where}.reporter\` must be pseudonym or name.`);
+    }
+    if (precision !== "second" && precision !== "hour" && precision !== "day") {
+      throw new ConfigError(`\`${where}.precision\` must be second, hour or day.`);
+    }
+    if (Number.isNaN(Date.parse(since))) {
+      throw new ConfigError(`\`${where}.since\` must be a date and time.`);
+    }
+    return {
+      registry: text(entry, "registry", where),
+      alias: text(entry, "alias", where),
+      otlp: text(entry, "otlp", where),
+      reporter,
+      precision,
+      since,
+      ...(entry.as === undefined ? {} : { as: text(entry, "as", where) }),
+    };
+  });
+}
+
 function adapterPins(value: unknown): Readonly<Record<string, string>> {
   if (value === undefined) return {};
   const entries = Object.entries(record(value, "adapters"));
@@ -169,10 +208,12 @@ function adapterPins(value: unknown): Readonly<Record<string, string>> {
 export function formatConfig(config: RegistryConfig): string {
   const targetTable = resolveTargets(process.env);
   // Written only when turned off, so a config that never opted out reads as it always has.
-  const { telemetry, ...rest } = config;
+  const { telemetry, usage, ...rest } = config;
   const document = {
     ...rest,
     ...(telemetry ? {} : { telemetry: false }),
+    // Written only once someone shares, like telemetry above.
+    ...(usage.length === 0 ? {} : { usage: usage.map((share) => ({ ...share })) }),
     accounts: config.accounts.map(({ id, registry, ...rest }) => ({
       id,
       registry,

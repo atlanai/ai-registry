@@ -7,6 +7,8 @@ export const codex = defineTarget({
   default: true,
   importable: true,
   roots: { project: ".codex", user: { default: "~/.codex", env: "CODEX_HOME" } },
+  // One rollout per session under sessions/<year>/<month>/<day>/, with each command it ran.
+  sessions: { path: "sessions", format: "codex-rollout" },
   detect: {
     env: ["CODEX_HOME"],
     binary: ["codex"],

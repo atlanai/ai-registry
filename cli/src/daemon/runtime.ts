@@ -46,10 +46,13 @@ import {
   FOLLOW_INTERVAL_MS,
 } from "#daemon/updates/cli-update.ts";
 import { jobOfWork, type ScopeWork } from "#engine/sync/work.ts";
+import { send } from "#engine/usage/send.ts";
 
 const EVENT_PAGE_SIZE = 200;
 
 const HOME_WATCH_MS = 15_000;
+/** How often runs are counted and sent, for someone who shares usage with a registry. */
+const USAGE_INTERVAL_MS = 15 * 60_000;
 
 export class DaemonRuntime {
   readonly #server: RpcServer;
@@ -62,6 +65,7 @@ export class DaemonRuntime {
     () => applyDaemonFollowInstalled(this.#replaceHooks()),
     FOLLOW_INTERVAL_MS,
   );
+  readonly #usage = new DaemonMinUpdate(() => this.#sendUsage(), USAGE_INTERVAL_MS);
   readonly #instanceId = `daemon_${randomUUID()}`;
   readonly #startedAtMs = Date.now();
   readonly #stopped = new Set<() => void>();
@@ -106,6 +110,7 @@ export class DaemonRuntime {
     this.#scheduler.start();
     this.#minUpdate.start();
     this.#follow.start();
+    this.#usage.start();
     // A home deleted under it leaves a daemon nobody can reach or stop.
     const home = toolHome();
     this.#homeWatch = setInterval(() => {
@@ -374,11 +379,29 @@ export class DaemonRuntime {
     };
   }
 
+  /** Does nothing for someone who shares with no registry: their sessions are not even read. */
+  async #sendUsage(): Promise<"skip"> {
+    for (const result of await send()) {
+      if (result.stopped === undefined) {
+        if (result.sent > 0)
+          this.#log.info("sent usage", { registry: result.alias, runs: result.sent });
+        continue;
+      }
+      this.#log.warn("usage not sent", {
+        registry: result.alias,
+        pending: result.pending,
+        why: result.stopped,
+      });
+    }
+    return "skip";
+  }
+
   async #finish(): Promise<void> {
     // Unbind last, or a replacement could abandon the rows this process is still finishing.
     clearInterval(this.#homeWatch);
     this.#minUpdate.stop();
     this.#follow.stop();
+    this.#usage.stop();
     this.#scheduler.stop();
     this.#server.drain();
     await this.#runner.stop();

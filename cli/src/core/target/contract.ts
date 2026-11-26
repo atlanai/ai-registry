@@ -175,6 +175,20 @@ interface Trust {
   scope?: "project" | "user" | undefined;
 }
 
+/**
+ * A built-in reader of a target's session records, chosen by id, so a definition never carries
+ * code. Each finds the artifacts a session loaded, for `aireg usage`.
+ */
+export const SESSION_FORMATS = ["claude-code-transcript", "codex-rollout"] as const;
+export type SessionFormat = (typeof SESSION_FORMATS)[number];
+
+/** Where a target keeps a record of each session, and which reader understands it. */
+export interface Sessions {
+  /** Under its user root: a folder searched for `.jsonl` files at any depth. */
+  path: string;
+  format: SessionFormat;
+}
+
 /** What a target is; a `shared-folder` is several tools' folder, never detected nor a default. */
 export const TARGET_CATEGORIES = ["coding-agent", "personal-agent", "shared-folder"] as const;
 export type TargetCategory = (typeof TARGET_CATEGORIES)[number];
@@ -213,6 +227,8 @@ export interface TargetDefinition {
   profiles?: Profiles | undefined;
   /** What to do after a change for the target to see it; printed, never run. */
   reload?: string | undefined;
+  /** Its session records, where aireg can read which artifacts it ran. */
+  sessions?: Sessions | undefined;
 }
 
 interface Signals {
@@ -242,6 +258,7 @@ export interface Target {
   verified: { command: string[]; range: string } | undefined;
   trust: Partial<Record<ArtifactKind, Trust>>;
   reload: string | undefined;
+  sessions: Sessions | undefined;
   /** Built in, or the path of the file in your user scope that defines it. */
   origin: string;
 }

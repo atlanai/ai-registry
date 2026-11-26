@@ -94,6 +94,13 @@ export function reportAdded(printer: Printer, said: Said): void {
   if (applied.introduced) {
     printer.success(`Added registry ${alias} at ${withoutCredentials(applied.location)}.`);
     if (source.label !== undefined) printer.note("about", source.label);
+    // Said once, when the registry is added; nothing is sent until the person agrees.
+    if (source.usage !== undefined) {
+      printer.note(
+        "usage",
+        `asks for runs of its skills; \`aireg usage share ${alias}\` sends them`,
+      );
+    }
     if (!applied.named && source.named === "address") {
       printer.note("named", "after its address; choose another with --as");
     }

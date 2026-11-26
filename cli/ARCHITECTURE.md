@@ -54,6 +54,8 @@ The architecture test also holds every `adapters/<id>/` to the public contract a
 | Front matter, read in full by the CLI, and as a YAML subset by the contract, which imports no package | `core/frontmatter.ts`, `adapter/layouts/frontmatter.ts` |
 | The engine range a project or manifest needs, and refusing an older aireg | `core/engines.ts` |
 | The lockfile, `.registry/manifest.lock.yml` | `core/lock.ts` |
+| Reading a target's session records for the artifacts it loaded, one reader per format | `core/usage/sessions/` |
+| Counting runs, keeping them, and sending them to a registry's usage endpoint | `engine/usage/` |
 | Running git | `adapters/git/exec.ts`, reached through `adapters/git/api.ts` |
 | The scope a command installs into, how messages name it, and where it places artifacts | `core/store/paths.ts` |
 | Edits to a target's own config file, such as registering a plugin | `core/target/register/` |

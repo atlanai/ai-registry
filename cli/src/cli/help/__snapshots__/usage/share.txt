@@ -1,0 +1,13 @@
+Send runs of a registry's artifacts to the usage endpoint it names
+
+Usage: aireg usage share
+       aireg usage share <registry> [--as <name>]
+       aireg usage share <registry> --off
+
+Options:
+      --as <name>  Your name in what is sent, for a registry that asks for names
+      --off        Stop sending runs to this registry
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/usage/
