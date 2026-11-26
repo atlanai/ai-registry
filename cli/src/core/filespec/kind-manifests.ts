@@ -294,12 +294,18 @@ export function specOf(
     const description = modelDescription(lifted.description, document);
     if (description !== undefined) lifted.description = description;
   }
-  // The registry slug is the name; the document keeps its own, which need not be a slug.
-  if (name !== undefined) lifted.name = name;
-  else if (typeof lifted.name === "string") lifted.name = sanitizeName(lifted.name);
+  // A custom kind's JSON card keeps the shape aireg 0.1 published, so released versions still validate.
+  const legacy = !["agent", "semantic_model"].includes(manifest.title) && entry.endsWith(".json");
+  if (!legacy) slugName(lifted, name);
   // A file the manifest gives a schema is validated as a file, so the file is the only copy.
   if (schemaFiles(manifest).some((file) => file.path === entry)) return lifted;
-  return { ...lifted, [documentKey(manifest)]: document };
+  return { ...lifted, [legacy ? "card" : documentKey(manifest)]: document };
+}
+
+/** The registry slug is the name; the document keeps its own, which need not be a slug. */
+function slugName(lifted: Record<string, unknown>, name: string | undefined): void {
+  if (name !== undefined) lifted.name = name;
+  else if (typeof lifted.name === "string") lifted.name = sanitizeName(lifted.name);
 }
 
 /** A kind's JSON or YAML document, by its extension; throws when it does not parse. */

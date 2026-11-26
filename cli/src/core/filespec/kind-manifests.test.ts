@@ -249,6 +249,16 @@ describe("a custom kind whose entry is YAML", () => {
     expect(envelopeSpec("glossary", files, kinds, "flights").terms).toEqual(parsed);
   });
 
+  test("keeps a JSON card as aireg 0.1 published it, so released versions still validate", () => {
+    const legacy = {
+      ...glossary,
+      "x-registry-files": { required: [{ path: "glossary.json" }] },
+    } as KindManifest;
+    const files = new Map([["glossary.json", text(JSON.stringify(parsed))]]);
+    const spec = envelopeSpec("glossary", files, { glossary: legacy }, "flights");
+    expect(spec).toEqual({ name: "Flights", description: "Flight terms by route.", card: parsed });
+  });
+
   test("has no spec when the YAML does not parse", () => {
     const files = new Map([["glossary.yaml", text("name: [unclosed\n")]]);
     expect(envelopeSpec("glossary", files, kinds)).toEqual({});
