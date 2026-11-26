@@ -105,7 +105,6 @@ describe("an MCP server's catalog entry and import", () => {
     const args = ["mcp", "new", "--from", source, "--name", "imported", "-y"];
     expect((await aireg(args, { cwd: engineering })).code).toBe(0);
 
-    // The server is 1.2.0, so the artifact starts there.
     const copied = join(engineering, "mcp_server", "imported", "1.2.0", "README.md");
     expect(await readFile(copied, "utf8")).toBe(readme);
   });

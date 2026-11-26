@@ -44,9 +44,7 @@ const read = (name: string): unknown => JSON.parse(readFileSync(join(FIXTURE, na
 
 const MCP_SERVER = join(
   import.meta.dirname,
-  ..."../../../examples/acme-registry/artifacts/engineering/mcp_server/issue-tracker/1.2.0".split(
-    "/",
-  ),
+  "../../../examples/acme-registry/artifacts/engineering/mcp_server/issue-tracker/1.2.0",
 );
 
 // Read in place from the spec, so they stay honest about the registries this client reads.

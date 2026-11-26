@@ -21,11 +21,11 @@ import {
   type KindManifest,
   SPEC_TEXT,
   schemaFiles,
-  serverVersion,
   specFile,
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
+import { serverVersion } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { documentProblems, fractionProblems } from "#core/filespec/validate/folders.ts";
 import { withName } from "#core/frontmatter.ts";

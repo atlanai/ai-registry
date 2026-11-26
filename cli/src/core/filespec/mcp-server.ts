@@ -30,10 +30,23 @@ export function serverSkeleton(manifest: KindManifest): SchemaNode {
 /** The server's `title`, which a catalog shows as its display name. */
 export function serverTitle(files: ReadonlyMap<string, Uint8Array>): string | undefined {
   const bytes = files.get(MCP_SERVER_ENTRY);
-  if (bytes === undefined) return undefined;
+  const server = bytes === undefined ? undefined : parsed(new TextDecoder().decode(bytes));
+  return isRecord(server) ? textOf(server.title) : undefined;
+}
+
+/** An MCP server's own `version`, which the artifact's version follows. */
+export function serverVersion(
+  manifest: KindManifest,
+  files: ReadonlyMap<string, string>,
+): string | undefined {
+  if (manifest.title !== "mcp_server") return undefined;
+  const server = parsed(files.get(MCP_SERVER_ENTRY) ?? "");
+  return isRecord(server) ? textOf(server.version) : undefined;
+}
+
+function parsed(text: string): unknown {
   try {
-    const server = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-    return isRecord(server) ? textOf(server.title) : undefined;
+    return JSON.parse(text) as unknown;
   } catch {
     return undefined;
   }

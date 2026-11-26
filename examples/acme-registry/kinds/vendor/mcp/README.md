@@ -3,8 +3,8 @@
 The JSON Schemas the [`mcp_server`](../../mcp_server.json) kind validates a `server.json` against,
 copied byte for byte from what the [MCP Registry](https://github.com/modelcontextprotocol/registry)
 publishes at each schema's `$id`. Apache-2.0 or MIT, as the registry's `LICENSE` describes for
-its contributions. Nothing here is edited, so
-each file keeps the `$id` its project gave it and is reached by its path here.
+its contributions. Nothing here is edited, so each file keeps the `$id` its project gave it and is
+reached by its path here.
 
 | Schema version | File | Source | sha256 |
 |---|---|---|---|
@@ -24,5 +24,5 @@ result only for keywords whose meaning did not change between the two drafts.
 `$id` included, since a 2020-12 `$id` moves the base a `$ref` resolves against.
 
 To add a schema version, copy the file served at its `$id` into a folder named after the version,
-add a row here, and add the URL to `server.$schema.enum` and an `if`/`then` to `server.allOf` in
-`mcp_server.json`.
+add a row here, and add the URL to `$schema.enum` and an `if`/`then` to `allOf` under
+`$defs.document` in `mcp_server.json`.

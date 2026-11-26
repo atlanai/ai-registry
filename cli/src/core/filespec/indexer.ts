@@ -252,7 +252,7 @@ async function recataloged(root: string, versionsAt: string, row: unknown): Prom
 
 /**
  * Keeps the metadata, `spec` and relationships an author added to an existing `artifact.json`,
- * except an MCP server's `spec`, which only its files give.
+ * except a `spec` lifted from a validated file, which only that file gives.
  */
 async function envelopeOf(
   root: string,
