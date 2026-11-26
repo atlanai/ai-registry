@@ -202,6 +202,10 @@
                     "type": "string"
                   },
                   {
+                    "const": "semantic_model",
+                    "type": "string"
+                  },
+                  {
                     "const": "mcp_server",
                     "type": "string"
                   }

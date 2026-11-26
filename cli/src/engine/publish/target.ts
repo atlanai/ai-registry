@@ -28,7 +28,7 @@ import {
   withheldFrom,
 } from "#core/catalog/withheld.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { kindsOf } from "#core/filespec/kind-manifests.ts";
+import { kindsOf, SPEC_TEXT } from "#core/filespec/kind-manifests.ts";
 import { type OfferTarget, offerFrom } from "#core/filespec/offer.ts";
 import { versionProblems } from "#core/filespec/validate/folders.ts";
 import { posixRelative } from "#core/fs/path.ts";
@@ -566,19 +566,22 @@ function alreadyPublished(
 }
 
 // Only a registry folder lays an agent out as the spec's agent kind does; another source
-// takes it as one `<name>.md`.
+// takes it as one `<name>.md`. A semantic model is the same file wherever it goes, so an edited
+// installed copy is checked before it is sent: an invalid one would stop the registry indexing.
 async function refuseInvalid(
   work: Work,
   namespace: string,
   input: PublishInput,
   folder: boolean,
 ): Promise<void> {
-  if (work.kind !== "skill" && !(work.kind === "agent" && folder)) return;
+  const checked =
+    work.kind === "skill" || work.kind === "semantic_model" || (work.kind === "agent" && folder);
+  if (!checked) return;
   const manifest = (await kindsOf(undefined))[work.kind];
   if (manifest === undefined) return;
   const decoder = new TextDecoder();
-  // Only a Markdown or JSON file can hold the spec, so a binary is never decoded.
-  const texts = input.files.filter((file) => /\.(md|json)$/.test(file.path));
+  // Only a Markdown, JSON or YAML file can hold the spec, so a binary is never decoded.
+  const texts = input.files.filter((file) => SPEC_TEXT.test(file.path));
   const problems = versionProblems(
     manifest,
     work,

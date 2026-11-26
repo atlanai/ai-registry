@@ -1,0 +1,95 @@
+# The definitions the reviewer agent and the pr-review skill use when asked how review is going.
+# Apache Ossie 0.1.1, the released version of the format.
+
+version: "0.1.1"
+
+semantic_model:
+  - name: review_metrics
+    description: Pull request review activity, with the definitions of review time and review load that the engineering dashboards use.
+    ai_context:
+      instructions: "Use this model for questions about pull request review. Review time runs from the first review request to the first review, and excludes draft pull requests."
+
+    datasets:
+      - name: pull_requests
+        source: engineering.public.pull_requests
+        primary_key: [pull_request_id]
+        description: One row per pull request.
+        fields:
+          - name: pull_request_id
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: pull_request_id
+            description: The pull request's identifier.
+          - name: opened_at
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: opened_at
+            description: When the pull request was opened.
+            dimension:
+              is_time: true
+          - name: is_draft
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: is_draft
+            description: Whether the pull request was a draft when review was requested.
+
+      - name: reviews
+        source: engineering.public.reviews
+        primary_key: [review_id]
+        description: One row per submitted review.
+        fields:
+          - name: review_id
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: review_id
+            description: The review's identifier.
+          - name: pull_request_id
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: pull_request_id
+            description: The pull request the review is on.
+          - name: reviewer
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: reviewer
+            description: Who submitted the review.
+          - name: hours_to_first_review
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: hours_to_first_review
+            description: Hours from the first review request to this review, set on a pull request's first review only.
+
+    relationships:
+      - name: reviews_to_pull_requests
+        from: reviews
+        to: pull_requests
+        from_columns: [pull_request_id]
+        to_columns: [pull_request_id]
+
+    metrics:
+      - name: median_review_hours
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: MEDIAN(reviews.hours_to_first_review)
+        description: Median hours from the first review request to the first review.
+        ai_context:
+          synonyms:
+            - "review time"
+            - "time to first review"
+      - name: reviews_per_reviewer
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: COUNT(reviews.review_id) / COUNT(DISTINCT reviews.reviewer)
+        description: Reviews submitted per reviewer.
+        ai_context:
+          synonyms:
+            - "review load"

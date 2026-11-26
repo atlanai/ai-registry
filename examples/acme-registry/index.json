@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": "2026-11-24T11:40:43.090Z",
+  "generated_at": "2026-11-26T18:45:54.201Z",
   "entries": [
     {
       "namespace": "engineering",
@@ -16,14 +16,14 @@
     },
     {
       "namespace": "engineering",
-      "kind": "mcp_server",
-      "name": "issue-tracker",
-      "latest": "1.2.0",
-      "digest": "sha256:d05c43b52f0371b731b417c152a2329267f8f27e7390cc6056750d11c9fdc7a0",
+      "kind": "semantic_model",
+      "name": "review-metrics",
+      "latest": "1.0.0",
+      "digest": "sha256:d1a7bd9a9faef92b1932f9dbcf3408b5fe13c8f77f230ef75953e741a17b7d71",
       "status": "active",
-      "description": "Search, read and update issues in the team's issue tracker.",
-      "catalog_digest": "sha256:2e50c9c61e93a5a22dfe8eea199b46064dffff6b47cba63660f5ad4ac839538a",
-      "updated_at": "2026-11-24T11:40:43.090Z"
+      "description": "Pull request review activity, with the definitions of review time and review load that the engineering dashboards use.",
+      "catalog_digest": "sha256:0607508aad1014f715d96fb9006f8908ff1fb6361e0cd5ac363fc067743a477a",
+      "updated_at": "2026-11-11T15:17:49.846Z"
     },
     {
       "namespace": "engineering",
@@ -36,6 +36,15 @@
       "status": "active",
       "catalog_digest": "sha256:874b8d153ae7723b73bccd6b2cecbca09689d72fa5f1330cd21368c2fbef5b17",
       "updated_at": "2026-09-01T10:12:00Z"
+    },
+    {
+      "namespace": "engineering",
+      "kind": "mcp_server",
+      "name": "issue-tracker",
+      "latest": "1.2.0",
+      "digest": "sha256:37c125eaa95c3c5b54cdc0819e79e981c7298dcf0ab44ceff6be5011d5828e10",
+      "status": "active",
+      "description": "Search, read and update issues in the team's issue tracker."
     }
   ]
 }

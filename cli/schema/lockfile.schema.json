@@ -10,7 +10,7 @@
   ],
   "properties": {
     "version": {
-      "description": "2 when an artifact records config entries, else 1. Any other version is refused rather than guessed at.",
+      "description": "2 when an artifact records config entries or is a semantic model, else 1. Any other version is refused rather than guessed at.",
       "anyOf": [
         {
           "const": 1,
@@ -109,6 +109,10 @@
                 },
                 {
                   "const": "agent",
+                  "type": "string"
+                },
+                {
+                  "const": "semantic_model",
                   "type": "string"
                 },
                 {

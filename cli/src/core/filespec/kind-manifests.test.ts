@@ -1,9 +1,11 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
+import { documentProblems } from "#core/filespec/validate/folders.ts";
 import mcpServer from "#schema/kinds/mcp_server.json" with { type: "json" };
 import { test } from "#test/kit/fixtures.ts";
 import {
+  entryName,
   envelopeSpec,
   fileProblems,
   type KindManifest,
@@ -14,6 +16,7 @@ import {
 import { check } from "./schema.ts";
 
 const text = (body: string) => new TextEncoder().encode(body);
+const OSSIE = join(import.meta.dirname, "..", "..", "..", "test", "fixtures", "ossie");
 
 describe("fileProblems", async () => {
   const { skill, agent } = (await kindsOf(undefined)) as Record<string, KindManifest>;
@@ -210,7 +213,7 @@ describe("an MCP server's spec", () => {
   };
   const readme = text("---\nname: wrong\ndescription: Wrong.\n---\n# Issues\n");
 
-  test("wraps server.json, and never reads the README", () => {
+  test("lifts its name and description from server.json, and never reads the README", () => {
     const files = new Map([
       ["README.md", readme],
       ["server.json", text(JSON.stringify(server))],
@@ -218,7 +221,6 @@ describe("an MCP server's spec", () => {
     expect(envelopeSpec("mcp_server", files, manifests, "issues")).toEqual({
       name: "issues",
       description: "Track issues.",
-      server,
     });
   });
 
@@ -227,7 +229,6 @@ describe("an MCP server's spec", () => {
     expect(envelopeSpec("mcp_server", files, manifests)).toEqual({
       name: "issue-tracker",
       description: "Track issues.",
-      server,
     });
   });
 
@@ -238,21 +239,184 @@ describe("an MCP server's spec", () => {
   });
 });
 
-describe("the bundled mcp_server kind", () => {
-  test("is a kind a registry that lists none still has", async () => {
-    expect(Object.keys(await kindsOf(undefined))).toContain("mcp_server");
+describe("a custom kind whose entry is YAML", () => {
+  const glossary = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: "kinds/glossary.json",
+    title: "glossary",
+    type: "object",
+    properties: {
+      name: { type: "string", pattern: "^[a-z0-9]+(-[a-z0-9]+)*$", maxLength: 64 },
+      description: { type: "string", minLength: 1, maxLength: 1024 },
+      terms: { type: "object" },
+    },
+    required: ["name", "terms"],
+    additionalProperties: false,
+    "x-registry-schema-version": 1,
+    "x-registry-files": {
+      required: [{ path: "glossary.yaml", media_type: "application/yaml" }],
+      optional: [{ glob: "source/**" }],
+    },
+  } as KindManifest;
+  const kinds = { glossary };
+  const document = "name: Flights\ndescription: Flight terms by route.\nterms:\n  - name: leg\n";
+  const parsed = {
+    name: "Flights",
+    description: "Flight terms by route.",
+    terms: [{ name: "leg" }],
+  };
+
+  test("wraps the document under the key its manifest declares, as an agent's card is", () => {
+    const files = new Map([["glossary.yaml", text(document)]]);
+    const spec = envelopeSpec("glossary", files, kinds, "flights");
+    expect(spec).toEqual({ name: "flights", description: "Flight terms by route.", terms: parsed });
+    expect(check(glossary, spec)).toEqual([]);
   });
 
-  test("checks server.json against the vendored schema without a registry", async () => {
-    const manifest = (await kindsOf(undefined)).mcp_server as KindManifest;
-    const server = {
-      $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-      name: "com.example/issue-tracker",
-      description: "Track issues.",
-      version: "1.2.0",
-    };
-    const spec = { name: "issue-tracker", description: "Track issues.", server };
-    expect(check(manifest, spec)).toEqual([]);
-    expect(check(manifest, { ...spec, server: { ...server, name: "no slash" } })).not.toEqual([]);
+  test("names it by the document's own name, made a slug, when no folder names it", () => {
+    const files = new Map([["glossary.yaml", text(document)]]);
+    expect(envelopeSpec("glossary", files, kinds).name).toBe("flights");
+  });
+
+  test("reads the file the manifest names, not a YAML file kept under source/", () => {
+    const files = new Map([
+      ["source/dbt_project.yml", text("name: jaffle_shop\n")],
+      ["glossary.yaml", text(document)],
+    ]);
+    expect(envelopeSpec("glossary", files, kinds, "flights").terms).toEqual(parsed);
+  });
+
+  test("keeps a JSON card as aireg 0.1 published it, so released versions still validate", () => {
+    const legacy = {
+      ...glossary,
+      "x-registry-files": { required: [{ path: "glossary.json" }] },
+    } as KindManifest;
+    const files = new Map([["glossary.json", text(JSON.stringify(parsed))]]);
+    const spec = envelopeSpec("glossary", files, { glossary: legacy }, "flights");
+    expect(spec).toEqual({ name: "Flights", description: "Flight terms by route.", card: parsed });
+  });
+
+  test("has no spec when the YAML does not parse", () => {
+    const files = new Map([["glossary.yaml", text("name: [unclosed\n")]]);
+    expect(envelopeSpec("glossary", files, kinds)).toEqual({});
+  });
+
+  test("stores a lone document under the file its manifest names", () => {
+    expect(entryName(glossary, "flights.yml")).toBe("glossary.yaml");
+    expect(entryName(glossary, "glossary.yaml")).toBe("glossary.yaml");
+    expect(entryName(glossary, "flights.json")).toBe("flights.json");
+    expect(entryName(glossary, "README.md")).toBe("README.md");
+  });
+});
+
+describe("a semantic model", () => {
+  const ossie = async (file: string): Promise<Uint8Array> =>
+    new Uint8Array(await readFile(join(OSSIE, file)));
+  const manifest = async (): Promise<KindManifest> =>
+    (await kindsOf(undefined)).semantic_model as KindManifest;
+  const specFrom = (source: Uint8Array, entry = "semantic_model.yaml") =>
+    envelopeSpec("semantic_model", new Map([[entry, source]]), undefined, "retail");
+  const problemsOf = async (source: Uint8Array, entry = "semantic_model.yaml") =>
+    documentProblems(await manifest(), new Map([[entry, Buffer.from(source).toString("utf8")]]));
+
+  test("is a kind every registry holds, beside skill and agent", async () => {
+    expect(Object.keys(await kindsOf(undefined))).toEqual([
+      "skill",
+      "agent",
+      "semantic_model",
+      "mcp_server",
+    ]);
+  });
+
+  test.for([
+    ["tpcds_semantic_model.yaml", "TPC-DS retail semantic model for sales and customer analytics"],
+    ["flights.semantic_model.yaml", undefined],
+    [
+      "tpcds_semantic_model.v0.1.1.yaml",
+      "TPC-DS retail semantic model for sales and customer analytics",
+    ],
+  ] as const)(
+    "lifts the name and description of Apache Ossie's own example %s and finds it valid",
+    async ([file, description]) => {
+      const spec = specFrom(await ossie(file));
+      expect(spec).toEqual({
+        name: "retail",
+        ...(description === undefined ? {} : { description }),
+      });
+      expect(check(await manifest(), spec)).toEqual([]);
+      expect(await problemsOf(await ossie(file))).toEqual([]);
+    },
+  );
+
+  test("keeps the model only in its file, so the envelope never repeats it", async () => {
+    const model = { version: "0.2.0.dev0", name: "Retail", datasets: [{ name: "s", source: "t" }] };
+    const spec = specFrom(text(JSON.stringify(model)), "semantic_model.json");
+    expect(spec).toEqual({ name: "retail" });
+    expect(check(await manifest(), { ...spec, model })).toEqual([
+      "`model` is not a field this kind takes",
+    ]);
+  });
+
+  test("reads its own file, not a document kept under source/", async () => {
+    const files = new Map([
+      ["source/semantic_models.yml", "semantic_models:\n  - name: orders\n"],
+      [
+        "semantic_model.yaml",
+        "version: 0.2.0.dev0\nname: x\ndescription: Flights.\ndatasets:\n  - name: f\n    source: db.f\n",
+      ],
+    ]);
+    const spec = envelopeSpec(
+      "semantic_model",
+      new Map([...files].map(([path, body]) => [path, text(body)])),
+      undefined,
+      "flights",
+    );
+    expect(spec.description).toBe("Flights.");
+    expect(documentProblems(await manifest(), files)).toEqual([]);
+  });
+
+  test("refuses a file that is not a semantic model, naming the file and the fields", async () => {
+    expect(await problemsOf(await ossie("invalid-flights-ontology.yaml"))).toEqual([
+      "semantic_model.yaml: `datasets` is required",
+      "semantic_model.yaml: `requires` is not a field this kind takes",
+      "semantic_model.yaml: `ontology` is not a field this kind takes",
+      "semantic_model.yaml: `ontology_mappings` is not a field this kind takes",
+    ]);
+  });
+
+  test("refuses a model written to one version's shape that declares the other", async () => {
+    const source = Buffer.from(await ossie("tpcds_semantic_model.v0.1.1.yaml"))
+      .toString("utf8")
+      .replace('version: "0.1.1"', 'version: "0.2.0.dev0"');
+    const problems = await problemsOf(text(source));
+    expect(problems).toContain("semantic_model.yaml: `name` is required");
+    expect(problems).toContain(
+      "semantic_model.yaml: `semantic_model` is not a field this kind takes",
+    );
+  });
+
+  test("refuses a version of Ossie it has no schema for, and a model that declares none", async () => {
+    const dataset = { name: "s", source: "t" };
+    const newer = { version: "0.3.0", name: "Retail", datasets: [dataset] };
+    expect(await problemsOf(text(JSON.stringify(newer)), "semantic_model.json")).toEqual([
+      "semantic_model.json: `version` must be equal to one of the allowed values",
+    ]);
+    const none = { name: "Retail", datasets: [dataset] };
+    expect(await problemsOf(text(JSON.stringify(none)), "semantic_model.json")).toEqual([
+      "semantic_model.json: `version` is required",
+    ]);
+  });
+
+  test("cuts a description past the manifest's limit in spec, and still finds the model valid", async () => {
+    const long = "a".repeat(4001);
+    const model = `version: 0.2.0.dev0\nname: Retail\ndescription: ${long}\ndatasets:\n  - name: s\n    source: t\n`;
+    const spec = specFrom(text(model));
+    expect((spec.description as string).length).toBe(4000);
+    expect(check(await manifest(), spec)).toEqual([]);
+  });
+
+  test("stores a lone model under the kind's file name, whatever it was called", async () => {
+    expect(entryName(await manifest(), "retail.yml")).toBe("semantic_model.yaml");
+    expect(entryName(await manifest(), "retail.json")).toBe("semantic_model.json");
   });
 });

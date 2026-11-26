@@ -16,7 +16,8 @@ themselves and [file-spec.md](../file-spec.md) are the contract.
 | [relationship.schema.json](relationship.schema.json) | one `relationships[]` edge | §3.4, §4.3, §6 |
 | [host.schema.json](host.schema.json) | the host document at `/.well-known/registry.json` | §8 |
 | [kind-manifest.schema.json](kind-manifest.schema.json) | what `kinds[].manifest_url` points at | §3.1 |
-| [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json), [kinds/mcp_server.json](kinds/mcp_server.json) | the `spec` of those kinds | §3.4 |
+| [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json), [kinds/semantic_model.json](kinds/semantic_model.json), [kinds/mcp_server.json](kinds/mcp_server.json) | the `spec` of those kinds | §3.4 |
+| [kinds/vendor/ossie/](kinds/vendor/ossie/README.md) | Apache Ossie's own schemas, unchanged, which `kinds/semantic_model.json` refers to | §3.4 |
 | [kinds/vendor/mcp/](kinds/vendor/mcp/README.md) | the MCP Registry's `server.json` schemas, unchanged, which `kinds/mcp_server.json` refers to | §3.4 |
 | [common.schema.json](common.schema.json) | shared `$defs`; never instantiated | §2.1, §4 |
 
@@ -69,8 +70,13 @@ schema a registry serves on its own, where `$ref` beside another keyword is stri
 draft-07 intends. `format` is an annotation in
 the CLI. Validation does not coerce values, insert defaults or remove fields.
 
-For built-in kinds, extraction reads only `SKILL.md`, `AGENT.md` or `agent-card.json`. An agent
-must carry exactly one of its two entry files. Optional file patterns are non-exhaustive
+For built-in kinds, extraction reads only `SKILL.md`, `AGENT.md`, `agent-card.json`,
+`semantic_model.yaml` or `semantic_model.json`. An agent must carry exactly one of its two entry
+files, and so must a semantic model. A file rule's `schema` is checked against that file, parsed
+as JSON or YAML, with references resolved against the manifest. The semantic model's rules point
+at its `$defs.document`, which refers to the Apache Ossie schemas under `kinds/vendor/ossie/`. A registry that
+serves its own `kinds/semantic_model.json` serves those schemas beside it; aireg bundles both for
+a registry that lists no kinds. Optional file patterns are non-exhaustive
 conventions; other supporting files are permitted and never replace the native entry.
 
 The CLI enforces exact required file paths and the complete alternatives declared by `one_of`.
@@ -94,5 +100,6 @@ python3 tools/check_schemas.py
 
 Structural checks need only the standard library. Instance validation, over every example
 registry under `examples/`, additionally needs
-`jsonschema` (`python3 -m pip install -r tools/requirements.txt`); without it that tier reports
+`jsonschema`, and `PyYAML` for the native files a file rule's `schema` covers
+(`python3 -m pip install -r tools/requirements.txt`); without them that tier reports
 itself skipped rather than failing.

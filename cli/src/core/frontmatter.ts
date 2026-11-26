@@ -15,7 +15,7 @@ export interface Frontmatter {
 const FENCE = /^---\r?\n([\s\S]*?)\r?\n---\r?(?:\n|$)/;
 
 /** Section 3.4's limit. An envelope keeps the whole description; a reader shortens it to print. */
-const DESCRIPTION_LIMIT = 4000;
+export const DESCRIPTION_LIMIT = 4000;
 
 /** A description as an envelope records it: one line, escapes removed, at most the spec's limit. */
 export function descriptionText(text: string): string {

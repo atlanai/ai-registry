@@ -329,7 +329,7 @@ describe("schema versions", () => {
       outcome: "changed",
     });
     expect(store.events("run_1").at(-1)?.kind).toBe("mcp_server");
-    expect(RUN_SCHEMA_VERSION).toBe(2);
+    expect(RUN_SCHEMA_VERSION).toBe(3);
   });
 
   test("creates only the tables it drops, so an adapter owns its own", () => {

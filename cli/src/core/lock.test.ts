@@ -68,6 +68,16 @@ describe("formatLock", () => {
     expect(text.indexOf("lint:")).toBeLessThan(text.indexOf("review:"));
   });
 
+  test("is version 2 with a semantic model, so an older aireg says to update", () => {
+    const withModel = lock();
+    expect(formatLock(withModel)).toContain("version: 1\n");
+    const review = withModel.artifacts.review as LockArtifact;
+    withModel.artifacts.review = { ...review, kind: "semantic_model" };
+    const text = formatLock(withModel);
+    expect(text).toContain("version: 2\n");
+    expect(parseLock(text).artifacts.review?.kind).toBe("semantic_model");
+  });
+
   test("carries no timestamp, so concurrent branches merge cleanly", () => {
     expect(formatLock(lock())).not.toMatch(/generated_?at|timestamp|\d{4}-\d{2}-\d{2}T/i);
   });

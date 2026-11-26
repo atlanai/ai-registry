@@ -216,7 +216,7 @@ describe("indexRoot", () => {
     await indexRoot(root, "2026-10-08T00:00:00Z");
 
     const envelope = JSON.parse(await readFile(join(server, "1.3.0", "artifact.json"), "utf8"));
-    expect(envelope.spec.server.description).toBe("Search and close issues.");
+    expect(envelope.spec.description).toBe("Search and close issues.");
     expect(envelope.metadata.description).toBe("Search and close issues.");
   });
 
@@ -245,7 +245,10 @@ describe("indexRoot", () => {
 
     const envelope = JSON.parse(await readFile(join(version, "artifact.json"), "utf8"));
     expect(envelope.metadata.display_name).toBe("Issue tracker");
-    expect(envelope.spec.server.name).toBe("com.example/issue-tracker");
+    expect(envelope.spec).toEqual({
+      name: "issue-tracker",
+      description: "Search, read and update issues in the team's issue tracker.",
+    });
   });
 
   test("drops the row of an artifact whose folder was deleted", async () => {
@@ -254,10 +257,8 @@ describe("indexRoot", () => {
     await indexRoot(root, "2026-10-08T00:00:00Z");
 
     const index = JSON.parse(await readFile(join(root, "index.json"), "utf8"));
-    expect(index.entries.map((entry: { name: string }) => entry.name)).toEqual([
-      "issue-tracker",
-      "pr-review",
-    ]);
+    const names = index.entries.map((entry: { name: string }) => entry.name).sort();
+    expect(names).toEqual(["issue-tracker", "pr-review", "review-metrics"]);
     expect(index.generated_at).toBe("2026-10-08T00:00:00Z");
   });
 });

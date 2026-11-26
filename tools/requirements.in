@@ -1,2 +1,3 @@
-# The schema validator for tools/check_schemas.py. tools/requirements.txt locks it; see its header to regenerate.
+# The schema validator for tools/check_schemas.py, and the YAML parser for the native files it checks. tools/requirements.txt locks them; see its header to regenerate.
 jsonschema==4.26.0
+pyyaml==6.0.3

@@ -12,9 +12,12 @@ artifacts/engineering/agent/reviewer/versions.json
 artifacts/engineering/agent/reviewer/0.3.0/          depends_on engineering/skill/pr-review@1.2.0
 artifacts/engineering/mcp_server/issue-tracker/versions.json
 artifacts/engineering/mcp_server/issue-tracker/1.2.0/ the publisher's server.json, unchanged
+artifacts/engineering/semantic_model/review-metrics/versions.json
+artifacts/engineering/semantic_model/review-metrics/1.0.0/   semantic_model.yaml, an Apache Ossie 0.1.1 model
 blobs/sha256/28eb…fc0c                               the rubric bytes
-kinds/skill.json, kinds/agent.json, kinds/mcp_server.json
+kinds/skill.json, kinds/agent.json, kinds/semantic_model.json, kinds/mcp_server.json
                                                      the manifests registry.json advertises
+kinds/vendor/ossie/                                  Apache Ossie's schemas, which kinds/semantic_model.json refers to
 kinds/vendor/mcp/                                    the MCP Registry's server.json schema, which kinds/mcp_server.json refers to
 ```
 
@@ -32,6 +35,8 @@ A client resolving `engineering/skill/pr-review`:
 
 The agent's envelope names the skill in `relationships[]`, so installing the agent pulls the skill the same way.
 
+The semantic model resolves the same way and ends at one file, `semantic_model.yaml`. Its envelope carries only the model's name and description, so a reader that wants the metric definitions fetches the file.
+
 ## Checking it
 
 ```
@@ -40,4 +45,4 @@ python3 tools/check.py examples/acme-registry
 
 recomputes every digest and checks that `index.json` and every `versions.json` agree with the version directories. In a repository root those two documents are written by the indexer, `aireg registry index`; the one hand edit they take is a status change in `versions.json` ([file spec](../../spec/file-spec.md) section 9). `python3 tools/check_schemas.py` additionally validates every document here against [`spec/schemas/`](../../spec/schemas/README.md).
 
-`kinds/` holds the manifests this root advertises in `registry.json`, so `manifest_url` resolves inside the root and the directory stays self-contained. They are copies of `spec/schemas/kinds/`, and `tools/check.py` fails if the bytes drift apart.
+`kinds/` holds the manifests this root advertises in `registry.json`, so `manifest_url` resolves inside the root and the directory stays self-contained. They are copies of `spec/schemas/kinds/`, and `tools/check.py` fails if the bytes drift apart. `kinds/vendor/ossie/` is copied with them, because `kinds/semantic_model.json` validates a model against the Ossie schema for the version it declares and a root serves every schema its manifests refer to.

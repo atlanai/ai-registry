@@ -35,10 +35,12 @@ describe("an MCP server in a registry that lists the kind", () => {
     });
     const index = await aireg(["registry", "index"], { cwd: root });
     expect(index.code).not.toBe(0);
-    expect(index.stderr).toContain("`server.name` is still TODO");
+    expect(index.stderr).toContain("server.json: `name` is still TODO");
   });
 
-  test("indexes it once filled in, and bumps it without editing server.json", async ({ aireg }) => {
+  test("indexes it once filled in, and bumps it only with server.json's version", async ({
+    aireg,
+  }) => {
     const server = await json(folder("0.1.0", "server.json"));
     const filled = { ...server, name: "com.example/weather", description: "Forecasts." };
     filled.remotes = [{ type: "streamable-http", url: "https://weather.example.com/mcp" }];
@@ -47,15 +49,19 @@ describe("an MCP server in a registry that lists the kind", () => {
 
     const bump = ["mcp", "bump", "weather", "minor", "--namespace", "engineering"];
     expect((await aireg(bump, { cwd: root })).code).toBe(0);
+    const stale = await aireg(["registry", "validate"], { cwd: root });
+    expect(stale.code).not.toBe(0);
+    expect(stale.stderr + stale.stdout).toContain(
+      "server.json is version 0.1.0 but sits in 0.2.0/",
+    );
+
+    const bumped = { ...filled, version: "0.2.0" };
+    await writeFile(folder("0.2.0", "server.json"), `${JSON.stringify(bumped, undefined, 2)}\n`);
     expect((await aireg(["registry", "index"], { cwd: root })).code).toBe(0);
     expect((await aireg(["registry", "validate"], { cwd: root })).code).toBe(0);
-
-    expect(await readFile(folder("0.2.0", "server.json"))).toEqual(
-      await readFile(folder("0.1.0", "server.json")),
-    );
     const envelope = await json(folder("0.2.0", "artifact.json"));
     expect(envelope.metadata.version).toBe("0.2.0");
-    expect(envelope.spec).toEqual({ name: "weather", description: "Forecasts.", server: filled });
+    expect(envelope.spec).toEqual({ name: "weather", description: "Forecasts." });
   });
 });
 
@@ -70,6 +76,8 @@ describe("an MCP server's catalog entry and import", () => {
   }) => {
     const bump = ["mcp", "bump", "issue-tracker", "minor", "--namespace", "engineering"];
     expect((await aireg(bump, { cwd: root })).code).toBe(0);
+    const server = JSON.parse(await readFile(next("server.json"), "utf8"));
+    await writeFile(next("server.json"), JSON.stringify({ ...server, version: "1.3.0" }));
     await writeFile(next("README.md"), "---\nname: other\ndescription: From Markdown.\n---\n");
     expect((await aireg(["registry", "index"], { cwd: root })).code).toBe(0);
 
@@ -97,6 +105,7 @@ describe("an MCP server's catalog entry and import", () => {
     const args = ["mcp", "new", "--from", source, "--name", "imported", "-y"];
     expect((await aireg(args, { cwd: engineering })).code).toBe(0);
 
+    // The server is 1.2.0, so the artifact starts there.
     const copied = join(engineering, "mcp_server", "imported", "1.2.0", "README.md");
     expect(await readFile(copied, "utf8")).toBe(readme);
   });
@@ -114,7 +123,7 @@ describe("an MCP server's catalog entry and import", () => {
     const result = await aireg(["mcp", "new", "--from", source, "-y"], { cwd: engineering });
 
     expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain("`server.name`");
+    expect(result.stderr).toContain('server.json: `name` "issues" does not match');
   });
 
   test("refuses to import a folder without server.json, without asking for front matter", async ({

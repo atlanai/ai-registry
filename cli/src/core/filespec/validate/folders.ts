@@ -1,4 +1,6 @@
 import { join, posix } from "node:path";
+import { isDeepStrictEqual } from "node:util";
+import { messageOf } from "#adapter/errors.ts";
 import { isRecord } from "#adapter/fields.ts";
 import { hashRegular } from "#adapter/files.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
@@ -9,12 +11,18 @@ import { contentDigest, type Envelope } from "#adapter/index.ts";
 import { MCP_SERVER_ENTRY } from "#adapter/kinds.ts";
 import { collidingPaths, isSafePath } from "#adapter/paths.ts";
 import { compareVersion, parseVersion } from "#adapter/semver.ts";
+import { isVersion } from "#adapter/spec/ref.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { listed, type versionFolders } from "#core/filespec/indexer.ts";
 import {
   fileProblems,
   type KindManifest,
   type kindsOf,
+  listedModelsProblem,
+  parseDocument,
+  SPEC_TEXT,
+  schemaFiles,
+  serverVersion,
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
@@ -28,33 +36,80 @@ const PLACEHOLDER = "TODO";
 /** The files its kind needs, fields, placeholders and name; `publish` asks before sending. */
 export function versionProblems(
   manifest: KindManifest,
-  at: { kind: string; name: string },
+  at: { kind: string; name: string; version?: string },
   present: ReadonlySet<string>,
   contents: ReadonlyMap<string, string>,
 ): string[] {
   const problems = fileProblems(manifest, present);
-  const server = manifest.title === "mcp_server";
+  const documents = documentProblems(manifest, contents);
+  problems.push(...documents);
   const spec = specOf(manifest, contents, at.name);
   if (spec === undefined) {
     // fileProblems already reports a missing server.json.
-    if (server && !present.has(MCP_SERVER_ENTRY)) return problems;
+    const missing = manifest.title === "mcp_server" && !present.has(MCP_SERVER_ENTRY);
+    if (documents.length > 0 || missing) return problems;
     const why =
       specParseProblem(manifest, contents) ?? "has no front matter to read its fields from";
     return [...problems, why];
   }
-  problems.push(...check(manifest, spec));
-  // An MCP server's `description` is a copy of `server.description`, which is reported instead.
-  const own = server ? { ...spec, description: undefined } : spec;
-  for (const field of placeholders(own)) problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
+  problems.push(...check(manifest, spec), ...fractionProblems(spec));
+  // A spec lifted from a validated file copies its fields, so the file's placeholders are reported instead.
+  const lifted = schemaFiles(manifest).length > 0;
+  for (const field of lifted ? [] : placeholders(spec))
+    problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
   if (typeof spec.name === "string" && spec.name !== at.name) {
     problems.push(`is named ${quoted(spec.name)} in its front matter but sits in ${at.name}/`);
+  }
+  // Section 3.4: an MCP server with a semantic version is published at that version.
+  const own = serverVersion(manifest, contents);
+  if (at.version !== undefined && own !== undefined && isVersion(own) && own !== at.version) {
+    problems.push(`${MCP_SERVER_ENTRY} is version ${own} but sits in ${at.version}/`);
   }
   return problems;
 }
 
+/**
+ * Section 4.2: an envelope holds whole numbers only, so that every canonicalizer agrees on its
+ * digest. Said here with the field, where the indexer could only refuse the whole envelope.
+ */
+export function fractionProblems(value: unknown, at = ""): string[] {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value)
+      ? []
+      : [`\`${at}\` is ${value}, and an envelope takes whole numbers only: write it as a string`];
+  }
+  if (!isRecord(value) && !Array.isArray(value)) return [];
+  return Object.entries(value).flatMap(([key, item]) =>
+    fractionProblems(item, at === "" ? key : `${at}.${key}`),
+  );
+}
+
+/** Each file its manifest gives a `schema`, parsed and checked against it, named in every problem. */
+export function documentProblems(
+  manifest: KindManifest,
+  files: ReadonlyMap<string, string>,
+): string[] {
+  return schemaFiles(manifest).flatMap(({ path, schema }) => {
+    const text = files.get(path);
+    if (text === undefined) return [];
+    let document: unknown;
+    try {
+      document = parseDocument(path, text);
+    } catch (error) {
+      return [`${path} does not parse: ${messageOf(error)}`];
+    }
+    const listed = listedModelsProblem(manifest, document);
+    const problems = listed === undefined ? check(schema, document, "the document") : [listed];
+    for (const field of placeholders(document))
+      problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
+    return problems.map((problem) => `${path}: ${problem}`);
+  });
+}
+
 function placeholders(value: unknown, at = ""): string[] {
   if (value === PLACEHOLDER) return [at];
-  if (!isRecord(value)) return [];
+  // A kind's document, such as a semantic model, holds its fields in lists too.
+  if (!isRecord(value) && !Array.isArray(value)) return [];
   return Object.entries(value).flatMap(([key, item]) =>
     placeholders(item, at === "" ? key : `${at}.${key}`),
   );
@@ -104,12 +159,13 @@ export async function folderProblems(
   const present = new Set(records.map((record) => record.path));
   const contents = new Map<string, string>();
   for (const path of present) {
-    if (/\.(md|json)$/.test(path))
-      contents.set(path, (await textAt(root, `${where}/${path}`)) ?? "");
+    if (SPEC_TEXT.test(path)) contents.set(path, (await textAt(root, `${where}/${path}`)) ?? "");
   }
   for (const message of versionProblems(manifest, folder, present, contents)) {
     problems.push({ path: where, message });
   }
+  const copy = await liftedDrift(root, where, manifest, contents, folder.name);
+  if (copy !== undefined) problems.push({ path: `${where}/${ENVELOPE}`, message: copy });
   for (const to of await dependsOn(root, where)) {
     if (!held.has(to)) {
       problems.push({
@@ -151,6 +207,25 @@ export async function folderProblems(
     });
   }
   return { problems, stale: false };
+}
+
+/**
+ * A spec lifted from a validated file must say what the file says, or a client reading the
+ * envelope would see something other than what was checked.
+ */
+async function liftedDrift(
+  root: string,
+  where: string,
+  manifest: KindManifest,
+  contents: ReadonlyMap<string, string>,
+  name: string,
+): Promise<string | undefined> {
+  if (schemaFiles(manifest).length === 0) return undefined;
+  const envelope = await readJson(rootReader(root), `${where}/${ENVELOPE}`).catch(() => undefined);
+  if (!isRecord(envelope) || envelope.spec === undefined) return undefined;
+  const expected = specOf(manifest, contents, name);
+  if (expected === undefined || isDeepStrictEqual(envelope.spec, expected)) return undefined;
+  return "has a `spec` that its files do not give; run `aireg registry index` to write it again";
 }
 
 type Folder = Awaited<ReturnType<typeof versionFolders>>[number];

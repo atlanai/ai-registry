@@ -203,7 +203,7 @@ export const Lockfile = Type.Object(
   {
     version: Type.Union([Type.Literal(1), Type.Literal(LOCK_VERSION)], {
       description:
-        "2 when an artifact records config entries, else 1. Any other version is refused rather than guessed at.",
+        "2 when an artifact records config entries or is a semantic model, else 1. Any other version is refused rather than guessed at.",
     }),
     registries: Type.Optional(Type.Record(Type.String(), Registry)),
     artifacts: Type.Optional(Type.Record(Type.String(), Artifact)),

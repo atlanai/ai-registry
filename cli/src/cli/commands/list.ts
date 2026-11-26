@@ -10,6 +10,7 @@ import {
   watchedFrom,
 } from "#cli/render/installed.ts";
 import { chosenFor, loadedBy, scopeTargets, toolName } from "#cli/render/tools.ts";
+import { isStoreOnly } from "#core/kinds.ts";
 import type { Lock, LockArtifact, LockRegistry } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { artifactPath, copyLeaf, type Roots, scopeName } from "#core/store/paths.ts";
@@ -97,6 +98,10 @@ export const { run } = defineCommand({
           header: "targets",
           value: (row: Installed) => {
             if (row.targets.length > 0) return printer.style.dim(tools(row));
+            // No coding agent has a folder for this kind: say where its copy is instead.
+            const entry = lock.artifacts[row.name];
+            if (entry !== undefined && isStoreOnly(entry.kind))
+              return printer.style.dim(entry.path);
             if (row.watched === undefined) return printer.style.dim("in no target");
             return printer.style.dim(`${toolName(targetTable, row.watched.target)} (watched)`);
           },
