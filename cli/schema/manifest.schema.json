@@ -135,7 +135,7 @@
       }
     },
     "artifacts": {
-      "description": "A string reference, or `{ ref, as, exclude, targets, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
+      "description": "A string reference, or `{ ref, as, exclude, targets, copy, trust, with, env, tools }` to rename it, leave members out, narrow where it lands, copy it rather than link it, trust a plugin it brings, or configure an MCP server.",
       "type": "array",
       "items": {
         "anyOf": [
@@ -212,6 +212,56 @@
                 "items": {
                   "minLength": 1,
                   "type": "string"
+                }
+              },
+              "with": {
+                "description": "An MCP server's input values, by input name. Never a secret.",
+                "type": "object",
+                "patternProperties": {
+                  "^(.*)$": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "env": {
+                "description": "An MCP server's secrets read from other environment variables: `SECRET_NAME: OTHER_VARIABLE`.",
+                "type": "object",
+                "patternProperties": {
+                  "^[A-Za-z_][A-Za-z0-9_]*$": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "type": "string"
+                  }
+                }
+              },
+              "tools": {
+                "additionalProperties": false,
+                "description": "An MCP server's tools a target may call.",
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }

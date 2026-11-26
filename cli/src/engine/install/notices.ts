@@ -38,9 +38,13 @@ export function appliedNotices(
     });
   }
   for (const kept of applied.kept) notices.push({ message: keptNotice(roots, kept) });
-  for (const { name, target, reason } of applied.unrendered) {
+  for (const { name, target, reason, shared } of applied.unrendered) {
+    const why =
+      shared === undefined
+        ? reason
+        : `${shared.file} is shared with ${displayName(targetTable, shared.with)}, which ${reason}`;
     notices.push({
-      message: `Did not install ${name} for ${displayName(targetTable, target)}: ${reason}.`,
+      message: `Did not install ${name} for ${displayName(targetTable, target)}: ${why}.`,
     });
   }
   return notices;

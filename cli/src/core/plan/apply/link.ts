@@ -39,6 +39,8 @@ export async function preflight(
   // Each folder is checked once here; every write checks its own path again as it happens.
   const checked = new Set<string>();
   for (const action of plan.actions) {
+    // A config entry is guarded where it is written, since its file is the target's, not ours.
+    if (action.kind === "configure" || action.kind === "unconfigure") continue;
     if (action.kind !== "record")
       await assertManagedPath(action.to, roots, {
         leaf: action.kind !== "unlink",

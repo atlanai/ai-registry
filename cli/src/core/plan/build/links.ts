@@ -70,6 +70,7 @@ export function placeLinks(
     claimed.blocked.length === 0 &&
     !refused &&
     !yours &&
+    !configured(item, build) &&
     !isStoreOnly(item.kind)
   ) {
     const other = build.options.roots.scope === "project" ? "user" : "project";
@@ -255,4 +256,11 @@ function noteRenamed(
     name: item.name,
     message: `The namespace ${quoted(link.renamed.namespace)} is also published by another registry, so ${link.target} loads the one from ${item.source} as ${quoted(link.renamed.name)}.`,
   });
+}
+
+/** A kind a selected target writes into its config is installed there, not placed. */
+function configured(item: Selected, build: BuildState): boolean {
+  return build.options.targets.some(
+    (name) => build.options.targetTable[name]?.kinds[item.kind]?.shape === "config",
+  );
 }

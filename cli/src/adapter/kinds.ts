@@ -1,5 +1,5 @@
 /** A kind with no file-spec schema cannot be published or verified, so it is not one. */
-export const KINDS = ["plugin", "skill", "agent", "semantic_model"] as const;
+export const KINDS = ["plugin", "skill", "agent", "semantic_model", "mcp_server"] as const;
 
 export type ArtifactKind = (typeof KINDS)[number];
 

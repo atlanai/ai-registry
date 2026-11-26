@@ -82,8 +82,8 @@ describe("aireg ui", () => {
         state: "available",
       });
       expect(state?.registries).toEqual([
-        // The example registry's skill, agent and semantic model.
-        expect.objectContaining({ name: "acme", count: 3, installed: 1 }),
+        // The example registry's skill, agent, semantic model and MCP server.
+        expect.objectContaining({ name: "acme", count: 4, installed: 1 }),
       ]);
       // No row says where it is on disk beyond what a person reads under `~`.
       expect(JSON.stringify(state)).not.toContain(home.dir);

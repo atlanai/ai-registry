@@ -2,8 +2,10 @@ import { quoted } from "#adapter/text.ts";
 import { NAMESPACE } from "#cli/options/flags.ts";
 import type { CommandContribution, OptionSpec } from "#core/host/extend.ts";
 import { contributedCommands } from "#core/host/load.ts";
+import { aKind, kindCommand } from "#core/kinds.ts";
 import type { Printer } from "#core/term/printer.ts";
 import {
+  BUILTIN_NAMES,
   BUILTIN_SPECS,
   type Hidden,
   hiddenKind,
@@ -76,10 +78,13 @@ async function table(cwd: string): Promise<{ commands: Command[]; hidden: Hidden
       hint: `Rename the command in its adapter, since ${PRECEDENCE}`,
     });
   }
-  const taken = new Set([...RESERVED, ...commands.flatMap((c) => [c.name, ...(c.aliases ?? [])])]);
-  for (const kind of await kindCommands(cwd)) {
-    if (taken.has(kind.name)) hidden.push(hiddenKind(kind.name));
-    else commands.push(kind);
+  const taken = new Set([
+    ...BUILTIN_NAMES,
+    ...commands.flatMap((c) => [c.name, ...(c.aliases ?? [])]),
+  ]);
+  for (const { kind, command } of await kindCommands(cwd)) {
+    if (RESERVED.has(kind) || taken.has(command.name)) hidden.push(hiddenKind(kind));
+    else commands.push(command);
   }
   return { commands, hidden };
 }
@@ -134,20 +139,20 @@ const KIND_NEW: readonly OptionSpec[] = [
 ];
 
 /** A kind the registry here holds is a command of its own: `aireg agent new triage`. */
-async function kindCommands(cwd: string): Promise<Command[]> {
+async function kindCommands(cwd: string): Promise<{ kind: string; command: Command }[]> {
   const { findRegistry } = await import("#core/filespec/init.ts");
   const { kindsOf } = await import("#core/filespec/kind-manifests.ts");
-  return Object.entries(await kindsOf(findRegistry(cwd))).map(([name, manifest]) => {
-    const a = /^[aeiou]/.test(name) ? "an" : "a";
+  return Object.entries(await kindsOf(findRegistry(cwd))).map(([kind, manifest]) => {
+    const name = kindCommand(kind);
     const spec: Command = {
       name,
-      summary: `Create ${a} ${name}, or start its next version`,
+      summary: `Create ${aKind(kind)}, or start its next version`,
       group: "Share",
       usage: [`aireg ${name} <action> [options]`],
       examples: [
         {
           command: `aireg ${name} new pr-review --namespace engineering`,
-          what: `a new ${name}`,
+          what: `a new ${kind}`,
         },
         { command: `aireg ${name} bump pr-review minor`, what: "start its next minor version" },
       ],
@@ -155,7 +160,7 @@ async function kindCommands(cwd: string): Promise<Command[]> {
       actions: [
         {
           name: "new",
-          summary: `Create ${a} ${name}`,
+          summary: `Create ${aKind(kind)}`,
           usage: [
             `aireg ${name} new [<name>] [options]`,
             `aireg ${name} new --from <path>... [options]`,
@@ -164,7 +169,7 @@ async function kindCommands(cwd: string): Promise<Command[]> {
         },
         {
           name: "bump",
-          summary: `Start the next version of ${a} ${name}`,
+          summary: `Start the next version of ${aKind(kind)}`,
           usage: [`aireg ${name} bump <name> [patch | minor | major | <version>] [options]`],
           maxArguments: 2,
           options: [NAMESPACE],
@@ -172,10 +177,10 @@ async function kindCommands(cwd: string): Promise<Command[]> {
       ],
       load: async () => {
         const { runKind } = await import("./kind.ts");
-        return { run: (context) => runKind(spec, manifest, context) };
+        return { run: (context) => runKind(spec, kind, manifest, context) };
       },
     };
-    return spec;
+    return { kind, command: spec };
   });
 }
 

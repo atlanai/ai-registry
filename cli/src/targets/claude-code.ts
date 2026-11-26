@@ -19,8 +19,25 @@ export const claudeCode = defineTarget({
     },
     skill: { shape: "directory", subdir: "skills" },
     agent: { shape: "file", subdir: "agents", extension: ".md" },
+    // A project's servers live in `.mcp.json` at its root, which expands `${VAR}` when it starts one.
+    mcp_server: {
+      shape: "config",
+      scope: "project",
+      anchor: "project",
+      file: ".mcp.json",
+      format: "json",
+      at: ["mcpServers", "{name}"],
+      codec: {
+        id: "mcp-json",
+        secret: { prefix: "${", suffix: "}" },
+        type: { stdio: "stdio", "streamable-http": "http", sse: "sse" },
+      },
+      transports: ["stdio", "streamable-http", "sse"],
+      // `permissions.allow` approves a tool rather than limiting the server, so only a deny applies.
+      deny: { file: "settings.json", at: ["permissions", "deny"], item: "mcp__{name}__{tool}" },
+    },
   },
   // A project's plugins load only once Claude Code trusts the project; skills and agents need no step.
   trust: { plugin: { run: "claude", scope: "project" } },
-  verified: { command: ["claude", "--version"], range: "2.1.296" },
+  verified: { command: ["claude", "--version"], range: "2.1.296 || 2.1.332" },
 });

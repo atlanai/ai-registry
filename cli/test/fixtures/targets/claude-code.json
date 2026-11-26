@@ -12,8 +12,23 @@
       "manifest": [{ "path": ".claude-plugin/plugin.json" }]
     },
     "skill": { "shape": "directory", "subdir": "skills" },
-    "agent": { "shape": "file", "subdir": "agents", "extension": ".md" }
+    "agent": { "shape": "file", "subdir": "agents", "extension": ".md" },
+    "mcp_server": {
+      "shape": "config",
+      "scope": "project",
+      "anchor": "project",
+      "file": ".mcp.json",
+      "format": "json",
+      "at": ["mcpServers", "{name}"],
+      "codec": {
+        "id": "mcp-json",
+        "secret": { "prefix": "${", "suffix": "}" },
+        "type": { "stdio": "stdio", "streamable-http": "http", "sse": "sse" }
+      },
+      "transports": ["stdio", "streamable-http", "sse"],
+      "deny": { "file": "settings.json", "at": ["permissions", "deny"], "item": "mcp__{name}__{tool}" }
+    }
   },
   "trust": { "plugin": { "run": "claude", "scope": "project" } },
-  "verified": { "command": ["claude", "--version"], "range": "2.1.296" }
+  "verified": { "command": ["claude", "--version"], "range": "2.1.296 || 2.1.332" }
 }

@@ -1,0 +1,350 @@
+import { existsSync } from "node:fs";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { expect } from "vitest";
+import { fileTest as test } from "#test/kit/fixtures.ts";
+
+const ACME = join(import.meta.dirname, "..", "..", "..", "examples", "acme-registry");
+
+test("installs an MCP server into Claude Code's .mcp.json, sees an edit, and removes it", async ({
+  aireg,
+  git,
+  project,
+  tmp,
+}) => {
+  const registry = join(tmp, "acme");
+  await cp(ACME, registry, { recursive: true });
+  await git.init(project);
+  await mkdir(join(project, ".registry"));
+  await writeFile(
+    join(project, ".registry", "manifest.yml"),
+    [
+      "targets: [claude-code]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "",
+    ].join("\n"),
+  );
+  const mcp = join(project, ".mcp.json");
+  await writeFile(mcp, JSON.stringify({ mcpServers: { mine: { command: "mine" } } }));
+
+  const installed = await aireg(["install", "-y"], { cwd: project });
+  expect(installed.code).toBe(0);
+  expect(installed.stdout).toContain("Installed issue-tracker for Claude Code.");
+  expect(installed.stderr).not.toContain("installed into no target");
+  const written = JSON.parse(await readFile(mcp, "utf8"));
+  expect(written.mcpServers).toEqual({
+    mine: { command: "mine" },
+    "issue-tracker": {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@example/issue-tracker-mcp@1.2.0"],
+      env: { ISSUES_URL: "https://issues.example.test", ISSUES_TOKEN: `\${ISSUES_TOKEN}` },
+    },
+  });
+  const lock = await readFile(join(project, ".registry", "manifest.lock.yml"), "utf8");
+  expect(lock).toContain("version: 2\n");
+  expect(lock).toContain("file: .mcp.json");
+
+  written.mcpServers["issue-tracker"].args.push("--verbose");
+  await writeFile(mcp, JSON.stringify(written));
+  const status = await aireg(["status"], { cwd: project });
+  expect(status.code).not.toBe(0);
+  expect(status.stdout).toContain("its entry in .mcp.json was edited after installation");
+
+  written.mcpServers["issue-tracker"].args.pop();
+  await writeFile(mcp, JSON.stringify(written));
+  expect((await aireg(["remove", "issue-tracker", "-y"], { cwd: project })).code).toBe(0);
+  expect(JSON.parse(await readFile(mcp, "utf8"))).toEqual({
+    mcpServers: { mine: { command: "mine" } },
+  });
+  expect(existsSync(join(project, ".claude"))).toBe(false);
+});
+
+test("shows how an MCP server starts, and what it reads", async ({ aireg, tmp }) => {
+  const registry = join(tmp, "shown");
+  await cp(ACME, registry, { recursive: true });
+  const shown = await aireg(["show", "engineering/issue-tracker", "--registry", registry]);
+  expect(shown.code).toBe(0);
+  expect(shown.stdout).toContain(
+    "runs   ISSUES_URL='<ISSUES_URL>' ISSUES_TOKEN=\"$ISSUES_TOKEN\" npx -y @example/issue-tracker-mcp@1.2.0",
+  );
+  expect(shown.stdout).toContain(
+    "runs   https://<tenant>.issues.example.com/mcp (streamable-http)",
+  );
+  expect(shown.stdout).toContain("reads  ISSUES_TOKEN, TOKEN");
+  const json = JSON.parse(
+    (await aireg(["show", "engineering/issue-tracker", "--registry", registry, "--json"])).stdout,
+  );
+  expect(json.data.server.reads).toEqual(["ISSUES_TOKEN", "TOKEN"]);
+});
+
+test("installs an MCP server, even one named, only once a person agrees to how it starts", async ({
+  aireg,
+  git,
+  tmp,
+}) => {
+  const project = join(tmp, "namespace");
+  const registry = join(tmp, "namespace-acme");
+  await cp(ACME, registry, { recursive: true });
+  await mkdir(join(project, ".registry"), { recursive: true });
+  await git.init(project);
+  await writeFile(
+    join(project, ".registry", "manifest.yml"),
+    [
+      "targets: [claude-code]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "",
+    ].join("\n"),
+  );
+  for (const args of [["add", "acme/engineering/issue-tracker"], ["install"]]) {
+    const refused = await aireg(args, { cwd: project });
+    expect(refused.code, args.join(" ")).toBe(2);
+    expect(refused.stderr).toContain(
+      '"issue-tracker" would start something new, which a target runs as you.',
+    );
+    expect(existsSync(join(project, ".mcp.json"))).toBe(false);
+  }
+
+  const added = await aireg(["install", "-y"], { cwd: project });
+  expect(added.code, added.stderr).toBe(0);
+  expect(existsSync(join(project, ".mcp.json"))).toBe(true);
+  // Unchanged, it is not asked about again.
+  expect((await aireg(["install"], { cwd: project })).code).toBe(0);
+});
+
+test("installs an MCP server for every project target that loads one, and removes it", async ({
+  aireg,
+  git,
+  tmp,
+}) => {
+  const project = join(tmp, "every-project");
+  const registry = join(tmp, "every");
+  await cp(ACME, registry, { recursive: true });
+  await mkdir(join(project, ".registry"), { recursive: true });
+  await git.init(project);
+  await writeFile(
+    join(project, ".registry", "manifest.yml"),
+    [
+      "targets: [claude-code, github-copilot, codex, cursor, gemini-cli, opencode, grok, pi, antigravity]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "",
+    ].join("\n"),
+  );
+  const mine: Record<string, string> = {
+    ".gemini/settings.json": '{\n  "theme": "dark"\n}\n',
+    ".codex/config.toml": 'model = "o4"\n',
+  };
+  for (const [file, text] of Object.entries(mine)) {
+    await mkdir(join(project, file, ".."), { recursive: true });
+    await writeFile(join(project, file), text);
+  }
+  const read = async (file: string) => readFile(join(project, file), "utf8");
+
+  const installed = await aireg(["install", "-y"], { cwd: project });
+  expect(installed.code, installed.stderr).toBe(0);
+  expect(installed.stderr).toContain(
+    "Did not install issue-tracker for Google Antigravity: it reads MCP servers only from your user scope",
+  );
+  const token = "ISSUES_TOKEN";
+  const args = ["-y", "@example/issue-tracker-mcp@1.2.0"];
+  const url = "https://issues.example.test";
+  const shared = { command: "npx", args, env: { ISSUES_URL: url, [token]: `\${${token}}` } };
+  const typed = { type: "stdio", ...shared };
+  expect(JSON.parse(await read(".mcp.json")).mcpServers["issue-tracker"]).toEqual(typed);
+  expect(JSON.parse(await read(".cursor/mcp.json")).mcpServers["issue-tracker"]).toEqual({
+    ...typed,
+    env: { ISSUES_URL: url, [token]: `\${env:${token}}` },
+  });
+  expect(JSON.parse(await read(".gemini/settings.json"))).toEqual({
+    theme: "dark",
+    mcpServers: { "issue-tracker": shared },
+  });
+  expect(JSON.parse(await read(".pi/mcp.json")).mcpServers["issue-tracker"]).toEqual(shared);
+  expect(JSON.parse(await read("opencode.json")).mcp["issue-tracker"]).toEqual({
+    type: "local",
+    command: ["npx", ...args],
+    environment: { ISSUES_URL: url, [token]: `{env:${token}}` },
+  });
+  const codex = await read(".codex/config.toml");
+  expect(codex).toContain('model = "o4"');
+  expect(codex).toContain(`env_vars = ["${token}"]`);
+  expect(await read(".grok/config.toml")).toContain(`${token} = "\${${token}}"`);
+
+  const status = await aireg(["status"], { cwd: project });
+  expect(status.code, status.stdout).toBe(0);
+
+  // Claude Code and Copilot share the entry, so dropping one target leaves it for the other.
+  const manifest = join(project, ".registry", "manifest.yml");
+  await writeFile(manifest, (await readFile(manifest, "utf8")).replace("claude-code, ", ""));
+  expect((await aireg(["install"], { cwd: project })).code).toBe(0);
+  expect(JSON.parse(await read(".mcp.json")).mcpServers["issue-tracker"]).toEqual(typed);
+
+  expect((await aireg(["remove", "issue-tracker", "-y"], { cwd: project })).code).toBe(0);
+  for (const [file, text] of Object.entries(mine)) expect(await read(file)).toBe(text);
+  for (const file of [".mcp.json", ".cursor/mcp.json", ".pi/mcp.json", "opencode.json"]) {
+    expect(existsSync(join(project, file)), file).toBe(false);
+  }
+  for (const folder of [".cursor", ".grok", ".pi"]) {
+    expect(existsSync(join(project, folder)), folder).toBe(false);
+  }
+});
+
+test("leaves a shared .mcp.json entry out for every target when one cannot apply its tool filter", async ({
+  aireg,
+  git,
+  tmp,
+}) => {
+  const project = join(tmp, "filtered");
+  const registry = join(tmp, "filtered-acme");
+  await cp(ACME, registry, { recursive: true });
+  await mkdir(join(project, ".registry"), { recursive: true });
+  await git.init(project);
+  const manifest = join(project, ".registry", "manifest.yml");
+  const write = (tools: string) =>
+    writeFile(
+      manifest,
+      [
+        "targets: [claude-code, github-copilot]",
+        "registries:",
+        `  acme: ${registry}`,
+        "artifacts:",
+        "  - ref: acme/engineering/issue-tracker",
+        "    with: { ISSUES_URL: https://issues.example.test }",
+        `    tools: ${tools}`,
+        "",
+      ].join("\n"),
+    );
+  const mcp = join(project, ".mcp.json");
+  const settings = join(project, ".claude", "settings.json");
+  const lock = join(project, ".registry", "manifest.lock.yml");
+
+  await write("{ allow: [echo, get-sum] }");
+  const allowed = await aireg(["install", "-y"], { cwd: project });
+  expect(allowed.stderr).toContain(
+    "Did not install issue-tracker for Claude Code: it allows only some tools, which this target cannot.",
+  );
+  expect(allowed.stderr).toContain(
+    "Did not install issue-tracker for GitHub Copilot: .mcp.json is shared with Claude Code, which cannot apply its tool filter.",
+  );
+  expect(existsSync(mcp)).toBe(false);
+
+  await write("{ deny: [echo] }");
+  const both = await aireg(["install", "-y"], { cwd: project });
+  expect(both.stderr).toContain(
+    "Did not install issue-tracker for Claude Code: .mcp.json is shared with GitHub Copilot, which cannot apply its tool filter.",
+  );
+  expect(existsSync(mcp)).toBe(false);
+  expect(existsSync(settings)).toBe(false);
+
+  // Claude Code applies a deny in its settings, so on its own it writes the shared entry.
+  const alone = (await readFile(manifest, "utf8")).replace(
+    "claude-code, github-copilot",
+    "claude-code",
+  );
+  await writeFile(manifest, alone);
+  const denied = await aireg(["install", "-y"], { cwd: project });
+  expect(denied.code, denied.stderr).toBe(0);
+  expect(JSON.parse(await readFile(mcp, "utf8")).mcpServers["issue-tracker"]).toBeDefined();
+  expect(JSON.parse(await readFile(settings, "utf8")).permissions.deny).toEqual([
+    "mcp__issue-tracker__echo",
+  ]);
+
+  await write("{ allow: [echo] }");
+  const switched = await aireg(["install"], { cwd: project });
+  expect(switched.stderr).not.toContain("did not write");
+  expect(existsSync(mcp)).toBe(false);
+  expect(await readFile(lock, "utf8")).not.toContain("file: .mcp.json");
+  expect(await readFile(lock, "utf8")).not.toContain("settings.json");
+  const status = JSON.parse((await aireg(["status", "--json"], { cwd: project })).stdout);
+  expect(status.data.artifacts[0].targets).toEqual({});
+});
+
+test("keeps what the person wrote: their deny rules, and other targets past a file aireg cannot read", async ({
+  aireg,
+  git,
+  tmp,
+}) => {
+  const project = join(tmp, "own");
+  const registry = join(tmp, "own-acme");
+  await cp(ACME, registry, { recursive: true });
+  await mkdir(join(project, ".registry"), { recursive: true });
+  await git.init(project);
+  await mkdir(join(project, ".claude"));
+  await mkdir(join(project, ".codex"));
+  await writeFile(
+    join(project, ".registry", "manifest.yml"),
+    [
+      "targets: [claude-code, codex, gemini-cli]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "    tools: { deny: [delete_issue, close_issue] }",
+      "",
+    ].join("\n"),
+  );
+  const settings = join(project, ".claude", "settings.json");
+  const own = "mcp__issue-tracker__delete_issue";
+  await writeFile(settings, JSON.stringify({ permissions: { deny: [own] } }));
+  // The person's own inline entry: Codex is skipped, and the others still install.
+  await writeFile(
+    join(project, ".codex", "config.toml"),
+    '[mcp_servers]\nissue-tracker = { command = "mine" }\n',
+  );
+
+  const installed = await aireg(["install", "-y"], { cwd: project });
+  expect(installed.code, installed.stderr).toBe(0);
+  expect(existsSync(join(project, ".mcp.json"))).toBe(true);
+  expect(existsSync(join(project, ".gemini", "settings.json"))).toBe(true);
+  expect(await readFile(join(project, ".codex", "config.toml"), "utf8")).toContain('"mine"');
+
+  // A file that will not parse is left whole, and the rest is still removed.
+  await writeFile(join(project, ".gemini", "settings.json"), "// mine\n{}\n");
+  const removed = await aireg(["remove", "issue-tracker", "-y"], { cwd: project });
+  expect(removed.code, removed.stderr).toBe(0);
+  expect(existsSync(join(project, ".mcp.json"))).toBe(false);
+  expect(await readFile(join(project, ".gemini", "settings.json"), "utf8")).toBe("// mine\n{}\n");
+  expect(JSON.parse(await readFile(settings, "utf8")).permissions.deny).toEqual([own]);
+
+  // An entry edited after install stays on remove, and so does every rule it relies on.
+  await writeFile(settings, JSON.stringify({ permissions: { deny: [] } }));
+  await writeFile(
+    join(project, ".registry", "manifest.yml"),
+    [
+      "targets: [claude-code]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "    tools: { deny: [delete_issue, close_issue] }",
+      "",
+    ].join("\n"),
+  );
+  expect((await aireg(["install", "-y"], { cwd: project })).code).toBe(0);
+  const mcp = join(project, ".mcp.json");
+  const written = JSON.parse(await readFile(mcp, "utf8"));
+  written.mcpServers["issue-tracker"].args.push("--verbose");
+  await writeFile(mcp, JSON.stringify(written));
+  expect((await aireg(["remove", "issue-tracker", "-y"], { cwd: project })).code).toBe(0);
+  expect(JSON.parse(await readFile(mcp, "utf8")).mcpServers["issue-tracker"]).toBeDefined();
+  expect(JSON.parse(await readFile(settings, "utf8")).permissions.deny).toEqual([
+    "mcp__issue-tracker__delete_issue",
+    "mcp__issue-tracker__close_issue",
+  ]);
+  const listed = await aireg(["list"], { cwd: project });
+  expect(listed.stdout).not.toContain("in no target");
+});

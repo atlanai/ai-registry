@@ -246,7 +246,67 @@ function artifactRef(raw: unknown): Ref {
   if (exclude !== undefined) ref = withExclusions(ref, exclude);
   if (entry.copy === true) ref = { ...ref, copy: true };
   if (trust !== undefined) ref = { ...ref, trust };
+  ref = { ...ref, ...serverSettings(entry, text, ref) };
   return targets === undefined ? ref : { ...ref, targets };
+}
+
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** `with`, `env` and `tools` configure one MCP server, so they need one artifact named. */
+function serverSettings(entry: Record<string, unknown>, text: string, ref: Ref): Partial<Ref> {
+  const named = ["with", "env", "tools"].filter((key) => entry[key] != null);
+  if (named.length === 0) return {};
+  if (ref.name === undefined) {
+    throw new ManifestError(
+      `Artifact ${quoted(text)} names a whole registry or namespace, so it cannot have \`${named[0]}\`.`,
+    );
+  }
+  const settings: Partial<Ref> = {};
+  if (entry.with != null) settings.with = withValues(entry.with, text);
+  if (entry.env != null) settings.env = envNames(entry.env, text);
+  if (entry.tools != null) settings.tools = toolLists(entry.tools, text);
+  return settings;
+}
+
+function withValues(raw: unknown, text: string): Record<string, string | string[]> {
+  const where = `\`with\` of artifact ${quoted(text)}`;
+  if (!isRecord(raw))
+    throw new ManifestError(`${where} must be a mapping of input names to values.`);
+  const out = dict<string | string[]>();
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      out[key] = String(value);
+    } else if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+      out[key] = value as string[];
+    } else {
+      throw new ManifestError(`${where} gives ${quoted(key)} a value that is not text or a list.`);
+    }
+  }
+  return out;
+}
+
+function envNames(raw: unknown, text: string): Record<string, string> {
+  const where = `\`env\` of artifact ${quoted(text)}`;
+  if (!isRecord(raw)) throw new ManifestError(`${where} must map a secret to a variable name.`);
+  const out = dict<string>();
+  for (const [key, value] of Object.entries(raw)) {
+    if (!ENV_NAME.test(key) || typeof value !== "string" || !ENV_NAME.test(value)) {
+      throw new ManifestError(`${where} maps ${quoted(key)} to something not a variable name.`, {
+        hint: "Write it as `SECRET_NAME: OTHER_VARIABLE`.",
+      });
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+function toolLists(raw: unknown, text: string): NonNullable<Ref["tools"]> {
+  if (!isRecord(raw))
+    throw new ManifestError(`\`tools\` of artifact ${quoted(text)} must be a mapping.`);
+  onlyKnown(raw, ["allow", "deny"], `\`tools\` of artifact ${quoted(text)}`);
+  const allow = stringList(raw.allow, text, "tools.allow");
+  const deny = stringList(raw.deny, text, "tools.deny");
+  return { ...(allow === undefined ? {} : { allow }), ...(deny === undefined ? {} : { deny }) };
 }
 
 function parseEnginesField(raw: unknown): string | undefined {

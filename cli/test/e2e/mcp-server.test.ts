@@ -12,6 +12,12 @@ test.beforeAll(async ({ tmp }) => {
   await cp(ACME, root, { recursive: true });
 });
 
+test("points aireg mcp_server at its command, aireg mcp", async ({ aireg }) => {
+  const result = await aireg(["mcp_server", "new", "weather"], { cwd: root });
+  expect(result.code).toBe(2);
+  expect(result.stderr).toContain("aireg mcp new");
+});
+
 describe("an MCP server in a registry that lists the kind", () => {
   const folder = (...rest: string[]) =>
     join(root, "artifacts", "engineering", "mcp_server", "weather", ...rest);
@@ -19,9 +25,7 @@ describe("an MCP server in a registry that lists the kind", () => {
 
   test("starts from a server.json, not from the envelope's spec", async ({ aireg }) => {
     const engineering = join(root, "artifacts", "engineering");
-    expect((await aireg(["mcp_server", "new", "weather", "-y"], { cwd: engineering })).code).toBe(
-      0,
-    );
+    expect((await aireg(["mcp", "new", "weather", "-y"], { cwd: engineering })).code).toBe(0);
 
     expect(await json(folder("0.1.0", "server.json"))).toEqual({
       $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
@@ -43,7 +47,7 @@ describe("an MCP server in a registry that lists the kind", () => {
     await writeFile(folder("0.1.0", "server.json"), `${JSON.stringify(filled, undefined, 2)}\n`);
     expect((await aireg(["registry", "index"], { cwd: root })).code).toBe(0);
 
-    const bump = ["mcp_server", "bump", "weather", "minor", "--namespace", "engineering"];
+    const bump = ["mcp", "bump", "weather", "minor", "--namespace", "engineering"];
     expect((await aireg(bump, { cwd: root })).code).toBe(0);
     const stale = await aireg(["registry", "validate"], { cwd: root });
     expect(stale.code).not.toBe(0);
@@ -70,7 +74,7 @@ describe("an MCP server's catalog entry and import", () => {
   test("takes its description and title from server.json, never from Markdown", async ({
     aireg,
   }) => {
-    const bump = ["mcp_server", "bump", "issue-tracker", "minor", "--namespace", "engineering"];
+    const bump = ["mcp", "bump", "issue-tracker", "minor", "--namespace", "engineering"];
     expect((await aireg(bump, { cwd: root })).code).toBe(0);
     const server = JSON.parse(await readFile(next("server.json"), "utf8"));
     await writeFile(next("server.json"), JSON.stringify({ ...server, version: "1.3.0" }));
@@ -98,7 +102,7 @@ describe("an MCP server's catalog entry and import", () => {
     await writeFile(join(source, "README.md"), readme);
     const engineering = join(root, "artifacts", "engineering");
 
-    const args = ["mcp_server", "new", "--from", source, "--name", "imported", "-y"];
+    const args = ["mcp", "new", "--from", source, "--name", "imported", "-y"];
     expect((await aireg(args, { cwd: engineering })).code).toBe(0);
 
     const copied = join(engineering, "mcp_server", "imported", "1.2.0", "README.md");
@@ -115,7 +119,7 @@ describe("an MCP server's catalog entry and import", () => {
     await writeFile(join(source, "server.json"), JSON.stringify({ ...server, name: "issues" }));
     const engineering = join(root, "artifacts", "engineering");
 
-    const result = await aireg(["mcp_server", "new", "--from", source, "-y"], { cwd: engineering });
+    const result = await aireg(["mcp", "new", "--from", source, "-y"], { cwd: engineering });
 
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('server.json: `name` "issues" does not match');
@@ -130,7 +134,7 @@ describe("an MCP server's catalog entry and import", () => {
     await writeFile(join(source, "README.md"), "# Issues\n");
     const engineering = join(root, "artifacts", "engineering");
 
-    const result = await aireg(["mcp_server", "new", "--from", source, "-y"], { cwd: engineering });
+    const result = await aireg(["mcp", "new", "--from", source, "-y"], { cwd: engineering });
 
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("has no server.json.");

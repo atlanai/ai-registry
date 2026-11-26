@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { list, plural, sanitizeText } from "#adapter/text.ts";
 import { statusWarning } from "#core/catalog/withheld.ts";
 import { dict } from "#core/fields.ts";
+import { aKind } from "#core/kinds.ts";
 import { emptyLock, type Lock, type LockArtifact } from "#core/lock.ts";
 import type { Manifest } from "#core/manifest/model.ts";
 import { dropUnusedSources, lockSourceOf } from "#core/plan/acquire/sources.ts";
@@ -21,6 +22,7 @@ import {
   keep,
   namespaceWants,
 } from "./carry.ts";
+import { planConfigs } from "./configs.ts";
 import { placeLinks, updateLinks, wantedLinks } from "./links.ts";
 import { keepUnmovedRevisions, lockRow, rewrittenFrom } from "./lock-row.ts";
 import { carriedOut, renamesFor } from "./rename.ts";
@@ -208,7 +210,9 @@ function planItem(item: Selected, build: BuildState): void {
   if (!updateLinks({ item, links, previous, state, restage }, build)) {
     build.unchanged.push(item.name);
   }
+  const entries = planConfigs(item, copy, previous, build);
   build.next.artifacts[item.name] = {
+    ...(entries.length === 0 ? {} : { entries }),
     ...lockRow({
       item,
       links,
@@ -255,7 +259,7 @@ function warnLeftOut(item: Selected, previous: LockArtifact | undefined, build: 
   const files = rest === 0 ? list(named) : `${named.join(", ")} and ${plural(rest, "more file")}`;
   build.warnings.push({
     name: item.name,
-    message: `${shown}${at} installs as its ${sanitizeText(leftOut.entry)} alone, since a target takes ${item.kind === "agent" ? "an" : "a"} ${item.kind} as one file, so ${files} ${leftOut.files.length === 1 ? "is" : "are"} left out.`,
+    message: `${shown}${at} installs as its ${sanitizeText(leftOut.entry)} alone, since a target takes ${aKind(item.kind)} as one file, so ${files} ${leftOut.files.length === 1 ? "is" : "are"} left out.`,
   });
 }
 
