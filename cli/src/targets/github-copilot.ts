@@ -37,7 +37,7 @@ export const githubCopilot = defineTarget({
       transports: ["stdio", "streamable-http", "sse"],
     },
   },
-  verified: { command: ["copilot", "--version"], range: "1.0.96" },
+  verified: { command: ["copilot", "--version"], range: "1.0.96 || 1.0.113" },
   reload:
     "Run `/skills reload` in a running Copilot CLI session, and start a new session for changed agents.",
 });

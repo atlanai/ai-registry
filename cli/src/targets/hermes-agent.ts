@@ -37,7 +37,7 @@ export const hermesAgent = defineTarget({
       transports: ["stdio", "streamable-http"],
     },
   },
-  verified: { command: ["hermes", "--version"], range: "0.23.0" },
+  verified: { command: ["hermes", "--version"], range: "0.23.0 || 0.23.2" },
   trust: { skill: { run: "hermes skills trust", scope: "project" } },
   reload:
     "Hermes Agent sees the change at your next message; run /reload-skills to refresh its slash commands.",

@@ -36,10 +36,7 @@ export function planConfigs(
       at: want.at,
       mapping: want.mapping,
       from: copy,
-      server:
-        item.server === undefined
-          ? undefined
-          : { with: item.server.with, env: item.server.env, tools: item.server.tools },
+      server: item.server,
       ...(receipt === undefined ? {} : { receipt }),
       ...(deny === undefined
         ? {}

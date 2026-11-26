@@ -35,6 +35,6 @@ export const cursor = defineTarget({
       transports: ["stdio", "streamable-http", "sse"],
     },
   },
-  verified: { command: ["agent", "--version"], range: "2026.10.12-d47ca18" },
+  verified: { command: ["agent", "--version"], range: "2026.08.11 || 2026.10.12-d47ca18" },
   reload: "Restart Cursor, or run Developer: Reload Window, to load the change.",
 });

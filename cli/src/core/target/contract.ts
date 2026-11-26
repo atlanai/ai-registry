@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "#adapter/kinds.ts";
+import type { Transport } from "#core/mcp/model.ts";
 
 /** Places nothing of its own: a container's members land where their own kinds go. */
 interface ContentsMapping {
@@ -110,7 +111,7 @@ interface ConfigMapping {
   scope?: "user" | "project" | undefined;
   codec: ConfigCodec;
   /** How the target can reach a server; an artifact that offers none of them is left out. */
-  transports: McpTransport[];
+  transports: Transport[];
   /** Where a denied tool goes when the entry cannot say: an `item` added to a list in `file`. */
   deny?: { file: string; at: string[]; item: string } | undefined;
   subdir?: undefined;
@@ -124,9 +125,7 @@ interface ConfigMapping {
   render?: undefined;
 }
 
-export type McpTransport = "stdio" | "streamable-http" | "sse";
-
-export type SecretField = "command" | "args" | "env" | "url" | "headers";
+export type SecretField = "args" | "env" | "url" | "headers";
 
 /** Tools the manifest allows or denies an MCP server. */
 export interface ToolFilter {
@@ -140,7 +139,7 @@ export interface McpJsonCodec {
   /** Around a secret's variable name, such as `${` and `}`; `in` limits the fields it expands in. */
   secret?: { prefix: string; suffix: string; in?: SecretField[] | undefined } | undefined;
   /** The `type` written for each transport; none for one not listed. */
-  type?: Partial<Record<McpTransport, string>> | undefined;
+  type?: Partial<Record<Transport, string>> | undefined;
   /** The URL's key for each remote transport, `url` when not listed. */
   url?: Partial<Record<"streamable-http" | "sse", string>> | undefined;
   /** `array`: `command` holds the program followed by its arguments. */

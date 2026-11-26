@@ -54,7 +54,7 @@ export const geminiCli = defineTarget({
       transports: ["stdio", "streamable-http", "sse"],
     },
   },
-  verified: { command: ["gemini", "--version"], range: "0.63.0" },
+  verified: { command: ["gemini", "--version"], range: "0.63.0 || 0.68.0" },
   // It loads a project's skills and agents only in a folder you trusted.
   trust: {
     skill: { run: "/permissions trust", scope: "project" },

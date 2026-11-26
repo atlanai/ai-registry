@@ -10,6 +10,7 @@ import { rewriteAtomic } from "#core/fs/atomic.ts";
 import { isStrictlyWithin, posixRelative, readTextIfPresent } from "#core/fs/path.ts";
 import { pruneEmptyParent } from "#core/fs/tree.ts";
 import type { LockEntry } from "#core/lock.ts";
+import { runLine } from "#core/mcp/describe.ts";
 import type { McpEntry } from "#core/mcp/model.ts";
 import { chooseOption, resolveServer } from "#core/mcp/resolve.ts";
 import type { Action } from "#core/plan/model.ts";
@@ -19,9 +20,7 @@ import type { ConfigCodec, ConfigValue, ToolFilter } from "#core/target/contract
 import type { ConfigDocument } from "#core/target/register/document.ts";
 import { entryDigest, itemsDigest } from "#core/target/register/entry.ts";
 import { openDocument } from "#core/target/register/register.ts";
-import type { ActionOf, Run, Unrendered } from "./run.ts";
-
-type Kept = { name: string; path: string; reason?: string; config?: true };
+import type { ActionOf, Kept, Run, Unrendered } from "./run.ts";
 
 /** What a configure or unconfigure did: the receipt to record, and an entry left to a person. */
 export interface Configured {
@@ -36,7 +35,8 @@ export interface Configured {
 /** Writes the target's entry, never over one a person edited or one that is not aireg's. */
 export async function configure(run: Run, action: ActionOf<"configure">): Promise<Configured> {
   const { name, target, to, at, mapping, receipt } = action;
-  const value = render(await readServer(action.from), action);
+  const server = await readServer(action.from);
+  const value = render(server, action);
   if (typeof value === "string") return leaveOut(run, action, { name, target, reason: value });
   const shared = await leftOutOfShared(run, action);
   if (shared !== undefined) return leaveOut(run, action, shared);
@@ -48,7 +48,15 @@ export async function configure(run: Run, action: ActionOf<"configure">): Promis
   const current = doc.table(at);
   const digest = digestOf(value);
   const file = posixRelative(run.inputs.roots.base, to);
-  const made: LockEntry = { target, file, format: mapping.format, at, digest };
+  const runs = runOf(server, action);
+  const made: LockEntry = {
+    target,
+    file,
+    format: mapping.format,
+    at,
+    digest,
+    ...(runs === undefined ? {} : { runs: runsDigest(runs) }),
+  };
   if (current !== undefined && digestOf(current) === digest) {
     return { written: false, receipt: made, ...(await denyList(run, action)) };
   }
@@ -65,11 +73,43 @@ export async function configure(run: Run, action: ActionOf<"configure">): Promis
       ...keptReceipt(receipt),
     };
   }
-  doc.drop(at);
-  doc.set(at, value);
+  try {
+    doc.drop(at);
+    doc.set(at, value);
+  } catch (error) {
+    // Such as an inline TOML table holding the entry: the person's, so only this target skips.
+    if (!(error instanceof AiregError)) throw error;
+    const reason = `${shown(at)} holds an entry aireg did not write; install it under another name with \`as\``;
+    return {
+      written: false,
+      kept: { name, path: to, config: true, reason },
+      ...keptReceipt(receipt),
+    };
+  }
   await rewriteAtomic(to, doc.render());
   return { written: true, receipt: made, ...(await denyList(run, action)) };
 }
+
+/** What the entry would start, when that differs from what aireg wrote there before. */
+export async function newRun(
+  action: ActionOf<"configure">,
+  dir: string,
+): Promise<string | undefined> {
+  const run = runOf(await readServer(dir), action);
+  if (run === undefined || action.receipt?.runs === runsDigest(run)) return undefined;
+  return run;
+}
+
+function runOf(server: unknown, action: ActionOf<"configure">): string | undefined {
+  const chosen = chooseOption(
+    resolveServer(server, action.server ?? {}),
+    action.mapping.transports,
+  );
+  if (typeof chosen === "string" || typeof render(server, action) === "string") return undefined;
+  return runLine(chosen.entry);
+}
+
+const runsDigest = (run: string): string => entryDigest({ run });
 
 /** A file aireg cannot parse, such as JSON with comments, is left whole rather than rewritten. */
 function readable(
@@ -220,9 +260,14 @@ async function denyList(
     doc.setList(deny.at, [...list, ...missing]);
     await rewriteAtomic(deny.to, doc.render());
   }
+  // A rule the person already had stays theirs, so remove never takes it.
+  const ours = deny.items.filter(
+    (item) => missing.includes(item) || deny.receipt?.items?.includes(item) === true,
+  );
+  if (ours.length === 0) return {};
   const file = posixRelative(run.inputs.roots.base, deny.to);
-  const digest = itemsDigest(deny.items, deny.items) as string;
-  return { denied: { target, file, format: "json", at: deny.at, digest, items: deny.items } };
+  const digest = itemsDigest(ours, ours) as string;
+  return { denied: { target, file, format: "json", at: deny.at, digest, items: ours } };
 }
 
 /** Takes back an entry aireg wrote, unless it was edited since. */
@@ -231,7 +276,9 @@ export async function unconfigure(run: Run, action: ActionOf<"unconfigure">): Pr
   await guard(run, to);
   const before = await readTextIfPresent(to);
   if (before === undefined) return { written: false };
-  const doc = openDocument(action.format, before, {}, to);
+  const doc = readable(action.format, before, to);
+  if (typeof doc === "string")
+    return { written: false, kept: { name, path: to, config: true, reason: doc } };
   if (receipt.items !== undefined) {
     const list = doc.list(receipt.at) ?? [];
     const left = list.filter((item) => !receipt.items?.includes(item as string));

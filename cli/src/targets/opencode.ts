@@ -39,5 +39,5 @@ export const opencode = defineTarget({
       transports: ["stdio", "streamable-http"],
     },
   },
-  verified: { command: ["opencode", "--version"], range: "1.19.0" },
+  verified: { command: ["opencode", "--version"], range: "1.17.9 || 1.19.0" },
 });

@@ -135,11 +135,18 @@ async function applyAction(run: Run, action: Action): Promise<void> {
     case "configure":
       return addConfigured(results, action, await configure(run, action));
     case "unconfigure":
+      // An edited entry stays, so the tools it denies stay denied.
+      if (action.receipt.items !== undefined && keptEntry(results, action.name)) {
+        return addConfigured(results, action, { written: false });
+      }
       return addConfigured(results, action, await unconfigure(run, action));
     case "record":
       return addRecorded(results, await record(run, action));
   }
 }
+
+const keptEntry = (results: RunResults, name: string): boolean =>
+  results.kept.some((kept) => kept.name === name && kept.config === true);
 
 /** Needs every clone landed first; returns the registrations it left to a person. */
 async function finish(run: Run, plan: Plan): Promise<ApplyResult["kept"]> {

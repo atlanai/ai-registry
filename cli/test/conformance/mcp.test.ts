@@ -54,7 +54,7 @@ test.for(CASES)(
     await git.init(project);
     await mkdir(join(base, SCOPE_DIR), { recursive: true });
     await writeFile(join(base, SCOPE_DIR, "manifest.yml"), MANIFEST(target, registry));
-    const ran = await aireg(["install", ...flags], { cwd: project });
+    const ran = await aireg(["install", "-y", ...flags], { cwd: project });
     expect(ran.code, ran.stderr).toBe(0);
     const path = join(base, file ?? "none");
     const text = existsSync(path) ? await readFile(path, "utf8") : "";

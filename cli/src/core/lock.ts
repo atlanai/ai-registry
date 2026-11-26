@@ -126,6 +126,8 @@ export interface LockEntry {
   digest: string;
   /** Set when aireg added these items to the list at `at`, rather than writing a table. */
   items?: string[] | undefined;
+  /** sha256 of what the entry starts, so only a change to that is asked about. */
+  runs?: string | undefined;
 }
 
 /** Set when a folder here supplied the bytes: it makes a row yours, and `publish` sends only those. */
@@ -299,14 +301,13 @@ function parseEntries(raw: unknown, scope: Scope): LockEntry[] | undefined {
     const file = scopePathOf(item.file, scope);
     const format = textOf(item.format);
     const digest = textOf(item.digest);
-    const at = Array.isArray(item.at) ? item.at.filter((key) => typeof key === "string") : [];
+    const runs = textOf(item.runs);
+    const at = textList(item.at) ?? [];
     if (target === undefined || file === undefined || digest === undefined) return undefined;
     if (!(FORMATS as readonly string[]).includes(format ?? "")) return undefined;
-    if (at.length === 0 || at.length !== (item.at as unknown[]).length) return undefined;
-    const items = Array.isArray(item.items)
-      ? item.items.filter((x) => typeof x === "string")
-      : undefined;
-    if (items !== undefined && items.length !== (item.items as unknown[]).length) return undefined;
+    if (at.length === 0) return undefined;
+    const items = textList(item.items);
+    if (item.items !== undefined && items === undefined) return undefined;
     entries.push({
       target,
       file,
@@ -314,9 +315,16 @@ function parseEntries(raw: unknown, scope: Scope): LockEntry[] | undefined {
       at,
       digest,
       ...(items === undefined ? {} : { items }),
+      ...(runs === undefined ? {} : { runs }),
     });
   }
   return entries;
+}
+
+function textList(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const texts = raw.filter((item): item is string => typeof item === "string");
+  return texts.length === raw.length ? texts : undefined;
 }
 
 function isLinkMode(value: string): value is LinkMode {

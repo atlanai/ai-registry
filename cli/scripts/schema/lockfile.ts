@@ -105,6 +105,12 @@ const Entry = Type.Object(
         description: "Items aireg added to the list at `at`, when it wrote no table there.",
       }),
     ),
+    runs: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description: "sha256 of what the entry starts, so a change to it is agreed to first.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );

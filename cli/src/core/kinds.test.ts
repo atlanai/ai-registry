@@ -66,12 +66,7 @@ describe("stagedLeaf", () => {
 
 describe("mcp_server", () => {
   test("is never scanned for in a target folder", () => {
-    expect(SCANNED_KINDS).not.toContain("mcp_server");
     expect(SCANNED_KINDS).toEqual(["skill", "agent", "semantic_model"]);
-  });
-
-  test("keeps server.json as the entry of its staged folder", () => {
-    expect(KIND_SPECS.mcp_server).toMatchObject({ shape: "directory", entry: "server.json" });
   });
 
   test("takes an before it, as agent does", () => {

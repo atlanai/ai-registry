@@ -3,7 +3,7 @@ import type { UpdateResult } from "#cli/commands/update/result.ts";
 import { UPDATE_COMMAND } from "#cli/commands/update/spec.ts";
 import { parse } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
-import { confirmIfDestructive } from "#cli/prompt/confirm-plan.ts";
+import { confirmIfDestructive, confirmRuns } from "#cli/prompt/confirm-plan.ts";
 import { cancel, interaction } from "#cli/prompt/interaction.ts";
 import { exitOnClash, reportCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize, whoNeeds } from "#cli/render/plan.ts";
@@ -103,8 +103,10 @@ async function update(
           .map(([name]) => name),
       ),
     }),
-    approve: async (plan, chosen) => {
-      approved = await confirmIfDestructive(step, plan, { verb: "Update", ...chosen });
+    approve: async (plan, chosen, peek) => {
+      approved =
+        (await confirmRuns(step, plan, peek, common.yes)) &&
+        (await confirmIfDestructive(step, plan, { verb: "Update", ...chosen }));
       return approved;
     },
   });

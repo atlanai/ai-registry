@@ -19,8 +19,7 @@ export function mcpJson(entry: McpEntry, codec: McpJsonCodec, tools?: ToolFilter
   }
 }
 
-/** Where the target narrows a server's tools: the key path for an allow list, and for a deny list. */
-export interface ToolKeys {
+interface ToolKeys {
   allow?: string[] | undefined;
   deny?: string[] | undefined;
 }

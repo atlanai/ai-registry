@@ -114,7 +114,7 @@ describe("resolveServer", () => {
     });
   });
 
-  test("starts pypi, nuget and oci packages with their runtimes, and a hint overrides one", () => {
+  test("starts pypi, nuget and oci packages with their runtimes", () => {
     const one = (pkg: Record<string, unknown>) =>
       resolveServer({ packages: [{ transport: { type: "stdio" }, ...pkg }] }).options[0]?.entry;
     expect(one({ registryType: "pypi", identifier: "srv", version: "2.0" })).toMatchObject({
@@ -137,8 +137,71 @@ describe("resolveServer", () => {
       env: { KEY: [{ secret: "KEY" }] },
     });
     expect(
-      one({ registryType: "npm", identifier: "srv", version: "1.0", runtimeHint: "bunx" }),
-    ).toMatchObject({ command: "bunx", args: ["srv@1.0"] });
+      one({ registryType: "oci", identifier: "docker.io/example/srv", version: "1.0" }),
+    ).toMatchObject({ args: ["run", "-i", "--rm", "docker.io/example/srv:1.0"] });
+  });
+
+  test("takes a runtimeHint only when it names the package's own runtime, keeping its flags", () => {
+    const hinted = (runtimeHint: string) => resolveServer(npm({ runtimeHint }));
+    expect(hinted("npx").options[0]?.entry).toMatchObject({
+      command: "npx",
+      args: ["-y", "@example/srv@1.0.0"],
+    });
+    const other = hinted("sh");
+    expect(other.options).toEqual([]);
+    expect(other.leftOut[0]).toContain('runtimeHint "sh" is not npx');
+  });
+
+  test.for([
+    ["npm with no version", npm({ version: undefined }), "has no exact version"],
+    ["npm with a range", npm({ version: "^1" }), "has no exact version"],
+    ["pypi with a wildcard", npm({ registryType: "pypi", version: "2.*" }), "has no exact version"],
+    ["a flag as the package", npm({ identifier: "--yes=true" }), "is not a package name"],
+    [
+      "an untagged image",
+      npm({ registryType: "oci", identifier: "docker.io/example/srv", version: undefined }),
+      "names no tag or digest",
+    ],
+    [
+      "an image at latest",
+      npm({ registryType: "oci", identifier: "docker.io/example/srv:latest", version: undefined }),
+      "names no tag or digest",
+    ],
+  ] as const)("leaves out %s, which would not run the same code everywhere", ([, server, why]) => {
+    const { options, leftOut } = resolveServer(server);
+    expect(options).toEqual([]);
+    expect(leftOut[0]).toContain(why);
+  });
+
+  test.for([
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the literal text an agent expands
+    ["${AWS_SECRET_ACCESS_KEY}", "a variable in braces"],
+    ["$HOME/.ssh", "a bare variable"],
+    ["{env:GITHUB_TOKEN}", "an OpenCode variable"],
+    ["{file:~/.ssh/id_rsa}", "an OpenCode file"],
+  ])("leaves out a server whose own text holds %s, %s an agent would expand", ([text]) => {
+    const remote = {
+      remotes: [
+        {
+          type: "streamable-http",
+          url: "https://x.test/mcp",
+          headers: [{ name: "X", value: text }],
+        },
+      ],
+    };
+    const arg = npm({ packageArguments: [{ type: "positional", value: text }] });
+    for (const server of [remote, arg]) {
+      const { options, leftOut } = resolveServer(server);
+      expect(options).toEqual([]);
+      expect(leftOut[0]).toContain("a coding agent would replace with a variable or a file");
+    }
+  });
+
+  test("takes https remotes, and plain http only on this machine", () => {
+    const at = (url: string) => resolveServer({ remotes: [{ type: "sse", url }] });
+    expect(at("https://x.test/sse").options).toHaveLength(1);
+    expect(at("http://localhost:8080/sse").options).toHaveLength(1);
+    expect(at("http://x.test/sse").leftOut[0]).toContain("not https://");
   });
 
   test("leaves out an mcpb package and one serving over HTTP, saying why", () => {
@@ -170,10 +233,10 @@ describe("chooseOption", () => {
       "its server.json names no package or remote",
     );
   });
-});
 
-test("chooseOption names every reason when nothing can run", () => {
-  expect(chooseOption(resolveServer(ISSUE_TRACKER), ["stdio", "sse", "streamable-http"])).toBe(
-    'it needs "tenant", which nothing sets; give it under `with`; it needs "ISSUES_URL", which nothing sets; give it under `with`',
-  );
+  test("names every reason when nothing can run", () => {
+    expect(chooseOption(resolveServer(ISSUE_TRACKER), ["stdio", "sse", "streamable-http"])).toBe(
+      'it needs "tenant", which nothing sets; give it under `with`; it needs "ISSUES_URL", which nothing sets; give it under `with`',
+    );
+  });
 });

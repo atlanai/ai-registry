@@ -33,7 +33,9 @@ export function resolveServer(server: unknown, settings: McpSettings = {}): Reso
   function attempt(make: () => McpOption | string): void {
     try {
       const made = make();
+      const expands = typeof made === "string" ? undefined : expanding(made.entry);
       if (typeof made === "string") leftOut.push(made);
+      else if (expands !== undefined) leftOut.push(expands);
       else options.push(made);
     } catch (error) {
       if (!(error instanceof Missing)) throw error;
@@ -67,6 +69,12 @@ function remoteEntry(remote: Json, settings: McpSettings): McpOption | string {
   const context: Context = { settings, secrets: new Set() };
   const url = template(text(remote.url) ?? "", vars(remote.variables), context);
   if (url === undefined) throw new Missing("a remote has no URL");
+  // A URL whose host comes from a secret starts with that reference, so it is not https.
+  const [first] = typeof url === "string" ? [url] : url;
+  const origin = typeof first === "string" ? first : "";
+  if (!/^https:\/\//i.test(origin) && !LOCAL.test(origin)) {
+    return "a remote that is not https:// would send its requests unencrypted";
+  }
   const headers: Record<string, Value> = {};
   for (const header of records(remote.headers)) {
     const name = text(header.name);
@@ -84,8 +92,54 @@ const RUNTIMES: Record<
   npm: { command: "npx", before: ["-y"], ref: (id, v) => (v ? `${id}@${v}` : id), after: [] },
   pypi: { command: "uvx", before: [], ref: (id, v) => (v ? `${id}==${v}` : id), after: [] },
   nuget: { command: "dnx", before: [], ref: (id, v) => (v ? `${id}@${v}` : id), after: ["--yes"] },
-  oci: { command: "docker", before: ["run", "-i", "--rm"], ref: (id) => id, after: [] },
+  oci: {
+    command: "docker",
+    before: ["run", "-i", "--rm"],
+    ref: (id, v) => (v !== undefined && !OCI_PINNED.test(id) ? `${id}:${v}` : id),
+    after: [],
+  },
 };
+
+/** A local server, the one place plain http:// is fine. */
+const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i;
+/** A package name: never empty, and never read as a flag by its runtime. */
+const IDENTIFIER = /^[A-Za-z0-9@_][A-Za-z0-9@._/:+-]*$/;
+/** One exact version, not a range such as `^1`, `>=2` or `1.x`. */
+const EXACT = /^v?\d+(\.\d+)*([-+][0-9A-Za-z.+-]+)?$/;
+/** An image named with a tag after its last `/`, or by digest. */
+const OCI_PINNED = /@sha256:[0-9a-f]{64}$|:[^/:@]+$/;
+
+/** A package that would not run the same code on every machine is not written. */
+function pinProblem(type: string, id: string, version: string | undefined): string | undefined {
+  if (!IDENTIFIER.test(id)) return `the ${type} package ${quoted(id)} is not a package name`;
+  if (type === "oci") {
+    const ref = version !== undefined && !OCI_PINNED.test(id) ? `${id}:${version}` : id;
+    if (!OCI_PINNED.test(ref) || /:latest$/.test(ref)) {
+      return `the image ${quoted(id)} names no tag or digest, so it would run whatever is newest`;
+    }
+    return undefined;
+  }
+  if (version === undefined || !EXACT.test(version)) {
+    return `the ${type} package ${quoted(id)} has no exact version, so it would run whatever is newest`;
+  }
+  return undefined;
+}
+
+/** Text an agent would expand when it reads its config, reading the host's variables or files. */
+const EXPANDS = /\$\{|\$[A-Za-z_]|\{env:|\{file:/;
+
+function expanding(entry: McpEntry): string | undefined {
+  const literals = (value: Value): string[] =>
+    typeof value === "string" ? [value] : value.filter((part) => typeof part === "string");
+  const values =
+    entry.transport === "stdio"
+      ? [entry.command, ...entry.args, ...Object.values(entry.env)]
+      : [entry.url, ...Object.values(entry.headers)];
+  const found = values.flatMap(literals).find((part) => EXPANDS.test(part));
+  return found === undefined
+    ? undefined
+    : `${quoted(found)} holds text a coding agent would replace with a variable or a file`;
+}
 
 function packageEntry(pkg: Json, settings: McpSettings): McpOption | string {
   const type = text(pkg.registryType) ?? "";
@@ -93,6 +147,12 @@ function packageEntry(pkg: Json, settings: McpSettings): McpOption | string {
   const runtime = RUNTIMES[type];
   if (runtime === undefined || id === undefined) {
     return `a package of type ${quoted(type)} is not one aireg can start`;
+  }
+  const unpinned = pinProblem(type, id, text(pkg.version));
+  if (unpinned !== undefined) return unpinned;
+  const hint = text(pkg.runtimeHint);
+  if (hint !== undefined && hint !== runtime.command) {
+    return `its runtimeHint ${quoted(hint)} is not ${runtime.command}, the runtime for ${type} packages`;
   }
   const transport = isRecord(pkg.transport) ? pkg.transport.type : undefined;
   if (transport !== "stdio") {
@@ -105,17 +165,17 @@ function packageEntry(pkg: Json, settings: McpSettings): McpOption | string {
     const value = name === undefined ? undefined : input(variable, name, context);
     if (name !== undefined && value !== undefined) env[name] = value;
   }
-  const hint = text(pkg.runtimeHint);
   // Docker passes the host's variables on only when each is named.
   const forwarded = type === "oci" ? Object.keys(env).flatMap((name) => ["-e", name]) : [];
   const args: Value[] = [
-    ...(hint === undefined ? [...runtime.before, ...forwarded] : []),
+    ...runtime.before,
+    ...forwarded,
     ...argumentsOf(pkg.runtimeArguments, context),
     runtime.ref(id, text(pkg.version)),
-    ...(hint === undefined ? runtime.after : []),
+    ...runtime.after,
     ...argumentsOf(pkg.packageArguments, context),
   ];
-  const entry: McpEntry = { transport: "stdio", command: hint ?? runtime.command, args, env };
+  const entry: McpEntry = { transport: "stdio", command: runtime.command, args, env };
   return { entry, secrets: [...context.secrets].sort() };
 }
 

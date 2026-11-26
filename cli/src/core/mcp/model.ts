@@ -14,7 +14,6 @@ interface StdioEntry {
   command: string;
   args: Value[];
   env: Record<string, Value>;
-  cwd?: string;
 }
 
 interface RemoteEntry {

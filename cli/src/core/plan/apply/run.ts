@@ -39,14 +39,14 @@ export interface ApplyResult {
     name: string;
     target: string;
     reason: string;
-    /** Left out because another target reading the same entry, `with`, could not take it. */
+    /** Left out because `with`, another target sharing this entry, could not take it. */
     shared?: { file: string; with: string };
   }[];
 }
 
 export type ActionOf<K extends Action["kind"]> = Extract<Action, { kind: K }>;
 
-type Kept = ApplyResult["kept"][number];
+export type Kept = ApplyResult["kept"][number];
 type Adopted = ApplyResult["adopted"][number];
 export type BackedUp = ApplyResult["backedUp"][number];
 export type Unrendered = ApplyResult["unrendered"][number];

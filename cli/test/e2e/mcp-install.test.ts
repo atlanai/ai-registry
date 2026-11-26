@@ -31,7 +31,7 @@ test("installs an MCP server into Claude Code's .mcp.json, sees an edit, and rem
   const mcp = join(project, ".mcp.json");
   await writeFile(mcp, JSON.stringify({ mcpServers: { mine: { command: "mine" } } }));
 
-  const installed = await aireg(["install"], { cwd: project });
+  const installed = await aireg(["install", "-y"], { cwd: project });
   expect(installed.code).toBe(0);
   expect(installed.stdout).toContain("Installed issue-tracker for Claude Code.");
   expect(installed.stderr).not.toContain("installed into no target");
@@ -69,7 +69,9 @@ test("shows how an MCP server starts, and what it reads", async ({ aireg, tmp })
   await cp(ACME, registry, { recursive: true });
   const shown = await aireg(["show", "engineering/issue-tracker", "--registry", registry]);
   expect(shown.code).toBe(0);
-  expect(shown.stdout).toContain("runs   npx -y @example/issue-tracker-mcp@1.2.0");
+  expect(shown.stdout).toContain(
+    "runs   ISSUES_URL='<ISSUES_URL>' ISSUES_TOKEN=\"$ISSUES_TOKEN\" npx -y @example/issue-tracker-mcp@1.2.0",
+  );
   expect(shown.stdout).toContain(
     "runs   https://<tenant>.issues.example.com/mcp (streamable-http)",
   );
@@ -80,7 +82,7 @@ test("shows how an MCP server starts, and what it reads", async ({ aireg, tmp })
   expect(json.data.server.reads).toEqual(["ISSUES_TOKEN", "TOKEN"]);
 });
 
-test("adds a namespace's MCP servers only with --yes when it cannot ask", async ({
+test("installs an MCP server, even one named, only once a person agrees to how it starts", async ({
   aireg,
   git,
   tmp,
@@ -92,18 +94,30 @@ test("adds a namespace's MCP servers only with --yes when it cannot ask", async 
   await git.init(project);
   await writeFile(
     join(project, ".registry", "manifest.yml"),
-    `targets: [claude-code]\nregistries:\n  acme: ${registry}\n`,
+    [
+      "targets: [claude-code]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "",
+    ].join("\n"),
   );
-  const refused = await aireg(["add", "acme/engineering"], { cwd: project });
-  expect(refused.code).toBe(2);
-  expect(refused.stderr).toContain(
-    '"issue-tracker" is an MCP server, which a target starts as you.',
-  );
-  expect(existsSync(join(project, ".claude"))).toBe(false);
+  for (const args of [["add", "acme/engineering/issue-tracker"], ["install"]]) {
+    const refused = await aireg(args, { cwd: project });
+    expect(refused.code, args.join(" ")).toBe(2);
+    expect(refused.stderr).toContain(
+      '"issue-tracker" would start something new, which a target runs as you.',
+    );
+    expect(existsSync(join(project, ".mcp.json"))).toBe(false);
+  }
 
-  const added = await aireg(["add", "acme/engineering", "-y"], { cwd: project });
-  expect(added.code).toBe(0);
-  expect(added.stderr).toContain('it needs "tenant", which nothing sets');
+  const added = await aireg(["install", "-y"], { cwd: project });
+  expect(added.code, added.stderr).toBe(0);
+  expect(existsSync(join(project, ".mcp.json"))).toBe(true);
+  // Unchanged, it is not asked about again.
+  expect((await aireg(["install"], { cwd: project })).code).toBe(0);
 });
 
 test("installs an MCP server for every project target that loads one, and removes it", async ({
@@ -138,7 +152,7 @@ test("installs an MCP server for every project target that loads one, and remove
   }
   const read = async (file: string) => readFile(join(project, file), "utf8");
 
-  const installed = await aireg(["install"], { cwd: project });
+  const installed = await aireg(["install", "-y"], { cwd: project });
   expect(installed.code, installed.stderr).toBe(0);
   expect(installed.stderr).toContain(
     "Did not install issue-tracker for Google Antigravity: it reads MCP servers only from your user scope",
@@ -217,7 +231,7 @@ test("leaves a shared .mcp.json entry out for every target when one cannot apply
   const lock = join(project, ".registry", "manifest.lock.yml");
 
   await write("{ allow: [echo, get-sum] }");
-  const allowed = await aireg(["install"], { cwd: project });
+  const allowed = await aireg(["install", "-y"], { cwd: project });
   expect(allowed.stderr).toContain(
     "Did not install issue-tracker for Claude Code: it allows only some tools, which this target cannot.",
   );
@@ -227,7 +241,7 @@ test("leaves a shared .mcp.json entry out for every target when one cannot apply
   expect(existsSync(mcp)).toBe(false);
 
   await write("{ deny: [echo] }");
-  const both = await aireg(["install"], { cwd: project });
+  const both = await aireg(["install", "-y"], { cwd: project });
   expect(both.stderr).toContain(
     "Did not install issue-tracker for Claude Code: .mcp.json is shared with GitHub Copilot, which cannot apply its tool filter.",
   );
@@ -240,7 +254,7 @@ test("leaves a shared .mcp.json entry out for every target when one cannot apply
     "claude-code",
   );
   await writeFile(manifest, alone);
-  const denied = await aireg(["install"], { cwd: project });
+  const denied = await aireg(["install", "-y"], { cwd: project });
   expect(denied.code, denied.stderr).toBe(0);
   expect(JSON.parse(await readFile(mcp, "utf8")).mcpServers["issue-tracker"]).toBeDefined();
   expect(JSON.parse(await readFile(settings, "utf8")).permissions.deny).toEqual([
@@ -255,4 +269,53 @@ test("leaves a shared .mcp.json entry out for every target when one cannot apply
   expect(await readFile(lock, "utf8")).not.toContain("settings.json");
   const status = JSON.parse((await aireg(["status", "--json"], { cwd: project })).stdout);
   expect(status.data.artifacts[0].targets).toEqual({});
+});
+
+test("keeps what the person wrote: their deny rules, and other targets past a file aireg cannot read", async ({
+  aireg,
+  git,
+  tmp,
+}) => {
+  const project = join(tmp, "own");
+  const registry = join(tmp, "own-acme");
+  await cp(ACME, registry, { recursive: true });
+  await mkdir(join(project, ".registry"), { recursive: true });
+  await git.init(project);
+  await mkdir(join(project, ".claude"));
+  await mkdir(join(project, ".codex"));
+  await writeFile(
+    join(project, ".registry", "manifest.yml"),
+    [
+      "targets: [claude-code, codex, gemini-cli]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "    tools: { deny: [delete_issue, close_issue] }",
+      "",
+    ].join("\n"),
+  );
+  const settings = join(project, ".claude", "settings.json");
+  const own = "mcp__issue-tracker__delete_issue";
+  await writeFile(settings, JSON.stringify({ permissions: { deny: [own] } }));
+  // The person's own inline entry: Codex is skipped, and the others still install.
+  await writeFile(
+    join(project, ".codex", "config.toml"),
+    '[mcp_servers]\nissue-tracker = { command = "mine" }\n',
+  );
+
+  const installed = await aireg(["install", "-y"], { cwd: project });
+  expect(installed.code, installed.stderr).toBe(0);
+  expect(existsSync(join(project, ".mcp.json"))).toBe(true);
+  expect(existsSync(join(project, ".gemini", "settings.json"))).toBe(true);
+  expect(await readFile(join(project, ".codex", "config.toml"), "utf8")).toContain('"mine"');
+
+  // A file that will not parse is left whole, and the rest is still removed.
+  await writeFile(join(project, ".gemini", "settings.json"), "// mine\n{}\n");
+  const removed = await aireg(["remove", "issue-tracker", "-y"], { cwd: project });
+  expect(removed.code, removed.stderr).toBe(0);
+  expect(existsSync(join(project, ".mcp.json"))).toBe(false);
+  expect(await readFile(join(project, ".gemini", "settings.json"), "utf8")).toBe("// mine\n{}\n");
+  expect(JSON.parse(await readFile(settings, "utf8")).permissions.deny).toEqual([own]);
 });

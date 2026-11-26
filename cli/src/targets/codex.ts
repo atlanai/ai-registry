@@ -96,7 +96,7 @@ export const codex = defineTarget({
       transports: ["stdio", "streamable-http"],
     },
   },
-  verified: { command: ["codex", "--version"], range: "0.162.1" },
+  verified: { command: ["codex", "--version"], range: "0.162.1 || 0.170.0" },
   // A project's `.codex` folder, agents included, loads only once Codex trusts the project.
   trust: { agent: { run: "codex", scope: "project" } },
 });

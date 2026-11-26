@@ -170,7 +170,7 @@ interface Open {
 
 function parseEntry(line: string): { keys: string[]; raw: string } | undefined {
   const key = readKey(line);
-  const value = key === undefined ? null : /^=\s*(.*)$/.exec(key.rest);
+  const value = key === undefined ? null : /^=\s*(.*)$/s.exec(key.rest);
   return key === undefined || value === null ? undefined : { keys: key.keys, raw: value[1] ?? "" };
 }
 

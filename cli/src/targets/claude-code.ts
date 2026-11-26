@@ -39,5 +39,5 @@ export const claudeCode = defineTarget({
   },
   // A project's plugins load only once Claude Code trusts the project; skills and agents need no step.
   trust: { plugin: { run: "claude", scope: "project" } },
-  verified: { command: ["claude", "--version"], range: "2.1.296" },
+  verified: { command: ["claude", "--version"], range: "2.1.296 || 2.1.332" },
 });

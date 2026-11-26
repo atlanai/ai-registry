@@ -92,7 +92,9 @@ The `mcp_server` kind's command is `aireg mcp`, with the same actions; no other 
 - `new --from` takes a folder or a lone `server.json`, and starts the artifact at the server's own `version`. A server whose version isn't a semantic version starts at 0.1.0, with a warning.
 - `bump` copies the folder and never edits `server.json`. Replace it with the publisher's new file, or set its `version` to the new one: `registry validate` refuses a `server.json` whose semantic version differs from its folder's.
 
-`aireg add` installs an MCP server as an entry in each target's config. Installing never starts the server. A secret is written as a reference to an environment variable, such as `${ISSUES_TOKEN}`, never as its value. `aireg show` prints the command or URL a server starts with and the variables it reads. Adding a whole namespace or registry lists its servers and asks first; without a terminal it needs `--yes`.
+`aireg add` installs an MCP server as an entry in each target's config. Installing never starts the server. A secret is written as a reference to an environment variable, such as `${ISSUES_TOKEN}`, never as its value. `aireg show` prints the command or URL a server starts with and the variables it reads. When `add`, `install` or `update` would start a server that is new, or start one differently, aireg prints how it starts and asks first; without a terminal it needs `--yes`.
+
+A server is left out of every target when what it starts isn't fixed or isn't safe to write: a package without an exact version, an image without a tag or digest, a `runtimeHint` other than its package type's runtime (`npx`, `uvx`, `dnx` or `docker`), a remote that isn't `https://` outside this machine, or text that a coding agent would expand itself, such as `${HOME}` or `{file:…}`.
 
 A manifest entry that names one server can set:
 
@@ -117,7 +119,12 @@ artifacts:
 | Google Antigravity | — | `~/.gemini/config/mcp_config.json` |
 | Hermes Agent | left out | `~/.hermes/config.yaml` |
 
-The shared `.agents` folder has no MCP file. A target is left out for a server, with the reason printed, when it cannot express it: a transport it does not load, a secret where it reads none (Codex reads a secret only as a whole variable, Gemini CLI only in `env`, Pi only in `env` and headers, Antigravity nowhere), or `tools` it cannot apply. Codex, Copilot, Gemini CLI, Antigravity and Hermes Agent take the tool lists; Claude Code takes `deny` as `permissions.deny` rules in `.claude/settings.json` and is left out for `allow`; the others are left out when `tools` is set. Targets that share a file, such as Claude Code and Copilot in `.mcp.json`, get the entry only when each takes it the same, tool filter included; otherwise it is left out for all of them. A config file aireg cannot parse, such as JSON with comments, is left as it is.
+The shared `.agents` folder has no MCP file. A target is left out for a server, with the reason printed, when:
+
+- it doesn't load the server's transport, or can't read a secret where the server needs one;
+- the server sets `tools` it can't apply. Codex, Gemini CLI, Antigravity and Hermes Agent take both lists, Copilot takes `allow`, and Claude Code takes `deny` as `permissions.deny` rules in `.claude/settings.json`;
+- it shares the file with another target, such as Claude Code and Copilot in `.mcp.json`, and the two would write the entry differently;
+- its config file doesn't parse, such as JSON with comments, which is left as it is.
 
 An entry edited after it was installed is kept, and `aireg status` reports it; one aireg did not write under the same name is left alone, so install the server under another name with `as`.
 

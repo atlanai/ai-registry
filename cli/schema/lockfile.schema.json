@@ -349,6 +349,11 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "runs": {
+                    "minLength": 1,
+                    "description": "sha256 of what the entry starts, so a change to it is agreed to first.",
+                    "type": "string"
                   }
                 }
               }

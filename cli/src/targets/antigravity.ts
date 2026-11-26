@@ -44,7 +44,7 @@ export const antigravity = defineTarget({
       transports: ["stdio", "streamable-http"],
     },
   },
-  verified: { command: ["agy", "--version"], range: "1.4.5" },
+  verified: { command: ["agy", "--version"], range: "1.4.5 || 1.5.17" },
   reload:
     "Start a new conversation in Antigravity, or run `/skills reload` in its CLI, to load the change.",
 });

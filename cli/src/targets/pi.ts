@@ -23,7 +23,7 @@ export const pi = defineTarget({
       transports: ["stdio", "streamable-http"],
     },
   },
-  verified: { command: ["pi", "--version"], range: "1.4.0" },
+  verified: { command: ["pi", "--version"], range: "1.1.0 || 1.4.0 || 1.5.2" },
   trust: { skill: { run: "/trust", scope: "project" } },
   reload: "Run /reload in Pi, or start a new session, to load the change.",
 });
