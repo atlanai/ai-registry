@@ -16,6 +16,17 @@
     },
     {
       "namespace": "engineering",
+      "kind": "mcp_server",
+      "name": "issue-tracker",
+      "latest": "1.2.0",
+      "digest": "sha256:37c125eaa95c3c5b54cdc0819e79e981c7298dcf0ab44ceff6be5011d5828e10",
+      "status": "active",
+      "description": "Search, read and update issues in the team's issue tracker.",
+      "catalog_digest": "sha256:8991a84ab10683efceb3ac70332577a80d48cfb6ffd57bcf81b5a3e6943c8780",
+      "updated_at": "2026-11-26T18:45:54.201Z"
+    },
+    {
+      "namespace": "engineering",
       "kind": "semantic_model",
       "name": "review-metrics",
       "latest": "1.0.0",
@@ -36,15 +47,6 @@
       "status": "active",
       "catalog_digest": "sha256:874b8d153ae7723b73bccd6b2cecbca09689d72fa5f1330cd21368c2fbef5b17",
       "updated_at": "2026-09-01T10:12:00Z"
-    },
-    {
-      "namespace": "engineering",
-      "kind": "mcp_server",
-      "name": "issue-tracker",
-      "latest": "1.2.0",
-      "digest": "sha256:37c125eaa95c3c5b54cdc0819e79e981c7298dcf0ab44ceff6be5011d5828e10",
-      "status": "active",
-      "description": "Search, read and update issues in the team's issue tracker."
     }
   ]
 }
