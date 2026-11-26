@@ -62,12 +62,11 @@ The CLI validates locally served manifests against both `kind-manifest.schema.js
 Draft 2020-12 meta-schema, then compiles their validation rules with Ajv. Relative `$id`s are
 rooted at the registry, and relative `$ref`s resolve against those identifiers. Referenced schema
 files must stay inside the registry and must be regular files, not symlinks. External references
-are reported as unresolved; validation never downloads a schema. A referenced schema that declares draft-07, such as
-the MCP Registry's `server.json` schema, is compiled with 2020-12 semantics, since Ajv cannot mix
-dialects. That matches draft-07 only for keywords whose meaning did not change;
+are reported as unresolved; validation never downloads a schema. A referenced draft-07 schema,
+such as the MCP Registry's `server.json` schema, is compiled with 2020-12 semantics, since Ajv
+cannot mix dialects. That matches draft-07 only for keywords whose meaning did not change;
 `tools/check_schemas.py` proves it for the copies under `kinds/vendor/`, but not for a draft-07
-schema a registry serves on its own, where `$ref` beside another keyword is stricter than
-draft-07 intends. `format` is an annotation in
+schema a registry serves on its own. `format` is an annotation in
 the CLI. Validation does not coerce values, insert defaults or remove fields.
 
 For built-in kinds, extraction reads only `SKILL.md`, `AGENT.md`, `agent-card.json`,

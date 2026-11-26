@@ -324,16 +324,6 @@ function slugName(lifted: Record<string, unknown>, name: string | undefined, dns
   }
 }
 
-/** An MCP server's own `version` from its `server.json`, which the artifact's version follows. */
-export function serverVersion(
-  manifest: KindManifest,
-  files: ReadonlyMap<string, string>,
-): string | undefined {
-  if (manifest.title !== "mcp_server") return undefined;
-  const server = parsedJson(files.get(MCP_SERVER_ENTRY) ?? "");
-  return isRecord(server) && typeof server.version === "string" ? server.version : undefined;
-}
-
 /** A kind's JSON or YAML document, by its extension; throws when it does not parse. */
 export function parseDocument(path: string, text: string): unknown {
   return YAML.test(path) ? parseYaml(text) : (JSON.parse(text) as unknown);
@@ -414,12 +404,4 @@ function documentKey(manifest: KindManifest): string {
   );
   const [only] = objects;
   return objects.length === 1 && only !== undefined ? only[0] : "card";
-}
-
-function parsedJson(text: string): unknown {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
 }

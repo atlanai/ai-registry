@@ -22,10 +22,10 @@ import {
   parseDocument,
   SPEC_TEXT,
   schemaFiles,
-  serverVersion,
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
+import { serverVersion } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { authored, refusal } from "#core/fs/tree.ts";
 import { type Problem, textAt, unparsed } from "./read.ts";
