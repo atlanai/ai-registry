@@ -212,17 +212,53 @@ def file_rules(manifest: dict) -> list[dict]:
     return [rule for rule in (r for group in sets for r in group) if isinstance(rule, dict)]
 
 
+# YAML 1.2 core schema, as the CLI's `yaml` package reads it; PyYAML's own resolvers are YAML 1.1.
+CORE_RESOLVERS = [
+    ("tag:yaml.org,2002:null", r"^(?:~|null|Null|NULL|)$", "~nN"),
+    ("tag:yaml.org,2002:bool", r"^(?:true|True|TRUE|false|False|FALSE)$", "tTfF"),
+    ("tag:yaml.org,2002:int", r"^(?:[-+]?[0-9]+|0o[0-7]+|0x[0-9a-fA-F]+)$", "-+0123456789"),
+    (
+        "tag:yaml.org,2002:float",
+        r"^(?:[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$",
+        "-+0123456789.",
+    ),
+]
+
+
 def yaml_loader():
-    """PyYAML's safe loader without YAML 1.1 timestamps, so a date stays text as in YAML 1.2."""
+    """YAML 1.2 core as the CLI reads it: no 1.1 booleans or dates, no merge keys, unique keys."""
+    import re
+
     import yaml
 
     class Loader(yaml.SafeLoader):
-        pass
+        yaml_implicit_resolvers = {}
 
-    Loader.yaml_implicit_resolvers = {
-        first: [(tag, regex) for tag, regex in resolvers if tag != "tag:yaml.org,2002:timestamp"]
-        for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
-    }
+        def construct_mapping(self, node, deep=False):
+            seen = set()
+            for key_node, _ in node.value:
+                key = self.construct_object(key_node, deep=True)
+                if key in seen:
+                    raise yaml.constructor.ConstructorError(
+                        None, None, f"duplicate key {key!r}", key_node.start_mark
+                    )
+                seen.add(key)
+            return super().construct_mapping(node, deep)
+
+        def flatten_mapping(self, node):
+            pass  # `<<` is an ordinary key in YAML 1.2, not a merge
+
+    for tag, pattern, first in CORE_RESOLVERS:
+        Loader.add_implicit_resolver(tag, re.compile(pattern), list(first) + ([""] if tag.endswith("null") else []))
+
+    def core_int(loader, node):
+        text = loader.construct_scalar(node)
+        for prefix, base in (("0o", 8), ("0x", 16)):
+            if text.startswith(prefix):
+                return int(text[2:], base)
+        return int(text, 10)
+
+    Loader.add_constructor("tag:yaml.org,2002:int", core_int)
     return lambda text: yaml.load(text, Loader=Loader)  # noqa: S506 - a SafeLoader subclass
 
 

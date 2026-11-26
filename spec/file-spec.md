@@ -204,8 +204,10 @@ it under `source/`.
 A kind manifest's file rule MAY carry a `schema`: a JSON Schema that the file at its `path`, parsed
 as JSON or YAML by its extension, MUST satisfy. Its references resolve against the manifest, so
 `{"$ref": "#/$defs/document"}` names a definition there. A writer validates the file against it
-when it validates `spec`, and refuses the version when the file fails. The file is hashed as bytes
-and never copied into the envelope, so section 4.2's integer rule does not apply to it.
+when it validates `spec`, and refuses the version when the file fails. YAML is read as YAML 1.2
+with the core schema: a mapping key MUST NOT repeat, and `<<` is an ordinary key, not a merge. The
+file is hashed as bytes and never copied into the envelope, so section 4.2's integer rule does not
+apply to it.
 
 ### 3.5 Native files
 

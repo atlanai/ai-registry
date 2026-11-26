@@ -69,9 +69,17 @@ class NativeFileTests(unittest.TestCase):
         [error] = self.errors()
         self.assertIn("at semantic_model: fails maxItems: 1", error)
 
-    def test_keeps_a_date_as_text_as_yaml_1_2_does(self):
-        loaded = self.module.yaml_loader()("released: 2026-11-25\n")
-        self.assertEqual(loaded, {"released": "2026-11-25"})
+    def test_reads_yaml_1_2_core_as_the_cli_does(self):
+        load = self.module.yaml_loader()
+        text = "released: 2026-11-25\ndescription: no\nmode: 0o10\nlegacy: 0b1\n"
+        self.assertEqual(
+            load(text), {"released": "2026-11-25", "description": "no", "mode": 8, "legacy": "0b1"}
+        )
+        self.assertEqual(load("b: &x {k: 1}\nc:\n  <<: *x\n")["c"], {"<<": {"k": 1}})
+
+    def test_refuses_a_duplicate_key_as_the_cli_does(self):
+        with self.assertRaisesRegex(Exception, "duplicate key 'name'"):
+            self.module.yaml_loader()("name: a\nname: b\n")
 
 
 if __name__ == "__main__":
