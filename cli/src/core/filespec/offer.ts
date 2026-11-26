@@ -177,7 +177,7 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
 function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
   const text = content.toString("utf8");
   const record = frontmatterRecord(text);
-  const fence = /^---\r?\n[\s\S]*?\r?\n(?=---\r?(?:\n|$))/.exec(text);
+  const fence = /^---[ \t]*\r?\n[\s\S]*?\r?\n(?=---[ \t]*\r?(?:\n|$))/.exec(text);
   if (record === undefined || fence === null || record.name !== undefined) {
     return { path: AGENT_ENTRY, content, executable: false };
   }
