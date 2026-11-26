@@ -67,6 +67,10 @@
                       {
                         "const": "agent",
                         "type": "string"
+                      },
+                      {
+                        "const": "semantic_model",
+                        "type": "string"
                       }
                     ]
                   },
@@ -188,6 +192,10 @@
                       {
                         "const": "agent",
                         "type": "string"
+                      },
+                      {
+                        "const": "semantic_model",
+                        "type": "string"
                       }
                     ]
                   },
@@ -232,6 +240,10 @@
                       {
                         "const": "agent",
                         "type": "string"
+                      },
+                      {
+                        "const": "semantic_model",
+                        "type": "string"
                       }
                     ]
                   },
@@ -272,6 +284,10 @@
                       },
                       {
                         "const": "agent",
+                        "type": "string"
+                      },
+                      {
+                        "const": "semantic_model",
                         "type": "string"
                       }
                     ]
@@ -314,6 +330,10 @@
                       {
                         "const": "agent",
                         "type": "string"
+                      },
+                      {
+                        "const": "semantic_model",
+                        "type": "string"
                       }
                     ]
                   },
@@ -354,6 +374,10 @@
                       },
                       {
                         "const": "agent",
+                        "type": "string"
+                      },
+                      {
+                        "const": "semantic_model",
                         "type": "string"
                       }
                     ]
@@ -509,6 +533,10 @@
                             },
                             {
                               "const": "agent",
+                              "type": "string"
+                            },
+                            {
+                              "const": "semantic_model",
                               "type": "string"
                             }
                           ]
@@ -826,6 +854,10 @@
                   },
                   {
                     "const": "agent",
+                    "type": "string"
+                  },
+                  {
+                    "const": "semantic_model",
                     "type": "string"
                   }
                 ]

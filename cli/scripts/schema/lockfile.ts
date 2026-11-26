@@ -179,8 +179,9 @@ const Artifact = Type.Object(
 /** The shape of `manifest.lock.yml`, as written. Reading is deliberately looser. */
 export const Lockfile = Type.Object(
   {
-    version: Type.Literal(LOCK_VERSION, {
-      description: "A lock of any other version is refused rather than guessed at.",
+    version: Type.Union([Type.Literal(1), Type.Literal(LOCK_VERSION)], {
+      description:
+        "2 when an artifact is a semantic model, else 1. Any other version is refused rather than guessed at.",
     }),
     registries: Type.Optional(Type.Record(Type.String(), Registry)),
     artifacts: Type.Optional(Type.Record(Type.String(), Artifact)),

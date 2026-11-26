@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": "2026-09-03T08:05:00Z",
+  "generated_at": "2026-11-11T15:17:49.846Z",
   "entries": [
     {
       "namespace": "engineering",
@@ -13,6 +13,17 @@
       "status": "active",
       "catalog_digest": "sha256:dd61c41e00a73292b05c3be1487cc38666d4f45c11bbeb39937f40cf903f1f1d",
       "updated_at": "2026-09-03T08:00:00Z"
+    },
+    {
+      "namespace": "engineering",
+      "kind": "semantic_model",
+      "name": "review-metrics",
+      "latest": "1.0.0",
+      "digest": "sha256:d1a7bd9a9faef92b1932f9dbcf3408b5fe13c8f77f230ef75953e741a17b7d71",
+      "status": "active",
+      "description": "Pull request review activity, with the definitions of review time and review load that the engineering dashboards use.",
+      "catalog_digest": "sha256:0607508aad1014f715d96fb9006f8908ff1fb6361e0cd5ac363fc067743a477a",
+      "updated_at": "2026-11-11T15:17:49.846Z"
     },
     {
       "namespace": "engineering",
