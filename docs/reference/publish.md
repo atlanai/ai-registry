@@ -74,7 +74,7 @@ Into a registry folder, an agent goes in as `AGENT.md`. A coding agent's own fil
 | `-m`, `--message <message>` | The change message, for a registry that records one. Defaults to a message naming each artifact and its version. A registry folder records none, so put it in your git commit instead. |
 | `--changed-since <commit>` | Publish only the artifacts whose files changed since this git commit. The commit must be in the repository's history. |
 | `--force` | Publish an edit made on an older version over a newer one published since. |
-| `-y`, `--yes` | Publish without asking. With no arguments, publish everything edited here. |
+| `-y`, `--yes` | Publish without asking. With no arguments, publish everything edited here, except unmanaged skills of one name whose files differ: name the one you mean by its path. |
 | `--dry-run` | Print what would be published, and send nothing. |
 
 `publish` also takes `-g`. Outside a project it uses your user scope and says so. See [Command options](options.md#command-options).

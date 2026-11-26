@@ -4,12 +4,14 @@ import { type Interaction, interactive } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
 import { multiselect } from "#cli/prompt/multiselect.ts";
 import type { Export } from "#core/manifest/model.ts";
+import { displayPath } from "#core/sync/adopt.ts";
 import type { Printer } from "#core/term/printer.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { exportWork } from "#engine/publish/exports.ts";
 import { exportsOn, installedPaths } from "#engine/publish/reach.ts";
 import { changedSince, type Exported, edited, fromArgs, type Work } from "#engine/publish/work.ts";
 import type { Loaded } from "#engine/scope/load.ts";
+import { differingNote } from "#engine/sync/scan.ts";
 
 export async function gather(
   step: Interaction,
@@ -43,7 +45,12 @@ async function chooseWork(
   cwd: string,
   keep: (found: Work[]) => Promise<Work[]>,
 ) {
-  const found = await keep(await edited(loaded, common, cwd));
+  const { works, differing } = await edited(loaded, common, cwd);
+  for (const item of differing) {
+    step.printer.warning(differingNote(item, (path) => displayPath(loaded.roots, path)));
+  }
+  if (differing.length > 0) step.printer.hint("Run `aireg publish <path>` to publish one of them.");
+  const found = await keep(works);
   // A dry run sends nothing, so listing everything is the answer to "what would go".
   if (found.length === 0 || common.yes || common.dryRun) return found;
   if (!interactive(step)) {

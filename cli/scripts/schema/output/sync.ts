@@ -66,6 +66,10 @@ const Preview = Type.Object(
         { additionalProperties: false },
       ),
     ),
+    differing: Type.Array(Found, {
+      description:
+        "Each copy of an unmanaged skill whose name another copy with different files shares. None is adopted.",
+    }),
     undeclared: Type.Array(Found),
     linkable: Type.Array(Found),
     changed: Type.Array(Found),

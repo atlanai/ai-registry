@@ -1,4 +1,5 @@
 import type { Artifact, Credential, Want } from "#adapter/index.ts";
+import { normalizedDigest } from "#core/fs/digest.ts";
 import { cloneLock, type Lock } from "#core/lock.ts";
 import { acquire } from "#core/plan/acquire/acquire.ts";
 import type { Roots } from "#core/store/paths.ts";
@@ -14,6 +15,8 @@ export interface Scan {
   items: SyncItem[];
   roots: Roots;
   local: Candidate[];
+  /** Unmanaged skills of one name with different files in different target folders. */
+  differing: Candidate[];
   undeclared: Candidate[];
   publisher: Map<string, string>;
   pinned: Lock;
@@ -79,9 +82,37 @@ export async function scan(
   const unique = (items: Candidate[]) => [
     ...new Map(items.map((item) => [`${item.kind}:${item.name}`, item])).values(),
   ];
-  const local = unique([...discovered.local]);
+  const { kept, differing } = await withoutDiffering(discovered.local);
+  const local = unique(kept);
   const undeclared = unique([...discovered.undeclared]);
-  return { items, roots: loaded.roots, local, undeclared, publisher, pinned, acquired };
+  return { items, roots: loaded.roots, local, differing, undeclared, publisher, pinned, acquired };
+}
+
+/** One line per name, as `status` words its duplicates, with each copy's path. */
+export function differingNote(item: Candidate, shown: (path: string) => string): string {
+  const paths = [item.from, ...item.elsewhere.map((copy) => copy.from)].map(shown).sort();
+  return `${paths.length} different ${item.name} ${item.kind}s, so none was taken: ${paths.join(", ")}.`;
+}
+
+/**
+ * Unmanaged skills of one name whose files differ are different skills, and each target
+ * may load its own, so nothing here may pick one: `publish <path>` names the one meant.
+ */
+export async function withoutDiffering(
+  found: readonly Candidate[],
+): Promise<{ kept: Candidate[]; differing: Candidate[] }> {
+  const kept: Candidate[] = [];
+  const differing: Candidate[] = [];
+  for (const item of found) {
+    if (item.kind !== "skill" || item.elsewhere.length === 0) {
+      kept.push(item);
+      continue;
+    }
+    const paths = [item.from, ...item.elsewhere.map((copy) => copy.from)];
+    const digests = new Set(await Promise.all(paths.map((path) => normalizedDigest(path))));
+    (digests.size > 1 ? differing : kept).push(item);
+  }
+  return { kept, differing };
 }
 
 /** The daemon scans repeatedly, so an open connection or timer would otherwise leak. */
