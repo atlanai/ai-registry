@@ -318,4 +318,33 @@ test("keeps what the person wrote: their deny rules, and other targets past a fi
   expect(existsSync(join(project, ".mcp.json"))).toBe(false);
   expect(await readFile(join(project, ".gemini", "settings.json"), "utf8")).toBe("// mine\n{}\n");
   expect(JSON.parse(await readFile(settings, "utf8")).permissions.deny).toEqual([own]);
+
+  // An entry edited after install stays on remove, and so does every rule it relies on.
+  await writeFile(settings, JSON.stringify({ permissions: { deny: [] } }));
+  await writeFile(
+    join(project, ".registry", "manifest.yml"),
+    [
+      "targets: [claude-code]",
+      "registries:",
+      `  acme: ${registry}`,
+      "artifacts:",
+      "  - ref: acme/engineering/issue-tracker",
+      "    with: { ISSUES_URL: https://issues.example.test }",
+      "    tools: { deny: [delete_issue, close_issue] }",
+      "",
+    ].join("\n"),
+  );
+  expect((await aireg(["install", "-y"], { cwd: project })).code).toBe(0);
+  const mcp = join(project, ".mcp.json");
+  const written = JSON.parse(await readFile(mcp, "utf8"));
+  written.mcpServers["issue-tracker"].args.push("--verbose");
+  await writeFile(mcp, JSON.stringify(written));
+  expect((await aireg(["remove", "issue-tracker", "-y"], { cwd: project })).code).toBe(0);
+  expect(JSON.parse(await readFile(mcp, "utf8")).mcpServers["issue-tracker"]).toBeDefined();
+  expect(JSON.parse(await readFile(settings, "utf8")).permissions.deny).toEqual([
+    "mcp__issue-tracker__delete_issue",
+    "mcp__issue-tracker__close_issue",
+  ]);
+  const listed = await aireg(["list"], { cwd: project });
+  expect(listed.stdout).not.toContain("in no target");
 });

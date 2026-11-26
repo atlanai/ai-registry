@@ -13,7 +13,7 @@ import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { assertManagedPath } from "#core/store/managed-paths.ts";
 import { PROJECTIONS_DIR, type Roots } from "#core/store/paths.ts";
 import { assemble } from "./assemble.ts";
-import { configure, shareEntries, unconfigure } from "./configure.ts";
+import { configure, entryStays, shareEntries, unconfigure } from "./configure.ts";
 import { journal } from "./journal.ts";
 import { linkInto, preflight, unlink } from "./link.ts";
 import { record } from "./record.ts";
@@ -136,7 +136,7 @@ async function applyAction(run: Run, action: Action): Promise<void> {
       return addConfigured(results, action, await configure(run, action));
     case "unconfigure":
       // An edited entry stays, so the tools it denies stay denied.
-      if (action.receipt.items !== undefined && keptEntry(results, action.name)) {
+      if (action.receipt.items !== undefined && (await entryStays(run, action))) {
         return addConfigured(results, action, { written: false });
       }
       return addConfigured(results, action, await unconfigure(run, action));
@@ -144,9 +144,6 @@ async function applyAction(run: Run, action: Action): Promise<void> {
       return addRecorded(results, await record(run, action));
   }
 }
-
-const keptEntry = (results: RunResults, name: string): boolean =>
-  results.kept.some((kept) => kept.name === name && kept.config === true);
 
 /** Needs every clone landed first; returns the registrations it left to a person. */
 async function finish(run: Run, plan: Plan): Promise<ApplyResult["kept"]> {

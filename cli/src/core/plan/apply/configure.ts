@@ -270,6 +270,18 @@ async function denyList(
   return { denied: { target, file, format: "json", at: deny.at, digest, items: ours } };
 }
 
+/** Whether the entry beside these deny rules was edited, so remove leaves it, whatever runs first. */
+export async function entryStays(run: Run, action: ActionOf<"unconfigure">): Promise<boolean> {
+  if (action.force === true) return false;
+  const entries = run.inputs.before?.artifacts[action.name]?.entries ?? [];
+  const entry = entries.find((one) => one.target === action.target && one.items === undefined);
+  if (entry === undefined) return false;
+  const to = join(run.inputs.roots.base, entry.file);
+  const doc = readable(entry.format, await readTextIfPresent(to), to);
+  const current = typeof doc === "string" ? undefined : doc.table(entry.at);
+  return current !== undefined && digestOf(current) !== entry.digest;
+}
+
 /** Takes back an entry aireg wrote, unless it was edited since. */
 export async function unconfigure(run: Run, action: ActionOf<"unconfigure">): Promise<Configured> {
   const { name, to, receipt } = action;
