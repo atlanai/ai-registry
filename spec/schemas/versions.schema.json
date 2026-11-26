@@ -33,7 +33,7 @@
           "status": { "$ref": "common.schema.json#/$defs/status" },
           "yanked": {
             "type": "boolean",
-            "description": "True when the version must not be selected by range resolution. Bytes remain resolvable to a pinned digest."
+            "description": "True when the version is withdrawn from new use: a client installs it only where a lockfile already holds it (file spec section 3.3). Bytes remain resolvable to a pinned digest."
           },
           "reason": {
             "type": "string",
