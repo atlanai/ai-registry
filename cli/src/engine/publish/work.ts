@@ -100,11 +100,15 @@ export async function expand(pattern: string, cwd: string): Promise<string[]> {
   return found.sort();
 }
 
-/** Each argument is a path, a glob over paths, or an installed name; a folder beside you wins. */
+/**
+ * Each argument is a path, a glob over paths, or an installed name; a folder beside you wins.
+ * `flags` is the destination, scope and dry run to repeat in a hint, with its leading space.
+ */
 export async function fromArgs(
   args: readonly string[],
   loaded: Loaded,
   cwd: string,
+  flags = "",
 ): Promise<Work[]> {
   const rows = loaded.lock.artifacts;
   const works: Work[] = [];
@@ -132,7 +136,7 @@ export async function fromArgs(
         const copy = copyPath(name, entry, loaded);
         return existsSync(copy) && realpathSync(copy) === target;
       });
-      if (row === undefined) throw linkedRoot(path, target);
+      if (row === undefined) throw linkedRoot(path, target, flags);
       works.push(installed(row[0], row[1], loaded));
     }
   }
@@ -176,10 +180,10 @@ function linkTarget(path: string): string | undefined {
   return existsSync(path) ? realpathSync(path) : undefined;
 }
 
-function linkedRoot(path: string, target: string): AiregError {
+function linkedRoot(path: string, target: string, flags: string): AiregError {
   return new AiregError(`${basename(path)} is a symlink; an artifact holds regular files only.`, {
     code: ErrorCode.Invalid,
-    hint: `Publish the folder it points to: \`aireg publish ${quoted(target)}\`.`,
+    hint: `Publish the folder it points to: \`aireg publish ${quoted(target)}${flags}\`.`,
   });
 }
 
