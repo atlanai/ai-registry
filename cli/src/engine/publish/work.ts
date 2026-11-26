@@ -9,6 +9,7 @@ import { isWithin } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { descriptionText, frontmatter } from "#core/frontmatter.ts";
+import { posixRelative } from "#core/fs/path.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { ExportFile } from "#core/manifest/export-fields.ts";
@@ -136,7 +137,36 @@ export async function fromArgs(
       works.push(installed(row[0], row[1], loaded));
     }
   }
-  return works;
+  return distinct(works, cwd);
+}
+
+/**
+ * One version folder per kind and name: two paths of one name in one call would write the
+ * second over the first. The same folder named twice is one artifact.
+ */
+function distinct(works: readonly Work[], cwd: string): Work[] {
+  const kept: Work[] = [];
+  const seen = new Map<string, Work>();
+  for (const work of works) {
+    const key = `${work.kind}/${work.name}`;
+    const other = seen.get(key);
+    if (other === undefined) {
+      seen.set(key, work);
+      kept.push(work);
+      continue;
+    }
+    if (realOrSelf(other.path) === realOrSelf(work.path)) continue;
+    const [one, two] = [other, work].map((each) => posixRelative(cwd, each.path) || ".");
+    throw new AiregError(`${one} and ${two} are both ${work.kind} ${work.name}.`, {
+      code: ErrorCode.Invalid,
+      hint: "Publish one of them, or give one another `name` in its front matter.",
+    });
+  }
+  return kept;
+}
+
+function realOrSelf(path: string): string {
+  return existsSync(path) ? realpathSync(path) : path;
 }
 
 function installedKey(arg: string, loaded: Loaded): string | undefined {

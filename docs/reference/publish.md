@@ -38,7 +38,7 @@ A first publish is version `0.1.0`. After that, `publish` takes the next patch v
 
 An artifact whose files match the newest published version is listed as `same` and not sent. On a terminal, when an artifact changed and you didn't pass `--bump`, `publish` asks how big a change it is.
 
-Before sending, `publish` lists each artifact as `add`, `update` with its old and new version, or `same`, and asks to confirm. It refuses a skill that [`aireg registry validate`](registry.md#aireg-registry-validate) would reject.
+Before sending, `publish` lists each artifact as `add`, `update` with its old and new version, or `same`, and asks to confirm. It refuses a skill that [`aireg registry validate`](registry.md#aireg-registry-validate) would reject. It also refuses two paths in one call whose artifacts share a kind and name, since both would be written as one version; the same folder named twice is published once.
 
 ### What it sends
 
