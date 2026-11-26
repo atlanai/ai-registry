@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect } from "vitest";
 import { parse } from "yaml";
-import { skillsFolder } from "#test/kit/builders/layouts.ts";
+import { skillFile, skillsFolder } from "#test/kit/builders/layouts.ts";
 import { test as base } from "#test/kit/fixtures.ts";
 import { makeHome } from "#test/kit/home.ts";
 import { runCli } from "#test/kit/run.ts";
@@ -146,6 +146,26 @@ describe("a folder of skills on this machine", () => {
       "skills-repo is a folder of skills, not a registry, so aireg reads it but does not publish to it.",
     );
     expect(published.stderr).toContain("`aireg registry init <folder>`");
+  });
+
+  test("names what it skipped in the folder when sync pulls from it, as add does", async ({
+    aireg,
+    initialised,
+    project,
+    tmp,
+  }) => {
+    const root = await kit(join(tmp, "skills-repo")).write();
+    await initialised(project);
+    expect((await aireg(["add", root, "--all"])).code).toBe(0);
+    // An edit upstream gives sync a pull, so it plans; the plan carries the folder's warnings.
+    await writeFile(
+      join(root, "skills", "pr-review", "SKILL.md"),
+      skillFile("pr-review", "pr-review.", "Review it twice.\n"),
+    );
+    const synced = await aireg(["sync", "-y"]);
+    expect(synced.code, synced.stderr).toBe(0);
+    expect(synced.stdout).toContain("pulled");
+    expect(synced.stderr).toContain("Skipped skills/evil, which is a symlink.");
   });
 
   test("reads what a broken registry.json sits beside only when told to", async ({
