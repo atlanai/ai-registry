@@ -205,6 +205,7 @@ def instances() -> list[tuple[Path, list[str]]]:
     """
     pairs: list[tuple[Path, list[str]]] = [
         (REPO / "examples" / "host-document.json", ["host.schema.json"]),
+        (REPO / "examples" / "usage-registry.json", ["registry.schema.json"]),
     ]
     for manifest in sorted((SCHEMA_DIR / "kinds").glob("*.json")):
         pairs.append((manifest, ["kind-manifest.schema.json"]))

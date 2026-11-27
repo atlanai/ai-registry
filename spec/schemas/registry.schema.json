@@ -54,6 +54,29 @@
       }
     },
     "generated_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "usage": {
+      "type": "object",
+      "description": "Where clients send runs of this root's artifacts, once the person they run for has turned sharing on. Optional; a root without it is complete. File spec section 14.1.",
+      "properties": {
+        "otlp": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^(https://|http://(localhost|127\\.[0-9.]+|\\[::1\\])(:[0-9]+)?(/|$))",
+          "description": "The base URL of an OpenTelemetry Protocol over HTTP endpoint, without the /v1/traces path. https, or http to a loopback host."
+        },
+        "reporter": {
+          "enum": ["pseudonym", "name"],
+          "default": "pseudonym",
+          "description": "How a person is named in what is sent. File spec section 14.4."
+        },
+        "time_precision": {
+          "enum": ["second", "hour", "day"],
+          "default": "hour",
+          "description": "How precisely a run's time is sent."
+        }
+      },
+      "required": ["otlp"]
+    },
     "api_version": {
       "type": "string",
       "const": "v1",

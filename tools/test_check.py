@@ -15,7 +15,9 @@ CHECK = ROOT / "tools" / "check.py"
 SKILL = Path("artifacts", "engineering", "skill", "pr-review")
 
 
-class CheckFixTests(unittest.TestCase):
+class RegistryCopy(unittest.TestCase):
+    """A fresh copy of the acme example for each test."""
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -31,6 +33,8 @@ class CheckFixTests(unittest.TestCase):
             text=True, capture_output=True,
         )
 
+
+class CheckFixTests(RegistryCopy):
     def link(self, relative):
         """Move a registry file or folder outside and leave a symlink in its place."""
         source = self.registry / relative
@@ -97,6 +101,50 @@ class CheckFixTests(unittest.TestCase):
         result = self.check()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("kinds/vendor/mcp/2025-12-11/server.schema.json: is a symlink", result.stdout)
+
+
+class UsageTests(RegistryCopy):
+    """File spec section 14.1: the usage block in registry.json."""
+
+    def set_usage(self, usage):
+        path = self.registry / "registry.json"
+        document = json.loads(path.read_text(encoding="utf-8"))
+        document["usage"] = usage
+        path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+    def assert_error(self, text):
+        result = self.check()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(text, result.stdout)
+
+    def test_https_and_loopback_endpoints_pass(self):
+        for otlp in ("https://otel.example.com", "http://localhost:4318", "http://127.0.0.1:6006", "http://[::1]:4318/"):
+            self.set_usage({"otlp": otlp, "reporter": "name", "time_precision": "second"})
+            result = self.check()
+            self.assertEqual(result.returncode, 0, otlp + result.stdout + result.stderr)
+
+    def test_plain_http_to_another_host_is_refused(self):
+        self.set_usage({"otlp": "http://otel.example.com"})
+        self.assert_error("must be https, or http to a loopback host")
+
+    def test_a_host_that_only_starts_like_localhost_is_refused(self):
+        self.set_usage({"otlp": "http://localhost.example.com"})
+        self.assert_error("must be https, or http to a loopback host")
+
+    def test_endpoint_is_required(self):
+        self.set_usage({"reporter": "pseudonym"})
+        self.assert_error("usage.otlp is required")
+
+    def test_traces_path_is_refused(self):
+        self.set_usage({"otlp": "https://otel.example.com/v1/traces"})
+        self.assert_error("a client adds /v1/traces")
+
+    def test_unknown_reporter_and_precision_are_refused(self):
+        self.set_usage({"otlp": "https://otel.example.com", "reporter": "email", "time_precision": "minute"})
+        result = self.check()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("is not pseudonym or name", result.stdout)
+        self.assertIn("is not second, hour or day", result.stdout)
 
 
 if __name__ == "__main__":

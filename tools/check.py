@@ -3,8 +3,9 @@
 
 Standard library only. Verifies path grammar and file paths, every file digest
 and size, the content digest and catalog digest of every version, that latest
-is the newest active release, that versions.json and index.json agree, and
-that every relationship resolves.
+is the newest active release, that versions.json and index.json agree,
+that every relationship resolves, and that a usage endpoint, when
+registry.json names one, uses a scheme a client may send to.
 
     python3 tools/check.py examples/acme-registry
     python3 tools/check.py examples/acme-registry --print-digests
@@ -293,6 +294,7 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
         blob_template = "://"  # nothing is read through it
 
     check_kind_manifests(root, registry, rep)
+    check_usage(registry, rep)
 
     index = None
     if inside(root, root / "index.json"):
@@ -510,6 +512,31 @@ def check_registry(root: Path, rep: Report, fix: bool, print_digests: bool, part
     if fix and index is not None:
         index["entries"].sort(key=lambda e: (e["namespace"], e["kind"], e["name"]))
         write_json(root, root / "index.json", index, rep)
+
+
+
+LOOPBACK_HTTP_RE = re.compile(r"^http://(localhost|127\.[0-9.]+|\[::1\])(:[0-9]+)?(/|$)")
+
+
+def check_usage(registry: dict, rep: Report) -> None:
+    """Section 14.1: where clients send runs. Section 11: which schemes they may use."""
+    usage = registry.get("usage")
+    if usage is None:
+        return
+    if not isinstance(usage, dict):
+        rep.error("registry.json: usage must be an object")
+        return
+    otlp = usage.get("otlp")
+    if not isinstance(otlp, str) or not otlp:
+        rep.error("registry.json: usage.otlp is required: the OpenTelemetry endpoint clients send runs to")
+    elif not (otlp.startswith("https://") or LOOPBACK_HTTP_RE.match(otlp)):
+        rep.error(f"registry.json: usage.otlp {otlp!r} must be https, or http to a loopback host")
+    elif otlp.rstrip("/").endswith("/v1/traces"):
+        rep.error("registry.json: usage.otlp is the endpoint's base URL; a client adds /v1/traces")
+    if usage.get("reporter", "pseudonym") not in ("pseudonym", "name"):
+        rep.error(f"registry.json: usage.reporter {usage.get('reporter')!r} is not pseudonym or name")
+    if usage.get("time_precision", "hour") not in ("second", "hour", "day"):
+        rep.error(f"registry.json: usage.time_precision {usage.get('time_precision')!r} is not second, hour or day")
 
 
 def main() -> int:

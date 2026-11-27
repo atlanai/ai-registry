@@ -117,6 +117,7 @@ The discovery document at the root. Schema: [`schemas/registry.schema.json`](sch
 | `blob_url` | no | URI template containing `{digest}`; default `blobs/sha256/{digest}` |
 | `kinds[]` | no | `{name, manifest_url}` per kind held. `manifest_url` is a URI reference; a relative one resolves against the root, so a root MAY serve its own manifests. The manifest format is open; the one this repository uses is [`schemas/kind-manifest.schema.json`](schemas/kind-manifest.schema.json) |
 | `generated_at` | no | when the indexer last ran |
+| `usage` | no | where clients send runs of this root's artifacts: `{otlp, reporter?, time_precision?}`; see section 14 |
 | `api_version` | no | kept for a future server; a file root omits it |
 
 ### 3.2 `index.json`
@@ -345,12 +346,13 @@ These rules bound what a client fetches, sends, and writes.
 - **Sizes and time.** A client MUST stop reading a file once it has received more bytes than the descriptor's `size`, and MUST verify the size and the digest before it uses the file. It SHOULD cap the size of each JSON document it parses, and give up on a request that takes too long rather than wait indefinitely.
 - **Paths.** A client writes a file only at a path section 2.3 allows, inside the folder it installs into, and MUST NOT follow a symbolic link it finds there.
 - **Cycles.** `depends_on` edges can form a cycle. A client resolves each ref once, so a cycle ends where it began.
+- **Usage.** A `usage.otlp` endpoint follows the scheme rules above. A client sends a credential to it only under the credentials rule, and sends nothing to it before the person has turned sharing on (section 14.4).
 
 aireg reads directory and git roots, not HTTPS roots. It applies the path, reference, and cycle rules to both and verifies every file's size and digest before using it. It refuses plain `http://` except to a loopback host, sends a stored credential only to the origin it was issued for and a token from the environment only to the registry of that name, and bounds each git operation with a timeout.
 
 ## 12. Conformance
 
-A root conforms when its documents satisfy the schemas and the requirements this document places on roots. A client conforms when it meets the requirements this document places on readers, including sections 3.3, 4, and 11. [`tools/check.py`](../tools/check.py) is the reference checker for roots; no conformance suite exists yet for clients.
+A root conforms when its documents satisfy the schemas and the requirements this document places on roots. A client conforms when it meets the requirements this document places on readers, including sections 3.3, 4, and 11, and, when it reports usage, section 14. [`tools/check.py`](../tools/check.py) is the reference checker for roots; no conformance suite exists yet for clients.
 
 ## 13. Versioning
 
@@ -358,3 +360,72 @@ A breaking change MUST come with a version bump:
 
 - `format_version` covers the documents, the layout, and the digests. A change that a format 1 reader cannot handle needs a new format version.
 - A kind manifest's `x-registry-schema-version` covers that kind's `spec` schema. A change after which the schema rejects content it accepted before needs a new schema version.
+
+## 14. Usage
+
+Usage records how often each artifact version a registry lists is run, by which program, and for whom. It is optional. A root that declares no usage is complete, and a client that does not report usage ignores this section.
+
+A registry does not store usage. Its `registry.json` names an OpenTelemetry endpoint, and a client sends each run there as a span once the person it runs for has turned sharing on. The endpoint is whatever the registry's owner runs to store and query traces: an OpenTelemetry Collector, or an observability backend that accepts the OpenTelemetry Protocol. Usage is not part of the registry's documents. No digest covers it, and no version changes when it changes.
+
+### 14.1 Where usage goes
+
+The `usage` object in `registry.json` (section 3.1) says where runs are sent.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `otlp` | yes | the base URL of an OpenTelemetry Protocol over HTTP endpoint, without the `/v1/traces` path |
+| `reporter` | no | how a person is named in what is sent: `pseudonym` (default) or `name`; see 14.4 |
+| `time_precision` | no | how precisely a run's time is sent: `second`, `hour` (default) or `day` |
+
+[`examples/usage-registry.json`](../examples/usage-registry.json) is a `registry.json` that asks for usage. A client sends runs to `{otlp}/v1/traces`, encoded as OTLP JSON or protobuf. When the endpoint needs a credential, the person supplies it to their client. A `registry.json` never carries one, because everyone who can read the registry can read it.
+
+### 14.2 What a run is
+
+A **run** is one use of one artifact version by a program, such as a coding agent loading a skill into a conversation. A run is counted at most once per turn, where a turn is one request to the program and everything it does to answer it. A client that sees the same artifact loaded twice in one turn reports one run.
+
+A client reports a run only for an artifact version it installed from this root, and only once it can name the version's ref (section 2.2). How a client notices a run depends on the program and is not defined here.
+
+### 14.3 The run span
+
+A client sends each run as one span:
+
+- `name` is `registry.artifact.run`, and `kind` is internal.
+- `startTimeUnixNano` and `endTimeUnixNano` are both when the run started, rounded down to the `time_precision`. A run is an event; how long the program spent on the artifact is not reported.
+- The span is the root of its own trace.
+
+The span carries these attributes, and no others:
+
+| Attribute | Required | Value |
+|---|---|---|
+| `registry.artifact.ref` | yes | the ref of the version that ran, `<namespace>/<kind>/<name>@<version>` |
+| `registry.artifact.digest` | SHOULD | the version's content digest (section 4.2) |
+| `registry.artifact.modified` | no | `true` when the local copy that ran differs from the published version |
+| `registry.run.id` | yes | an identifier unique to this run, 1 to 128 characters from `[A-Za-z0-9._-]`. A client that sends a run again sends the same id. |
+| `registry.run.trigger` | no | what started the run: `person`, `model`, `artifact` (another artifact called it) or `unknown` |
+| `registry.target` | SHOULD | the program that ran it, such as `claude-code` or `codex`. This document does not fix the list. |
+
+The span's resource carries these attributes, and no others besides the `telemetry.sdk.*` attributes an OpenTelemetry SDK adds:
+
+| Attribute | Required | Value |
+|---|---|---|
+| `registry.usage.reporter` | yes | the person, named as 14.4 says, in the namespace grammar of section 2.1 |
+| `registry.name` | yes | the registry's `name` from `registry.json` |
+| `registry.url` | no | the registry's `url`, when `registry.json` has one |
+| `service.name` | SHOULD | the client that sent the run, such as `aireg` |
+| `service.version` | no | that client's version |
+
+A reader MUST ignore attributes it does not understand.
+
+### 14.4 Privacy
+
+A run carries no content. A client MUST NOT send prompts, model output, file paths, project or repository names, host names or the artifact's own content, and MUST NOT derive a run id or a pseudonym in a way that reveals any of them.
+
+A client MUST NOT send runs until the person it runs for has turned sharing on for that registry, and MUST NOT send a run that happened before then. Their agreement covers the `otlp`, `reporter` and `time_precision` the registry named at the time: when the registry changes any of them, a client MUST ask again before it sends more. It MAY count runs on the person's own machine without asking.
+
+With `reporter: pseudonym`, a client names the person by a stable identifier that does not reveal who they are. With `reporter: name`, it uses a name the person chose. A reporter MUST NOT be an email address.
+
+### 14.5 Reading usage
+
+A reader counts runs by distinct `registry.run.id`, so a run sent twice counts once. It SHOULD be able to show runs per artifact version, per reporter and per target, over a period such as the last 30 days. Where a reader gets the spans from is the endpoint's concern, not this document's.
+
+Usage is reported, not proven. Anyone who can send to the endpoint can add runs, so a reader MUST NOT treat a count as authenticated.
