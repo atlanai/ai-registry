@@ -30,7 +30,8 @@ async function commandLine(pid: number): Promise<string | undefined> {
 async function windowsCommandLine(pid: number): Promise<string | undefined> {
   // Interpolated into a PowerShell filter, so only a plain positive integer gets there.
   if (!Number.isSafeInteger(pid) || pid <= 0) return undefined;
-  const { code, stdout } = await exec(
+  const askedAt = Date.now();
+  const { code, stdout, stderr } = await exec(
     "powershell",
     [
       "-NoProfile",
@@ -41,6 +42,7 @@ async function windowsCommandLine(pid: number): Promise<string | undefined> {
     { timeoutMs: WINDOWS_EXEC_MS },
   );
   const line = stdout.trim();
+  process.stderr.write(`ASK pid=${pid} ms=${Date.now() - askedAt} code=${code} line=${line.slice(0, 80)} err=${stderr.trim().slice(0, 120)}\n`);
   return code !== 0 || line === "" ? undefined : line;
 }
 

@@ -72,6 +72,14 @@ export async function runCli(args: readonly string[], options: RunOptions): Prom
     const e = error as { code?: number; killed?: boolean; stdout?: string; stderr?: string };
     const stderr = e.stderr ?? "";
     const killed = e.killed === true ? `\naireg killed after ${CLI_TIMEOUT_MS} ms.\n` : "";
+    if (process.env.DIAG_LOG && ((e.code === 1 && args[0] === "sync") || e.killed === true)) {
+      const { appendFileSync, readFileSync } = await import("node:fs");
+      let daemon = "";
+      try {
+        daemon = readFileSync(`${home}/.aireg/logs/daemon.log`, "utf8").split("\n").slice(-40).join("\n");
+      } catch {}
+      appendFileSync(process.env.DIAG_LOG, `\n===== ${e.killed === true ? "KILLED " : ""}${args.join(" ")} code=${e.code}\n--stdout\n${e.stdout}\n--stderr\n${stderr}\n--daemon\n${daemon}\n`);
+    }
     return ran(e.code ?? 1, e.stdout ?? "", `${stderr}${killed}`);
   }
 }

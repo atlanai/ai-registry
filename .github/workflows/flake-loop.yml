@@ -1,0 +1,104 @@
+name: Flake loop (temporary)
+
+on:
+  push:
+    branches: [ci/loop-flaky-tests-tmp]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: cli
+    shell: bash
+
+env:
+  EXIT_FIX: ec123858ba0c4c46568d082f05180dd6099f5bf2
+  UI_FIX: c396b2de
+  GIT_AUTHOR_NAME: ci
+  GIT_AUTHOR_EMAIL: ci@example.com
+  GIT_COMMITTER_NAME: ci
+  GIT_COMMITTER_EMAIL: ci@example.com
+
+jobs:
+  suite:
+    name: suite ${{ matrix.os }} ${{ matrix.variant }} Node ${{ matrix.node }} rep ${{ matrix.rep }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: ["24.22.1", "26.12.1"]
+        variant: [before, after]
+        rep: [1, 2]
+        include:
+          - { os: windows-latest, node: "24.22.1", variant: after, rep: 1 }
+          - { os: windows-latest, node: "24.22.1", variant: after, rep: 2 }
+          - { os: macos-latest, node: "24.22.1", variant: after, rep: 1 }
+    steps:
+      - run: git config --global core.autocrlf false
+        working-directory: .
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Take main's exit path
+        if: matrix.variant == 'before'
+        run: git show "$EXIT_FIX~1:cli/src/main.ts" > src/main.ts && git diff --stat
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - run: npm install --global --force corepack@0.36.0 && corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - name: Loop e2e and contract suites
+        run: |
+          set +e
+          export DIAG_LOG="$RUNNER_TEMP/diag.log"
+          workers=$(node -p 'Math.ceil(require("node:os").availableParallelism() * 1.5)')
+          for i in 1 2 3 4 5; do
+            ./node_modules/.bin/vitest run --project e2e --project contract --maxWorkers="$workers" > "$RUNNER_TEMP/run$i.txt" 2>&1
+            echo "iteration $i exit=$? $(grep -E '^ +Tests ' "$RUNNER_TEMP/run$i.txt" | sed 's/\x1b\[[0-9;]*m//g')"
+            grep -E ' FAIL ' "$RUNNER_TEMP/run$i.txt" | sed 's/\x1b\[[0-9;]*m//g' | sort -u || true
+          done
+          echo "killed CLIs: $(grep -c '^===== KILLED' "$DIAG_LOG" 2>/dev/null || echo 0)"
+          echo "sync exit 1: $(grep -c '^===== sync' "$DIAG_LOG" 2>/dev/null || echo 0)"
+          echo "::group::diag"; cat "$DIAG_LOG" 2>/dev/null | cut -c1-400 | head -400; echo "::endgroup::"
+
+  windows-process-info:
+    name: windows process-info ${{ matrix.variant }}
+    runs-on: windows-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [before, after]
+    steps:
+      - run: git config --global core.autocrlf false
+        working-directory: .
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Take main's test
+        if: matrix.variant == 'before'
+        run: git show "origin/main:cli/src/daemon/process/process-info.test.ts" > src/daemon/process/process-info.test.ts
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.1"
+          package-manager-cache: false
+      - run: npm install --global --force corepack@0.36.0 && corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - name: Loop the unit suite, which is the load the test fails under
+        run: |
+          set +e
+          workers=$(node -p 'Math.ceil(require("node:os").availableParallelism() * 1.5)')
+          for i in 1 2 3 4 5 6 7 8; do
+            ./node_modules/.bin/vitest run --project unit --maxWorkers="$workers" > out.txt 2>&1
+            echo "iteration $i exit=$?"
+            sed 's/\x1b\[[0-9;]*m//g' out.txt | grep -E "ASK|process-info.test|FAIL|Tests " | head -20
+          done
