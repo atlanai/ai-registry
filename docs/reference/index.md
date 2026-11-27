@@ -64,7 +64,7 @@ aireg add <registry>/<namespace>[/<name>[@<version>]] [options]
 | [`aireg sync`](sync.md) | Sync this project with its registries. |
 | [`aireg publish`](publish.md) | Publish artifacts to a registry, as new versions. |
 | [`aireg watch`](watch.md) | Publish a folder's skills and agents whenever they change. |
-| [`aireg skill`, `aireg agent`, `aireg semantic_model`](kinds.md) | Create a skill, an agent or a semantic model, or start its next version. |
+| [`aireg skill`, `aireg agent`, `aireg semantic_model`, `aireg mcp`](kinds.md) | Create a skill, an agent, a semantic model or an MCP server, or start its next version. |
 
 ### Automate
 
@@ -80,6 +80,7 @@ aireg add <registry>/<namespace>[/<name>[@<version>]] [options]
 | [`aireg config`](config.md) | Read and write aireg's own settings. |
 | [`aireg doctor`](doctor.md) | Check that this machine can install artifacts. |
 | [`aireg unlock`](unlock.md) | Show or clear a stuck write lock. |
+| [`aireg backup`](backup.md) | See or restore files of yours that aireg moved aside. |
 | [`aireg logs`](logs.md) | Read aireg's diagnostic logs. |
 | [`aireg adapter`](adapter.md) | Install an adapter, or write a new one. |
 | [`aireg self`](self.md) | Update aireg, or uninstall it. |

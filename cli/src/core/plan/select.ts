@@ -315,8 +315,14 @@ function choose(ref: Ref, source: Acquired, entry: Entry, pass: Choosing): Choic
     named: ref.name !== undefined,
     ...(ref.copy === true ? { copy: true } : {}),
     ...(ref.localName === undefined ? {} : { aliased: true }),
+    ...serverSettings(ref),
   };
   return { kind: "new", ref, selected };
+}
+
+function serverSettings(ref: Ref): Pick<Selected, "server"> {
+  if (ref.with === undefined && ref.env === undefined && ref.tools === undefined) return {};
+  return { server: { with: ref.with, env: ref.env, tools: ref.tools } };
 }
 
 /** A plugin from a source that is not a registry runs nothing until a person trusts it by name. */

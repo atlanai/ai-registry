@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { ArtifactKind } from "#adapter/kinds.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isWithin } from "#adapter/paths.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -68,6 +68,7 @@ export interface Chosen {
 }
 
 function entryOf(kind: ArtifactKind): string {
+  if (kind === "mcp_server") return MCP_SERVER_ENTRY;
   return kind === "agent" ? AGENT_ENTRY : SKILL_ENTRY;
 }
 

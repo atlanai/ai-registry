@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, posix, sep } from "node:path";
 import { Ajv2020, type SchemaObject } from "ajv/dist/2020.js";
+import draft07 from "ajv/dist/refs/json-schema-draft-07.json" with { type: "json" };
 import { describe, expect, test } from "vitest";
 import { buildEnvelope } from "#adapter/index.ts";
 
@@ -12,6 +13,8 @@ function ajv(): Ajv2020 {
   // The schemas declare `format` keywords ajv carries no validator for;
   // the shapes, not the string formats, are what is asserted.
   const compiler = new Ajv2020({ allErrors: true, strict: false, validateFormats: false });
+  // The MCP Registry's `server.json` schema is draft-07 (`kinds/vendor/mcp/README.md`).
+  compiler.addMetaSchema(draft07);
   const parse = (path: string): SchemaObject =>
     JSON.parse(readFileSync(join(SCHEMAS, path), "utf8")) as SchemaObject;
   const load = (path: string): void => {
@@ -38,6 +41,11 @@ function check(compiler: Ajv2020, schema: string, document: unknown): string[] {
 }
 
 const read = (name: string): unknown => JSON.parse(readFileSync(join(FIXTURE, name), "utf8"));
+
+const MCP_SERVER = join(
+  import.meta.dirname,
+  "../../../examples/acme-registry/artifacts/engineering/mcp_server/issue-tracker/1.2.0",
+);
 
 // Read in place from the spec, so they stay honest about the registries this client reads.
 describe("the file spec schemas", () => {
@@ -67,5 +75,39 @@ describe("the file spec schemas", () => {
       "/metadata must have required property 'namespace'",
       "/metadata must have required property 'version'",
     ]);
+  });
+});
+
+describe("the mcp_server kind", () => {
+  const compiler = ajv();
+  const DOCUMENT = "kinds/mcp_server.json#/$defs/document";
+  const read = (file: string): Record<string, unknown> =>
+    JSON.parse(readFileSync(join(MCP_SERVER, file), "utf8")) as Record<string, unknown>;
+
+  test("accepts the example server, its server.json checked by the MCP Registry schema", () => {
+    expect(check(compiler, "artifact-known-kinds.schema.json", read("artifact.json"))).toEqual([]);
+    expect(check(compiler, DOCUMENT, read("server.json"))).toEqual([]);
+    const renamed = { ...read("server.json"), name: "issue-tracker" };
+    expect(check(compiler, DOCUMENT, renamed)).toContain(
+      '/name must match pattern "^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$"',
+    );
+  });
+
+  test("takes only the server.json schema versions it vendors", () => {
+    const future = {
+      ...read("server.json"),
+      $schema: "https://static.modelcontextprotocol.io/schemas/2099-01-01/server.schema.json",
+    };
+    expect(check(compiler, DOCUMENT, future)).toContain(
+      "/$schema must be equal to one of the allowed values",
+    );
+  });
+
+  test("holds only the slug and description in spec, never a copy of server.json", () => {
+    const envelope = read("artifact.json") as { spec: Record<string, unknown> };
+    envelope.spec.server = read("server.json");
+    expect(check(compiler, "artifact-known-kinds.schema.json", envelope)).toContain(
+      "/spec must NOT have additional properties",
+    );
   });
 });

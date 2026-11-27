@@ -22,7 +22,6 @@ describe("starterModel", () => {
       "semantic_model.yaml: `semantic_model.0.description` is still TODO",
       "semantic_model.yaml: `semantic_model.0.datasets.0.name` is still TODO",
       "semantic_model.yaml: `semantic_model.0.datasets.0.source` is still TODO",
-      "`description` is still TODO",
     ]);
     expect(problems(text.replaceAll("TODO", "sales"))).toEqual([]);
   });

@@ -28,8 +28,23 @@ export const antigravity = defineTarget({
       scope: "user",
       codec: { id: "frontmatter-strict", keep: ["name", "description"] },
     },
+    // It documents no way to read a secret, so a server that needs one is left out.
+    mcp_server: {
+      shape: "config",
+      // Its CLI reads MCP servers only from the user's file, not a project's `.agents/`.
+      scope: "user",
+      file: "mcp_config.json",
+      format: "json",
+      at: ["mcpServers", "{name}"],
+      codec: {
+        id: "mcp-json",
+        url: { "streamable-http": "serverUrl" },
+        tools: { allow: ["enabledTools"], deny: ["disabledTools"] },
+      },
+      transports: ["stdio", "streamable-http"],
+    },
   },
-  verified: { command: ["agy", "--version"], range: "1.4.5" },
+  verified: { command: ["agy", "--version"], range: "1.4.5 || 1.5.17" },
   reload:
     "Start a new conversation in Antigravity, or run `/skills reload` in its CLI, to load the change.",
 });

@@ -1,7 +1,8 @@
-import type { LinkMode, Lock } from "#core/lock.ts";
+import type { LinkMode, Lock, LockEntry } from "#core/lock.ts";
 import type { Carried } from "#core/plan/carries.ts";
 import type { Action, PluginDocument, Staged } from "#core/plan/model.ts";
 import type { Roots } from "#core/store/paths.ts";
+import type { Configured } from "./configure.ts";
 import type { LinkGuard } from "./link-guard.ts";
 
 /** `record` only writes the lock, so it is not counted. */
@@ -34,12 +35,18 @@ export interface ApplyResult {
   /** Plugins this run installed or updated that carry something a target starts on its own. */
   carried: { name: string; carries: Carried[] }[];
   /** Rendered placements skipped because the artifact could not fill one. */
-  unrendered: { name: string; target: string; reason: string }[];
+  unrendered: {
+    name: string;
+    target: string;
+    reason: string;
+    /** Left out because `with`, another target sharing this entry, could not take it. */
+    shared?: { file: string; with: string };
+  }[];
 }
 
 export type ActionOf<K extends Action["kind"]> = Extract<Action, { kind: K }>;
 
-type Kept = ApplyResult["kept"][number];
+export type Kept = ApplyResult["kept"][number];
 type Adopted = ApplyResult["adopted"][number];
 export type BackedUp = ApplyResult["backedUp"][number];
 export type Unrendered = ApplyResult["unrendered"][number];
@@ -94,6 +101,10 @@ export interface RunResults {
   unrendered: Unrendered[];
   recorded: Lock | undefined;
   projections: ReadonlySet<string> | undefined;
+  /** By installed name, the config entries this run leaves aireg's. */
+  receipts: Map<string, LockEntry[]>;
+  /** Configure actions by the file and key path they write, and the targets each leaves out. */
+  shared: Map<string, { group: ActionOf<"configure">[]; out?: Map<string, Unrendered> }>;
 }
 
 export interface Run {
@@ -125,7 +136,7 @@ export function startRun(inputs: RunInputs, guards: Map<string, LinkGuard>): Run
       skipped: new Set(),
       blockers: new Map(),
       unstaged: new Map(),
-      performed: { stage: 0, clone: 0, link: 0, unlink: 0 },
+      performed: { stage: 0, clone: 0, link: 0, unlink: 0, configure: 0, unconfigure: 0 },
       installed: new Set(),
       kept: [],
       adopted: [],
@@ -133,6 +144,8 @@ export function startRun(inputs: RunInputs, guards: Map<string, LinkGuard>): Run
       unrendered: [],
       recorded: undefined,
       projections: undefined,
+      receipts: new Map(),
+      shared: new Map(),
     },
   };
 }
@@ -209,6 +222,22 @@ export function addLinked(results: RunResults, action: ActionOf<"link">, linked:
 export function addUnlinked(results: RunResults, backedUp: BackedUp | undefined): void {
   if (backedUp !== undefined) results.backedUp.push(backedUp);
   results.performed.unlink += 1;
+}
+
+export function addConfigured(
+  results: RunResults,
+  action: ActionOf<"configure" | "unconfigure">,
+  done: Configured,
+): void {
+  if (done.kept !== undefined) results.kept.push(done.kept);
+  if (done.unrendered !== undefined) results.unrendered.push(done.unrendered);
+  if (done.written) results.performed[action.kind] += 1;
+  if (action.kind === "unconfigure") return;
+  const receipts = results.receipts.get(action.name) ?? [];
+  if (done.receipt !== undefined) receipts.push(done.receipt);
+  if (done.denied !== undefined) receipts.push(done.denied);
+  results.receipts.set(action.name, receipts);
+  if (done.written) results.installed.add(action.name);
 }
 
 export interface Recorded {

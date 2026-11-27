@@ -2,6 +2,14 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 
 export type TomlScalar = string | number | boolean;
 
+/** What a key is set to: a scalar, or a one-line array of them. */
+export type TomlValue = TomlScalar | TomlScalar[];
+
+/** A table as read, with each table under it nested by its key; null is a value aireg does not read. */
+export interface TomlTable {
+  [key: string]: TomlValue | TomlTable | null;
+}
+
 const MAX_BYTES = 1_000_000;
 const BARE_KEY = /^[A-Za-z0-9_-]+$/;
 const ESCAPES: Readonly<Record<string, string>> = { n: "\n", t: "\t", r: "\r" };
@@ -35,24 +43,34 @@ export function multilineQuote(value: string): string {
 }
 
 /** Undefined when there is no such table; `[]` is the root. */
-export function readTable(
-  text: string,
-  at: readonly string[],
-): Record<string, TomlScalar | null> | undefined {
+export function readTable(text: string, at: readonly string[]): TomlTable | undefined {
   if (at.length === 0) return readRoot(text);
   const { start, entries } = span(text, at);
-  if (start < 0) return undefined;
-  const out: Record<string, TomlScalar | null> = {};
+  const children = childTables(text, at);
+  if (start < 0 && children.length === 0) return undefined;
+  const out: TomlTable = {};
   for (const { start: first, end, entry } of entries) {
     out[entry.keys[0]] = end - first === 1 ? parseValue(entry.raw) : null;
   }
+  for (const key of children) out[key] = readTable(text, [...at, key]) ?? {};
   return out;
 }
 
+/** The keys of the tables headed directly under `at`, in file order. */
+function childTables(text: string, at: readonly string[]): string[] {
+  const keys: string[] = [];
+  for (const { heading } of statements(text.split(/\r?\n/))) {
+    if (heading === undefined || heading.array || heading.at.length <= at.length) continue;
+    const key = heading.at[at.length] as string;
+    if (startsWith(heading.at, at) && !keys.includes(key)) keys.push(key);
+  }
+  return keys;
+}
+
 /** Single-line keys before the first heading. Read only. */
-function readRoot(text: string): Record<string, TomlScalar | null> {
+function readRoot(text: string): TomlTable {
   checked(text);
-  const out: Record<string, TomlScalar | null> = {};
+  const out: TomlTable = {};
   for (const { start, end, heading, entry } of statements(text.split(/\r?\n/))) {
     if (heading !== undefined) break;
     const [key, ...dotted] = entry?.keys ?? [];
@@ -152,7 +170,7 @@ interface Open {
 
 function parseEntry(line: string): { keys: string[]; raw: string } | undefined {
   const key = readKey(line);
-  const value = key === undefined ? null : /^=\s*(.*)$/.exec(key.rest);
+  const value = key === undefined ? null : /^=\s*(.*)$/s.exec(key.rest);
   return key === undefined || value === null ? undefined : { keys: key.keys, raw: value[1] ?? "" };
 }
 
@@ -218,7 +236,30 @@ function nesting(char: string | undefined, depth: number): number {
 }
 
 /** Null for a value this editor does not read, so it never equals one aireg would write. */
-function parseValue(raw: string): TomlScalar | null {
+function parseValue(raw: string): TomlValue | null {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) return parseArray(trimmed.slice(1));
+  return parseScalar(raw);
+}
+
+/** A one-line array of scalars, as aireg writes one; anything else reads as null. */
+function parseArray(raw: string): TomlScalar[] | null {
+  const items: TomlScalar[] = [];
+  let rest = raw.trimStart();
+  for (;;) {
+    if (rest.startsWith("]")) return /^\]\s*(#.*)?$/.test(rest) ? items : null;
+    const string = readString(rest);
+    const bare = string === undefined ? /^[^,\]]+/.exec(rest)?.[0] : undefined;
+    const item = string === undefined ? parseScalar(bare ?? "") : string.value;
+    if (item === null) return null;
+    items.push(item);
+    rest = (string === undefined ? rest.slice((bare ?? "").length) : string.rest).trimStart();
+    if (rest.startsWith(",")) rest = rest.slice(1).trimStart();
+    else if (!rest.startsWith("]")) return null;
+  }
+}
+
+function parseScalar(raw: string): TomlScalar | null {
   const string = readString(raw.trim());
   if (string !== undefined) return /^\s*(#.*)?$/.test(string.rest) ? string.value : null;
   const bare = raw.replace(/#.*$/, "").trim();
@@ -263,7 +304,10 @@ function span(text: string, at: readonly string[]): Span {
       table = heading.at;
     } else if (entry !== undefined) {
       if (inside && entry.keys.length === 1) entries.push(statement as Span["entries"][number]);
-      else elsewhere ||= !inside && startsWith([...table, ...entry.keys], at);
+      // A key under a table below this one sets that table, not this one's keys.
+      else
+        elsewhere ||=
+          !inside && table.length <= at.length && startsWith([...table, ...entry.keys], at);
     }
   }
   return { lines, nl, trailing, start, end, entries, elsewhere };
@@ -277,7 +321,7 @@ function startsWith(path: readonly string[], prefix: readonly string[]): boolean
 export function setKeys(
   text: string,
   at: readonly string[],
-  values: Readonly<Record<string, TomlScalar>>,
+  values: Readonly<Record<string, TomlValue>>,
 ): string {
   const found = span(text, at);
   const { lines, nl, start } = found;
@@ -288,7 +332,7 @@ export function setKeys(
       { code: ErrorCode.Invalid, hint: `Move those keys under a ${heading(at)} heading.` },
     );
   }
-  const line = (key: string, value: TomlScalar) => `${renderKey(key)} = ${renderValue(value)}`;
+  const line = (key: string, value: TomlValue) => `${renderKey(key)} = ${renderValue(value)}`;
   if (start < 0) {
     const body = Object.entries(values).map(([key, value]) => line(key, value));
     const prefix = text === "" ? "" : `${lines.join(nl)}${nl}${nl}`;
@@ -298,12 +342,13 @@ export function setKeys(
   for (const { entry } of found.entries) missing.delete(entry.keys[0]);
   return rewrite(
     found,
-    (key) => (Object.hasOwn(values, key) ? line(key, values[key] as TomlScalar) : undefined),
-    [...missing].map((key) => line(key, values[key] as TomlScalar)),
+    (key) => (Object.hasOwn(values, key) ? line(key, values[key] as TomlValue) : undefined),
+    [...missing].map((key) => line(key, values[key] as TomlValue)),
   );
 }
 
-function renderValue(value: TomlScalar): string {
+function renderValue(value: TomlValue): string {
+  if (Array.isArray(value)) return `[${value.map(renderValue).join(", ")}]`;
   return typeof value === "string" ? quote(value) : String(value);
 }
 
@@ -340,11 +385,13 @@ export function unsetKeys(text: string, at: readonly string[], keys: readonly st
   return rewrite(found, (key) => (keys.includes(key) ? null : undefined));
 }
 
-/** Also deletes the blank lines that set it apart. */
+/** With every table under it, and the blank lines that set each apart. */
 export function dropTable(text: string, at: readonly string[]): string {
-  const found = span(text, at);
+  let current = text;
+  for (const key of childTables(text, at)) current = dropTable(current, [...at, key]);
+  const found = span(current, at);
   const { lines, start, end } = found;
-  if (start < 0) return text;
+  if (start < 0) return current;
   let from = start;
   while (from > 0 && (lines[from - 1] ?? "").trim() === "") from -= 1;
   let to = end;

@@ -11,7 +11,7 @@ import { frontmatter } from "#core/frontmatter.ts";
 import { posixRelative } from "#core/fs/path.ts";
 import { canonicalAsync } from "#core/fs/realpath.ts";
 import { isDirectory } from "#core/fs/tree.ts";
-import { AGENT_ENTRY } from "#core/kinds.ts";
+import { AGENT_ENTRY, aKind } from "#core/kinds.ts";
 import type { Lock } from "#core/lock.ts";
 import { type ExportFile, isGlob } from "#core/manifest/export-fields.ts";
 import type { Export, ExportDependency, Manifest } from "#core/manifest/model.ts";
@@ -285,8 +285,6 @@ function untracked(path: string, reading: Reading): boolean {
   const { tracked } = reading;
   return tracked !== undefined && !tracked.some((file) => isWithin(path, file));
 }
-
-const aKind = (kind: ArtifactKind) => `${kind === "agent" ? "an" : "a"} ${kind}`;
 
 function refuseKind(entry: Export, roots: ReadonlyMap<string, ArtifactKind>, base: string): void {
   if (entry.kind === undefined) return;

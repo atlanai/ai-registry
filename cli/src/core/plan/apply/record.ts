@@ -27,6 +27,10 @@ export async function record(run: Run, action: ActionOf<"record">): Promise<Reco
   for (const [name, entry] of Object.entries(action.lock.artifacts)) {
     if (run.results.unstaged.has(name)) continue;
     if (patchRow(seen, roots.base, name, entry)) installed.push(name);
+    const receipts = run.results.receipts.get(name);
+    if (receipts !== undefined) {
+      entry.entries = receipts.length === 0 ? undefined : receipts;
+    }
   }
   await writeLock(roots, action.lock);
   return { lock: action.lock, projections, installed, copies, plugins };
