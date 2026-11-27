@@ -36,6 +36,15 @@ describe("build", () => {
     expect(kinds(plan)).toEqual(["stage", "clone", "link", "record"]);
   });
 
+  test("names no artifact for a registry's own warning", () => {
+    const sources = acquired([entry()]);
+    sources[0]?.catalog.warnings.push("Skipped skills/evil, which is a symlink.");
+    const plan = build(kitManifest(), emptyLock(), sources, { artifacts: {} }, PLAN_OPTIONS);
+    expect(plan.warnings).toEqual([
+      { name: undefined, message: "Skipped skills/evil, which is a symlink." },
+    ]);
+  });
+
   test("takes back the links an install gave a row of yours, and keeps the row", () => {
     const lock = installed();
     const origin = { target: "claude-code", path: ".claude/skills/my-lint", step: "origins" };

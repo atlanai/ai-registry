@@ -88,7 +88,7 @@ export async function applyLocal({
   const result = await commit({ loaded, plan: narrowed, acquired: scan.acquired, targets, onStep });
   for (const { name, message, hint } of plan.warnings) {
     // A published row's own note says why its copy stayed; the plan only saw an edit.
-    if (name === undefined || !recording.has(name) || published.has(name)) continue;
+    if (name !== undefined && (!recording.has(name) || published.has(name))) continue;
     notices.push({ message, ...(hint === undefined ? {} : { hint }) });
   }
   notices.push(...followed.notices, ...rewrittenNotices(plan));
