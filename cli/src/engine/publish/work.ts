@@ -10,6 +10,7 @@ import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { descriptionText, frontmatter } from "#core/frontmatter.ts";
 import { posixRelative } from "#core/fs/path.ts";
+import { canonical } from "#core/fs/realpath.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { ExportFile } from "#core/manifest/export-fields.ts";
@@ -155,7 +156,7 @@ function distinct(works: readonly Work[], cwd: string): Work[] {
       kept.push(work);
       continue;
     }
-    if (realOrSelf(other.path) === realOrSelf(work.path)) continue;
+    if (canonical(other.path) === canonical(work.path)) continue;
     const [one, two] = [other, work].map((each) => posixRelative(cwd, each.path) || ".");
     throw new AiregError(`${one} and ${two} are both ${work.kind} ${work.name}.`, {
       code: ErrorCode.Invalid,
@@ -163,10 +164,6 @@ function distinct(works: readonly Work[], cwd: string): Work[] {
     });
   }
   return kept;
-}
-
-function realOrSelf(path: string): string {
-  return existsSync(path) ? realpathSync(path) : path;
 }
 
 function installedKey(arg: string, loaded: Loaded): string | undefined {
