@@ -9,16 +9,20 @@ and a JSON Pointer that exist. That catches the likely failure, a typo'd $ref.
 
 The instance tier validates each example registry's documents (every
 examples/*/registry.json root) against their schemas, asserting `format` where
-the validator has a checker for it, and needs `jsonschema`. Without it the tier reports itself skipped and the run still
-succeeds, so this script is usable wherever tools/check.py is. CI passes
---require-jsonschema, which makes a missing `jsonschema` an error instead.
+the validator has a checker for it, and needs `jsonschema`. It also validates each
+native file a kind manifest's file rule gives a `schema`, which for YAML needs PyYAML.
+Without either module its part reports itself skipped and the run still succeeds, so
+this script is usable wherever tools/check.py is. CI passes --require-jsonschema,
+which makes a missing module an error instead.
 
 $ids here are relative paths, not URLs, so schemas are preloaded into a resolver
-keyed by path rather than fetched. See spec/schemas/README.md.
+keyed by path rather than fetched. See spec/schemas/README.md. A schema under
+vendor/ is another project's file; see check_vendored.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -27,6 +31,7 @@ REPO = Path(__file__).resolve().parent.parent
 SCHEMA_DIR = REPO / "spec" / "schemas"
 EXAMPLES = sorted(path.parent for path in (REPO / "examples").glob("*/registry.json"))
 DIALECT = "https://json-schema.org/draft/2020-12/schema"
+DRAFT_07 = "http://json-schema.org/draft-07/schema#"
 
 
 class Report:
@@ -49,6 +54,76 @@ def schema_paths() -> list[Path]:
 
 def rel(path: Path) -> str:
     return path.relative_to(SCHEMA_DIR).as_posix()
+
+
+def is_vendored(key: str) -> bool:
+    """A schema copied unchanged from another project, under a vendor/ folder."""
+    return "vendor" in Path(key).parts
+
+
+def vendor_readme(path: Path) -> Path | None:
+    """The README.md of the vendor folder a vendored schema sits under, if there is one."""
+    for parent in path.parents:
+        if parent.parent.name == "vendor":
+            readme = parent / "README.md"
+            return readme if readme.is_file() else None
+    return None
+
+
+# Keywords beside $ref that only annotate. Anything else, including $id, which in 2020-12
+# moves the base the $ref resolves against, makes draft-07 and 2020-12 disagree.
+ANNOTATIONS = {"$ref", "$schema", "$comment", "title", "description", "default",
+               "examples", "example", "definitions", "$defs", "deprecated", "readOnly", "writeOnly"}
+# Keywords whose value is a map of names to subschemas: every value is walked, whatever its name.
+SCHEMA_MAPS = {"properties", "patternProperties", "definitions", "$defs"}
+# Keywords whose value is data, not a schema.
+DATA = {"enum", "const", "default", "examples", "example"}
+
+
+def draft07_differences(node, trail: str = "$"):
+    """Places where a draft-07 schema would validate differently under 2020-12 semantics.
+
+    A validator that cannot mix dialects, such as Ajv, applies a vendored draft-07 schema
+    with 2020-12 semantics, so a copy is accepted only while that gives the same answer.
+    """
+    if isinstance(node, list):
+        for i, value in enumerate(node):
+            yield from draft07_differences(value, f"{trail}[{i}]")
+        return
+    if not isinstance(node, dict):
+        return
+    if isinstance(node.get("items"), list):
+        yield f"{trail}.items is an array"
+    for keyword in ("additionalItems", "dependencies"):
+        if keyword in node:
+            yield f"{trail} uses {keyword}"
+    if "$ref" in node and trail != "$" and set(node) - ANNOTATIONS:
+        yield f"{trail} has keywords beside $ref: {sorted(set(node) - ANNOTATIONS)}"
+    for key, value in node.items():
+        if key in DATA:
+            continue
+        if key in SCHEMA_MAPS and isinstance(value, dict):
+            for name, schema in value.items():
+                yield from draft07_differences(schema, f"{trail}.{key}.{name}")
+        else:
+            yield from draft07_differences(value, f"{trail}.{key}")
+
+
+def check_vendored(key: str, path: Path, doc: dict, rep: Report) -> None:
+    readme = vendor_readme(path)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if readme is None:
+        rep.error(f"{key}: vendored, but its vendor folder has no README.md recording its source")
+    elif digest not in readme.read_text():
+        rep.error(f"{key}: sha256 {digest} is not the one {rel(readme)} records; "
+                  "copy the file unchanged from its source, or update the README")
+    if doc.get("$schema") == DRAFT_07:
+        for difference in draft07_differences(doc):
+            rep.error(f"{key}: {difference}, which 2020-12 validates differently")
+    elif doc.get("$schema") != DIALECT:
+        rep.error(f"{key}: $schema is {doc.get('$schema')!r}, expected {DIALECT} or {DRAFT_07}")
+    if not isinstance(doc.get("$id"), str) or "://" not in doc["$id"]:
+        rep.error(f"{key}: a vendored schema keeps its project's absolute $id")
 
 
 def resolve_pointer(doc, pointer: str):
@@ -88,6 +163,9 @@ def check_structure(rep: Report) -> dict[str, dict]:
 
     seen: dict[str, str] = {}
     for key, doc in loaded.items():
+        if is_vendored(key):
+            check_vendored(key, SCHEMA_DIR / key, doc, rep)
+            continue
         if doc.get("$schema") != DIALECT:
             rep.error(f"{key}: $schema is {doc.get('$schema')!r}, expected {DIALECT}")
         ident = doc.get("$id")
@@ -157,10 +235,14 @@ def check_instances(loaded: dict[str, dict], rep: Report, required: bool) -> boo
                      "(pip install -r tools/requirements.txt). Structural checks above still ran.")
         return False
 
-    registry = Registry().with_resources(
+    resources = [
         (key, Resource.from_contents(doc, default_specification=DRAFT202012))
         for key, doc in loaded.items()
-    )
+    ]
+    # A vendored schema's own references resolve against its own absolute $id.
+    resources += [(resource.id(), resource) for key, resource in resources
+                  if is_vendored(key) and resource.id() is not None]
+    registry = Registry().with_resources(resources)
 
     checked = 0
     for path, schema_keys in instances():
@@ -178,6 +260,8 @@ def check_instances(loaded: dict[str, dict], rep: Report, required: bool) -> boo
                 rep.error(f"{path.relative_to(REPO)} against {key}: at {where}: {err.message}")
             checked += 1
 
+    checked += check_native_files(loaded, registry, rep, required)
+
     # Each kind manifest must also be a valid 2020-12 schema in its own right.
     for manifest in sorted((SCHEMA_DIR / "kinds").glob("*.json")):
         try:
@@ -188,6 +272,120 @@ def check_instances(loaded: dict[str, dict], rep: Report, required: bool) -> boo
 
     print(f"ran {checked} validations")
     return True
+
+
+def shown(path: Path) -> str:
+    return str(path.relative_to(REPO)) if path.is_relative_to(REPO) else str(path)
+
+
+def file_rules(manifest: dict) -> list[dict]:
+    files = manifest.get("x-registry-files", {})
+    sets = [files.get("required", []), files.get("optional", []), *files.get("one_of", [])]
+    return [rule for rule in (r for group in sets for r in group) if isinstance(rule, dict)]
+
+
+# YAML 1.2 core schema, as the CLI's `yaml` package reads it; PyYAML's own resolvers are YAML 1.1.
+CORE_RESOLVERS = [
+    ("tag:yaml.org,2002:null", r"^(?:~|null|Null|NULL|)$", "~nN"),
+    ("tag:yaml.org,2002:bool", r"^(?:true|True|TRUE|false|False|FALSE)$", "tTfF"),
+    ("tag:yaml.org,2002:int", r"^(?:[-+]?[0-9]+|0o[0-7]+|0x[0-9a-fA-F]+)$", "-+0123456789"),
+    (
+        "tag:yaml.org,2002:float",
+        r"^(?:[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$",
+        "-+0123456789.",
+    ),
+]
+
+
+def yaml_loader():
+    """YAML 1.2 core as the CLI reads it: no 1.1 booleans or dates, no merge keys, unique keys."""
+    import re
+
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        yaml_implicit_resolvers = {}
+
+        def construct_mapping(self, node, deep=False):
+            seen = set()
+            for key_node, _ in node.value:
+                key = self.construct_object(key_node, deep=True)
+                if key in seen:
+                    raise yaml.constructor.ConstructorError(
+                        None, None, f"duplicate key {key!r}", key_node.start_mark
+                    )
+                seen.add(key)
+            return super().construct_mapping(node, deep)
+
+        def flatten_mapping(self, node):
+            pass  # `<<` is an ordinary key in YAML 1.2, not a merge
+
+    for tag, pattern, first in CORE_RESOLVERS:
+        Loader.add_implicit_resolver(tag, re.compile(pattern), list(first) + ([""] if tag.endswith("null") else []))
+
+    def core_int(loader, node):
+        text = loader.construct_scalar(node)
+        for prefix, base in (("0o", 8), ("0x", 16)):
+            if text.startswith(prefix):
+                return int(text[2:], base)
+        return int(text, 10)
+
+    Loader.add_constructor("tag:yaml.org,2002:int", core_int)
+    return lambda text: yaml.load(text, Loader=Loader)  # noqa: S506 - a SafeLoader subclass
+
+
+def check_native_files(loaded: dict[str, dict], registry, rep: Report, required: bool) -> int:
+    """Validate each native file a kind manifest gives a schema, parsed by its extension."""
+    from jsonschema import Draft202012Validator
+
+    try:
+        load_yaml = yaml_loader()
+    except ImportError:
+        load_yaml = None
+        if required:
+            rep.error("PyYAML is not installed, and --require-jsonschema needs it for YAML native files "
+                      "(pip install -r tools/requirements.txt)")
+        else:
+            rep.note("PyYAML is not installed; YAML native files are not validated "
+                     "(pip install -r tools/requirements.txt)")
+
+    checked = 0
+    for example in EXAMPLES:
+        for envelope in sorted((example / "artifacts").rglob("artifact.json")):
+            try:
+                kind = json.loads(envelope.read_text()).get("kind")
+            except (OSError, json.JSONDecodeError):
+                continue  # the envelope check above reports it
+            manifest = loaded.get(f"kinds/{kind}.json")
+            if manifest is None:
+                continue
+            for rule in file_rules(manifest):
+                if "schema" not in rule or "path" not in rule:
+                    continue
+                native = envelope.parent / rule["path"]
+                if not native.is_file():
+                    continue
+                is_yaml = native.suffix in (".yaml", ".yml")
+                if is_yaml and load_yaml is None:
+                    continue
+                try:
+                    text = native.read_text()
+                    document = load_yaml(text) if is_yaml else json.loads(text)
+                except Exception as exc:  # noqa: BLE001 - a parse error, surfaced verbatim
+                    rep.error(f"{shown(native)}: does not parse: {exc}")
+                    continue
+                # Scoped to the manifest, so its #/$defs and relative refs resolve as they would there.
+                schema = {**rule["schema"], "$id": manifest["$id"],
+                          "$defs": {**manifest.get("$defs", {}), **rule["schema"].get("$defs", {})}}
+                validator = Draft202012Validator(schema, registry=registry)
+                for err in sorted(validator.iter_errors(document), key=lambda e: list(e.path)):
+                    where = "/".join(str(p) for p in err.path) or "(root)"
+                    # jsonschema quotes the whole failing value, which for a list of models is the file.
+                    message = err.message if len(err.message) <= 200 else f"fails {err.validator}: {err.validator_value!r}"
+                    rep.error(f"{shown(native)} against {manifest['$id']} {rule['path']}: "
+                              f"at {where}: {message}")
+                checked += 1
+    return checked
 
 
 def main() -> int:

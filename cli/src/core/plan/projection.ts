@@ -344,7 +344,8 @@ function plannedLink(
   options: ProjectionOptions,
   kind?: ArtifactKind,
 ): PlannedLink {
-  const mapping = kind === undefined ? undefined : options.targetTable[name]?.kinds[kind];
+  const found = kind === undefined ? undefined : options.targetTable[name]?.kinds[kind];
+  const mapping = found?.shape === "config" ? undefined : found;
   return {
     target: name,
     absolute: path,

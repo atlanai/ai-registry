@@ -1,4 +1,5 @@
 import type { Artifact, Credential, Want } from "#adapter/index.ts";
+import { normalizedDigest } from "#core/fs/digest.ts";
 import { cloneLock, type Lock } from "#core/lock.ts";
 import { acquire } from "#core/plan/acquire/acquire.ts";
 import type { Roots } from "#core/store/paths.ts";
@@ -14,6 +15,8 @@ export interface Scan {
   items: SyncItem[];
   roots: Roots;
   local: Candidate[];
+  /** Each copy of an unmanaged skill whose name a copy with different files shares. */
+  differing: Candidate[];
   undeclared: Candidate[];
   publisher: Map<string, string>;
   pinned: Lock;
@@ -79,9 +82,32 @@ export async function scan(
   const unique = (items: Candidate[]) => [
     ...new Map(items.map((item) => [`${item.kind}:${item.name}`, item])).values(),
   ];
-  const local = unique([...discovered.local]);
+  const { kept, differing } = await withoutDiffering(discovered.local);
+  const local = unique(kept);
   const undeclared = unique([...discovered.undeclared]);
-  return { items, roots: loaded.roots, local, undeclared, publisher, pinned, acquired };
+  return { items, roots: loaded.roots, local, differing, undeclared, publisher, pinned, acquired };
+}
+
+/** Skills of one name whose files differ are different skills, so neither stands in for the other. */
+async function withoutDiffering(
+  found: readonly Candidate[],
+): Promise<{ kept: Candidate[]; differing: Candidate[] }> {
+  const kept: Candidate[] = [];
+  const differing: Candidate[] = [];
+  for (const item of found) {
+    if (item.kind !== "skill" || item.elsewhere.length === 0) {
+      kept.push(item);
+      continue;
+    }
+    const copies = [item, ...item.elsewhere];
+    const digests = new Set(await Promise.all(copies.map(({ from }) => normalizedDigest(from))));
+    if (digests.size === 1) kept.push(item);
+    else
+      differing.push(
+        ...copies.map(({ from, target }) => ({ ...item, from, target, elsewhere: [] })),
+      );
+  }
+  return { kept, differing };
 }
 
 /** The daemon scans repeatedly, so an open connection or timer would otherwise leak. */

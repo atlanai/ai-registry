@@ -2,16 +2,18 @@ import { rm, rmdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fanOut } from "#core/fs/link.ts";
 import { entries, remove } from "#core/fs/tree.ts";
+import { isStoreOnly } from "#core/kinds.ts";
 import { assertLeasesHeld } from "#core/lease/lease.ts";
 import { type Lock, readLock } from "#core/lock.ts";
 import { carriedBy } from "#core/plan/carries.ts";
-import type { Action, Fetch, Plan } from "#core/plan/model.ts";
+import { type Action, type Fetch, type Plan, storeOnlyNames } from "#core/plan/model.ts";
 import { assertRemovable } from "#core/plan/removable.ts";
 import { backupStamp } from "#core/store/backups.ts";
 import { ensureScopeIgnore } from "#core/store/ignore.ts";
 import { assertManagedPath } from "#core/store/managed-paths.ts";
 import { PROJECTIONS_DIR, type Roots } from "#core/store/paths.ts";
 import { assemble } from "./assemble.ts";
+import { configure, entryStays, shareEntries, unconfigure } from "./configure.ts";
 import { journal } from "./journal.ts";
 import { linkInto, preflight, unlink } from "./link.ts";
 import { record } from "./record.ts";
@@ -19,18 +21,37 @@ import { applyRegistrations } from "./registrations.ts";
 import {
   type ApplyResult,
   addCloned,
+  addConfigured,
   addLinked,
   addRecorded,
   addStaging,
   addUnlinked,
+  linkKey,
   type Run,
   type RunInputs,
+  type RunResults,
   startRun,
 } from "./run.ts";
 import { cloneInto, prefetch, stage } from "./stage.ts";
 
-const linked = (lock: Lock | undefined, name: string): number =>
-  lock?.artifacts[name]?.links.length ?? 0;
+/** How many places hold the artifact: its links and config entries, or its own copy for a kind that has none. */
+const linked = (lock: Lock | undefined, name: string): number => {
+  const artifact = lock?.artifacts[name];
+  if (artifact === undefined) return 0;
+  return isStoreOnly(artifact.kind) ? 1 : artifact.links.length + (artifact.entries?.length ?? 0);
+};
+
+/** The store-only artifacts this run copied into the scope: for them the copy is the install. */
+function copied(plan: Plan, results: RunResults): string[] {
+  const storeOnly = storeOnlyNames(results.recorded);
+  return plan.actions.flatMap((action) =>
+    action.kind === "clone" &&
+    storeOnly.has(action.name) &&
+    !results.skipped.has(linkKey(action.name, action.to))
+      ? [action.name]
+      : [],
+  );
+}
 
 export interface ApplyOptions {
   plan: Plan;
@@ -55,6 +76,7 @@ export async function apply({
     { roots, env, ahead: prefetch(plan, fetch), before, stamp: () => (stamp ??= backupStamp()) },
     guards,
   );
+  shareEntries(run, plan.actions);
 
   let leaseCheckedAt = 0;
   for (const action of plan.actions) {
@@ -64,7 +86,7 @@ export async function apply({
       leaseCheckedAt = Date.now();
     }
     onStep?.(action);
-    if (action.kind !== "record")
+    if (action.kind !== "record" && action.kind !== "configure" && action.kind !== "unconfigure")
       await assertManagedPath(action.to, roots, { leaf: action.kind !== "unlink", env });
     await applyAction(run, action);
   }
@@ -72,17 +94,23 @@ export async function apply({
 
   await rm(roots.applyJournal, { force: true });
   const { results } = run;
+  const { recorded } = results;
   return {
     performed: results.performed,
-    installed: [...results.installed].sort(),
+    installed: [...new Set([...results.installed, ...copied(plan, results)])].sort(),
     added: Object.keys(results.recorded?.artifacts ?? {})
       .filter((name) => linked(before, name) === 0)
       .sort(),
     removed:
-      results.recorded === undefined
+      recorded === undefined
         ? []
         : Object.keys(before?.artifacts ?? {})
-            .filter((name) => linked(before, name) > 0 && linked(results.recorded, name) === 0)
+            // One whose link was never made held no place, so leaving the lock is its removal.
+            .filter(
+              (name) =>
+                recorded.artifacts[name] === undefined ||
+                (linked(before, name) > 0 && linked(recorded, name) === 0),
+            )
             .sort(),
     lock: results.recorded,
     degraded: [...results.degraded].sort(),
@@ -110,6 +138,14 @@ async function applyAction(run: Run, action: Action): Promise<void> {
       return addLinked(results, action, await linkInto(run, action));
     case "unlink":
       return addUnlinked(results, await unlink(run, action));
+    case "configure":
+      return addConfigured(results, action, await configure(run, action));
+    case "unconfigure":
+      // An edited entry stays, so the tools it denies stay denied.
+      if (action.receipt.items !== undefined && (await entryStays(run, action))) {
+        return addConfigured(results, action, { written: false });
+      }
+      return addConfigured(results, action, await unconfigure(run, action));
     case "record":
       return addRecorded(results, await record(run, action));
   }

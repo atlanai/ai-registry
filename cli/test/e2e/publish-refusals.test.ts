@@ -102,4 +102,21 @@ describe("a refused publish", () => {
     }
     await rm(join(version, "scripts"));
   });
+
+  test("refuses a symlinked folder with a hint that runs as printed", async ({ aireg }) => {
+    await mkdir(join(work, "real", "pointed"), { recursive: true });
+    await writeFile(join(work, "real", "pointed", "SKILL.md"), skillBody("pointed"));
+    await symlink(join(work, "real", "pointed"), join(work, "skills", "pointed"));
+
+    const send = ["publish", "skills/pointed", "--to", "team/platform", "--dry-run"];
+    const refused = await aireg(send, { cwd: work });
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("pointed is a symlink; an artifact holds regular files only.");
+    const hint = refused.stderr.match(/`aireg (publish [^`]+)`/);
+    expect(hint, refused.stderr).not.toBeNull();
+    // The temp path needs no shell quoting, so splitting on spaces reads it back.
+    const again = await aireg((hint as RegExpMatchArray)[1]?.split(" ") ?? [], { cwd: work });
+    expect(again.code, again.stderr).toBe(0);
+    expect(existsSync(join(registryRoot, "artifacts", "platform", "skill", "pointed"))).toBe(false);
+  });
 });

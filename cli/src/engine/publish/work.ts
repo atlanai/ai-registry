@@ -9,13 +9,17 @@ import { isWithin } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { descriptionText, frontmatter } from "#core/frontmatter.ts";
+import { posixRelative } from "#core/fs/path.ts";
+import { canonical } from "#core/fs/realpath.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import type { ExportFile } from "#core/manifest/export-fields.ts";
 import type { Export } from "#core/manifest/model.ts";
 import { gitIn } from "#core/process.ts";
 import { refuseRedirectedCopy } from "#core/store/managed-paths.ts";
-import { artifactPath, copyLeaf } from "#core/store/paths.ts";
+import { artifactPath, copyLeaf, type Scope, scopeFlag } from "#core/store/paths.ts";
+import type { Candidate } from "#core/sync/adopt.ts";
+import { shellWord } from "#core/term/format.ts";
 import { matchInstalled, rowsNamed } from "#engine/installed-names.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/scope/load.ts";
@@ -100,11 +104,15 @@ export async function expand(pattern: string, cwd: string): Promise<string[]> {
   return found.sort();
 }
 
-/** Each argument is a path, a glob over paths, or an installed name; a folder beside you wins. */
+/**
+ * Each argument is a path, a glob over paths, or an installed name; a folder beside you wins.
+ * `again` holds the arguments a hint repeats after the path, such as `--to`.
+ */
 export async function fromArgs(
   args: readonly string[],
   loaded: Loaded,
   cwd: string,
+  again: readonly string[] = [],
 ): Promise<Work[]> {
   const rows = loaded.lock.artifacts;
   const works: Work[] = [];
@@ -132,11 +140,36 @@ export async function fromArgs(
         const copy = copyPath(name, entry, loaded);
         return existsSync(copy) && realpathSync(copy) === target;
       });
-      if (row === undefined) throw linkedRoot(path, target);
+      if (row === undefined) throw linkedRoot(path, target, loaded.roots.scope, again);
       works.push(installed(row[0], row[1], loaded));
     }
   }
-  return works;
+  return distinct(works, cwd);
+}
+
+/**
+ * One version folder per kind and name: two paths of one name in one call would write the
+ * second over the first. The same folder named twice is one artifact.
+ */
+function distinct(works: readonly Work[], cwd: string): Work[] {
+  const kept: Work[] = [];
+  const seen = new Map<string, Work>();
+  for (const work of works) {
+    const key = `${work.kind}/${work.name}`;
+    const other = seen.get(key);
+    if (other === undefined) {
+      seen.set(key, work);
+      kept.push(work);
+      continue;
+    }
+    if (canonical(other.path) === canonical(work.path)) continue;
+    const [one, two] = [other, work].map((each) => posixRelative(cwd, each.path) || ".");
+    throw new AiregError(`${one} and ${two} are both ${work.kind} ${work.name}.`, {
+      code: ErrorCode.Invalid,
+      hint: "Publish one of them, or give one another `name` in its front matter.",
+    });
+  }
+  return kept;
 }
 
 function installedKey(arg: string, loaded: Loaded): string | undefined {
@@ -176,10 +209,16 @@ function linkTarget(path: string): string | undefined {
   return existsSync(path) ? realpathSync(path) : undefined;
 }
 
-function linkedRoot(path: string, target: string): AiregError {
+function linkedRoot(
+  path: string,
+  target: string,
+  scope: Scope,
+  again: readonly string[],
+): AiregError {
+  const words = [target, ...again].map(shellWord).join(" ");
   return new AiregError(`${basename(path)} is a symlink; an artifact holds regular files only.`, {
     code: ErrorCode.Invalid,
-    hint: `Publish the folder it points to: \`aireg publish ${quoted(target)}\`.`,
+    hint: `Publish the folder it points to: \`aireg publish ${words}${scopeFlag(scope)}\`.`,
   });
 }
 
@@ -208,7 +247,11 @@ export async function changedSince(works: Work[], rev: string, cwd: string): Pro
 }
 
 /** What this scope changed or wrote that its registries do not hold yet. */
-export async function edited(loaded: Loaded, common: CommonOptions, cwd: string): Promise<Work[]> {
+export async function edited(
+  loaded: Loaded,
+  common: CommonOptions,
+  cwd: string,
+): Promise<{ works: Work[]; differing: Candidate[] }> {
   const found = await scan(loaded, common, {
     credentials: await credentialsForManifest(loaded.manifest.registries, cwd),
   });
@@ -230,5 +273,5 @@ export async function edited(loaded: Loaded, common: CommonOptions, cwd: string)
       base: undefined,
     });
   }
-  return works;
+  return { works, differing: found.differing };
 }

@@ -2,10 +2,17 @@ import { relative } from "node:path";
 import type { ArtifactKind } from "#adapter/kinds.ts";
 import { list, plural } from "#adapter/text.ts";
 import { olderThan } from "#core/engines.ts";
-import type { Lock } from "#core/lock.ts";
+import { isStoreOnly } from "#core/kinds.ts";
+import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { ApplyResult } from "#core/plan/apply/run.ts";
 import { describeCarried } from "#core/plan/carries.ts";
-import type { Action, Plan, Renamed } from "#core/plan/model.ts";
+import {
+  type Action,
+  type Plan,
+  type Renamed,
+  recordOf,
+  storeOnlyNames,
+} from "#core/plan/model.ts";
 import type { Roots } from "#core/store/paths.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { trustFor } from "#core/target/placement.ts";
@@ -35,6 +42,8 @@ const VERB: Record<Shown["kind"], string> = {
   clone: "copy",
   link: "install",
   unlink: "uninstall",
+  configure: "configure",
+  unconfigure: "unconfigure",
 };
 
 export function whoNeeds(by: readonly string[]): string {
@@ -57,11 +66,15 @@ export function summarize(
     new Set(shown.flatMap((action) => (kinds.includes(action.kind) ? [action.name] : [])));
   const held = applied.lock?.artifacts;
   // A namespace installs through one link, so the lock, not the link, says where each one went.
-  const targetsOf = (name: string) =>
-    held?.[name]?.links.map((item) => item.target) ??
-    shown.flatMap((action) =>
-      action.kind === "link" && action.name === name ? [action.target] : [],
+  const targetsOf = (name: string) => {
+    const row = held?.[name];
+    if (row !== undefined) return [...row.links, ...(row.entries ?? [])].map((item) => item.target);
+    return shown.flatMap((action) =>
+      (action.kind === "link" || action.kind === "configure") && action.name === name
+        ? [action.target]
+        : [],
     );
+  };
   // Named as they were chosen: one folder can serve several tools.
   const toolsOf = (name: string, folders = targetsOf(name)): string[] => {
     const kind = held?.[name]?.kind ?? before.artifacts[name]?.kind;
@@ -73,8 +86,11 @@ export function summarize(
         toolName(targetTable, tool),
       ),
     );
-  const installed = applied.added.filter((name) => targetsOf(name).length > 0);
-  const changed = [...touched("clone", "link", "unlink")].filter(
+  const copyOf = (name: string) => storeCopy(held?.[name] ?? before.artifacts[name]);
+  const installed = applied.added.filter(
+    (name) => targetsOf(name).length > 0 || copyOf(name) !== undefined,
+  );
+  const changed = [...touched("clone", "link", "unlink", "configure", "unconfigure")].filter(
     (name) => !applied.added.includes(name) && !applied.removed.includes(name),
   );
   const lines = Object.values(applied.performed).some((count) => count > 0)
@@ -92,6 +108,7 @@ export function summarize(
   }
   for (const line of lines) printer.success(line);
   const acted = touched("clone", "link", "unlink", "stage");
+  noteCopies(printer, [...installed, ...changed], held, copyOf);
   for (const [name, by] of Object.entries(plan.neededBy)) {
     if (acted.has(name)) printer.note("with", `${name}, which ${whoNeeds(by)}`);
   }
@@ -119,6 +136,24 @@ export function summarize(
     targets,
     scope,
   );
+}
+
+/** Where a kind no coding agent has a folder for is installed: this scope's copy, which no link names. */
+function storeCopy(artifact: LockArtifact | undefined): string | undefined {
+  return artifact !== undefined && isStoreOnly(artifact.kind) ? artifact.path : undefined;
+}
+
+/** Says where each such artifact's files are, since no target's folder shows them. */
+function noteCopies(
+  printer: Printer,
+  names: readonly string[],
+  held: Lock["artifacts"] | undefined,
+  copyOf: (name: string) => string | undefined,
+): void {
+  for (const name of names) {
+    const copy = copyOf(name);
+    if (copy !== undefined && held?.[name] !== undefined) printer.note("at", copy);
+  }
 }
 
 /** Up to three names, else a count, so a large install still reads as one line. */
@@ -253,7 +288,8 @@ export type Ran = Pick<RunResult, "plan" | "before" | "targets" | "targetTable" 
 };
 
 function targetOf(action: Shown): string | undefined {
-  if (action.kind === "link") return action.target;
+  if (action.kind === "link" || action.kind === "configure") return action.target;
+  if (action.kind === "unconfigure") return action.target;
   return action.kind === "unlink" ? action.link?.target : undefined;
 }
 
@@ -266,6 +302,20 @@ function placedKind(
   return (action.plugin === true ? "plugin" : action.part) ?? kindOf(action.name);
 }
 
+/** What a dry run would install: each linked artifact, and each store-only one it would copy. */
+function plannedInstalls(plan: Plan, planned: readonly Action[]): string[] {
+  const storeOnly = storeOnlyNames(recordOf(plan));
+  return [
+    ...new Set(
+      planned.flatMap((action) =>
+        action.kind === "link" || (action.kind === "clone" && storeOnly.has(action.name))
+          ? [action.name]
+          : [],
+      ),
+    ),
+  ].sort();
+}
+
 export function outcome({ plan, applied }: RunResult, dryRun: boolean): Outcome {
   const planned = plan.actions.filter((action) => action.kind !== "record");
   return {
@@ -274,11 +324,7 @@ export function outcome({ plan, applied }: RunResult, dryRun: boolean): Outcome 
       applied === undefined
         ? planned.length
         : Object.values(applied.performed).reduce((sum, count) => sum + count, 0),
-    installed:
-      applied?.installed ??
-      [
-        ...new Set(planned.flatMap((action) => (action.kind === "link" ? [action.name] : []))),
-      ].sort(),
+    installed: applied?.installed ?? plannedInstalls(plan, planned),
     kept: applied?.kept ?? [],
     ...collisionFields(plan),
   };

@@ -27,6 +27,20 @@ const Artifact = Type.Object(
       description: "`false` for one already published, or under `--dry-run`.",
     }),
     dependsOn: Type.Array(Type.Object({ to: Type.String() }, { additionalProperties: false })),
+    withheld: Type.Optional(
+      Type.Object(
+        {
+          version: Type.String(),
+          status: Type.String({ description: "Such as `blocked`, `pending_review` or `draft`." }),
+          reason: Type.Optional(Type.String()),
+        },
+        {
+          additionalProperties: false,
+          description:
+            "The version the registry would serve, when its status holds it back instead.",
+        },
+      ),
+    ),
     files: Type.Optional(Paths),
     filesChanged: Type.Optional(
       Type.Object(

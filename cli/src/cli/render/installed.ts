@@ -66,7 +66,9 @@ export function installed(lock: Lock, manifest: Manifest, targetTable: Targets):
             ? ""
             : abbreviate(source.revision)),
         pinned: entry !== undefined && pinOf(manifest, entry) !== undefined,
-        targets: [...new Set((entry?.links ?? []).map((link) => link.target))].sort(),
+        targets: [
+          ...new Set([...(entry?.links ?? []), ...(entry?.entries ?? [])].map((at) => at.target)),
+        ].sort(),
         ...(watched === undefined ? {} : { watched }),
         ...(neededBy === undefined ? {} : { neededBy }),
       };

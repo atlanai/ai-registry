@@ -282,6 +282,69 @@ describe("validateRoot on blob storage", () => {
   });
 });
 
+describe("validateRoot on an MCP server", () => {
+  const VERSION = "artifacts/engineering/mcp_server/issue-tracker/1.2.0";
+  const edit = async <T>(root: string, file: string, change: (document: T) => void) => {
+    const at = join(root, VERSION, file);
+    const document = JSON.parse(await readFile(at, "utf8")) as T;
+    change(document);
+    await writeFile(at, JSON.stringify(document));
+  };
+  const messages = async (root: string) =>
+    (await validateRoot(root)).problems.map((problem) => problem.message);
+
+  test("checks server.json against the MCP Registry's draft-07 schema", async ({ root }) => {
+    await cp(ACME, root, { recursive: true });
+    await edit<{ packages: [{ transport: unknown }] }>(root, "server.json", (server) => {
+      server.packages[0].transport = { type: "carrier-pigeon" };
+    });
+
+    const found = await messages(root);
+    const invalid =
+      "server.json: `packages.0.transport.type` must be equal to one of the allowed values";
+    expect(found.filter((message) => message === invalid)).toHaveLength(1);
+  });
+
+  test("names the JSON file that does not parse", async ({ root }) => {
+    await cp(ACME, root, { recursive: true });
+    await writeFile(join(root, VERSION, "server.json"), "{");
+
+    const found = await messages(root);
+    expect(found.some((message) => message.startsWith("server.json does not parse:"))).toBe(true);
+  });
+
+  test("says once that server.json is missing, and nothing of front matter", async ({ root }) => {
+    await cp(ACME, root, { recursive: true });
+    await rm(join(root, VERSION, "server.json"));
+
+    const found = await messages(root);
+    expect(found.filter((message) => message === "has no server.json")).toHaveLength(1);
+    expect(found.some((message) => message.includes("front matter"))).toBe(false);
+  });
+
+  test("reports an unfilled description once, where server.json holds it", async ({ root }) => {
+    await cp(ACME, root, { recursive: true });
+    await edit<{ description: string }>(root, "server.json", (server) => {
+      server.description = "TODO";
+    });
+
+    const found = await messages(root);
+    expect(found).toContain("server.json: `description` is still TODO");
+    expect(found).not.toContain("`description` is still TODO");
+  });
+
+  test("refuses an artifact.json whose spec its server.json does not give", async ({ root }) => {
+    await cp(ACME, root, { recursive: true });
+    await edit<{ spec: { description: string } }>(root, "artifact.json", (envelope) => {
+      envelope.spec.description = "Something else.";
+    });
+
+    expect(await messages(root)).toContain(
+      "has a `spec` that its files do not give; run `aireg registry index` to write it again",
+    );
+  });
+});
+
 describe("validateRoot against a base", () => {
   const LINT = "artifacts/eng/skill/lint";
 

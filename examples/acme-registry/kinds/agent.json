@@ -39,7 +39,8 @@
       "to_kinds": [
         "skill",
         "agent",
-        "mcp_server"
+        "mcp_server",
+        "semantic_model"
       ],
       "cardinality": "many",
       "direction": "outbound"

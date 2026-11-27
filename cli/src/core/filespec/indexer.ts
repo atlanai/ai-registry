@@ -39,11 +39,18 @@ import {
 import { catalogDigest } from "#adapter/spec/canonical.ts";
 import { describeFile } from "#adapter/spec/envelope.ts";
 import { isDigest, isVersion } from "#adapter/spec/ref.ts";
-import { ownDescription } from "#core/frontmatter.ts";
+import { descriptionText, ownDescription } from "#core/frontmatter.ts";
 import { writeAtomic } from "#core/fs/atomic.ts";
 import { authored, exists, refusal, subdirectories } from "#core/fs/tree.ts";
 import { withLease } from "#core/lease/lease.ts";
-import { envelopeSpec, type KindManifest, kindsOf } from "./kind-manifests.ts";
+import {
+  envelopeSpec,
+  type KindManifest,
+  kindsOf,
+  SPEC_TEXT,
+  schemaFiles,
+} from "./kind-manifests.ts";
+import { serverTitle } from "./mcp-server.ts";
 
 export interface VersionFolder {
   namespace: string;
@@ -243,7 +250,10 @@ async function recataloged(root: string, versionsAt: string, row: unknown): Prom
   return want === row.catalog_digest ? row : { ...row, catalog_digest: want };
 }
 
-/** Keeps the metadata, `spec` and relationships an author added to an existing `artifact.json`. */
+/**
+ * Keeps the metadata, `spec` and relationships an author added to an existing `artifact.json`,
+ * except a `spec` lifted from a validated file, which only that file gives.
+ */
 async function envelopeOf(
   root: string,
   folder: VersionFolder,
@@ -279,8 +289,20 @@ async function envelopeOf(
     | undefined;
   const onDisk = new Set(records.map((record) => record.path));
   files.push(...(await blobFiles(root, folder, existing, onDisk, blobUrl)));
-  const { digest: _digest, ...kept } = existing?.metadata ?? {};
-  const description = ownDescription(bytes, folder.name) ?? kept.description;
+  const { digest: _digest, display_name: keptName, ...kept } = existing?.metadata ?? {};
+  // A spec lifted from a validated file follows the file, so a copied artifact.json can't pin an older one.
+  const manifest = kinds[folder.kind];
+  const lifted = manifest !== undefined && schemaFiles(manifest).length > 0;
+  const spec =
+    lifted || existing?.spec === undefined
+      ? envelopeSpec(folder.kind, bytes, kinds, folder.name)
+      : (existing.spec as Record<string, unknown>);
+  // A kind whose file is a document, such as a semantic model, is described by its `spec`.
+  const description =
+    ownDescription(bytes, folder.name) ??
+    (typeof spec.description === "string" ? descriptionText(spec.description) : undefined) ??
+    kept.description;
+  const displayName = manifest?.title === "mcp_server" ? serverTitle(bytes) : keptName;
   return buildEnvelope({
     kind: folder.kind as ArtifactKind,
     metadata: {
@@ -289,21 +311,19 @@ async function envelopeOf(
       namespace: folder.namespace,
       version: folder.version,
       ...(description === undefined ? {} : { description }),
+      ...(displayName === undefined ? {} : { display_name: displayName }),
     },
     files,
-    spec:
-      existing?.spec === undefined
-        ? envelopeSpec(folder.kind, bytes, kinds, folder.name)
-        : (existing.spec as Record<string, unknown>),
+    spec,
     ...(Array.isArray(existing?.relationships)
       ? { relationships: existing.relationships as never }
       : {}),
   });
 }
 
-/** Only Markdown or JSON can hold a spec or description; others are hashed as they stream. */
+/** Only Markdown, JSON or YAML can hold a spec or description; others are hashed as they stream. */
 async function digested(dir: string, path: string) {
-  if (!/\.(md|json)$/.test(path)) {
+  if (!SPEC_TEXT.test(path)) {
     const read = await hashRegular(dir, path);
     return read.kind === "file" ? { ...read, bytes: new Uint8Array() } : read;
   }

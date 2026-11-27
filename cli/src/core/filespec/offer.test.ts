@@ -167,6 +167,20 @@ test("publishing an explicit native agent file preserves its front matter", asyn
   expect(Buffer.from(input.files[0]!.content).toString()).toBe(body);
 });
 
+test("fills a missing agent name after a byte order mark and padded fences", async () => {
+  const path = join(root, "helper.md");
+  await writeFile(path, "\uFEFF--- \r\ndescription: Helps.\r\n---\t\r\nHelp.\r\n");
+  const { input } = await offerFrom(path, {
+    kind: "agent",
+    name: "helper",
+    version: "1.0.0",
+    asAgentDocument: true,
+  });
+  expect(Buffer.from(input.files[0]!.content).toString()).toBe(
+    "\uFEFF--- \r\ndescription: Helps.\r\nname: helper\r\n---\t\r\nHelp.\r\n",
+  );
+});
+
 test("refuses a skill folder that is itself a symlink", async () => {
   await mkdir(join(root, "outside"));
   await writeFile(join(root, "outside", "SKILL.md"), "---\nname: lint\ndescription: L.\n---\n");

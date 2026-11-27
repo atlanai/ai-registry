@@ -2,7 +2,7 @@ import type { InstallResult } from "#cli/commands/install/result.ts";
 import { INSTALL_COMMAND } from "#cli/commands/install/spec.ts";
 import { noArguments, parse } from "#cli/options/parse.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
-import { confirmIfDestructive } from "#cli/prompt/confirm-plan.ts";
+import { confirmIfDestructive, confirmRuns } from "#cli/prompt/confirm-plan.ts";
 import { cancel, interaction } from "#cli/prompt/interaction.ts";
 import { exitOnClash, reportCollisions } from "#cli/render/collisions.ts";
 import { outcome, planReport, summarize } from "#cli/render/plan.ts";
@@ -35,8 +35,10 @@ export const { run } = defineCommand({
       printer: context.printer,
       cwd: context.cwd,
       report: planReport(context.printer),
-      approve: async (plan, chosen) => {
-        approved = await confirmIfDestructive(step, plan, { verb: "Update", ...chosen });
+      approve: async (plan, chosen, peek) => {
+        approved =
+          (await confirmRuns(step, plan, peek, common.yes)) &&
+          (await confirmIfDestructive(step, plan, { verb: "Update", ...chosen }));
         return approved;
       },
     });

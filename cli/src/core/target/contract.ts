@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "#adapter/kinds.ts";
+import type { Transport } from "#core/mcp/model.ts";
 
 /** Places nothing of its own: a container's members land where their own kinds go. */
 interface ContentsMapping {
@@ -91,7 +92,68 @@ export type Codec =
       restrictions?: string[] | undefined;
     };
 
-export type KindMapping = ContentsMapping | DirectoryMapping | FileMapping;
+/**
+ * An entry in a config file the target reads, such as an MCP server's, written from what the
+ * artifact resolves to by `codec`; nothing is placed in a folder.
+ */
+interface ConfigMapping {
+  shape: "config";
+  /** Relative to the target root, or to the project with `anchor: "project"`; takes `{name}`. */
+  file: string;
+  format: "json" | "toml" | "yaml";
+  /** Key path to the entry; takes `{name}`. */
+  at: string[];
+  /** `project` for a file in the project's own folder, such as `.mcp.json`; the root at user scope. */
+  anchor?: "root" | "project" | undefined;
+  /** At user scope, this file in the root instead of `file`. */
+  userFile?: string | undefined;
+  /** Written at this scope alone, when the file is only read there. */
+  scope?: "user" | "project" | undefined;
+  codec: ConfigCodec;
+  /** How the target can reach a server; an artifact that offers none of them is left out. */
+  transports: Transport[];
+  /** Where a denied tool goes when the entry cannot say: an `item` added to a list in `file`. */
+  deny?: { file: string; at: string[]; item: string } | undefined;
+  subdir?: undefined;
+  extension?: undefined;
+  place?: undefined;
+  depth?: undefined;
+  entry?: undefined;
+  manifest?: undefined;
+  register?: undefined;
+  keys?: undefined;
+  render?: undefined;
+}
+
+export type SecretField = "args" | "env" | "url" | "headers";
+
+/** Tools the manifest allows or denies an MCP server. */
+export interface ToolFilter {
+  allow?: readonly string[] | undefined;
+  deny?: readonly string[] | undefined;
+}
+
+/** An MCP server's entry in JSON-like fields; each option names the target's own key or syntax. */
+export interface McpJsonCodec {
+  id: "mcp-json";
+  /** Around a secret's variable name, such as `${` and `}`; `in` limits the fields it expands in. */
+  secret?: { prefix: string; suffix: string; in?: SecretField[] | undefined } | undefined;
+  /** The `type` written for each transport; none for one not listed. */
+  type?: Partial<Record<Transport, string>> | undefined;
+  /** The URL's key for each remote transport, `url` when not listed. */
+  url?: Partial<Record<"streamable-http" | "sse", string>> | undefined;
+  /** `array`: `command` holds the program followed by its arguments. */
+  command?: "array" | undefined;
+  /** The key of the environment map, `env` when unset. */
+  env?: string | undefined;
+  /** Key paths of the allow and deny lists of tools. */
+  tools?: { allow?: string[] | undefined; deny?: string[] | undefined } | undefined;
+}
+
+/** Renders a resolved MCP server as the target's own entry. */
+export type ConfigCodec = McpJsonCodec | { id: "mcp-codex" };
+
+export type KindMapping = ContentsMapping | DirectoryMapping | FileMapping | ConfigMapping;
 
 interface ManifestEntry {
   /** Relative to the plugin directory. */

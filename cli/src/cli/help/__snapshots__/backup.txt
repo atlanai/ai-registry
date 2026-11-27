@@ -1,0 +1,16 @@
+See or restore files of yours that aireg moved aside
+
+Usage: aireg backup [<action>] [options]
+
+Actions:
+  list     List the runs that moved files aside, newest first (alias: ls)
+  restore  Put what a run moved aside back where it was
+
+Examples:
+  $ aireg backup list -g     see what aireg moved out of your tools' folders
+  $ aireg backup restore -g  choose a run and put what it moved back
+
+Learn more:
+  Run `aireg backup <action> --help` for an action's options.
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/backup/

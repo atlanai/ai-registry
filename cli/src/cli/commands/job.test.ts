@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, vi } from "vitest";
 import { emptyRegistryConfig, type Job, type StepPolicy } from "#core/config/model.ts";
 import { writeConfig } from "#core/config/repository.ts";
-import { AiregError } from "#core/errors.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
 import { commandContext } from "#test/kit/command.ts";
 import { test } from "#test/kit/fixtures.ts";
 import { run } from "./job.ts";
@@ -41,6 +41,7 @@ describe("a job command that fails validation", () => {
     ["retry", "zz-nope"],
     ["cancel", "zz-nope"],
     ["runs", "zz-nope"],
+    ["runs", "--job", "zz-nope"],
   ];
 
   test("does not start the daemon", async () => {
@@ -57,9 +58,15 @@ describe("job add --interval", () => {
     async (value) => {
       await expect(
         run(context(["add", "--registry", "undeclared", "--interval", value])),
-      ).rejects.toThrow(/--interval takes a whole number of at least 60, not/);
+      ).rejects.toThrow(/--interval takes a whole number from 60 to 86400, not/);
     },
   );
+
+  test("refuses more than a day as a usage error", async () => {
+    await expect(
+      run(context(["add", "--registry", "undeclared", "--interval", "86401"])),
+    ).rejects.toMatchObject({ code: ErrorCode.Usage });
+  });
 });
 
 describe("a job named by a name other than its id", () => {

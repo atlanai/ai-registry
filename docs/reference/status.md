@@ -17,7 +17,7 @@ aireg status [-g]
 | `ok` | Installed as the lockfile records it. |
 | `missing` | The stored copy, or a link in a target folder, is missing, or something else holds the path the link needs. |
 | `replaced` | A target's link was replaced by a file or folder of yours, or points outside the scope. `--json` calls this state `dangling`. |
-| `edited` | The installed copy was edited after it was installed. With `--copy`, that includes the copy in the target folder. |
+| `edited` | The installed copy was edited after it was installed. With `--copy`, that includes the copy in the target folder. Files a file manager leaves, such as `.DS_Store`, `Thumbs.db`, `desktop.ini` and `._*`, are not edits. |
 
 The table shows each artifact's kind, version and registry, then a column per target it was installed for: `✓` when linked where that target reads it, `missing`, `replaced`, `foreign` when its link points outside the scope, or `-` when it isn't installed there. A version marked `pinned` is held by the manifest.
 

@@ -2,7 +2,7 @@ import { list } from "#adapter/text.ts";
 import type { CommandSpec } from "#cli/commands/command.ts";
 import { FOR, POLICIES, SELECT, USER } from "#cli/options/flags.ts";
 import { DEFAULT_INTERVAL_SECONDS } from "#core/config/model.ts";
-import { MINIMUM_INTERVAL_SECONDS } from "#core/config/parse-job.ts";
+import { MAXIMUM_INTERVAL_SECONDS, MINIMUM_INTERVAL_SECONDS } from "#core/config/parse-job.ts";
 import { RUN_MODES, RUN_STATES } from "#core/run/model.ts";
 import { MAX_PAGE_SIZE } from "#core/run/store.ts";
 
@@ -48,7 +48,7 @@ export const JOB_COMMAND: CommandSpec = {
         {
           flag: "--interval",
           value: "<seconds>",
-          integer: { min: MINIMUM_INTERVAL_SECONDS },
+          integer: { min: MINIMUM_INTERVAL_SECONDS, max: MAXIMUM_INTERVAL_SECONDS },
           describe: `How often the job runs, in seconds (default ${DEFAULT_INTERVAL_SECONDS})`,
         },
         {

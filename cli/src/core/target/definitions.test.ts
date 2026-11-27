@@ -143,3 +143,36 @@ describe("targetProblems", () => {
     expect(targetProblems(definitions).join("\n")).toMatch(problem);
   });
 });
+
+describe("a config entry mapping", () => {
+  const config = {
+    shape: "config" as const,
+    file: ".mcp.json",
+    format: "json" as const,
+    at: ["mcpServers", "{name}"],
+    codec: { id: "mcp-json" as const, secret: { prefix: "${", suffix: "}" } },
+    transports: ["stdio" as const],
+  };
+
+  test("is fine for an MCP server", () => {
+    expect(targetProblems([target({ kinds: { mcp_server: config } })])).toEqual([]);
+  });
+
+  test.each([
+    ["another kind", { skill: config }, /only an MCP server/],
+    [
+      "a file outside its root",
+      { mcp_server: { ...config, file: "../x.json" } },
+      /not a path inside/,
+    ],
+    [
+      "a key with an unknown variable",
+      { mcp_server: { ...config, at: ["{source}"] } },
+      /\{source\}/,
+    ],
+    ["no transports", { mcp_server: { ...config, transports: [] } }, /transports/],
+  ])("refuses %s", (_, kinds, problem) => {
+    const problems = targetProblems([target({ kinds: kinds as TargetDefinition["kinds"] })]);
+    expect(problems.join("\n")).toMatch(problem);
+  });
+});

@@ -8,8 +8,9 @@
   "kinds": {
     "plugin": { "shape": "contents" },
     "skill": { "shape": "directory", "subdir": "skills" },
-    "agent": { "shape": "file", "subdir": "agents", "extension": ".agent.md" }
+    "agent": { "shape": "file", "subdir": "agents", "extension": ".agent.md" },
+    "mcp_server": {"shape": "config", "file": ".mcp.json", "anchor": "project", "userFile": "mcp-config.json", "format": "json", "at": ["mcpServers", "{name}"], "codec": {"id": "mcp-json", "secret": {"prefix": "${", "suffix": "}"}, "type": {"stdio": "stdio", "streamable-http": "http", "sse": "sse"}, "tools": {"allow": ["tools"]}}, "transports": ["stdio", "streamable-http", "sse"]}
   },
-  "verified": { "command": ["copilot", "--version"], "range": "1.0.96" },
+  "verified": { "command": ["copilot", "--version"], "range": "1.0.96 || 1.0.113" },
   "reload": "Run `/skills reload` in a running Copilot CLI session, and start a new session for changed agents."
 }

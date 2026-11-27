@@ -93,6 +93,28 @@ const Origin = Type.Object(
   NAMES_TARGET,
 );
 
+const Entry = Type.Object(
+  {
+    target: Type.String({ minLength: 1 }),
+    file: Type.String({ minLength: 1, description: "Relative to the scope base." }),
+    format: Type.Union([Type.Literal("json"), Type.Literal("toml"), Type.Literal("yaml")]),
+    at: Type.Array(Type.String(), { minItems: 1, description: "Key path to the entry." }),
+    digest: Type.String({ minLength: 1, description: "sha256 of the entry as written." }),
+    items: Type.Optional(
+      Type.Array(Type.String(), {
+        description: "Items aireg added to the list at `at`, when it wrote no table there.",
+      }),
+    ),
+    runs: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description: "sha256 of what the entry starts, so a change to it is agreed to first.",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
 const Artifact = Type.Object(
   {
     registry: Type.String({ minLength: 1, description: "Key into `registries`." }),
@@ -159,6 +181,12 @@ const Artifact = Type.Object(
     links: Type.Array(Link, {
       description: "Only this list is pruned, so a file the CLI never wrote is never removed.",
     }),
+    entries: Type.Optional(
+      Type.Array(Entry, {
+        minItems: 1,
+        description: "Config entries written for it; only one still as written is removed.",
+      }),
+    ),
     needed_by: Type.Optional(
       Type.Array(Type.String({ minLength: 1 }), {
         minItems: 1,
@@ -179,8 +207,9 @@ const Artifact = Type.Object(
 /** The shape of `manifest.lock.yml`, as written. Reading is deliberately looser. */
 export const Lockfile = Type.Object(
   {
-    version: Type.Literal(LOCK_VERSION, {
-      description: "A lock of any other version is refused rather than guessed at.",
+    version: Type.Union([Type.Literal(1), Type.Literal(LOCK_VERSION)], {
+      description:
+        "2 when an artifact records config entries or is a semantic model, else 1. Any other version is refused rather than guessed at.",
     }),
     registries: Type.Optional(Type.Record(Type.String(), Registry)),
     artifacts: Type.Optional(Type.Record(Type.String(), Artifact)),

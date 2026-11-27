@@ -28,7 +28,7 @@ index.json                                   # catalog: every (namespace, kind, 
 
 artifacts/                                   # every artifact lives here and nothing else does
   <namespace>/                               # the owner inside this root: a workspace, a team, a GitHub owner
-    <kind>/                                  # skill, agent, mcp_server, …
+    <kind>/                                  # skill, agent, semantic_model, mcp_server, …
       <name>/
         versions.json                        # one entry per version: version, digest, catalog_digest, published_at, status, yanked
         <version>/
@@ -156,6 +156,8 @@ At `artifacts/<namespace>/<kind>/<name>/versions.json`. Schema: [`schemas/versio
 
 A client MUST NOT remove an installed copy because its status changed. When an update finds the installed version blocked and no other version to move to, the client SHOULD fail, naming the version and its `reason`, and leave removal to the user.
 
+A client MUST NOT install a yanked version that its lockfile does not already hold, even when the request names that version. Where the lockfile holds it, the client installs it as it would any other version, so existing setups keep working, and SHOULD warn that it is yanked, naming the `reason`. `yanked` and `status` apply independently: a yanked `deprecated` version installs from the lockfile with both warnings, and a yanked `blocked` version does not install at all. Yanking withdraws a version from new installs; blocking withdraws it everywhere.
+
 ### 3.4 `<version>/artifact.json`
 
 The envelope: a fixed header, an open `spec` the kind owns, the files the version carries, and its outbound relationships. Schema: [`schemas/artifact.schema.json`](schemas/artifact.schema.json), with the kind manifests applied to `spec` in [`schemas/artifact-known-kinds.schema.json`](schemas/artifact-known-kinds.schema.json).
@@ -189,6 +191,41 @@ its description to `spec.description`, and uses the registry slug for `spec.name
 own `name` remains its human-readable name and need not equal the slug. An agent MUST carry
 exactly one of these native entry files. Other supporting files are permitted; the optional
 file patterns in a kind manifest are non-exhaustive conventions.
+
+A semantic model carries one [Apache Ossie](https://github.com/apache/ossie) document, as
+`semantic_model.yaml` or `semantic_model.json`, and MUST carry exactly one of the two. The file is
+the only copy of the model: `spec` holds the registry slug as `spec.name` and, when the model has
+one, its description as `spec.description`, from the root `description` or from the model a 0.1.1
+document lists. The model's own `name` remains in the document and need not equal the slug. The
+document MUST satisfy the Ossie schema for the `version` it declares, and a 0.1.1 document MUST
+list exactly one model, so that one artifact is one model as in 0.2. Those schemas are copied
+unchanged into [`schemas/kinds/vendor/ossie/`](schemas/kinds/vendor/ossie/README.md), so a writer
+validates a model without fetching anything. The files a model was converted from MAY sit beside
+it under `source/`.
+
+An MCP server carries one `server.json` in the format the
+[MCP Registry](https://github.com/modelcontextprotocol/registry) defines, exactly as its
+publisher wrote it. The file is the only copy of the server: `spec` holds the registry slug as
+`spec.name` and the server's `description` as `spec.description`. The server's own reverse-DNS
+`name` remains in the file and need not resemble the slug. The file MUST name in `$schema` a
+`server.json` schema version the kind manifest lists, as the MCP Registry requires of what it
+publishes, and MUST satisfy that schema. Those schemas are copied unchanged into
+[`schemas/kinds/vendor/mcp/`](schemas/kinds/vendor/mcp/README.md).
+
+A registry MUST NOT change `server.json`, including its `_meta`, so a republished server stays
+byte-identical to its publisher's. When the server's `version` is a semantic version,
+`metadata.version` MUST equal it. The digest pins `server.json`, not the packages, images or
+remotes it names: a package's dependencies resolve when it starts, and an OCI identifier without
+`@sha256:` names a tag that can move. Which tools to expose, timeouts, and input values are decided
+where the server is installed, not in the registry.
+
+A kind manifest's file rule MAY carry a `schema`: a JSON Schema that the file at its `path`, parsed
+as JSON or YAML by its extension, MUST satisfy. Its references resolve against the manifest, so
+`{"$ref": "#/$defs/document"}` names a definition there. A writer validates the file against it
+when it validates `spec`, and refuses the version when the file fails. YAML is read as YAML 1.2
+with the core schema: a mapping key MUST NOT repeat, and `<<` is an ordinary key, not a merge. The
+file is hashed as bytes and never copied into the envelope, so section 4.2's integer rule does not
+apply to it.
 
 ### 3.5 Native files
 

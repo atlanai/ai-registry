@@ -27,6 +27,32 @@ test("sees an edit to a copy it digested before, even one of the same size", asy
   expect(await digest(copy)).not.toBe(before);
 });
 
+test("reads OS files in a copy as no edit, and any other new file as one", async ({ tmp }) => {
+  const copy = await tree(join(tmp, "copy"), { "SKILL.md": "hello\n" });
+  const before = await digest(copy);
+
+  for (const name of [".DS_Store", "Thumbs.db", "desktop.ini", "._SKILL.md"]) {
+    await writeFile(join(copy, name), "os");
+  }
+  expect(await digest(copy)).toBe(before);
+
+  await writeFile(join(copy, "notes.md"), "mine\n");
+  expect(await digest(copy)).not.toBe(before);
+});
+
+test("reads a repository or dependencies placed in a copy as an edit", async ({ tmp }) => {
+  for (const [folder, file] of [
+    [".git", "HEAD"],
+    ["node_modules", "index.js"],
+  ] as const) {
+    const copy = await tree(join(tmp, folder), { "SKILL.md": "hello\n" });
+    const before = await digest(copy);
+    await mkdir(join(copy, folder));
+    await writeFile(join(copy, folder, file), "mine\n");
+    expect(await digest(copy)).not.toBe(before);
+  }
+});
+
 test("tells apart two trees whose files run together into the same bytes", async ({ tmp }) => {
   const one = await tree(join(tmp, "one"), { "a.md": "x b.md 0 y" });
   const two = await tree(join(tmp, "two"), { "a.md": "x", "b.md": "y" });

@@ -1,0 +1,16 @@
+{
+  "namespace": "engineering",
+  "kind": "semantic_model",
+  "name": "review-metrics",
+  "latest": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "digest": "sha256:d1a7bd9a9faef92b1932f9dbcf3408b5fe13c8f77f230ef75953e741a17b7d71",
+      "published_at": "2026-11-11T15:17:49.846Z",
+      "status": "active",
+      "yanked": false,
+      "catalog_digest": "sha256:0607508aad1014f715d96fb9006f8908ff1fb6361e0cd5ac363fc067743a477a"
+    }
+  ]
+}

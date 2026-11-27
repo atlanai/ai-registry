@@ -22,8 +22,22 @@ export const hermesAgent = defineTarget({
       depth: 6,
       keys: { "disable-model-invocation": false },
     },
+    // Only its user config lists servers.
+    mcp_server: {
+      shape: "config",
+      scope: "user",
+      file: "config.yaml",
+      format: "yaml",
+      at: ["mcp_servers", "{name}"],
+      codec: {
+        id: "mcp-json",
+        secret: { prefix: "${", suffix: "}" },
+        tools: { allow: ["tools", "include"], deny: ["tools", "exclude"] },
+      },
+      transports: ["stdio", "streamable-http"],
+    },
   },
-  verified: { command: ["hermes", "--version"], range: "0.23.0" },
+  verified: { command: ["hermes", "--version"], range: "0.23.0 || 0.23.2" },
   trust: { skill: { run: "hermes skills trust", scope: "project" } },
   reload:
     "Hermes Agent sees the change at your next message; run /reload-skills to refresh its slash commands.",

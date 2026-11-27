@@ -10,8 +10,9 @@ import {
 } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { digest } from "#core/fs/digest.ts";
 import type { LinkMode, Lock } from "#core/lock.ts";
-import type { Plan } from "#core/plan/model.ts";
+import type { Action, Plan } from "#core/plan/model.ts";
 import { roots as makeRoots, type Roots } from "#core/store/paths.ts";
 import { lock as lockOf } from "#test/kit/builders/lock.ts";
 import { emptyPlan } from "#test/kit/builders/plan.ts";
@@ -117,6 +118,27 @@ describe("a link over something already at its destination", () => {
     await apply({ plan: linkPlan("copy", true).plan, roots, fetch, env: process.env });
     expect(await readFile(join(dest(), "SKILL.md"), "utf8")).toBe("theirs\n");
     await expect(lstat(join(root, ".registry", "backups"))).rejects.toThrow();
+  });
+
+  test("replaces a copy that still holds what it wrote, and backs up one edited since", async () => {
+    const written = (digestOf: string) => {
+      const { plan } = linkPlan("copy", true);
+      const [action, ...rest] = plan.actions;
+      return { ...plan, actions: [{ ...action, written: digestOf } as Action, ...rest] };
+    };
+    await folder(dest(), "as written\n");
+    const wrote = await digest(dest());
+    const replaced = await apply({ plan: written(wrote), roots, fetch, env: process.env });
+    expect(replaced.backedUp).toEqual([]);
+    expect(await readFile(join(dest(), "SKILL.md"), "utf8")).toBe("theirs\n");
+
+    await writeFile(join(dest(), "SKILL.md"), "MY LOCAL EDIT\n");
+    const before = await digest(dest(), wrote);
+    expect(before).not.toBe(wrote);
+    const result = await apply({ plan: written(wrote), roots, fetch, env: process.env });
+    expect(await readFile(join(dest(), "SKILL.md"), "utf8")).toBe("theirs\n");
+    const moved = result.backedUp[0]?.to ?? "";
+    expect(await readFile(join(moved, "SKILL.md"), "utf8")).toBe("MY LOCAL EDIT\n");
   });
 
   test("replaces its own link into the scope folder, and links a free path", async () => {

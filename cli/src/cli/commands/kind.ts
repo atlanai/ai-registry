@@ -28,10 +28,10 @@ interface Options {
 /** `aireg <kind> <action>`: one set of verbs for every kind a registry holds. */
 export function runKind(
   spec: CommandSpec,
+  kind: string,
   manifest: KindManifest,
   context: CommandContext,
 ): Promise<void> {
-  const kind = spec.name;
   return defineCommand<Options>({
     spec,
     parse(argv) {
@@ -39,7 +39,7 @@ export function runKind(
       const [verb, argument, extra] = positionals;
       if (verb === undefined) {
         const actions = (spec.actions ?? []).map((a) => a.name);
-        throw needsInput(kind, "an action", `Use ${list(actions, "or")}.`);
+        throw needsInput(spec.name, "an action", `Use ${list(actions, "or")}.`);
       }
       return {
         action: verb,

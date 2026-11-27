@@ -4,8 +4,8 @@ import {
   attentionHints,
   conflictHint,
   follow,
-  PUBLISH_HINT,
   PUBLISHED_BY_YOU,
+  publishHint,
   type StoppedRun,
   stoppedError,
 } from "#cli/commands/sync/follow.ts";
@@ -18,7 +18,7 @@ import { isStepPolicy, STEP_POLICIES } from "#core/config/model.ts";
 import { registryToken } from "#core/env.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
 import { unknownRegistry } from "#core/manifest/errors.ts";
-import { type Roots, scopeName } from "#core/store/paths.ts";
+import { type Roots, scopeFlag, scopeName } from "#core/store/paths.ts";
 import { type Candidate, displayPath } from "#core/sync/adopt.ts";
 import { type SyncItem, UNSETTLED } from "#core/sync/model.ts";
 import { POLICY_AXES, type PolicyAxis, type SyncPolicy } from "#core/sync/policy.ts";
@@ -46,6 +46,7 @@ interface Preview {
   data: SyncPreview;
   shown: SyncItem[];
   local: Candidate[];
+  differing: Candidate[];
   undeclared: Candidate[];
   roots: Roots;
   claims: { linkable: Candidate[]; changed: Candidate[]; kept: Candidate[] };
@@ -80,6 +81,7 @@ const sync = defineCommand({
     renderSync(printer, {
       items: result.shown,
       found: result.local,
+      differing: result.differing,
       undeclared: result.undeclared,
       roots: result.roots,
       claims: result.claims,
@@ -171,6 +173,7 @@ async function preview(
   const unsettled =
     items.some((item) => UNSETTLED.includes(item.disposition)) ||
     local.length > 0 ||
+    found.differing.length > 0 ||
     found.undeclared.length > 0;
   if (unsettled) context.exit = ExitCode.Changed;
   return {
@@ -179,6 +182,7 @@ async function preview(
       scope: loaded.roots.scope,
       artifacts: shown.map(previewItem),
       local: local.map((item) => ({ ...place(item), suggestedPath: item.suggestedPath })),
+      differing: found.differing.map(place),
       undeclared: undeclared.map(place),
       linkable: claiming ? linkable.map(place) : [],
       changed: claiming ? changed.map(place) : [],
@@ -186,6 +190,7 @@ async function preview(
     },
     shown,
     local,
+    differing: found.differing,
     undeclared,
     roots: loaded.roots,
     claims: claiming ? { linkable, changed, kept: [] } : { linkable: [], changed: [], kept },
@@ -237,15 +242,17 @@ async function nextSteps(
 ): Promise<string[]> {
   const { items, local, publisher } = found;
   const next: string[] = [];
+  const flag = scopeFlag(loaded.roots.scope);
   const has = (...dispositions: string[]) =>
     items.some((item) => dispositions.includes(item.disposition));
-  if (has("pull", "pull-delete")) next.push("Run `aireg sync` to take the registry's changes.");
+  if (has("pull", "pull-delete"))
+    next.push(`Run \`aireg sync${flag}\` to take the registry's changes.`);
   const conflict = items.find((item) => item.disposition === "conflict");
   if (conflict !== undefined) {
     const names = items.map((item) => item.name);
     next.push(await conflictHint(loaded, names, conflict.name, conflict.source));
   }
-  if (has(...PUBLISHED_BY_YOU) || local.length > 0) next.push(PUBLISH_HINT);
+  if (has(...PUBLISHED_BY_YOU) || local.length > 0) next.push(publishHint(loaded.roots.scope));
   if (undeclared.length > 0) {
     const names = undeclared
       .map((item) => {
@@ -253,7 +260,7 @@ async function nextSteps(
         return alias === undefined ? item.name : `${alias}/${item.name}`;
       })
       .join(" ");
-    next.push(`Run \`aireg add ${names}\` to install them from their registry.`);
+    next.push(`Run \`aireg add ${names}${flag}\` to install them from their registry.`);
   }
   return next;
 }

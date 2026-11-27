@@ -19,7 +19,7 @@ aireg publish [<path> | <glob> | <name>]... [--to <registry>/<namespace>[/<name>
 - a glob over paths, such as `'.claude/skills/*'`
 - the name of an installed artifact, to publish the edits you made to it
 
-With no arguments, `publish` takes the work edited in this scope: installed artifacts you changed, and skills and agents in your target folders that no registry has yet. On a terminal it asks which to publish. Without a terminal, pass `--yes` to publish all of them.
+With no arguments, `publish` takes the work edited in this scope: installed artifacts you changed, and skills and agents in your target folders that no registry has yet. On a terminal it asks which to publish. Without a terminal, pass `--yes` to publish all of them. Two skills of one name whose files differ are left out with a warning: publish the one you mean by its path.
 
 ### Where it goes
 
@@ -38,7 +38,7 @@ A first publish is version `0.1.0`. After that, `publish` takes the next patch v
 
 An artifact whose files match the newest published version is listed as `same` and not sent. On a terminal, when an artifact changed and you didn't pass `--bump`, `publish` asks how big a change it is.
 
-Before sending, `publish` lists each artifact as `add`, `update` with its old and new version, or `same`, and asks to confirm. It refuses a skill that [`aireg registry validate`](registry.md#aireg-registry-validate) would reject.
+Before sending, `publish` lists each artifact as `add`, `update` with its old and new version, or `same`, and asks to confirm. It refuses a skill that [`aireg registry validate`](registry.md#aireg-registry-validate) would reject. It also refuses two paths in one call whose artifacts share a kind and name, since both would be written as one version; the same folder named twice is published once.
 
 ### What it sends
 
@@ -88,6 +88,8 @@ With `--json`, `publish` asks no questions and prints each artifact with its old
 ```
 
 `registry` is the registry's name, or for `--to <folder>`, the registry folder as `--to` gave it. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`. `digest` is the artifact's content identity: its files and dependencies, but not its version. Two runs give the same digest exactly when they would publish the same content.
+
+When the registry holds the version it would serve back by its status, such as `blocked` or `pending_review`, the artifact also carries `withheld`: that version, its `status`, and the `reason` when the registry gives one. `from` is then that version, so a held-back artifact does not read as new.
 
 ## Exit status
 

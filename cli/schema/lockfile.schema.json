@@ -10,9 +10,17 @@
   ],
   "properties": {
     "version": {
-      "description": "A lock of any other version is refused rather than guessed at.",
-      "const": 1,
-      "type": "number"
+      "description": "2 when an artifact records config entries or is a semantic model, else 1. Any other version is refused rather than guessed at.",
+      "anyOf": [
+        {
+          "const": 1,
+          "type": "number"
+        },
+        {
+          "const": 2,
+          "type": "number"
+        }
+      ]
     },
     "registries": {
       "type": "object",
@@ -101,6 +109,14 @@
                 },
                 {
                   "const": "agent",
+                  "type": "string"
+                },
+                {
+                  "const": "semantic_model",
+                  "type": "string"
+                },
+                {
+                  "const": "mcp_server",
                   "type": "string"
                 }
               ]
@@ -269,6 +285,74 @@
                   "framed": {
                     "pattern": "^sha256:[0-9a-f]{64}$",
                     "description": "The copy's digest with each file's path, mode and size framed. `digest` is the one aireg 0.1 checks.",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "entries": {
+              "minItems": 1,
+              "description": "Config entries written for it; only one still as written is removed.",
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "target",
+                  "file",
+                  "format",
+                  "at",
+                  "digest"
+                ],
+                "properties": {
+                  "target": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "file": {
+                    "minLength": 1,
+                    "description": "Relative to the scope base.",
+                    "type": "string"
+                  },
+                  "format": {
+                    "anyOf": [
+                      {
+                        "const": "json",
+                        "type": "string"
+                      },
+                      {
+                        "const": "toml",
+                        "type": "string"
+                      },
+                      {
+                        "const": "yaml",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "at": {
+                    "minItems": 1,
+                    "description": "Key path to the entry.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "digest": {
+                    "minLength": 1,
+                    "description": "sha256 of the entry as written.",
+                    "type": "string"
+                  },
+                  "items": {
+                    "description": "Items aireg added to the list at `at`, when it wrote no table there.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "runs": {
+                    "minLength": 1,
+                    "description": "sha256 of what the entry starts, so a change to it is agreed to first.",
                     "type": "string"
                   }
                 }

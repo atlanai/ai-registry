@@ -60,6 +60,7 @@ async function publish(
     paths: positionals,
     since: own["changed-since"],
     found,
+    to: own.to,
   });
   if (chosen === undefined) return canceled(printer);
   const bound = await boundFor(chosen, manifest, own.to, given, known, { base, cwd: context.cwd });

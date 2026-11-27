@@ -1,22 +1,37 @@
 import { posix } from "node:path";
+import type { SchemaObject } from "ajv/dist/2020.js";
 import { messageOf } from "#adapter/errors.ts";
 import { isRecord } from "#adapter/fields.ts";
 import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { isKindSegment, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_SERVER_ENTRY, SEMANTIC_MODEL_ENTRIES, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { dict } from "#core/fields.ts";
-import { frontmatterParseProblem, frontmatterRecord } from "#core/frontmatter.ts";
+import {
+  DESCRIPTION_LIMIT,
+  frontmatterParseProblem,
+  frontmatterRecord,
+} from "#core/frontmatter.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { AGENT_CARD_ENTRY } from "#core/product.ts";
+import { parseYaml } from "#core/yaml.ts";
 import agent from "#schema/kinds/agent.json" with { type: "json" };
+import mcpServer from "#schema/kinds/mcp_server.json" with { type: "json" };
+import semanticModel from "#schema/kinds/semantic_model.json" with { type: "json" };
 import skill from "#schema/kinds/skill.json" with { type: "json" };
 
-import { prepareManifest } from "./schema.ts";
+import { fileRules, fileSchema, prepareManifest } from "./schema.ts";
+
+/** Files that can hold a kind's `spec` or a description, so the only ones read as text. */
+export const SPEC_TEXT = /\.(md|json|ya?ml)$/;
+
+/** A kind's document when its entry is not Markdown: JSON, or YAML such as an Apache Ossie model. */
+const DOCUMENT = /\.(json|ya?ml)$/;
+const YAML = /\.ya?ml$/;
 
 /** Fields the scaffolder understands; validation accepts the full JSON Schema vocabulary. */
 export interface SchemaNode {
@@ -36,6 +51,8 @@ export interface SchemaNode {
 interface FileRule {
   path?: string;
   glob?: string;
+  media_type?: string;
+  schema?: boolean | Record<string, unknown>;
 }
 
 export interface KindManifest extends SchemaNode {
@@ -51,6 +68,8 @@ export interface KindManifest extends SchemaNode {
 const BUNDLED: Readonly<Record<string, KindManifest>> = dict([
   ["skill", skill as KindManifest],
   ["agent", agent as KindManifest],
+  ["semantic_model", semanticModel as KindManifest],
+  ["mcp_server", mcpServer as KindManifest],
 ]);
 
 type Served = { manifest: KindManifest } | { problem: string };
@@ -125,15 +144,9 @@ async function served(root: string, url: string): Promise<Served> {
 }
 
 function filePaths(files: unknown): unknown[] {
-  if (!isRecord(files)) return [];
-  const rules = [
-    files.required,
-    files.optional,
-    ...(Array.isArray(files.one_of) ? files.one_of : []),
-  ];
-  return rules
-    .flatMap((set) => (Array.isArray(set) ? set : []))
-    .flatMap((rule) => (isRecord(rule) && "path" in rule ? [rule.path] : []));
+  return fileRules({ "x-registry-files": files }).flatMap((rule) =>
+    "path" in rule ? [rule.path] : [],
+  );
 }
 
 export async function manifestProblems(root: string): Promise<{ path: string; message: string }[]> {
@@ -214,6 +227,8 @@ export function specFile(
 ): string | undefined {
   if (manifest.title === "skill") return files.has(SKILL_ENTRY) ? SKILL_ENTRY : undefined;
   if (manifest.title === "agent") return files.has(AGENT_ENTRY) ? AGENT_ENTRY : undefined;
+  // An MCP server's README is documentation; its spec comes from its JSON files.
+  if (manifest.title === "mcp_server") return undefined;
   return [...primaryFiles(manifest), ...files.keys()].find(
     (path) => path.endsWith(".md") && files.has(path),
   );
@@ -230,7 +245,7 @@ export function envelopeSpec(
   if (manifest === undefined) return {};
   const text = new Map<string, string>();
   for (const [path, bytes] of files) {
-    if (/\.(md|json)$/.test(path)) text.set(path, Buffer.from(bytes).toString("utf8"));
+    if (SPEC_TEXT.test(path)) text.set(path, Buffer.from(bytes).toString("utf8"));
   }
   return specOf(manifest, text, name) ?? {};
 }
@@ -252,28 +267,141 @@ export function specOf(
   const markdown = specFile(manifest, files);
   if (markdown !== undefined) return frontmatterRecord(files.get(markdown) ?? "");
   if (manifest.title === "skill") return undefined;
-  let json: string | undefined;
-  if (manifest.title !== "agent") json = [...files.keys()].find((path) => path.endsWith(".json"));
-  else if (files.has(AGENT_CARD_ENTRY)) json = AGENT_CARD_ENTRY;
-  if (json === undefined) return undefined;
-  let card: unknown;
+  const entry = entryOf(manifest, files);
+  if (entry === undefined) return undefined;
+  let document: unknown;
   try {
-    card = JSON.parse(files.get(json) ?? "") as unknown;
+    document = parseDocument(entry, files.get(entry) ?? "");
   } catch {
-    // A card that is not JSON carries no spec, as Markdown with no front matter carries none.
+    // A document that does not parse carries no spec, as Markdown with no front matter carries none.
     return undefined;
   }
-  // The card stays verbatim, with the fields a kind requires lifted beside it (`kinds/agent.json`).
+  // The document stays verbatim, with the fields a kind requires lifted beside it (`kinds/agent.json`).
   const lifted: Record<string, unknown> = {};
-  if (isRecord(card)) {
+  if (isRecord(document)) {
     for (const field of ["name", "description"]) {
-      const value = card[field];
+      const value = document[field];
       if (value !== undefined) lifted[field] = value;
     }
   }
-  if (manifest.title === "agent") {
-    if (name !== undefined) lifted.name = name;
-    else if (typeof lifted.name === "string") lifted.name = sanitizeName(lifted.name);
+  if (manifest.title === "semantic_model") {
+    const description = modelDescription(lifted.description, document);
+    if (description !== undefined) lifted.description = description;
   }
-  return { ...lifted, card };
+  // A custom kind's JSON card keeps the shape aireg 0.1 published, so released versions still validate.
+  const legacy = !OWN_DOCUMENT.includes(manifest.title) && entry.endsWith(".json");
+  if (!legacy) slugName(lifted, name, manifest.title === "mcp_server");
+  // A file the manifest gives a schema is validated as a file, so the file is the only copy.
+  if (schemaFiles(manifest).some((file) => file.path === entry)) return lifted;
+  return { ...lifted, [legacy ? "card" : documentKey(manifest)]: document };
+}
+
+/** The file a kind's `spec` is lifted from, when it is a JSON or YAML document. */
+function entryOf(manifest: KindManifest, files: ReadonlyMap<string, string>): string | undefined {
+  if (manifest.title === "agent") return files.has(AGENT_CARD_ENTRY) ? AGENT_CARD_ENTRY : undefined;
+  if (manifest.title === "semantic_model")
+    return SEMANTIC_MODEL_ENTRIES.find((path) => files.has(path));
+  if (manifest.title === "mcp_server")
+    return files.has(MCP_SERVER_ENTRY) ? MCP_SERVER_ENTRY : undefined;
+  // The files the manifest names come first, so a document under `source/` is never the entry.
+  return [...namedFiles(manifest), ...files.keys()].find(
+    (path) => DOCUMENT.test(path) && files.has(path),
+  );
+}
+
+/** Kinds whose `spec` aireg lifts from a document of their own format. */
+const OWN_DOCUMENT = ["agent", "semantic_model", "mcp_server"];
+
+/**
+ * The registry slug is the name; the document keeps its own, which need not be a slug. An MCP
+ * server's is reverse-DNS, `io.github.acme/weather`, so the slug comes from its last segment.
+ */
+function slugName(lifted: Record<string, unknown>, name: string | undefined, dns: boolean): void {
+  if (name !== undefined) lifted.name = name;
+  else if (typeof lifted.name === "string") {
+    const own = dns ? (lifted.name.split("/").pop() ?? lifted.name) : lifted.name;
+    lifted.name = sanitizeName(own);
+  }
+}
+
+/** A kind's JSON or YAML document, by its extension; throws when it does not parse. */
+export function parseDocument(path: string, text: string): unknown {
+  return YAML.test(path) ? parseYaml(text) : (JSON.parse(text) as unknown);
+}
+
+/** Each file a manifest names by path with a `schema`, and that schema scoped to the manifest. */
+export function schemaFiles(manifest: KindManifest): { path: string; schema: SchemaObject }[] {
+  const raw = manifest as unknown as Record<string, unknown>;
+  return fileRules(raw).flatMap((rule) => {
+    const schema = fileSchema(raw, rule);
+    return typeof rule.path === "string" && schema !== undefined
+      ? [{ path: rule.path, schema }]
+      : [];
+  });
+}
+
+/**
+ * A semantic model's description as `spec` holds it: the document's own, or that of the one model
+ * a 0.1.1 document lists. The copy is for search, so one past the manifest's limit is cut, not
+ * refused: the model is valid Ossie, and its file keeps every character.
+ */
+function modelDescription(own: unknown, document: unknown): unknown {
+  const description = own ?? listedDescription(document);
+  if (typeof description !== "string") return description;
+  return [...description].slice(0, DESCRIPTION_LIMIT).join("");
+}
+
+/**
+ * Apache Ossie 0.1.1 lists models where 0.2 holds one, and an artifact is one model. The schema
+ * refuses a longer list too; this says what to do about it.
+ */
+export function listedModelsProblem(manifest: KindManifest, document: unknown): string | undefined {
+  if (manifest.title !== "semantic_model" || !isRecord(document)) return undefined;
+  const models = document.semantic_model;
+  if (!Array.isArray(models) || models.length === 1) return undefined;
+  if (models.length === 0)
+    return "lists no model under `semantic_model`, and an artifact holds one";
+  return `lists ${models.length} models under \`semantic_model\`, and an artifact holds one: split it into one artifact per model`;
+}
+
+/**
+ * The name a lone document is stored under: the file the manifest names with its extension, so
+ * `retail.yml` becomes `semantic_model.yaml`. Its own name when the manifest names no such file.
+ */
+export function entryName(manifest: KindManifest, file: string): string {
+  const named = namedFiles(manifest);
+  if (named.includes(file) || !DOCUMENT.test(file)) return file;
+  const extension = (path: string) => (YAML.test(path) ? "yaml" : "json");
+  return named.find((path) => DOCUMENT.test(path) && extension(path) === extension(file)) ?? file;
+}
+
+/** Every file a manifest names by path: the required ones, then each alternative in order. */
+function namedFiles(manifest: KindManifest): string[] {
+  const files = manifest["x-registry-files"];
+  return [...(files.required ?? []), ...(files.one_of ?? []).flat()].flatMap((rule) =>
+    rule.path === undefined ? [] : [rule.path],
+  );
+}
+
+/**
+ * Apache Ossie 0.1.1 nests each model in a `semantic_model` list, so the document has no
+ * description of its own. A document that lists one model is described by that model.
+ */
+function listedDescription(document: unknown): string | undefined {
+  const models = isRecord(document) ? document.semantic_model : undefined;
+  if (!Array.isArray(models) || models.length !== 1) return undefined;
+  const [model] = models as unknown[];
+  return isRecord(model) && typeof model.description === "string" ? model.description : undefined;
+}
+
+/**
+ * Where `spec` holds a kind's document: the one object property its manifest declares, so
+ * `card` for an agent. `card` when a manifest declares none.
+ */
+function documentKey(manifest: KindManifest): string {
+  const objects = Object.entries(manifest.properties ?? {}).filter(
+    ([, node]) => node.type === "object",
+  );
+  const [only] = objects;
+  return objects.length === 1 && only !== undefined ? only[0] : "card";
 }

@@ -13,7 +13,7 @@ import {
   RunEventType,
   type RunRecord,
 } from "#core/run/model.ts";
-import { scopeFlag } from "#core/store/paths.ts";
+import { type Scope, scopeFlag } from "#core/store/paths.ts";
 import { followRun, type RpcClient } from "#daemon/rpc/client.ts";
 import { publishInstead } from "#engine/publish/target.ts";
 import type { load } from "#engine/scope/load.ts";
@@ -49,7 +49,9 @@ export async function conflictHint(
 
 /** What `aireg publish` settles: an edit, or a removal, made here. */
 export const PUBLISHED_BY_YOU = ["publish", "archive", "adopt"] as const;
-export const PUBLISH_HINT = "Run `aireg publish` to publish what was edited here.";
+export function publishHint(scope: Scope): string {
+  return `Run \`aireg publish${scopeFlag(scope)}\` to publish what was edited here.`;
+}
 
 export interface Followed {
   attention: boolean;
@@ -169,12 +171,14 @@ export async function attentionHints(
   }
   const yours: readonly string[] = PUBLISHED_BY_YOU;
   if (waiting.some((item) => yours.includes(item.disposition ?? ""))) {
-    context.printer.hint(PUBLISH_HINT);
+    context.printer.hint(publishHint(loaded.roots.scope));
   }
   const other = waiting.some(
     (item) => item.disposition !== "conflict" && !yours.includes(item.disposition ?? ""),
   );
   if (other || waiting.length === 0) {
-    context.printer.hint("Run `aireg sync --dry-run` to see what each one needs.");
+    context.printer.hint(
+      `Run \`aireg sync --dry-run${scopeFlag(loaded.roots.scope)}\` to see what each one needs.`,
+    );
   }
 }

@@ -33,6 +33,14 @@
                 {
                   "const": "agent",
                   "type": "string"
+                },
+                {
+                  "const": "semantic_model",
+                  "type": "string"
+                },
+                {
+                  "const": "mcp_server",
+                  "type": "string"
                 }
               ]
             },
@@ -70,6 +78,54 @@
                     "type": "string"
                   }
                 ]
+              }
+            },
+            "server": {
+              "additionalProperties": false,
+              "description": "For an MCP server.",
+              "type": "object",
+              "required": [
+                "runs",
+                "reads",
+                "leftOut"
+              ],
+              "properties": {
+                "runs": {
+                  "description": "Each way it runs: a command line, or a URL.",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "transport"
+                    ],
+                    "properties": {
+                      "transport": {
+                        "type": "string"
+                      },
+                      "command": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "reads": {
+                  "description": "Environment variables it reads its secrets from.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "leftOut": {
+                  "description": "Why a way it lists cannot run.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }

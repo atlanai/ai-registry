@@ -68,6 +68,16 @@ describe("formatLock", () => {
     expect(text.indexOf("lint:")).toBeLessThan(text.indexOf("review:"));
   });
 
+  test("is version 2 with a semantic model, so an older aireg says to update", () => {
+    const withModel = lock();
+    expect(formatLock(withModel)).toContain("version: 1\n");
+    const review = withModel.artifacts.review as LockArtifact;
+    withModel.artifacts.review = { ...review, kind: "semantic_model" };
+    const text = formatLock(withModel);
+    expect(text).toContain("version: 2\n");
+    expect(parseLock(text).artifacts.review?.kind).toBe("semantic_model");
+  });
+
   test("carries no timestamp, so concurrent branches merge cleanly", () => {
     expect(formatLock(lock())).not.toMatch(/generated_?at|timestamp|\d{4}-\d{2}-\d{2}T/i);
   });
@@ -266,9 +276,45 @@ describe("a lock an earlier aireg wrote", () => {
   });
 });
 
+describe("config entries", () => {
+  const receipt = {
+    target: "claude-code",
+    file: ".mcp.json",
+    format: "json" as const,
+    at: ["mcpServers", "issue-tracker"],
+    digest: "d".repeat(64),
+  };
+
+  test("are written as version 2 and read back; a lock without them stays version 1", () => {
+    const value = lock();
+    value.artifacts.lint = { ...(value.artifacts.lint as LockArtifact), entries: [receipt] };
+    const text = formatLock(value);
+    expect(LOCK_VERSION).toBe(2);
+    expect(text).toContain("version: 2\n");
+    expect(parseLock(text).artifacts.lint?.entries).toEqual([receipt]);
+    expect(formatLock(lock())).toContain("version: 1\n");
+  });
+
+  test("a version 1 lock, which has none, still reads", () => {
+    const text = formatLock(lock());
+    expect(text).toContain("version: 1\n");
+    expect(Object.keys(parseLock(text).artifacts)).toEqual(["lint", "review"]);
+  });
+
+  test("refuses a row whose entry it cannot read, or that leaves the project", () => {
+    const value = lock();
+    value.artifacts.lint = { ...(value.artifacts.lint as LockArtifact), entries: [receipt] };
+    const text = formatLock(value);
+    expect(() => parseLock(text.replace("format: json", "format: ini"))).toThrow(LockError);
+    expect(() => parseLock(text.replace("file: .mcp.json", "file: ../.mcp.json"))).toThrow(
+      LockError,
+    );
+  });
+});
+
 describe("lock version", () => {
   test("refuses a lock a newer aireg wrote, and says how to read it", () => {
-    const ahead = formatLock(lock()).replace(`version: ${LOCK_VERSION}`, "version: 99");
+    const ahead = formatLock(lock()).replace("version: 1", "version: 99");
     expect(() => parseLock(ahead)).toThrow(
       expect.objectContaining({
         message: expect.stringContaining("version 99"),

@@ -36,6 +36,8 @@ export interface SyncPreview {
   scope: Scope;
   artifacts: PreviewItem[];
   local: Written[];
+  /** Each copy of an unmanaged skill whose name another copy with different files shares. */
+  differing: Found[];
   undeclared: Found[];
   linkable: Found[];
   changed: Found[];

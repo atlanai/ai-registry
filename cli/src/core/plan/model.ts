@@ -4,8 +4,10 @@ import type { LayoutId } from "#adapter/layouts/ids.ts";
 import type { SourceConfig } from "#core/adapter/identity.ts";
 import type { Catalog } from "#core/catalog/catalog.ts";
 import type { Withheld } from "#core/catalog/withheld.ts";
-import type { LinkMode, Lock } from "#core/lock.ts";
-import type { Codec, KeyFile } from "#core/target/contract.ts";
+import { isStoreOnly } from "#core/kinds.ts";
+import type { LinkMode, Lock, LockEntry } from "#core/lock.ts";
+import type { Ref } from "#core/ref.ts";
+import type { Codec, KeyFile, KindMapping } from "#core/target/contract.ts";
 import type { Carried } from "./carries.ts";
 import type { Conflict, Need, Unresolved } from "./depends.ts";
 import type { Untrusted } from "./select.ts";
@@ -98,6 +100,8 @@ export type Action =
       adopt?: boolean;
       /** How the lock recorded a link at this path; absent when aireg made none. */
       recorded?: LinkMode;
+      /** A shared plugin copy's digest as aireg wrote it; one that differs now was edited. */
+      written?: string;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
       /** Absent writes the bytes as they are. */
@@ -124,9 +128,37 @@ export type Action =
       /** The target link the lock recorded here, when this is one. */
       link?: { target: string; mode: LinkMode };
     }
+  | {
+      kind: "configure";
+      name: string;
+      target: string;
+      /** The config file, absolute. */
+      to: string;
+      at: string[];
+      mapping: Extract<KindMapping, { shape: "config" }>;
+      /** This scope's copy, which holds `server.json`. */
+      from: string;
+      server: Pick<Ref, "with" | "env" | "tools"> | undefined;
+      /** What the lockfile says aireg wrote there before. */
+      receipt?: LockEntry;
+      /** Denied tools added as items of a list in another file, for a target whose entry cannot. */
+      deny?: { to: string; at: string[]; items: string[]; receipt?: LockEntry };
+      /** Replaces our entry even when it was edited. */
+      force?: true;
+    }
+  | {
+      kind: "unconfigure";
+      name: string;
+      target: string;
+      to: string;
+      format: "json" | "toml" | "yaml";
+      receipt: LockEntry;
+      force?: true;
+    }
   | { kind: "record"; lock: Lock };
 
 export interface Warning {
+  /** The artifact it is about; undefined for a registry's own, or a manifest ref's. */
   name: string | undefined;
   message: string;
   /** Printed on its own line. */
@@ -216,6 +248,8 @@ export interface Selected {
   copy?: boolean;
   /** Its name was written with `as:`, so it is never renamed for it. */
   aliased?: boolean;
+  /** An MCP server's settings from the manifest. */
+  server?: Pick<Ref, "with" | "env" | "tools">;
 }
 
 export interface Incompatible {
@@ -249,6 +283,18 @@ export interface Rewritten {
   version: string;
   locked: string;
   served: string;
+}
+
+/**
+ * The artifacts of a kind that is installed as the scope's own copy, such as a semantic model:
+ * each is installed once the lockfile holds it, though nothing links to it.
+ */
+export function storeOnlyNames(lock: Lock | undefined): Set<string> {
+  return new Set(
+    Object.entries(lock?.artifacts ?? {}).flatMap(([name, artifact]) =>
+      isStoreOnly(artifact.kind) ? [name] : [],
+    ),
+  );
 }
 
 export function recordOf(plan: Plan): Lock {

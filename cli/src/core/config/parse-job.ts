@@ -22,6 +22,9 @@ import {
 /** The scheduler's floor: a job run more often than this is a busy loop. */
 export const MINIMUM_INTERVAL_SECONDS = 60;
 
+/** A day at most: a job left longer reads as one that stopped. */
+export const MAXIMUM_INTERVAL_SECONDS = 24 * 60 * 60;
+
 /** Each id as aireg 0.1 knew it, which is what an adapter built against it reads. */
 export function earlierIds(targetTable: Targets, ids: readonly string[]): string[] {
   return ids.map((id) => earlierId(targetTable, id));

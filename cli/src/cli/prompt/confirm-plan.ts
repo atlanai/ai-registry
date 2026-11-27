@@ -1,11 +1,14 @@
 import { type ArtifactKind, KINDS } from "#adapter/kinds.ts";
-import { list, plural } from "#adapter/text.ts";
+import { list, plural, quoted, sanitizeText } from "#adapter/text.ts";
 import { loadedBy, skipLine, toolName, unhandled } from "#cli/render/tools.ts";
+import { AiregError, ErrorCode } from "#core/errors.ts";
 import type { Lock } from "#core/lock.ts";
-import type { Plan } from "#core/plan/model.ts";
+import { newRun } from "#core/plan/apply/configure.ts";
+import { type Plan, storeOnlyNames } from "#core/plan/model.ts";
 import type { Targets } from "#core/target/contract.ts";
 import { readsFor } from "#core/target/placement.ts";
 import { tableLines } from "#core/term/table.ts";
+import type { Peek } from "#engine/install/pipeline.ts";
 import { type Interaction, interactive } from "./interaction.ts";
 import { canceled } from "./model.ts";
 import { confirm } from "./select.ts";
@@ -31,6 +34,43 @@ export interface PlanContext {
   /** Kinds being installed, used to explain a target that gets nothing. */
   kinds?: readonly ArtifactKind[] | undefined;
   targetTable?: Targets | undefined;
+}
+
+/** A target runs an MCP server as you, so a new or changed command is agreed to first. */
+export async function confirmRuns(
+  step: Interaction,
+  plan: Plan,
+  peek: Peek,
+  yes: boolean,
+): Promise<boolean> {
+  const runs = new Map<string, Set<string>>();
+  for (const action of plan.actions) {
+    if (action.kind !== "configure") continue;
+    // A version this run stages is read where it is fetched; one already here, from its copy.
+    const run = await newRun(action, (await peek(action.name)) ?? action.from);
+    if (run !== undefined) runs.set(action.name, (runs.get(action.name) ?? new Set()).add(run));
+  }
+  if (runs.size === 0 || yes) return true;
+  const names = list([...runs.keys()].sort().map((name) => quoted(name)));
+  if (!interactive(step)) {
+    throw new AiregError(`${names} would start something new, which a target runs as you.`, {
+      code: ErrorCode.Usage,
+      hint: "Run `aireg show` on each to see how it starts, then run this again with `--yes`.",
+    });
+  }
+  for (const [name, lines] of [...runs].sort(([a], [b]) => a.localeCompare(b))) {
+    step.printer.info(name);
+    for (const line of lines) step.printer.note("runs", sanitizeText(line));
+  }
+  const answer = await confirm(
+    {
+      message: `Start ${plural(runs.size, "MCP server")} this way, which a target runs as you?`,
+      style: step.printer.errStyle,
+      initial: false,
+    },
+    step.io,
+  );
+  return !canceled(answer) && answer;
 }
 
 /** Asked for each plugin that runs things as you; no is the default, and the answer without a terminal. */
@@ -250,6 +290,11 @@ function skipped(
 
 /** Chosen targets the plan places nothing in, so the review can warn before it applies. */
 export function unreached(plan: Plan, targets: readonly string[], targetTable?: Targets): string[] {
+  // A plan of semantic models alone places nothing in any target, and is not meant to.
+  const record = plan.actions.find((action) => action.kind === "record");
+  const storeOnly = storeOnlyNames(record?.lock);
+  const placed = plan.actions.flatMap((action) => (action.kind === "record" ? [] : [action.name]));
+  if (placed.length > 0 && placed.every((name) => storeOnly.has(name))) return [];
   const reached = new Set<string>();
   for (const action of plan.actions) {
     if (action.kind === "link") reached.add(action.target);

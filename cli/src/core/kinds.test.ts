@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { KINDS } from "#adapter/kinds.ts";
-import { KIND_SPECS, kindDir, stagedLeaf } from "./kinds.ts";
+import { aKind, isStoreOnly, KIND_SPECS, kindDir, SCANNED_KINDS, stagedLeaf } from "./kinds.ts";
 
 describe("KIND_SPECS", () => {
   test("gives every kind a distinct directory", () => {
@@ -13,6 +13,25 @@ describe("KIND_SPECS", () => {
       const spec = KIND_SPECS[kind];
       expect(spec.extensions.length > 0, kind).toBe(spec.shape === "file");
     }
+  });
+});
+
+describe("a semantic model", () => {
+  test("is kept as the scope's own copy, a directory no target links to", () => {
+    expect(KINDS).toContain("semantic_model");
+    expect(KIND_SPECS.semantic_model).toEqual({
+      dir: "semantic_models",
+      shape: "directory",
+      extensions: [],
+      storeOnly: true,
+    });
+    expect(isStoreOnly("semantic_model")).toBe(true);
+    expect(KINDS.filter(isStoreOnly)).toEqual(["semantic_model"]);
+    expect(isStoreOnly(undefined)).toBe(false);
+  });
+
+  test("is staged under its name, with the files beside its model", () => {
+    expect(stagedLeaf("semantic_model", "retail", "semantic_models/retail")).toBe("retail");
   });
 });
 
@@ -42,5 +61,17 @@ describe("stagedLeaf", () => {
     expect(stagedLeaf("agent", "odd", "agents/odd.")).toBe("odd");
     expect(stagedLeaf("agent", "odd", "agents/odd")).toBe("odd");
     expect(stagedLeaf("agent", "odd", "agents/odd.a-b")).toBe("odd");
+  });
+});
+
+describe("mcp_server", () => {
+  test("is never scanned for in a target folder", () => {
+    expect(SCANNED_KINDS).toEqual(["skill", "agent", "semantic_model"]);
+  });
+
+  test("takes an before it, as agent does", () => {
+    expect(aKind("mcp_server")).toBe("an MCP server");
+    expect(aKind("agent")).toBe("an agent");
+    expect(aKind("skill")).toBe("a skill");
   });
 });

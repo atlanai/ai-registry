@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { isVersion } from "#adapter/spec/ref.ts";
 import { list } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { STREAMED } from "#cli/commands/define.ts";
@@ -11,9 +12,19 @@ import { cancel, interaction, interactive } from "#cli/prompt/interaction.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { findRegistry } from "#core/filespec/init.ts";
 import { type KindManifest, primaryFiles } from "#core/filespec/kind-manifests.ts";
+import { serverSkeleton } from "#core/filespec/mcp-server.ts";
 import { refuseRedirect, writeFresh } from "#core/fs/fresh.ts";
 import type { Printer } from "#core/term/printer.ts";
-import { askFields, nameOf, render, scaffold, settings } from "./fields.ts";
+import {
+  askFields,
+  nameOf,
+  render,
+  renderDocument,
+  scaffold,
+  settings,
+  starterModel,
+} from "./fields.ts";
+import { PLACEHOLDER } from "./files.ts";
 import { outsidePlace, registryPlace } from "./place.ts";
 
 export interface Created extends KindNew {
@@ -45,20 +56,39 @@ export async function init(
     ? await registryPlace({ kind, root, context, own, yes, given, step })
     : outsidePlace(kind, files, context, given);
   if (place === undefined) return STREAMED;
-  const { name, at } = place;
-  const shown = relative(context.cwd, at) || ".";
+  const { name } = place;
+  let { at } = place;
 
-  const { fields, todo } = scaffold(manifest, name, sets);
-  if (interactive(step) && !(await askFields(step, fields, todo))) {
+  // A semantic model's file is an Apache Ossie document, which no manifest field describes.
+  const starter = manifest.title === "semantic_model" ? starterModel(name) : undefined;
+  // An MCP server's file is the publisher's `server.json`, whose name is reverse-DNS, not the slug.
+  const server = manifest.title === "mcp_server";
+  const { fields, todo } =
+    starter === undefined
+      ? scaffold(server ? serverSkeleton(manifest) : manifest, name, sets)
+      : { fields: {}, todo: starter.todo };
+  if (server && !sets.some(([path]) => path.join(".") === "name")) {
+    fields.name = PLACEHOLDER;
+    todo.unshift("name");
+  }
+  if (starter === undefined && interactive(step) && !(await askFields(step, fields, todo))) {
     cancel(step);
     return STREAMED;
   }
+  // A server is published at its own version, so `--set version=2.0.0` starts at 2.0.0.
+  const version = fields.version;
+  if (server && inRegistry && typeof version === "string" && isVersion(version)) {
+    at = join(dirname(at), version);
+  }
+  const shown = relative(context.cwd, at) || ".";
 
   const created = files.map((file) => (shown === "." ? file : `${shown}/${file}`));
   for (const file of files) refuseRedirect(inRegistry ? root : context.cwd, join(at, file));
   await mkdir(at, { recursive: true });
   for (const [index, file] of files.entries()) {
-    await writeFresh(join(at, file), render(file, fields), {
+    const text =
+      starter === undefined ? render(file, fields) : renderDocument(file, starter.document);
+    await writeFresh(join(at, file), text, {
       shown: created[index] as string,
       hint: "Move it aside, or name a new artifact.",
     });

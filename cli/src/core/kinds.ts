@@ -1,6 +1,6 @@
 import { basename, extname, join } from "node:path";
 import { type ArtifactKind, KINDS } from "#adapter/index.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_SERVER_ENTRY, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { AGENT_CARD_ENTRY } from "./product.ts";
 
 export interface KindSpec {
@@ -16,6 +16,11 @@ export interface KindSpec {
   entry?: string;
   /** Entry filenames a file-shaped kind can install; companion files stay in the registry. */
   served?: readonly string[];
+  /**
+   * No coding agent has a folder for this kind, so the scope's own copy is the install: it is
+   * staged and locked, and linked into no target.
+   */
+  storeOnly?: true;
 }
 
 /** The one file a registry's agent version folder holds. */
@@ -30,10 +35,42 @@ export const KIND_SPECS: Record<ArtifactKind, KindSpec> = {
     extensions: [".md"],
     served: [AGENT_ENTRY, AGENT_CARD_ENTRY],
   },
+  mcp_server: {
+    dir: "mcp_servers",
+    shape: "directory",
+    extensions: [],
+    entry: MCP_SERVER_ENTRY,
+  },
+  // A directory, so the files a model was converted from, under `source/`, come with it.
+  semantic_model: { dir: "semantic_models", shape: "directory", extensions: [], storeOnly: true },
 };
 
-/** Kinds the registry scanner walks; `plugin` is found by its manifest. */
-export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter((kind) => kind !== "plugin");
+/** Whether installing this kind means keeping the scope's copy, with no link into a target. */
+export function isStoreOnly(kind: ArtifactKind | undefined): boolean {
+  return kind !== undefined && KIND_SPECS[kind].storeOnly === true;
+}
+
+/**
+ * Kinds the registry scanner walks; `plugin` is found by its manifest, and an MCP server is
+ * written into a target's config, never placed as a folder there.
+ */
+export const SCANNED_KINDS: readonly ArtifactKind[] = KINDS.filter(
+  (kind) => kind !== "plugin" && kind !== "mcp_server",
+);
+
+/** Commands named otherwise than their kind, which no other kind or command may take. */
+export const KIND_COMMANDS: Readonly<Record<string, string>> = { mcp_server: "mcp" };
+
+/** The command `aireg <command>` a kind runs as. */
+export function kindCommand(kind: string): string {
+  return Object.hasOwn(KIND_COMMANDS, kind) ? (KIND_COMMANDS[kind] as string) : kind;
+}
+
+/** The kind with its article, as a sentence names it. */
+export function aKind(kind: string): string {
+  if (kind === "mcp_server") return "an MCP server";
+  return `${/^[aeiou]/.test(kind) ? "an" : "a"} ${kind}`;
+}
 
 /** The kind a folder of artifacts holds, read from its name, such as `skills`. */
 export function kindOfDir(dir: string): ArtifactKind | undefined {

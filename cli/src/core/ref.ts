@@ -24,6 +24,12 @@ export interface Ref {
   copy?: boolean | undefined;
   /** Non-registry plugins a person let install with the hooks or servers they carry. */
   trust?: string[] | undefined;
+  /** An MCP server's input values, by input name; never a secret. */
+  with?: Record<string, string | string[]> | undefined;
+  /** An MCP server's secrets read from other environment variables, by the secret's own. */
+  env?: Record<string, string> | undefined;
+  /** An MCP server's tools a target may call, where it can narrow them. */
+  tools?: { allow?: string[] | undefined; deny?: string[] | undefined } | undefined;
 }
 
 export class RefParseError extends AiregError {

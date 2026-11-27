@@ -2,9 +2,10 @@ import { resolve } from "node:path";
 import { quoted, sanitizeText } from "#adapter/text.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import { removal } from "#core/plan/removable.ts";
-import { editedAnywhere } from "#core/plan/survey.ts";
-import { artifactPath, copyLeaf } from "#core/store/paths.ts";
+import { artifactPath, copyLeaf, scopeFlag } from "#core/store/paths.ts";
 import { keep } from "./carry.ts";
+import { unconfigure } from "./configs.ts";
+import { editedKept } from "./edited.ts";
 import type { BuildState } from "./state.ts";
 
 /** A target link the lock recorded, which apply takes back only if it is still ours. */
@@ -56,7 +57,7 @@ export function removeStale(build: BuildState): void {
       continue;
     }
     const state = build.survey.artifacts[name];
-    const edited = editedAnywhere(entry, state);
+    const edited = editedKept(name, entry, state, build.options);
     if (edited && !build.options.force && build.options.discard?.has(name) !== true) {
       // Kept with its source: a lock row whose registry is gone is dropped on
       // read, and the files would be left with nothing to manage them.
@@ -66,12 +67,13 @@ export function removeStale(build: BuildState): void {
       build.warnings.push({
         name,
         message: `${quoted(name)} was edited after installation, so it was kept although nothing here needs it any more.`,
-        hint: `Run \`aireg remove ${name} --force\` to delete it.`,
+        hint: `Run \`aireg remove ${name} --force${scopeFlag(build.options.roots.scope)}\` to delete it.`,
       });
       continue;
     }
     if (entry.neededBy !== undefined) build.pruned.push(name);
     for (const link of entry.links) unlinkRecorded(build, name, link);
+    for (const receipt of entry.entries ?? []) unconfigure(build, name, receipt);
     unlink(
       build,
       name,
