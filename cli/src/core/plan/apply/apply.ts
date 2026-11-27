@@ -94,6 +94,7 @@ export async function apply({
 
   await rm(roots.applyJournal, { force: true });
   const { results } = run;
+  const { recorded } = results;
   return {
     performed: results.performed,
     installed: [...new Set([...results.installed, ...copied(plan, results)])].sort(),
@@ -101,10 +102,15 @@ export async function apply({
       .filter((name) => linked(before, name) === 0)
       .sort(),
     removed:
-      results.recorded === undefined
+      recorded === undefined
         ? []
         : Object.keys(before?.artifacts ?? {})
-            .filter((name) => linked(before, name) > 0 && linked(results.recorded, name) === 0)
+            // One whose link was never made held no place, so leaving the lock is its removal.
+            .filter(
+              (name) =>
+                recorded.artifacts[name] === undefined ||
+                (linked(before, name) > 0 && linked(recorded, name) === 0),
+            )
             .sort(),
     lock: results.recorded,
     degraded: [...results.degraded].sort(),
