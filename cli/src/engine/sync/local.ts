@@ -87,10 +87,8 @@ export async function applyLocal({
   await refuseBlocked(narrowed);
   const result = await commit({ loaded, plan: narrowed, acquired: scan.acquired, targets, onStep });
   for (const { name, message, hint } of plan.warnings) {
-    // A registry's own warning (named for its alias, or for nothing) is this run's, as install says.
-    const artifact = name !== undefined && !opened.has(name);
     // A published row's own note says why its copy stayed; the plan only saw an edit.
-    if (artifact && (!recording.has(name) || published.has(name))) continue;
+    if (name !== undefined && (!recording.has(name) || published.has(name))) continue;
     notices.push({ message, ...(hint === undefined ? {} : { hint }) });
   }
   notices.push(...followed.notices, ...rewrittenNotices(plan));

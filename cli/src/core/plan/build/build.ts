@@ -76,7 +76,7 @@ function planWith(
   const { selected, incompatible, clashes, untrusted } = selection;
   const warnings: Warning[] = [
     ...acquired.flatMap((source) =>
-      source.catalog.warnings.map((message) => ({ name: source.alias, message })),
+      source.catalog.warnings.map((message) => ({ name: undefined, message })),
     ),
     ...selection.warnings,
   ];

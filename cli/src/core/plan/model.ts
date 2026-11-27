@@ -158,6 +158,7 @@ export type Action =
   | { kind: "record"; lock: Lock };
 
 export interface Warning {
+  /** The artifact it is about; undefined for a registry's own, or a manifest ref's. */
   name: string | undefined;
   message: string;
   /** Printed on its own line. */
