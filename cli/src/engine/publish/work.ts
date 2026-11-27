@@ -15,7 +15,8 @@ import type { ExportFile } from "#core/manifest/export-fields.ts";
 import type { Export } from "#core/manifest/model.ts";
 import { gitIn } from "#core/process.ts";
 import { refuseRedirectedCopy } from "#core/store/managed-paths.ts";
-import { artifactPath, copyLeaf } from "#core/store/paths.ts";
+import { artifactPath, copyLeaf, type Scope, scopeFlag } from "#core/store/paths.ts";
+import { shellWord } from "#core/term/format.ts";
 import { matchInstalled, rowsNamed } from "#engine/installed-names.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import type { Loaded } from "#engine/scope/load.ts";
@@ -102,13 +103,13 @@ export async function expand(pattern: string, cwd: string): Promise<string[]> {
 
 /**
  * Each argument is a path, a glob over paths, or an installed name; a folder beside you wins.
- * `flags` is the destination, scope and dry run to repeat in a hint, with its leading space.
+ * `again` holds the arguments a hint repeats after the path, such as `--to`.
  */
 export async function fromArgs(
   args: readonly string[],
   loaded: Loaded,
   cwd: string,
-  flags = "",
+  again: readonly string[] = [],
 ): Promise<Work[]> {
   const rows = loaded.lock.artifacts;
   const works: Work[] = [];
@@ -136,7 +137,7 @@ export async function fromArgs(
         const copy = copyPath(name, entry, loaded);
         return existsSync(copy) && realpathSync(copy) === target;
       });
-      if (row === undefined) throw linkedRoot(path, target, flags);
+      if (row === undefined) throw linkedRoot(path, target, loaded.roots.scope, again);
       works.push(installed(row[0], row[1], loaded));
     }
   }
@@ -180,10 +181,16 @@ function linkTarget(path: string): string | undefined {
   return existsSync(path) ? realpathSync(path) : undefined;
 }
 
-function linkedRoot(path: string, target: string, flags: string): AiregError {
+function linkedRoot(
+  path: string,
+  target: string,
+  scope: Scope,
+  again: readonly string[],
+): AiregError {
+  const words = [target, ...again].map(shellWord).join(" ");
   return new AiregError(`${basename(path)} is a symlink; an artifact holds regular files only.`, {
     code: ErrorCode.Invalid,
-    hint: `Publish the folder it points to: \`aireg publish ${quoted(target)}${flags}\`.`,
+    hint: `Publish the folder it points to: \`aireg publish ${words}${scopeFlag(scope)}\`.`,
   });
 }
 

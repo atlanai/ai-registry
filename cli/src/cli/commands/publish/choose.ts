@@ -4,8 +4,6 @@ import { type Interaction, interactive } from "#cli/prompt/interaction.ts";
 import { canceled } from "#cli/prompt/model.ts";
 import { multiselect } from "#cli/prompt/multiselect.ts";
 import type { Export } from "#core/manifest/model.ts";
-import { scopeFlag } from "#core/store/paths.ts";
-import { shellWord } from "#core/term/format.ts";
 import type { Printer } from "#core/term/printer.ts";
 import type { CommonOptions } from "#engine/options.ts";
 import { exportWork } from "#engine/publish/exports.ts";
@@ -31,13 +29,12 @@ export async function gather(
 
   const exported = found === undefined ? undefined : await exportWork(found, loaded.roots.base);
   let works: Work[] | undefined;
-  // A hint naming another path runs as printed: same destination, scope and dry run.
-  const flags = [
-    to === undefined ? "" : ` --to ${shellWord(to)}`,
-    scopeFlag(loaded.roots.scope),
-    common.dryRun ? " --dry-run" : "",
-  ].join("");
-  if (paths.length > 0) works = await keep(await fromArgs(paths, loaded, cwd, flags));
+  // A hint naming another path runs as printed: same destination and dry run.
+  const again = [
+    ...(to === undefined ? [] : ["--to", to]),
+    ...(common.dryRun ? ["--dry-run"] : []),
+  ];
+  if (paths.length > 0) works = await keep(await fromArgs(paths, loaded, cwd, again));
   else if (exported !== undefined) works = await keep(exported);
   else works = await chooseWork(step, loaded, common, cwd, keep);
   for (const work of works ?? []) work.exported = found?.get(work.path);

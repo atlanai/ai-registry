@@ -112,14 +112,10 @@ describe("a refused publish", () => {
     const refused = await aireg(send, { cwd: work });
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain("pointed is a symlink; an artifact holds regular files only.");
-    const hint = refused.stderr.match(/`aireg publish ("[^"]*")((?: [^`\s]+)*)`/);
+    const hint = refused.stderr.match(/`aireg (publish [^`]+)`/);
     expect(hint, refused.stderr).not.toBeNull();
-    const [, target, flags] = hint as RegExpMatchArray;
-    const rerun = ["publish", JSON.parse(target as string), ...(flags as string).split(" ")];
-    const again = await aireg(
-      rerun.filter((arg) => arg !== ""),
-      { cwd: work },
-    );
+    // The temp path needs no shell quoting, so splitting on spaces reads it back.
+    const again = await aireg((hint as RegExpMatchArray)[1]?.split(" ") ?? [], { cwd: work });
     expect(again.code, again.stderr).toBe(0);
     expect(existsSync(join(registryRoot, "artifacts", "platform", "skill", "pointed"))).toBe(false);
   });
