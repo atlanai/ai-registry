@@ -108,9 +108,9 @@ describe("an export's own version", () => {
     );
     const sent = await send("--json");
     expect(sent.code, sent.stderr).toBe(0);
-    const [below] = JSON.parse(sent.stdout).data.artifacts;
-    expect(below).toMatchObject({ from: "0.2.1", version: "0.1.5", belowLatest: true });
-    expect(below).not.toHaveProperty("withheld");
+    expect(JSON.parse(sent.stdout).data.artifacts).toEqual([
+      expect.objectContaining({ from: "0.2.1", version: "0.1.5", belowLatest: true }),
+    ]);
     expect(await written()).toEqual(["0.1.5", "0.2.0", "0.2.1"]);
   });
 

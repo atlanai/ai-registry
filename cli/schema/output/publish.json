@@ -127,7 +127,7 @@
               },
               "withheld": {
                 "additionalProperties": false,
-                "description": "The registry's newest version, when its status holds it back rather than serving it.",
+                "description": "The version the registry would serve, when its status holds it back instead.",
                 "type": "object",
                 "required": [
                   "version",

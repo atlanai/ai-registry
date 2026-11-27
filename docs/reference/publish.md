@@ -89,6 +89,8 @@ With `--json`, `publish` asks no questions and prints each artifact with its old
 
 `registry` is the registry's name, or for `--to <folder>`, the registry folder as `--to` gave it. `from` is `null` for a new artifact, and `published` is `false` for one already published or under `--dry-run`. `digest` is the artifact's content identity: its files and dependencies, but not its version. Two runs give the same digest exactly when they would publish the same content.
 
+When the registry holds the version it would serve back by its status, such as `blocked` or `pending_review`, the artifact also carries `withheld`: that version, its `status`, and the `reason` when the registry gives one. `from` is then that version, so a held-back artifact does not read as new.
+
 ## Exit status
 
 - `0`: published, nothing new to publish, a dry run, or canceled at a question.

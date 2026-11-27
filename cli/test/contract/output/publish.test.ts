@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { expect } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -8,7 +8,8 @@ import { outputContract } from "./kit.ts";
 
 const contract = outputContract("publish");
 
-// An agent with companion files and a dependency, and an export kept back, fill every optional key.
+// An agent with companion files and a dependency, an export kept back, and a blocked version
+// fill every optional key.
 const MANIFEST = `exports:
   - skills
   - path: skills/draft
@@ -47,5 +48,12 @@ test("publish prints data its schema describes, sent, planned and kept back", as
   expect(await contract.violations(aireg, ["publish", "--dry-run"], "publish")).toBe("");
   const kept = ["publish", "skills/draft", "--dry-run"];
   expect(await contract.violations(aireg, kept, "publish")).toBe("");
+  const versions = join(project, "registry/artifacts/team/skill/review/versions.json");
+  const document = JSON.parse(await readFile(versions, "utf8")) as {
+    versions: { status?: string; reason?: string }[];
+  };
+  for (const row of document.versions) Object.assign(row, { status: "blocked", reason: "unsafe" });
+  await writeFile(versions, JSON.stringify(document));
+  expect(await contract.violations(aireg, ["publish", "--dry-run"], "publish")).toBe("");
   expect(contract.unchecked()).toEqual([]);
 });

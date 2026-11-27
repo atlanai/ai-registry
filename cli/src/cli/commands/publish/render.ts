@@ -42,7 +42,7 @@ export function report(
   return { dryRun, target, artifacts, skipped: [...skipped] };
 }
 
-/** A registry that holds its newest version back, as a blocked one, says so apart from absence. */
+/** Tells a held-back version apart from a missing one. */
 function withheldOf(item: Planned): Pick<PublishReport["artifacts"][number], "withheld"> {
   const held = item.withheld;
   if (held === undefined) return {};

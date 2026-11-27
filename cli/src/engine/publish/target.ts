@@ -326,7 +326,7 @@ export interface Planned {
   same: boolean;
   /** The version sorts below the registry's newest, as an export's own older `version` can. */
   belowLatest: boolean;
-  /** The registry's newest version when it holds that one back, such as a blocked one. */
+  /** The version the registry would serve, when its status holds it back. */
   withheld?: Withheld | undefined;
   input: PublishInput;
   /** Changes against the latest version, when files are available and a publish is needed. */

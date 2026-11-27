@@ -37,7 +37,7 @@ const Artifact = Type.Object(
         {
           additionalProperties: false,
           description:
-            "The registry's newest version, when its status holds it back rather than serving it.",
+            "The version the registry would serve, when its status holds it back instead.",
         },
       ),
     ),
