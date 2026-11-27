@@ -1,11 +1,14 @@
 import { spawn } from "node:child_process";
+import { rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { describe, expect, test } from "vitest";
 import { Operations, UiError } from "#cli/ui/operations.ts";
-import type { PageReader } from "#cli/ui/page-state.ts";
+import type { KeptArtifact, PageReader } from "#cli/ui/page-state.ts";
 import type { UiEvent } from "#cli/ui/protocol.ts";
 import type { Command, Running, Stream } from "#core/child/commands.ts";
 import { processAlive } from "#core/process.ts";
+import { tempDir } from "#test/kit/temp.ts";
 
 const GRACE_MS = 300;
 
@@ -174,5 +177,62 @@ describe("applying a plan", () => {
     expect((refused as UiError).message).toContain("The registry changed since the preview");
     expect((refused as UiError).hint).toBe("Preview again.");
     expect(launched).toEqual([]);
+  });
+});
+
+describe("reading an installed file", () => {
+  test.each([
+    ["semantic_model.yaml", "semantic_model:\n  name: retail\n"],
+    ["semantic_model.json", '{"name":"retail"}\n'],
+  ])("reads an installed semantic model's %s without falling back to show", async (entry, body) => {
+    const dir = await tempDir("ui-semantic-model-");
+    try {
+      await writeFile(join(dir, entry), body, "utf8");
+      const artifact: KeptArtifact = {
+        key: "acme/analytics/semantic_model/retail",
+        name: "retail",
+        namespace: "analytics",
+        registry: "acme",
+        kind: "semantic_model",
+        version: "0.1.0",
+        installedVersion: "0.1.0",
+        description: "Retail metrics.",
+        state: "ok",
+        detail: "",
+        digest: "sha256:abc",
+        diskDigest: "sha256:abc",
+        path: "~/.registry/artifacts/acme/analytics/semantic_models/retail",
+        links: [],
+        harnesses: [],
+        listed: true,
+        carriedBy: undefined,
+        copy: dir,
+        installedKey: "acme/analytics/semantic_model/retail",
+        local: false,
+      };
+      const modelReader = {
+        read: async () => ({
+          root: dir,
+          console: { scope: "project" },
+          artifacts: [artifact],
+        }),
+      } as unknown as PageReader;
+      const { start, launched } = dryRuns();
+      const operations = new Operations(
+        modelReader,
+        () => {},
+        () => {},
+        { start },
+      );
+
+      await expect(operations.file(artifact.key)).resolves.toEqual({
+        key: artifact.key,
+        text: body,
+        from: "installed",
+      });
+      expect(launched).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

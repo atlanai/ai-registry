@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { basename, dirname } from "node:path";
 import { readRegular } from "#adapter/files.ts";
-import { SKILL_ENTRY } from "#adapter/kinds.ts";
+import { SEMANTIC_MODEL_ENTRIES, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { sanitizeText } from "#adapter/text.ts";
 import type { AddResult } from "#cli/commands/add/result.ts";
 import type { DoctorResult } from "#cli/commands/doctor/result.ts";
@@ -218,13 +218,12 @@ export class Operations {
   async file(key: string): Promise<UiFile> {
     const artifact = await this.find(key);
     if (artifact.copy !== "") {
-      const [root, file] =
-        artifact.kind === "agent"
-          ? [dirname(artifact.copy), basename(artifact.copy)]
-          : [artifact.copy, artifact.kind === "skill" ? SKILL_ENTRY : "README.md"];
-      const read = await readRegular(root, file).catch(() => undefined);
-      if (read?.kind === "file")
-        return { key, text: read.bytes.toString("utf8"), from: "installed" };
+      for (const [root, file] of installedFiles(artifact)) {
+        const read = await readRegular(root, file).catch(() => undefined);
+        if (read?.kind === "file") {
+          return { key, text: read.bytes.toString("utf8"), from: "installed" };
+        }
+      }
     }
     // A plugin may hold no README; that is an answer, not an error.
     if (!artifact.listed) return { key, text: "", from: "installed" };
@@ -410,6 +409,15 @@ function seenOf({ changes, untrusted }: Preview): string {
 
 function busyError(): UiError {
   return new UiError("Another action is still running.", "Wait for it to finish.");
+}
+
+function installedFiles(artifact: KeptArtifact): readonly [string, string][] {
+  if (artifact.kind === "agent") return [[dirname(artifact.copy), basename(artifact.copy)]];
+  if (artifact.kind === "skill") return [[artifact.copy, SKILL_ENTRY]];
+  if (artifact.kind === "semantic_model") {
+    return SEMANTIC_MODEL_ENTRIES.map((file) => [artifact.copy, file]);
+  }
+  return [[artifact.copy, "README.md"]];
 }
 
 function parsed(text: string): Captured["json"] {
