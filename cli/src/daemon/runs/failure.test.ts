@@ -71,6 +71,16 @@ describe("dueAt", () => {
     expect(dueAt(WATCH, recent)).toBe(120_000);
   });
 
+  test("keeps the plain interval while runs keep changing something", () => {
+    const changed = { ...EMPTY_RUN_COUNTS, examined: 1, changed: 1 };
+    const recent = [
+      run({ id: "run_2", counts: changed }),
+      run({ id: "run_1", counts: changed }),
+      run({ id: "run_0", counts: changed }),
+    ];
+    expect(dueAt(WATCH, recent)).toBe(60_000);
+  });
+
   test("backs off consecutive outright failures, ignoring interruptions between them", () => {
     const recent = [
       run({ id: "run_2", state: "failed", finishedAtMs: 300 }),

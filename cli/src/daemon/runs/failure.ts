@@ -130,6 +130,8 @@ function failureStreak(recent: readonly RunRecord[]): number {
 }
 
 function repeats(recent: readonly RunRecord[], latest: RunRecord): number {
+  // Only quiet runs back off: a job that keeps finding changes is still busy.
+  if (latest.counts.changed > 0) return 0;
   const key = outcomeKey(latest.state as TerminalRunState, latest.counts);
   let count = 0;
   for (const previous of recent) {
