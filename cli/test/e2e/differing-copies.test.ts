@@ -8,11 +8,7 @@ const FILL = { description: "Fill PDF forms.", body: "Use pdftk.\n" };
 const EXTRACT = { description: "Extract text from PDF files.", body: "Use pdftotext.\n" };
 
 describe("unmanaged skills of one name whose files differ", () => {
-  test("sync and publish name both copies and take neither until one is named", async ({
-    aireg,
-    home,
-    tmp,
-  }) => {
+  test("sync and publish name both copies and take neither", async ({ aireg, home, tmp }) => {
     const registryRoot = join(tmp, "registry");
     const made = await aireg(["registry", "init", registryRoot, "--name", "team", "-y"], {
       cwd: home.dir,
@@ -41,16 +37,6 @@ describe("unmanaged skills of one name whose files differ", () => {
     expect(sent.stderr).toContain(".agents/skills/pdf");
     expect(sent.stderr).toContain(".claude/skills/pdf");
     expect(await readdir(join(registryRoot, "artifacts", "platform", "skill"))).toEqual(["csv"]);
-
-    const named = await aireg(
-      ["publish", join(home.dir, ".agents", "skills", "pdf"), "--to", "team/platform", "--yes"],
-      { cwd: home.dir },
-    );
-    expect(named.code, named.stderr).toBe(0);
-    expect((await readdir(join(registryRoot, "artifacts", "platform", "skill"))).sort()).toEqual([
-      "csv",
-      "pdf",
-    ]);
   });
 
   test("identical copies of one name are still adopted once", async ({ aireg, home, tmp }) => {

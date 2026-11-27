@@ -182,14 +182,7 @@ async function preview(
       scope: loaded.roots.scope,
       artifacts: shown.map(previewItem),
       local: local.map((item) => ({ ...place(item), suggestedPath: item.suggestedPath })),
-      differing: found.differing.flatMap((item) =>
-        [item, ...item.elsewhere].map((copy) => ({
-          name: item.name,
-          kind: item.kind,
-          path: displayPath(loaded.roots, copy.from),
-          target: copy.target,
-        })),
-      ),
+      differing: found.differing.map(place),
       undeclared: undeclared.map(place),
       linkable: claiming ? linkable.map(place) : [],
       changed: claiming ? changed.map(place) : [],

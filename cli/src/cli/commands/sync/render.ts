@@ -24,7 +24,7 @@ interface SyncView {
   items: readonly SyncItem[];
   found: readonly Candidate[];
   /** Same name, different files: none is adopted until one is named. */
-  differing?: readonly Candidate[];
+  differing: readonly Candidate[];
   undeclared: readonly Candidate[];
   roots: Roots;
   /** Undeclared copies holding the registry's bytes, and ones someone changed. */
@@ -39,8 +39,7 @@ interface SyncView {
 }
 
 export function renderSync(printer: Printer, view: SyncView): void {
-  const { items, found, undeclared, roots, claims, registry } = view;
-  const differing = view.differing ?? [];
+  const { items, found, differing, undeclared, roots, claims, registry } = view;
   const shown = items.filter((item) => item.disposition !== "synced");
 
   if (
@@ -82,11 +81,7 @@ export function renderSync(printer: Printer, view: SyncView): void {
   if (found.length > 0)
     candidates(printer, "Written here, published nowhere", "adopt", found, roots);
   if (differing.length > 0) {
-    const copies = differing.flatMap((item) => [
-      item,
-      ...item.elsewhere.map((copy) => ({ ...item, from: copy.from, target: copy.target })),
-    ]);
-    candidates(printer, "Same name, different files, adopted nowhere", "skip", copies, roots);
+    candidates(printer, "Same name, different files, adopted nowhere", "skip", differing, roots);
     printer.hint("Run `aireg publish <path>` to publish the one you mean.");
   }
   if (claims.linkable.length > 0) {

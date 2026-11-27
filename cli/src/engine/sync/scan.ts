@@ -15,7 +15,7 @@ export interface Scan {
   items: SyncItem[];
   roots: Roots;
   local: Candidate[];
-  /** Unmanaged skills of one name with different files in different target folders. */
+  /** Each copy of an unmanaged skill whose name a copy with different files shares. */
   differing: Candidate[];
   undeclared: Candidate[];
   publisher: Map<string, string>;
@@ -88,17 +88,8 @@ export async function scan(
   return { items, roots: loaded.roots, local, differing, undeclared, publisher, pinned, acquired };
 }
 
-/** One line per name, as `status` words its duplicates, with each copy's path. */
-export function differingNote(item: Candidate, shown: (path: string) => string): string {
-  const paths = [item.from, ...item.elsewhere.map((copy) => copy.from)].map(shown).sort();
-  return `${paths.length} different ${item.name} ${item.kind}s, so none was taken: ${paths.join(", ")}.`;
-}
-
-/**
- * Unmanaged skills of one name whose files differ are different skills, and each target
- * may load its own, so nothing here may pick one: `publish <path>` names the one meant.
- */
-export async function withoutDiffering(
+/** Skills of one name whose files differ are different skills, so neither stands in for the other. */
+async function withoutDiffering(
   found: readonly Candidate[],
 ): Promise<{ kept: Candidate[]; differing: Candidate[] }> {
   const kept: Candidate[] = [];
@@ -108,9 +99,13 @@ export async function withoutDiffering(
       kept.push(item);
       continue;
     }
-    const paths = [item.from, ...item.elsewhere.map((copy) => copy.from)];
-    const digests = new Set(await Promise.all(paths.map((path) => normalizedDigest(path))));
-    (digests.size > 1 ? differing : kept).push(item);
+    const copies = [item, ...item.elsewhere];
+    const digests = new Set(await Promise.all(copies.map(({ from }) => normalizedDigest(from))));
+    if (digests.size === 1) kept.push(item);
+    else
+      differing.push(
+        ...copies.map(({ from, target }) => ({ ...item, from, target, elsewhere: [] })),
+      );
   }
   return { kept, differing };
 }

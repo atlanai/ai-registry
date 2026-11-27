@@ -11,7 +11,6 @@ import { exportWork } from "#engine/publish/exports.ts";
 import { exportsOn, installedPaths } from "#engine/publish/reach.ts";
 import { changedSince, type Exported, edited, fromArgs, type Work } from "#engine/publish/work.ts";
 import type { Loaded } from "#engine/scope/load.ts";
-import { differingNote } from "#engine/sync/scan.ts";
 
 export async function gather(
   step: Interaction,
@@ -46,10 +45,17 @@ async function chooseWork(
   keep: (found: Work[]) => Promise<Work[]>,
 ) {
   const { works, differing } = await edited(loaded, common, cwd);
-  for (const item of differing) {
-    step.printer.warning(differingNote(item, (path) => displayPath(loaded.roots, path)));
+  const copies = new Map<string, string[]>();
+  for (const { name, from } of differing) {
+    copies.set(name, [...(copies.get(name) ?? []), displayPath(loaded.roots, from)]);
   }
-  if (differing.length > 0) step.printer.hint("Run `aireg publish <path>` to publish one of them.");
+  for (const [name, paths] of copies) {
+    step.printer.warning(
+      `${paths.length} different ${name} skills, so none was taken: ${paths.join(", ")}.`,
+    );
+  }
+  if (differing.length > 0)
+    step.printer.hint("Run `aireg publish <path>` to publish the one you mean.");
   const found = await keep(works);
   // A dry run sends nothing, so listing everything is the answer to "what would go".
   if (found.length === 0 || common.yes || common.dryRun) return found;
