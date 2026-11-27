@@ -114,8 +114,14 @@ describe("a refused publish", () => {
     expect(refused.stderr).toContain("pointed is a symlink; an artifact holds regular files only.");
     const hint = refused.stderr.match(/`aireg (publish [^`]+)`/);
     expect(hint, refused.stderr).not.toBeNull();
-    // The temp path needs no shell quoting, so splitting on spaces reads it back.
-    const again = await aireg((hint as RegExpMatchArray)[1]?.split(" ") ?? [], { cwd: work });
+    // A Windows temp path holds backslashes, so the hint single-quotes it; read the words back.
+    const words = ((hint as RegExpMatchArray)[1] ?? "").match(/'(?:[^']|'\\'')*'|\S+/g) ?? [];
+    const again = await aireg(
+      words.map((word) =>
+        word.startsWith("'") ? word.slice(1, -1).replaceAll("'\\''", "'") : word,
+      ),
+      { cwd: work },
+    );
     expect(again.code, again.stderr).toBe(0);
     expect(existsSync(join(registryRoot, "artifacts", "platform", "skill", "pointed"))).toBe(false);
   });
