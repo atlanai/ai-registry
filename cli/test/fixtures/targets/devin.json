@@ -4,7 +4,12 @@
   "overrides": true,
   "roots": {
     "project": ".devin",
-    "user": { "default": "~/.config/devin", "env": "XDG_CONFIG_HOME", "within": "devin" }
+    "user": {
+      "default": "~/.config/devin",
+      "env": "XDG_CONFIG_HOME",
+      "within": "devin",
+      "windows": { "default": "~/AppData/Roaming/devin", "env": "APPDATA", "within": "devin" }
+    }
   },
   "detect": { "binary": ["devin", "devin-desktop"], "paths": ["~/.devin"] },
   "reads": { "skill": ["devin", "universal"] },

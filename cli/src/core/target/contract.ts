@@ -241,6 +241,16 @@ interface Trust {
 export const TARGET_CATEGORIES = ["coding-agent", "personal-agent", "shared-folder"] as const;
 export type TargetCategory = (typeof TARGET_CATEGORIES)[number];
 
+/**
+ * `default` is under `~/`; `env` is the variable the target reads to move it; `within` the root's
+ * path inside that folder, when not the folder itself.
+ */
+export interface UserRoot {
+  default: string;
+  env?: string | undefined;
+  within?: string | undefined;
+}
+
 /** One target aireg installs into, as its module under `src/targets` defines it. */
 export interface TargetDefinition {
   id: string;
@@ -255,11 +265,8 @@ export interface TargetDefinition {
   importable?: boolean | undefined;
   roots: {
     project: string;
-    /**
-     * `default` is under `~/`; `env` is the variable the target reads to move it; `within` the
-     * root's path inside that folder, when not the folder itself.
-     */
-    user: { default: string; env?: string | undefined; within?: string | undefined };
+    /** `windows`, when set, replaces the rest on Windows. */
+    user: UserRoot & { windows?: UserRoot | undefined };
   };
   detect?: Detect | "never" | undefined;
   /**

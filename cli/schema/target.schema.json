@@ -721,6 +721,31 @@
               "minLength": 1,
               "description": "The root's path inside the folder `env` names, when not that folder.",
               "type": "string"
+            },
+            "windows": {
+              "additionalProperties": false,
+              "description": "The user root on Windows, in place of the rest.",
+              "type": "object",
+              "required": [
+                "default"
+              ],
+              "properties": {
+                "default": {
+                  "pattern": "^~/.",
+                  "description": "Under your home folder.",
+                  "type": "string"
+                },
+                "env": {
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                  "description": "The variable the target itself reads to move it.",
+                  "type": "string"
+                },
+                "within": {
+                  "minLength": 1,
+                  "description": "The root's path inside the folder `env` names, when not that folder.",
+                  "type": "string"
+                }
+              }
             }
           }
         }

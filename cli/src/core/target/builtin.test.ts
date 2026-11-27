@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 import { BUILTIN_TARGETS } from "#targets/index.ts";
 import { takesPlugin, trustFor } from "./placement.ts";
-import { pluginProjection } from "./roots.ts";
+import { pluginProjection, targetRoot } from "./roots.ts";
 import { resolveTargets } from "./table.ts";
 
 const BUILTIN = Object.fromEntries(BUILTIN_TARGETS.map((target) => [target.id, target]));
@@ -44,5 +44,17 @@ describe("codex", () => {
     expect(trustFor(codex, "agent", "project")).toBe("codex");
     expect(trustFor(codex, "agent", "user")).toBeUndefined();
     expect(trustFor(codex, "skill", "project")).toBeUndefined();
+  });
+});
+
+describe("devin", () => {
+  // Devin documents `%APPDATA%\devin` for Windows, and `~/.config/devin` elsewhere.
+  test("keeps its user folder in APPDATA on Windows", () => {
+    const env = { HOME: "/tmp/home", APPDATA: "/tmp/roaming", XDG_CONFIG_HOME: "/tmp/xdg" };
+    const where = { scope: "user" as const, cwd: "/tmp/proj", env };
+    expect(targetRoot(resolveTargets(env, "win32").devin!, where)).toBe(
+      resolve("/tmp/roaming/devin"),
+    );
+    expect(targetRoot(resolveTargets(env, "linux").devin!, where)).toBe(resolve("/tmp/xdg/devin"));
   });
 });

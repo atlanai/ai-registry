@@ -2,7 +2,13 @@ import { isAbsolute } from "node:path";
 import { type ArtifactKind, KINDS } from "#adapter/kinds.ts";
 import { quoted } from "#adapter/text.ts";
 import { KIND_SPECS } from "#core/kinds.ts";
-import type { ConfigValue, KindMapping, RegisterEntry, TargetDefinition } from "./contract.ts";
+import type {
+  ConfigValue,
+  KindMapping,
+  RegisterEntry,
+  TargetDefinition,
+  UserRoot,
+} from "./contract.ts";
 import { templateVars } from "./template.ts";
 
 const TEMPLATE_VARS = {
@@ -83,14 +89,18 @@ function aliasProblems(
 }
 
 function rootProblems(definition: TargetDefinition, report: Report) {
-  if (!definition.roots.user.default.startsWith("~/")) report("the user root is not under ~/.");
-  for (const path of [definition.roots.project, definition.roots.user.default.slice(2)]) {
-    pathProblem(path, [], report);
-  }
-  const within = definition.roots.user.within;
-  if (within !== undefined) {
-    pathProblem(within, [], report);
-    if (definition.roots.user.env === undefined) report("roots.user.within needs an env.");
+  pathProblem(definition.roots.project, [], report);
+  userRootProblems(definition.roots.user, "roots.user", report);
+  const windows = definition.roots.user.windows;
+  if (windows !== undefined) userRootProblems(windows, "roots.user.windows", report);
+}
+
+function userRootProblems(user: UserRoot, key: string, report: Report) {
+  if (!user.default.startsWith("~/")) report(`${key}.default is not under ~/.`);
+  pathProblem(user.default.slice(2), [], report);
+  if (user.within !== undefined) {
+    pathProblem(user.within, [], report);
+    if (user.env === undefined) report(`${key}.within needs an env.`);
   }
 }
 
