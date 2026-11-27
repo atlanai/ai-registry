@@ -15,6 +15,7 @@
             "scope",
             "artifacts",
             "local",
+            "differing",
             "undeclared",
             "linkable",
             "changed",
@@ -215,6 +216,56 @@
                     "type": "string"
                   },
                   "suggestedPath": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "differing": {
+              "description": "Each copy of an unmanaged skill whose name another copy with different files shares. None is adopted.",
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "kind",
+                  "path",
+                  "target"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "const": "plugin",
+                        "type": "string"
+                      },
+                      {
+                        "const": "skill",
+                        "type": "string"
+                      },
+                      {
+                        "const": "agent",
+                        "type": "string"
+                      },
+                      {
+                        "const": "semantic_model",
+                        "type": "string"
+                      },
+                      {
+                        "const": "mcp_server",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "path": {
+                    "description": "Its folder, relative to the scope.",
+                    "type": "string"
+                  },
+                  "target": {
                     "type": "string"
                   }
                 }
