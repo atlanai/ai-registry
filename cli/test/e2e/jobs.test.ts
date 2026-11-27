@@ -253,3 +253,11 @@ describe("a job whose selector names a target by its aireg 0.1 id", () => {
     expect(written).toContain("enabled: false");
   }, 60_000);
 });
+
+describe("job exit status", () => {
+  test("runs of a job that does not exist fail", async ({ aireg }) => {
+    const ran = await aireg(["job", "runs", "--job", "no-such-job"]);
+    expect(ran.code, ran.stdout).toBe(1);
+    expect(ran.stderr).toContain('No job named "no-such-job".');
+  });
+});

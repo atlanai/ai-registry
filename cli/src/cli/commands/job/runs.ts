@@ -1,5 +1,6 @@
 import { plural, quoted } from "#adapter/text.ts";
 import { action, STREAMED } from "#cli/commands/define.ts";
+import { jobNamed } from "#cli/commands/job/find.ts";
 import type { JobOptions } from "#cli/commands/job/options.ts";
 import type { JobRun, RunDetail, RunList } from "#cli/commands/job/result.ts";
 import { needsInput } from "#cli/options/parse.ts";
@@ -53,17 +54,17 @@ export const runs = action({
     context,
   ): Promise<Listed | Detailed | typeof STREAMED> {
     if (runId !== undefined) checkRunId(runId);
+    // A job is named by its name or id; runs record the id.
+    const job = own.job === undefined ? undefined : jobNamed(await readConfig(), own.job);
     return withDaemon(async (client) => {
       if (runId !== undefined) {
         if (own.follow !== true) return detail(client, runId);
         await follow(context.printer, client, runId);
         return STREAMED;
       }
-      // A job is named by its name or id; runs record the id.
-      const job = own.job === undefined ? undefined : findJob(await readConfig(), own.job);
       const { state, limit } = own;
       const { runs } = await client.request("run.list", {
-        ...(own.job === undefined ? {} : { jobId: job?.id ?? own.job }),
+        ...(job === undefined ? {} : { jobId: job.id }),
         ...(state === undefined ? {} : { state }),
         ...(limit === undefined ? {} : { limit }),
       });
