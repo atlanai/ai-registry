@@ -12,8 +12,8 @@ export interface Frontmatter {
   engine: string | undefined;
 }
 
-/** A byte order mark may come first, as Windows PowerShell 5.1 and some editors write UTF-8. */
-const FENCE = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?(?:\n|$)/;
+/** Editors may save a byte order mark first and spaces or tabs after a fence. */
+const FENCE = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?(?:\n|$)/d;
 
 /** Section 3.4's limit. An envelope keeps the whole description; a reader shortens it to print. */
 export const DESCRIPTION_LIMIT = 4000;
@@ -73,6 +73,15 @@ export function withName(text: string, name: string): string {
   const match = FENCE.exec(text);
   if (match === null) return text;
   return match[0].replace(/^name:.*$/m, `name: ${name}`) + text.slice(match[0].length);
+}
+
+/** Adds a `name:` line to a readable block that has none, keeping the file's line endings. */
+export function withMissingName(text: string, name: string): string {
+  const end = FENCE.exec(text)?.indices?.[1]?.[1];
+  const record = frontmatterRecord(text);
+  if (end === undefined || record === undefined || record.name !== undefined) return text;
+  const eol = text[end] === "\r" ? "\r\n" : "\n";
+  return `${text.slice(0, end)}${eol}name: ${name}${text.slice(end)}`;
 }
 
 export function splitFrontmatter(text: string): { yaml: string; body: string } | undefined {
