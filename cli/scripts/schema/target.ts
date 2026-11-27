@@ -262,23 +262,6 @@ const PerKind = <T extends TSchema>(schema: T) =>
   );
 
 /** The shape of a target file in `$AIREG_HOME/targets/`. The loader stays the authority. */
-
-const USER_ROOT = {
-  default: Type.String({ pattern: "^~/.", description: "Under your home folder." }),
-  env: Type.Optional(
-    Type.String({
-      pattern: VARIABLE,
-      description: "The variable the target itself reads to move it.",
-    }),
-  ),
-  within: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description: "The root's path inside the folder `env` names, when not that folder.",
-    }),
-  ),
-};
-
 export const Target = Type.Object(
   {
     $schema: Type.Optional(
@@ -314,11 +297,17 @@ export const Target = Type.Object(
         project: Type.String({ minLength: 1, description: "Relative to the project." }),
         user: Type.Object(
           {
-            ...USER_ROOT,
-            windows: Type.Optional(
-              Type.Object(USER_ROOT, {
-                additionalProperties: false,
-                description: "The user root on Windows, in place of the rest.",
+            default: Type.String({ pattern: "^~/.", description: "Under your home folder." }),
+            env: Type.Optional(
+              Type.String({
+                pattern: VARIABLE,
+                description: "The variable the target itself reads to move it.",
+              }),
+            ),
+            within: Type.Optional(
+              Type.String({
+                minLength: 1,
+                description: "The root's path inside the folder `env` names, when not that folder.",
               }),
             ),
           },

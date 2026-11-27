@@ -198,41 +198,6 @@ describe("target files", () => {
     );
   });
 
-  test("take the Windows user root on Windows alone", async () => {
-    const roots = {
-      project: ".tool",
-      user: {
-        default: "~/.config/tool",
-        env: "XDG_CONFIG_HOME",
-        within: "tool",
-        windows: { default: "~/AppData/Roaming/tool", env: "APPDATA", within: "tool" },
-      },
-    };
-    await save("tool.json", { ...TOOL, roots });
-    const at = (platform: NodeJS.Platform, vars: NodeJS.ProcessEnv) =>
-      targetRoot(resolveTargets(env, platform).tool as Target, {
-        scope: "user",
-        cwd: "/work",
-        env: vars,
-      });
-    const appData = { APPDATA: "/roaming", XDG_CONFIG_HOME: "/xdg" };
-    expect(at("win32", appData)).toBe(resolve("/roaming", "tool"));
-    expect(at("win32", {})).toBe(join(env.HOME as string, "AppData", "Roaming", "tool"));
-    expect(at("darwin", appData)).toBe(resolve("/xdg", "tool"));
-    expect(at("linux", {})).toBe(join(env.HOME as string, ".config", "tool"));
-  });
-
-  test("check a Windows user root as they check the user root", async () => {
-    const withWindows = (windows: object) => ({
-      ...TOOL,
-      roots: { ...TOOL.roots, user: { ...TOOL.roots.user, windows } },
-    });
-    await save("tool.json", withWindows({ default: "C:/tool" }));
-    expect(problems()).toEqual(['"roots/user/windows/default" must start with ~/.']);
-    await save("tool.json", withWindows({ default: "~/tool", within: "tool" }));
-    expect(problems()).toEqual(["roots.user.windows.within needs an env."]);
-  });
-
   test("detect nothing from a project folder they say proves nothing", async ({ tmp }) => {
     await save("tool.json", { ...TOOL, detect: { projectRoot: false } });
     const project = join(tmp, "project");

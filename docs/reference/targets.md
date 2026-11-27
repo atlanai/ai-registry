@@ -69,7 +69,7 @@ With `GEMINI_CLI_HOME` set, Gemini CLI reads `.agents/skills` inside that folder
 
 Google Antigravity covers its App, IDE and CLI, which share `~/.gemini/config`. aireg writes its skills as copies, and its agents only in your user scope, since a project's `.agents/agents` holds other tools' agents.
 
-Devin covers Devin Desktop, formerly Windsurf, and the Devin CLI: Devin Desktop runs the CLI as its agent, so both read `.devin` and `~/.config/devin`, which is `%APPDATA%\devin` on Windows. Choose `devin` where you would have chosen Windsurf. An agent keeps only its `name` and `description`, since Devin reads `model` and `tools` as its own names; one that limits its tools is left out.
+Devin covers Devin Desktop, formerly Windsurf, and the Devin CLI: Devin Desktop runs the CLI as its agent, so both read `.devin` and `~/.config/devin`. Choose `devin` where you would have chosen Windsurf. On Windows, Devin keeps its user folder in `%APPDATA%\devin`: set `XDG_CONFIG_HOME` to `%APPDATA%` for aireg to install there. An agent keeps only its `name` and `description`, since Devin reads `model` and `tools` as its own names; one that limits its tools is left out.
 
 Hermes Agent loads a project's skills once you run `hermes skills trust`. aireg leaves out a skill whose name one of Hermes's bundled skills already has, such as `systematic-debugging`, since Hermes would then load neither. On Windows, or for a Hermes profile other than the default, set `HERMES_HOME` to the folder Hermes uses.
 
@@ -96,7 +96,7 @@ A target file adds a target aireg doesn't ship, or replaces one it does with `"o
 }
 ```
 
-This target reads skills from the shared `.agents` folder and agents from `.tool/agents/`, takes a plugin as the skills and agents it holds, and answers to `tl` as well as `tool`. A target whose user folder is elsewhere on Windows sets `roots.user.windows`, with the same keys as `roots.user`, which it then replaces there. [`target.schema.json`](https://github.com/atlanai/ai-registry/blob/main/cli/schema/target.schema.json) describes every key. A file can't set `default`, `importable` or `detect.caller`, which only built-in targets use.
+This target reads skills from the shared `.agents` folder and agents from `.tool/agents/`, takes a plugin as the skills and agents it holds, and answers to `tl` as well as `tool`. [`target.schema.json`](https://github.com/atlanai/ai-registry/blob/main/cli/schema/target.schema.json) describes every key. A file can't set `default`, `importable` or `detect.caller`, which only built-in targets use.
 
 An alias is a lowercase name that isn't another target's id or alias. A file can't take a built-in alias as its id: to replace Claude Code, name the file `claude-code.json`, not `claude.json`, and set `"overrides": true`. A file that replaces a built-in target and sets no `aliases` keeps the built-in's.
 

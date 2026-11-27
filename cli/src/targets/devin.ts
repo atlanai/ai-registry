@@ -7,12 +7,7 @@ export const devin = defineTarget({
   category: "coding-agent",
   roots: {
     project: ".devin",
-    user: {
-      default: "~/.config/devin",
-      env: "XDG_CONFIG_HOME",
-      within: "devin",
-      windows: { default: "~/AppData/Roaming/devin", env: "APPDATA", within: "devin" },
-    },
+    user: { default: "~/.config/devin", env: "XDG_CONFIG_HOME", within: "devin" },
   },
   // `~/.codeium/windsurf` is left out: other skill installers create it too.
   detect: { binary: ["devin", "devin-desktop"], paths: ["~/.devin"] },

@@ -9,10 +9,7 @@ import { canonicalIds } from "./ids.ts";
 import { BUILT_IN, loadTargetFiles } from "./load.ts";
 
 /** Plain data, since it crosses the daemon RPC. */
-export function resolveTargets(
-  env: NodeJS.ProcessEnv,
-  platform: NodeJS.Platform = process.platform,
-): Targets {
+export function resolveTargets(env: NodeJS.ProcessEnv): Targets {
   const definitions = new Map<string, { definition: TargetDefinition; origin: string }>();
   for (const definition of BUILTIN_TARGETS) {
     definitions.set(definition.id, { definition, origin: BUILT_IN });
@@ -22,10 +19,8 @@ export function resolveTargets(
   }
   const out: Targets = {};
   for (const { definition, origin } of definitions.values()) {
-    out[definition.id] = toTarget(definition, env, origin, platform);
-    for (const profile of profilesOf(definition, env, origin, platform)) {
-      out[profile.name] = profile;
-    }
+    out[definition.id] = toTarget(definition, env, origin);
+    for (const profile of profilesOf(definition, env, origin)) out[profile.name] = profile;
   }
   for (const target of Object.values(out)) {
     for (const [kind, reads] of Object.entries(target.reads) as [ArtifactKind, string[]][]) {
@@ -39,19 +34,17 @@ function toTarget(
   definition: TargetDefinition,
   env: NodeJS.ProcessEnv,
   origin: string = BUILT_IN,
-  platform: NodeJS.Platform = process.platform,
 ): Target {
   const detect = definition.detect ?? {};
-  const user = (platform === "win32" && definition.roots.user.windows) || definition.roots.user;
   const category = definition.category ?? "coding-agent";
   return {
     name: definition.id,
     aliases: [...(definition.aliases ?? [])],
     displayName: definition.displayName,
     projectRoot: definition.roots.project,
-    userRoot: expandUserPath(user.default, env),
-    envHome: user.env,
-    envWithin: user.within,
+    userRoot: expandUserPath(definition.roots.user.default, env),
+    envHome: definition.roots.user.env,
+    envWithin: definition.roots.user.within,
     detect:
       detect === "never"
         ? "never"
@@ -89,12 +82,7 @@ function kindsOf(definition: TargetDefinition): Target["kinds"] {
 /** A profile name as both its folder and a target id can carry it. */
 const PROFILE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
-function profilesOf(
-  definition: TargetDefinition,
-  env: NodeJS.ProcessEnv,
-  origin: string,
-  platform: NodeJS.Platform,
-) {
+function profilesOf(definition: TargetDefinition, env: NodeJS.ProcessEnv, origin: string) {
   const root = definition.profiles?.root;
   if (root === undefined) return [];
   const pattern = expandUserPath(root, env);
@@ -111,7 +99,7 @@ function profilesOf(
     if (!folder.startsWith(prefix) || !folder.endsWith(suffix)) return [];
     const profile = folder.slice(prefix.length, folder.length - suffix.length);
     if (!PROFILE.test(profile)) return [];
-    const base = toTarget(definition, env, origin, platform);
+    const base = toTarget(definition, env, origin);
     // A profile is this machine's alone, so a project never installs into it. Its aliases stay
     // empty: `<alias>:<profile>` reaches it through its definition's aliases.
     return [
