@@ -180,10 +180,28 @@ async function fetchBytes(
     );
   }
   if (!response.ok) return { status: response.status, bytes: new Uint8Array() };
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > limit) throw fail("invalid", `${url.href} is larger than aireg reads.`);
+  const bytes = await bodyWithin(response, limit, url);
   context.onBytes(bytes.byteLength);
   return { status: response.status, bytes };
+}
+
+/** Stops reading past `limit`, so a body is never held whole before its size is known. */
+async function bodyWithin(response: Response, limit: number, url: URL): Promise<Uint8Array> {
+  const tooLarge = () => fail("invalid", `${url.href} is larger than aireg reads.`);
+  const declared = Number(response.headers.get("content-length") ?? Number.NaN);
+  if (Number.isFinite(declared) && declared > limit) {
+    await response.body?.cancel().catch(() => {});
+    throw tooLarge();
+  }
+  if (response.body === null) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of response.body) {
+    size += chunk.byteLength;
+    if (size > limit) throw tooLarge();
+    chunks.push(chunk);
+  }
+  return new Uint8Array(Buffer.concat(chunks));
 }
 
 function isSecure(url: URL): boolean {
