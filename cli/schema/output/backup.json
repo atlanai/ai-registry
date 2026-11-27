@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "output/backup.json",
+  "title": "aireg backup --json",
+  "description": "The `data` each `aireg backup` action prints under --json, by action.",
+  "$defs": {
+    "list": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "scope",
+        "root",
+        "runs"
+      ],
+      "properties": {
+        "scope": {
+          "anyOf": [
+            {
+              "const": "user",
+              "type": "string"
+            },
+            {
+              "const": "project",
+              "type": "string"
+            }
+          ]
+        },
+        "root": {
+          "description": "The scope's backups folder.",
+          "type": "string"
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "description": "Newest first.",
+            "type": "object",
+            "required": [
+              "stamp",
+              "counts",
+              "items"
+            ],
+            "properties": {
+              "stamp": {
+                "description": "What `aireg backup restore <stamp>` takes.",
+                "type": "string"
+              },
+              "at": {
+                "description": "When it ran, as an ISO 8601 time.",
+                "type": "string"
+              },
+              "counts": {
+                "description": "Items per target.",
+                "type": "object",
+                "patternProperties": {
+                  "^(.*)$": {
+                    "type": "number"
+                  }
+                }
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "name",
+                    "target",
+                    "dir",
+                    "path"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "description": "The target folder it was moved out of.",
+                      "type": "string"
+                    },
+                    "dir": {
+                      "description": "The folder within the target.",
+                      "type": "string"
+                    },
+                    "path": {
+                      "description": "Where it is now.",
+                      "type": "string"
+                    },
+                    "origin": {
+                      "description": "Where it was, when aireg can tell.",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "restore": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "scope",
+        "stamp",
+        "restored",
+        "skipped"
+      ],
+      "properties": {
+        "scope": {
+          "anyOf": [
+            {
+              "const": "user",
+              "type": "string"
+            },
+            {
+              "const": "project",
+              "type": "string"
+            }
+          ]
+        },
+        "stamp": {
+          "type": "string"
+        },
+        "restored": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "target",
+              "path"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "target": {
+                "description": "The target folder it was moved out of.",
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "replaced": {
+                "description": "The new backup holding what stood there.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "target",
+              "reason"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "target": {
+                "description": "The target folder it was moved out of.",
+                "type": "string"
+              },
+              "path": {
+                "description": "Where it would go back to.",
+                "type": "string"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "const": "kept",
+                    "type": "string"
+                  },
+                  {
+                    "const": "taken",
+                    "type": "string"
+                  },
+                  {
+                    "const": "installed",
+                    "type": "string"
+                  },
+                  {
+                    "const": "refused",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unknown",
+                    "type": "string"
+                  }
+                ]
+              },
+              "detail": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

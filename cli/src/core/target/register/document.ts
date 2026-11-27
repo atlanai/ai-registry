@@ -5,7 +5,14 @@ import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
 import { NAME } from "#core/product.ts";
 import type { ConfigValue } from "#core/target/contract.ts";
-import { dropTable, readTable, setKeys, type TomlScalar, unsetKeys } from "./toml.ts";
+import {
+  dropTable,
+  readTable,
+  setKeys,
+  type TomlScalar,
+  type TomlValue,
+  unsetKeys,
+} from "./toml.ts";
 
 type Table = Record<string, unknown>;
 
@@ -32,12 +39,20 @@ export function tomlDocument(text: string, file: string): ConfigDocument {
   const unsupported = (): never => {
     throw new AiregError(`${file} holds no list aireg can edit.`, { code: ErrorCode.Invalid });
   };
+  const set = (at: readonly string[], values: Readonly<Record<string, ConfigValue>>): void => {
+    const { own, tables } = split(values, file);
+    if (Object.keys(own).length > 0 || Object.keys(tables).length === 0) {
+      current = setKeys(current, at, own);
+    }
+    for (const [key, table] of Object.entries(tables)) {
+      current = dropTable(current, [...at, key]);
+      set([...at, key], table);
+    }
+  };
   // `value`: a blank file is an empty table; one holding only comments is still someone's text.
   return {
     table: (at) => readTable(current, at),
-    set: (at, values) => {
-      current = setKeys(current, at, scalars(values, file));
-    },
+    set,
     unset: (at, keys) => {
       current = unsetKeys(current, at, keys);
     },
@@ -53,17 +68,24 @@ export function tomlDocument(text: string, file: string): ConfigDocument {
   };
 }
 
-function scalars(values: Readonly<Record<string, ConfigValue>>, file: string) {
-  const out: Record<string, TomlScalar> = {};
+/** Scalars and arrays of them stay on the table; a nested table gets a heading of its own. */
+function split(values: Readonly<Record<string, ConfigValue>>, file: string) {
+  const own: Record<string, TomlValue> = {};
+  const tables: Record<string, Record<string, ConfigValue>> = {};
   for (const [key, value] of Object.entries(values)) {
-    if (typeof value === "object") {
-      throw new AiregError(`Only plain values can be written to ${file}.`, {
+    if (Array.isArray(value) && value.every((item) => typeof item !== "object")) {
+      own[key] = value as TomlScalar[];
+    } else if (typeof value === "object" && !Array.isArray(value)) {
+      tables[key] = value;
+    } else if (typeof value !== "object") {
+      own[key] = value;
+    } else {
+      throw new AiregError(`Only values, lists of values and tables can be written to ${file}.`, {
         code: ErrorCode.Invalid,
       });
     }
-    out[key] = value;
   }
-  return out;
+  return { own, tables };
 }
 
 export function jsonDocument(text: string | undefined, start: Table, file: string): ConfigDocument {
@@ -184,6 +206,8 @@ export function yamlDocument(text: string | undefined, start: Table, file: strin
       for (const key of keys) doc.deleteIn([...at, key]);
     },
     drop: (at) => {
+      // The YAML library refuses to delete below a mapping that is not there.
+      if (at.length > 1 && table(at.slice(0, -1)) === undefined) return;
       doc.deleteIn(at);
     },
     list: (at) => {

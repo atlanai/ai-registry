@@ -16,8 +16,9 @@ themselves and [file-spec.md](../file-spec.md) are the contract.
 | [relationship.schema.json](relationship.schema.json) | one `relationships[]` edge | §3.4, §4.3, §6 |
 | [host.schema.json](host.schema.json) | the host document at `/.well-known/registry.json` | §8 |
 | [kind-manifest.schema.json](kind-manifest.schema.json) | what `kinds[].manifest_url` points at | §3.1 |
-| [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json), [kinds/semantic_model.json](kinds/semantic_model.json) | the `spec` of those kinds | §3.4 |
+| [kinds/skill.json](kinds/skill.json), [kinds/agent.json](kinds/agent.json), [kinds/semantic_model.json](kinds/semantic_model.json), [kinds/mcp_server.json](kinds/mcp_server.json) | the `spec` of those kinds | §3.4 |
 | [kinds/vendor/ossie/](kinds/vendor/ossie/README.md) | Apache Ossie's own schemas, unchanged, which `kinds/semantic_model.json` refers to | §3.4 |
+| [kinds/vendor/mcp/](kinds/vendor/mcp/README.md) | the MCP Registry's `server.json` schemas, unchanged, which `kinds/mcp_server.json` refers to | §3.4 |
 | [common.schema.json](common.schema.json) | shared `$defs`; never instantiated | §2.1, §4 |
 
 An envelope is validated against **both** artifact schemas on purpose. The plain one is the
@@ -35,7 +36,8 @@ preserves additional native front-matter fields. Writers validate against that p
 **`$id`s are relative, and are identifiers rather than locations.** A schema's `$id` is the path it
 sits at under this directory, and every `$ref` is a relative path resolved the same way. The one
 exception is a schema under a `vendor/` folder, which is another project's file copied byte for
-byte and keeps that project's `$id`; it is still reached by its path here. Nothing
+byte and keeps that project's `$id`, `$schema` and internal references; it is still reached by its
+path here, and its folder's README records its source and sha256. Nothing
 dereferences an `$id` over the network, so a validator preloads this directory into a resolver
 rather than fetching `$ref`s. No schema file is covered by a content digest or a catalog digest, so
 giving the `$id`s an absolute base later moves no digest.
@@ -60,7 +62,11 @@ The CLI validates locally served manifests against both `kind-manifest.schema.js
 Draft 2020-12 meta-schema, then compiles their validation rules with Ajv. Relative `$id`s are
 rooted at the registry, and relative `$ref`s resolve against those identifiers. Referenced schema
 files must stay inside the registry and must be regular files, not symlinks. External references
-are reported as unresolved; validation never downloads a schema. `format` is an annotation in
+are reported as unresolved; validation never downloads a schema. A referenced draft-07 schema,
+such as the MCP Registry's `server.json` schema, is compiled with 2020-12 semantics, since Ajv
+cannot mix dialects. That matches draft-07 only for keywords whose meaning did not change;
+`tools/check_schemas.py` proves it for the copies under `kinds/vendor/`, but not for a draft-07
+schema a registry serves on its own. `format` is an annotation in
 the CLI. Validation does not coerce values, insert defaults or remove fields.
 
 For built-in kinds, extraction reads only `SKILL.md`, `AGENT.md`, `agent-card.json`,

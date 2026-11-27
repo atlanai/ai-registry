@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { KINDS } from "#adapter/kinds.ts";
-import { isStoreOnly, KIND_SPECS, kindDir, stagedLeaf } from "./kinds.ts";
+import { aKind, isStoreOnly, KIND_SPECS, kindDir, SCANNED_KINDS, stagedLeaf } from "./kinds.ts";
 
 describe("KIND_SPECS", () => {
   test("gives every kind a distinct directory", () => {
@@ -61,5 +61,17 @@ describe("stagedLeaf", () => {
     expect(stagedLeaf("agent", "odd", "agents/odd.")).toBe("odd");
     expect(stagedLeaf("agent", "odd", "agents/odd")).toBe("odd");
     expect(stagedLeaf("agent", "odd", "agents/odd.a-b")).toBe("odd");
+  });
+});
+
+describe("mcp_server", () => {
+  test("is never scanned for in a target folder", () => {
+    expect(SCANNED_KINDS).toEqual(["skill", "agent", "semantic_model"]);
+  });
+
+  test("takes an before it, as agent does", () => {
+    expect(aKind("mcp_server")).toBe("an MCP server");
+    expect(aKind("agent")).toBe("an agent");
+    expect(aKind("skill")).toBe("a skill");
   });
 });

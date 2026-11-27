@@ -486,3 +486,19 @@ describe("applyRegister, kept to the run's target roots", () => {
     },
   );
 });
+
+describe("a TOML document", () => {
+  test("writes a nested table under a heading of its own", async () => {
+    const { tomlDocument } = await import("./document.ts");
+    const doc = tomlDocument("", "config.toml");
+    doc.set(["mcp_servers", "srv"], { command: "npx", args: ["-y"], env: { KEY: "v" } });
+    expect(doc.render()).toBe(
+      '[mcp_servers.srv]\ncommand = "npx"\nargs = ["-y"]\n\n[mcp_servers.srv.env]\nKEY = "v"\n',
+    );
+    expect(doc.table(["mcp_servers", "srv"])).toEqual({
+      command: "npx",
+      args: ["-y"],
+      env: { KEY: "v" },
+    });
+  });
+});

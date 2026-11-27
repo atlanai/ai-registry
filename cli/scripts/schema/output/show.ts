@@ -16,6 +16,28 @@ const Artifact = Type.Object(
     version: Type.Optional(Type.String({ description: "The version the registry serves." })),
     body: Type.String({ description: "The Markdown file as written." }),
     carries: Carries,
+    server: Type.Optional(
+      Type.Object(
+        {
+          runs: Type.Array(
+            Type.Object(
+              {
+                transport: Type.String(),
+                command: Type.Optional(Type.String()),
+                url: Type.Optional(Type.String()),
+              },
+              { additionalProperties: false },
+            ),
+            { description: "Each way it runs: a command line, or a URL." },
+          ),
+          reads: Type.Array(Type.String(), {
+            description: "Environment variables it reads its secrets from.",
+          }),
+          leftOut: Type.Array(Type.String(), { description: "Why a way it lists cannot run." }),
+        },
+        { additionalProperties: false, description: "For an MCP server." },
+      ),
+    ),
   },
   { additionalProperties: false, description: "An artifact a registry serves." },
 );

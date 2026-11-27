@@ -92,6 +92,12 @@ class CheckFixTests(unittest.TestCase):
         artifacts = self.link("artifacts")
         self.assert_refused(artifacts / "engineering" / "skill" / "pr-review" / "versions.json")
 
+    def test_linked_vendored_schema_is_not_read(self):
+        self.link(Path("kinds", "vendor", "mcp", "2025-12-11", "server.schema.json"))
+        result = self.check()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("kinds/vendor/mcp/2025-12-11/server.schema.json: is a symlink", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

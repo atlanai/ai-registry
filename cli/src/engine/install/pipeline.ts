@@ -4,6 +4,7 @@ import { readTextIfPresent } from "#core/fs/path.ts";
 import type { Lock } from "#core/lock.ts";
 import { formatManifest } from "#core/manifest/format.ts";
 import { writeManifest } from "#core/manifest/repository.ts";
+import { fetchFrom } from "#core/plan/acquire/sources.ts";
 import { guardsOf } from "#core/plan/apply/link.ts";
 import type { LinkGuard } from "#core/plan/apply/link-guard.ts";
 import type { ApplyResult } from "#core/plan/apply/run.ts";
@@ -40,6 +41,9 @@ export interface Chosen {
   targets: readonly string[];
   targetTable: Targets;
 }
+
+/** The folder a version the plan stages will have, read before approval; undefined if none. */
+export type Peek = (name: string) => Promise<string | undefined>;
 
 export interface RunResult extends Chosen {
   plan: Plan;
@@ -82,7 +86,7 @@ export interface RunOptions {
   /** Runs under the scope's lease. */
   edit?: ((loaded: Loaded) => RunRequest | Promise<RunRequest>) | undefined;
   /** Asked before a byte is written; false leaves the project untouched. */
-  approve?: ((plan: Plan, chosen: Chosen) => Promise<boolean>) | undefined;
+  approve?: ((plan: Plan, chosen: Chosen, peek: Peek) => Promise<boolean>) | undefined;
 }
 
 /** The single install path: `add`, `update` and `remove` differ only in `edit`. */
@@ -166,7 +170,14 @@ async function write(
 
     await refuseBlocked(planned);
 
-    if (approve !== undefined && !(await approve(planned, chosen))) return result(undefined);
+    const fetch = fetchFrom(acquired);
+    const peek: Peek = async (name) => {
+      const staged = planned.actions.find(
+        (action) => action.kind === "stage" && action.name === name,
+      );
+      return staged?.kind === "stage" ? (await fetch(staged.source, staged.path)).path : undefined;
+    };
+    if (approve !== undefined && !(await approve(planned, chosen, peek))) return result(undefined);
 
     const edited = formatManifest(manifest) !== loaded.manifestAsRead;
     // Read under the lease, so only this run's edit is undone.

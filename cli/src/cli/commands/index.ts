@@ -1,9 +1,11 @@
 import { quoted } from "#adapter/text.ts";
 import { NAMESPACE } from "#cli/options/flags.ts";
-import type { CommandContribution, OptionSpec } from "#core/host/extend.ts";
+import type { ActionContribution, CommandContribution, OptionSpec } from "#core/host/extend.ts";
 import { contributedCommands } from "#core/host/load.ts";
+import { aKind, kindCommand } from "#core/kinds.ts";
 import type { Printer } from "#core/term/printer.ts";
 import {
+  BUILTIN_NAMES,
   BUILTIN_SPECS,
   type Hidden,
   hiddenKind,
@@ -11,7 +13,7 @@ import {
   printHidden,
   RESERVED,
 } from "./builtins.ts";
-import { type Command, GROUPS, type Group } from "./command.ts";
+import { type ActionSpec, type Command, GROUPS, type Group } from "./command.ts";
 
 /** Loaded only when that command runs. */
 const LOADERS: Readonly<Record<string, Command["load"]>> = {
@@ -38,6 +40,7 @@ const LOADERS: Readonly<Record<string, Command["load"]>> = {
   config: () => import("./config.ts"),
   doctor: () => import("./doctor.ts"),
   unlock: () => import("./unlock.ts"),
+  backup: () => import("./backup.ts"),
   adapter: () => import("./adapter.ts"),
   logs: () => import("./logs.ts"),
   self: () => import("./self.ts"),
@@ -76,10 +79,13 @@ async function table(cwd: string): Promise<{ commands: Command[]; hidden: Hidden
       hint: `Rename the command in its adapter, since ${PRECEDENCE}`,
     });
   }
-  const taken = new Set([...RESERVED, ...commands.flatMap((c) => [c.name, ...(c.aliases ?? [])])]);
-  for (const kind of await kindCommands(cwd)) {
-    if (taken.has(kind.name)) hidden.push(hiddenKind(kind.name));
-    else commands.push(kind);
+  const taken = new Set([
+    ...BUILTIN_NAMES,
+    ...commands.flatMap((c) => [c.name, ...(c.aliases ?? []), ...(c.formerly ?? [])]),
+  ]);
+  for (const { kind, command } of await kindCommands(cwd)) {
+    if (RESERVED.has(kind) || taken.has(command.name)) hidden.push(hiddenKind(kind));
+    else commands.push(command);
   }
   return { commands, hidden };
 }
@@ -88,6 +94,7 @@ function fromContribution(command: CommandContribution): Command {
   return {
     name: command.name,
     ...(command.aliases === undefined ? {} : { aliases: [...command.aliases] }),
+    ...(command.hiddenAliases === undefined ? {} : { formerly: [...command.hiddenAliases] }),
     summary: command.summary,
     group: asGroup(command.group),
     usage: command.usage ?? [
@@ -96,10 +103,17 @@ function fromContribution(command: CommandContribution): Command {
     ...(command.examples === undefined ? {} : { examples: command.examples }),
     ...(command.docs === undefined ? {} : { docs: command.docs }),
     ...(command.options === undefined ? {} : { options: command.options }),
-    ...(command.actions === undefined
-      ? {}
-      : { actions: command.actions.map((name) => ({ name })) }),
+    ...(command.actions === undefined ? {} : { actions: command.actions.map(actionOf) }),
     load: command.load,
+  };
+}
+
+function actionOf(action: string | ActionContribution): ActionSpec {
+  if (typeof action === "string") return { name: action };
+  return {
+    name: action.name,
+    ...(action.summary === undefined ? {} : { summary: action.summary }),
+    ...(action.hidden === true ? { hidden: true } : {}),
   };
 }
 
@@ -124,7 +138,7 @@ const KIND_NEW: readonly OptionSpec[] = [
     flag: "--from",
     value: "<path>",
     multiple: true,
-    describe: "An existing skill folder or agent file to copy in (repeatable)",
+    describe: "An existing artifact folder or file to copy in (repeatable)",
   },
   {
     flag: "--name",
@@ -134,20 +148,20 @@ const KIND_NEW: readonly OptionSpec[] = [
 ];
 
 /** A kind the registry here holds is a command of its own: `aireg agent new triage`. */
-async function kindCommands(cwd: string): Promise<Command[]> {
+async function kindCommands(cwd: string): Promise<{ kind: string; command: Command }[]> {
   const { findRegistry } = await import("#core/filespec/init.ts");
   const { kindsOf } = await import("#core/filespec/kind-manifests.ts");
-  return Object.entries(await kindsOf(findRegistry(cwd))).map(([name, manifest]) => {
-    const a = /^[aeiou]/.test(name) ? "an" : "a";
+  return Object.entries(await kindsOf(findRegistry(cwd))).map(([kind, manifest]) => {
+    const name = kindCommand(kind);
     const spec: Command = {
       name,
-      summary: `Create ${a} ${name}, or start its next version`,
+      summary: `Create ${aKind(kind)}, or start its next version`,
       group: "Share",
       usage: [`aireg ${name} <action> [options]`],
       examples: [
         {
           command: `aireg ${name} new pr-review --namespace engineering`,
-          what: `a new ${name}`,
+          what: `a new ${kind}`,
         },
         { command: `aireg ${name} bump pr-review minor`, what: "start its next minor version" },
       ],
@@ -155,7 +169,7 @@ async function kindCommands(cwd: string): Promise<Command[]> {
       actions: [
         {
           name: "new",
-          summary: `Create ${a} ${name}`,
+          summary: `Create ${aKind(kind)}`,
           usage: [
             `aireg ${name} new [<name>] [options]`,
             `aireg ${name} new --from <path>... [options]`,
@@ -164,7 +178,7 @@ async function kindCommands(cwd: string): Promise<Command[]> {
         },
         {
           name: "bump",
-          summary: `Start the next version of ${a} ${name}`,
+          summary: `Start the next version of ${aKind(kind)}`,
           usage: [`aireg ${name} bump <name> [patch | minor | major | <version>] [options]`],
           maxArguments: 2,
           options: [NAMESPACE],
@@ -172,10 +186,10 @@ async function kindCommands(cwd: string): Promise<Command[]> {
       ],
       load: async () => {
         const { runKind } = await import("./kind.ts");
-        return { run: (context) => runKind(spec, manifest, context) };
+        return { run: (context) => runKind(spec, kind, manifest, context) };
       },
     };
-    return spec;
+    return { kind, command: spec };
   });
 }
 
@@ -190,7 +204,7 @@ export async function lookup(name: string, cwd = process.cwd()): Promise<Command
   const own = lookupBuiltin(name);
   if (own !== undefined) return own;
   return (await allCommands(cwd)).find(
-    (c) => c.name === name || c.aliases?.includes(name) === true,
+    (c) => c.name === name || c.aliases?.includes(name) === true || c.formerly?.includes(name),
   );
 }
 

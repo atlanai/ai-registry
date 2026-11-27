@@ -1,4 +1,5 @@
 import { join, posix } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { messageOf } from "#adapter/errors.ts";
 import { isRecord } from "#adapter/fields.ts";
 import { hashRegular } from "#adapter/files.ts";
@@ -7,8 +8,10 @@ import { rootReader } from "#adapter/filespec/folder.ts";
 import { ENVELOPE } from "#adapter/filespec/names.ts";
 import { isRemote, locatorOf } from "#adapter/filespec/resolve.ts";
 import { contentDigest, type Envelope } from "#adapter/index.ts";
+import { MCP_SERVER_ENTRY } from "#adapter/kinds.ts";
 import { collidingPaths, isSafePath } from "#adapter/paths.ts";
 import { compareVersion, parseVersion } from "#adapter/semver.ts";
+import { isVersion } from "#adapter/spec/ref.ts";
 import { list, quoted } from "#adapter/text.ts";
 import { listed, type versionFolders } from "#core/filespec/indexer.ts";
 import {
@@ -22,6 +25,7 @@ import {
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
+import { serverVersion } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { authored, refusal } from "#core/fs/tree.ts";
 import { type Problem, textAt, unparsed } from "./read.ts";
@@ -32,7 +36,7 @@ const PLACEHOLDER = "TODO";
 /** The files its kind needs, fields, placeholders and name; `publish` asks before sending. */
 export function versionProblems(
   manifest: KindManifest,
-  at: { kind: string; name: string },
+  at: { kind: string; name: string; version?: string },
   present: ReadonlySet<string>,
   contents: ReadonlyMap<string, string>,
 ): string[] {
@@ -41,15 +45,25 @@ export function versionProblems(
   problems.push(...documents);
   const spec = specOf(manifest, contents, at.name);
   if (spec === undefined) {
-    if (documents.length > 0) return problems;
+    // fileProblems already reports a missing server.json.
+    const missing = manifest.title === "mcp_server" && !present.has(MCP_SERVER_ENTRY);
+    if (documents.length > 0 || missing) return problems;
     const why =
       specParseProblem(manifest, contents) ?? "has no front matter to read its fields from";
     return [...problems, why];
   }
   problems.push(...check(manifest, spec), ...fractionProblems(spec));
-  for (const field of placeholders(spec)) problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
+  // A spec lifted from a validated file copies its fields, so the file's placeholders are reported instead.
+  const lifted = schemaFiles(manifest).length > 0;
+  for (const field of lifted ? [] : placeholders(spec))
+    problems.push(`\`${field}\` is still ${PLACEHOLDER}`);
   if (typeof spec.name === "string" && spec.name !== at.name) {
     problems.push(`is named ${quoted(spec.name)} in its front matter but sits in ${at.name}/`);
+  }
+  // Section 3.4: an MCP server with a semantic version is published at that version.
+  const own = serverVersion(manifest, contents);
+  if (at.version !== undefined && own !== undefined && isVersion(own) && own !== at.version) {
+    problems.push(`${MCP_SERVER_ENTRY} is version ${own} but sits in ${at.version}/`);
   }
   return problems;
 }
@@ -150,6 +164,8 @@ export async function folderProblems(
   for (const message of versionProblems(manifest, folder, present, contents)) {
     problems.push({ path: where, message });
   }
+  const copy = await liftedDrift(root, where, manifest, contents, folder.name);
+  if (copy !== undefined) problems.push({ path: `${where}/${ENVELOPE}`, message: copy });
   for (const to of await dependsOn(root, where)) {
     if (!held.has(to)) {
       problems.push({
@@ -191,6 +207,25 @@ export async function folderProblems(
     });
   }
   return { problems, stale: false };
+}
+
+/**
+ * A spec lifted from a validated file must say what the file says, or a client reading the
+ * envelope would see something other than what was checked.
+ */
+async function liftedDrift(
+  root: string,
+  where: string,
+  manifest: KindManifest,
+  contents: ReadonlyMap<string, string>,
+  name: string,
+): Promise<string | undefined> {
+  if (schemaFiles(manifest).length === 0) return undefined;
+  const envelope = await readJson(rootReader(root), `${where}/${ENVELOPE}`).catch(() => undefined);
+  if (!isRecord(envelope) || envelope.spec === undefined) return undefined;
+  const expected = specOf(manifest, contents, name);
+  if (expected === undefined || isDeepStrictEqual(envelope.spec, expected)) return undefined;
+  return "has a `spec` that its files do not give; run `aireg registry index` to write it again";
 }
 
 type Folder = Awaited<ReturnType<typeof versionFolders>>[number];
