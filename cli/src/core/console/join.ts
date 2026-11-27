@@ -6,7 +6,7 @@ export const THIS_MACHINE = "this machine";
 /** States that need a person, most urgent first; a merged row shows the first it holds. */
 const ATTENTION = ["failed", "missing", "dangling", "edited", "duplicate"];
 
-export interface CatalogEntry {
+interface CatalogEntry {
   name: string;
   kind: string;
   namespace?: string;
@@ -99,7 +99,7 @@ export function joinCatalogs(
 }
 
 /** Merges observations of one local folder, keeping every diagnostic and target. */
-export function reconcileLocal(artifacts: readonly Joined[]): Joined[] {
+function reconcileLocal(artifacts: readonly Joined[]): Joined[] {
   const copies = new Map<string, Joined>();
   const result: Joined[] = [];
   for (const artifact of artifacts) {
