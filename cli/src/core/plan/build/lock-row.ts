@@ -48,12 +48,13 @@ export function lockRow({
     origin: previous?.origin,
     links: links.map((link) => {
       const mode = modeOf(link, previous);
-      const written = previous?.links.find((old) => old.path === link.relative)?.digest;
+      const old = previous?.links.find((each) => each.path === link.relative);
       return {
         target: link.target,
         path: link.relative,
         mode,
-        ...(mode === "copy" && written !== undefined ? { digest: written } : {}),
+        ...(mode === "copy" && old?.digest !== undefined ? { digest: old.digest } : {}),
+        ...(mode === "copy" && old?.requested === true ? { requested: true as const } : {}),
       };
     }),
     ...(neededBy === undefined ? {} : { neededBy }),

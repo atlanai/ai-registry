@@ -91,6 +91,8 @@ export type Action =
       from: string;
       to: string;
       copy: boolean;
+      /** The run asked for the copy, rather than leaving a copy the lock records in place. */
+      requested?: boolean;
       /** Points the target at a whole plugin, which has to be assembled. */
       plugin?: boolean;
       /** Present with `plugin`: the content this projection links to. */

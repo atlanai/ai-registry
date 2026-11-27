@@ -286,6 +286,11 @@
                     "pattern": "^sha256:[0-9a-f]{64}$",
                     "description": "The copy's digest with each file's path, mode and size framed. `digest` is the one aireg 0.1 checks.",
                     "type": "string"
+                  },
+                  "requested": {
+                    "description": "A copy made because the run asked for one, so a run that asks for none links it again. Any other copy stays while it is on disk.",
+                    "const": true,
+                    "type": "boolean"
                   }
                 }
               }

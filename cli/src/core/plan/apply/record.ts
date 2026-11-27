@@ -70,7 +70,15 @@ function keepUnstaged(run: Run, lock: Lock): void {
 function patchRow(
   results: Pick<
     RunResults,
-    "digests" | "staged" | "kept" | "skipped" | "blockers" | "modes" | "pathModes" | "copies"
+    | "digests"
+    | "staged"
+    | "kept"
+    | "skipped"
+    | "blockers"
+    | "modes"
+    | "pathModes"
+    | "copies"
+    | "requested"
   >,
   base: string,
   name: string,
@@ -100,8 +108,10 @@ function patchRow(
   let installs = false;
   for (const item of entry.links) {
     const at = resolve(base, item.path);
-    const mode = results.modes.get(linkKey(name, at)) ?? results.pathModes.get(at);
+    const key = linkKey(name, at);
+    const mode = results.modes.get(key) ?? results.pathModes.get(at);
     if (mode !== undefined) item.mode = mode;
+    if (results.modes.has(key)) item.requested = results.requested.has(key) ? true : undefined;
     // A plugin folder is linked once, for its first member, and installs every member it serves.
     if (results.pathModes.has(at)) installs = true;
     const written = results.copies.get(at);
