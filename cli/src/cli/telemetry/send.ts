@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { link, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { callingAgent, SIGNALS } from "#cli/prompt/caller.ts";
 import { isCI } from "#core/env.ts";
@@ -28,6 +28,8 @@ export async function sendQueued(
     return;
   }
   if (!Array.isArray(items)) return;
+  // Once per sender: each event asking for itself would race the others to create it.
+  const id = installId(env);
   const sends = (items as Queued[]).map(async ({ event, github = [] }) => {
     const confirmed =
       github.length > 0 &&
@@ -37,7 +39,7 @@ export async function sendQueued(
     const response = await $fetch(state.url, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(await payloadOf(fields, env)),
+      body: JSON.stringify(payloadOf(fields, env, await id)),
       redirect: "error",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -51,10 +53,11 @@ export async function sendQueued(
   clearTimeout(timer);
 }
 
-async function payloadOf(
+function payloadOf(
   fields: Record<string, unknown>,
   env: NodeJS.ProcessEnv,
-): Promise<Record<string, string>> {
+  id: string | undefined,
+): Record<string, string> {
   const payload: Record<string, string> = {
     event: String(fields.event),
     v: VERSION,
@@ -64,7 +67,6 @@ async function payloadOf(
   if (isCI(env)) payload.ci = "1";
   const agent = agentOf(env);
   if (agent !== undefined) payload.agent = agent;
-  const id = await installId(env);
   if (id !== undefined) payload.id = id;
   for (const [key, value] of Object.entries(fields)) {
     if (key !== "event" && typeof value === "string") payload[key] = value;
@@ -92,20 +94,28 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 async function installId(env: NodeJS.ProcessEnv): Promise<string | undefined> {
   try {
     const file = join(ensureHome(env), TELEMETRY_ID_FILE);
-    const stored = async () => (await readFile(file, "utf8").catch(() => "")).trim();
+    const stored = async () => {
+      const found = (await readFile(file, "utf8").catch(() => "")).trim();
+      return UUID.test(found) ? found : undefined;
+    };
     const found = await stored();
-    if (UUID.test(found)) return found;
-    // `wx` so two senders starting at once keep one ID: the second reads the first's.
+    if (found !== undefined) return found;
+    // Linked into place whole, so another sender never reads an ID half written.
     const made = randomUUID();
-    const wrote = await writeFile(file, `${made}\n`, {
-      mode: 0o600,
-      flag: found === "" ? "wx" : "w",
-    })
-      .then(() => true)
-      .catch(() => false);
-    if (wrote) return made;
-    const theirs = await stored();
-    return UUID.test(theirs) ? theirs : undefined;
+    const aside = `${file}.${made}`;
+    await writeFile(aside, `${made}\n`, { mode: 0o600 });
+    try {
+      await link(aside, file);
+      return made;
+    } catch {
+      // A sender starting at the same time keeps its ID; a file without one is replaced.
+      const theirs = await stored();
+      if (theirs !== undefined) return theirs;
+      await rename(aside, file);
+      return made;
+    } finally {
+      await rm(aside, { force: true });
+    }
   } catch {
     return undefined;
   }

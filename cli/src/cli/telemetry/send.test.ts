@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, vi } from "vitest";
 import { test } from "#test/kit/fixtures.ts";
@@ -89,6 +89,21 @@ describe("sendQueued", () => {
     expect(events.find((event) => event.event === "search")).not.toHaveProperty("query");
     const id = (await readFile(join(tmp, "telemetry-id"), "utf8")).trim();
     for (const event of events) expect(event).toMatchObject({ id, ci: "1", os: process.platform });
+  });
+
+  // An empty file is what a sender reading another's ID mid-write, or after it died, would see.
+  test("gives every event the one ID it saves, past an ID file with nothing in it", async ({
+    tmp,
+  }) => {
+    await writeFile(join(tmp, "telemetry-id"), "");
+    const { requests, $fetch } = recorder();
+    const env = { AIREG_HOME: tmp, AIREG_TELEMETRY_URL: COLLECTOR };
+    await sendQueued(JSON.stringify(Array.from({ length: 20 }, () => SYNC)), env, $fetch);
+
+    const id = (await readFile(join(tmp, "telemetry-id"), "utf8")).trim();
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(new Set(sent(requests).map((event) => event.id))).toEqual(new Set([id]));
+    expect(await readdir(tmp)).toEqual(["telemetry-id"]);
   });
 
   test("names only an agent aireg knows", async ({ tmp }) => {
