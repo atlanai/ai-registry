@@ -65,8 +65,11 @@ export async function present(path: string): Promise<boolean> {
   return (await ifPresent(lstat(path))) !== undefined;
 }
 
-/** VCS metadata, OS litter and installed dependencies: never an artifact's content. */
-const LITTER = new Set([".git", ".hg", ".svn", "CVS", ".DS_Store", "Thumbs.db", "node_modules"]);
+/** VCS metadata and installed dependencies: never published, but a person's work in a copy. */
+const LITTER = new Set([".git", ".hg", ".svn", "CVS", "node_modules"]);
+
+/** What a file manager writes on its own when a folder is opened. */
+const OS_FILES = new Set([".DS_Store", "Thumbs.db", "desktop.ini"]);
 
 /** Names that hold credentials far more often than skill content. */
 const SECRET_NAMES = new Set([
@@ -93,7 +96,7 @@ export async function walk(root: string): Promise<FileRecord[]> {
   return (await scan(root, "every")).files;
 }
 
-/** Every regular file but litter: what a copy holds, as a digest compares it. */
+/** Every regular file but OS files: what a copy holds, as a digest compares it. */
 export async function contents(root: string): Promise<FileRecord[]> {
   return (await scan(root, "contents")).files;
 }
@@ -103,7 +106,7 @@ export interface Irregular {
   reason: "is a symlink" | "is not a regular file" | "may hold credentials";
 }
 
-/** `every` file; the `contents`, skipping litter; or what is `authored`, refusing credentials too. */
+/** `every` file; the `contents`, skipping OS files; or what is `authored`, skipping all litter. */
 type Reading = "every" | "contents" | "authored";
 
 async function scan(
@@ -117,7 +120,8 @@ async function scan(
   async function visit(dir: string): Promise<void> {
     const items = await readdir(dir, { withFileTypes: true });
     for (const item of items.sort((a, b) => a.name.localeCompare(b.name))) {
-      if (reading !== "every" && isLitter(item.name)) continue;
+      if (reading === "contents" && isOsFile(item.name)) continue;
+      if (reading === "authored" && isLitter(item.name)) continue;
       const full = join(dir, item.name);
       if (item.isDirectory()) {
         await visit(full);
@@ -148,7 +152,11 @@ async function scan(
 }
 
 function isLitter(name: string): boolean {
-  return LITTER.has(name) || name.startsWith("._") || /^\..+\.swp$/.test(name);
+  return LITTER.has(name) || isOsFile(name) || /^\..+\.swp$/.test(name);
+}
+
+function isOsFile(name: string): boolean {
+  return OS_FILES.has(name) || name.startsWith("._");
 }
 
 const SECRET_EXTENSIONS = [".key", ".p12", ".pem", ".pfx"];

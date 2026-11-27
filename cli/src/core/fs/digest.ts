@@ -62,8 +62,8 @@ function remember(framed: string, earlier: string): void {
 }
 
 /**
- * Whether a placed copy was edited: returns `recorded` while the copy still matches it. Litter
- * such as `.DS_Store` is never content, so a file manager opening the folder is no edit.
+ * Whether a placed copy was edited: returns `recorded` while the copy still matches it. OS files
+ * such as `.DS_Store` are no edit; a `.git` or `node_modules` is, so update never drops it.
  */
 export async function digest(path: string, recorded?: string): Promise<string> {
   const tree = (await isDirectory(path))
