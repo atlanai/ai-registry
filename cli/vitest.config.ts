@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
+    setupFiles: ["test/kit/setup-env.ts"],
     // The e2e suites spawn the built binary, so a loaded machine needs a high ceiling.
     testTimeout: 60_000,
     hookTimeout: 60_000,

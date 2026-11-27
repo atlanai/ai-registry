@@ -4,6 +4,19 @@ import { SIGNALS } from "#cli/prompt/caller.ts";
 import { envName } from "#core/env.ts";
 import { HOME_DIR } from "#core/product.ts";
 import { SCOPE_DIR } from "#core/store/paths.ts";
+import { BUILTIN_TARGETS } from "#targets/index.ts";
+
+/** Variables on the developer's machine that move a target's folder or change what aireg prints. */
+export const HOST_ENV: readonly string[] = [
+  ...new Set([
+    ...BUILTIN_TARGETS.flatMap((target) => [
+      ...(target.roots.user.env === undefined ? [] : [target.roots.user.env]),
+      ...(typeof target.detect === "object" ? (target.detect.env ?? []) : []),
+    ]),
+    "AI_AGENT",
+    ...SIGNALS.flatMap((signal) => signal.env),
+  ]),
+];
 
 export interface Home {
   /** HOME and USERPROFILE. */
@@ -20,6 +33,7 @@ export function homeEnv(dir: string): Record<string, string> {
   // Cleared: under GitHub Actions validate diffs against the base branch and setup edits
   // GITHUB_PATH, and inside a coding agent aireg prints differently from what a person sees.
   return {
+    ...Object.fromEntries(HOST_ENV.map((name) => [name, ""])),
     HOME: dir,
     USERPROFILE: dir,
     [envName("HOME")]: join(dir, HOME_DIR),
@@ -32,9 +46,6 @@ export function homeEnv(dir: string): Record<string, string> {
     NO_COLOR: "1",
     GITHUB_ACTIONS: "",
     GITHUB_BASE_REF: "",
-    ...Object.fromEntries(
-      ["AI_AGENT", ...SIGNALS.flatMap((signal) => signal.env)].map((name) => [name, ""]),
-    ),
   };
 }
 

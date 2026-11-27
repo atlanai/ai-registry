@@ -104,7 +104,7 @@ function untar(tar: Uint8Array, into: Collector): void {
   while (at + 512 <= tar.byteLength) {
     const header = tar.subarray(at, at + 512);
     if (header.every((byte) => byte === 0)) break;
-    const size = octal(header, 124, 12);
+    const size = sizeOf(header, into);
     const type = String.fromCharCode(header[156] ?? 0);
     const prefix = text(header, 345, 155);
     const own = text(header, 0, 100);
@@ -122,6 +122,15 @@ function untar(tar: Uint8Array, into: Collector): void {
     if (type !== "0" && type !== "\0") into.refuse(name, "not a regular file");
     into.add(name, body.slice(), (octal(header, 100, 8) & EXECUTE_BITS) !== 0);
   }
+}
+
+/** A negative size would hold the position still or move it back, so the loop never ends. */
+function sizeOf(header: Uint8Array, into: Collector): number {
+  const size = octal(header, 124, 12);
+  if (!Number.isSafeInteger(size) || size < 0) {
+    throw fail("invalid", `${into.name}'s archive has a header with no valid size.`);
+  }
+  return size;
 }
 
 interface ZipEntry {
