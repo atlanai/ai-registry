@@ -1,3 +1,4 @@
+import { gzipSync } from "node:zlib";
 import { describe, expect, test } from "vitest";
 import { tarGz, zip } from "#test/kit/site.ts";
 import { unpack } from "./archive.ts";
@@ -47,6 +48,17 @@ describe("unpack", () => {
     );
     const big = tarGz([{ path: "a", body: "x".repeat(2048) }]);
     expect(() => unpack("fill", big, { bytes: 1024, files: 10 })).toThrow(/unpacks to more than/);
+  });
+
+  test("refuses a header with a negative size", () => {
+    const header = Buffer.alloc(512);
+    header.write("pax", 0, 100, "utf8");
+    header.write("-0000001000\0", 124);
+    header.write("g", 156);
+    const archive = gzipSync(Buffer.concat([header, Buffer.alloc(1024)]));
+    expect(() => unpack("fill", archive)).toThrow(
+      "fill's archive has a header with no valid size.",
+    );
   });
 
   test("refuses what is neither a .tar.gz nor a .zip", () => {
