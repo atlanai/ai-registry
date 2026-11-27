@@ -167,9 +167,9 @@ test("publishing an explicit native agent file preserves its front matter", asyn
   expect(Buffer.from(input.files[0]!.content).toString()).toBe(body);
 });
 
-test("fills an agent document's missing name when its fences end in whitespace", async () => {
+test("fills a missing agent name after a byte order mark and padded fences", async () => {
   const path = join(root, "helper.md");
-  await writeFile(path, "--- \ndescription: Helps.\n---\t\nHelp.\n");
+  await writeFile(path, "\uFEFF--- \r\ndescription: Helps.\r\n---\t\r\nHelp.\r\n");
   const { input } = await offerFrom(path, {
     kind: "agent",
     name: "helper",
@@ -177,7 +177,7 @@ test("fills an agent document's missing name when its fences end in whitespace",
     asAgentDocument: true,
   });
   expect(Buffer.from(input.files[0]!.content).toString()).toBe(
-    "--- \ndescription: Helps.\nname: helper\n---\t\nHelp.\n",
+    "\uFEFF--- \r\ndescription: Helps.\r\nname: helper\r\n---\t\r\nHelp.\r\n",
   );
 });
 

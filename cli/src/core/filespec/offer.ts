@@ -16,7 +16,7 @@ import { describeFile } from "#adapter/spec/envelope.ts";
 import { isVersion } from "#adapter/spec/ref.ts";
 import { quoted } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
-import { frontmatterRecord, ownDescription } from "#core/frontmatter.ts";
+import { frontmatterRecord, ownDescription, withMissingName } from "#core/frontmatter.ts";
 import { authoredArtifact, isDirectory, refusal } from "#core/fs/tree.ts";
 import { AGENT_ENTRY } from "#core/kinds.ts";
 import { envelopeSpec } from "./kind-manifests.ts";
@@ -176,12 +176,8 @@ async function uploadFiles(path: string, target: OfferTarget): Promise<UploadFil
 /** A registry agent requires a name the agent file may omit; the artifact's name fills it. */
 function agentDocument(content: Buffer, target: OfferTarget): UploadFile {
   const text = content.toString("utf8");
-  const record = frontmatterRecord(text);
-  const fence = /^---[ \t]*\r?\n[\s\S]*?\r?\n(?=---[ \t]*\r?(?:\n|$))/.exec(text);
-  if (record === undefined || fence === null || record.name !== undefined) {
-    return { path: AGENT_ENTRY, content, executable: false };
-  }
-  const filled = `${fence[0]}name: ${target.name}\n${text.slice(fence[0].length)}`;
+  const filled = withMissingName(text, target.name);
+  if (filled === text) return { path: AGENT_ENTRY, content, executable: false };
   return { path: AGENT_ENTRY, content: Buffer.from(filled, "utf8"), executable: false };
 }
 
