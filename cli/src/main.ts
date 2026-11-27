@@ -321,17 +321,32 @@ async function runCommand(
   }
 }
 
-// Node's fetch keeps an aborted connection open until its 10 s connect timeout, so a finished
-// command exits once its output is written.
-function exitWhenWritten(code: number): void {
-  let pending = 2;
-  for (const stream of [process.stdout, process.stderr]) {
-    // `end`, not an empty write: Bun calls that back before queued output reaches a pipe.
-    stream.end(() => {
-      pending -= 1;
-      if (pending === 0) process.exit(code);
-    });
-  }
+const LINGER_MS = 2_000;
+
+/** The dispatcher behind Node's `fetch`, once something has fetched. */
+interface FetchDispatcher {
+  destroy(): Promise<void>;
 }
 
-exitWhenWritten(await main());
+/**
+ * Ends with the event loop rather than `process.exit()`, which can hang for good on Node 24 and
+ * 26 while V8 compiles in the background: https://github.com/nodejs/node/issues/64274.
+ */
+async function finish(code: number): Promise<void> {
+  process.exitCode = code;
+  // `end`, not an empty write: Bun calls that back before queued output reaches a pipe.
+  await Promise.all(
+    [process.stdout, process.stderr].map(
+      (stream) => new Promise<void>((resolve) => stream.end(resolve)),
+    ),
+  );
+  // Node's fetch keeps an aborted connection open until its 10 s connect timeout.
+  const dispatcher = (globalThis as Record<symbol, FetchDispatcher | undefined>)[
+    Symbol.for("undici.globalDispatcher.1")
+  ];
+  await dispatcher?.destroy().catch(() => undefined);
+  // Anything else still open, such as an adapter's socket, must not keep the shell waiting.
+  setTimeout(() => process.exit(code), LINGER_MS).unref();
+}
+
+await finish(await main());
