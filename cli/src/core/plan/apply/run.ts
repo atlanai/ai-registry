@@ -14,7 +14,7 @@ export interface ApplyResult {
   installed: string[];
   /** Artifacts the lock holds now that no target had before this run. */
   added: string[];
-  /** Artifacts some target had before this run that none has now. */
+  /** Artifacts this run took out of the lock, or that lost the last target holding them. */
   removed: string[];
   lock: Lock | undefined;
   /** Targets that asked for a symlink and got a copy, so project edits no longer reach them. */

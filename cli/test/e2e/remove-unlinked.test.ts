@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { skillsFolder } from "#test/kit/builders/layouts.ts";
@@ -22,5 +22,8 @@ describe("remove names what it removed", () => {
     expect(removed.code).toBe(0);
     expect(removed.stdout + removed.stderr).not.toContain("Updated s.");
     expect(removed.stdout + removed.stderr).toContain("Removed s.");
+    expect(await readFile(join(project, ".claude", "skills", "s", "SKILL.md"), "utf8")).toBe(
+      "mine\n",
+    );
   });
 });

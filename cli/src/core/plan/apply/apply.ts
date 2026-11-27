@@ -39,14 +39,6 @@ const linked = (lock: Lock | undefined, name: string): number => {
   return isStoreOnly(artifact.kind) ? 1 : artifact.links.length;
 };
 
-/**
- * Whether the run removed the artifact: it left the lock, or it lost the last place that held it.
- * An artifact whose link was never made (something of the person's sat in its place) holds no
- * place before the run, so leaving the lock is what removes it.
- */
-const removedBy = (before: Lock | undefined, after: Lock, name: string): boolean =>
-  after.artifacts[name] === undefined || (linked(before, name) > 0 && linked(after, name) === 0);
-
 /** The store-only artifacts this run copied into the scope: for them the copy is the install. */
 function copied(plan: Plan, results: RunResults): string[] {
   const storeOnly = storeOnlyNames(results.recorded);
@@ -110,7 +102,12 @@ export async function apply({
       recorded === undefined
         ? []
         : Object.keys(before?.artifacts ?? {})
-            .filter((name) => removedBy(before, recorded, name))
+            // One whose link was never made held no place, so leaving the lock is its removal.
+            .filter(
+              (name) =>
+                recorded.artifacts[name] === undefined ||
+                (linked(before, name) > 0 && linked(recorded, name) === 0),
+            )
             .sort(),
     lock: results.recorded,
     degraded: [...results.degraded].sort(),
