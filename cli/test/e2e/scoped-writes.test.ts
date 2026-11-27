@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { rename } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 import { registry } from "#test/kit/builders/registry.ts";
 import { fileTest } from "#test/kit/fixtures.ts";
 import { tree } from "#test/kit/tree.ts";
@@ -39,7 +39,8 @@ describe("an add or remove opens only the registry it changes", () => {
     tmp,
     market,
   }) => {
-    await rename(market.far, `${market.far}.gone`);
+    // Retried: Windows refuses the rename while a process that just read the registry holds it.
+    await vi.waitFor(() => rename(market.far, `${market.far}.gone`), { timeout: 10_000 });
     const added = await aireg(["add", "-g", "near/team/skill/review", "-y"], outside(tmp));
     expect(added.code, added.stderr).toBe(0);
     expect(
