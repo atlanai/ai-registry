@@ -92,7 +92,7 @@ export function refusal(entry: Irregular): string {
 }
 
 /** Sorted, so two walks of the same tree always produce the same list. */
-export async function walk(root: string): Promise<FileRecord[]> {
+async function walk(root: string): Promise<FileRecord[]> {
   return (await scan(root, "every")).files;
 }
 
