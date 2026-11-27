@@ -326,6 +326,8 @@ export interface Planned {
   same: boolean;
   /** The version sorts below the registry's newest, as an export's own older `version` can. */
   belowLatest: boolean;
+  /** The version the registry would serve, when its status holds it back. */
+  withheld?: Withheld | undefined;
   input: PublishInput;
   /** Changes against the latest version, when files are available and a publish is needed. */
   changes?: Changes | undefined;
@@ -453,6 +455,7 @@ export async function plan({
     version,
     same,
     belowLatest: below(version, current?.version),
+    withheld: published.withheld.get(key)?.withheld,
     input,
     ...changesAgainst(
       { same, current, from },

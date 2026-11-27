@@ -133,6 +133,27 @@
                   }
                 }
               },
+              "withheld": {
+                "additionalProperties": false,
+                "description": "The version the registry would serve, when its status holds it back instead.",
+                "type": "object",
+                "required": [
+                  "version",
+                  "status"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Such as `blocked`, `pending_review` or `draft`.",
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              },
               "files": {
                 "type": "array",
                 "items": {
