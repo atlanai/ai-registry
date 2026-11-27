@@ -21,15 +21,21 @@ export async function gather(
     paths: readonly string[];
     since: string | undefined;
     found: ReadonlyMap<string, Export> | undefined;
+    to: string | undefined;
   },
 ): Promise<Work[] | undefined> {
-  const { paths, since, found } = options;
+  const { paths, since, found, to } = options;
   const keep = async (works: Work[]) =>
     since === undefined ? works : changedSince(works, since, cwd);
 
   const exported = found === undefined ? undefined : await exportWork(found, loaded.roots.base);
   let works: Work[] | undefined;
-  if (paths.length > 0) works = await keep(await fromArgs(paths, loaded, cwd));
+  // A hint naming another path runs as printed: same destination and dry run.
+  const again = [
+    ...(to === undefined ? [] : ["--to", to]),
+    ...(common.dryRun ? ["--dry-run"] : []),
+  ];
+  if (paths.length > 0) works = await keep(await fromArgs(paths, loaded, cwd, again));
   else if (exported !== undefined) works = await keep(exported);
   else works = await chooseWork(step, loaded, common, cwd, keep);
   for (const work of works ?? []) work.exported = found?.get(work.path);

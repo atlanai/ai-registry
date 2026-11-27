@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
@@ -29,4 +30,19 @@ test("refuses an installed copy reached through a symlinked .registry/artifacts"
   await expect(fromArgs(["lint"], loaded, roots.cwd)).rejects.toThrow(
     /lint was not published because .* is a symlink/,
   );
+});
+
+test("quotes the folder a symlink points to so its hint runs as printed", async ({ tmp }) => {
+  const roots = makeRoots("user", tmp, { AIREG_USER_SCOPE: join(tmp, "scope") });
+  const target = join(tmp, "odd $(id)", "pointed");
+  await mkdir(target, { recursive: true });
+  await mkdir(join(tmp, "skills"));
+  await symlink(target, join(tmp, "skills", "pointed"));
+  const loaded = { roots, lock: { registries: {}, artifacts: {} } } as unknown as Loaded;
+
+  await expect(
+    fromArgs(["skills/pointed"], loaded, tmp, ["--to", "team/platform", "--dry-run"]),
+  ).rejects.toMatchObject({
+    hint: `Publish the folder it points to: \`aireg publish '${realpathSync(target)}' --to team/platform --dry-run -g\`.`,
+  });
 });
