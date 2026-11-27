@@ -206,6 +206,51 @@ describe("indexRoot", () => {
     expect(row).not.toHaveProperty("catalog_digest");
   });
 
+  test("reads an MCP server's spec from its files, not from a copied artifact.json", async () => {
+    const server = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker");
+    await cp(join(server, "1.2.0"), join(server, "1.3.0"), { recursive: true });
+    const document = JSON.parse(await readFile(join(server, "1.3.0", "server.json"), "utf8"));
+    document.description = "Search and close issues.";
+    await writeFile(join(server, "1.3.0", "server.json"), JSON.stringify(document));
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    const envelope = JSON.parse(await readFile(join(server, "1.3.0", "artifact.json"), "utf8"));
+    expect(envelope.spec.description).toBe("Search and close issues.");
+    expect(envelope.metadata.description).toBe("Search and close issues.");
+  });
+
+  test("drops a copied display name when the new server.json has no title", async () => {
+    const server = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker");
+    await cp(join(server, "1.2.0"), join(server, "1.3.0"), { recursive: true });
+    const { title: _title, ...document } = JSON.parse(
+      await readFile(join(server, "1.3.0", "server.json"), "utf8"),
+    );
+    await writeFile(join(server, "1.3.0", "server.json"), JSON.stringify(document));
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    const envelope = JSON.parse(await readFile(join(server, "1.3.0", "artifact.json"), "utf8"));
+    expect(envelope.metadata).not.toHaveProperty("display_name");
+  });
+
+  test("indexes an MCP server whose artifact.json holds a null spec", async () => {
+    const version = join(root, "artifacts", "engineering", "mcp_server", "issue-tracker", "1.3.0");
+    const from = join(dirname(version), "1.2.0");
+    await mkdir(version, { recursive: true });
+    await cp(join(from, "server.json"), join(version, "server.json"));
+    await writeFile(join(version, "artifact.json"), JSON.stringify({ spec: null }));
+
+    await indexRoot(root, "2026-10-08T00:00:00Z");
+
+    const envelope = JSON.parse(await readFile(join(version, "artifact.json"), "utf8"));
+    expect(envelope.metadata.display_name).toBe("Issue tracker");
+    expect(envelope.spec).toEqual({
+      name: "issue-tracker",
+      description: "Search, read and update issues in the team's issue tracker.",
+    });
+  });
+
   test("drops the row of an artifact whose folder was deleted", async () => {
     await rm(join(root, "artifacts", "engineering", "agent", "reviewer"), { recursive: true });
 
@@ -213,7 +258,7 @@ describe("indexRoot", () => {
 
     const index = JSON.parse(await readFile(join(root, "index.json"), "utf8"));
     const names = index.entries.map((entry: { name: string }) => entry.name).sort();
-    expect(names).toEqual(["pr-review", "review-metrics"]);
+    expect(names).toEqual(["issue-tracker", "pr-review", "review-metrics"]);
     expect(index.generated_at).toBe("2026-10-08T00:00:00Z");
   });
 });

@@ -1,0 +1,10 @@
+Put what a run moved aside back where it was
+
+Usage: aireg backup restore [<stamp>] [options]
+
+Options:
+  -g, --user  Act on your user scope instead of this project
+
+Learn more:
+  Run `aireg --help` for the global options (--json, --verbose, -q, --color, --no-color, --log-level, -y).
+  Docs: https://atlanai.github.io/ai-registry/reference/backup/

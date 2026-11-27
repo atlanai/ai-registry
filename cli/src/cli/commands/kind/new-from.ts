@@ -5,7 +5,8 @@ import { isRecord } from "#adapter/fields.ts";
 import { readJson } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { ARTIFACTS_DIR, ENVELOPE } from "#adapter/filespec/names.ts";
-import { list, sanitizeName } from "#adapter/text.ts";
+import { isVersion } from "#adapter/spec/ref.ts";
+import { list, quoted, sanitizeName } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { STREAMED } from "#cli/commands/define.ts";
 import type { KindNewFrom } from "#cli/commands/kind/result.ts";
@@ -19,16 +20,19 @@ import {
   fileProblems,
   type KindManifest,
   SPEC_TEXT,
+  schemaFiles,
   specFile,
   specOf,
   specParseProblem,
 } from "#core/filespec/kind-manifests.ts";
+import { serverVersion } from "#core/filespec/mcp-server.ts";
 import { check } from "#core/filespec/schema.ts";
 import { documentProblems, fractionProblems } from "#core/filespec/validate/folders.ts";
 import { withName } from "#core/frontmatter.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
 import { expandUserPath } from "#core/fs/path.ts";
 import { authored, type Irregular, refusal } from "#core/fs/tree.ts";
+import { kindCommand } from "#core/kinds.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { nameOf } from "./fields.ts";
 import { FRESH } from "./files.ts";
@@ -41,11 +45,17 @@ interface Incoming {
   entries: string[];
   stored: ReadonlyMap<string, string>;
   name: string;
+  /** The first version: an MCP server keeps its own, so the two stay equal. */
+  version: string;
+  /** Why a server's own version was not taken. */
+  versionNote: string | undefined;
   front: { file: string; name: string } | undefined;
 }
 
+const FIRST_VERSION = "0.1.0";
+
 export interface Copied extends KindNewFrom {
-  shown: { name: string; at: string }[];
+  shown: { name: string; at: string; note: string | undefined }[];
 }
 
 export async function newFrom(
@@ -60,7 +70,7 @@ export async function newFrom(
     throw needsInput(
       `${kind} new --from`,
       "a folder",
-      `Name the folder: \`aireg ${kind} new --from <path>\`.`,
+      `Name the folder: \`aireg ${kindCommand(kind)} new --from <path>\`.`,
     );
   }
   if (own.name !== undefined && paths.length > 1) {
@@ -86,18 +96,18 @@ export async function newFrom(
   const namespace = await namespaceFor(root, context.cwd, own, context, yes);
   if (namespace === undefined) return STREAMED;
   for (const item of found) {
-    refuseRedirect(root, join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0"));
+    refuseRedirect(root, join(root, ARTIFACTS_DIR, namespace, kind, item.name, item.version));
     if (existsSync(join(root, ARTIFACTS_DIR, namespace, kind, item.name))) {
       throw new AiregError(`${namespace}/${kind}/${item.name} already exists.`, {
         code: ErrorCode.Conflict,
-        hint: `Start its next version with \`aireg ${kind} bump ${item.name}\`.`,
+        hint: `If it is the same one, start its next version with \`aireg ${kindCommand(kind)} bump ${item.name}\`. If not, choose another name with \`--name\`.`,
       });
     }
   }
 
-  const copied: { name: string; at: string }[] = [];
+  const copied: { name: string; at: string; note: string | undefined }[] = [];
   for (const item of found) {
-    const at = join(root, ARTIFACTS_DIR, namespace, kind, item.name, "0.1.0");
+    const at = join(root, ARTIFACTS_DIR, namespace, kind, item.name, item.version);
     await mkdir(at, { recursive: true });
     for (const path of item.entries) {
       await cp(join(item.dir, path), join(at, item.stored.get(path) ?? path), FRESH);
@@ -108,19 +118,26 @@ export async function newFrom(
       const file = join(at, item.front.file);
       await writeFile(file, withName(await readFile(file, "utf8"), item.name), "utf8");
     }
-    copied.push({ name: item.name, at });
+    copied.push({ name: item.name, at, note: item.versionNote });
   }
 
   return {
     kind,
     namespace,
     created: copied.map((item) => ({ name: item.name, at: relative(root, item.at) })),
-    shown: copied.map((item) => ({ name: item.name, at: relative(context.cwd, item.at) || "." })),
+    shown: copied.map((item) => ({
+      name: item.name,
+      at: relative(context.cwd, item.at) || ".",
+      note: item.note,
+    })),
   };
 }
 
 export function printCopied(result: Copied, printer: Printer): void {
-  for (const item of result.shown) printer.success(`Copied ${item.name} into ${item.at}/.`);
+  for (const item of result.shown) {
+    printer.success(`Copied ${item.name} into ${item.at}/.`);
+    if (item.note !== undefined) printer.warning(item.note);
+  }
   printer.note("next", "aireg registry index");
 }
 
@@ -135,7 +152,7 @@ async function incoming(
   if (!existsSync(source)) {
     throw new AiregError(`Nothing exists at ${input}.`, {
       code: ErrorCode.NotFound,
-      hint: `Name an existing ${kind} folder or file: \`aireg ${kind} new --from <path>\`.`,
+      hint: `Name an existing ${kind} folder or file: \`aireg ${kindCommand(kind)} new --from <path>\`.`,
     });
   }
   const isDirectory = (await stat(source)).isDirectory();
@@ -163,7 +180,8 @@ async function incoming(
     ...fileProblems(manifest, new Set(entries.map((path) => stored.get(path) ?? path))),
     ...documents,
     ...(spec === undefined ? [] : [...check(manifest, spec), ...fractionProblems(spec)]),
-    ...(spec === undefined && documents.length === 0
+    // A kind whose spec comes from a validated file has no front matter; fileProblems says it's missing.
+    ...(spec === undefined && documents.length === 0 && schemaFiles(manifest).length === 0
       ? [specParseProblem(manifest, texts) ?? "has no front matter"]
       : []),
   ];
@@ -175,13 +193,19 @@ async function incoming(
   if (problems.length > 0) {
     throw new AiregError(`${input} is not a valid ${kind}: ${problems.join("; ")}.`, {
       code: ErrorCode.Invalid,
-      hint: `Fix it where it is, then run \`aireg ${kind} new --from ${input}\` again.`,
+      hint: `Fix it where it is, then run \`aireg ${kindCommand(kind)} new --from ${input}\` again.`,
     });
   }
   const file = specFile(manifest, texts);
   const front =
     file !== undefined && typeof spec?.name === "string" ? { file, name: spec.name } : undefined;
-  return { input, dir, entries, stored, name, front };
+  const own = serverVersion(manifest, texts);
+  const version = own !== undefined && isVersion(own) ? own : FIRST_VERSION;
+  const versionNote =
+    own === undefined || version === own
+      ? undefined
+      : `Its version ${quoted(own)} is not a semantic version, so the artifact starts at ${FIRST_VERSION}.`;
+  return { input, dir, entries, stored, name, version, versionNote, front };
 }
 
 /** One file named by `--from`, refused as a link the way a folder's entries are. */

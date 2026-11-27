@@ -738,6 +738,250 @@
                           }
                         }
                       }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "file",
+                        "format",
+                        "at",
+                        "codec",
+                        "transports"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "config",
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "anyOf": [
+                            {
+                              "const": "json",
+                              "type": "string"
+                            },
+                            {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            {
+                              "const": "yaml",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "at": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "anchor": {
+                          "anyOf": [
+                            {
+                              "const": "root",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-json",
+                                  "type": "string"
+                                },
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "transports": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "stdio",
+                                "type": "string"
+                              },
+                              {
+                                "const": "streamable-http",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sse",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        }
+                      }
                     }
                   ]
                 },
@@ -1195,6 +1439,250 @@
                           }
                         }
                       }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "file",
+                        "format",
+                        "at",
+                        "codec",
+                        "transports"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "config",
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "anyOf": [
+                            {
+                              "const": "json",
+                              "type": "string"
+                            },
+                            {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            {
+                              "const": "yaml",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "at": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "anchor": {
+                          "anyOf": [
+                            {
+                              "const": "root",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-json",
+                                  "type": "string"
+                                },
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "transports": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "stdio",
+                                "type": "string"
+                              },
+                              {
+                                "const": "streamable-http",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sse",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        }
+                      }
                     }
                   ]
                 },
@@ -1649,6 +2137,951 @@
                             "body": {
                               "type": "string"
                             }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "file",
+                        "format",
+                        "at",
+                        "codec",
+                        "transports"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "config",
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "anyOf": [
+                            {
+                              "const": "json",
+                              "type": "string"
+                            },
+                            {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            {
+                              "const": "yaml",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "at": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "anchor": {
+                          "anyOf": [
+                            {
+                              "const": "root",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-json",
+                                  "type": "string"
+                                },
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "transports": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "stdio",
+                                "type": "string"
+                              },
+                              {
+                                "const": "streamable-http",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sse",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "mcp_server": {
+                  "description": "Where one kind lands inside the target's folder.",
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "contents",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "directory",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "fan",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "entry": {
+                          "type": "string"
+                        },
+                        "manifest": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "path"
+                            ],
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "register": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "description": "One edit to a config file the target reads: `value`, `upsert` or `append`.",
+                            "type": "object",
+                            "required": [
+                              "file",
+                              "format",
+                              "at"
+                            ],
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "anyOf": [
+                                  {
+                                    "const": "toml",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "json",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "yaml",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "at": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "init": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "conflict": {
+                                "anyOf": [
+                                  {
+                                    "const": "overwrite",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keep",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "remove": {
+                                "anyOf": [
+                                  {
+                                    "const": "ours",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "entry",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "off": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "value": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "upsert": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "key",
+                                  "item"
+                                ],
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^(.*)$": {
+                                        "description": "Text, a number, true or false, a list or a table."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "append": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "const": false,
+                                  "type": "boolean"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "path",
+                                    "body"
+                                  ],
+                                  "properties": {
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "body": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^(.*)$": {
+                                          "description": "Text, a number, true or false, a list or a table."
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir",
+                        "extension"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "render": {
+                          "additionalProperties": false,
+                          "description": "Deprecated: the frontmatter-toml codec.",
+                          "type": "object",
+                          "required": [
+                            "format",
+                            "fields",
+                            "body"
+                          ],
+                          "properties": {
+                            "format": {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "file",
+                        "format",
+                        "at",
+                        "codec",
+                        "transports"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "config",
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "anyOf": [
+                            {
+                              "const": "json",
+                              "type": "string"
+                            },
+                            {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            {
+                              "const": "yaml",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "at": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "anchor": {
+                          "anyOf": [
+                            {
+                              "const": "root",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-json",
+                                  "type": "string"
+                                },
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "transports": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "stdio",
+                                "type": "string"
+                              },
+                              {
+                                "const": "streamable-http",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sse",
+                                "type": "string"
+                              }
+                            ]
                           }
                         }
                       }
@@ -1674,6 +3107,12 @@
                   }
                 },
                 "agent": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "mcp_server": {
                   "type": "array",
                   "items": {
                     "type": "string"
@@ -1758,6 +3197,31 @@
                   }
                 },
                 "agent": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs; never run.",
+                  "type": "object",
+                  "required": [
+                    "run"
+                  ],
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "const": "project",
+                          "type": "string"
+                        },
+                        {
+                          "const": "user",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "mcp_server": {
                   "additionalProperties": false,
                   "description": "A command a person runs; never run.",
                   "type": "object",
@@ -2336,6 +3800,250 @@
                           }
                         }
                       }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "file",
+                        "format",
+                        "at",
+                        "codec",
+                        "transports"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "config",
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "anyOf": [
+                            {
+                              "const": "json",
+                              "type": "string"
+                            },
+                            {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            {
+                              "const": "yaml",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "at": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "anchor": {
+                          "anyOf": [
+                            {
+                              "const": "root",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-json",
+                                  "type": "string"
+                                },
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "transports": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "stdio",
+                                "type": "string"
+                              },
+                              {
+                                "const": "streamable-http",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sse",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        }
+                      }
                     }
                   ]
                 },
@@ -2793,6 +4501,250 @@
                           }
                         }
                       }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "file",
+                        "format",
+                        "at",
+                        "codec",
+                        "transports"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "config",
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "anyOf": [
+                            {
+                              "const": "json",
+                              "type": "string"
+                            },
+                            {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            {
+                              "const": "yaml",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "at": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "anchor": {
+                          "anyOf": [
+                            {
+                              "const": "root",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-json",
+                                  "type": "string"
+                                },
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "transports": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "stdio",
+                                "type": "string"
+                              },
+                              {
+                                "const": "streamable-http",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sse",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        }
+                      }
                     }
                   ]
                 },
@@ -3247,6 +5199,951 @@
                             "body": {
                               "type": "string"
                             }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "file",
+                        "format",
+                        "at",
+                        "codec",
+                        "transports"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "config",
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "anyOf": [
+                            {
+                              "const": "json",
+                              "type": "string"
+                            },
+                            {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            {
+                              "const": "yaml",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "at": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "anchor": {
+                          "anyOf": [
+                            {
+                              "const": "root",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-json",
+                                  "type": "string"
+                                },
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "transports": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "stdio",
+                                "type": "string"
+                              },
+                              {
+                                "const": "streamable-http",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sse",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "mcp_server": {
+                  "description": "Where one kind lands inside the target's folder.",
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "contents",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "directory",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "fan",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "depth": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "entry": {
+                          "type": "string"
+                        },
+                        "manifest": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "path"
+                            ],
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "register": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "description": "One edit to a config file the target reads: `value`, `upsert` or `append`.",
+                            "type": "object",
+                            "required": [
+                              "file",
+                              "format",
+                              "at"
+                            ],
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "anyOf": [
+                                  {
+                                    "const": "toml",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "json",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "yaml",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "at": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "init": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "conflict": {
+                                "anyOf": [
+                                  {
+                                    "const": "overwrite",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keep",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "remove": {
+                                "anyOf": [
+                                  {
+                                    "const": "ours",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "entry",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "off": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "value": {
+                                "type": "object",
+                                "patternProperties": {
+                                  "^(.*)$": {
+                                    "description": "Text, a number, true or false, a list or a table."
+                                  }
+                                }
+                              },
+                              "upsert": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "key",
+                                  "item"
+                                ],
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^(.*)$": {
+                                        "description": "Text, a number, true or false, a list or a table."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "append": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "type": "object",
+                          "patternProperties": {
+                            "^(.*)$": {
+                              "anyOf": [
+                                {
+                                  "const": false,
+                                  "type": "boolean"
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "path",
+                                    "body"
+                                  ],
+                                  "properties": {
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "body": {
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^(.*)$": {
+                                          "description": "Text, a number, true or false, a list or a table."
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "subdir",
+                        "extension"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "subdir": {
+                          "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "const": "user",
+                          "type": "string"
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "const": "link",
+                              "type": "string"
+                            },
+                            {
+                              "const": "copy",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "fields",
+                                "body"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-toml",
+                                  "type": "string"
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "body": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "keep"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-strict",
+                                  "type": "string"
+                                },
+                                "keep": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "set"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "frontmatter-set",
+                                  "type": "string"
+                                },
+                                "set": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^(.*)$": {
+                                      "description": "Text, a number, true or false, a list or a table."
+                                    }
+                                  }
+                                },
+                                "restrictions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "render": {
+                          "additionalProperties": false,
+                          "description": "Deprecated: the frontmatter-toml codec.",
+                          "type": "object",
+                          "required": [
+                            "format",
+                            "fields",
+                            "body"
+                          ],
+                          "properties": {
+                            "format": {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "body": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "shape",
+                        "file",
+                        "format",
+                        "at",
+                        "codec",
+                        "transports"
+                      ],
+                      "properties": {
+                        "shape": {
+                          "const": "config",
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "anyOf": [
+                            {
+                              "const": "json",
+                              "type": "string"
+                            },
+                            {
+                              "const": "toml",
+                              "type": "string"
+                            },
+                            {
+                              "const": "yaml",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "at": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "anchor": {
+                          "anyOf": [
+                            {
+                              "const": "root",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "anyOf": [
+                            {
+                              "const": "user",
+                              "type": "string"
+                            },
+                            {
+                              "const": "project",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "userFile": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "codec": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-json",
+                                  "type": "string"
+                                },
+                                "secret": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "prefix",
+                                    "suffix"
+                                  ],
+                                  "properties": {
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "suffix": {
+                                      "type": "string"
+                                    },
+                                    "in": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "command",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "args",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "env",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "url",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "headers",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                "type": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "stdio": {
+                                      "type": "string"
+                                    },
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "url": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "streamable-http": {
+                                      "type": "string"
+                                    },
+                                    "sse": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "command": {
+                                  "const": "array",
+                                  "type": "string"
+                                },
+                                "env": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "tools": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "properties": {
+                                    "allow": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "deny": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "const": "mcp-codex",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "deny": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file",
+                            "at",
+                            "item"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "at": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "item": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "transports": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "const": "stdio",
+                                "type": "string"
+                              },
+                              {
+                                "const": "streamable-http",
+                                "type": "string"
+                              },
+                              {
+                                "const": "sse",
+                                "type": "string"
+                              }
+                            ]
                           }
                         }
                       }
@@ -3272,6 +6169,12 @@
                   }
                 },
                 "agent": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "mcp_server": {
                   "type": "array",
                   "items": {
                     "type": "string"
@@ -3356,6 +6259,31 @@
                   }
                 },
                 "agent": {
+                  "additionalProperties": false,
+                  "description": "A command a person runs; never run.",
+                  "type": "object",
+                  "required": [
+                    "run"
+                  ],
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "anyOf": [
+                        {
+                          "const": "project",
+                          "type": "string"
+                        },
+                        {
+                          "const": "user",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "mcp_server": {
                   "additionalProperties": false,
                   "description": "A command a person runs; never run.",
                   "type": "object",

@@ -121,6 +121,10 @@ function profileProblems(root: string, report: Report) {
 
 function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Report) {
   if (mapping.shape === "contents") return;
+  if (mapping.shape === "config") {
+    configProblems(kind, mapping, report);
+    return;
+  }
   pathProblem(mapping.subdir, TEMPLATE_VARS.placement, report);
   for (const entry of mapping.manifest ?? []) {
     pathProblem(entry.path, [], report);
@@ -150,6 +154,24 @@ function mappingProblems(kind: ArtifactKind, mapping: KindMapping, report: Repor
   const toml = tomlCodec(mapping);
   for (const key of [...(toml?.fields ?? []), toml?.body ?? "body"]) {
     if (!/^[A-Za-z0-9_-]+$/.test(key)) report(`${kind} renders ${key}, which is not a bare key.`);
+  }
+}
+
+function configProblems(
+  kind: ArtifactKind,
+  mapping: Extract<KindMapping, { shape: "config" }>,
+  report: Report,
+) {
+  if (kind !== "mcp_server")
+    report(`kinds.${kind}: only an MCP server is written as a config entry.`);
+  pathProblem(mapping.file, ["name"], report);
+  if (mapping.at.length === 0) report(`kinds.${kind}: at names no key.`);
+  for (const key of mapping.at) templateProblems(key, ["name"], report);
+  if (mapping.transports.length === 0) report(`kinds.${kind}: transports names none.`);
+  if (mapping.userFile !== undefined) pathProblem(mapping.userFile, ["name"], report);
+  if (mapping.deny !== undefined) {
+    pathProblem(mapping.deny.file, ["name"], report);
+    templateProblems(mapping.deny.item, ["name", "tool"], report);
   }
 }
 

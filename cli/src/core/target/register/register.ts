@@ -81,7 +81,7 @@ class Files {
   }
 }
 
-function openDocument(
+export function openDocument(
   format: RegisterEntry["format"],
   before: string | undefined,
   init: Record<string, ConfigValue>,

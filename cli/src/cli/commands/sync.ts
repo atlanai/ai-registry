@@ -46,6 +46,7 @@ interface Preview {
   data: SyncPreview;
   shown: SyncItem[];
   local: Candidate[];
+  differing: Candidate[];
   undeclared: Candidate[];
   roots: Roots;
   claims: { linkable: Candidate[]; changed: Candidate[]; kept: Candidate[] };
@@ -80,6 +81,7 @@ const sync = defineCommand({
     renderSync(printer, {
       items: result.shown,
       found: result.local,
+      differing: result.differing,
       undeclared: result.undeclared,
       roots: result.roots,
       claims: result.claims,
@@ -171,6 +173,7 @@ async function preview(
   const unsettled =
     items.some((item) => UNSETTLED.includes(item.disposition)) ||
     local.length > 0 ||
+    found.differing.length > 0 ||
     found.undeclared.length > 0;
   if (unsettled) context.exit = ExitCode.Changed;
   return {
@@ -179,6 +182,7 @@ async function preview(
       scope: loaded.roots.scope,
       artifacts: shown.map(previewItem),
       local: local.map((item) => ({ ...place(item), suggestedPath: item.suggestedPath })),
+      differing: found.differing.map(place),
       undeclared: undeclared.map(place),
       linkable: claiming ? linkable.map(place) : [],
       changed: claiming ? changed.map(place) : [],
@@ -186,6 +190,7 @@ async function preview(
     },
     shown,
     local,
+    differing: found.differing,
     undeclared,
     roots: loaded.roots,
     claims: claiming ? { linkable, changed, kept: [] } : { linkable: [], changed: [], kept },

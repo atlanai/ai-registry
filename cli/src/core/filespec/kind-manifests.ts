@@ -6,7 +6,7 @@ import { readJson, SpecError } from "#adapter/filespec/documents.ts";
 import { rootReader } from "#adapter/filespec/folder.ts";
 import { isKindSegment, REGISTRY_DOCUMENT } from "#adapter/filespec/names.ts";
 import { isRemote } from "#adapter/filespec/resolve.ts";
-import { SEMANTIC_MODEL_ENTRIES, SKILL_ENTRY } from "#adapter/kinds.ts";
+import { MCP_SERVER_ENTRY, SEMANTIC_MODEL_ENTRIES, SKILL_ENTRY } from "#adapter/kinds.ts";
 import { isSafePath } from "#adapter/paths.ts";
 import { quoted, sanitizeName } from "#adapter/text.ts";
 import { AiregError, ErrorCode } from "#core/errors.ts";
@@ -20,6 +20,7 @@ import { AGENT_ENTRY } from "#core/kinds.ts";
 import { AGENT_CARD_ENTRY } from "#core/product.ts";
 import { parseYaml } from "#core/yaml.ts";
 import agent from "#schema/kinds/agent.json" with { type: "json" };
+import mcpServer from "#schema/kinds/mcp_server.json" with { type: "json" };
 import semanticModel from "#schema/kinds/semantic_model.json" with { type: "json" };
 import skill from "#schema/kinds/skill.json" with { type: "json" };
 
@@ -68,6 +69,7 @@ const BUNDLED: Readonly<Record<string, KindManifest>> = dict([
   ["skill", skill as KindManifest],
   ["agent", agent as KindManifest],
   ["semantic_model", semanticModel as KindManifest],
+  ["mcp_server", mcpServer as KindManifest],
 ]);
 
 type Served = { manifest: KindManifest } | { problem: string };
@@ -225,6 +227,8 @@ export function specFile(
 ): string | undefined {
   if (manifest.title === "skill") return files.has(SKILL_ENTRY) ? SKILL_ENTRY : undefined;
   if (manifest.title === "agent") return files.has(AGENT_ENTRY) ? AGENT_ENTRY : undefined;
+  // An MCP server's README is documentation; its spec comes from its JSON files.
+  if (manifest.title === "mcp_server") return undefined;
   return [...primaryFiles(manifest), ...files.keys()].find(
     (path) => path.endsWith(".md") && files.has(path),
   );
@@ -263,17 +267,7 @@ export function specOf(
   const markdown = specFile(manifest, files);
   if (markdown !== undefined) return frontmatterRecord(files.get(markdown) ?? "");
   if (manifest.title === "skill") return undefined;
-  let entry: string | undefined;
-  if (manifest.title === "agent") {
-    if (files.has(AGENT_CARD_ENTRY)) entry = AGENT_CARD_ENTRY;
-  } else if (manifest.title === "semantic_model") {
-    entry = SEMANTIC_MODEL_ENTRIES.find((path) => files.has(path));
-  } else {
-    // The files the manifest names come first, so a document under `source/` is never the entry.
-    entry = [...namedFiles(manifest), ...files.keys()].find(
-      (path) => DOCUMENT.test(path) && files.has(path),
-    );
-  }
+  const entry = entryOf(manifest, files);
   if (entry === undefined) return undefined;
   let document: unknown;
   try {
@@ -295,17 +289,39 @@ export function specOf(
     if (description !== undefined) lifted.description = description;
   }
   // A custom kind's JSON card keeps the shape aireg 0.1 published, so released versions still validate.
-  const legacy = !["agent", "semantic_model"].includes(manifest.title) && entry.endsWith(".json");
-  if (!legacy) slugName(lifted, name);
+  const legacy = !OWN_DOCUMENT.includes(manifest.title) && entry.endsWith(".json");
+  if (!legacy) slugName(lifted, name, manifest.title === "mcp_server");
   // A file the manifest gives a schema is validated as a file, so the file is the only copy.
   if (schemaFiles(manifest).some((file) => file.path === entry)) return lifted;
   return { ...lifted, [legacy ? "card" : documentKey(manifest)]: document };
 }
 
-/** The registry slug is the name; the document keeps its own, which need not be a slug. */
-function slugName(lifted: Record<string, unknown>, name: string | undefined): void {
+/** The file a kind's `spec` is lifted from, when it is a JSON or YAML document. */
+function entryOf(manifest: KindManifest, files: ReadonlyMap<string, string>): string | undefined {
+  if (manifest.title === "agent") return files.has(AGENT_CARD_ENTRY) ? AGENT_CARD_ENTRY : undefined;
+  if (manifest.title === "semantic_model")
+    return SEMANTIC_MODEL_ENTRIES.find((path) => files.has(path));
+  if (manifest.title === "mcp_server")
+    return files.has(MCP_SERVER_ENTRY) ? MCP_SERVER_ENTRY : undefined;
+  // The files the manifest names come first, so a document under `source/` is never the entry.
+  return [...namedFiles(manifest), ...files.keys()].find(
+    (path) => DOCUMENT.test(path) && files.has(path),
+  );
+}
+
+/** Kinds whose `spec` aireg lifts from a document of their own format. */
+const OWN_DOCUMENT = ["agent", "semantic_model", "mcp_server"];
+
+/**
+ * The registry slug is the name; the document keeps its own, which need not be a slug. An MCP
+ * server's is reverse-DNS, `io.github.acme/weather`, so the slug comes from its last segment.
+ */
+function slugName(lifted: Record<string, unknown>, name: string | undefined, dns: boolean): void {
   if (name !== undefined) lifted.name = name;
-  else if (typeof lifted.name === "string") lifted.name = sanitizeName(lifted.name);
+  else if (typeof lifted.name === "string") {
+    const own = dns ? (lifted.name.split("/").pop() ?? lifted.name) : lifted.name;
+    lifted.name = sanitizeName(own);
+  }
 }
 
 /** A kind's JSON or YAML document, by its extension; throws when it does not parse. */

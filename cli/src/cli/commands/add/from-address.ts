@@ -1,7 +1,7 @@
 import { sanitizeName } from "#adapter/text.ts";
 import type { CommandContext } from "#cli/commands/command.ts";
 import { defaultIo } from "#cli/prompt/ask.ts";
-import { confirmPlan, confirmTrust } from "#cli/prompt/confirm-plan.ts";
+import { confirmPlan, confirmRuns, confirmTrust } from "#cli/prompt/confirm-plan.ts";
 import { equivalent } from "#cli/prompt/equivalent.ts";
 import { cancel, type Interaction, interaction, interactive } from "#cli/prompt/interaction.ts";
 import { exitOnClash } from "#cli/render/collisions.ts";
@@ -66,14 +66,11 @@ export async function addAddress(
 
   // Trust is asked on a terminal however exactly the address says what to install: naming a
   // plugin is not agreeing to what it runs. Only `--yes` or no terminal leaves it to `--trust`.
-  const trust = await trustFor(
-    step,
-    source,
-    chosenEntries(choices.select, entries),
-    own.trust ?? [],
-    loaded.manifest.artifacts.flatMap((ref) => (ref.registry === alias ? (ref.trust ?? []) : [])),
+  const chosen = chosenEntries(choices.select, entries);
+  const trusted = loaded.manifest.artifacts.flatMap((ref) =>
+    ref.registry === alias ? (ref.trust ?? []) : [],
   );
-
+  const trust = await trustFor(step, source, chosen, own.trust ?? [], trusted);
   const refs = requestedRefs(resolved, input, alias, within, choices.select);
 
   let approved = true;
@@ -116,14 +113,16 @@ export async function addAddress(
         declaredFrom: introduced ? [input, ...sourceWords(own)] : undefined,
       };
     },
-    approve: async (plan, { targets, targetTable }) => {
-      approved = await confirmPlan(asking, plan, {
-        verb: "Install",
-        // The targets picked for this add, which an entry may narrow from the scope's.
-        targets: choices.targets ?? targets,
-        kinds: choices.kinds,
-        targetTable,
-      });
+    approve: async (plan, { targets, targetTable }, peek) => {
+      approved =
+        (await confirmRuns(step, plan, peek, common.yes)) &&
+        (await confirmPlan(asking, plan, {
+          verb: "Install",
+          // The targets picked for this add, which an entry may narrow from the scope's.
+          targets: choices.targets ?? targets,
+          kinds: choices.kinds,
+          targetTable,
+        }));
       return approved;
     },
   });

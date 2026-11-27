@@ -96,6 +96,8 @@ const Reference = Type.String({
   description: "An address, such as acme/platform or acme/platform/skill/lint@1.2.0.",
 });
 
+const ENV_NAME = "^[A-Za-z_][A-Za-z0-9_]*$";
+
 const DetailedReference = Type.Object(
   {
     ref: Type.String({
@@ -136,6 +138,26 @@ const DetailedReference = Type.Object(
         description:
           "Plugins, by name, allowed to install with the hooks, servers or executables they carry, as `aireg add --trust` records.",
       }),
+    ),
+    with: Type.Optional(
+      Type.Record(Type.String(), Type.Union([Type.String(), Type.Array(Type.String())]), {
+        description: "An MCP server's input values, by input name. Never a secret.",
+      }),
+    ),
+    env: Type.Optional(
+      Type.Record(Type.String({ pattern: ENV_NAME }), Type.String({ pattern: ENV_NAME }), {
+        description:
+          "An MCP server's secrets read from other environment variables: `SECRET_NAME: OTHER_VARIABLE`.",
+      }),
+    ),
+    tools: Type.Optional(
+      Type.Object(
+        {
+          allow: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+          deny: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+        },
+        { additionalProperties: false, description: "An MCP server's tools a target may call." },
+      ),
     ),
   },
   { additionalProperties: false, ...ONE_TARGETS_KEY },
@@ -283,7 +305,7 @@ export const Manifest = Type.Object(
     artifacts: Type.Optional(
       Type.Array(Type.Union([Reference, DetailedReference]), {
         description:
-          "A string reference, or `{ ref, as, exclude, targets, copy, trust }` to rename it, leave members out, narrow where it lands, copy it rather than link it, or trust a plugin it brings.",
+          "A string reference, or `{ ref, as, exclude, targets, copy, trust, with, env, tools }` to rename it, leave members out, narrow where it lands, copy it rather than link it, trust a plugin it brings, or configure an MCP server.",
       }),
     ),
     exports: Type.Optional(

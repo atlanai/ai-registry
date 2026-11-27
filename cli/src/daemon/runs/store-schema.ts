@@ -7,7 +7,7 @@ import { SYNC_OPERATIONS } from "#core/sync/policy.ts";
  * History is a cache, so any other layout is rebuilt. Raise it whenever a CHECK below takes a
  * new value, such as a kind: a file built before then refuses the row.
  */
-export const RUN_SCHEMA_VERSION = 2;
+export const RUN_SCHEMA_VERSION = 3;
 
 export const RUN_HISTORY_PER_JOB = 200;
 

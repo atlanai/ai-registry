@@ -16,6 +16,7 @@ import type { Export } from "#core/manifest/model.ts";
 import { gitIn } from "#core/process.ts";
 import { refuseRedirectedCopy } from "#core/store/managed-paths.ts";
 import { artifactPath, copyLeaf, type Scope, scopeFlag } from "#core/store/paths.ts";
+import type { Candidate } from "#core/sync/adopt.ts";
 import { shellWord } from "#core/term/format.ts";
 import { matchInstalled, rowsNamed } from "#engine/installed-names.ts";
 import type { CommonOptions } from "#engine/options.ts";
@@ -219,7 +220,11 @@ export async function changedSince(works: Work[], rev: string, cwd: string): Pro
 }
 
 /** What this scope changed or wrote that its registries do not hold yet. */
-export async function edited(loaded: Loaded, common: CommonOptions, cwd: string): Promise<Work[]> {
+export async function edited(
+  loaded: Loaded,
+  common: CommonOptions,
+  cwd: string,
+): Promise<{ works: Work[]; differing: Candidate[] }> {
   const found = await scan(loaded, common, {
     credentials: await credentialsForManifest(loaded.manifest.registries, cwd),
   });
@@ -241,5 +246,5 @@ export async function edited(loaded: Loaded, common: CommonOptions, cwd: string)
       base: undefined,
     });
   }
-  return works;
+  return { works, differing: found.differing };
 }
