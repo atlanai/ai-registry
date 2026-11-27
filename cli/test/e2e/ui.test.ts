@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect } from "vitest";
+import { describe, expect, vi } from "vitest";
 import type { UiEvent } from "#cli/ui/protocol.ts";
 import { marketplace } from "#test/kit/builders/layouts.ts";
 import { test } from "#test/kit/fixtures.ts";
@@ -73,7 +73,15 @@ describe("aireg ui", () => {
     const ui = await serveUi(home, project);
     try {
       const auth = await session(ui);
-      const state = (await rpc(ui, auth, "state.snapshot")).result;
+      // A catalog not read within the UI's short wait comes back loading, so ask until it is read.
+      const state = await vi.waitFor(
+        async () => {
+          const snapshot = (await rpc(ui, auth, "state.snapshot")).result;
+          expect(snapshot?.registries.some((registry) => registry.loading)).toBe(false);
+          return snapshot;
+        },
+        { timeout: 10_000, interval: 100 },
+      );
       const byName = Object.fromEntries((state?.artifacts ?? []).map((a) => [a.name, a]));
       expect(byName["pr-review"]).toMatchObject({ registry: "acme", state: "ok" });
       expect(byName.reviewer).toMatchObject({ registry: "acme", state: "available" });

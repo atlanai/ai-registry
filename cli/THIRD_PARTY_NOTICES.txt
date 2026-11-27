@@ -973,7 +973,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 --------------------------------------------------------------------------------
-@tanstack/query-core 5.107.1
+@tanstack/query-core 5.108.2
 License: MIT
 --------------------------------------------------------------------------------
 
@@ -1000,7 +1000,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 --------------------------------------------------------------------------------
-@tanstack/react-query 5.107.1
+@tanstack/react-query 5.108.2
 License: MIT
 --------------------------------------------------------------------------------
 
@@ -2360,7 +2360,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
-lucide-react 1.73.0
+lucide-react 1.77.0
 License: ISC
 --------------------------------------------------------------------------------
 
@@ -4410,7 +4410,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
-tailwind-merge 3.7.0
+tailwind-merge 3.7.1
 License: MIT
 --------------------------------------------------------------------------------
 
