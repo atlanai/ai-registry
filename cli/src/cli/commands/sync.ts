@@ -4,8 +4,8 @@ import {
   attentionHints,
   conflictHint,
   follow,
-  PUBLISH_HINT,
   PUBLISHED_BY_YOU,
+  publishHint,
   type StoppedRun,
   stoppedError,
 } from "#cli/commands/sync/follow.ts";
@@ -247,7 +247,7 @@ async function nextSteps(
     const names = items.map((item) => item.name);
     next.push(await conflictHint(loaded, names, conflict.name, conflict.source));
   }
-  if (has(...PUBLISHED_BY_YOU) || local.length > 0) next.push(PUBLISH_HINT);
+  if (has(...PUBLISHED_BY_YOU) || local.length > 0) next.push(publishHint(loaded.roots.scope));
   if (undeclared.length > 0) {
     const names = undeclared
       .map((item) => {

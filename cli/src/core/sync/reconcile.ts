@@ -65,7 +65,7 @@ export async function reconcile(
     const watch = watchOf(previous, item);
     const held =
       item === undefined
-        ? heldBack(name, previous, acquired, { unlisted, untrusted, scope: roots.scope })
+        ? heldBack(name, previous, acquired, unlisted, untrusted, roots.scope)
         : carriesMoved(item, previous, roots.scope);
     if (held !== undefined) {
       items.push({
@@ -128,13 +128,10 @@ function heldBack(
   name: string,
   previous: LockArtifact | undefined,
   acquired: readonly Acquired[],
-  held: {
-    unlisted: ReadonlyMap<string, Unlisted>;
-    untrusted: readonly Untrusted[];
-    scope: Scope;
-  },
+  unlisted: ReadonlyMap<string, Unlisted>,
+  untrusted: readonly Untrusted[],
+  scope: Scope,
 ): string | undefined {
-  const { unlisted, untrusted, scope } = held;
   const distrusted = untrusted.find(
     (item) => item.registry === previous?.registry && item.name === previous?.name,
   );
