@@ -81,6 +81,8 @@ export interface RunResults {
   pathModes: Map<string, LinkMode>;
   /** What each copy-mode link wrote, recorded so a later edit to it is seen. */
   copies: Map<string, string>;
+  /** Copies made because the run asked for one, by `linkKey`. */
+  requested: Set<string>;
   degraded: Set<string>;
   /** Projections to rebuild once every clone has landed, by directory. */
   plugins: Map<string, PluginSource>;
@@ -129,6 +131,7 @@ export function startRun(inputs: RunInputs, guards: Map<string, LinkGuard>): Run
       modes: new Map(),
       pathModes: new Map(),
       copies: new Map(),
+      requested: new Set(),
       degraded: new Set(),
       plugins: new Map(),
       fanned: new Map(),
@@ -213,6 +216,10 @@ export function addLinked(results: RunResults, action: ActionOf<"link">, linked:
   results.modes.set(key, made.mode);
   results.pathModes.set(action.to, made.mode);
   if (made.digest !== undefined) results.copies.set(action.to, made.digest);
+  // A copy taken over stays a copy, whatever the run asked for.
+  if (made.mode === "copy" && action.requested === true && linked.adopted === undefined) {
+    results.requested.add(key);
+  }
   if (made.degraded === true) results.degraded.add(action.target);
   if (linked.adopted !== undefined) results.adopted.push(linked.adopted);
   results.performed.link += 1;

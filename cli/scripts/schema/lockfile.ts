@@ -41,6 +41,12 @@ const Link = Type.Object(
           "The copy's digest with each file's path, mode and size framed. `digest` is the one aireg 0.1 checks.",
       }),
     ),
+    requested: Type.Optional(
+      Type.Literal(true, {
+        description:
+          "A copy made because the run asked for one, so a run that asks for none links it again. Any other copy stays while it is on disk.",
+      }),
+    ),
   },
   NAMES_TARGET,
 );

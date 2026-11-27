@@ -160,16 +160,21 @@ export function updateLinks(
     const own = previous?.links.find((old) => old.path === link.relative);
     // A plugin folder belongs to its whole namespace, so a new member finds it recorded too.
     const prior = link.shared === true && !placed(own, previous) ? sharedAt(build, link) : own;
-    // A copy the lockfile records, such as one taken over in place, stays a copy.
-    const kept = prior?.mode === "copy" && link.shared !== true;
-    const copying =
+    const requested =
       link.codec !== undefined ||
       link.entry !== undefined ||
       link.copy === true ||
       rename !== undefined ||
       build.options.copy ||
-      item.copy === true ||
-      kept;
+      item.copy === true;
+    // A copy no run asked for, one taken over or made where a link would not do, stays while it
+    // is here: a committed lock never makes another machine copy.
+    const kept =
+      prior?.mode === "copy" &&
+      prior.requested !== true &&
+      link.shared !== true &&
+      isCopy(state?.links[link.relative]);
+    const copying = requested || kept;
     // A placement kept back last run is tried again, so it is reported until it lands.
     const correct =
       inPlace(state?.links[link.relative], copying, link.from) &&
@@ -182,6 +187,7 @@ export function updateLinks(
       build.actions.push(
         linkAction(item, link, {
           copy: copying,
+          requested,
           rename,
           recorded: prior?.mode,
           written: link.shared === true ? prior?.digest : undefined,
@@ -263,6 +269,10 @@ function inPlace(
   );
 }
 
+function isCopy(observed: ArtifactSurvey["links"][string] | undefined): boolean {
+  return observed?.present === true && !observed.isLink;
+}
+
 /** A target's own copy that was edited stays as it is unless forced; planning has said so. */
 function keepsEditedCopy(
   prior: LockArtifact["links"][number] | undefined,
@@ -277,6 +287,7 @@ function linkAction(
   link: PlannedLink,
   how: {
     copy: boolean;
+    requested?: boolean;
     rename: string | undefined;
     recorded: LinkMode | undefined;
     written?: string | undefined;
@@ -290,6 +301,7 @@ function linkAction(
     from: link.from,
     to: link.absolute,
     copy: how.copy,
+    ...(how.requested === true ? { requested: true } : {}),
     plugin: link.shared === true,
     ...(link.content === undefined ? {} : { content: link.content }),
     ...(link.document === undefined ? {} : { document: link.document }),

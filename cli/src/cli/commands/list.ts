@@ -148,10 +148,12 @@ function detailData({ name, entry, source, copy, targetTable }: Detail): ListRes
     path: entry.path,
     copy,
     ...(watched === undefined ? {} : { watched }),
-    links: entry.links.map(({ digest, ...link }) => ({
-      ...link,
+    links: entry.links.map(({ target, path, mode, digest }) => ({
+      target,
+      path,
+      mode,
       ...(digest === undefined ? {} : { digest }),
-      harness: earlierId(targetTable, link.target),
+      harness: earlierId(targetTable, target),
     })),
     ...(entry.neededBy === undefined ? {} : { neededBy: entry.neededBy }),
   };

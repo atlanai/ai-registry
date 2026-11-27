@@ -113,6 +113,8 @@ interface LockLink {
   mode: LinkMode;
   /** A copy's digest as written, so an edit to the target's own copy is seen. */
   digest?: string | undefined;
+  /** Copied because a run asked for a copy, so a run that asks for none links it again. */
+  requested?: true | undefined;
 }
 
 /** A config entry aireg wrote, such as an MCP server's, so only one still as written is removed. */
@@ -271,7 +273,13 @@ function parseLinks(raw: unknown, scope: Scope): LockLink[] | undefined {
     const digest = digestOf(item);
     if (target === undefined || path === undefined) return undefined;
     if (mode === undefined || !isLinkMode(mode)) return undefined;
-    links.push({ target, path, mode, ...(digest === undefined ? {} : { digest }) });
+    links.push({
+      target,
+      path,
+      mode,
+      ...(digest === undefined ? {} : { digest }),
+      ...(item.requested === true ? { requested: true as const } : {}),
+    });
   }
   return links;
 }
@@ -437,6 +445,7 @@ function artifactDoc(artifact: LockArtifact, table: Targets): Record<string, unk
         path: link.path,
         mode: link.mode,
         ...digestDoc(link.mode === "copy" ? link.digest : undefined),
+        ...(link.mode === "copy" && link.requested === true ? { requested: true } : {}),
       })),
     entries: artifact.entries?.length
       ? [...artifact.entries]
