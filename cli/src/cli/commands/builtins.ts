@@ -2,6 +2,7 @@ import { quoted } from "#adapter/text.ts";
 import { ADAPTER_COMMAND } from "#cli/commands/adapter/spec.ts";
 import { ADD_COMMAND } from "#cli/commands/add/spec.ts";
 import { AUTH_COMMAND } from "#cli/commands/auth/spec.ts";
+import { BACKUP_COMMAND } from "#cli/commands/backup/spec.ts";
 import { CONFIG_COMMAND } from "#cli/commands/config/spec.ts";
 import { CONSOLE_COMMAND } from "#cli/commands/console/spec.ts";
 import { DAEMON_COMMAND } from "#cli/commands/daemon/spec.ts";
@@ -54,6 +55,7 @@ export const BUILTIN_SPECS: readonly CommandSpec[] = [
   CONFIG_COMMAND,
   DOCTOR_COMMAND,
   UNLOCK_COMMAND,
+  BACKUP_COMMAND,
   ADAPTER_COMMAND,
   LOGS_COMMAND,
   SELF_COMMAND,

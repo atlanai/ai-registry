@@ -1,5 +1,5 @@
 import { list, quoted } from "#adapter/text.ts";
-import type { ActionSpec, CommandSpec } from "#cli/commands/command.ts";
+import { type ActionSpec, type CommandSpec, shownActions } from "#cli/commands/command.ts";
 import { allCommands, warnHidden } from "#cli/commands/index.ts";
 import { GLOBAL_OPTIONS, MAP_FORMATS, type MapFormat } from "#cli/options/flags.ts";
 import { AiregError, ErrorCode, ExitCode } from "#core/errors.ts";
@@ -62,8 +62,8 @@ export function commandNode(command: CommandSpec): MapNode {
       : {}),
     ...described(command),
     docs: docsUrl(command.docs),
-    ...(command.actions !== undefined && command.actions.length > 0
-      ? { children: command.actions.map((action) => actionNode(command, action)) }
+    ...(shownActions(command).length > 0
+      ? { children: shownActions(command).map((action) => actionNode(command, action)) }
       : {}),
   };
 }

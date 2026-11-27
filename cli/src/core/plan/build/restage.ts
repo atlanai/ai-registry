@@ -2,8 +2,9 @@ import { quoted } from "#adapter/text.ts";
 import { nativePath } from "#core/kinds.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { Acquired, Selected } from "#core/plan/model.ts";
-import { type ArtifactSurvey, copyEdited, editedAnywhere, editedHere } from "#core/plan/survey.ts";
+import { type ArtifactSurvey, editedHere } from "#core/plan/survey.ts";
 import { scopeName, stagingPath } from "#core/store/paths.ts";
+import { editedCopy, editedKept } from "./edited.ts";
 import type { BuildState } from "./state.ts";
 
 /** A missing copy is restaged from the lock; if the source no longer serves that, both move. */
@@ -29,10 +30,10 @@ function shouldRestage(
 ): boolean {
   // A copy the lock never described is a person's work or an interrupted run: keep it unless asked.
   const unlocked = state?.staged === true && (previous === undefined || previous.digest === "");
-  const edited = editedAnywhere(previous, state);
+  const edited = editedKept(item.name, previous, state, build.options);
   const copied = editedHere(previous, state)
     ? undefined
-    : previous?.links.find((link) => copyEdited(link, state));
+    : editedCopy(item.name, previous, state, build.options);
 
   if (!edited && !unlocked) {
     const source = build.byAlias.get(item.source);

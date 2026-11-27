@@ -23,7 +23,7 @@ import {
   namespaceWants,
 } from "./carry.ts";
 import { planConfigs } from "./configs.ts";
-import { placeLinks, updateLinks, wantedLinks } from "./links.ts";
+import { placeLinks, recopyPlugins, updateLinks, wantedLinks } from "./links.ts";
 import { keepUnmovedRevisions, lockRow, rewrittenFrom } from "./lock-row.ts";
 import { carriedOut, renamesFor } from "./rename.ts";
 import { planCopy, restages } from "./restage.ts";
@@ -140,6 +140,7 @@ function planWith(
   carryUntrusted(state, untrusted);
   carryUnresolved(state, needs);
   removeStale(state);
+  recopyPlugins(state);
   flushUnlinks(state, held);
   dropUnusedSources(next);
   keepUnmovedRevisions(lock, next);

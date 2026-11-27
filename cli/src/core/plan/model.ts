@@ -100,6 +100,8 @@ export type Action =
       adopt?: boolean;
       /** How the lock recorded a link at this path; absent when aireg made none. */
       recorded?: LinkMode;
+      /** A shared plugin copy's digest as aireg wrote it; one that differs now was edited. */
+      written?: string;
       /** Placed as a real directory of links rather than one link. */
       fan?: boolean;
       /** Absent writes the bytes as they are. */
