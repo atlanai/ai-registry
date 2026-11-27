@@ -29,7 +29,7 @@
 | `BROWSER` | The browser `aireg auth login` and the console open a link in, instead of the system default. The first program of a `:`-separated list (`;` on Windows), run with the link as its only argument. |
 | `TERM` | `dumb` turns color and animation off. |
 | `HOME`, `USERPROFILE` | Your home folder, in that order, else the one your OS reports. `~` in a path you type means this folder. |
-| `XDG_CONFIG_HOME` | Where the fish startup file, the Linux daemon service and OpenCode's `opencode/` user folder go, if not `~/.config`. |
+| `XDG_CONFIG_HOME` | Where the fish startup file, the Linux daemon service and the `opencode/` and `devin/` user folders of OpenCode and Devin go, if not `~/.config`. |
 | `XDG_RUNTIME_DIR` | Where the daemon's socket goes, if set to an absolute path. Otherwise the system's temporary folder. A folder there that another user made first is passed over, ending at `run/` in aireg's folder. |
 | `SHELL`, `ZDOTDIR` | Which shell startup files the installer adds aireg to, and where zsh keeps them. |
 | `GITHUB_ACTIONS` | Set to `true` by GitHub Actions. The installer then puts aireg on `PATH` through `GITHUB_PATH`, and `aireg registry validate` prints problems as annotations. |

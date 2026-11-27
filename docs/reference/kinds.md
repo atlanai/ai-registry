@@ -118,11 +118,12 @@ artifacts:
 | Pi | `.pi/mcp.json` | `~/.pi/agent/mcp.json` |
 | Google Antigravity | — | `~/.gemini/config/mcp_config.json` |
 | Hermes Agent | left out | `~/.hermes/config.yaml` |
+| Devin | `.devin/mcp_config.json` | `~/.config/devin/mcp_config.json` |
 
 The shared `.agents` folder has no MCP file. A target is left out for a server, with the reason printed, when:
 
 - it doesn't load the server's transport, or can't read a secret where the server needs one;
-- the server sets `tools` it can't apply. Codex, Gemini CLI, Antigravity and Hermes Agent take both lists, Copilot takes `allow`, and Claude Code takes `deny` as `permissions.deny` rules in `.claude/settings.json`;
+- the server sets `tools` it can't apply. Codex, Gemini CLI, Antigravity and Hermes Agent take both lists, Copilot takes `allow`, Devin takes `deny`, and Claude Code takes `deny` as `permissions.deny` rules in `.claude/settings.json`;
 - it shares the file with another target, such as Claude Code and Copilot in `.mcp.json`, and the two would write the entry differently;
 - its config file doesn't parse, such as JSON with comments, which is left as it is.
 

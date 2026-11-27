@@ -1,0 +1,14 @@
+.config/
+.config/devin/
+.config/devin/agents/
+.config/devin/agents/planner.md 732bc56aaeab
+.config/devin/agents/reviewer.md ce14e241d21a
+.config/devin/skills/
+.config/devin/skills/lint -> ../../../.registry/artifacts/fx/ns/skills/lint
+.config/devin/skills/ship -> ../../../.registry/artifacts/kit/kit/skills/ship
+project/
+project/.devin/
+project/.devin/agents/
+project/.devin/agents/reviewer.md ce14e241d21a
+project/.devin/skills/
+project/.devin/skills/lint -> ../../.registry/artifacts/fx/ns/skills/lint

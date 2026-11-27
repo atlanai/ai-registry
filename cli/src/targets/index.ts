@@ -2,6 +2,7 @@ import { antigravity } from "./antigravity.ts";
 import { claudeCode } from "./claude-code.ts";
 import { codex } from "./codex.ts";
 import { cursor } from "./cursor.ts";
+import { devin } from "./devin.ts";
 import { geminiCli } from "./gemini-cli.ts";
 import { githubCopilot } from "./github-copilot.ts";
 import { grok } from "./grok.ts";
@@ -9,7 +10,6 @@ import { hermesAgent } from "./hermes-agent.ts";
 import { opencode } from "./opencode.ts";
 import { pi } from "./pi.ts";
 import { universal } from "./universal.ts";
-import { windsurf } from "./windsurf.ts";
 
 /** Every target aireg installs into; the order is the order defaults are listed in. */
 export const BUILTIN_TARGETS = [
@@ -23,6 +23,6 @@ export const BUILTIN_TARGETS = [
   pi,
   antigravity,
   hermesAgent,
-  windsurf,
+  devin,
   universal,
 ] as const;

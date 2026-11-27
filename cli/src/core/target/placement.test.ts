@@ -56,12 +56,13 @@ describe("placementFor", () => {
     expect(place("agent", ["hermes-agent"])).toEqual({ targets: [], unreadable: ["hermes-agent"] });
   });
 
-  test("places Windsurf skills in its own folder unless sharing with another target", () => {
-    expect(place("skill", ["windsurf"]).targets).toEqual(["windsurf"]);
-    expect(place("skill", ["windsurf"], "user").targets).toEqual(["windsurf"]);
-    expect(place("skill", ["windsurf", "codex"]).targets).toEqual(["universal"]);
-    expect(place("skill", ["windsurf", "codex"], "user").targets).toEqual(["universal"]);
-    expect(place("agent", ["windsurf"])).toEqual({ targets: [], unreadable: ["windsurf"] });
+  // Devin reads `.agents` too, but its own folder is the one Devin Desktop documents first.
+  test("gives Devin its own folders, and the shared one when another target reads it", () => {
+    expect(place("skill", ["devin"]).targets).toEqual(["devin"]);
+    expect(place("skill", ["devin"], "user").targets).toEqual(["devin"]);
+    expect(place("skill", ["devin", "codex"]).targets).toEqual(["universal"]);
+    expect(place("skill", ["devin", "codex"], "user").targets).toEqual(["universal"]);
+    expect(place("agent", ["devin"]).targets).toEqual(["devin"]);
   });
 
   test("ignores names it does not know and repeats it was given", () => {

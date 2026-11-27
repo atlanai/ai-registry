@@ -43,7 +43,7 @@ Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agent
 | Pi | `pi` | `.agents/skills/` | `~/.agents/skills/` |
 | Google Antigravity | `antigravity` | `.agents/skills/` | `~/.gemini/config/skills/` |
 | Hermes Agent | `hermes-agent` | `.agents/skills/` | `~/.hermes/skills/` |
-| Windsurf | `windsurf` | `.windsurf/skills/` | `~/.codeium/windsurf/skills/` |
+| Devin | `devin` | `.devin/skills/` | `~/.config/devin/skills/` |
 | Shared `.agents` folder | `universal` | `.agents/skills/` | `~/.agents/skills/` |
 
 ### Agents
@@ -58,15 +58,18 @@ Pass the id to `--for`. The earlier ids `claude`, `copilot`, `gemini` and `agent
 | OpenCode | `opencode` | `.opencode/agents/` | `~/.config/opencode/agents/` |
 | Grok Build | `grok` | `.grok/agents/` | `~/.grok/agents/` |
 | Google Antigravity | `antigravity` | none | `~/.gemini/config/agents/` |
+| Devin | `devin` | `.devin/agents/` | `~/.config/devin/agents/` |
 | Shared `.agents` folder | `universal` | `.agents/agents/` | `~/.agents/agents/` |
 
-Pi, Hermes Agent and Windsurf have no agents, so aireg installs none for them.
+Pi and Hermes Agent have no agents, so aireg installs none for them.
 
-A user folder moves with its target's own variable: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, `GROK_HOME`, `HERMES_HOME`, `PI_CODING_AGENT_DIR`, or `XDG_CONFIG_HOME` for OpenCode.
+A user folder moves with its target's own variable: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GEMINI_CLI_HOME`, `GROK_HOME`, `HERMES_HOME`, `PI_CODING_AGENT_DIR`, or `XDG_CONFIG_HOME` for OpenCode and Devin.
 
 With `GEMINI_CLI_HOME` set, Gemini CLI reads `.agents/skills` inside that folder, not the shared `~/.agents/skills`. aireg places Gemini CLI's own skills under the variable, but a skill you install for Gemini CLI together with a target that reads `~/.agents`, such as Codex, lands only in that shared folder, where Gemini CLI does not look. While the variable is set, install for Gemini CLI on its own: `aireg add -g <source> --for gemini-cli`.
 
 Google Antigravity covers its App, IDE and CLI, which share `~/.gemini/config`. aireg writes its skills as copies, and its agents only in your user scope, since a project's `.agents/agents` holds other tools' agents.
+
+Devin covers Devin Desktop, formerly Windsurf, and the Devin CLI: Devin Desktop runs the CLI as its agent, so both read `.devin` and `~/.config/devin`. Choose `devin` where you would have chosen Windsurf. An agent keeps only its `name` and `description`, since Devin reads `model` and `tools` as its own names; one that limits its tools is left out.
 
 Hermes Agent loads a project's skills once you run `hermes skills trust`. aireg leaves out a skill whose name one of Hermes's bundled skills already has, such as `systematic-debugging`, since Hermes would then load neither. On Windows, or for a Hermes profile other than the default, set `HERMES_HOME` to the folder Hermes uses.
 

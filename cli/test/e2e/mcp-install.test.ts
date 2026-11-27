@@ -133,7 +133,7 @@ test("installs an MCP server for every project target that loads one, and remove
   await writeFile(
     join(project, ".registry", "manifest.yml"),
     [
-      "targets: [claude-code, github-copilot, codex, cursor, gemini-cli, opencode, grok, pi, antigravity]",
+      "targets: [claude-code, github-copilot, codex, cursor, gemini-cli, opencode, grok, pi, antigravity, devin]",
       "registries:",
       `  acme: ${registry}`,
       "artifacts:",
@@ -172,6 +172,10 @@ test("installs an MCP server for every project target that loads one, and remove
     mcpServers: { "issue-tracker": shared },
   });
   expect(JSON.parse(await read(".pi/mcp.json")).mcpServers["issue-tracker"]).toEqual(shared);
+  expect(JSON.parse(await read(".devin/mcp_config.json")).mcpServers["issue-tracker"]).toEqual({
+    ...typed,
+    env: { ISSUES_URL: url, [token]: `\${env:${token}}` },
+  });
   expect(JSON.parse(await read("opencode.json")).mcp["issue-tracker"]).toEqual({
     type: "local",
     command: ["npx", ...args],
@@ -193,10 +197,16 @@ test("installs an MCP server for every project target that loads one, and remove
 
   expect((await aireg(["remove", "issue-tracker", "-y"], { cwd: project })).code).toBe(0);
   for (const [file, text] of Object.entries(mine)) expect(await read(file)).toBe(text);
-  for (const file of [".mcp.json", ".cursor/mcp.json", ".pi/mcp.json", "opencode.json"]) {
+  for (const file of [
+    ".mcp.json",
+    ".cursor/mcp.json",
+    ".pi/mcp.json",
+    "opencode.json",
+    ".devin/mcp_config.json",
+  ]) {
     expect(existsSync(join(project, file)), file).toBe(false);
   }
-  for (const folder of [".cursor", ".grok", ".pi"]) {
+  for (const folder of [".cursor", ".grok", ".pi", ".devin"]) {
     expect(existsSync(join(project, folder)), folder).toBe(false);
   }
 });
