@@ -47,7 +47,7 @@ aireg installs into one of two scopes:
 
 ## Targets
 
-A target is a coding or personal agent, or a folder several of them read, that aireg installs into. aireg knows eleven:
+A target is a coding or personal agent, or a folder several of them read, that aireg installs into. aireg knows twelve:
 
 | Id | Alias | Target |
 |---|---|---|
@@ -61,6 +61,7 @@ A target is a coding or personal agent, or a folder several of them read, that a
 | `pi` | | Pi |
 | `antigravity` | | Google Antigravity: its App, IDE and CLI (`agy`) |
 | `hermes-agent` | | Hermes Agent |
+| `devin` | | Devin: Devin Desktop, formerly Windsurf, and the Devin CLI (`devin`) |
 | `universal` | `agents` | The shared `.agents` folder, which several coding agents read. `add` doesn't offer it; choosing one of those agents writes there. |
 
 An alias works wherever aireg reads an id: `--for`, `init --import`, `aireg targets show`, a manifest, the lockfile, a job, a target file's `reads`, and a profile's `<id>:<profile>`. aireg prints the id, so `--for claude,codex` reports `claude-code` and `codex`; the manifest and the lockfile also keep the id aireg 0.1 knows, as below.

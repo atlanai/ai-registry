@@ -2,6 +2,7 @@ import { antigravity } from "./antigravity.ts";
 import { claudeCode } from "./claude-code.ts";
 import { codex } from "./codex.ts";
 import { cursor } from "./cursor.ts";
+import { devin } from "./devin.ts";
 import { geminiCli } from "./gemini-cli.ts";
 import { githubCopilot } from "./github-copilot.ts";
 import { grok } from "./grok.ts";
@@ -22,5 +23,6 @@ export const BUILTIN_TARGETS = [
   pi,
   antigravity,
   hermesAgent,
+  devin,
   universal,
 ] as const;

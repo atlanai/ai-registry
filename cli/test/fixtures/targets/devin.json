@@ -1,0 +1,36 @@
+{
+  "id": "devin",
+  "displayName": "Devin",
+  "overrides": true,
+  "roots": {
+    "project": ".devin",
+    "user": { "default": "~/.config/devin", "env": "XDG_CONFIG_HOME", "within": "devin" }
+  },
+  "detect": { "binary": ["devin", "devin-desktop"], "paths": ["~/.devin"] },
+  "reads": { "skill": ["devin", "universal"] },
+  "kinds": {
+    "plugin": { "shape": "contents" },
+    "skill": { "shape": "directory", "subdir": "skills" },
+    "agent": {
+      "shape": "file",
+      "subdir": "agents",
+      "extension": ".md",
+      "codec": { "id": "frontmatter-strict", "keep": ["name", "description"] }
+    },
+    "mcp_server": {
+      "shape": "config",
+      "file": "mcp_config.json",
+      "format": "json",
+      "at": ["mcpServers", "{name}"],
+      "codec": {
+        "id": "mcp-json",
+        "secret": { "prefix": "${env:", "suffix": "}" },
+        "type": { "stdio": "stdio", "streamable-http": "http", "sse": "sse" },
+        "tools": { "deny": ["disabledTools"] }
+      },
+      "transports": ["stdio", "streamable-http", "sse"]
+    }
+  },
+  "verified": { "command": ["devin", "--version"], "range": "3000.14.30833 || 3000.15.14" },
+  "reload": "Start a new Devin session to load the change."
+}

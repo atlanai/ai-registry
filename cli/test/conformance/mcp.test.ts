@@ -26,6 +26,11 @@ const PLACES: Record<string, { project?: string; user?: string; key: string }> =
   grok: { project: ".grok/config.toml", user: ".grok/config.toml", key: "mcp_servers" },
   pi: { project: ".pi/mcp.json", user: ".pi/agent/mcp.json", key: "mcpServers" },
   "hermes-agent": { user: ".hermes/config.yaml", key: "mcp_servers" },
+  devin: {
+    project: ".devin/mcp_config.json",
+    user: ".config/devin/mcp_config.json",
+    key: "mcpServers",
+  },
 };
 
 const MANIFEST = (target: string, registry: string) =>
