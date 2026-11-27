@@ -48,6 +48,11 @@ export interface Serving {
 }
 
 const LARGEST_BODY = 64 * 1024;
+/**
+ * A refused body is read and dropped up to this much before the connection closes: closing with
+ * it unread resets the connection, and the client may lose the answer.
+ */
+const DROPPED_BODY = 4 * 1024 * 1024;
 
 /** Scripts and styles only from this server's own files, and never framed. */
 const CSP = [
@@ -200,7 +205,7 @@ function session(response: ServerResponse, body: string, bound: Bound): void {
   response.end();
 }
 
-/** Undefined past the limit; the rest is never read. */
+/** Undefined past the limit, with the rest read and dropped unless it is too large even to drop. */
 async function read(request: IncomingMessage): Promise<string | undefined> {
   const declared = Number(request.headers["content-length"] ?? "0");
   if (!Number.isFinite(declared) || declared > LARGEST_BODY) return undefined;
@@ -208,25 +213,41 @@ async function read(request: IncomingMessage): Promise<string | undefined> {
   let size = 0;
   for await (const chunk of request as AsyncIterable<Buffer>) {
     size += chunk.length;
-    if (size > LARGEST_BODY) return undefined;
-    chunks.push(chunk);
+    if (size > DROPPED_BODY) return undefined;
+    if (size <= LARGEST_BODY) chunks.push(chunk);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return size > LARGEST_BODY ? undefined : Buffer.concat(chunks).toString("utf8");
 }
 
-/** Closes the connection, so a body left unread is dropped rather than parsed as a request. */
+/** Answers once the body is read and dropped, then closes, so no leftover is parsed as a request. */
 function reject(
   request: IncomingMessage,
   response: ServerResponse,
   status: number,
   message: string,
 ): void {
-  response.writeHead(status, {
-    ...HEADERS,
-    "content-type": "application/json; charset=utf-8",
-    connection: "close",
+  let answered = false;
+  const answer = () => {
+    if (answered) return;
+    answered = true;
+    response.writeHead(status, {
+      ...HEADERS,
+      "content-type": "application/json; charset=utf-8",
+      connection: "close",
+    });
+    response.end(JSON.stringify({ error: message }), () => request.destroy());
+  };
+  if (request.complete || request.destroyed) {
+    answer();
+    return;
+  }
+  let dropped = 0;
+  request.on("data", (chunk: Buffer) => {
+    dropped += chunk.length;
+    if (dropped > DROPPED_BODY) answer();
   });
-  response.end(JSON.stringify({ error: message }), () => request.destroy());
+  request.once("end", answer);
+  request.once("error", answer);
 }
 
 function sendAsset(

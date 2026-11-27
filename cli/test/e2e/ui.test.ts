@@ -51,12 +51,15 @@ describe("aireg ui", () => {
         body: call,
       });
       expect(rebound.status).toBe(421);
-      const huge = await send(ui.port, "/rpc", {
-        method: "POST",
-        headers: pageHeaders(ui, cookie),
-        body: "x".repeat(70_000),
-      });
-      expect(huge.status).toBe(413);
+      // A body the server drops unread would reset the connection under the answer, often enough.
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const huge = await send(ui.port, "/rpc", {
+          method: "POST",
+          headers: pageHeaders(ui, cookie),
+          body: "x".repeat(2_000_000),
+        });
+        expect(huge.status).toBe(413);
+      }
       expect((await rpc(ui, cookie, "state.snapshot")).result?.scope).toBe("user");
     } finally {
       // SIGINT lets the server close and exit 0; Windows has no signals and ends the process.
