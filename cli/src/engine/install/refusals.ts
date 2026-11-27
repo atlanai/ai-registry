@@ -13,7 +13,7 @@ import type { Acquired, Kept, Plan } from "#core/plan/model.ts";
 import { recordOf } from "#core/plan/model.ts";
 import type { Untrusted } from "#core/plan/select.ts";
 import { type Unlisted, unlistedMessage } from "#core/plan/unlisted.ts";
-import type { Scope } from "#core/store/paths.ts";
+import { type Scope, scopeFlag } from "#core/store/paths.ts";
 import { shellWord } from "#core/term/format.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { VERSION } from "#core/version.ts";
@@ -94,6 +94,7 @@ export function refuseWithheld(
   plan: Plan,
   printer: Printer,
   moving: ReadonlySet<string> | undefined,
+  scope: Scope,
 ): void {
   const absent = plan.withheld.filter((item) => item.absent);
   const blocked = plan.withheld.filter(
@@ -107,7 +108,7 @@ export function refuseWithheld(
   const lines = [...absentLines(absent), ...keptLines(blocked)];
   throw new AiregError(`${list(lines)}.`, {
     code: ErrorCode.Invalid,
-    hint: removeHint(failed.map(({ name }) => name)),
+    hint: removeHint(failed, scope),
   });
 }
 
@@ -117,9 +118,9 @@ function absentLines(absent: readonly Kept[]): string[] {
   );
 }
 
-function removeHint(names: readonly string[]): string {
-  const commands = names.map((name) => `\`aireg remove ${name}\``);
-  return `Run ${list(commands)} to take ${names.length === 1 ? "it" : "them"} out.`;
+function removeHint(items: readonly { name: string }[], scope: Scope): string {
+  const commands = items.map(({ name }) => `\`aireg remove ${name}${scopeFlag(scope)}\``);
+  return `Run ${list(commands)} to take ${items.length === 1 ? "it" : "them"} out.`;
 }
 
 /**
@@ -130,15 +131,16 @@ export function refuseUnlisted(
   unlisted: readonly Unlisted[],
   printer: Printer,
   moving: ReadonlySet<string> | undefined,
+  scope: Scope,
 ): void {
   const moved = unlisted.filter((item) => moving?.has(item.name) === true);
   const held = unlisted.filter((item) => !moved.includes(item));
   for (const item of held) printer.warning(`${unlistedMessage(item)}.`);
-  if (held.length > 0) printer.hint(removeHint(held.map((item) => item.name)));
+  if (held.length > 0) printer.hint(removeHint(held, scope));
   if (moved.length === 0) return;
   throw new AiregError(`${list(moved.map(unlistedMessage))}.`, {
     code: ErrorCode.NotFound,
-    hint: removeHint(moved.map((item) => item.name)),
+    hint: removeHint(moved, scope),
   });
 }
 

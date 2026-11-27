@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { quoted, sanitizeText } from "#adapter/text.ts";
 import type { LockArtifact } from "#core/lock.ts";
 import { removal } from "#core/plan/removable.ts";
-import { artifactPath, copyLeaf } from "#core/store/paths.ts";
+import { artifactPath, copyLeaf, scopeFlag } from "#core/store/paths.ts";
 import { keep } from "./carry.ts";
 import { unconfigure } from "./configs.ts";
 import { editedKept } from "./edited.ts";
@@ -67,7 +67,7 @@ export function removeStale(build: BuildState): void {
       build.warnings.push({
         name,
         message: `${quoted(name)} was edited after installation, so it was kept although nothing here needs it any more.`,
-        hint: `Run \`aireg remove ${name} --force\` to delete it.`,
+        hint: `Run \`aireg remove ${name} --force${scopeFlag(build.options.roots.scope)}\` to delete it.`,
       });
       continue;
     }

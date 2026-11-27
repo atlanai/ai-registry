@@ -18,7 +18,7 @@ import { reaches } from "#core/manifest/match.ts";
 import type { Plan } from "#core/plan/model.ts";
 import { editedAnywhere, survey } from "#core/plan/survey.ts";
 import { formatAddress, parseRef, type Ref, relativeTo, withExclusions } from "#core/ref.ts";
-import { type Roots, scopeName } from "#core/store/paths.ts";
+import { type Roots, scopeFlag, scopeName } from "#core/store/paths.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { runPipeline } from "#engine/install/pipeline.ts";
 import { selectTargets } from "#engine/install/targets.ts";
@@ -116,7 +116,7 @@ async function remove(
           `${list(edited)} ${edited.length === 1 ? "has" : "have"} local edits, so nothing was removed.`,
           {
             code: ErrorCode.Changed,
-            hint: "Run `aireg sync --dry-run` to compare the edits with the registry, or pass `--force` to delete them.",
+            hint: `Run \`aireg sync --dry-run${scopeFlag(fresh.roots.scope)}\` to compare the edits with the registry, or pass \`--force\` to delete them.`,
           },
         );
       }

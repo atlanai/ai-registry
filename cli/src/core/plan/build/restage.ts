@@ -3,7 +3,7 @@ import { nativePath } from "#core/kinds.ts";
 import type { Lock, LockArtifact } from "#core/lock.ts";
 import type { Acquired, Selected } from "#core/plan/model.ts";
 import { type ArtifactSurvey, editedHere } from "#core/plan/survey.ts";
-import { scopeName, stagingPath } from "#core/store/paths.ts";
+import { scopeFlag, scopeName, stagingPath } from "#core/store/paths.ts";
 import { editedCopy, editedKept } from "./edited.ts";
 import type { BuildState } from "./state.ts";
 
@@ -52,24 +52,25 @@ function keptWarning(
   unlocked: boolean,
   copiedPath: string | undefined,
 ): BuildState["warnings"][number] {
+  const flag = scopeFlag(build.options.roots.scope);
   if (unlocked) {
     return {
       name: item.name,
       message: `${quoted(item.name)} was already in ${scopeName(build.options.roots.scope)} and the lockfile did not record it, so it was kept as it is.`,
-      hint: "Run `aireg sync` to compare it with its registry, or `aireg install --force` to replace it with the registry copy.",
+      hint: `Run \`aireg sync${flag}\` to compare it with its registry, or \`aireg install --force${flag}\` to replace it with the registry copy.`,
     };
   }
   if (copiedPath !== undefined) {
     return {
       name: item.name,
       message: `${quoted(item.name)} was edited after installation in ${copiedPath}, so it was left as it is.`,
-      hint: "Run `aireg install --force` to replace it.",
+      hint: `Run \`aireg install --force${flag}\` to replace it.`,
     };
   }
   return {
     name: item.name,
     message: `${quoted(item.name)} was edited after installation, so it was left as it is.`,
-    hint: "Run `aireg sync` to compare it with its registry, or `aireg install --force` to restore the version in the lockfile.",
+    hint: `Run \`aireg sync${flag}\` to compare it with its registry, or \`aireg install --force${flag}\` to restore the version in the lockfile.`,
   };
 }
 
