@@ -2,6 +2,7 @@ import { quoted } from "#adapter/text.ts";
 import { ADAPTER_COMMAND } from "#cli/commands/adapter/spec.ts";
 import { ADD_COMMAND } from "#cli/commands/add/spec.ts";
 import { AUTH_COMMAND } from "#cli/commands/auth/spec.ts";
+import { BACKUP_COMMAND } from "#cli/commands/backup/spec.ts";
 import { CONFIG_COMMAND } from "#cli/commands/config/spec.ts";
 import { CONSOLE_COMMAND } from "#cli/commands/console/spec.ts";
 import { DAEMON_COMMAND } from "#cli/commands/daemon/spec.ts";
@@ -25,6 +26,7 @@ import { UI_COMMAND } from "#cli/commands/ui/spec.ts";
 import { UNLOCK_COMMAND } from "#cli/commands/unlock/spec.ts";
 import { UPDATE_COMMAND } from "#cli/commands/update/spec.ts";
 import { WATCH_COMMAND } from "#cli/commands/watch/spec.ts";
+import { KIND_COMMANDS } from "#core/kinds.ts";
 import type { Printer } from "#core/term/printer.ts";
 import type { CommandSpec } from "./command.ts";
 
@@ -53,15 +55,22 @@ export const BUILTIN_SPECS: readonly CommandSpec[] = [
   CONFIG_COMMAND,
   DOCTOR_COMMAND,
   UNLOCK_COMMAND,
+  BACKUP_COMMAND,
   ADAPTER_COMMAND,
   LOGS_COMMAND,
   SELF_COMMAND,
 ];
 
 /** A kind or an adapter's command cannot take these names. */
-export const RESERVED: ReadonlySet<string> = new Set([
+export const BUILTIN_NAMES: ReadonlySet<string> = new Set([
   "help",
   ...BUILTIN_SPECS.flatMap((c) => [c.name, ...(c.aliases ?? []), ...(c.formerly ?? [])]),
+]);
+
+/** Names no kind or adapter command may take, a kind's own command among them. */
+export const RESERVED: ReadonlySet<string> = new Set([
+  ...BUILTIN_NAMES,
+  ...Object.values(KIND_COMMANDS),
 ]);
 
 export interface Hidden {

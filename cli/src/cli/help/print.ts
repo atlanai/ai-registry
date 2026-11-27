@@ -1,5 +1,5 @@
 import { list, quoted } from "#adapter/text.ts";
-import { type ActionSpec, type CommandSpec, GROUPS } from "#cli/commands/command.ts";
+import { type ActionSpec, type CommandSpec, GROUPS, shownActions } from "#cli/commands/command.ts";
 import { allCommands, lookup, warnHidden } from "#cli/commands/index.ts";
 import { GLOBAL_OPTIONS } from "#cli/options/flags.ts";
 import { closest, didYouMean, unknownAction } from "#cli/options/suggest.ts";
@@ -180,7 +180,9 @@ function writeGroups(printer: Printer, commands: readonly CommandSpec[], actions
     for (const command of inGroup) {
       printer.info(`  ${command.name.padEnd(width)}  ${command.summary}`);
       if (actions && command.actions !== undefined) {
-        const names = (command.actions ?? []).map((action) => action.name).join("  ");
+        const names = shownActions(command)
+          .map((action) => action.name)
+          .join("  ");
         printer.info(`  ${"".padEnd(width)}  ${printer.style.dim(names)}`);
       }
     }
@@ -213,7 +215,7 @@ function renderCommand(printer: Printer, command: CommandSpec, action: ActionSpe
       `${bold("Aliases:")} ${of.aliases.map((alias) => `${prefix} ${alias}`).join(", ")}`,
     );
   }
-  const actions = action === undefined ? (command.actions ?? []) : [];
+  const actions = action === undefined ? shownActions(command) : [];
   if (actions.length > 0) {
     const width = Math.max(...actions.map((a) => a.name.length));
     printer.info();

@@ -1,5 +1,5 @@
 /** A kind with no file-spec schema cannot be published or verified, so it is not one. */
-export const KINDS = ["plugin", "skill", "agent", "semantic_model"] as const;
+export const KINDS = ["plugin", "skill", "agent", "semantic_model", "mcp_server"] as const;
 
 export type ArtifactKind = (typeof KINDS)[number];
 
@@ -9,6 +9,9 @@ export function isKind(value: string): value is ArtifactKind {
 
 /** The file that makes a directory a skill and holds its front matter. */
 export const SKILL_ENTRY = "SKILL.md";
+
+/** An MCP server version's one required file, the publisher's MCP Registry document. */
+export const MCP_SERVER_ENTRY = "server.json";
 
 /** The Apache Ossie document a semantic model's folder holds: exactly one of the two. */
 export const SEMANTIC_MODEL_ENTRIES = ["semantic_model.yaml", "semantic_model.json"] as const;

@@ -39,6 +39,8 @@ export async function preflight(
   // Each folder is checked once here; every write checks its own path again as it happens.
   const checked = new Set<string>();
   for (const action of plan.actions) {
+    // A config entry is guarded where it is written, since its file is the target's, not ours.
+    if (action.kind === "configure" || action.kind === "unconfigure") continue;
     if (action.kind !== "record")
       await assertManagedPath(action.to, roots, {
         leaf: action.kind !== "unlink",
@@ -62,7 +64,10 @@ export async function guardsOf(plan: Plan, scope: GuardScope): Promise<Map<strin
         rendered !== undefined && "text" in rendered
           ? { file: writtenFile(action), text: rendered.text }
           : undefined;
-      guards.set(action.to, await guardLink(action.to, action.recorded, scope, text));
+      guards.set(
+        action.to,
+        await guardLink(action.to, action.recorded, scope, text, action.written),
+      );
     } else if (action.kind === "unlink" && action.link !== undefined) {
       guards.set(action.to, await guardLink(action.to, action.link.mode, scope));
     }

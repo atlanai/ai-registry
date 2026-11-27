@@ -70,6 +70,7 @@ export function placeLinks(
     claimed.blocked.length === 0 &&
     !refused &&
     !yours &&
+    !configured(item, build) &&
     !isStoreOnly(item.kind)
   ) {
     const other = build.options.roots.scope === "project" ? "user" : "project";
@@ -156,7 +157,9 @@ export function updateLinks(
   let touched = restage;
   for (const link of links) {
     const rename = link.shared === true ? undefined : renamedTo(item);
-    const prior = previous?.links.find((old) => old.path === link.relative);
+    const own = previous?.links.find((old) => old.path === link.relative);
+    // A plugin folder belongs to its whole namespace, so a new member finds it recorded too.
+    const prior = link.shared === true && !placed(own, previous) ? sharedAt(build, link) : own;
     // A copy the lockfile records, such as one taken over in place, stays a copy.
     const kept = prior?.mode === "copy" && link.shared !== true;
     const copying =
@@ -167,13 +170,23 @@ export function updateLinks(
       build.options.copy ||
       item.copy === true ||
       kept;
-    const correct = inPlace(state?.links[link.relative], copying, link.from);
-    if (keepsEditedCopy(prior, state, build)) continue;
+    // A placement kept back last run is tried again, so it is reported until it lands.
+    const correct =
+      inPlace(state?.links[link.relative], copying, link.from) &&
+      !keptBack(previous, link.relative);
+    // An edited plugin copy is backed up when it is next copied, not kept: its members move on.
+    if (link.shared !== true && keepsEditedCopy(prior, state, build)) continue;
     if ((restage || !correct) && !build.linked.has(link.absolute)) {
       build.linked.add(link.absolute);
       const adopt = build.options.adopt?.has(item.name) === true;
       build.actions.push(
-        linkAction(item, link, { copy: copying, rename, recorded: prior?.mode, adopt }),
+        linkAction(item, link, {
+          copy: copying,
+          rename,
+          recorded: prior?.mode,
+          written: link.shared === true ? prior?.digest : undefined,
+          adopt,
+        }),
       );
       touched = true;
       noteRenamed(item, link, prior?.mode, build);
@@ -184,6 +197,57 @@ export function updateLinks(
     touched = unlinkRecorded(build, item.name, stale) || touched;
   }
   return touched;
+}
+
+type RecordedLink = LockArtifact["links"][number];
+
+/** Planned last run but kept back, as when something of a person's stood there. */
+function keptBack(row: LockArtifact | undefined, path: string): boolean {
+  return row?.blocked?.some((each) => each.path === path) === true;
+}
+
+function placed(own: RecordedLink | undefined, row: LockArtifact | undefined): boolean {
+  return own !== undefined && !keptBack(row, own.path);
+}
+
+/** The plugin folder as a member that placed it recorded it, with the bytes it holds. */
+function sharedAt(build: BuildState, link: PlannedLink): RecordedLink | undefined {
+  if (link.shared !== true) return undefined;
+  for (const row of Object.values(build.lock.artifacts)) {
+    const recorded = row.links.find((each) => each.path === link.relative);
+    if (placed(recorded, row)) return recorded;
+  }
+  return undefined;
+}
+
+/**
+ * A copied plugin holds its members' bytes, so one that lost a member is copied again for a
+ * member still in it.
+ */
+export function recopyPlugins(build: BuildState): void {
+  for (const { to, link } of build.unlinks) {
+    if (link?.mode === "copy") recopyPlugin(build, to);
+  }
+}
+
+function recopyPlugin(build: BuildState, to: string): void {
+  const holder = build.claimed.get(to);
+  if (holder === undefined || build.linked.has(to)) return;
+  const link = build.wants
+    .get(holder)
+    ?.find((each) => each.absolute === to && each.shared === true && each.copy === true);
+  if (link === undefined) return;
+  const prior = sharedAt(build, link);
+  build.linked.add(to);
+  build.actions.push(
+    linkAction({ name: holder }, link, {
+      copy: true,
+      rename: undefined,
+      recorded: prior?.mode,
+      written: prior?.digest,
+      adopt: false,
+    }),
+  );
 }
 
 /** A copy is a real folder; anywhere else one means the link was replaced by content we do not own. */
@@ -209,12 +273,13 @@ function keepsEditedCopy(
 }
 
 function linkAction(
-  item: Selected,
+  item: Pick<Selected, "name">,
   link: PlannedLink,
   how: {
     copy: boolean;
     rename: string | undefined;
     recorded: LinkMode | undefined;
+    written?: string | undefined;
     adopt: boolean;
   },
 ): Extract<Action, { kind: "link" }> {
@@ -237,6 +302,7 @@ function linkAction(
     ...(link.depth === undefined ? {} : { depth: link.depth }),
     ...(how.rename === undefined ? {} : { rename: how.rename }),
     ...(how.recorded === undefined ? {} : { recorded: how.recorded }),
+    ...(how.written === undefined ? {} : { written: how.written }),
     ...(how.adopt && link.codec === undefined && link.entry === undefined && link.shared !== true
       ? { adopt: true }
       : {}),
@@ -255,4 +321,11 @@ function noteRenamed(
     name: item.name,
     message: `The namespace ${quoted(link.renamed.namespace)} is also published by another registry, so ${link.target} loads the one from ${item.source} as ${quoted(link.renamed.name)}.`,
   });
+}
+
+/** A kind a selected target writes into its config is installed there, not placed. */
+function configured(item: Selected, build: BuildState): boolean {
+  return build.options.targets.some(
+    (name) => build.options.targetTable[name]?.kinds[item.kind]?.shape === "config",
+  );
 }

@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "generated_at": "2026-11-11T15:17:49.846Z",
+  "generated_at": "2026-11-26T18:45:54.201Z",
   "entries": [
     {
       "namespace": "engineering",
@@ -13,6 +13,17 @@
       "status": "active",
       "catalog_digest": "sha256:dd61c41e00a73292b05c3be1487cc38666d4f45c11bbeb39937f40cf903f1f1d",
       "updated_at": "2026-09-03T08:00:00Z"
+    },
+    {
+      "namespace": "engineering",
+      "kind": "mcp_server",
+      "name": "issue-tracker",
+      "latest": "1.2.0",
+      "digest": "sha256:37c125eaa95c3c5b54cdc0819e79e981c7298dcf0ab44ceff6be5011d5828e10",
+      "status": "active",
+      "description": "Search, read and update issues in the team's issue tracker.",
+      "catalog_digest": "sha256:8991a84ab10683efceb3ac70332577a80d48cfb6ffd57bcf81b5a3e6943c8780",
+      "updated_at": "2026-11-26T18:45:54.201Z"
     },
     {
       "namespace": "engineering",

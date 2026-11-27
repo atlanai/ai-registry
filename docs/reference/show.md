@@ -16,6 +16,8 @@ aireg show ./<path>
 
 A plugin can carry more than instructions: hooks, MCP servers, LSP servers, monitors and executables in `bin/`, which a coding agent starts by itself and runs as you. When an artifact carries any of these, `show` names them in a warning, and `add`, `install` and `update` name them after installing it. Read what such a plugin runs before you install it, and know that an update can add to it.
 
+For an MCP server, `show` prints its README, or its `server.json` when it has none, then each command or URL it starts with and the environment variables it reads its secrets from. An input nothing sets yet shows as `<name>`. With `--json` this is under `server`.
+
 Name an artifact by its full name, `<registry>/<namespace>/<name>`. Add `@<version>` to read an older version.
 
 To read from a registry without declaring it first, give its address with `--registry` and write the rest of the full name on its own: `aireg show engineering/pr-review --registry github.com/acme/ai-registry`.

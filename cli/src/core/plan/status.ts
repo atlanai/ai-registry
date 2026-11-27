@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
 import { isWithin } from "#adapter/paths.ts";
 import { sanitizeText } from "#adapter/text.ts";
-import type { Lock } from "#core/lock.ts";
+import type { Lock, LockEntry } from "#core/lock.ts";
 import { NAME } from "#core/product.ts";
 import { type Roots, scopeName } from "#core/store/paths.ts";
-import { copyEdited, editedHere, type Survey } from "./survey.ts";
+import { copyEdited, editedHere, receiptKey, type Survey } from "./survey.ts";
 
 /** Worst state wins per artifact, and the worst across all of them is the exit code. */
 const STATES = ["ok", "missing", "dangling", "edited"] as const;
@@ -56,13 +56,19 @@ export function status(lock: Lock, survey: Survey, roots: Roots): ArtifactStatus
     };
 
     const ours = resolve(roots.artifacts);
-    for (const link of entry.links) {
-      const found = linkFinding(link, state, ours);
+    const findings = [
+      ...entry.links.map((link) => ({ target: link.target, ...linkFinding(link, state, ours) })),
+      ...(entry.entries ?? []).map((receipt) => ({
+        target: receipt.target,
+        ...entryFinding(receipt, state),
+      })),
+    ];
+    for (const found of findings) {
       if (found.state !== "ok") {
         worst = worse(worst, found.state);
         detail ??= found.detail;
       }
-      see(link.target, found.seen);
+      see(found.target, found.seen);
     }
 
     const [held] = entry.blocked ?? [];
@@ -83,6 +89,21 @@ export function status(lock: Lock, survey: Survey, roots: Roots): ArtifactStatus
   }
 
   return out;
+}
+
+/** How a config entry the lock recorded looks now: gone, edited, or as written. */
+function entryFinding(
+  receipt: LockEntry,
+  state: Survey["artifacts"][string] | undefined,
+): { state: State; detail?: string; seen: LinkState } {
+  const now = state?.entries?.[receiptKey(receipt)];
+  if (now === receipt.digest) return { state: "ok", seen: "linked" };
+  const file = sanitizeText(receipt.file);
+  if (now === undefined) {
+    return { state: "missing", detail: `${receipt.target}: not in ${file}`, seen: "missing" };
+  }
+  const detail = `${receipt.target}: its entry in ${file} was edited after installation`;
+  return { state: "edited", detail, seen: "replaced" };
 }
 
 /** How one recorded link looks on disk: the state it adds, why, and what its target sees. */

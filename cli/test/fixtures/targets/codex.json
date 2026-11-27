@@ -119,14 +119,15 @@
         ],
         "body": "developer_instructions"
       }
-    }
+    },
+    "mcp_server": {"shape": "config", "file": "config.toml", "format": "toml", "at": ["mcp_servers", "{name}"], "codec": {"id": "mcp-codex"}, "transports": ["stdio", "streamable-http"]}
   },
   "verified": {
     "command": [
       "codex",
       "--version"
     ],
-    "range": "0.162.1"
+    "range": "0.162.1 || 0.170.0"
   },
   "trust": {
     "agent": {

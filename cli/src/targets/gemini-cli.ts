@@ -38,8 +38,23 @@ export const geminiCli = defineTarget({
         ],
       },
     },
+    // It expands a variable only in `env` and `headers`, and reads a bare `url` as streamable HTTP.
+    mcp_server: {
+      shape: "config",
+      file: "settings.json",
+      format: "json",
+      at: ["mcpServers", "{name}"],
+      codec: {
+        id: "mcp-json",
+        secret: { prefix: "${", suffix: "}", in: ["env", "headers"] },
+        type: { sse: "sse" },
+        url: { "streamable-http": "httpUrl" },
+        tools: { allow: ["includeTools"], deny: ["excludeTools"] },
+      },
+      transports: ["stdio", "streamable-http", "sse"],
+    },
   },
-  verified: { command: ["gemini", "--version"], range: "0.63.0" },
+  verified: { command: ["gemini", "--version"], range: "0.63.0 || 0.68.0" },
   // It loads a project's skills and agents only in a folder you trusted.
   trust: {
     skill: { run: "/permissions trust", scope: "project" },

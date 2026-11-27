@@ -166,6 +166,90 @@ const KindMapping = Type.Union(
       },
       { additionalProperties: false },
     ),
+    Type.Object(
+      {
+        shape: Type.Literal("config"),
+        file: Type.String(),
+        format: Type.Union([Type.Literal("json"), Type.Literal("toml"), Type.Literal("yaml")]),
+        at: Texts,
+        anchor: Type.Optional(Type.Union([Type.Literal("root"), Type.Literal("project")])),
+        scope: Type.Optional(Type.Union([Type.Literal("user"), Type.Literal("project")])),
+        userFile: Type.Optional(Type.String({ minLength: 1 })),
+        codec: Type.Union([
+          Type.Object(
+            {
+              id: Type.Literal("mcp-json"),
+              secret: Type.Optional(
+                Type.Object(
+                  {
+                    prefix: Type.String(),
+                    suffix: Type.String(),
+                    in: Type.Optional(
+                      Type.Array(
+                        Type.Union([
+                          Type.Literal("command"),
+                          Type.Literal("args"),
+                          Type.Literal("env"),
+                          Type.Literal("url"),
+                          Type.Literal("headers"),
+                        ]),
+                      ),
+                    ),
+                  },
+                  { additionalProperties: false },
+                ),
+              ),
+              type: Type.Optional(
+                Type.Object(
+                  {
+                    stdio: Type.Optional(Type.String()),
+                    "streamable-http": Type.Optional(Type.String()),
+                    sse: Type.Optional(Type.String()),
+                  },
+                  { additionalProperties: false },
+                ),
+              ),
+              url: Type.Optional(
+                Type.Object(
+                  {
+                    "streamable-http": Type.Optional(Type.String()),
+                    sse: Type.Optional(Type.String()),
+                  },
+                  { additionalProperties: false },
+                ),
+              ),
+              command: Type.Optional(Type.Literal("array")),
+              env: Type.Optional(Type.String({ minLength: 1 })),
+              tools: Type.Optional(
+                Type.Object(
+                  {
+                    allow: Type.Optional(Type.Array(Type.String(), { minItems: 1 })),
+                    deny: Type.Optional(Type.Array(Type.String(), { minItems: 1 })),
+                  },
+                  { additionalProperties: false },
+                ),
+              ),
+            },
+            { additionalProperties: false },
+          ),
+          Type.Object({ id: Type.Literal("mcp-codex") }, { additionalProperties: false }),
+        ]),
+        deny: Type.Optional(
+          Type.Object(
+            {
+              file: Type.String({ minLength: 1 }),
+              at: Type.Array(Type.String(), { minItems: 1 }),
+              item: Type.String({ minLength: 1 }),
+            },
+            { additionalProperties: false },
+          ),
+        ),
+        transports: Type.Array(
+          Type.Union([Type.Literal("stdio"), Type.Literal("streamable-http"), Type.Literal("sse")]),
+        ),
+      },
+      { additionalProperties: false },
+    ),
   ],
   { description: "Where one kind lands inside the target's folder." },
 );
@@ -176,6 +260,7 @@ const PerKind = <T extends TSchema>(schema: T) =>
       plugin: Type.Optional(schema),
       skill: Type.Optional(schema),
       agent: Type.Optional(schema),
+      mcp_server: Type.Optional(schema),
     },
     { additionalProperties: false },
   );

@@ -27,6 +27,8 @@ export interface ActionSpec {
   readonly options?: readonly OptionSpec[];
   /** The most words it takes after its name; absent takes any number. */
   readonly maxArguments?: number;
+  /** Runs, but help and `--map` leave it out. */
+  readonly hidden?: boolean;
 }
 
 export interface CommandSpec {
@@ -75,4 +77,9 @@ export function runAction(
   const names = (spec.actions ?? []).map((a) => a.name);
   const hint = `Use ${list(names, "or")}.${more === undefined ? "" : ` ${more}`}`;
   throw unknownAction(spec.name, action, names, hint);
+}
+
+/** A hidden action still runs and has its own help; only listings leave it out. */
+export function shownActions(command: Pick<CommandSpec, "actions">): readonly ActionSpec[] {
+  return (command.actions ?? []).filter((action) => action.hidden !== true);
 }

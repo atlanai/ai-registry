@@ -16,6 +16,10 @@
     {
       "if": { "properties": { "kind": { "const": "semantic_model" } }, "required": ["kind"] },
       "then": { "properties": { "spec": { "$ref": "kinds/semantic_model.json" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "mcp_server" } }, "required": ["kind"] },
+      "then": { "properties": { "spec": { "$ref": "kinds/mcp_server.json" } } }
     }
   ]
 }

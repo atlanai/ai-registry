@@ -25,7 +25,7 @@ import { emptyCatalog, finalize, merge } from "#core/catalog/catalog.ts";
 import { newestFrom, withheldFrom } from "#core/catalog/withheld.ts";
 import { engineFromUnknown } from "#core/engines.ts";
 import { bindAdapter } from "#core/hook/bind.ts";
-import { KIND_SPECS } from "#core/kinds.ts";
+import { aKind, KIND_SPECS } from "#core/kinds.ts";
 import { withLease } from "#core/lease/lease.ts";
 import { cacheDir, ensureHome } from "#core/store/paths.ts";
 import { type SourceConfig, sourceKey } from "./identity.ts";
@@ -122,7 +122,7 @@ export async function resolveArtifacts(
     const path = served === undefined ? undefined : entryPath(artifact);
     if (path === undefined) {
       catalog.warnings.push(
-        `${quoted(name)} is ${artifact.kind === "agent" ? "an" : "a"} ${artifact.kind}, which is one file, but ${artifact.files.length} were published and none is its entry file.`,
+        `${quoted(name)} is ${aKind(artifact.kind)}, which is one file, but ${artifact.files.length} were published and none is its entry file.`,
       );
       continue;
     }

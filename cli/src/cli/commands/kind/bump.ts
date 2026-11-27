@@ -12,6 +12,7 @@ import { AiregError, ErrorCode } from "#core/errors.ts";
 import { requireRegistry } from "#core/filespec/init.ts";
 import { refuseRedirect } from "#core/fs/fresh.ts";
 import { present } from "#core/fs/tree.ts";
+import { kindCommand } from "#core/kinds.ts";
 import type { Printer } from "#core/term/printer.ts";
 import { nameOf, valid } from "./fields.ts";
 import { FRESH } from "./files.ts";
@@ -34,7 +35,7 @@ export async function version(
     throw needsInput(
       `${kind} bump`,
       "a name",
-      `Name the ${kind}: \`aireg ${kind} bump <name> [patch | minor | major | <version>]\`.`,
+      `Name the ${kind}: \`aireg ${kindCommand(kind)} bump <name> [patch | minor | major | <version>]\`.`,
     );
   }
   const root = requireRegistry(context.cwd);
@@ -52,7 +53,7 @@ export async function version(
   if (latest === undefined)
     throw new AiregError(`${input} has no version to start from.`, {
       code: ErrorCode.Invalid,
-      hint: `Start one with \`aireg ${kind} new ${input}\`.`,
+      hint: `Start one with \`aireg ${kindCommand(kind)} new ${input}\`.`,
     });
 
   const bump = how ?? "patch";

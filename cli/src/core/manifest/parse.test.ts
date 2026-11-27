@@ -77,6 +77,40 @@ describe("manifest keys", () => {
   });
 });
 
+describe("an MCP server's settings", () => {
+  const entry = (settings: string) =>
+    `registries: { acme: acme/reg }\nartifacts:\n  - ref: acme/engineering/issue-tracker\n${settings}`;
+
+  test("reads with, env and tools, and writes them back", () => {
+    const manifest = parseManifest(
+      entry(
+        "    with: { tenant: acme, port: 3000, tag: [a, b] }\n    env: { ISSUES_TOKEN: ACME_TOKEN }\n    tools: { deny: [delete_issue] }\n",
+      ),
+    );
+    expect(manifest.artifacts[0]).toMatchObject({
+      with: { tenant: "acme", port: "3000", tag: ["a", "b"] },
+      env: { ISSUES_TOKEN: "ACME_TOKEN" },
+      tools: { deny: ["delete_issue"] },
+    });
+    expect(parseManifest(formatManifest(manifest)).artifacts[0]).toEqual(manifest.artifacts[0]);
+  });
+
+  test("refuses an env entry that is not a variable name", () => {
+    expect(() => parseManifest(entry('    env: { ISSUES_TOKEN: "$(id)" }\n'))).toThrow(
+      'maps "ISSUES_TOKEN" to something not a variable name',
+    );
+  });
+
+  test("refuses settings on a whole namespace, and unknown tools keys", () => {
+    expect(() =>
+      parseManifest(
+        "registries: { acme: acme/reg }\nartifacts:\n  - { ref: acme/engineering, with: { a: b } }\n",
+      ),
+    ).toThrow("cannot have `with`");
+    expect(() => parseManifest(entry("    tools: { only: [x] }\n"))).toThrow("only");
+  });
+});
+
 describe("exports and publish", () => {
   const declared = [
     "registries:",

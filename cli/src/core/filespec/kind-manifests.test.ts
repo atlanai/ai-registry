@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { documentProblems } from "#core/filespec/validate/folders.ts";
+import mcpServer from "#schema/kinds/mcp_server.json" with { type: "json" };
 import { test } from "#test/kit/fixtures.ts";
 import {
   entryName,
@@ -202,6 +203,42 @@ describe("a kind manifest a registry serves", () => {
   });
 });
 
+describe("an MCP server's spec", () => {
+  const manifests = { mcp_server: mcpServer as unknown as KindManifest };
+  const server = {
+    $schema: "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    name: "com.example/issue-tracker",
+    description: "Track issues.",
+    version: "1.2.0",
+  };
+  const readme = text("---\nname: wrong\ndescription: Wrong.\n---\n# Issues\n");
+
+  test("lifts its name and description from server.json, and never reads the README", () => {
+    const files = new Map([
+      ["README.md", readme],
+      ["server.json", text(JSON.stringify(server))],
+    ]);
+    expect(envelopeSpec("mcp_server", files, manifests, "issues")).toEqual({
+      name: "issues",
+      description: "Track issues.",
+    });
+  });
+
+  test("names it after the server when no folder gives the slug", () => {
+    const files = new Map([["server.json", text(JSON.stringify(server))]]);
+    expect(envelopeSpec("mcp_server", files, manifests)).toEqual({
+      name: "issue-tracker",
+      description: "Track issues.",
+    });
+  });
+
+  test("carries no spec when server.json does not parse", () => {
+    expect(envelopeSpec("mcp_server", new Map([["server.json", text("{")]]), manifests)).toEqual(
+      {},
+    );
+  });
+});
+
 describe("a custom kind whose entry is YAML", () => {
   const glossary = {
     $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -283,7 +320,12 @@ describe("a semantic model", () => {
     documentProblems(await manifest(), new Map([[entry, Buffer.from(source).toString("utf8")]]));
 
   test("is a kind every registry holds, beside skill and agent", async () => {
-    expect(Object.keys(await kindsOf(undefined))).toEqual(["skill", "agent", "semantic_model"]);
+    expect(Object.keys(await kindsOf(undefined))).toEqual([
+      "skill",
+      "agent",
+      "semantic_model",
+      "mcp_server",
+    ]);
   });
 
   test.for([

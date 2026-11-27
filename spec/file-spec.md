@@ -203,6 +203,22 @@ unchanged into [`schemas/kinds/vendor/ossie/`](schemas/kinds/vendor/ossie/README
 validates a model without fetching anything. The files a model was converted from MAY sit beside
 it under `source/`.
 
+An MCP server carries one `server.json` in the format the
+[MCP Registry](https://github.com/modelcontextprotocol/registry) defines, exactly as its
+publisher wrote it. The file is the only copy of the server: `spec` holds the registry slug as
+`spec.name` and the server's `description` as `spec.description`. The server's own reverse-DNS
+`name` remains in the file and need not resemble the slug. The file MUST name in `$schema` a
+`server.json` schema version the kind manifest lists, as the MCP Registry requires of what it
+publishes, and MUST satisfy that schema. Those schemas are copied unchanged into
+[`schemas/kinds/vendor/mcp/`](schemas/kinds/vendor/mcp/README.md).
+
+A registry MUST NOT change `server.json`, including its `_meta`, so a republished server stays
+byte-identical to its publisher's. When the server's `version` is a semantic version,
+`metadata.version` MUST equal it. The digest pins `server.json`, not the packages, images or
+remotes it names: a package's dependencies resolve when it starts, and an OCI identifier without
+`@sha256:` names a tag that can move. Which tools to expose, timeouts, and input values are decided
+where the server is installed, not in the registry.
+
 A kind manifest's file rule MAY carry a `schema`: a JSON Schema that the file at its `path`, parsed
 as JSON or YAML by its extension, MUST satisfy. Its references resolve against the manifest, so
 `{"$ref": "#/$defs/document"}` names a definition there. A writer validates the file against it
